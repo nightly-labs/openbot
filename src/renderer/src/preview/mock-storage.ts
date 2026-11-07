@@ -4,7 +4,7 @@ import {
   FILES_BREAKDOWN,
   FILES_CHIEF_BREAKDOWN,
   FILES_CONVERSATIONS,
-  FILES_OLD_RUNTIME_BYTES,
+  FILES_REMOVABLE_RUNTIMES,
   FILES_ROWS,
 } from "../../stories/files-fixtures";
 
@@ -15,7 +15,7 @@ const FREE_BYTES = 182 * GB;
 export function createMockStorage(): StorageDesktopApi {
   let files = structuredClone(FILES_ROWS);
   let breakdown = structuredClone(FILES_BREAKDOWN);
-  let oldRuntimeBytes = FILES_OLD_RUNTIME_BYTES;
+  let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
 
   const usage = (input: GetStorageUsageInput): StorageUsage => {
     const inScope = (agentId: string | null, conversationId: string | null) =>
@@ -60,13 +60,12 @@ export function createMockStorage(): StorageDesktopApi {
     },
     openFile: async () => undefined,
     openLocation: async () => undefined,
-    getOldRuntimeVersions: async () => ({ bytes: oldRuntimeBytes }),
-    removeOldRuntimeVersions: async () => {
-      breakdown = breakdown.map((row) =>
-        row.category === "runtimes" ? { ...row, bytes: row.bytes - oldRuntimeBytes } : row,
-      );
-      oldRuntimeBytes = 0;
-      return { bytes: 0 };
+    getRemovableRuntimes: async () => structuredClone(removableRuntimes),
+    removeRemovableRuntimes: async () => {
+      const { bytes } = removableRuntimes;
+      breakdown = breakdown.map((row) => (row.category === "runtimes" ? { ...row, bytes: row.bytes - bytes } : row));
+      removableRuntimes = { bytes: 0, providers: [] };
+      return structuredClone(removableRuntimes);
     },
   };
 }

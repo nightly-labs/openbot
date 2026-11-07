@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { Channel, ChannelDraft } from "@openbot/contracts/ipc";
+import type { Channel, ChannelDraft, ChannelIcon } from "@openbot/contracts/ipc";
 import {
   Button,
   buttonVariants,
@@ -11,14 +11,17 @@ import {
   Plus,
   Popover,
   Search,
-  Textarea,
+  SwitchField,
   Tooltip,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
+import { ChannelContextActions } from "@openbot/ui/features/channels/ChannelContextActions";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, For, onSettled, Show } from "solid-js";
@@ -50,6 +53,11 @@ export function ChannelEditor(props: ChannelEditorProps) {
   const { t } = useText();
   const agentList = channels.agents;
   const channel = () => channels.state.page?.channel;
+  /** "Delete history" for the settings, or nothing when the host cannot delete it. */
+  function deleteHistoryAction(channelId: string): (() => Promise<void>) | undefined {
+    if (!channels.historyDeletionSupported()) return undefined;
+    return () => channels.deleteHistory(channelId);
+  }
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
   const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });
   let lastSignature = "";
@@ -177,6 +185,9 @@ export function ChannelEditor(props: ChannelEditorProps) {
    * is deliberate: removing a member commits the instructions the user can see, rather than
    * reviving the stored ones. Instructions over the limit are the exception: they stay in the field,
    * unsaved, and the stored ones go with the other fields until the user shortens them.
+   *
+   * `isolated` is not in the draft: only its switch sends it. A draft without it keeps the stored
+   * value, so a rename here cannot undo a change that another client or an agent made (#5380).
    */
   function draftFrom(current: Channel): ChannelDraft {
     return {
@@ -270,8 +281,49 @@ export function ChannelEditor(props: ChannelEditorProps) {
     };
   }
 
+  /** The picture editor shows only where the channel picture is kept: on this computer. */
+  const pictureChannel = () => (channels.pictureSupported() ? channel() : undefined);
+
+  /**
+   * An icon replaces an uploaded image, as a face replaces an agent's photo. The icon is saved first,
+   * and the image shows over it until its removal: when a step fails, the image is not lost.
+   */
+  async function selectIcon(icon: ChannelIcon): Promise<void> {
+    const current = channel();
+    if (!current) return;
+    const saved = await commit((draft) => {
+      draft.icon = icon;
+    });
+    if (saved && current.imageUrl) await channels.setImage(current.id, null);
+  }
+
+  /** Removes the icon and the image, so the channel shows its member faces again. */
+  async function resetPicture(): Promise<void> {
+    const current = channel();
+    if (!current) return;
+    const saved =
+      !current.icon ||
+      (await commit((draft) => {
+        draft.icon = null;
+      }));
+    if (saved && current.imageUrl) await channels.setImage(current.id, null);
+  }
+
   return (
     <div class="channel-editor">
+      <Show when={pictureChannel()}>
+        {(current) => (
+          <ChannelPictureEditor
+            members={current().members}
+            agents={agentList()}
+            icon={current().icon}
+            imageUrl={current().imageUrl}
+            onSetImage={(image) => channels.setImage(current().id, image)}
+            onSelectIcon={selectIcon}
+            onReset={resetPicture}
+          />
+        )}
+      </Show>
       <SettingsField label={t("channel.form.nameShort")}>
         <Input
           aria-label={t("channel.form.name")}
@@ -307,10 +359,11 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
       </SettingsField>
       <SettingsField label={t("channel.form.instructions")}>
-        <Textarea
+        <ResizableTextarea
           class="settings-instructions-input"
           rows="4"
           aria-label={t("channel.form.instructionsLabel")}
+          resizeLabel={t("channel.form.instructionsResize")}
           placeholder={t("channel.form.instructionsPlaceholder")}
           invalid={instructionsTooLong(fields.instructions)}
           value={fields.instructions}
@@ -326,6 +379,18 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
         <InstructionsLimit text={fields.instructions} />
       </SettingsField>
+      <Show when={channels.isolationSupported()}>
+        <SwitchField
+          checked={channel()?.isolated === true}
+          onChange={(isolated) =>
+            void commit((draft) => {
+              draft.isolated = isolated;
+            })
+          }
+          label={t("channel.settings.isolated")}
+          description={t("channel.settings.isolatedDescription")}
+        />
+      </Show>
       <SettingsLinkGroup>
         <SettingsLinkRow
           label={t("channel.settings.memories")}
@@ -338,6 +403,17 @@ export function ChannelEditor(props: ChannelEditorProps) {
           onClick={props.onOpenRoutines}
         />
       </SettingsLinkGroup>
+      {/* The host refuses both for an archived channel. */}
+      <Show when={channels.contextActionsSupported() && !channel()?.archived && channel()}>
+        {(current) => (
+          <ChannelContextActions
+            channelName={current().name}
+            startNewConversation={() => channels.clearContext(current().id)}
+            compact={() => channels.compactContext(current().id)}
+            deleteHistory={deleteHistoryAction(current().id)}
+          />
+        )}
+      </Show>
       <section class="channel-members" aria-label={t("channel.members.title")}>
         <h3 class="channel-members-title">{t("channel.members.title")}</h3>
         <ItemGroup class="channel-member-list">

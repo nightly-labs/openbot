@@ -73,7 +73,7 @@ const TURN_TIMEOUT_MS = 300_000;
 export async function runTurn(
   client: AgentClient,
   thread: string,
-  options: { model?: string; text?: string; timeoutMs?: number } = {},
+  options: { model?: string; effort?: string; text?: string; images?: readonly string[]; timeoutMs?: number } = {},
 ): Promise<TurnResult> {
   const result: TurnResult = { reply: "", error: null, status: null };
   let finished = false;
@@ -102,11 +102,20 @@ export async function runTurn(
   // `turn/start` can fail first; then nothing awaits `done`.
   done.catch(() => undefined);
   try {
-    const input = [{ type: "text", text: options.text ?? "hello", text_elements: [] }];
+    const input = [
+      { type: "text", text: options.text ?? "hello", text_elements: [] },
+      // An attached image, as OpenBot sends one: a path that the driver reads.
+      ...(options.images ?? []).map((path) => ({ type: "localImage", path })),
+    ];
     await runCauseEffect(
       client.request(
         "turn/start",
-        { threadId: thread, ...(options.model ? { model: options.model } : {}), input },
+        {
+          threadId: thread,
+          ...(options.model ? { model: options.model } : {}),
+          ...(options.effort ? { effort: options.effort } : {}),
+          input,
+        },
         (value) => value,
       ),
     );

@@ -90,6 +90,19 @@ export interface BrowserActionHistoryEntry {
   detail?: string | undefined;
 }
 
+/** A bot check that the snapshot found on the page, or one that passed while the snapshot waited. */
+export interface BrowserChallenge {
+  vendor: string;
+  /**
+   * `checking`: a check that passes by itself is still running after this read's time ran out.
+   * `needs-user`: a person must pass it. `blocked`: the site refuses this browser.
+   */
+  status: "cleared" | "checking" | "needs-user" | "blocked";
+  waitedMs: number;
+  /** What the agent does next. */
+  next: string;
+}
+
 export interface BrowserSnapshot {
   tabId: string;
   revision: number;
@@ -105,6 +118,7 @@ export interface BrowserSnapshot {
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
   image?: { included: boolean; reason: string; width: number; height: number };
+  challenge?: BrowserChallenge;
 }
 
 export interface BrowserRecordingArtifact {

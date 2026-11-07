@@ -1,6 +1,7 @@
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
-import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
+import type { CauseCode } from "@openbot/telemetry";
+import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
 
@@ -25,8 +26,9 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
 /**
  * OpenCode 2.1.3's wrapper error for any failure that it has no ACP error for. Its data names only
  * the JavaScript error class, so the user read the generic text with no provider name (#2850).
+ * A start can get it too, when the probe `session/new` fails on a slow computer; a later start works (#4237).
  */
-function isOpenCodeInternalFailure(error: unknown): boolean {
+export function isOpenCodeInternalFailure(error: unknown): boolean {
   return (
     error instanceof RequestError &&
     error.code === -32603 &&
@@ -39,9 +41,18 @@ function isOpenCodeInternalFailure(error: unknown): boolean {
  * `-32000` and "provider authentication required", and no provider ID. A user with no key can pick
  * a paid or third-party model, and met that text with no next step (#2746). The model ID names the
  * provider before its first `/`.
+ *
+ * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
+ * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
+ * OpenCode sign-in sent the user to the wrong place.
  */
-function openCodeAuthRequired(error: unknown, model: string | null): string | null {
+function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
+  if (endpoint)
+    return sourceText(
+      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      { provider: endpoint.name },
+    );
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -113,6 +124,39 @@ function openCodeRequestFailure(
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
 }
 
+/**
+ * The causes of OpenCode 2.2.5's error names: `-32603` errors carry `data.errorName`. A name that is
+ * not here, such as `provider.unknown` or `tool.execution`, gives the decision to the text. A spent
+ * budget is a limit that the user set, not a payment.
+ */
+const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
+  "provider.auth": "authentication",
+  "provider.rate-limit": "rate_limit",
+  "provider.free-limit": "usage_limit",
+  "provider.go-limit": "usage_limit",
+  "provider.chatgpt-limit": "usage_limit",
+  "provider.quota": "usage_limit",
+  "provider.budget-limit": "usage_limit",
+  "provider.model-budget-limit": "usage_limit",
+  "provider.transport": "network",
+  "provider.timeout": "timeout",
+  "provider.internal": "provider_unavailable",
+  "provider.invalid-output": "provider_internal_error",
+  "provider.invalid-request": "invalid_request",
+  "provider.unsupported-operation": "invalid_request",
+  "provider.no-route": "model_not_found",
+  "permission.rejected": "permission",
+  ServiceUnavailableError: "provider_unavailable",
+};
+
+function openCodeFailureCause(error: unknown): CauseCode | null {
+  if (!(error instanceof RequestError) || !isRecord(error.data)) return null;
+  const name = error.data.errorName;
+  return typeof name === "string" && Object.hasOwn(OPENCODE_ERROR_CAUSES, name)
+    ? (OPENCODE_ERROR_CAUSES[name] ?? null)
+    : null;
+}
+
 export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.x has a session that 1.x wrote after the one-time `session_v2` copy. It answers with
   // invalid params and the ID in data.sessionId. The same code with another message is a session of
@@ -123,8 +167,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
         error.data.sessionId === sessionId &&
         error.message === `Invalid params: session not found: ${sessionId}`
       : null,
-  turnFailure: (error, detail, redact, log, model) => {
-    const authRequired = openCodeAuthRequired(error, model);
+  turnFailure: (error, detail, redact, log, model, endpoint) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))
@@ -135,6 +179,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       return sourceText("error.provider.opencodeServiceFailure");
     return openCodeRequestFailure(error, detail, redact, log);
   },
+  failureCause: openCodeFailureCause,
   // OpenCode reports a model reply with no text, or with reasoning only, as a successful empty
   // turn and logs no error. OpenCode 1.18.31 failed the prompt on a rate limit and on a refused
   // connection; other provider errors can still end here. Do not invent the upstream cause or
@@ -163,4 +208,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
+  // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
+  childSessionUpdates: true,
 };

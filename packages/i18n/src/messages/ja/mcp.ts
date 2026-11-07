@@ -41,7 +41,7 @@ export const messages = {
   "mcp.status.didNotStart": "起動しませんでした",
   "mcp.status.unreachable": "接続できません",
   "mcp.server.providerLimitNote":
-    "Claude のみ: 作業ディレクトリを指定したサーバーは、ほかのプロバイダーには渡されません。",
+    "Claude と Codex のみ: 作業ディレクトリを指定したサーバーは、ほかのプロバイダーには渡されません。",
   "mcp.server.runtimeDownloading":
     "STDIO サーバーの起動に使うランタイムをダウンロードしています。完了するまでサーバーが起動しないことがあります。",
   "mcp.server.runtimeDownloadingProgress":
@@ -83,7 +83,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "引き継ぐ変数 {position} を削除",
   "mcp.panel.workingDirectory": "作業ディレクトリ",
   "mcp.panel.workingDirectoryDescription":
-    "Claude のエージェントと接続テストは、ここでサーバーを起動します。空のままにすると、すべてのプロバイダーにこのサーバーを渡します。ほかのプロバイダーはディレクトリを設定できないため、ディレクトリを指定したサーバーは使われません。",
+    "Claude と Codex のエージェントと接続テストは、ここでサーバーを起動します。空のままにすると、すべてのプロバイダーにこのサーバーを渡します。ほかのプロバイダーはディレクトリを設定できないため、ディレクトリを指定したサーバーは使われません。",
   "mcp.panel.endpointTitle": "エンドポイント",
   "mcp.panel.endpointDescription": "すべてのプロバイダーが HTTP MCP サーバーを使えます。",
   "mcp.panel.serverUrl": "サーバー URL",
@@ -139,11 +139,11 @@ export const messages = {
   "mcp.panel.appSaved": "アプリを保存しました。使用するにはサインインしてください。",
   "mcp.panel.appRemoved": "アプリを削除しました。",
   "mcp.signIn.relayDescription":
-    "サインインページが {page} にあることを確認してから、ブラウザーで開いてください。完了すると、OpenBot がサインインを {host} に送信します。",
+    "ブラウザーで {page} にサインインしてください。完了すると、OpenBot がサインインを {host} に送信します。",
   "mcp.signIn.relayOpenDescription":
-    "お使いのブラウザーで {page} のサインインページを開いてください。完了したら、ブラウザーに表示されたアドレスをここに貼り付けてください。その後、OpenBot がサインインを {host} に送信します。",
+    "ブラウザーで {page} にサインインしてください。完了したら、ブラウザーに表示されたアドレスをここに貼り付けてください。その後、OpenBot がサインインを {host} に送信します。",
   "mcp.signIn.relayDeviceDescription":
-    "サインインページが {page} にあることを確認してから、ブラウザーで開いてサインインを完了してください。{host} はサインインを自動で検出します。",
+    "ブラウザーで {page} にサインインし、そこで完了してください。{host} はサインインを自動で検出します。",
   "mcp.signIn.relayOpen": "サインインページを開く",
   "mcp.signIn.relayPasteHint":
     "ブラウザーが OpenBot に戻らない場合は、表示されているアドレスをコピーしてここに貼り付けてください。",

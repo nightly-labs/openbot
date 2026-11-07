@@ -87,6 +87,17 @@ export const messages = {
   "server.add.billing.monthly": "Mensual",
   "server.add.billing.yearly": "Anual",
   "server.add.billing.save": "Ahorra un {percent}%",
+  "server.add.use.label": "Uso",
+  "server.add.use.personal": "Personal",
+  "server.add.use.work": "Trabajo",
+  "server.add.license.people": "Personas en el trabajo",
+  "server.add.license.minimum": {
+    one: "{count} persona ya usa tus servidores, así que no puedes elegir menos.",
+    other: "{count} personas ya usan tus servidores, así que no puedes elegir menos.",
+  },
+  "server.add.license.bundle": "Paquete −{percent}%",
+  "server.add.license.included": "Incluye: {license}",
+  "server.add.license.includedTrial": "Incluye: {license}, gratis hasta el {date}",
   "server.add.billedMonthly": "Facturación mensual",
   "server.add.billedYearly": "{price} facturados anualmente",
   "server.add.yearlySaving": "Ahorra {amount}",
@@ -96,14 +107,35 @@ export const messages = {
   "server.add.custom.description":
     "Obtén infraestructura dedicada, almacenamiento adicional o funciones adaptadas a tu forma de trabajar.",
   "server.add.custom.action": "Contáctanos",
-  "server.add.join.title": "¿Tienes una invitación?",
   "server.add.join.action": "Unirse a un servidor",
+  "server.add.otherOptions": "Otras opciones",
+  "server.local.createTitle": "Nuevo servidor en este equipo",
+  "server.local.createDescription":
+    "El servidor tiene sus propios agentes, chats y archivos. Se ejecuta en este equipo.",
+  "server.local.nameLabel": "Nombre del servidor",
+  "server.local.create": "Crear servidor",
+  "server.local.creating": "Creando servidor…",
+  "server.local.createFailed": "No se pudo crear el servidor.",
+  "server.local.limitReached":
+    "Puedes tener como máximo {limit} servidores en este equipo. Elimina uno para crear otro.",
+  "server.local.deleteConfirmTitle": "¿Eliminar {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot detiene el servidor y mueve sus agentes, chats y archivos a la papelera.",
+  "server.local.deleting": "Eliminando servidor…",
+  "server.local.deletedTitle": "{name} eliminado",
   "server.add.limit.title": "Esta cuenta tiene el número máximo de servidores",
   "server.add.limit.description": {
     one: "Una cuenta puede tener {count} servidor de pago. Para añadir un servidor, elimina uno primero.",
     other: "Una cuenta puede tener {count} servidores de pago. Para añadir un servidor, elimina uno primero.",
   },
   "server.add.limit.manage": "Gestionar servidores",
+  "server.upgrade.title": "Tus agentes se están quedando sin espacio",
+  "server.upgrade.description":
+    "A {server} le queda poco espacio libre. Mejora el plan para que tus agentes sigan trabajando sin interrupciones.",
+  "server.upgrade.used": "{used} de {total} usados",
+  "server.upgrade.current": "{plan} (actual)",
+  "server.upgrade.price": "Precio",
+  "server.upgrade.action": "Mejorar a {plan}",
   "server.hosted.progressTitle": "Configurando {name}",
   "server.hosted.paymentTitle": "Termina el pago en tu navegador",
   "server.hosted.paymentDescription": "La configuración comienza cuando Stripe confirma el pago.",
@@ -164,6 +196,7 @@ export const messages = {
   "server.rail.addRemote": "Añadir servidor remoto",
   "server.rail.add": "Añadir un servidor",
   "server.rail.buttonLabel": "Servidor {name}",
+  "server.rail.thisComputer": "en este equipo",
   "server.rail.notificationsMuted": "notificaciones silenciadas",
   "server.rail.actions": "Acciones del servidor",
   "server.rail.unmute": "Dejar de silenciar",
@@ -174,6 +207,8 @@ export const messages = {
   "server.rail.restart": "Reiniciar servidor",
   "server.rail.leave": "Abandonar servidor",
   "server.rail.delete": "Eliminar servidor",
+  "server.rail.hide": "Ocultar servidor",
+  "server.rail.showLocal": "Mostrar {name}",
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
   "server.select.failedDescription": "No se pudo cambiar de servidor. Inténtalo de nuevo.",
   "server.select.openAgentFailed": "No se pudo abrir {name}. Búscalo en la barra lateral.",
@@ -269,19 +304,13 @@ export const messages = {
   "server.settings.addLogo": "Añadir logotipo del servidor",
   "server.settings.removeLogo": "Eliminar logotipo del servidor",
   "server.settings.access": "Acceso",
+  "server.companySignIn.desktopOnly": "Configura el inicio de sesión único en la app de escritorio de OpenBot.",
   "server.settings.publish": "Publicar este servidor",
   "server.settings.published": "El servidor está publicado",
   "server.settings.setUpDesktopTitle": "Configurar escritorio remoto",
   "server.settings.setUpDesktopDescription": "Ve y controla este Mac desde otro equipo.",
   "server.settings.later": "Más tarde",
   "server.settings.setUp": "Configurar",
-  "server.settings.notifications": "Notificaciones",
-  "server.settings.muteNotifications": "Silenciar notificaciones",
-  "server.settings.muteDescription":
-    "Detén las notificaciones de escritorio, los sonidos y las actualizaciones en la muesca del MacBook de este servidor.",
-  "server.settings.mutedUntilDescription": "{until}. Desactiva para volver a recibir notificaciones ahora.",
-  "server.settings.notifyAbout": "Notificarme sobre",
-  "server.settings.notifyAboutDescription": "Qué eventos de los agentes muestran una notificación de escritorio.",
   "server.settings.agents": "Agentes",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":
@@ -291,6 +320,12 @@ export const messages = {
   "server.settings.memoryLimit": "Recuerdos por agente",
   "server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",
+  "server.settings.memoryReview": "Revisión de recuerdos",
+  "server.settings.memoryReviewDescription":
+    "Con qué frecuencia los agentes de este servidor guardan en segundo plano datos duraderos de sus chats.",
+  "server.settings.memoryReviewOff": "Desactivada",
+  "server.settings.memoryReviewTurns": { one: "Cada {count} turno", other: "Cada {count} turnos" },
+  "server.settings.memoryReviewLoadFailed": "No se pudo cargar el ajuste de revisión de recuerdos.",
   "server.settings.remoteOnline": "El host está en línea. Su propietario controla la publicación.",
   "server.settings.remoteOffline": "El host está sin conexión. Su propietario controla la publicación.",
   "server.settings.reachable": "Accesible en línea. Solo las personas invitadas pueden iniciar sesión.",
@@ -306,6 +341,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La clave actual y la nueva firman un traspaso. Las apps de los miembros cambian a la nueva clave cuando se vuelven a conectar. Hazlo si el archivo de la clave se copió o quedó expuesto.",
   "server.settings.hostKeyRotated": "Clave del servidor cambiada",
+  "server.settings.hostKeyChanged": "Último cambio",
+  "server.settings.hostKeyChangedDescription": "{date}. La clave anterior y la clave nueva firmaron este cambio.",
   "server.settings.hostKeyLocalOnly": "Aquí solo el servidor de este ordenador puede cambiar su clave.",
   "server.settings.removeTitle": "Eliminar servidor",
   "server.settings.removeDescription":
@@ -387,8 +424,10 @@ export const messages = {
   "server.invite.showQr": "Mostrar código QR de invitación",
   "server.invite.permaHint":
     "Nunca caduca y se puede usar muchas veces. Cualquiera con este enlace puede unirse; revócalo para desactivarlo.",
-  "server.invite.full":
-    "Este servidor tiene el máximo de {limit} miembros. Elimina a un miembro para invitar a otra persona.",
+  "server.invite.full": {
+    one: "Este servidor tiene el máximo de {count} miembro. Elimina a un miembro para invitar a otra persona.",
+    other: "Este servidor tiene el máximo de {count} miembros. Elimina a un miembro para invitar a otra persona.",
+  },
   "server.invite.qrLabel": "Código QR de invitación",
   "server.invite.qrDescription": "Escanea este código en OpenBot Mobile para unirte a este servidor.",
   "server.invite.accepted": "Invitación aceptada",
@@ -414,8 +453,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "La invitación deja de funcionar. Quienes se unieron con ella siguen siendo miembros.",
   "server.desktop.accessTitle": "Acceso al escritorio remoto",
-  "server.desktop.gatewayDescription":
-    "Todos los miembros activos del servidor pueden controlar este host. No hay una contraseña independiente para el escritorio remoto.",
+  "server.desktop.gatewayPolicyDescription":
+    "No hay una contraseña aparte para el escritorio remoto. Los ajustes de abajo eligen quién puede controlar este equipo.",
   "server.desktop.componentInstalled": "Componente del host instalado",
   "server.desktop.componentNotInstalled": "Componente del host sin instalar",
   "server.desktop.sessions": "Acceso desatendido: {unattended} · Sesiones activas: {active}/{max}",
@@ -428,13 +467,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Vuelve a conectarte al host antes de abrir su escritorio.",
   "server.desktop.hostUpdateDescription": "Actualiza OpenBot en el host para usar el control remoto.",
   "server.desktop.serviceAvailable": "Servicio disponible",
-  "server.desktop.serviceAvailableDescription":
-    "El control por WebRTC está disponible para todos los miembros activos.",
   "server.desktop.serviceNotReady": "Servicio no preparado",
   "server.desktop.serviceNotReadyDescription":
     "Inicia el control remoto para comprobar los componentes y permisos del host. El host notificará cualquier error de configuración.",
   "server.desktop.remoteControl": "Control remoto",
   "server.desktop.startHint": "Inicia el control remoto desde el botón del monitor en la cabecera del servidor.",
+  "server.desktop.accessLabel": "Quién puede controlar este equipo",
+  "server.desktop.accessDescription":
+    "Los miembros que pueden abrir el escritorio de este equipo desde otro dispositivo.",
+  "server.desktop.accessOwner": "Solo el propietario",
+  "server.desktop.accessAdmins": "Propietario y administradores",
+  "server.desktop.accessMembers": "Todos los miembros",
+  "server.desktop.askLabel": "Preguntar en este equipo",
+  "server.desktop.askDescription":
+    "Cada sesión espera a que una persona en este equipo la permita. Si no hay respuesta en 30 segundos, OpenBot la rechaza.",
+  "server.desktop.activeTitle": "Sesiones de escritorio remoto activas: {active}",
+  "server.desktop.activeDescription": "Termina cada sesión ahora. Los miembros pueden volver a pedirlo.",
+  "server.desktop.stopAll": "Detener todo el control remoto",
+  "server.desktop.policyLoadFailed": "No se pudieron cargar los ajustes de control remoto.",
+  "server.desktop.policySaveFailed": "No se pudieron guardar los ajustes de control remoto.",
+  "server.desktop.stopFailed": "No se pudo detener el control remoto.",
   "server.settings.providersTitle": "Proveedores",
   "server.settings.providersDescription": "Gestiona los proveedores de IA del equipo que ejecuta este servidor.",
   "server.settings.providersSwitchNote": "Cambia a {name} para gestionar sus proveedores de IA.",
@@ -558,4 +610,12 @@ export const messages = {
   "server.restartNotice.restartingDescription":
     "OpenBot vuelve a conectarse automáticamente cuando {name} esté disponible de nuevo.",
   "server.restartNotice.backTitle": "{name} vuelve a estar en línea",
+  "server.settings.personalityTitle": "Personalidad",
+  "server.settings.personalityDescription": "Elige cómo te hablan los agentes de este servidor.",
+  "server.settings.responseStyle": "Estilo de respuesta",
+  "server.settings.responseStyleDescription":
+    "Natural: los agentes envían actualizaciones breves mientras trabajan y el chat las muestra. Clásico: los agentes responden una vez, al terminar.",
+  "server.settings.responseStyleNatural": "Natural",
+  "server.settings.responseStyleClassic": "Clásico",
+  "server.settings.personalityLoadFailed": "No se pudo cargar la personalidad del servidor.",
 } as const satisfies PartialTranslation<typeof source>;

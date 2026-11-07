@@ -4,7 +4,7 @@
  * host from its own contexts.
  */
 
-import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import type { AgentApproval, AgentEvent, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -18,6 +18,7 @@ import type {
   PromptAnswerOptions,
   SendMessageResult,
 } from "../conversation/conversation-types";
+import { readerCanDeleteMessage } from "../conversation/message-delete-access";
 import {
   ChannelAboveComposer,
   ChannelEmptyState,
@@ -160,10 +161,9 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     if (!env.connectionReady() || readOnly()) return { error: t("channel.error.action") };
     const sequenceBefore = page()?.throughSequence ?? 0;
     // A request that opens with a member is addressed to that member, the way a reader writes it. A
-    // mention later in the text is a reference that the owner of the work can see.
-    const mention = chatTagReferences(body).find(
-      (reference) => reference.kind === "agent" && !body.slice(0, reference.start).trim(),
-    );
+    // mention later in the text is a reference that the owner of the work can see. The host reads
+    // every opening mention from the text; the field names the first one for a host that reads one.
+    const mention = leadingAddress(body).mentions[0];
     try {
       const after = await channels.send({
         type: "send",
@@ -201,6 +201,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
    * One stop at a time, and none after the first that fails: the controller keeps one failed command
    * for its retry, and a later stop that succeeds would clear the error of the one that failed.
    */
+  let rowStopping = false;
   async function stopWork() {
     if (!env.connectionReady()) return;
     for (const taskId of activeRuns()) {
@@ -248,6 +249,19 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         name: (id) => (id ? agentName(id) : t("sidebar.section.unassigned")),
       });
     },
+    // The existing Stop of a task. The stopped-task card above the composer then offers Continue,
+    // Reassign and Cancel for it.
+    // One stop at a time, as in stopWork: a second click while a stop runs does nothing, so that a
+    // stop that succeeds does not clear the error of one that failed.
+    stopAwaitingReply: (taskId) => {
+      if (rowStopping || !env.connectionReady() || readOnly()) return;
+      rowStopping = true;
+      void channels
+        .command({ type: "stop", operationId: crypto.randomUUID(), channelId, taskId, recipientAgentId: null })
+        .finally(() => {
+          rowStopping = false;
+        });
+    },
     HeaderTitle: (props) => <ChannelHeaderTitle channelId={channelId} onOpenSettings={props.onOpenSettings} />,
     SettingsPane: (props) => (
       <ChannelSettingsPane
@@ -261,6 +275,12 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     AboveComposer: () => <ChannelAboveComposer channelId={channelId} />,
     EmptyState: () => <ChannelEmptyState channelId={channelId} />,
   };
+
+  const deleteMessage = (messageId: string) => channels.deleteMessage(channelId, messageId);
+  /** Whether the reader may delete `message`: their own, or any message for this computer or an admin. */
+  const canDeleteMessage = (message: AgentMessage) =>
+    !readOnly() &&
+    readerCanDeleteMessage(message, { deleteAny: channels.deletesAnyMessage(), isOwnSender: env.isOwnSender });
 
   return {
     source,
@@ -309,5 +329,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       return respond(() => channels.port().agent.respondToBrowserTakeover({ requestId, decision }));
     },
     onStop: () => void stopWork(),
+    /** The Delete action of the channel. A host without `message-delete-v1` has none. */
+    deleteMessageAction: () => (channels.messageDeletionSupported() ? deleteMessage : undefined),
+    canDeleteMessage,
   };
 }

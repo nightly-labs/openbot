@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Как в системе",
   "mobile.settings.language.footer":
     "Вариант «Как в системе» берёт первый язык из настроек телефона. Непереведённый текст показывается на английском.",
+  "mobile.settings.language.restartTitle": "Перезапустить OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Этот язык читается в другом направлении. Экраны сменят направление при следующем запуске OpenBot. Если после перезапуска экраны выглядят неправильно, закройте OpenBot в переключателе приложений и откройте его снова.",
+  "mobile.settings.language.restartNow": "Перезапустить сейчас",
+  "mobile.settings.language.restartFailed":
+    "Не удалось перезапустить OpenBot. Экраны сменят направление, когда вы снова откроете OpenBot.",
   "mobile.settings.dictation.language": "Язык диктовки",
   "mobile.settings.about.development": "Разработка",
   "mobile.settings.about.openFailed": "Не удалось открыть ссылку. Повторите попытку.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Поддержка",
   "mobile.settings.home.supportHint": "Помощь и сохранение журнала поддержки",
   "mobile.settings.support.help": "Получить помощь",
+  "mobile.settings.support.discord": "Открыть тикет в Discord",
+  "mobile.settings.support.discordHint": "Самый быстрый способ получить помощь",
   "mobile.settings.support.message": "Написать нам в X",
   "mobile.settings.support.issues": "Сообщить о проблеме на GitHub",
   "mobile.settings.support.helpFooter":
-    "Расскажите, что произошло и когда. Приложите файл журнала поддержки к обращению на GitHub.",
+    "Расскажите, что произошло и когда. Приложите файл журнала поддержки к тикету в Discord или к обращению на GitHub.",
   "mobile.settings.support.log": "Журнал поддержки",
+  "mobile.settings.support.show": "Показать журнал",
   "mobile.settings.support.save": "Сохранить файл журнала",
   "mobile.settings.support.events": {
     one: "{count} событие",
@@ -39,8 +48,8 @@ export const messages = {
     "Журнал хранится на этом телефоне, OpenBot его не отправляет. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
   "mobile.settings.support.saveFailed": "Не удалось сохранить файл журнала. Повторите попытку.",
   "mobile.settings.support.sharingUnavailable": "На этом телефоне нельзя поделиться файлом.",
-  "mobile.settings.support.recent": "Последние события",
-  "mobile.settings.support.recentFooter": "Сначала новые. В сохранённом файле все события.",
+  "mobile.settings.support.newestFirst": "Сначала новые.",
+  "mobile.settings.support.showOlder": "Показать более ранние события",
   "mobile.settings.support.empty": "Событий пока нет.",
   "mobile.settings.sessions.kindDesktop": "компьютер",
   "mobile.settings.sessions.kindMobile": "телефон",
@@ -74,12 +83,9 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
   "mobile.settings.animations.all": "Анимации",
-  "mobile.settings.animations.chatZoom": "Увеличение чатов",
-  "mobile.settings.animations.chatZoomFooter":
-    "Чат открывается из своего аватара в списке и сворачивается обратно в него. Если выключить, чат выезжает сбоку.",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
-    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
+    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными, а персонажи на экране приветствия и на пустом главном экране перестанут парить.",
   "mobile.settings.animations.composerResize": "Компактное поле сообщения",
   "mobile.settings.animations.composerResizeFooter":
     "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",
@@ -125,7 +131,6 @@ export const messages = {
     "Уведомления и Live Activity воспроизводят этот звук. Live Activity также включает экран. Звук OpenBot — тот же звук, который играет приложение для компьютера, когда задача завершена. Следующие четыре звука — звуки звуковых тем приложения для компьютера.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Уведомления воспроизводят этот звук. Звук OpenBot — тот же звук, который играет приложение для компьютера, когда задача завершена. Следующие четыре звука — звуки звуковых тем приложения для компьютера.",
-  "mobile.settings.notifications.notifyAbout": "Уведомлять о",
   "mobile.settings.notifications.level.all": "Вся активность",
   "mobile.settings.notifications.level.needsMe": "Только когда я нужен",
   "mobile.settings.notifications.level.nothing": "Ничего",
@@ -142,12 +147,29 @@ export const messages = {
     "События этого сервера, о которых уведомляет этот телефон. У приложения для компьютера свои настройки.",
   "mobile.settings.notifications.serverUnsupported":
     "Этот сервер не может отправлять уведомления. Обновите OpenBot на компьютере, где он работает.",
+  "mobile.settings.notifications.thisPhone": "Этот телефон",
+  "mobile.settings.notifications.whatYouHear": "О чём вы узнаёте",
+  "mobile.settings.notifications.wholeServer": "Весь сервер",
+  "mobile.settings.notifications.levelShort.all": "Все",
+  "mobile.settings.notifications.levelShort.needsMe": "Нужен я",
+  "mobile.settings.notifications.levelShort.nothing": "Выкл.",
+  "mobile.settings.notifications.thisPhoneOnly": "Только этот телефон",
+  "mobile.settings.notifications.offForEveryone": "Выключено для всех на этом сервере",
+  "mobile.settings.notifications.turnOn": "Включить",
+  "mobile.settings.notifications.turnOnFor": "Включить уведомления {name} для всех на этом сервере",
+  "mobile.settings.notifications.chooseAgent": "Выбрать для одного агента",
+  "mobile.settings.notifications.chooseAnotherAgent": "Выбрать другого агента",
+  "mobile.settings.notifications.levelsFooter": "Нажмите уровень агента ещё раз, чтобы он следовал настройке сервера.",
+  "mobile.settings.notifications.agentsUnsupported": "Обновите OpenBot на этом сервере, чтобы выбирать агентов.",
+  "mobile.settings.notifications.agentsOffline": "Агенты появятся, когда этот сервер будет в сети.",
+  "mobile.settings.notifications.scopeFooter":
+    "Ваш выбор действует на всех ваших устройствах. Режим без звука действует только на этом телефоне.",
   "mobile.settings.notifications.channel": "Уведомления агентов ({sound})",
   "mobile.settings.notifications.channelSilent": "Уведомления агентов (без звука)",
   "mobile.settings.privacy.title": "Конфиденциальность",
   "mobile.settings.privacy.footer":
-    "Передавать данные об использовании функций и результатах подключения с этого телефона. Содержимое сообщений и файлы не отправляются.",
-  "mobile.settings.privacy.analytics": "Делиться аналитикой продукта",
+    "Данные об использовании функций и результатах подключения с этого телефона всегда отправляются в аналитику OpenBot. Вкл.: вместе с ID аккаунта и почтой. Выкл.: только со случайным ID установки. Содержимое сообщений и файлы не отправляются.",
+  "mobile.settings.privacy.analytics": "Связывать аналитику с моим аккаунтом",
   "mobile.settings.privacy.retry": "Повторить сохранение настройки конфиденциальности",
   "mobile.settings.conversations.title": "Диалоги",
   "mobile.settings.conversations.hiddenChats": "Скрытые чаты",
@@ -250,6 +272,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Слушание",
   "mobile.settings.voice.tab.speaking": "Озвучивание",
+  "mobile.settings.voice.pause.title": "Пауза перед отправкой",
+  "mobile.settings.voice.pause.label": "Ждать новые слова",
+  "mobile.settings.voice.pause.footer":
+    "В голосовом разговоре OpenBot отправляет ваши слова, когда столько времени не распознаёт новых слов. Шум без слов не продлевает прослушивание. Выберите паузу длиннее, если говорите медленно или останавливаетесь подумать.",
+  "mobile.settings.voice.pause.seconds": "{seconds} с",
+  "mobile.settings.voice.speed.title": "Скорость ответов",
+  "mobile.settings.voice.speed.footer": "Скорость ответов, которые OpenBot читает вслух, также в голосовом разговоре.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot передаёт вашу речь в ElevenLabs с одноразовым токеном, и ElevenLabs списывает оплату с вашего аккаунта. Ключ остаётся на этом телефоне.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,11 +5,12 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
 import { memo, useEffect, useRef, useState } from "react";
-import { type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
+import { type ColorValue, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 import { useListSettled } from "./use-list-settled";
 
@@ -37,7 +38,6 @@ const CodeBlockBody = memo(function CodeBlockBody({
   finished = false,
   highlight: highlightAllowed,
 }: ChatCodeBlockProps & { highlight: boolean }) {
-  const { fontScale } = useWindowDimensions();
   const { t } = useText();
   const { foreground, muted, colors } = useCodeTokenColors();
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
@@ -108,16 +108,11 @@ const CodeBlockBody = memo(function CodeBlockBody({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <ScrollView
-        horizontal
-        bounces={false}
-        style={{ flexGrow: 0, flexShrink: 0, height: text.split("\n").length * 20 * fontScale + 20, maxWidth: "100%" }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14, alignItems: "flex-start" }}
-      >
+      <View style={[CODE_LAYOUT_STYLE, { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }]}>
         <Typography.Code
           selectable={selectable}
           className="bg-transparent p-0"
-          style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
+          style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: 20 }]}
         >
           {tokens.map((token) => (
             <Typography.Code
@@ -133,7 +128,7 @@ const CodeBlockBody = memo(function CodeBlockBody({
             </Typography.Code>
           ))}
         </Typography.Code>
-      </ScrollView>
+      </View>
     </View>
   );
 });

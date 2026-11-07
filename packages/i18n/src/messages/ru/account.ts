@@ -69,6 +69,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot сейчас не может связаться с сервисом аккаунтов.",
   "account.login.signInDescription":
     "Войдите или создайте аккаунт по электронной почте. Мы отправим вам одноразовый код.",
+  "account.login.keyringChangedDescription":
+    "Связка ключей системы потеряла ваш последний вход. Теперь OpenBot хранит входы в собственном файле на этом компьютере. Войдите ещё раз.",
   "account.login.codeAccepted": "Код принят.",
   "account.login.codeSent": "Мы отправили код на {email}.",
   "account.login.connectingSecurely": "Устанавливаем защищённое соединение…",
@@ -106,4 +108,5 @@ export const messages = {
   "account.language.previous": "Предыдущий язык",
   "account.language.next": "Следующий язык",
   "account.language.continue": "Продолжить",
+  "account.language.change": "Сменить язык",
 } as const satisfies PartialTranslation<typeof source>;

@@ -8,6 +8,10 @@ export const messages = {
     "O OpenBot não conseguiu registrar o Uso do computador na configuração do Codex. Verifique se seu config.toml do Codex é válido e gravável, depois reinicie o OpenBot. Você pode desativar o Uso do computador nas configurações do agente para continuar sem ele.",
   "error.provider.codexUnresponsive": "O Codex parou de responder, então o OpenBot encerrou o processo dele.",
   "error.provider.acpUnresponsive": "O {provider} não respondeu a tempo, então o OpenBot encerrou o processo dele.",
+  "error.provider.acpSignInLost":
+    "O {provider} perdeu o login, então o OpenBot encerrou o processo dele. Envie sua mensagem de novo.",
+  "error.provider.acpMcpNotLoaded":
+    "O {provider} não carregou as ferramentas do OpenBot, então este agente não pode usá-las nem falar com os colegas. Uma política de equipe do {provider} pode bloquear servidores MCP locais. Peça ao administrador da sua equipe para permiti-los e tente de novo.",
   "error.provider.endpointsReadOnly":
     "Os endpoints salvos foram gravados por uma versão mais recente do OpenBot, ou o arquivo não pode ser lido. Atualize o OpenBot para alterá-los.",
   "error.provider.endpointNoSecureStorage":
@@ -64,6 +68,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Desative o provedor antes de remover o download dele.",
   "error.provider.removeWhileDownloading": "Aguarde o fim do download e depois remova.",
   "error.provider.removeIncomplete": "Um programa usa arquivos desta CLI. Feche-o e tente de novo.",
+  "error.provider.removeDownloadsFailed": "Não foi possível remover os downloads da CLI de {providers}.",
   "error.provider.cliOverride": "Remova a substituição explícita do caminho da CLI antes de atualizar pelo OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "A atualização do ambiente de execução não foi concluída.",
   "error.provider.downloadHttp": "O download do ambiente de execução falhou com HTTP {status}.",
@@ -102,6 +107,12 @@ export const messages = {
   "error.provider.modelsTooMany": "Há modelos demais.",
   "error.provider.modelIdCharacter": "Um ID de modelo contém um caractere inválido.",
   "error.provider.modelIdDuplicate": "Dois modelos têm o mesmo ID.",
+  "error.provider.contextWindowInvalid":
+    "A janela de contexto de um modelo deve ser um número inteiro de tokens entre {min} e {max}.",
+  "error.provider.maxOutputInvalid":
+    "A saída máxima de um modelo deve ser um número inteiro de tokens entre {min} e {max}.",
+  "error.provider.reasoningEffortsInvalid": "Os níveis de esforço de um modelo não são válidos.",
+  "error.provider.inputsInvalid": "Os tipos de entrada de um modelo não são válidos.",
   "error.provider.headersTooMany": "Há cabeçalhos demais.",
   "error.provider.headerNameCharacter": "O nome de um cabeçalho contém um caractere não permitido pelo HTTP.",
   "error.provider.headerNameTooLong": "O nome de um cabeçalho é muito longo.",
@@ -126,16 +137,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "O ChatGPT foi baixado, mas não foi possível iniciá-lo. Baixe-o novamente no OpenBot.",
   "error.provider.codexMissing": "O ChatGPT não foi baixado. Baixe-o no OpenBot para continuar.",
-  "error.provider.codexConfigIgnored": {
-    one: "O Codex ignorou {count} configuração em seu arquivo: {settings}. Corrija ou remova essa configuração, ou atualize o Codex.",
-    other:
-      "O Codex ignorou {count} configurações em seu arquivo: {settings}. Corrija ou remova essas configurações, ou atualize o Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "O Codex ignorou {count} configuração em seu arquivo. Corrija ou remova essa configuração, ou atualize o Codex.",
-    other:
-      "O Codex ignorou {count} configurações em seu arquivo. Corrija ou remova essas configurações, ou atualize o Codex.",
-  },
   "error.provider.claudeOutdated": "O Claude Code {version} é muito antigo. O OpenBot exige 2.1.232 ou posterior.",
   "error.provider.claudeNotStarted": "A CLI do Claude foi encontrada, mas não foi possível iniciá-la.",
   "error.provider.claudeNotStartedHint":
@@ -184,13 +185,21 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} não retornou uma conta autenticada.",
   "error.provider.signInExpired": "Seu login em {provider} expirou. Entre novamente para continuar.",
   "error.provider.cliActivateFailed": "O OpenBot não conseguiu ativar a CLI gerenciada.",
+  "error.provider.noMainlandChinaSignIn": "{provider} não tem login para a China continental.",
+  "error.provider.cliNewVersionNotStarted": "A nova versão não foi iniciada.",
   "error.provider.cliBusyReconnect": "A CLI de {provider} está executando um turno. Aguarde o término e reconecte.",
+  "error.provider.cliBusySignOut":
+    "A CLI do {provider} está processando um turno. Aguarde terminar e depois desconecte.",
   "error.provider.opencodeCredentialsRejected":
     "O provedor do modelo recusou a chave de API. Corrija a chave do OpenCode em Configurações, ou a chave do provedor com `opencode auth login`. Depois, tente novamente ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeAuthRequired":
     'O OpenCode não tem login no provedor do modelo "{provider}". Escolha um modelo com o rótulo Grátis ou conecte o provedor: cole uma chave do OpenCode Go nas configurações do OpenCode ou execute `opencode auth login` em um terminal. Depois, tente novamente.',
   "error.provider.opencodeAuthRequiredUnknown":
     "O OpenCode não tem login no provedor deste modelo. Escolha um modelo com o rótulo Grátis ou conecte o provedor: cole uma chave do OpenCode Go nas configurações do OpenCode ou execute `opencode auth login` em um terminal. Depois, tente novamente.",
+  "error.provider.customEndpointKeyRefused":
+    'O endpoint "{provider}" recusou a chave de API ou os cabeçalhos. Digite-os novamente em Configurações do servidor → Provedores e tente novamente.',
+  "error.provider.customEndpointKeyMissing":
+    'O endpoint "{provider}" precisa de uma chave de API. Adicione a chave em Configurações do servidor → Provedores e tente novamente.',
   "error.provider.opencodeKeyExpired":
     "Sua chave de API do OpenCode expirou. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
   "error.provider.opencodeServiceFailure":
@@ -209,6 +218,10 @@ export const messages = {
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeNetwork":
     "O OpenCode não conseguiu se conectar ao provedor do modelo. Verifique a conexão de rede do computador que executa o OpenBot e tente novamente.\n{detail}",
+  "error.provider.codexStateBusy":
+    "O ChatGPT ainda está preparando o histórico local após uma inicialização anterior. Aguarde alguns minutos e tente novamente.",
+  "error.provider.realtimeLimitZero":
+    "O Linux parou o provedor porque o OpenBot tem um limite de CPU em tempo real igual a 0. O limite vem do seu sistema. Instale e inicie o rtkit (`rtkit-daemon`), execute `systemctl --user restart xdg-desktop-portal` e depois reinicie o OpenBot. Reiniciar apenas o xdg-desktop-portal não resolve enquanto o rtkit estiver ausente.",
   "error.provider.opencodeDatabaseNewer":
     "O OpenCode não conseguiu abrir o banco de dados porque uma versão mais recente do OpenCode o alterou. Atualize o OpenCode para a versão 2 ou posterior e tente novamente.",
   "error.provider.opencodeNoAnswer":
@@ -230,6 +243,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "A versão do Gemini tem um formato inesperado.",
   "error.provider.antigravityMissing": "O Gemini não foi baixado. Baixe-o no OpenBot para continuar.",
   "error.provider.antigravityNotStarted": "O servidor do Gemini foi encontrado, mas não é possível ler sua versão.",
+  "error.provider.antigravityOverrideInvalid":
+    "O servidor do Gemini em OPENBOT_ANTIGRAVITY_PATH não existe ou não é executável. Corrija o caminho ou remova a variável e reinicie o OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Não foi possível ler a versão do servidor do Gemini.",
   "error.provider.antigravitySignIn": "Entre com o Google para usar o Gemini.",
   "error.provider.antigravityRateLimited":
@@ -256,13 +271,33 @@ export const messages = {
   "error.provider.clineNotStarted": "Não foi possível iniciar o Cline. Execute `cline --version` em um terminal.",
   "error.provider.clineVersionUnreadable": "Não foi possível ler a versão da CLI do Cline.",
   "error.provider.clineSignIn": "Entre com o Cline ou defina CLINE_API_KEY para usar o Cline.",
+  "error.provider.kimiArchivePath": "O arquivo compactado do Kimi tem um caminho inesperado.",
+  "error.provider.kimiChecksum": "A soma de verificação do ambiente de execução do Kimi não corresponde.",
+  "error.provider.kimiLicenseChecksum": "A soma de verificação da licença do Kimi não corresponde.",
+  "error.provider.kimiMissing": "O Kimi não foi baixado. Baixe-o no OpenBot para continuar.",
+  "error.provider.kimiOutdated": "A CLI do Kimi {version} é muito antiga. O OpenBot exige 1.52.0 ou posterior.",
+  "error.provider.kimiNotStarted": "Não foi possível iniciar o Kimi. Execute `kimi --version` em um terminal.",
+  "error.provider.kimiVersionUnreadable": "Não foi possível ler a versão da CLI do Kimi.",
+  "error.provider.kimiSignIn": "Entre com o Kimi Code para usar o Kimi.",
+  "error.provider.devinSignIn": "Entre com o Devin para usar o Devin.",
+  "error.provider.copilotSignIn": "Entre com o GitHub ou defina COPILOT_GITHUB_TOKEN para usar o GitHub Copilot.",
+  "error.provider.mistralSignIn": "Entre com a Mistral ou defina MISTRAL_API_KEY para usar o Mistral.",
+  "error.provider.hermesMissing": "O Hermes Agent não está instalado. Instale-o e tente novamente.",
+  "error.provider.hermesNotStarted":
+    "Não foi possível iniciar o Hermes Agent. Execute `hermes --version` em um terminal.",
+  "error.provider.hermesVersionUnreadable": "Não é possível ler a versão do Hermes Agent.",
+  "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
+  "error.provider.claudeApiKeyNoCredit":
+    "A chave de API da Anthropic não tem crédito de API. Um plano do Claude não paga as solicitações feitas com uma chave de API. Adicione crédito no Anthropic Console, ou entre no Claude em Configurações e selecione a conta do Claude no menu de modelos do agente.",
   "error.provider.foreignReasoning":
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
   "error.provider.museMcpStartupFault":
     "O Muse não conseguiu iniciar um servidor MCP e bloqueou o MCP nesta sessão. O OpenBot iniciou uma nova sessão do Muse com o histórico do chat. Tente novamente. Se o erro continuar, desative o Uso do computador ou o servidor MCP que falhou para este agente.",
+  "error.provider.claudeSessionMissing":
+    "O Claude Code não encontrou a sessão salva deste chat. O OpenBot iniciou uma nova sessão do Claude Code com o histórico do chat. Tente novamente.",
   "error.provider.grokSignIn": "Execute `grok login` ou defina XAI_API_KEY para usar o Grok.",
   "error.provider.acpSignInTimedOut": "O tempo do login esgotou.",
   "error.provider.acpSignInStopped": "O login parou antes de terminar.",
@@ -272,6 +307,8 @@ export const messages = {
     "O Gemini não conseguiu abrir a página de login no seu navegador. Verifique o navegador padrão e conecte novamente.",
   "error.provider.acpSignInFailed": "O login não foi concluído.",
   "error.provider.acpSignInFailedReason": "O login não foi concluído: {reason}",
+  "error.provider.acpSignOutFailed": "O logout não foi concluído.",
+  "error.provider.acpSignOutFailedReason": "O logout não foi concluído: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Este provedor não oferece esta forma de login neste computador. Atualize o provedor e tente novamente.",
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",
@@ -310,6 +347,7 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Este computador não tem armazenamento seguro, por isso não é possível salvar os valores das variáveis de ambiente. Remova-os e tente novamente.",
   "error.provider.customAgentNotSaved": "Este agente personalizado não está salvo. Atualize a lista e tente novamente.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. «Espaço de trabalho» bloqueia isso. Tente «Acesso completo».",
   "error.provider.customAgentTooMany": "Você pode salvar no máximo {count} agentes personalizados.",
   "error.provider.customAgentEnvValueMissing": "Digite um valor para {name}.",
   "error.provider.off": "{provider} está desligado no OpenBot. Ligue-o nas configurações de provedor primeiro.",
@@ -321,6 +359,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} aceita apenas uma conta.",
   "error.provider.accountNeedsConnection": "Conecte {provider} antes de adicionar outra conta.",
   "error.provider.usageResetUnsupported": "{provider} não pode redefinir limites de uso.",
+  "error.provider.signOutUnsupported": "O OpenBot não pode desconectar o login do {provider}.",
   "error.provider.usageResetNotConnected": "Entre novamente nesta conta do {provider} antes de redefinir o uso dela.",
   "error.provider.accountLimit": "{provider} aceita no máximo {limit} contas.",
   "error.provider.accountNotFound": "Esta conta de {provider} não está neste computador. Atualize e tente novamente.",
@@ -398,6 +437,8 @@ export const messages = {
   "error.provider.registryPrerequisite": "Instale {tool} no computador anfitrião antes de instalar este agente.",
   "error.provider.registryBindingChanged": "O agente personalizado mudou durante a instalação. Tente de novo.",
   "error.provider.registryInstallFailed": "A instalação do agente falhou. A instalação anterior permanece inalterada.",
+  "error.provider.hermesInstallFailed": "O Hermes Agent não foi instalado. Tente de novo ou use o guia de instalação.",
+  "error.provider.hermesNeedsGitCurl": "O Hermes Agent precisa de git e curl. Instale-os e tente de novo.",
   "error.provider.registryRemoveBusy":
     "Aguarde a instalação do agente e o trabalho ACP ativo terminarem antes de removê-lo.",
 } as const satisfies PartialTranslation<typeof source>;

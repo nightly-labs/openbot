@@ -9,4 +9,5 @@ export const messages = defineMessages("status.host", {
   "status.host.ready": "This OpenBot is ready for WebRTC connections.",
   "status.host.stopping": "Making this OpenBot private…",
   "status.host.private": "This OpenBot is private.",
+  "status.host.removed": "This OpenBot was removed from your account. Publish it again to share it.",
 });

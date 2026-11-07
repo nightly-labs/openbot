@@ -8,7 +8,7 @@ import {
   providerDisplayName,
 } from "@openbot/contracts/ipc";
 import { reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
-import { providerAccountName } from "@openbot/ui/components/provider-accounts";
+import { findModelOption, providerAccountName } from "@openbot/ui/components/provider-accounts";
 import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
 import { ThreadHeader } from "@openbot/ui/features/conversation/threads/ThreadHeader";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
@@ -34,9 +34,9 @@ export function ConversationHeader() {
     actingBrowserControl,
     agentActivity,
     browserControlAgent,
-    changeFastMode,
     channel,
     fastMode,
+    fastModeChange,
     props,
     runningTurnRuntime,
     selectAndConfirmModel,
@@ -48,6 +48,7 @@ export function ConversationHeader() {
     sidePanelOpen,
     sideThreadOpen,
     toggleSidePanel,
+    moveThreadToPanel,
   } = useConversationViewScope();
   const runningThreads = () => props.threads?.running ?? 0;
   /** While a side thread is open, the agent's name goes back to the agent's own chat. */
@@ -55,6 +56,8 @@ export function ConversationHeader() {
     const header = props.threads?.header;
     return header && sideThreadOpen() ? () => header.onOpen(MAIN_THREAD_ID) : undefined;
   };
+  /** With thread tabs, the agent's name is the tab of the agent's own chat. */
+  const titleSelected = () => (props.threads ? !sideThreadOpen() : undefined);
   const working = () => agentActivity() === "Working";
   const providerName = (provider: AgentProviderRef) =>
     isKnownAgentProvider(provider) ? providerDisplayName(provider) : String(provider);
@@ -68,7 +71,7 @@ export function ConversationHeader() {
   /** Each part shows only where the two runtimes differ, so a model change alone names only the models. */
   const runtimeLabel = (runtime: BadgeRuntime, other: BadgeRuntime) => {
     const parts = [
-      props.modelOptions.find((option) => option.provider === runtime.provider && option.id === runtime.model)?.name ??
+      findModelOption(props.modelOptions, props.agentStatus?.providers, runtime.provider, runtime.model)?.name ??
         runtime.model,
     ];
     if (runtime.provider !== other.provider) parts.unshift(providerName(runtime.provider));
@@ -103,6 +106,7 @@ export function ConversationHeader() {
       onSettingsIntent={() => void loadAgentSettingsPanel()}
       onOpenSettings={() => setActiveRightPanel("settings")}
       onOpenChat={openMainChat()}
+      titleSelected={titleSelected()}
       pendingModel={pendingModel()}
       modelPicker={{
         provider: settingsProvider(),
@@ -123,14 +127,12 @@ export function ConversationHeader() {
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,
-        onChange: (model, provider, accountId) => void selectAndConfirmModel(model, provider, accountId),
+        accountUsage: props.accountUsage,
+        onChange: (model, provider, accountId, effort) =>
+          void selectAndConfirmModel(model, provider, accountId, effort),
         onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
-        // Codex only for now, and only on this computer: the Team API does not carry fast mode.
         fastMode: fastMode(),
-        onFastModeChange:
-          settingsProvider() === "codex" && props.server?.kind === "local"
-            ? (next) => void changeFastMode(next)
-            : undefined,
+        onFastModeChange: fastModeChange(),
       }}
       remoteControl={
         props.remoteDesktopEnabled !== false && props.server?.kind === "remote"
@@ -144,7 +146,11 @@ export function ConversationHeader() {
             }
           : undefined
       }
-      threads={<Show when={props.threads}>{(threads) => <ThreadHeader {...threads().header} />}</Show>}
+      threads={
+        <Show when={props.threads}>
+          {(threads) => <ThreadHeader {...threads().header} onMoveToSide={moveThreadToPanel} />}
+        </Show>
+      }
       sidePanel={
         channel?.readOnly()
           ? undefined

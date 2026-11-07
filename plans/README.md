@@ -17,6 +17,7 @@ changes, and respect the `STOP` conditions.
 | 007 | The web client keeps only the latest page of a conversation that is not open | P2 | S | — | DONE |
 | 008 | Mailbox reads of one delivery do not sort or scan the whole mailbox | P2 | S | — | DONE |
 | 009 | An HTTPS sign-out or session revoke also closes the browser views of that session | P2 | S | — | DONE |
+| 010 | Branch a conversation from a message | P1 | L | — | IN PROGRESS |
 
 Allowed states: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED: <reason>`,
 `REJECTED: <reason>`.

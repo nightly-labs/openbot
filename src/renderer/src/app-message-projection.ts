@@ -1,11 +1,13 @@
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
+  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   hostedSiteConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  isPlanContinuationMarker,
   isVaultChangeMarker,
   marketplaceSuggestionEvent,
   mcpSignInEvent,
@@ -51,12 +53,16 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     ...(stored.busyMessageMode === undefined ? {} : { busyMessageMode: stored.busyMessageMode }),
     ...(stored.taskLimit === undefined ? {} : { taskLimit: stored.taskLimit }),
     ...(stored.backupModels === undefined ? {} : { backupModels: stored.backupModels }),
+    ...(stored.additionalFolders === undefined ? {} : { additionalFolders: stored.additionalFolders }),
+    ...(stored.excludedFolders === undefined ? {} : { excludedFolders: stored.excludedFolders }),
     ...(stored.usageLimitReturn === undefined ? {} : { usageLimitReturn: stored.usageLimitReturn }),
     ...(stored.pendingRuntime === undefined ? {} : { pendingRuntime: stored.pendingRuntime }),
     threadId: stored.threadId,
     workspacePath: stored.workspacePath,
     avatarSeed: stored.avatarSeed,
     avatarHue: stored.avatarHue,
+    ...(stored.avatarColor == null ? {} : { avatarColor: stored.avatarColor }),
+    ...(stored.chatColor === undefined ? {} : { chatColor: stored.chatColor }),
     avatarUrl: stored.avatarUrl,
     ...(stored.marketplaceSource === undefined ? {} : { marketplaceSource: stored.marketplaceSource }),
     updatedAt: stored.updatedAt,
@@ -190,6 +196,7 @@ export function toAgentMessages(
       existing.items = [...(existing.items ?? []), text];
       existing.itemIds = [...(existing.itemIds ?? []), message.id];
       existing.itemCreatedAt = [...(existing.itemCreatedAt ?? []), message.createdAt];
+      existing.itemStreaming = [...(existing.itemStreaming ?? []), message.status === "streaming"];
       existing.streaming = existing.streaming || message.status === "streaming";
       if (message.trace) existing.trace = message.trace;
       continue;
@@ -209,6 +216,7 @@ export function toAgentMessages(
       items: [text],
       itemIds: [message.id],
       itemCreatedAt: [message.createdAt],
+      itemStreaming: [message.status === "streaming"],
       ...(message.trace === undefined ? {} : { trace: message.trace }),
     };
     thinkingByTurn.set(key, thinking);
@@ -229,6 +237,8 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.reasoningEffort === right.reasoningEffort &&
     left.providerAccountId === right.providerAccountId &&
     JSON.stringify(left.backupModels) === JSON.stringify(right.backupModels) &&
+    (left.additionalFolders ?? []).join("\n") === (right.additionalFolders ?? []).join("\n") &&
+    (left.excludedFolders ?? []).join("\n") === (right.excludedFolders ?? []).join("\n") &&
     JSON.stringify(left.usageLimitReturn) === JSON.stringify(right.usageLimitReturn) &&
     JSON.stringify(left.pendingRuntime) === JSON.stringify(right.pendingRuntime) &&
     left.access === right.access &&
@@ -244,6 +254,8 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.threadId === right.threadId &&
     left.avatarSeed === right.avatarSeed &&
     left.avatarHue === right.avatarHue &&
+    (left.avatarColor ?? null) === (right.avatarColor ?? null) &&
+    left.chatColor === right.chatColor &&
     left.avatarUrl === right.avatarUrl &&
     marketplaceSourcesEqual(left.marketplaceSource, right.marketplaceSource) &&
     left.updatedAt === right.updatedAt &&
@@ -295,6 +307,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
     JSON.stringify(left.items) === JSON.stringify(right.items) &&
     JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
+    JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
     JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
     JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
   );
@@ -326,6 +339,7 @@ function chatActionMarker(
       messageId: message.exchange.messageId,
       replyToMessageId: message.exchange.replyToMessageId,
       expectsReply: message.exchange.expectsReply !== false,
+      ...(message.exchange.senderTaskId === undefined ? {} : { senderTaskId: message.exchange.senderTaskId }),
     };
   }
   if (isContextResetMarker(message)) return { kind: "context-reset", timestamp: message.createdAt };
@@ -335,6 +349,16 @@ function chatActionMarker(
   if (isChannelChangeMarker(message))
     return { kind: "channel-change", text: message.text, timestamp: message.createdAt };
   if (isVaultChangeMarker(message)) return { kind: "vault-change", text: message.text, timestamp: message.createdAt };
+  if (isPlanContinuationMarker(message))
+    return { kind: "plan-continuation", text: message.text, timestamp: message.createdAt };
+  if (message.author === "system" && message.itemType === AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE)
+    return {
+      kind: "instructions-change",
+      agentId: ownerAgentId ?? null,
+      change: message.instructionsChange ?? null,
+      text: message.text,
+      timestamp: message.createdAt,
+    };
   const skillEvent = skillConversationEvent(message);
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
@@ -415,18 +439,32 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-export function retainThinkingMessages(previous: AgentMessage[], next: AgentMessage[]): AgentMessage[] {
+/**
+ * Keeps the steps of the running turn that a snapshot does not hold yet. A turn that ended is
+ * not kept: its last snapshot is what the thread stores, and a quiet routine run removes its
+ * steps there on purpose, so a kept copy would show text that a reload no longer shows.
+ */
+export function retainThinkingMessages(
+  previous: AgentMessage[],
+  next: AgentMessage[],
+  activeTurnId: string | null,
+): AgentMessage[] {
   const result = [...next];
   const nextIds = new Set(result.map((message) => message.id));
   for (const thinking of previous) {
     if (thinking.kind !== "thinking" || nextIds.has(thinking.id) || !thinking.turnId) continue;
+    if (thinking.turnId !== activeTurnId) continue;
     const sameTurnIndexes = result.flatMap((message, index) => (message.turnId === thinking.turnId ? [index] : []));
     if (sameTurnIndexes.length === 0) continue;
     const finalAnswerIndex = result.findIndex(
       (message) => message.turnId === thinking.turnId && message.author === "agent" && message.kind !== "thinking",
     );
     const insertionIndex = finalAnswerIndex >= 0 ? finalAnswerIndex : (sameTurnIndexes.at(-1) ?? result.length - 1) + 1;
-    result.splice(insertionIndex, 0, { ...thinking, streaming: false });
+    result.splice(insertionIndex, 0, {
+      ...thinking,
+      streaming: false,
+      ...(thinking.itemStreaming ? { itemStreaming: thinking.itemStreaming.map(() => false) } : {}),
+    });
     nextIds.add(thinking.id);
   }
   return result;

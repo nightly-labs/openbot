@@ -39,7 +39,8 @@ export const messages = defineMessages("mcp", {
   "mcp.status.noAnswer": "No answer",
   "mcp.status.didNotStart": "Did not start",
   "mcp.status.unreachable": "Unreachable",
-  "mcp.server.providerLimitNote": "Claude only: a server with a working directory is not given to the other providers.",
+  "mcp.server.providerLimitNote":
+    "Claude and Codex only: a server with a working directory is not given to the other providers.",
   "mcp.server.runtimeDownloading":
     "Downloading the runtime a STDIO server is started with. One may not start until it finishes.",
   "mcp.server.runtimeDownloadingProgress":
@@ -81,7 +82,7 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.removePassthroughVariable": "Remove passthrough variable {position}",
   "mcp.panel.workingDirectory": "Working directory",
   "mcp.panel.workingDirectoryDescription":
-    "Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: no other provider can set a directory, so it skips a server that names one.",
+    "Claude and Codex agents and the connection test start the server here. Leave it empty to give this server to every provider: the other providers cannot set a directory, so they skip a server that names one.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Every provider can use an HTTP MCP server.",
   "mcp.panel.serverUrl": "Server URL",
@@ -140,11 +141,11 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.appSaved": "App saved. Sign in to use it.",
   "mcp.panel.appRemoved": "App removed.",
   "mcp.signIn.relayDescription":
-    "Check that the sign-in page is on {page}, then open it in your browser. When you finish, OpenBot sends the sign-in to {host}.",
+    "Sign in on {page} in your browser. When you finish, OpenBot sends the sign-in to {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Open the sign-in page of {page} in your browser. When you finish, paste the address that the browser shows here. OpenBot then sends the sign-in to {host}.",
+    "Sign in on {page} in your browser. When you finish, paste the address that the browser shows here. OpenBot then sends the sign-in to {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Check that the sign-in page is on {page}, then open it in your browser and finish there. {host} sees the sign-in by itself.",
+    "Sign in on {page} in your browser and finish there. {host} sees the sign-in by itself.",
   "mcp.signIn.relayOpen": "Open sign-in page",
   "mcp.signIn.relayPasteHint":
     "If the browser does not come back to OpenBot, copy the address that it shows and paste it here.",

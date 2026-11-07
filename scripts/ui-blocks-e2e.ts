@@ -19,6 +19,16 @@ import {
   teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol/current";
 import {
+  addUiBlockAutoAnswers,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  withUiBlockAutoAnswers,
+} from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
+  addUiBlockVaultRequests,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  withUiBlockVaultRequests,
+} from "@openbot/contracts/team-protocol/ui-block-vault-v1";
+import {
   decodeTeamProtocolV6CurrentHttpResponse,
   encodeTeamProtocolV6CurrentHttpResponse,
 } from "@openbot/contracts/team-protocol/v6-adapter";
@@ -36,6 +46,7 @@ import {
   type UiBlockResponse,
   type UiBlockSpec,
   type UiBlockValue,
+  type UiBlockVaultRequest,
   uiBlockAnswersFromResponse,
 } from "@openbot/contracts/ui-blocks";
 import { Effect } from "effect";
@@ -451,6 +462,63 @@ try {
     assert.ok(event && !event.includes('"autoAnswer"'));
   });
 
+  await step("ui-block-auto-answer-v1: a protocol 9 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(8).includes(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(9).includes(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY));
+  });
+
+  await step("ui-block-auto-answer-v1: page and event carry the host's auto-answer state", () => {
+    const encoded = withUiBlockAutoAnswers(
+      encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, current, { uiBlocks: true }),
+      current,
+    );
+    assert.ok(!encoded.includes(SECRET));
+    // As the team client reads it: the frozen codec leaves the key out, and the client copies it back.
+    const wire = JSON.parse(encoded);
+    const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
+    assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));
+    addUiBlockAutoAnswers(decoded, wire);
+    const messages: unknown[] = Array.isArray(decoded.messages) ? decoded.messages : [];
+    const autoAnswers = messages.map((message) => {
+      assert.ok(isConversationMessage(message));
+      return message.uiBlock?.state.autoAnswer;
+    });
+    assert.deepEqual(
+      autoAnswers,
+      current.messages.map((message) => message.uiBlock?.state.autoAnswer),
+    );
+    assert.ok(
+      autoAnswers.some((autoAnswer) => autoAnswer?.done === true),
+      "no plan card that the host answered",
+    );
+
+    const plain = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: current },
+      { uiBlocks: true },
+    );
+    assert.ok(plain);
+    const event = JSON.parse(withUiBlockAutoAnswers(plain, { type: "conversation-page", page: current }));
+    const read = decodeTeamProtocolV7BaseCurrentEvent(event);
+    assert(read.kind === "known" && read.event.type === "conversation-page");
+    addUiBlockAutoAnswers(read.event, event);
+    assert.deepEqual(
+      read.event.page.messages.map((message) => message.uiBlock?.state.autoAnswer),
+      current.messages.map((message) => message.uiBlock?.state.autoAnswer),
+    );
+    return { autoAnswers: autoAnswers.filter(Boolean).length };
+  });
+
+  await step("ui-block-auto-answer-v1: a body without an automatic answer keeps its bytes", () => {
+    const withoutAuto = page(
+      current.messages.map((message) =>
+        message.uiBlock ? { ...message, uiBlock: onV1Wire(message.uiBlock) } : message,
+      ),
+    );
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, withoutAuto, { uiBlocks: true });
+    assert.equal(withUiBlockAutoAnswers(encoded, withoutAuto), encoded);
+  });
+
   await step("a malformed block fails closed in both directions", () => {
     const broken = JSON.parse(JSON.stringify(page(snapshot.messages.slice(0, 1))));
     broken.messages[0].uiBlock.version = 99;
@@ -465,6 +533,75 @@ try {
     );
     event.page.messages[0].uiBlock.state.status = "unknown";
     assert.equal(decodeTeamProtocolV7BaseCurrentEvent(event).kind, "invalid");
+  });
+
+  // A form of `request_vault_item` after the user saved a card: the host marks it with `vault`.
+  const formMessage = snapshot.messages.find((message) => message.uiBlock?.spec.type === "form");
+  assert(formMessage?.uiBlock, "no form block to mark as a Vault request");
+  const vault: UiBlockVaultRequest = {
+    kind: "card",
+    saved: { id: "item-1", name: "Travel card", brand: "visa", last4: "4242" },
+  };
+  const vaultPage = page([{ ...formMessage, id: "vault-1", uiBlock: { ...formMessage.uiBlock, vault } }]);
+  const apiKeyPage = page([{ ...formMessage, id: "api-key-1", uiBlock: { ...formMessage.uiBlock, apiKey: true } }]);
+
+  await step("ui-block-vault-v1: a protocol 9 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(TEAM_UI_BLOCK_VAULT_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(8).includes(TEAM_UI_BLOCK_VAULT_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(9).includes(TEAM_UI_BLOCK_VAULT_CAPABILITY));
+  });
+
+  await step("ui-blocks-v1 without ui-block-vault-v1: the Vault request stays off the wire", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, vaultPage, { uiBlocks: true });
+    assert.ok(hasUiBlock(encoded) && !encoded.includes('"vault"'));
+    const event = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: vaultPage },
+      { uiBlocks: true },
+    );
+    assert.ok(event && hasUiBlock(event) && !event.includes('"vault"'));
+  });
+
+  await step("ui-block-vault-v1: page and event carry the Vault request", () => {
+    const encoded = withUiBlockVaultRequests(
+      encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, vaultPage, { uiBlocks: true }),
+      vaultPage,
+    );
+    assert.ok(!encoded.includes(SECRET));
+    // As the team client reads it: the frozen codec leaves the key out, and the client copies it back.
+    const wire = JSON.parse(encoded);
+    const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
+    assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));
+    addUiBlockVaultRequests(decoded, wire);
+    const [message] = Array.isArray(decoded.messages) ? decoded.messages : [];
+    assert.ok(isConversationMessage(message));
+    assert.deepEqual(message.uiBlock?.vault, vault);
+
+    const plain = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: vaultPage },
+      { uiBlocks: true },
+    );
+    assert.ok(plain);
+    const event = JSON.parse(withUiBlockVaultRequests(plain, { type: "conversation-page", page: vaultPage }));
+    const read = decodeTeamProtocolV7BaseCurrentEvent(event);
+    assert(read.kind === "known" && read.event.type === "conversation-page");
+    addUiBlockVaultRequests(read.event, event);
+    assert.deepEqual(read.event.page.messages[0]?.uiBlock?.vault, vault);
+    return { bytes: encoded.length };
+  });
+
+  await step("ui-blocks-v1: the API key marker of the host stays off the wire", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, apiKeyPage, { uiBlocks: true });
+    assert.ok(hasUiBlock(encoded) && !encoded.includes('"apiKey"'));
+    const event = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: apiKeyPage },
+      { uiBlocks: true },
+    );
+    assert.ok(event && hasUiBlock(event) && !event.includes('"apiKey"'));
+  });
+
+  await step("ui-block-vault-v1: a body without a Vault request keeps its bytes", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, current, { uiBlocks: true });
+    assert.equal(withUiBlockVaultRequests(encoded, current), encoded);
   });
 
   await writeFile(resolve(OUT, "report.json"), `${JSON.stringify({ ok: true, steps }, null, 2)}\n`);

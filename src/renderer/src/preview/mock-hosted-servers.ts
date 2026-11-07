@@ -1,4 +1,9 @@
-import { BILLING_PLANS, type BillingServerPlan } from "@openbot/contracts/billing";
+import {
+  BILLING_PLANS,
+  type BillingPlanId,
+  type BillingServerPlan,
+  billingListPrices,
+} from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
   type HostedServerCatalog,
@@ -15,18 +20,16 @@ const MOCK_STEP_MS = 4_000;
 /** The account server's `MAX_SERVERS_PER_ACCOUNT`. */
 const MOCK_MAX_SERVERS = 50;
 
-/** The monthly amounts in minor units, as `scripts/stripe-bootstrap.ts` sets them. A year costs 20% less. */
-const MONTHLY_PRICES = {
-  starter: { eur: 2_000, usd: 2_500, pln: 9_000 },
-  standard: { eur: 5_000, usd: 6_000, pln: 22_000 },
-  pro: { eur: 10_000, usd: 12_000, pln: 44_000 },
-} as const;
-
-const prices = (monthly: { eur: number; usd: number; pln: number }) => ({
-  eur: { month: monthly.eur, year: monthly.eur * 12 * 0.8 },
-  usd: { month: monthly.usd, year: monthly.usd * 12 * 0.8 },
-  pln: { month: monthly.pln, year: monthly.pln * 12 * 0.8 },
-});
+/** The list prices of a plan, as `scripts/stripe-bootstrap.ts` sets them in Stripe. */
+function prices(plan: BillingPlanId) {
+  const month = billingListPrices(plan, "month");
+  const year = billingListPrices(plan, "year");
+  return {
+    eur: { month: month.eur, year: year.eur },
+    usd: { month: month.usd, year: year.usd },
+    pln: { month: month.pln, year: year.pln },
+  };
+}
 
 /** The Stripe sandbox catalog, for the preview and Storybook. */
 export const MOCK_HOSTED_SERVER_CATALOG: HostedServerCatalog = {
@@ -35,7 +38,7 @@ export const MOCK_HOSTED_SERVER_CATALOG: HostedServerCatalog = {
     diskGb: plan.storageGb,
     memberLimit: plan.memberLimit,
     relativeSpeed: plan.relativeSpeed,
-    prices: prices(MONTHLY_PRICES[plan.id]),
+    prices: prices(plan.id),
     soldOut: plan.id === "starter",
   })),
 };

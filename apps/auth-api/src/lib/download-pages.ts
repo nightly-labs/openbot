@@ -4,16 +4,10 @@
 // released app does, because these pages are what a search engine shows for "OpenBot for Linux".
 
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
-import { LANDING_FAQ, type LandingQuestion } from "./landing-faq";
+import { faqStructuredData, type LandingQuestion } from "./landing-faq";
 import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_PAGE_LINKS } from "./landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
-import {
-  OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_META,
-  OPENBOT_SOCIAL_IMAGE_URL,
-  OPENBOT_X_HANDLE,
-} from "./site-metadata";
+import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
 /** The sitemap date of the pages. Change it when their text changes. */
@@ -73,9 +67,11 @@ export interface DownloadPageContent {
   operatingSystem: string;
 }
 
-const PROVIDERS_ANSWER = LANDING_FAQ.find((entry) => entry.question === "Which AI models can OpenBot use?")?.answer;
+/** The English answer of the home page question "Which AI models can OpenBot use?". */
+const PROVIDERS_ANSWER =
+  "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor, Cline, Muse Code and Pi, and Inception's Mercury models. You can also run any agent that speaks the Agent Client Protocol, such as Goose or Qwen Code, connect any OpenAI-compatible endpoint, and use local models in Ollama or LM Studio.";
 const FREE_ANSWER =
-  "Yes. The app costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.";
+  "Yes, for personal and other noncommercial use. The app costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have. Commercial use needs a license.";
 const CONNECT_STEP: DownloadStep = {
   text: "Connect a provider, such as Codex with your ChatGPT plan or Claude Code with your Claude plan. Then describe the agent you want in one prompt and save it.",
 };
@@ -106,9 +102,7 @@ const PHONE_FREE_ANSWER =
 function providersQuestion(system: string): LandingQuestion {
   return {
     question: `Which AI agents can I run on ${system}?`,
-    answer:
-      PROVIDERS_ANSWER ??
-      "Codex, Claude Code, Gemini, Grok and OpenCode, and any OpenAI-compatible endpoint, also one on your own computer.",
+    answer: PROVIDERS_ANSWER,
   };
 }
 
@@ -394,6 +388,12 @@ export const DOWNLOAD_HUB = {
     "Free for Mac, Windows and Linux, with apps for iPhone and Android. Get the installer for this computer, or choose a system below for its requirements and install steps.",
 } as const;
 
+/** One social card for the hub and the page of each system. */
+const DOWNLOAD_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/download.jpg",
+  alt: "Teamwork. Now installing. OpenBot agents around a glass ring",
+};
+
 export function downloadPagePath(platform: DownloadPagePlatform | "hub"): string {
   return OPENBOT_DOWNLOAD_PAGE_LINKS[platform];
 }
@@ -420,18 +420,6 @@ function breadcrumbData(platform: DownloadPagePlatform | "hub", siteUrl: string)
   };
 }
 
-function faqData(faq: readonly LandingQuestion[]) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faq.map((entry) => ({
-      "@type": "Question",
-      name: entry.question,
-      acceptedAnswer: { "@type": "Answer", text: entry.answer },
-    })),
-  };
-}
-
 export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl: string) {
   const page = platform === "hub" ? undefined : DOWNLOAD_PAGES[platform];
   const title = page?.title ?? DOWNLOAD_HUB.title;
@@ -444,6 +432,7 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
         downloadUrl: page.installers.map((installer) => new URL(installer.href, siteUrl).toString()),
       }
     : OPENBOT_SOFTWARE_APPLICATION;
+  const image = pageSocialImageMeta(DOWNLOAD_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -455,16 +444,15 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
       { property: "og:url", content: url },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: description },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
       { "script:ld+json": application },
       { "script:ld+json": breadcrumbData(platform, siteUrl) },
-      ...(page ? [{ "script:ld+json": faqData(page.faq) }] : []),
+      ...(page ? [{ "script:ld+json": faqStructuredData(page.faq) }] : []),
     ],
     links: [{ rel: "canonical", href: url }],
   };

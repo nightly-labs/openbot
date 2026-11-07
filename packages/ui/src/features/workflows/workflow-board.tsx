@@ -22,6 +22,7 @@ import {
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { diagramEdgeMidpoint, diagramEdgePath } from "../diagrams/diagram-graph";
+import type { WorkflowGitHubCanvas } from "./workflow-github";
 import type { Box } from "./workflow-ink";
 import type { WorkflowLoop } from "./workflow-loops";
 import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
@@ -195,6 +196,8 @@ export interface WfnBoard {
   setField: (id: string, key: string, value: WfnFieldValue, typing?: boolean) => void;
   /** Sets several fields as one change, such as the connection and the place of a channel. */
   setFields: (id: string, values: WfnFields) => void;
+  /** The GitHub triggers that lead to a node, nearest first. A GitHub output acts on their events. */
+  githubTriggers: (id: string) => string[];
   /** Copies a node. Only the canvas has it. */
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
@@ -206,6 +209,8 @@ export interface WfnBoard {
   catalogs: () => WorkflowCatalogs;
   /** The node kinds, triggers and outputs that the host runs. Without it, the nodes offer all of them. */
   features: () => WorkflowFeatures | undefined;
+  /** The GitHub repositories, events and actions of the host. Without it, GitHub cards ask to connect. */
+  github: () => WorkflowGitHubCanvas | undefined;
   /** Runs the workflow from one trigger. Only the canvas has it; elsewhere a trigger runs by itself. */
   runFrom?: ((id: string) => void) | undefined;
   /** The schedule of a trigger node. The canvas keeps it with the node, not in the fields. */
@@ -286,6 +291,11 @@ export function BoardProvider(props: { board: WfnBoard; children: JSX.Element })
 export interface BoardOptions {
   /** The agents, models, places and files that the nodes offer. The host reads them. */
   catalogs: () => WorkflowCatalogs;
+  /**
+   * While the canvas plays an agent's change: `unbuilt` for a connection that does not show yet, and
+   * `arrived` for one that just showed.
+   */
+  buildState?: (edgeId: string) => "unbuilt" | "arrived" | undefined;
   selected?: string | undefined;
   edges?: readonly WfnEdge[] | undefined;
   /** The world scale. The canvas zooms; the gallery does not. */
@@ -328,6 +338,7 @@ export interface BoardOptions {
   /** The fields of the nodes when the board opens, such as the fields of a saved graph. */
   fields?: Record<string, WfnFields> | undefined;
   features?: () => WorkflowFeatures | undefined;
+  github?: () => WorkflowGitHubCanvas | undefined;
   duplicate?: (id: string) => void;
   /**
    * A connection dropped on the empty canvas. When it returns true, the line stays drawn to the drop
@@ -799,6 +810,22 @@ export function createBoard(options: BoardOptions) {
       if (state.locked.length > 0) lockAll(state.locked, false);
     },
     field: (id, key) => state.fields[id]?.[key],
+    githubTriggers: (id) => {
+      const found: string[] = [];
+      const seen = new Set([id]);
+      let layer = [id];
+      while (layer.length > 0) {
+        const next: string[] = [];
+        for (const edge of state.edges) {
+          if (!layer.includes(edge.to) || seen.has(edge.from) || state.removed.includes(edge.from)) continue;
+          seen.add(edge.from);
+          if (state.fields[edge.from]?.trigger === "github") found.push(edge.from);
+          else next.push(edge.from);
+        }
+        layer = next;
+      }
+      return found;
+    },
     setField: (id, key, value, burst = false) => {
       if (state.fields[id]?.[key] === value) return;
       const edit = `${id}:${key}`;
@@ -820,6 +847,7 @@ export function createBoard(options: BoardOptions) {
     duplicate: options.duplicate,
     catalogs: () => options.catalogs(),
     features: () => options.features?.(),
+    github: () => options.github?.(),
     status: (id) => options.status?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
@@ -1195,6 +1223,7 @@ export function createBoard(options: BoardOptions) {
                       state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
                     }
                     data-motion={motion ? "" : undefined}
+                    data-build={options.buildState?.(edge.id)}
                   >
                     <path class="wfn-edge-line" d={line().path} />
                     <Show when={tone(edge) === "run"}>
@@ -1274,6 +1303,7 @@ export function createBoard(options: BoardOptions) {
                   <span
                     class="wfn-edge-label"
                     data-branch={edge.branch}
+                    data-build={options.buildState?.(edge.id)}
                     aria-hidden="true"
                     style={{ left: `${spot().x}px`, top: `${spot().y}px` }}
                   >

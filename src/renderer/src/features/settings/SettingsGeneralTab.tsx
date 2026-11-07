@@ -1,4 +1,12 @@
-import { APP_INTERFACE_SIZES, type AppInterfaceSize, type AppVariant } from "@openbot/contracts/ipc";
+import {
+  APP_INTERFACE_SIZES,
+  type AppInterfaceSize,
+  type AppVariant,
+  type AvatarColor,
+  QUIT_GUARDS,
+  type QuitGuard,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Item,
   ItemActions,
@@ -13,9 +21,13 @@ import {
   SelectValue,
   SettingsSection,
   SwitchField,
+  toast,
 } from "@openbot/ui";
+import { documentColorScheme } from "@openbot/ui/document-color-scheme";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { ChatBackgroundSetting } from "@openbot/ui/features/settings/ChatBackgroundSetting";
+import { OwnChatColorTrigger } from "@openbot/ui/features/settings/ChatColorSetting";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
@@ -28,6 +40,12 @@ import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
+const quitGuardOptions = [...QUIT_GUARDS];
+const QUIT_GUARD_LABEL = {
+  working: "settings.quitGuard.working",
+  always: "settings.quitGuard.always",
+  never: "settings.quitGuard.never",
+} as const satisfies Record<QuitGuard, AppTextKey>;
 
 interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
@@ -39,6 +57,9 @@ interface SettingsGeneralTabProps {
   selectMount: HTMLElement | undefined;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
+  /** The chat color of the account, or null for none. */
+  chatColor: AvatarColor | null;
+  onSetChatColor: (color: AvatarColor | null) => Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -46,9 +67,20 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const appearance = useAppearanceChoice();
   const logoColor = useLogoColorChoice();
   const interfaceSize = useInterfaceSizeChoice();
-  const { format } = useText();
+  const { format, errorMessage } = useText();
+  const saveChatColor = (color: AvatarColor | null) =>
+    void props
+      .onSetChatColor(color)
+      .catch((error: unknown) =>
+        toast.error(errorMessage(error, i18n.t("settings.preferences.saveFailed")), { error }),
+      );
   const interfaceSizeLabel = (value: AppInterfaceSize | undefined) =>
     value === undefined ? "" : format.percent(value / 100);
+  /** macOS always keeps running after the window closes. There the switch moves OpenBot from the Dock to the menu bar. */
+  const backgroundRow = () =>
+    props.platform === "darwin"
+      ? ({ title: "settings.menuBar.title", description: "settings.menuBar.description" } as const)
+      : ({ title: "settings.keepRunning.title", description: "settings.keepRunning.description" } as const);
   return (
     <>
       <SettingsSection title={i18n.t("settings.appearance.title")}>
@@ -60,8 +92,9 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemContent>
             <ItemActions>
               <AppearanceSelect
-                value={appearance.appearance()}
-                onChange={appearance.changeAppearance}
+                value={appearance.theme()}
+                onChange={appearance.changeTheme}
+                palettes={appearance.palettes()}
                 mount={props.selectMount}
               />
             </ItemActions>
@@ -117,6 +150,33 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemContent>
             <LogoColorPicker value={logoColor.color()} onChange={logoColor.changeColor} />
           </Item>
+          <Item data-settings-row="settings.chatColor.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.chatColor.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatColor.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <OwnChatColorTrigger value={props.chatColor} onChange={saveChatColor} />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="settings.chatBackground.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.chatBackground.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatBackground.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <ChatBackgroundSetting
+                scheme={documentColorScheme()}
+                light={appearance.chatBackgroundLight()}
+                dark={appearance.chatBackgroundDark()}
+                onChange={(scheme, value) =>
+                  scheme === "light"
+                    ? appearance.changeChatBackgroundLight(value)
+                    : appearance.changeChatBackgroundDark(value)
+                }
+              />
+            </ItemActions>
+          </Item>
         </ItemGroup>
       </SettingsSection>
 
@@ -142,6 +202,13 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             onChange={(checked) => props.onUpdateSetting("showAgentSteps", checked)}
             label={i18n.t("settings.showAgentSteps.title")}
             description={i18n.t("settings.showAgentSteps.description")}
+          />
+          <SwitchField
+            data-settings-row="settings.compactMessageActions.title"
+            checked={props.value.compactMessageActions}
+            onChange={(checked) => props.onUpdateSetting("compactMessageActions", checked)}
+            label={i18n.t("settings.compactMessageActions.title")}
+            description={i18n.t("settings.compactMessageActions.description")}
           />
           <Item data-settings-row="settings.externalLinks.title" class="settings-modal-row">
             <ItemContent>
@@ -180,11 +247,11 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           />
           <Show when={props.value.keepRunningInBackground !== null}>
             <SwitchField
-              data-settings-row="settings.keepRunning.title"
+              data-settings-row={backgroundRow().title}
               checked={props.value.keepRunningInBackground === true}
               onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-              label={i18n.t("settings.keepRunning.title")}
-              description={i18n.t("settings.keepRunning.description")}
+              label={i18n.t(backgroundRow().title)}
+              description={i18n.t(backgroundRow().description)}
             />
           </Show>
           <Show when={props.value.keepAwake !== null}>
@@ -211,6 +278,37 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.restoreWorkspace.title")}
             description={i18n.t("settings.restoreWorkspace.description")}
           />
+          <Show when={props.value.quitGuard}>
+            {(quitGuard) => (
+              <Item data-settings-row="settings.quitGuard.title" class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.quitGuard.title")}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.quitGuard.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Select<QuitGuard>
+                    class="settings-modal-select"
+                    options={quitGuardOptions}
+                    value={quitGuard()}
+                    onChange={(value) => value && value !== quitGuard() && props.onUpdateSetting("quitGuard", value)}
+                    placement="bottom-end"
+                    itemComponent={(selectProps) => (
+                      <SelectItem item={selectProps.item}>
+                        {i18n.t(QUIT_GUARD_LABEL[selectProps.item.rawValue])}
+                      </SelectItem>
+                    )}
+                  >
+                    <SelectTrigger size="sm" aria-label={i18n.t("settings.quitGuard.title")}>
+                      <SelectValue<QuitGuard>>
+                        {(state) => i18n.t(QUIT_GUARD_LABEL[state.selectedOption()])}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent mount={props.selectMount} />
+                  </Select>
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
         </ItemGroup>
       </SettingsSection>
 

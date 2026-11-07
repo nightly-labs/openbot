@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
@@ -36,8 +36,10 @@ function seed(db: DatabaseSync): void {
       '2026-01-01', '2026-01-01', 2)`).run();
 }
 
+type Contents = Record<string, Record<string, SQLOutputValue>[]>;
+
 /** Every row of every table, by table name. */
-function contents(db: DatabaseSync): Record<string, unknown[]> {
+function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
@@ -46,6 +48,14 @@ function contents(db: DatabaseSync): Record<string, unknown[]> {
     .all()
     .map((row) => String(row.name));
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
+}
+
+/** Migration 57 gives each agent routine the chat as the place where it runs. */
+function withChatRunPlace(tables: Contents): Contents {
+  const routines = tables.projection_agent_routines;
+  return routines
+    ? { ...tables, projection_agent_routines: routines.map((row) => ({ ...row, run_in: "chat" })) }
+    : tables;
 }
 
 function waitTables(db: DatabaseSync) {
@@ -63,7 +73,7 @@ describe("agent wait migration", () => {
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({
-        ...before,
+        ...withChatRunPlace(before),
         agent_waits: [],
         projection_messaging_memories: [],
         routine_result_deliveries: [],
@@ -73,6 +83,9 @@ describe("agent wait migration", () => {
         projection_messaging_allowed_roles: [],
         browser_profiles: [],
         workflow_edges: [],
+        workflow_github_actions: [],
+        workflow_github_deliveries: [],
+        workflow_github_runs: [],
         workflow_nodes: [],
         workflow_output_deliveries: [],
         workflow_runs: [],
@@ -82,8 +95,13 @@ describe("agent wait migration", () => {
         workflow_versions: [],
         workflow_webhook_receipts: [],
         workflows: [],
+        projection_messaging_allowed_senders: [],
+        projection_deleted_thread_messages: [],
+        browser_proxies: [],
+        browser_profile_proxies: [],
+        agent_usage_skill_loads: [],
       });
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 47 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 58 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -103,7 +121,7 @@ describe("agent wait migration", () => {
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
     expect(contents(db)).toEqual({
-      ...before,
+      ...withChatRunPlace(before),
       agent_waits: [],
       projection_messaging_memories: [],
       routine_result_deliveries: [],
@@ -113,6 +131,9 @@ describe("agent wait migration", () => {
       projection_messaging_allowed_roles: [],
       browser_profiles: [],
       workflow_edges: [],
+      workflow_github_actions: [],
+      workflow_github_deliveries: [],
+      workflow_github_runs: [],
       workflow_nodes: [],
       workflow_output_deliveries: [],
       workflow_runs: [],
@@ -122,15 +143,20 @@ describe("agent wait migration", () => {
       workflow_versions: [],
       workflow_webhook_receipts: [],
       workflows: [],
+      projection_messaging_allowed_senders: [],
+      projection_deleted_thread_messages: [],
+      browser_proxies: [],
+      browser_profile_proxies: [],
+      agent_usage_skill_loads: [],
     });
   });
 
   it("rejects newer and incomplete migration histories before it creates the table", () => {
     const db = databaseAtWithSeed(33);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(48,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(59,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=48; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=59; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(waitTables(db)).toEqual([]);

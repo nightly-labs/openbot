@@ -17,22 +17,14 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "./content-collection";
-import {
-  PLUGINS_DESCRIPTION,
-  PLUGINS_TITLE,
-  pluginIndexUrl,
-  pluginUrl,
-  SITE_PLUGINS,
-  type SitePlugin,
-} from "./plugins";
+import { PLUGIN_PAGE_SOCIAL_IMAGE, pluginUrl, type SitePlugin } from "./plugins";
 import {
   OPENBOT_LOGO_URL,
   OPENBOT_SITE_TITLE,
   OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_META,
-  OPENBOT_SOCIAL_IMAGE_URL,
+  OPENBOT_SOCIAL_IMAGE_TAGS,
   OPENBOT_X_HANDLE,
+  pageSocialImageMeta,
 } from "./site-metadata";
 
 /** The generated social cards. Matches what `content-images.ts` writes. */
@@ -67,6 +59,9 @@ function articleOgImageAlt(title: string): string {
 export function collectionIndexHead(collection: ContentCollection, siteUrl: string) {
   const url = collectionIndexUrl(collection, siteUrl);
   const feed = collectionFeedUrl(collection, siteUrl);
+  const image = collection.indexSocialImage
+    ? pageSocialImageMeta(collection.indexSocialImage, siteUrl)
+    : OPENBOT_SOCIAL_IMAGE_TAGS;
 
   return {
     meta: [
@@ -79,13 +74,12 @@ export function collectionIndexHead(collection: ContentCollection, siteUrl: stri
       { property: "og:url", content: url },
       { property: "og:title", content: collection.indexTitle },
       { property: "og:description", content: collection.indexDescription },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: collection.indexTitle },
       { name: "twitter:description", content: collection.indexDescription },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [
       { rel: "canonical", href: url },
@@ -248,53 +242,11 @@ function collectionStructuredData(collection: ContentCollection, siteUrl: string
  * pipeline in `content-images.ts` draws articles, and a listing is not an article. The structured
  * data is `SoftwareApplication`, which is what a plugin is.
  */
-export function pluginsIndexHead(siteUrl: string) {
-  const url = pluginIndexUrl(siteUrl);
-
-  return {
-    meta: [
-      { title: PLUGINS_TITLE },
-      { name: "description", content: PLUGINS_DESCRIPTION },
-      { "script:ld+json": pluginsIndexStructuredData(url, siteUrl) },
-      { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "OpenBot" },
-      { property: "og:locale", content: "en_US" },
-      { property: "og:url", content: url },
-      { property: "og:title", content: PLUGINS_TITLE },
-      { property: "og:description", content: PLUGINS_DESCRIPTION },
-      ...OPENBOT_SOCIAL_IMAGE_META,
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: OPENBOT_X_HANDLE },
-      { name: "twitter:title", content: PLUGINS_TITLE },
-      { name: "twitter:description", content: PLUGINS_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
-    ],
-    links: [{ rel: "canonical", href: url }],
-  };
-}
-
-/** The index as a list of the plugin pages, as the comparison index is. */
-function pluginsIndexStructuredData(url: string, siteUrl: string) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: PLUGINS_TITLE,
-    description: PLUGINS_DESCRIPTION,
-    url,
-    itemListElement: SITE_PLUGINS.map((plugin, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: plugin.name,
-      url: pluginUrl(plugin.slug, siteUrl),
-    })),
-  };
-}
-
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
   const title = `${plugin.name} MCP Plugin for AI Agents — OpenBot`;
   const description = searchDescription(plugin.description);
+  const image = pageSocialImageMeta(PLUGIN_PAGE_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -307,13 +259,12 @@ export function pluginHead(plugin: SitePlugin, siteUrl: string) {
       { property: "og:url", content: url },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: description },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [{ rel: "canonical", href: url }],
   };

@@ -23,6 +23,8 @@ export interface PickerOption<T extends string> {
   /** A node kind gives the tile the colour of that kind. */
   kind?: string;
   chips?: readonly PickerChip[];
+  /** More text that the search finds, such as the full name of a repository whose row shows its short name. */
+  searchText?: string;
   /** An action that removes something, such as Delete. */
   danger?: boolean;
   /** An action that moves the focus, such as Rename, runs after the menu closes. */
@@ -38,7 +40,9 @@ export interface PickerGroup<T extends string> {
 
 /** True when the name or a chip of the option holds the query, which is lower case. */
 export const pickerMatches = (option: PickerOption<string>, query: string) =>
-  [option.label, ...(option.chips ?? []).map((chip) => chip.text)].some((text) => text.toLowerCase().includes(query));
+  [option.label, option.searchText ?? "", ...(option.chips ?? []).map((chip) => chip.text)].some((text) =>
+    text.toLowerCase().includes(query),
+  );
 
 /** The heading of a group. The group has its own label, so screen readers skip this one. */
 export function PickerHeading(props: { group: Pick<PickerGroup<string>, "label" | "icon"> }) {
@@ -86,11 +90,13 @@ export function PickerRow(props: { option: PickerOption<string>; checked?: boole
 /**
  * The panel, the search field and the filter. With `search`, the field takes focus when the menu
  * opens, typing filters the rows by name and chip text, and the down arrow moves to the first row.
+ * With `loading`, a line under the rows tells that more rows come.
  */
 function PickerShell<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];
   search: string | undefined;
+  loading?: boolean | undefined;
   children: (group: PickerGroup<T>) => JSX.Element;
 }) {
   const { t } = useText();
@@ -158,6 +164,9 @@ function PickerShell<T extends string>(props: {
             (event) => {
               if (!field || event.target === field) return;
               if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return;
+              // Space turns a check row on or off.
+              const checkRow = event.target instanceof HTMLElement && event.target.role === "menuitemcheckbox";
+              if (event.key === " " && checkRow) return;
               event.stopPropagation();
               field.focus();
             },
@@ -169,6 +178,9 @@ function PickerShell<T extends string>(props: {
         <For each={shown()} fallback={<p class="wfn-picker-empty">{t("workflow.picker.noMatches")}</p>}>
           {(group) => props.children(group)}
         </For>
+        <Show when={props.loading}>
+          <p class="wfn-picker-empty">{t("common.loading")}</p>
+        </Show>
       </div>
     </DropdownMenu.Content>
   );
@@ -181,7 +193,9 @@ export function PickerMenu<T extends string>(props: {
   value: T | undefined;
   onSelect: (value: T) => void;
   /** The placeholder of the search field. Without it, the list has no search. */
-  search?: string;
+  search?: string | undefined;
+  /** More rows come, such as the labels of a repository that the host still reads. */
+  loading?: boolean | undefined;
 }) {
   const choose = (value: string) => {
     for (const group of props.groups) {
@@ -190,7 +204,7 @@ export function PickerMenu<T extends string>(props: {
     }
   };
   return (
-    <PickerShell label={props.label} groups={props.groups} search={props.search}>
+    <PickerShell label={props.label} groups={props.groups} search={props.search} loading={props.loading}>
       {(group) => (
         <DropdownMenu.RadioGroup
           class="wfn-picker-group"
@@ -207,6 +221,41 @@ export function PickerMenu<T extends string>(props: {
             )}
           </For>
         </DropdownMenu.RadioGroup>
+      )}
+    </PickerShell>
+  );
+}
+
+/** A check menu: each row turns one value on or off, and the menu stays open. */
+export function PickerChecks<T extends string>(props: {
+  label: string;
+  groups: readonly PickerGroup<T>[];
+  values: readonly T[];
+  onChange: (values: readonly T[]) => void;
+  /** The placeholder of the search field. Without it, the list has no search. */
+  search?: string | undefined;
+}) {
+  const checked = (value: T) => props.values.includes(value);
+  const toggle = (value: T, on: boolean) =>
+    props.onChange(on ? [...props.values, value] : props.values.filter((other) => other !== value));
+  return (
+    <PickerShell label={props.label} groups={props.groups} search={props.search}>
+      {(group) => (
+        <fieldset class="wfn-picker-group" aria-label={group.label ?? props.label}>
+          <PickerHeading group={group} />
+          <For each={group.options}>
+            {(option) => (
+              <DropdownMenu.CheckboxItem
+                class="wfn-picker-row"
+                checked={checked(option.value)}
+                closeOnSelect={false}
+                onChange={(on: boolean) => toggle(option.value, on)}
+              >
+                <PickerRow option={option} checked={checked(option.value)} />
+              </DropdownMenu.CheckboxItem>
+            )}
+          </For>
+        </fieldset>
       )}
     </PickerShell>
   );

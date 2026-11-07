@@ -4,8 +4,7 @@
 import { Link } from "@tanstack/solid-router";
 
 const CONTACT_EMAIL = "hello@openbot.run";
-const PRICING_URL = "https://openbot.run/pricing";
-const PRICING_LABEL = "openbot.run/pricing";
+const PRICING_LABEL = "http://openbot.run/pricing";
 
 export function Terms() {
   return (
@@ -30,7 +29,7 @@ export function Terms() {
         of any unauthorised access to or use of your account or any other security incident affecting your account.
       </p>
 
-      <h2>Services Description</h2>
+      <h2>Services description</h2>
       <p>
         OpenBot is a source-available platform that enables users to create, configure, manage, and collaborate with
         artificial intelligence agents ("AI Agents").
@@ -81,7 +80,7 @@ export function Terms() {
       </p>
       <p>
         Commercial License subscriptions are available with monthly or annual billing periods. Current pricing and plan
-        details are available on the <a href={PRICING_URL}>{PRICING_LABEL}</a> page.
+        details are available on the <Link to="/pricing">{PRICING_LABEL}</Link> page.
       </p>
       <p>
         The detailed rules governing Commercial Licenses, including Seat assignments, additional Seats, renewals,
@@ -104,7 +103,7 @@ export function Terms() {
       </p>
       <p>
         Hosted Server subscriptions are available with monthly or annual billing periods. Current pricing, available
-        plans, and their technical specifications are presented on the <a href={PRICING_URL}>{PRICING_LABEL}</a> page.
+        plans, and their technical specifications are presented on the <Link to="/pricing">{PRICING_LABEL}</Link> page.
       </p>
 
       <h2>Pricing and Plan Selection</h2>
@@ -537,8 +536,8 @@ export function Terms() {
         subscription basis.
       </p>
       <p>
-        The applicable fees, billing periods, plan characteristics, and any additional charges are presented on the
-        OpenBot Pricing page and during the purchasing process.
+        The applicable fees, billing periods, plan characteristics, and any additional charges are presented on the{" "}
+        <Link to="/pricing">OpenBot Pricing</Link> page and during the purchasing process.
       </p>
       <p>
         Commercial Licenses are billed according to the number of Seats purchased and the applicable billing period, in
@@ -756,8 +755,8 @@ export function Terms() {
         <Link to="/privacy-policy">OpenBot Privacy Policy</Link>, available through the official OpenBot website.
       </p>
       <p>
-        Where required, the processing of personal data on behalf of a customer is additionally governed by a separate
-        Data Processing Agreement.
+        Where required, the processing of personal data on behalf of a customer is additionally governed by a separate{" "}
+        <Link to="/dpa">Data Processing Agreement</Link>.
       </p>
       <p>
         These Terms regulate the contractual use of the Platform, while the Privacy Policy provides information about
@@ -843,8 +842,8 @@ export function Terms() {
         Agreement shall prevail.
       </p>
       <p>
-        These Terms do not replace or override any applicable software licence, Commercial License Agreement, Data
-        Processing Agreement, or individually negotiated agreement.
+        These Terms do not replace or override any applicable software licence, Commercial License Agreement,{" "}
+        <Link to="/dpa">Data Processing Agreement</Link>, or individually negotiated agreement.
       </p>
       <p>
         If any provision of these Terms is found to be invalid or unenforceable, the remaining provisions shall remain
@@ -856,11 +855,13 @@ export function Terms() {
       <p>
         Synthetify Labs sp. z o.o.
         <br />
-        KRS: 0000895882
+        KRS 0000895882
         <br />
-        NIP: 6812085952
+        NIP 6812085952.
         <br />
         Trzebunia 513, 32-438 Trzebunia, Poland
+        <br />
+        +48 515901078
       </p>
       <p>
         All inquiries, feedback, comments, requests for technical support, and other communications concerning the

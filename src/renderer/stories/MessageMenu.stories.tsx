@@ -1,7 +1,7 @@
 import type { MessageReaction } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageActions, MessageMenu, MessageMenuItems } from "@openbot/ui/features/conversation/MessageRendering";
 import { createStore } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -32,9 +32,12 @@ const rowCallbacks = {
 };
 const onReply = fn();
 const onCopy = fn();
+const onMarkUnread = fn();
+const onBranch = fn();
+const onDelete = fn();
 
 /** A message row with the action row and the right-click menu, as the timeline draws it. */
-function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
+function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boolean }) {
   const [state, setState] = createStore<{
     reaction: MessageReaction | undefined;
     reading: boolean;
@@ -55,6 +58,8 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
     onReply,
     onCopy,
   };
+  /** Only the last answer of a turn in an agent chat branches. */
+  const branch = () => (own() || props.channel ? undefined : onBranch);
   const readAloud = () =>
     own()
       ? undefined
@@ -79,18 +84,40 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
           reactions={!props.channel}
           pickerOpen={state.pickerOpen}
           expandedEmoji={false}
-          copied={false}
           onTogglePicker={() =>
             setState((draft) => {
               draft.pickerOpen = !draft.pickerOpen;
             })
           }
           onExpandEmoji={fn()}
-          readAloud={readAloud()}
-          {...actions}
+          onReact={actions.onReact}
+          onReply={actions.onReply}
+          menu={() => (
+            <MessageMenuItems
+              message={message()}
+              reactions={!props.channel}
+              readAloud={readAloud()}
+              onMarkUnread={own() || props.channel ? undefined : onMarkUnread}
+              onBranch={branch()}
+              branchDisabled={props.busy}
+              onDelete={onDelete}
+              {...actions}
+            />
+          )}
         />
       }
-      menu={() => <MessageMenu message={message()} reactions={!props.channel} readAloud={readAloud()} {...actions} />}
+      menu={() => (
+        <MessageMenu
+          message={message()}
+          reactions={!props.channel}
+          readAloud={readAloud()}
+          onMarkUnread={own() || props.channel ? undefined : onMarkUnread}
+          onBranch={branch()}
+          branchDisabled={props.busy}
+          onDelete={onDelete}
+          {...actions}
+        />
+      )}
     />
   );
 }
@@ -103,7 +130,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Right-click a message, or press Shift+F10 in its action row. React opens a submenu. */
+/**
+ * Right-click a message, or press Shift+F10 in its action row. React opens a submenu. The last
+ * answer of a turn also has Branch from here, and an agent message has Mark unread. Delete is last.
+ */
 export const AgentChat: Story = {
   render: () => (
     <main class="foundation-story">
@@ -113,7 +143,16 @@ export const AgentChat: Story = {
   ),
 };
 
-/** A channel message has no reactions, so the menu leaves React out. */
+/** While a turn runs, Branch shows but is disabled. */
+export const TurnRuns: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <MenuRow message={agentMessage} busy />
+    </main>
+  ),
+};
+
+/** A channel message has no reactions and no branch, so the menu leaves them out. */
 export const Channel: Story = {
   render: () => (
     <main class="foundation-story">

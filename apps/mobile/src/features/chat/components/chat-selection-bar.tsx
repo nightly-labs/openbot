@@ -4,6 +4,7 @@ import { Typography } from "heroui-native";
 import { useEffect, useState } from "react";
 import { ScrollView, type ViewStyle } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { ChatGlassButton } from "./chat-glass-icon-button";
@@ -67,6 +68,7 @@ export function ChatSelectionBar({
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
+  const insets = useSafeAreaInsets();
   const { mounted, shown } = usePresence(visible);
   if (!mounted) return null;
   return (
@@ -78,7 +80,9 @@ export function ChatSelectionBar({
       accessibilityElementsHidden={!shown}
       importantForAccessibility={shown ? "auto" : "no-hide-descendants"}
       className="pb-2"
-      contentContainerClassName="gap-2 px-4"
+      contentContainerClassName="gap-2"
+      // The row scrolls from edge to edge; its ends keep clear of the side insets.
+      contentContainerStyle={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
     >
       {ACTIONS.map(({ action, label }, index) => (
         <Animated.View

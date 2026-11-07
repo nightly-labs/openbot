@@ -2,6 +2,9 @@ import {
   type AgentAccessLevels,
   graphAgentIds,
   type WorkflowDetail,
+  type WorkflowGitHubCatalog,
+  type WorkflowGitHubHistory,
+  type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowSaveResult,
@@ -11,16 +14,32 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
-import type { WorkflowPlace } from "@openbot/ui/features/workflows/workflow-model";
+import type { WorkflowBuild } from "@openbot/ui/features/workflows/workflow-build";
+import {
+  EMPTY_GITHUB_HISTORY,
+  githubItemUrl,
+  type WorkflowGitHubCanvas,
+} from "@openbot/ui/features/workflows/workflow-github";
+import type {
+  WorkflowDiscordServer,
+  WorkflowPlace,
+  WorkflowSlackWorkspace,
+  WorkflowTelegramChat,
+} from "@openbot/ui/features/workflows/workflow-model";
 import { EMPTY_WORKFLOW_RUN_VIEW, type WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import type { DesktopAnalyticsScope, WorkflowAnalyticsAction } from "../../analytics";
+import { webhookFailureCode } from "../../webhook-failure-code";
+import { createGitHubConnector } from "../connectors/github-connector";
 import type { WorkflowHost } from "./workflows-port";
 
 const RUN_PAGE = 20;
 /** The pause after the last edit before the canvas saves. */
 const SAVE_DELAY_MS = 400;
+
+/** The options of a repository that the host could not read. */
+const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
 const FAILURE_CODES = {
   create: "create_failed",
@@ -57,20 +76,20 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   ): Promise<T> => {
     const scope = analytics?.();
     const startedAt = performance.now();
-    const send = (result: "succeeded" | "failed") =>
+    const send = (result: "succeeded" | "failed", error?: unknown) =>
       scope?.track("workflow_action", {
         action,
         ...(nodeKind ? { node_kind: nodeKind } : {}),
         duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
         result,
-        ...(result === "failed" ? { failure_code: FAILURE_CODES[action] } : {}),
+        ...(result === "failed" ? { failure_code: webhookFailureCode(error, FAILURE_CODES[action]) } : {}),
       });
     try {
       const value = await call();
       send("succeeded");
       return value;
     } catch (error) {
-      send("failed");
+      send("failed", error);
       throw error;
     }
   };
@@ -89,13 +108,22 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     detail: WorkflowDetail;
     runs: WorkflowRunView;
     versions: readonly WorkflowVersion[];
+    github: WorkflowGitHubHistory;
   }>();
   const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>([]);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
+  const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
+  const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
+  const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
   /** Null while this account manages every agent of the host. */
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
   const [resetKey, setResetKey] = createSignal(0);
+  /** The last change of an agent that the canvas plays. */
+  const [build, setBuild] = createSignal<WorkflowBuild>();
+  /** Plays a change of `agentId` on the canvas, from `before`, or from an empty canvas for a new workflow. */
+  const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
+    setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
 
   /** The open workflow. A plain value, so that a callback reads the new one at once. */
   let current = "";
@@ -147,18 +175,78 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     setResetKey((key) => key + 1);
   };
 
-  /** Reads the library and, for the open workflow, its detail, runs and versions. */
-  const read = async (workflowId: string) => {
+  /**
+   * The GitHub events of the open workflow. A failed read shows no events rather than no workflow:
+   * the Events row is a view of the triggers, and the next change reads it again.
+   */
+  const readGitHubHistory = (workflowId: string) =>
+    host.githubSupported()
+      ? host.workflows.githubHistory(workflowId).catch(() => EMPTY_GITHUB_HISTORY)
+      : Promise.resolve(EMPTY_GITHUB_HISTORY);
+
+  const connector = createGitHubConnector(
+    () => host.githubConnector,
+    () => host.hostName(),
+  );
+  /** Undefined while it is read, and for an account that may not read it: only an admin adds GitHub steps. */
+  const [githubCatalog, setGitHubCatalog] = createSignal<WorkflowGitHubCatalog>();
+  /** The labels and people of each repository that a card asked for, by lower-case name, for this page. */
+  const [githubOptions, setGitHubOptions] = createSignal<ReadonlyMap<string, WorkflowGitHubRepositoryOptions>>(
+    new Map(),
+  );
+  const askedOptions = new Set<string>();
+  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
+  let catalogRead = 0;
+  const readGitHubCatalog = () => {
+    if (!host.githubSupported()) return;
+    const request = ++catalogRead;
+    host.workflows.githubCatalog().then(
+      (next) => {
+        if (!disposed && request === catalogRead) setGitHubCatalog(next);
+      },
+      () => undefined,
+    );
+  };
+  /** A change on GitHub can give or take repositories, labels and people, so all are read again. */
+  const refreshGitHub = () => {
+    askedOptions.clear();
+    setGitHubOptions(new Map());
+    readGitHubCatalog();
+  };
+  // A connection that starts or ends changes the repositories that the host reaches.
+  let connectionState: string | undefined;
+  createEffect(
+    () => connector.detail.props.status.state,
+    (state) => {
+      const before = connectionState;
+      connectionState = state;
+      if (before !== undefined && state !== before) refreshGitHub();
+    },
+  );
+  /** Set when GitHub opened to change the installation. The next window focus reads the repositories again. */
+  let awaitingInstall = false;
+  const onFocus = () => {
+    if (!awaitingInstall) return;
+    awaitingInstall = false;
+    refreshGitHub();
+  };
+
+  /**
+   * Reads the library and, for the open workflow, its detail, runs and versions. `agentId`: the agent
+   * whose change the read is for. When the change replaces the canvas, the canvas plays it.
+   */
+  const read = async (workflowId: string, agentId?: string) => {
     const seen = edits;
     const list = await host.workflows.list();
     if (disposed) return;
     setSummaries(list);
     // A delete changes the library too: the delete then opens another workflow.
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
-    const [next, page, versions] = await Promise.all([
+    const [next, page, versions, github] = await Promise.all([
       host.workflows.get(workflowId),
       host.workflows.runs({ workflowId, limit }),
       host.workflows.versions(workflowId),
+      readGitHubHistory(workflowId),
     ]);
     if (disposed || workflowId !== current) return;
     const outside =
@@ -167,9 +255,13 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
       seen === edits &&
       writing === 0 &&
       pending === undefined;
+    const before = stored()?.detail;
     // The canvas reads the graph only when it opens or resets, so a read under its edits keeps them.
-    setStored({ detail: next, runs: page, versions });
-    if (outside) reset(next);
+    setStored({ detail: next, runs: page, versions, github });
+    if (outside) {
+      if (agentId !== undefined && before?.summary.id === workflowId) playBuild(workflowId, agentId, before.graph);
+      reset(next);
+    }
     return next;
   };
 
@@ -227,19 +319,45 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     host.places().then((next) => {
       if (!disposed) setPlaces(next);
     }, report);
+    host.discordServers().then((next) => {
+      if (!disposed) setDiscord(next);
+    }, report);
+    host.telegramChats().then((next) => {
+      if (!disposed) setTelegram(next);
+    }, report);
+    host.slackWorkspaces().then((next) => {
+      if (!disposed) setSlack(next);
+    }, report);
   };
 
-  const refresh = (workflowId: string | null) => {
-    read(workflowId ?? current).catch(report);
+  const refresh = (workflowId: string | null, agentId?: string) => {
+    // A workflow that an agent makes opens, so the person sees the agent build it. While the person's
+    // edit saves, the open workflow stays, and the new one only goes into the library.
+    if (
+      workflowId !== null &&
+      agentId !== undefined &&
+      workflowId !== current &&
+      writing === 0 &&
+      pending === undefined &&
+      !summaries().some((summary) => summary.id === workflowId)
+    ) {
+      playBuild(workflowId, agentId, null);
+      open(workflowId);
+      return;
+    }
+    read(workflowId ?? current, agentId).catch(report);
     if (workflowId !== null) return;
     readPlaces();
     readLevels();
+    readGitHubCatalog();
   };
 
   onSettled(() => {
     const stop = host.onChanged(refresh);
+    window.addEventListener("focus", onFocus);
     return () => {
       stop();
+      window.removeEventListener("focus", onFocus);
       // A pending edit still saves after the page closes.
       flush();
       disposed = true;
@@ -250,6 +368,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   untrack(() => {
     readPlaces();
     readLevels();
+    readGitHubCatalog();
   });
   write(async () => {
     const list = await host.workflows.list();
@@ -292,9 +411,52 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     write(() => tracked(action, () => call(workflowId), nodeKind));
   };
 
+  const github: WorkflowGitHubCanvas = {
+    catalog: githubCatalog,
+    history: () => stored()?.github ?? EMPTY_GITHUB_HISTORY,
+    run: (runId) => {
+      const entry = stored()?.runs.runs.find((candidate) => candidate.run.id === runId);
+      return entry && { number: entry.run.number, status: entry.run.status };
+    },
+    options: (repository) => {
+      const key = repository.toLowerCase();
+      const known = githubOptions().get(key);
+      if (known || askedOptions.has(key) || !host.githubSupported()) return known;
+      askedOptions.add(key);
+      host.workflows.githubOptions({ repository }).then(
+        (next) => {
+          if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, next));
+        },
+        (error: unknown) => {
+          // The menus stop loading and show no options. A change on GitHub reads them again.
+          if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, NO_OPTIONS));
+          report(error);
+        },
+      );
+      return undefined;
+    },
+    connection: () => connector.detail.props,
+    openGitHub: () => {
+      awaitingInstall = true;
+      connector.detail.props.onOpenInstall();
+    },
+    opening: connector.busy,
+    openItem: (item) => {
+      host.openUrl(githubItemUrl(item)).catch(report);
+    },
+    runLastEvent: (nodeId) => {
+      start("run", (workflowId) =>
+        host.workflows.githubRunLastEvent({ workflowId, nodeId, requestId: crypto.randomUUID() }),
+      );
+    },
+  };
+
   const props: WorkflowsControllerProps = {
     get resetKey() {
       return resetKey();
+    },
+    get build() {
+      return build();
     },
     get runs() {
       return stored()?.runs ?? EMPTY_WORKFLOW_RUN_VIEW;
@@ -401,5 +563,14 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     },
   };
 
-  return { detail: () => stored()?.detail, places, readOnly: () => lock() !== undefined, props };
+  return {
+    detail: () => stored()?.detail,
+    places,
+    discord,
+    telegram,
+    slack,
+    readOnly: () => lock() !== undefined,
+    github,
+    props,
+  };
 }

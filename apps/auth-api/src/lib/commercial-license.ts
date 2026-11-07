@@ -3,7 +3,7 @@
 export const COMMERCIAL_LICENSE_ROUTE = "/commercial-license";
 
 /** The "Last updated" date on the page. Change it when the text changes. */
-export const COMMERCIAL_LICENSE_UPDATED_AT = "2026-10-22";
+export const COMMERCIAL_LICENSE_UPDATED_AT = "2026-10-29";
 
 export const COMMERCIAL_LICENSE_META = {
   title: "OpenBot Commercial License Agreement",

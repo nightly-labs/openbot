@@ -1,3 +1,4 @@
+import type { AgentMessage } from "@openbot/ui/data";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "../chat-search";
@@ -5,11 +6,14 @@ import { clearChatSearchHighlights, findChatSearchMatches, renderChatSearchHighl
 import type { ConversationProps } from "../conversation-types";
 
 export interface SearchStoreDeps {
-  props: ConversationProps;
+  /** The messages are read only to search again when they change. */
+  props: Pick<ConversationProps, "onSearchMessages" | "onOpenSearchMessage"> & {
+    messages: readonly Pick<AgentMessage, "id" | "body" | "items">[];
+  };
   chatSearchOpen: () => boolean;
   chatSearchQuery: () => string;
   activeChatSearchIndex: () => number;
-  scrollElement: () => HTMLDivElement | undefined;
+  scrollElement: () => HTMLElement | undefined;
   revealMatch: () => void;
   setChatSearchOpen: (open: boolean) => void;
   setChatSearchQuery: (query: string) => void;

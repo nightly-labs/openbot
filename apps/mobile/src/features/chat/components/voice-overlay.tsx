@@ -15,11 +15,13 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { VoiceMode } from "./use-voice-mode";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -158,6 +160,7 @@ function VoiceTranscript({
 }) {
   const scroll = useRef<ScrollViewInstance>(null);
   const [reserve] = useState(createRevealQueue);
+  const insets = useSafeAreaInsets();
   // A word is known by its position: the recognizer corrects a word in place,
   // and only words at new positions come in.
   const words = text
@@ -171,14 +174,15 @@ function VoiceTranscript({
       contentContainerStyle={{
         paddingTop: topInset + TRANSCRIPT_TOP,
         paddingBottom: bottomInset,
-        paddingHorizontal: 28,
+        paddingLeft: insets.left + 28,
+        paddingRight: insets.right + 28,
       }}
       showsVerticalScrollIndicator={false}
       onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
     >
       {reply ? (
         <View className="mb-4 flex-row items-center gap-2">
-          <Reply color={String(muted)} size={16} />
+          <Reply color={String(muted)} size={16} style={MIRROR_IN_RTL} />
           <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-muted">
             {reply}
           </Typography.Paragraph>

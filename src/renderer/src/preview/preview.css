@@ -38,7 +38,7 @@
     grid-column: 1;
     grid-row: 1;
     flex-direction: row;
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
   }
 
@@ -66,6 +66,9 @@
 
   .openbot-playground-root .agent-row,
   .openbot-playground-root .sidebar-compact .agent-row {
+    --agent-row-avatar-size: 36px;
+    --sidebar-pinned-avatar-size: 36px;
+
     width: 48px;
     height: 48px;
     flex: 0 0 48px;

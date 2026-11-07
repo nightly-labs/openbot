@@ -156,9 +156,23 @@ EMAIL_SMTP_PORT=465
 EMAIL_SMTP_USERNAME=hello@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
 EMAIL_FROM=hello@openbot.run
+EMAIL_LICENSE_FROM=licenses@openbot.run
 ```
 
+License emails (the first payment, a failed renewal payment, and the end of a license) go from
+`EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
+make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`.
+
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
+
+Production does not open the SMTP socket itself. From some Cloudflare locations, such as FSD, a
+socket to the mail host fails at once (#4578). The production Worker sends each email through the
+`openbot-email-relay` Worker (`wrangler.email-relay.jsonc`) over the `EMAIL_RELAY` service binding.
+Cloudflare places that Worker near the mail host. The relay has no route and keeps no secret: the
+binding request carries the SMTP settings and the message. CI and `bun run api:deploy` deploy the
+relay before the production Worker. When you change `EMAIL_SMTP_HOST` or `EMAIL_SMTP_PORT`, also
+change `placement.host` in `wrangler.email-relay.jsonc`. The test Worker and local `vite dev` send
+from their own socket. To see where the relay runs, read the `colo` of its Workers Logs events.
 
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
@@ -183,6 +197,12 @@ variables. The SMTP connection uses TLS from the start and accepts only port 465
 GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REPORT_HASH_SECRET`, and the optional
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
+
+`COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
+SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another
+value, each company must enter its client secret again. Without it, company sign-in answers 503 and
+everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
+Environment; a local deployment reads it from the encrypted `.env.production`.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
@@ -210,6 +230,18 @@ for a team invitation. The message is never sent in that case, so the app can
 ask again later. Namecheap Private Email allows 500 messages an hour for each
 mailbox, and every sign-in code and invitation spends that same quota.
 
+Production has a fallback: the `EMAIL_FALLBACK` `send_email` binding of Cloudflare Email Service.
+When SMTP surely did not send a message (a sender limit, a refusal of the sender or the message, or
+a connection that stopped before `DATA`), the Worker sends the same message through Cloudflare. It
+does not fall back after `smtp_delivery_unknown`, an invalid input or configuration, or a refused
+recipient. The fallback uses only the time left in the 25-second delivery budget of a sign-in code,
+and it does not start with less than 2 seconds left, as after three SMTP timeouts. When
+Cloudflare also fails, the answer stays the SMTP failure, so a sender limit keeps its 429. Each
+fallback sends an `email_fallback_sent` analytics event. Before the first deploy with the binding,
+onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
+`allowed_sender_addresses` equal to `EMAIL_FROM` and `EMAIL_LICENSE_FROM`. The preview and test
+Workers have no fallback.
+
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
 `EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
 The D1 counter of sign-in allows 3 messages for each IP address and 15 in total in each 15-minute
@@ -230,13 +262,22 @@ bun run api:deploy
 
 The service applies limits per email, per IP, per challenge, and per resend.
 
+A deploy replaces every file under `/assets/`. Before a production deploy, CI and `bun run api:deploy`
+run `scripts/keep-previous-assets.ts`. It copies the files of the builds that were live in the last
+24 hours from `https://openbot.run` into the new build, so a tab that is open during a deploy can
+still load code. The site keeps the list of these files in `/asset-history.json`. When the list or a
+file cannot be read, the deploy continues with fewer files, and such a tab reloads when it next loads
+code.
+
 ## Hosted sites
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
 of a registered server. With them, a request sees only that server's sites, and a new site counts
-against the server plan's limit. A wrong token gets 401 `host_unauthorized`. Without them, a new site
-goes into the account's unlinked bucket of one site; `GET /v1/sites?scope=unlinked` lists only that
-bucket. `GET /v1/sites` returns `{ sites, limit, used }`.
+against the server's limit: a `server_site_limits` row, else its plan's limit, else the account's shared
+pool (3 sites for each license user, else 1), within an account cap of 300. A wrong token gets 401
+`host_unauthorized`. Without them, a new site goes into the account's unlinked bucket of one site;
+`GET /v1/sites?scope=unlinked` lists only that bucket. `GET /v1/sites` returns `{ sites, limit, used }`, plus an optional `limitReason`: `shared` for a
+server in the shared pool, `account` when the account cap is full.
 
 ## Authentication data retention
 
@@ -267,6 +308,26 @@ Set the private JWK, public JWKS, active key ID, Signal URL, and webhook secret 
 the encrypted environment. The private and public keys must use ES256. The Signal
 URL must point to a DNS-only host. Cloudflare carries only account and configuration
 requests. It does not carry Team API or Remote Desktop data.
+
+Two optional variables spread hosts over more than one Signal machine. When both are empty, each
+ticket names `REMOTE_SIGNAL_URL`, as before.
+
+- `REMOTE_SIGNAL_HOMES`: the Signal machines that a host can have as its home, as `id=url,id=url`,
+  for example `a=wss://signal-a.openbot.run/v1/signal,b=wss://signal-b.openbot.run/v1/signal`. An ID
+  has 1 to 32 characters from `a-z`, `0-9` and `-`. A URL must use `wss:`, or `ws:` when
+  `REMOTE_SIGNAL_URL` uses `ws:`. An invalid value makes each ticket request fail with
+  `503 remote_not_configured`. A host ticket request with `signalHome: true` gets a home, which
+  `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
+  until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
+  home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+- `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
+  `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
+  again only to the URLs that failed.
+- `SIGNAL_ENTRY_ZONE_ID` and the secret `SIGNAL_ENTRY_DNS_TOKEN`: with both and two homes, the cron
+  `*/1 * * * *` moves the `REMOTE_SIGNAL_URL` name to another home when its machine stops answering
+  `/health/ready` (`src/server/signal-entry-failover.ts`). The token needs only `Zone.DNS:Edit` on that
+  zone. The test and preview Workers keep the zone empty, so they never change production DNS.
 
 To deploy your own copy of this Worker with your own Signal, see
 [Self-hosted remote access](../../docs/self-hosting.md).

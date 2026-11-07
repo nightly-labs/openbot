@@ -27,4 +27,18 @@ export const messages = {
   "error.site.fileType": "No se permite este tipo de archivo: {path}",
   "error.site.fileOutsideRoot": "Los archivos del sitio deben permanecer dentro de la raíz del código fuente: {path}",
   "error.site.fileTooLarge": "Un archivo supera el límite de 1 MB: {path}",
+  "error.site.serverLimit": {
+    one: "Este servidor alcanzó su límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
+    other:
+      "Este servidor alcanzó su límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
+  },
+  "error.site.sharedLimit":
+    "Los servidores de tu cuenta sin plan comparten sus sitios activos, y todos están en uso. Para publicar un sitio aquí, elimina un sitio de uno de estos servidores, añade usuarios a tu licencia o usa un servidor en la nube con un plan que tenga más sitios.",
+  "error.site.accountLimit":
+    "Tu cuenta tiene el número máximo de sitios activos en todos sus servidores: {count}. Para publicar otro sitio, elimina un sitio.",
+  "error.site.unlinkedLimit": {
+    one: "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
+    other:
+      "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

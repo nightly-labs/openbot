@@ -1,4 +1,5 @@
-import type { ChannelSummary, HiddenAgent, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { ChannelSummary, HiddenAgent, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import { Button } from "@openbot/ui";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
@@ -7,11 +8,13 @@ import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobile
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
 import { SIDEBAR_HIDDEN_GROUP_OPEN_ID, type SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
-import { createSignal, untrack } from "solid-js";
+import { createSignal, For, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
+import { applySidebarLayoutAction } from "../src/preview/mock-sidebar-layout";
 import { requireFixture, STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE, STORY_SERVERS } from "./fixtures";
+import { SettledArgs } from "./settled-args";
 
 const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
@@ -105,13 +108,15 @@ const stressLayout: SidebarLayoutSnapshot = {
 };
 
 /* One channel for each shape the member cluster has to draw: a single face, a pair, the triangle,
- * the full quad, and the count that takes the last cell when the members outnumber it. */
+ * the full quad, the count that takes the last cell when the members outnumber it, and the count of
+ * two digits that takes the bottom row. */
 const channelSizes = [
   { name: "Solo", size: 1 },
   { name: "Pair", size: 2 },
   { name: "Trio", size: 3 },
   { name: "Quad", size: 4 },
   { name: "All hands", size: 6 },
+  { name: "Company", size: 13 },
 ];
 const storyChannels: ChannelSummary[] = channelSizes.map(({ name, size }, index) => ({
   id: `channel-${size}`,
@@ -213,7 +218,7 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
         props.onReorderPeople(memberIds);
       }}
       onMutateLayout={async (action) => {
-        setLayout((current) => applyStoryLayoutAction(current, action));
+        setLayout((current) => applySidebarLayoutAction(current, action));
         await props.onMutateLayout(action);
       }}
       onToggleSection={(sectionId) => {
@@ -228,71 +233,10 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   );
 }
 
-function applyStoryLayoutAction(layout: SidebarLayoutSnapshot, action: SidebarLayoutAction): SidebarLayoutSnapshot {
-  const revision = layout.revision + 1;
-  if (action.type === "create") {
-    const id = crypto.randomUUID();
-    return {
-      ...layout,
-      revision,
-      sections: [...layout.sections, { id, name: action.name.trim() }],
-      order: [...layout.order, id],
-      agentAssignments: action.agentId
-        ? { ...layout.agentAssignments, [action.agentId]: id }
-        : { ...layout.agentAssignments },
-      agentOrder: [...layout.agentOrder],
-    };
-  }
-  if (action.type === "rename") {
-    return {
-      ...layout,
-      revision,
-      sections: layout.sections.map((section) =>
-        section.id === action.sectionId ? { ...section, name: action.name.trim() } : section,
-      ),
-    };
-  }
-  if (action.type === "delete") {
-    return {
-      ...layout,
-      revision,
-      sections: layout.sections.filter((section) => section.id !== action.sectionId),
-      order: layout.order.filter((sectionId) => sectionId !== action.sectionId),
-      agentAssignments: Object.fromEntries(
-        Object.entries(layout.agentAssignments).filter(([, sectionId]) => sectionId !== action.sectionId),
-      ),
-      agentOrder: [...layout.agentOrder],
-    };
-  }
-  if (action.type === "move") {
-    const order = [...layout.order];
-    const index = order.indexOf(action.sectionId);
-    const target = index + (action.direction === "up" ? -1 : 1) * (action.steps ?? 1);
-    if (index >= 0 && target >= 0 && target < order.length) {
-      const [movedSectionId] = order.splice(index, 1);
-      if (movedSectionId) order.splice(target, 0, movedSectionId);
-    }
-    return { ...layout, revision, order };
-  }
-  if (action.type === "move-agent") {
-    const agentOrder = layout.agentOrder.filter((agentId) => agentId !== action.agentId);
-    const insertionIndex = action.beforeAgentId === null ? agentOrder.length : agentOrder.indexOf(action.beforeAgentId);
-    agentOrder.splice(insertionIndex < 0 ? agentOrder.length : insertionIndex, 0, action.agentId);
-    const agentAssignments = { ...layout.agentAssignments };
-    if (action.sectionId === null) delete agentAssignments[action.agentId];
-    else agentAssignments[action.agentId] = action.sectionId;
-    return { ...layout, revision, agentAssignments, agentOrder };
-  }
-  const agentAssignments = { ...layout.agentAssignments };
-  if (action.sectionId === null) delete agentAssignments[action.agentId];
-  else agentAssignments[action.agentId] = action.sectionId;
-  return { ...layout, revision, agentAssignments };
-}
-
 const meta = {
   title: "Navigation/Sidebar",
   component: Sidebar,
-  render: (storyArgs) => <InteractiveSidebar {...storyArgs} />,
+  render: (storyArgs) => <SettledArgs>{() => <InteractiveSidebar {...storyArgs} />}</SettledArgs>,
   args,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof Sidebar>;
@@ -540,6 +484,74 @@ export const Sections: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
+const folderIds = {
+  clients: "55555555-5555-4555-8555-555555555550",
+  acme: "55555555-5555-4555-8555-555555555551",
+  launch: "55555555-5555-4555-8555-555555555552",
+  northwind: "55555555-5555-4555-8555-555555555553",
+  internal: "55555555-5555-4555-8555-555555555554",
+  archive: "55555555-5555-4555-8555-555555555555",
+};
+/** Three levels: "Clients / Acme Robotics / Launch". "Archive" is empty. */
+const folderLayout: SidebarLayoutSnapshot = {
+  revision: 1,
+  sections: [
+    { id: folderIds.clients, name: "Clients" },
+    { id: folderIds.acme, name: "Acme Robotics", parentId: folderIds.clients },
+    { id: folderIds.launch, name: "Launch", parentId: folderIds.acme },
+    { id: folderIds.northwind, name: "Northwind", parentId: folderIds.clients },
+    { id: folderIds.internal, name: "Internal" },
+    { id: folderIds.archive, name: "Archive" },
+  ],
+  order: [
+    "people",
+    folderIds.clients,
+    folderIds.acme,
+    folderIds.launch,
+    folderIds.northwind,
+    folderIds.internal,
+    folderIds.archive,
+    "unassigned",
+  ],
+  agentAssignments: {
+    chief: folderIds.internal,
+    research: folderIds.acme,
+    sales: folderIds.clients,
+    "stress-agent-1": folderIds.acme,
+    "stress-agent-2": folderIds.launch,
+    "stress-agent-3": folderIds.launch,
+    "stress-agent-4": folderIds.northwind,
+    "stress-agent-5": folderIds.internal,
+  },
+  agentOrder: ["sales", "research", "stress-agent-1", "stress-agent-2", "stress-agent-3", "chief"],
+};
+const folderAgents = stressAgents.slice(0, 11);
+
+/** Folders in folders. A folder header stays at the top while its chats scroll under it. */
+export const Folders: Story = {
+  args: {
+    agents: folderAgents,
+    layout: folderLayout,
+    pinnedItems: [],
+    foldersSupported: true,
+    sectionDuplicateSupported: true,
+    onDuplicateSection: fn(),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/** Closed folders are a list of headers. A closed folder shows its unread count. */
+export const FoldersClosed: Story = {
+  args: {
+    agents: folderAgents,
+    layout: folderLayout,
+    pinnedItems: [],
+    foldersSupported: true,
+    collapsedSectionIds: [folderIds.acme, folderIds.internal],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
 export const DragStress: Story = {
   args: { agents: stressAgents, layout: stressLayout, pinnedItems: pinnedSix },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
@@ -593,7 +605,7 @@ const serverMenu = {
   onSelect: fn(),
   onAdd: fn(),
   onSetMuted: fn(),
-  onSetNotificationLevel: fn(),
+  onOpenNotificationSettings: fn(),
   onOpenSettings: fn(),
 };
 
@@ -730,4 +742,79 @@ export const DeletedChats: Story = {
     showingArchivedChannels: true,
     deletedChannels: storyChannels.map((channel) => ({ ...channel, id: `deleted-${channel.id}`, archived: true })),
   },
+};
+
+/* The felt badges: unread counts of one, two and three digits, a failed routine, and the "+N" count
+ * of the channel clusters. "Research" is pinned and active, so its badge sits on the raised row. */
+const feltBadgeStates: Record<string, SidebarAgentState> = {
+  chief: { kind: "unread", count: 1 },
+  research: { kind: "unread", count: 10 },
+  sales: { kind: "unread", count: 128 },
+  "stress-agent-1": { kind: "routine", phase: "failed", count: 1 },
+};
+
+export const FeltBadges: Story = {
+  args: {
+    ...Channels.args,
+    activeAgentId: "research",
+    activeChannelId: null,
+    agentStates: feltBadgeStates,
+    pinnedItems: [
+      { kind: "agent", id: "research" },
+      { kind: "agent", id: "stress-agent-1" },
+      { kind: "channel", id: "channel-13" },
+      { kind: "channel", id: "channel-2" },
+    ],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/* The steps of the smoke: a new unread, two counts that go up, the count read to zero, and a routine
+ * that fails and then succeeds. Each button sets the state, so each transition can run again. */
+const feltBadgeSteps: {
+  label: string;
+  chief?: SidebarAgentState | undefined;
+  sales?: SidebarAgentState | undefined;
+}[] = [
+  { label: "1", chief: { kind: "unread", count: 1 } },
+  { label: "10", chief: { kind: "unread", count: 10 } },
+  { label: "128", chief: { kind: "unread", count: 128 } },
+  { label: "Read", chief: undefined },
+  { label: "Fail", sales: { kind: "routine", phase: "failed", count: 1 } },
+  { label: "Succeed", sales: undefined },
+];
+
+function FeltBadgeTransitions(props: Parameters<typeof Sidebar>[0]) {
+  const [states, setStates] = createSignal<Record<string, SidebarAgentState>>({});
+  const apply = (step: (typeof feltBadgeSteps)[number]) =>
+    setStates((current) => {
+      const next = { ...current };
+      for (const id of ["chief", "sales"] as const) {
+        if (!(id in step)) continue;
+        const state = step[id];
+        if (state) next[id] = state;
+        else delete next[id];
+      }
+      return next;
+    });
+  return (
+    <div class="grid h-screen w-[280px] grid-rows-[auto_1fr]">
+      <div class="flex flex-wrap gap-1 p-2">
+        <For each={feltBadgeSteps}>
+          {(step) => (
+            <Button size="sm" variant="outline" onClick={() => apply(step)}>
+              {step.label}
+            </Button>
+          )}
+        </For>
+      </div>
+      <InteractiveSidebar {...props} agentStates={states()} />
+    </div>
+  );
+}
+
+/** Each button sets one state, so the badge lands, rolls its digits, closes, and the X lands. */
+export const FeltBadgeMotion: Story = {
+  args: { pinnedItems: [{ kind: "agent", id: "chief" }], activeAgentId: "research" },
+  render: (storyArgs) => <SettledArgs>{() => <FeltBadgeTransitions {...storyArgs} />}</SettledArgs>,
 };

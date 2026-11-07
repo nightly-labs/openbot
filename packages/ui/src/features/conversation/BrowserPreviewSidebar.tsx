@@ -1,7 +1,8 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
-import { Button, ChevronRight, Maximize2, Monitor, Plus, Skeleton, X } from "@openbot/ui";
+import { Button, Maximize2, Monitor, Skeleton, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { useText } from "@openbot/ui/text";
+import { holdFlag } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 
 const BROWSER_PANEL_MIN = 220;
@@ -23,11 +24,16 @@ interface BrowserPreviewSidebarProps {
   onOpenTab: (tabId: string, trigger: HTMLButtonElement) => void;
   onCloseTab?: (tabId: string) => void;
   onNewTab?: () => void;
-  onCollapse: () => void;
 }
 
 export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps) {
   const { t } = useText();
+  let panel!: HTMLElement;
+  // The chat beside the panel makes room for it, also while the full view hides it (`panel-layout.css`).
+  onSettled(() => {
+    const conversation = panel.closest(".conversation-panel");
+    return conversation ? holdFlag(conversation, "browser-side-panel") : undefined;
+  });
   const defaultPanelWidth = () =>
     Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
   const storedPanelWidth = props.readCustomWidth();
@@ -68,6 +74,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
 
   return (
     <aside
+      ref={panel}
       id="browser-side-panel"
       class="browser-panel browser-preview-sidebar"
       aria-label={t("browser.previews.label")}
@@ -88,24 +95,6 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         onReset={resetPanelWidth}
       />
 
-      <header class="window-drag browser-preview-header">
-        <span class="side-panel-pane-title">{t("browser.panel.label")}</span>
-        <Show when={props.onNewTab}>
-          <Button variant="ghost" size="icon-sm" aria-label={t("browser.newTab")} onClick={() => props.onNewTab?.()}>
-            <Plus />
-          </Button>
-        </Show>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          class="side-panel-pane-close"
-          aria-label={t("browser.previews.collapse")}
-          data-cuelume-tap="close"
-          onClick={props.onCollapse}
-        >
-          <ChevronRight />
-        </Button>
-      </header>
       <div class="browser-preview-list">
         <For each={props.tabs} keyed={(tab) => tab.id}>
           {(tab) => (

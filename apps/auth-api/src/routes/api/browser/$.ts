@@ -7,10 +7,10 @@ import {
   requestAuthService,
   requestAvatarBucket,
   requestBillingService,
+  requestCompanySignIn,
   requestHostedServerService,
   requestHostedSiteService,
   requestRemoteControlPlane,
-  requestRemoteSignalUrl,
   requestTeamInviteEmailDelivery,
 } from "../../../server/request-auth";
 import { requestSourceIp } from "../../../server/source-ip";
@@ -19,6 +19,7 @@ function handle({ request }: { request: Request }) {
   return handleBrowserApi(request, {
     auth: requestAuthService(),
     remote: requestRemoteControlPlane(),
+    companySignIn: requestCompanySignIn,
     hostLogo: (hostId, version) => readHostLogo(requestAvatarBucket(), hostId, version),
     hosting: requestHostedServerService,
     inviteEmailDelivery: requestTeamInviteEmailDelivery,
@@ -26,7 +27,6 @@ function handle({ request }: { request: Request }) {
     billing: requestBillingService,
     avatarBucket: requestAvatarBucket,
     hostedSites: requestHostedSiteService,
-    signalUrl: requestRemoteSignalUrl,
     sourceIp: requestSourceIp,
     errorResponse: hostedServerErrorResponse,
   });

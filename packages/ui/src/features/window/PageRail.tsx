@@ -6,6 +6,8 @@ import {
   ChartArea,
   DropdownMenu,
   Ellipsis,
+  GalleryVerticalEnd,
+  ListChecks,
   MotionTooltip,
   Pin,
   Settings,
@@ -168,14 +170,25 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
 }
 
 /** The rail pages. Agents and Routines show the same page with a different sidebar list. */
-export type PageRailPage = "agents" | "routines" | "workflows" | "schedule" | "usage" | "marketplace" | "settings";
+export type PageRailPage =
+  | "agents"
+  | "routines"
+  | "workflows"
+  | "tasks"
+  | "schedule"
+  | "usage"
+  | "library"
+  | "marketplace"
+  | "settings";
 
 /** The pages that the user can pin to the rail, in rail order. Agents always shows. */
 export const PAGE_RAIL_PINNABLE_PAGES = [
   "routines",
   "workflows",
+  "tasks",
   "schedule",
   "usage",
+  "library",
 ] as const satisfies readonly PageRailPage[];
 export type PageRailPinnablePage = (typeof PAGE_RAIL_PINNABLE_PAGES)[number];
 
@@ -195,9 +208,13 @@ export interface PageRailProps {
   onRoutines?: (() => void) | undefined;
   /** Absent when the server has no workflows. */
   onWorkflows?: (() => void) | undefined;
+  /** Absent where the server keeps no tasks. */
+  onTasks?: ((button: HTMLElement) => void) | undefined;
   /** Absent where there is no schedule page. */
   onSchedule?: ((button: HTMLElement) => void) | undefined;
   onUsage: (button: HTMLElement) => void;
+  /** Absent where the server keeps no files, such as the web client. */
+  onLibrary?: ((button: HTMLElement) => void) | undefined;
   /** Absent while Marketplace cannot open. */
   onMarketplace?: (() => void) | undefined;
   onSettings: (button: HTMLElement) => void;
@@ -335,7 +352,7 @@ export function PageRail(props: PageRailProps) {
   /** The pages that this server has, in rail order. */
   const pages = createMemo((): RailPage[] => {
     const list: RailPage[] = [];
-    const { onRoutines, onWorkflows, onSchedule } = props;
+    const { onRoutines, onWorkflows, onTasks, onSchedule } = props;
     if (onRoutines) {
       list.push({
         id: "routines",
@@ -352,6 +369,9 @@ export function PageRail(props: PageRailProps) {
         open: () => onWorkflows(),
       });
     }
+    if (onTasks) {
+      list.push({ id: "tasks", label: t("app.rail.tasks"), icon: ListChecks, open: onTasks });
+    }
     if (onSchedule) {
       list.push({
         id: "schedule",
@@ -361,6 +381,10 @@ export function PageRail(props: PageRailProps) {
       });
     }
     list.push({ id: "usage", label: t("app.rail.usage"), icon: ChartArea, open: props.onUsage });
+    const onLibrary = props.onLibrary;
+    if (onLibrary) {
+      list.push({ id: "library", label: t("app.rail.library"), icon: GalleryVerticalEnd, open: onLibrary });
+    }
     return list;
   });
   return (

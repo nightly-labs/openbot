@@ -64,9 +64,14 @@ const Navigation = createSimpleContext({
       nonce: number;
     } | null>(null);
 
-    /** False when the chat opens in another window. */
-    function selectAgent(agentId: string): boolean {
+    /**
+     * False when the chat opens in another window. With `tabId`, the agent opens at that thread tab, not
+     * at the tab it showed last: a link from a message opens a conversation of that message.
+     */
+    function selectAgent(agentId: string, tabId?: string): boolean {
       if (agentSetupOpen() && creatingAgent()) return false;
+      // The tab is written first, so a chat window that opens for the agent reads it.
+      if (tabId !== undefined) agentThreads.open(agentId, tabId);
       // A chat window shows its one chat, and main marks that chat in the sidebar. Another agent
       // opens in its own chat window, from search, a schedule or the Dynamic Island.
       const chatWindow = platform.chatWindow;
@@ -255,7 +260,12 @@ const Navigation = createSimpleContext({
       else if (entry.kind === "channel") void channels.open(entry.id);
       else void selectDirectMember(entry.id);
     }
-    const goBack = () => goInHistory(-1);
+    /** Back first leaves an open settings detail page, such as Providers › ChatGPT, for its list. */
+    const goBack = () => {
+      const pageBack = windowPage.pageBack();
+      if (pageBack) pageBack.back();
+      else goInHistory(-1);
+    };
     const goForward = () => goInHistory(1);
 
     /** A dialog or menu over the chat keeps its keys and mouse buttons. */
@@ -297,7 +307,7 @@ const Navigation = createSimpleContext({
       globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
-      chatHistory: { previous: history.previous, next: history.next, goBack, goForward },
+      chatHistory: { previous: history.previous, next: history.next, pageBack: windowPage.pageBack, goBack, goForward },
     };
   },
 });

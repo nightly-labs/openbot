@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { isAgentTaskOpen, taskNeedsYou } from "@openbot/team-client/agent-tasks";
 import * as Crypto from "expo-crypto";
 import { type Href, router, useFocusEffect } from "expo-router";
@@ -8,24 +9,23 @@ import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import ChartColumn from "lucide-react-native/icons/chart-column";
+import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CircleX from "lucide-react-native/icons/circle-x";
 import EyeOff from "lucide-react-native/icons/eye-off";
+import ListChecks from "lucide-react-native/icons/list-checks";
 import ListRestart from "lucide-react-native/icons/list-restart";
 import Plus from "lucide-react-native/icons/plus";
 import Search from "lucide-react-native/icons/search";
 import Settings from "lucide-react-native/icons/settings";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
-import SquareCheck from "lucide-react-native/icons/square-check";
 import UsersRound from "lucide-react-native/icons/users-round";
 import {
   type ComponentProps,
   type PropsWithChildren,
   type RefObject,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -59,8 +59,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
+import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { MobileSearchResults, SearchCaption } from "@/features/search/components/mobile-search-results";
 import { setHomeSearchOpener } from "@/features/search/model/home-search-request";
@@ -74,15 +73,26 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { BlurSwap } from "@/shared/components/blur-swap";
+import { useBottomFieldMetrics } from "@/shared/components/bottom-field-metrics";
 import { ANDROID_BLUR, GLASS_CAPSULE_HEIGHT, GlassCapsule } from "@/shared/components/glass-capsule";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion, useTransitionMode } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { currentText, useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
+
+/**
+ * Opens an agent chat from the search. In the chat list pane, the chat takes the place of the open
+ * one.
+ */
+function openSearchedChat(pane: ReturnType<typeof useChatListPane>, agentId: string): void {
+  const open = () => router.push({ pathname: "/chat/[agentId]", params: { agentId } });
+  if (pane) openChatFromPane(pane, agentId, open);
+  else open();
+}
 
 /** The height of the search field at the bottom of home. */
 export const HOME_SEARCH_HEIGHT = GLASS_CAPSULE_HEIGHT;
@@ -490,6 +500,8 @@ export function HomeSearchResults({
         contentContainerStyle={{
           paddingTop: insets.top + RESULTS_TOP_GAP,
           paddingBottom: HOME_SEARCH_HEIGHT + Math.max(insets.bottom, 12) + 24,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         }}
         mode="insets"
         bottomOffset={HOME_SEARCH_HEIGHT + KEYBOARD_GAP}
@@ -581,6 +593,7 @@ function TaskTargetRow({ agent, onPress }: { agent: MobileAgent; onPress: () => 
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={36}
         animateIdle={false}
@@ -616,14 +629,35 @@ export function HomeSearchBar({
   // clears it first.
   const touched = useRef(false);
   // A quick action of the app icon opens the search with the keyboard. The field registers it, so a
-  // request that comes while the list loads waits until the field and its input are mounted.
+  // request that comes while the list loads waits until the field and its input are mounted. A request
+  // that closes the screens over home comes before home shows again, and a hidden field takes no
+  // focus, so the field waits for home to have focus.
+  const navigation = useNavigation();
   useEffect(() => {
-    setHomeSearchOpener(() => {
+    let removeFocusListener: (() => void) | null = null;
+    const focusField = () => {
       touched.current = false;
       input.current?.focus();
+    };
+    setHomeSearchOpener(() => {
+      removeFocusListener?.();
+      removeFocusListener = null;
+      if (navigation.isFocused()) {
+        focusField();
+        return;
+      }
+      const remove = navigation.addListener("focus", () => {
+        remove();
+        removeFocusListener = null;
+        focusField();
+      });
+      removeFocusListener = remove;
     });
-    return () => setHomeSearchOpener(null);
-  }, [input]);
+    return () => {
+      removeFocusListener?.();
+      setHomeSearchOpener(null);
+    };
+  }, [input, navigation]);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reduced = useReducedMotion();
@@ -639,13 +673,11 @@ export function HomeSearchBar({
   if (search.result && search.result !== shownResult) setShownResult(search.result);
   const showsResult = search.result !== null;
   const resultColor = shownResult?.ok
-    ? getBloubAvatarColor(shownResult.agent.avatarSeed, shownResult.agent.avatarHue)
+    ? avatarHeadColor(shownResult.agent.avatarSeed, shownResult.agent.avatarHue, shownResult.agent.avatarColor)
     : danger;
   // As the prototype: the color at 18% over the field, so the text in the same color stays readable.
   const resultTint = `${resultColor}2e`;
-  // iOS sets the field into the home indicator area. The Android gesture handle is lower in the
-  // inset and the field must stay above it.
-  const bottomGap = isAndroid ? insets.bottom + 8 : Math.max(insets.bottom - 8, 12);
+  const { height: fieldHeight, bottomGap } = useBottomFieldMetrics();
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   // The field rises only when the keyboard reaches it, and then stays 8 pt above it. Android can
   // report an open keyboard with no height (a hardware or floating keyboard); the field stays.
@@ -677,9 +709,9 @@ export function HomeSearchBar({
 
   return (
     <Animated.View
-      className="absolute right-4 left-4 flex-row items-center gap-2"
+      className="absolute flex-row items-center gap-2"
       pointerEvents="box-none"
-      style={[{ bottom: bottomGap }, barStyle]}
+      style={[{ bottom: bottomGap, left: insets.left + 16, right: insets.right + 16 }, barStyle]}
     >
       {search.mounted ? (
         // While the results leave, the button is out of the layout, so the field grows under it as its
@@ -704,7 +736,8 @@ export function HomeSearchBar({
             <GlassCapsule
               liquidGlass={liquidGlass}
               fallbackBackground={fieldBackground}
-              width={HOME_SEARCH_HEIGHT}
+              width={fieldHeight}
+              height={fieldHeight}
               animateGlass
               glassHidden={!search.open}
             >
@@ -736,6 +769,7 @@ export function HomeSearchBar({
       ) : null}
       <Animated.View className="min-w-0 flex-1" layout={layout}>
         <HomeFieldCapsule
+          height={fieldHeight}
           liquidGlass={liquidGlass}
           fallbackBackground={fieldBackground}
           tint={resultTint}
@@ -790,6 +824,7 @@ export function HomeSearchBar({
                   paddingBottom: 0,
                   paddingTop: 0,
                   textAlignVertical: "center",
+                  ...fieldDirectionStyle(search.query),
                 }}
                 value={search.query}
                 onChangeText={search.setQuery}
@@ -912,6 +947,7 @@ function TaskResultContent({
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={26}
         animateIdle={false}
@@ -943,7 +979,7 @@ const TARGET_NAME_WIDTH = 80;
  */
 function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void }) {
   const { t } = useText();
-  const color = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
+  const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
   return (
     <Pressable
       accessibilityRole="button"
@@ -958,6 +994,7 @@ function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => voi
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={28}
         animateIdle={false}
@@ -1029,7 +1066,7 @@ interface Shortcut {
 /** Before the user types: the pages to go to, and the agents of the server. */
 function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseTasks: boolean }) {
   const { t } = useText();
-  const gate = useContext(ChatNavigationGateContext);
+  const pane = useChatListPane();
   const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const hasServer = useMobileWorkspaceSelector((current) =>
     current.servers.some((server) => server.id === current.activeServer.id),
@@ -1043,7 +1080,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
             {
               id: "tasks",
               label: t("mobile.app.route.threads"),
-              icon: SquareCheck,
+              icon: ListChecks,
               href: { pathname: "/server-tasks", params: { serverId } } as const,
             },
           ]
@@ -1052,14 +1089,14 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
         ? [
             {
               id: "routines",
-              label: t("mobile.app.route.routines"),
+              label: t("mobile.app.route.schedule"),
               icon: CalendarClock,
               href: { pathname: "/server-routines", params: { serverId } } as const,
             },
             {
               id: "usage",
               label: t("mobile.app.route.usage"),
-              icon: ChartColumn,
+              icon: ChartArea,
               href: { pathname: "/server-usage", params: { serverId } } as const,
             },
             {
@@ -1086,7 +1123,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
   );
   const openChat = (agent: MobileAgent) => {
     onLeave();
-    if (!gate?.openFromHome(agent.id)) router.push({ pathname: "/chat/[agentId]", params: { agentId: agent.id } });
+    openSearchedChat(pane, agent.id);
   };
   return (
     <View className="pb-2">
@@ -1135,9 +1172,9 @@ const NAME_MARK = "\u2063";
  */
 function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSearch }) {
   const { t } = useText();
-  const gate = useContext(ChatNavigationGateContext);
+  const pane = useChatListPane();
   const muted = String(useThemeColor("muted"));
-  const color = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
+  const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
   const { tasks } = useServerTasks(agent.serverId, { agentId: agent.id });
   const sorted = [...tasks].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   const ideas = [...new Set(sorted.filter((task) => !isAgentTaskOpen(task)).map((task) => task.title.trim()))]
@@ -1147,7 +1184,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   const [before = "", after = ""] = t("mobile.search.thread.newFor", { name: NAME_MARK }).split(NAME_MARK);
   const message = () => {
     search.leave();
-    if (!gate?.openFromHome(agent.id)) router.push({ pathname: "/chat/[agentId]", params: { agentId: agent.id } });
+    openSearchedChat(pane, agent.id);
   };
   return (
     // The spacing of the prototype: 4 pt above the page, 8 pt beside the avatar, 10 pt above the line.
@@ -1158,6 +1195,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
             agentId={agent.id}
             serverId={agent.serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={40}
             animateIdle={false}
@@ -1177,7 +1215,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
         </View>
         <View className="flex-row items-start gap-2">
           <View className="pt-0.5">
-            <SquareCheck color={muted} size={16} strokeWidth={1.8} />
+            <ListChecks color={muted} size={16} strokeWidth={1.8} />
           </View>
           <Typography.Paragraph className="min-w-0 flex-1 text-muted" style={typeScale.caption}>
             {t("mobile.search.thread.how", { name: agent.name })}{" "}
@@ -1323,6 +1361,7 @@ function AgentChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void
             agentId={agent.id}
             serverId={agent.serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={48}
             animateIdle={false}

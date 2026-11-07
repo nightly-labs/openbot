@@ -27,7 +27,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Result, Schema, Semaphore } from "effect";
+import { Cache, Effect, Exit, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
@@ -40,6 +40,8 @@ import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery
 import { archiveDirectory, inspectArchive, inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
+/** How long `listInstalled` keeps the newest catalog version of a skill. */
+const CATALOG_VERSION_LIFETIME = "60 seconds";
 const SKILL_FOLDER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 interface Draft {
@@ -69,9 +71,21 @@ interface SkillsLock {
 export class SkillMarketplaceService {
   readonly #drafts = new Map<string, Draft>();
   readonly #writes = new Map<string, { gate: Semaphore.Semaphore; users: number }>();
+  /**
+   * The newest catalog version of each listed skill, for `listInstalled`. The Skills tab reads every
+   * agent at once and agents share skills, so one GET for each skill serves all agents for a short
+   * time. A read that starts while the GET of the same skill runs waits for that GET. A failed GET is
+   * not kept: the next read asks again, and this read keeps the installed version, as before.
+   */
+  readonly #catalogVersions = Effect.runSync(
+    Cache.makeWith((skillId: string) => this.get(skillId).pipe(Effect.map((detail) => detail.version)), {
+      capacity: 1_000,
+      timeToLive: (exit) => (Exit.isSuccess(exit) ? CATALOG_VERSION_LIFETIME : 0),
+    }),
+  );
 
   constructor(
-    private readonly auth: CentralAuthManager,
+    private readonly auth: Pick<CentralAuthManager, "requestAuthorized" | "downloadAuthorized" | "resolveApiUrl">,
     private readonly listAgents: () => AgentSummary[],
     private readonly refreshAgentRuntime: (agentId: string) => Effect.Effect<void, AgentLifecycleFailed> = () =>
       Effect.void,
@@ -101,6 +115,24 @@ export class SkillMarketplaceService {
         return yield* this.requireLocalLibrary().get(skillId).pipe(toSkillMarketplaceFailure);
       const detail = yield* this.auth
         .requestAuthorized(`/v1/skills/${encodeURIComponent(skillId)}`, { method: "GET" }, decodeMarketplaceSkillDetail)
+        .pipe(toSkillMarketplaceFailure);
+      return {
+        ...detail,
+        iconUrl: this.absoluteUrl(detail.iconUrl),
+        creatorAvatarUrl: this.absoluteUrl(detail.creatorAvatarUrl ?? null),
+      };
+    });
+  }
+
+  /** The skill a shared link names, by its slug. Only a link reads this; it never adds the skill. */
+  getBySlug(slug: string): Effect.Effect<MarketplaceSkillDetail, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
+      const detail = yield* this.auth
+        .requestAuthorized(
+          `/v1/skills/slug/${encodeURIComponent(slug)}`,
+          { method: "GET" },
+          decodeMarketplaceSkillDetail,
+        )
         .pipe(toSkillMarketplaceFailure);
       return {
         ...detail,
@@ -167,8 +199,8 @@ export class SkillMarketplaceService {
       const installed: InstalledSkill[] = [];
       for (const entry of Object.values(lock.skills)) {
         let availableVersion = entry.version;
-        const detail = yield* Effect.result(this.get(entry.skillId));
-        if (Result.isSuccess(detail)) availableVersion = detail.success.version;
+        const newest = yield* Effect.result(this.#availableVersion(entry.skillId));
+        if (Result.isSuccess(newest)) availableVersion = newest.success;
         const state = yield* installedState(agent.workspacePath, entry);
         installed.push(
           toInstalledSkill(
@@ -182,6 +214,13 @@ export class SkillMarketplaceService {
       installed.push(...(yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)));
       return installed.sort((a, b) => a.name.localeCompare(b.name));
     });
+  }
+
+  /** A local skill is read from this computer each time; a catalog skill comes from the short cache. */
+  #availableVersion(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
+    return skillId.startsWith("local-skill-")
+      ? this.get(skillId).pipe(Effect.map((detail) => detail.version))
+      : Cache.get(this.#catalogVersions, skillId);
   }
 
   listInstalledForChatTags(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {
@@ -225,6 +264,9 @@ export class SkillMarketplaceService {
         : yield* this.auth
             .downloadAuthorized(`/v1/skills/${encodeURIComponent(input.skillId)}/content`)
             .pipe(toSkillMarketplaceFailure);
+      // The install read the newest version, so the next list does not show an older one as newest.
+      if (!input.skillId.startsWith("local-skill-"))
+        yield* Cache.set(this.#catalogVersions, input.skillId, detail.version);
       return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
     });
   }
@@ -398,6 +440,11 @@ export class SkillMarketplaceService {
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
       for (const folder of folders.keys()) {
         if (owned.has(folder)) continue;
+        // OpenBot writes its own skill to this folder in every workspace, so only an older install can own it.
+        if (MANAGED_SKILL_SLUGS.has(folder))
+          return yield* new SkillMarketplaceFailure({
+            cause: new Error(sourceText("error.skill.managedSlug", { slug: folder })),
+          });
         for (const target of [
           ...targetDirectories(agent.workspacePath, folder),
           disabledDirectory(agent.workspacePath, folder),
@@ -887,6 +934,15 @@ const readLock = Effect.fn("SkillMarketplace.readLock")(function* (
     if (!isSkillsLock(value)) throw new Error(sourceText("error.skill.lockInvalid"));
     return value;
   });
+});
+/** The folder of each installed pack and the folders of its skills. */
+export const readPackFolders = Effect.fn("SkillMarketplace.readPackFolders")(function* (workspace: string) {
+  const lock = yield* readLock(workspace);
+  return new Map(
+    Object.values(lock.skills).flatMap(
+      (entry): Array<[string, string[]]> => (entry.folders ? [[entry.slug, entry.folders]] : []),
+    ),
+  );
 });
 const writeLock = Effect.fn("SkillMarketplace.writeLock")((workspace: string, lock: SkillsLock) =>
   writeFileAtomically(lockPath(workspace), `${JSON.stringify(lock, null, 2)}\n`, { createDirectory: true }).pipe(

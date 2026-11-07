@@ -18,9 +18,13 @@ export interface ProviderPromptCacheSource extends HostPromptCacheTtlOptions {
 /**
  * The Claude page's prompt cache time of this computer or a joined server (`prompt-cache-ttl-v1`).
  * The host checks the role again. Undefined while `source` is.
+ *
+ * Each new value of `status` reads the time again: the host sends a status event after a change,
+ * such as one from the mobile app or another admin.
  */
 export function createProviderPromptCache(
   source: () => ProviderPromptCacheSource | undefined,
+  status: () => unknown,
 ): () => ProviderPromptCache | undefined {
   const { t, errorMessage } = useText();
   const calls = (): HostPromptCacheTtlCalls => source()?.calls ?? window.openbot.hostAdmin;
@@ -32,35 +36,54 @@ export function createProviderPromptCache(
   /** Bumped for each server, so an answer for an earlier one is dropped. */
   let generation = 0;
 
+  /** Bumped for each read and each save, so only the last answer shows. */
+  let reads = 0;
+
+  function load(serverId: string, request: number): void {
+    const read = ++reads;
+    untrack(calls)
+      .getPromptCacheTtl(serverId)
+      .then(
+        (next) => {
+          if (request === generation && read === reads && !state.pending)
+            setState((draft) => {
+              draft.value = next.ttl;
+            });
+        },
+        (error: unknown) => {
+          if (request === generation && read === reads && !state.pending)
+            setState((draft) => {
+              draft.error = errorMessage(error, t("provider.settings.promptCacheLoadFailed"));
+            });
+        },
+      );
+  }
+
   createEffect(
     () => source()?.serverId,
     (serverId) => {
       const current = ++generation;
       setState(() => ({ value: null, pending: false, error: null }));
-      if (serverId === undefined) return;
-      untrack(calls)
-        .getPromptCacheTtl(serverId)
-        .then(
-          (next) => {
-            if (current === generation)
-              setState((draft) => {
-                draft.value = next.ttl;
-              });
-          },
-          (error: unknown) => {
-            if (current === generation)
-              setState((draft) => {
-                draft.error = errorMessage(error, t("provider.settings.promptCacheLoadFailed"));
-              });
-          },
-        );
+      if (serverId !== undefined) load(serverId, current);
     },
   );
+
+  let opened = false;
+  createEffect(status, () => {
+    // The effect above reads the time when the page opens.
+    if (!opened) {
+      opened = true;
+      return;
+    }
+    const serverId = untrack(source)?.serverId;
+    if (serverId !== undefined && !untrack(() => state.pending)) load(serverId, generation);
+  });
 
   async function choose(ttl: PromptCacheTtl): Promise<void> {
     const serverId = source()?.serverId;
     if (serverId === undefined || state.pending) return;
     const request = generation;
+    reads++;
     setState((draft) => {
       draft.pending = true;
       draft.error = null;

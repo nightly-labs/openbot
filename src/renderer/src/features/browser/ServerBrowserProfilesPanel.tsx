@@ -1,5 +1,6 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { BrowserProfilesPanel } from "@openbot/ui/features/browser/BrowserProfilesPanel";
+import type { BrowserProfileProxies } from "@openbot/ui/features/browser/BrowserProxies";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
 import { actionToast } from "../../action-toast";
@@ -15,7 +16,8 @@ export interface ServerBrowserProfilesOptions {
 /**
  * The Browser profiles section of the server settings. It lists the profiles each time it opens,
  * and again when the settings change to another server. The list also counts the agents of the
- * shared profile, and each change lists it again, because a delete moves agents.
+ * shared profile, and each change lists it again, because a delete moves agents. A change made on
+ * another device, such as the phone, shows while the section is open.
  */
 export function ServerBrowserProfilesPanel(
   props: ServerBrowserProfilesOptions & { menuMount: HTMLElement | undefined },
@@ -38,8 +40,23 @@ export function ServerBrowserProfilesPanel(
         },
         () => undefined,
       );
+      return store.follow();
     },
   );
+  /** The proxy choice, when the server sent its proxies. An older server has no proxy routes. */
+  const proxies = (): BrowserProfileProxies | undefined => {
+    const list = props.store.state.proxies;
+    if (!list) return undefined;
+    return {
+      list,
+      computers: props.store.state.computers ?? [],
+      sharing: props.store.state.sharing,
+      onSave: props.store.saveProxy,
+      onDelete: props.store.removeProxy,
+      onSetProfileProxy: props.store.setProfileProxy,
+      onSetSharing: props.store.setSharing,
+    };
+  };
   return (
     <BrowserProfilesPanel
       profiles={props.store.state.profiles}
@@ -53,6 +70,7 @@ export function ServerBrowserProfilesPanel(
       onClear={props.store.clear}
       onDelete={props.store.remove}
       menuMount={props.menuMount}
+      proxies={proxies()}
     />
   );
 }

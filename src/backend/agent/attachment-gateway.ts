@@ -311,6 +311,12 @@ export class AttachmentGateway {
     const [workspaceRoot, sharedRoot] = yield* attachmentCall(() =>
       Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]),
     );
+    // The folders the user gave the agent. One that was moved or deleted is left out.
+    const folderRoots = yield* attachmentCall(async () =>
+      (await Promise.allSettled((agent.additionalFolders ?? []).map((folder) => realpath(folder)))).flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      ),
+    );
     const normalized = value.replaceAll("\\", "/");
     const sharedReference = ["~/OpenBot/Shared/", "OpenBot/Shared/", "Shared/"].some((prefix) =>
       normalized.startsWith(prefix),
@@ -324,19 +330,30 @@ export class AttachmentGateway {
         ? [sharedPathFromInput(this.#sharedRoot, value)]
         : [workspacePathFromInput(agent.workspacePath, agent.id, value), sharedPathFromInput(this.#sharedRoot, value)];
 
+    // Why each candidate failed, so the agent and the log get the real cause (#4564).
+    const reasons: string[] = [];
     for (const candidate of candidates) {
       try {
         if (
           !scope.allowAnyReadablePath &&
           attachmentResult(yield* Effect.result(attachmentCall(() => lstat(candidate)))).isSymbolicLink()
-        )
+        ) {
+          reasons.push("the path is a symbolic link");
           continue;
+        }
         const resolved = attachmentResult(yield* Effect.result(attachmentCall(() => realpath(candidate))));
-        if (!scope.allowAnyReadablePath && !isWithin(workspaceRoot, resolved) && !isWithin(sharedRoot, resolved)) {
+        if (
+          !scope.allowAnyReadablePath &&
+          ![workspaceRoot, sharedRoot, ...folderRoots].some((root) => isWithin(root, resolved))
+        ) {
+          reasons.push("the file is outside these folders");
           continue;
         }
         const authorizedMetadata = attachmentResult(yield* Effect.result(attachmentCall(() => lstat(resolved))));
-        if (authorizedMetadata.isSymbolicLink() || !authorizedMetadata.isFile()) continue;
+        if (authorizedMetadata.isSymbolicLink() || !authorizedMetadata.isFile()) {
+          reasons.push("the path is not a regular file");
+          continue;
+        }
         let retained = false;
         return attachmentResult(
           yield* Effect.result(
@@ -359,16 +376,27 @@ export class AttachmentGateway {
             ),
           ),
         );
-      } catch {
+      } catch (error) {
         // Try the other permitted root for relative paths.
+        reasons.push(sourceFailureReason(error));
       }
     }
     return yield* attachmentFailure(
       new Error(
-        scope.allowAnyReadablePath
-          ? "Upload files must exist, be regular files, and be readable by OpenBot."
-          : "Attachment files must exist inside this agent's workspace or the OpenBot shared directory.",
+        `${
+          scope.allowAnyReadablePath
+            ? "Upload files must exist, be regular files, and be readable by OpenBot."
+            : "Attachment files must exist inside this agent's workspace or the OpenBot shared directory."
+        } Reason: ${[...new Set(reasons)].join("; ")}.`,
       ),
     );
   });
+}
+
+/** A Node error names its code and call, not the path, so the reason does not repeat a local path. */
+function sourceFailureReason(error: unknown): string {
+  if (error instanceof Error && "code" in error && typeof error.code === "string") {
+    return "syscall" in error && typeof error.syscall === "string" ? `${error.code} from ${error.syscall}` : error.code;
+  }
+  return error instanceof Error ? error.message.replace(/\.$/, "") : String(error);
 }

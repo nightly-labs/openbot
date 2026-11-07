@@ -31,11 +31,26 @@ export const messages = {
   "marketplace.agents.loadingDetail": "Загрузка сведений об агенте…",
   "marketplace.agents.skills": "Навыки",
   "marketplace.agents.routines": "Регулярные задачи",
-  "marketplace.agents.routineActive": "Активна",
   "marketplace.agents.routineInactive": "Неактивна",
+  "marketplace.agents.by": "автор: {name}",
+  "marketplace.agents.routineCount": {
+    one: "{count} регулярная задача",
+    few: "{count} регулярные задачи",
+    many: "{count} регулярных задач",
+    other: "{count} регулярной задачи",
+  },
+  "marketplace.agents.yours": "Ваши агенты",
+  "marketplace.agents.all": "Все агенты",
+  "marketplace.agents.missing": "Этого агента нет в каталоге.",
+  "marketplace.agents.trust.reviewed": "Создан другим пользователем OpenBot. OpenBot проверил его перед публикацией.",
+  "marketplace.agents.trust.reviewedBeforeAdd":
+    "Создан другим пользователем OpenBot. OpenBot проверил его перед публикацией. После добавления он может действовать от вашего имени.",
+  "marketplace.agents.trust.pending": "Автор поделился им до проверки OpenBot.",
+  "marketplace.agents.trust.pendingBeforeAdd":
+    "Автор поделился им до проверки OpenBot. После добавления он может действовать от вашего имени.",
+  "marketplace.agents.source.pending": "Ещё не проверен",
 
   "marketplace.skill.loading": "Загрузка навыка",
-  "marketplace.skill.update": "Обновить навык",
   "marketplace.try.readFailed": "OpenBot не удалось прочитать навыки этого агента. Повторите попытку.",
   "marketplace.try.enable": "Чтобы попробовать этот навык, включите его в настройках агента.",
   "marketplace.try.repair": "Чтобы попробовать этот навык, восстановите его в настройках агента.",
@@ -53,15 +68,6 @@ export const messages = {
     many: "{installs} установок",
     other: "{installs} установки",
   },
-  "marketplace.filter": "Фильтр",
-  "marketplace.filter.on": "Фильтр: {filters}",
-  "marketplace.filter.all": "Все",
-  "marketplace.filter.status": "Статус",
-  "marketplace.filter.category": "Категория",
-  "marketplace.filter.added": "Добавлены",
-  "marketplace.filter.notAdded": "Не добавлены",
-  "marketplace.filter.installed": "Установлены",
-  "marketplace.filter.notInstalled": "Не установлены",
   "marketplace.filter.clear": "Сбросить фильтры",
   "marketplace.noMatch.apps": "Приложений по этому запросу не найдено.",
   "marketplace.noMatch.filters": "Ничего не подходит под фильтры.",
@@ -86,8 +92,6 @@ export const messages = {
   "marketplace.empty.agents": "В каталоге пока нет агентов.",
   "marketplace.empty.apps": "В каталоге пока нет приложений.",
   "marketplace.empty.skills": "В каталоге пока нет навыков.",
-  "marketplace.properties.agent": "Об этом агенте",
-  "marketplace.properties.skill": "Об этом навыке",
   "marketplace.properties.creator": "Автор",
   "marketplace.properties.category": "Категория",
   "marketplace.properties.version": "Версия",
@@ -117,7 +121,9 @@ export const messages = {
   "marketplace.app.slackTagline": "Упоминания и личные сообщения в Slack",
   "marketplace.app.discordTagline": "Упоминания и личные сообщения в Discord",
   "marketplace.app.telegramTagline": "Группы и личные чаты в Telegram",
+  "marketplace.app.whatsappTagline": "Свой чат и разрешённые люди в WhatsApp",
   "marketplace.app.bitwardenTagline": "Вход на сайты с учётными данными из общей папки",
+  "marketplace.app.protonPassTagline": "Вход на сайты с учётными данными из общего хранилища",
   "marketplace.app.onePasswordCategory": "Управление логинами и учётными данными",
   "marketplace.app.yourApps": "Ваши приложения",
   "marketplace.app.addCustom": "Добавить своё",
@@ -138,6 +144,7 @@ export const messages = {
   "marketplace.app.setup.account": "Войдите в аккаунт {name} в браузере.",
   "marketplace.app.setup.key": "Нужен ключ API из аккаунта {name}.",
   "marketplace.app.setup.keySaved": "{field} хранится на {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot удалит данные входа этого аккаунта на {host}.",
   "marketplace.app.setup.desktop": "Работает в настольном приложении {name} по адресу {address}.",
   "marketplace.app.setup.desktopConnected": "Подключено к {address}.",
   "marketplace.app.setup.open": "Вход и ключ не нужны.",
@@ -230,6 +237,25 @@ export const messages = {
     "Используйте стили из этого репозитория и сделайте в Paper дизайн страницы настроек.",
   "marketplace.plugin.paper.prompt.tokens":
     "Перечислите токены дизайна в открытом файле Paper и сравните их с нашей темой.",
+  "marketplace.plugin.higgsfield.tagline": "ИИ-изображения, видео и аудио",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield позволяет агентам создавать изображения, видео, персонажей и аудио моделями Higgsfield, такими как Seedance, Kling, Veo и MiniMax Hailuo, проверять баланс кредитов и просматривать Asset Library. Результаты сохраняются в Assets Higgsfield пользователя. Каждый пользователь входит в свой аккаунт Higgsfield в браузере. Каждая генерация расходует кредиты этого аккаунта по стандартному тарифу, даже на безлимитном плане.",
+  "marketplace.plugin.higgsfield.app":
+    "Создание изображений, видео и аудио, персонажи, кредиты и ассеты через MCP-сервер Higgsfield со входом в браузере.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Сколько у меня кредитов Higgsfield?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Сделайте в Higgsfield предметное фото керамической кружки на деревянном столе.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Сделайте в Higgsfield 5-секундное видео волн на закате.",
+  "marketplace.plugin.elevenlabs.tagline": "Речь, голоса и голосовые агенты",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs позволяет агентам превращать текст в речь, работать с голосами, а также создавать, тестировать и просматривать голосовых агентов ElevenLabs и их разговоры. Созданное аудио приходит как ссылка для скачивания с коротким сроком действия. Каждый пользователь входит в свой аккаунт ElevenLabs в браузере, и каждая генерация расходует кредиты этого аккаунта.",
+  "marketplace.plugin.elevenlabs.app":
+    "Синтез речи, голоса и управление голосовыми агентами через MCP-сервер ElevenLabs со входом в браузере.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Прочитайте этот абзац спокойным голосом ElevenLabs и дайте мне аудио.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Покажите моих голосовых агентов ElevenLabs и голос каждого из них.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Кратко опишите последние десять разговоров моего голосового агента поддержки.",
   "marketplace.plugin.appleApps.tagline": "Почта, Календарь и другое на вашем Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps позволяет агентам работать с приложениями Почта, Календарь, Контакты, Напоминания, Заметки, Сообщения и Safari на этом Mac. Работает только в macOS. OpenBot запускает mcp-icloud — сервер сообщества, который не создан Apple или OpenBot. Сервер управляет приложениями через AppleScript на этом компьютере, и ему не нужны аккаунт или ключ. При установке OpenBot может сразу запросить у macOS доступ ко всем этим приложениям, по одному запросу на приложение. Иначе macOS спросит, когда агент впервые использует приложение. Чтобы изменить это позже, откройте Системные настройки › Конфиденциальность и безопасность › Автоматизация. Агенты могут отправлять письма и iMessage, а также изменять или удалять события, контакты и напоминания, поэтому проверяйте каждую запись перед подтверждением. То, что читают инструменты, например текст писем, передаётся провайдеру модели агента.",
@@ -248,6 +274,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Объясните самый частый сбой в мобильном проекте и его вероятную причину.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Насколько стабилен текущий релиз по сравнению с предыдущим?",
+  "marketplace.plugin.gitlab.tagline": "Задачи, merge requests и пайплайны",
+  "marketplace.plugin.gitlab.description":
+    "GitLab позволяет агентам искать проекты, читать и создавать задачи, проверять и обновлять merge requests, читать файлы и коммиты репозитория и проверять пайплайны и задания CI на GitLab.com. Каждый пользователь входит в свой аккаунт GitLab через браузер. У агентов те же права, что у пользователя: они могут отправлять коммиты, менять задачи и merge requests и сливать их. Для GitLab на своём сервере добавьте в настройках серверов MCP сервер с адресом вашего GitLab и /api/v4/mcp в конце, и войдите там.",
+  "marketplace.plugin.gitlab.app":
+    "Проекты, задачи, merge requests, репозитории и пайплайны CI через сервер MCP GitLab со входом через браузер.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Какие merge requests ждут моего ревью?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Почему упал последний пайплайн в основной ветке?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Заведите задачу о сбое в очереди синхронизации с шагами воспроизведения.",
   "marketplace.plugin.vercel.tagline": "Деплои, логи сборки и проекты",
   "marketplace.plugin.vercel.description":
     "Vercel позволяет агентам просматривать проекты и последние деплои, читать логи сборки и выполнения и выяснять, почему сборка не удалась. Каждый пользователь входит в свой аккаунт Vercel через браузер и выбирает команды, которые могут использовать агенты. В этих командах у агентов те же права, что и у аккаунта пользователя. Они также могут изменять переменные окружения, домены, DNS-записи и деплои, а также покупать домены.",
@@ -286,6 +321,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Найдите этот платёж и объясните, почему он не прошёл.",
   "marketplace.plugin.stripe.prompt.customer": "Кратко опишите счета этого клиента и его задолженность.",
   "marketplace.plugin.stripe.prompt.link": "Составьте платёжную ссылку на тариф Pro за 49 в месяц.",
+  "marketplace.plugin.revenuecat.tagline": "Подписки, продукты и пейволы",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat позволяет агентам читать и изменять настройки подписок в приложении: приложения, продукты, entitlements, offerings, пакеты, пейволы и эксперименты. Агенты также могут искать клиентов и их покупки, читать графики и метрики. Секретный API-ключ RevenueCat передаётся в одном заголовке Authorization. Ключ даёт доступ к одному проекту. С ключом только для чтения агенты могут только читать. С ключом для записи агенты могут отправлять продукты на проверку в App Store, выдавать клиентам entitlements и удалять пакеты, правила таргетинга и вебхуки.",
+  "marketplace.plugin.revenuecat.app":
+    "Продукты, entitlements, offerings, пейволы и метрики через MCP-сервер RevenueCat с секретным API-ключом.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Какие offerings и пакеты есть в моём проекте RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Как в этом месяце изменились мой доход и активные подписки в RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Какие entitlements есть у этого клиента RevenueCat и когда они истекают?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "В панели RevenueCat откройте API keys в своём проекте и создайте секретный API-ключ. Для просмотра данных достаточно ключа только для чтения.",
   "marketplace.plugin.posthog.tagline": "Продуктовая аналитика и флаги",
   "marketplace.plugin.posthog.description":
     "PostHog позволяет агентам запрашивать события и воронки, проверять флаги функций и кратко описывать, что изменилось после релиза. Персональный API-ключ из настроек проекта передаётся в одном заголовке Authorization.",
@@ -335,6 +382,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Отправьте черновик анонса запуска списку бета-тестеров.",
   "marketplace.plugin.resend.prompt.status": "Дошло ли письмо со счётом до клиента?",
   "marketplace.plugin.resend.prompt.template": "Составьте письмо для сброса пароля для нового сценария.",
+  "marketplace.plugin.omnisend.tagline": "Email- и SMS-маркетинг",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend позволяет агентам читать отчёты по кампаниям и формам, находить контакты и сегменты, а также создавать и изменять кампании, автоматизации, шаблоны писем, формы и товары. Каждый пользователь входит в свой аккаунт Omnisend в браузере и выбирает уровень доступа на экране согласия. С доступом на запись агенты также могут отправлять кампании и удалять данные. Выберите доступ только для чтения, если агентам нужны только отчёты.",
+  "marketplace.plugin.omnisend.app":
+    "Кампании, автоматизации, контакты, сегменты, формы и отчёты через MCP-сервер Omnisend со входом в браузере.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "Как прошли кампании прошлой недели по сравнению с позапрошлой?",
+  "marketplace.plugin.omnisend.prompt.segment": "Сколько контактов в сегменте VIP и как он изменился за этот месяц?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Подготовь черновик кампании для новой коллекции, но не отправляй его.",
   "marketplace.plugin.composio.tagline": "Множество приложений по вашей ссылке Composio",
   "marketplace.plugin.composio.description":
     "Composio подключает агентов к Gmail, Slack, GitHub и сотням других приложений через один сервер MCP. Подключите нужные приложения в своём аккаунте Composio и вставьте сюда его URL MCP и ключ API.",
@@ -404,6 +460,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Какие задачи в Todoist нужно сделать сегодня?",
   "marketplace.plugin.todoist.prompt.capture": "Добавь эти пункты в мои «Входящие» в Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Перенеси мои просроченные задачи в Todoist на завтра.",
+  "marketplace.plugin.ticktick.tagline": "Задачи, списки, привычки и фокус",
+  "marketplace.plugin.ticktick.description":
+    "TickTick позволяет агентам искать и фильтровать задачи, добавлять и изменять задачи, а также управлять списками, разделами, папками, тегами и комментариями. Агенты также могут читать и изменять привычки и записи фокуса и читать события из календарей, подключённых к TickTick. Каждый пользователь входит в свой аккаунт TickTick в браузере. Агенты получают доступ на чтение и запись: они могут завершать, перемещать и удалять задачи, а также удалять теги и записи фокуса.",
+  "marketplace.plugin.ticktick.app":
+    "Задачи, списки, привычки и записи фокуса через MCP-сервер TickTick со входом в браузере.",
+  "marketplace.plugin.ticktick.prompt.today": "Какие задачи в TickTick нужно сделать сегодня?",
+  "marketplace.plugin.ticktick.prompt.capture": "Добавь эти пункты во входящие TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "Какие задачи в TickTick были выполнены на прошлой неделе?",
   "marketplace.plugin.trello.tagline": "Доски, списки и карточки",
   "marketplace.plugin.trello.description":
     "С Trello агенты ищут и читают доски, списки, карточки, чек-листы и комментарии, создают доски и карточки, перемещают списки и карточки, отмечают карточки выполненными и добавляют чек-листы, комментарии и метки. Агенты также могут читать и добавлять карточки во «Входящих» Trello пользователя и читать события Planner, которые могут приходить из подключённого календаря Google или Outlook. Каждый пользователь входит в свой аккаунт Trello через браузер и выбирает рабочие пространства на экране согласия. В этих рабочих пространствах у агентов те же права, что и у пользователя. Они могут архивировать карточки и списки, но сервер не может ничего удалить навсегда.",
@@ -411,6 +475,34 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Какие карточки в Trello назначены мне?",
   "marketplace.plugin.trello.prompt.board": "Кратко опиши, что сейчас в работе на моей доске Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Добавь эти пункты как карточки на мою доску Trello.",
+  "marketplace.plugin.clickup.tagline": "Задачи, документы и новости команды",
+  "marketplace.plugin.clickup.description":
+    "ClickUp позволяет агентам искать задачи, документы, комментарии и чаты, создавать и изменять задачи, списки и документы, оставлять комментарии, отправлять сообщения в чат и учитывать время. Каждый пользователь входит в свой аккаунт ClickUp через браузер. Агенты получают те же права, что и пользователь. Они могут перемещать задачи в корзину и удалять комментарии.",
+  "marketplace.plugin.clickup.app":
+    "Задачи, документы, комментарии, чат и учёт времени через MCP-сервер ClickUp со входом в браузере.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Найди мои открытые задачи в ClickUp со сроком на этой неделе.",
+  "marketplace.plugin.clickup.prompt.createTask": "Создай задачу в ClickUp из этих пунктов и назначь её мне.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Найди последнее обновление проекта в ClickUp и кратко перечисли открытые вопросы.",
+  "marketplace.plugin.coinbase.tagline": "Курсы криптовалют, портфели и торговля",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase позволяет агентам читать курсы, балансы, портфели, ордера и комиссии в Coinbase Advanced Trade, просматривать и размещать ордера, обменивать активы и переводить средства между портфелями. Каждый пользователь входит в свой аккаунт Coinbase через браузер. У агентов те же права, что и у пользователя. Ордера и обмены используют реальные средства, а агенты могут оплачивать запросы x402 с баланса USDC.",
+  "marketplace.plugin.coinbase.app":
+    "Курсы, балансы, портфели, ордера и обмены через MCP-сервер Coinbase со входом в браузере.",
+  "marketplace.plugin.coinbase.prompt.balances": "Какие у меня балансы на Coinbase в каждом портфеле?",
+  "marketplace.plugin.coinbase.prompt.price": "Покажи курс BTC-USD на Coinbase и как он менялся на этой неделе.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Покажи предварительный просмотр рыночной покупки ETH на 50 USD на Coinbase. Не размещай ордер.",
+  "marketplace.plugin.robinhood.tagline": "Брокерские счета и торговля через агентов",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood позволяет агентам читать счета, позиции, балансы, историю операций и списки наблюдения клиента Robinhood, читать рыночные данные и размещать ордера на акции, опционы и криптовалюту. Каждый пользователь входит в свой аккаунт Robinhood через браузер. При первом входе Robinhood просит пользователя открыть отдельный счёт Agentic. Агенты могут торговать только на этом счёте и по умолчанию размещают ордера, не запрашивая у пользователя подтверждения каждого.",
+  "marketplace.plugin.robinhood.app":
+    "Счета, позиции, рыночные данные и сделки через MCP-сервер Robinhood со входом в браузере.",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Подведи итог моим позициям в Robinhood и тому, как они изменились сегодня.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "Как на этой неделе изменилась каждая акция из моего списка наблюдения в Robinhood?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Сколько наличных на моём счёте Agentic в Robinhood?",
   "marketplace.plugin.huggingface.tagline": "Модели, датасеты и статьи на Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face позволяет агентам искать модели, датасеты, Spaces, коллекции и статьи на Hugging Face Hub, читать карточки моделей и файлы репозиториев, просматривать датасеты и искать по документации Hugging Face. Он использует публичные данные Hub и не требует аккаунта и ключа. Инструменты только читают данные: агенты не могут создавать репозитории или запускать задачи.",
@@ -424,24 +516,98 @@ export const messages = {
   "marketplace.auth.personalApiKey": "Личный API-ключ",
   "marketplace.auth.mcpUrl": "URL MCP",
   "marketplace.auth.createKey": "Создать ключ",
-  "marketplace.skill.installMenu.install": "Установить",
-  "marketplace.skill.installMenu.installNamed": "Установить: {name}",
-  "marketplace.skill.installMenu.allAgents": "Все агенты",
-  "marketplace.skill.installMenu.agents": {
+  "marketplace.skill.doc": "SKILL.md",
+  "marketplace.try.in": "Попробовать в {name}",
+  "marketplace.skills.yours": "Ваши навыки",
+  "marketplace.skills.seeAll": "Показать все",
+  "marketplace.skills.seeAllName": "Показать все: {name}",
+  "marketplace.skills.none": "Пока ни у одного агента нет навыков.",
+  "marketplace.skills.noneHint": "Навык учит агента одной задаче. Добавьте навык ниже или создайте свой.",
+  "marketplace.skills.sourceLabel": "Источник",
+  "marketplace.skills.source.all": "Все",
+  "marketplace.skills.source.verified": "Проверенные",
+  "marketplace.skills.source.public": "Публичные",
+  "marketplace.skills.source.verifiedLong": "Проверен OpenBot",
+  "marketplace.skills.source.publicLong": "Одобрен OpenBot",
+  "marketplace.skills.sortLabel": "Сортировка",
+  "marketplace.skills.sortName": "Сортировка: {name}",
+  "marketplace.skills.sort.installs": "Популярные",
+  "marketplace.skills.sort.updated": "Недавно обновлённые",
+  "marketplace.skills.sort.name": "Название",
+  "marketplace.skills.featured": "Рекомендуемые",
+  "marketplace.skills.all": "Все навыки",
+  "marketplace.skills.count": {
+    one: "{count} навык",
+    few: "{count} навыка",
+    many: "{count} навыков",
+    other: "{count} навыка",
+  },
+  "marketplace.skills.searchIn": "Поиск: {name}",
+  "marketplace.skills.missing": "Этого навыка нет в каталоге.",
+  "marketplace.skills.state.off": "Выключен",
+  "marketplace.skills.state.repair": "Требует восстановления",
+  "marketplace.skills.state.update": "Есть обновление",
+  "marketplace.skills.state.modified": "Изменён вами",
+  "marketplace.skills.stateOn": "{state}: {agents}",
+  "marketplace.skills.version": "Версия {version}",
+  "marketplace.skills.origin.local": "Создан на этом компьютере",
+  "marketplace.skills.origin.workspace": "В папке этого агента",
+  "marketplace.skills.origin.marketplace": "Из каталога · версия {version}",
+  "marketplace.skills.status.notAdded": "Не добавлен",
+  "marketplace.skills.status.on": "Включён: {agents}",
+  "marketplace.skills.agentCount": {
     one: "{count} агент",
     few: "{count} агента",
     many: "{count} агентов",
     other: "{count} агента",
   },
-  "marketplace.skill.installMenu.here": "Вы здесь",
-  "marketplace.skill.installMenu.change": {
-    one: "{label}: установлен «{name}». Изменить",
-    few: "{label}: установлен «{name}». Изменить",
-    many: "{label}: установлен «{name}». Изменить",
-    other: "{label}: установлен «{name}». Изменить",
+  "marketplace.skills.allAgents": "все агенты",
+  "marketplace.skills.agentsTitle": "Агенты · {total}",
+  "marketplace.skills.agents.search": "Поиск агентов",
+  "marketplace.skills.agents.searchName": "Поиск агентов с навыком «{name}»",
+  "marketplace.skills.agents.noMatch": "Нет агентов по запросу «{query}».",
+  "marketplace.skills.agents.removeAll": "Удалить у всех",
+  "marketplace.skills.agents.removeAllName": {
+    one: "Удалить «{name}» у {count} агента",
+    few: "Удалить «{name}» у всех {count} агентов",
+    many: "Удалить «{name}» у всех {count} агентов",
+    other: "Удалить «{name}» у всех {count} агента",
   },
-  "marketplace.skill.doc": "SKILL.md",
-  "marketplace.try.in": "Попробовать в {name}",
+  "marketplace.skills.agent.toggle": "«{name}»: {agent}",
+  "marketplace.skills.agent.remove": "Удалить",
+  "marketplace.skills.agent.removeName": "Удалить «{name}»: {agent}",
+  "marketplace.skills.add": "Добавить",
+  "marketplace.skills.addName": "Добавить «{name}» агентам",
+  "marketplace.skills.addToAgents": "Добавить агентам",
+  "marketplace.skills.onOf": "Включён у {have} из {total}",
+  "marketplace.skills.chooseAgents": "«{name}» есть у: {agents}. Выбрать агентов",
+  "marketplace.skills.dialog.list": "Агенты с навыком «{name}»",
+  "marketplace.skills.dialog.search": {
+    one: "Поиск среди {count} агента",
+    few: "Поиск среди {count} агентов",
+    many: "Поиск среди {count} агентов",
+    other: "Поиск среди {count} агента",
+  },
+  "marketplace.skills.dialog.all": {
+    one: "{count} агент",
+    few: "Все {count} агента",
+    many: "Все {count} агентов",
+    other: "Все {count} агента",
+  },
+  "marketplace.skills.dialog.allMatches": {
+    one: "{count} совпадение",
+    few: "Все {count} совпадения",
+    many: "Все {count} совпадений",
+    other: "Все {count} совпадения",
+  },
+  "marketplace.skills.dialog.checked": "{checked} из {total}",
+  "marketplace.skills.dialog.save": "Сохранить",
+  "marketplace.skills.dialog.saveBoth": "Сохранить: добавить {added}, удалить {removed}",
+  "marketplace.skills.dialog.addTo": "Добавить: {agents}",
+  "marketplace.skills.dialog.removeFrom": "Удалить у: {agents}",
+  "marketplace.skills.dialog.full": "Достигнут лимит навыков",
+  "marketplace.skills.dialog.unread": "Навыки не прочитаны",
+  "marketplace.skills.local.gone": "Сейчас ни у одного агента нет этого навыка.",
 
   "marketplace.notice.agentAdded": "Агент «{name}» добавлен.",
   "marketplace.notice.agentUpdated": "Агент «{name}» обновлён.",

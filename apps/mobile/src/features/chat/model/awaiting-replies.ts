@@ -1,5 +1,6 @@
 import type { ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import type { MobileAgentWait } from "@/features/workspace/model/agent-activity";
 
 /**
  * The rows of the waiting block: which teammates this agent asked, and where each answer is.
@@ -18,11 +19,18 @@ export interface AwaitingReply {
   preview: string | null;
   /** The queued answer, which the person can steer into the running turn. */
   deliveryId: string | null;
+  /**
+   * What stops a teammate that was asked before it can reply: a question, an approval or a browser
+   * takeover in its own chat. The row names it in place of "Working".
+   */
+  wait: MobileAgentWait | null;
 }
 
 export function awaitingReplies(
   messages: readonly ConversationMessage[],
   replies: readonly QueueDelivery[],
+  /** The wait of each agent of the server that waits for the user. */
+  waits: Readonly<Record<string, MobileAgentWait>> = {},
 ): AwaitingReply[] {
   // A failed question stays until the person writes again: then they have seen it.
   const lastUserIndex = messages.findLastIndex((message) => message.author === "user");
@@ -47,12 +55,14 @@ export function awaitingReplies(
           state: "replied",
           preview: replyPreview(reply),
           deliveryId: reply.id,
+          wait: null,
         });
         continue;
       }
       const state = deliveryState(delivery.status);
       if (!state || (state === "failed" && index < lastUserIndex)) continue;
-      rows.push({ id, agentId: delivery.recipientAgentId, state, preview: null, deliveryId: null });
+      const wait = state === "failed" ? null : (waits[delivery.recipientAgentId] ?? null);
+      rows.push({ id, agentId: delivery.recipientAgentId, state, preview: null, deliveryId: null, wait });
     }
   });
   // An answer to a question on an earlier page, or to one sent from another conversation.
@@ -64,9 +74,11 @@ export function awaitingReplies(
       state: "replied",
       preview: replyPreview(reply),
       deliveryId: reply.id,
+      wait: null,
     });
   }
-  return rows;
+  // A wait comes before work, because the work cannot go on until the wait ends.
+  return [...rows.filter((row) => row.wait), ...rows.filter((row) => !row.wait)];
 }
 
 /** Null for a delivery that has landed: its answer is in the transcript, or it had none. */

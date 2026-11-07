@@ -64,6 +64,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot şu anda hesap hizmetine ulaşamıyor.",
   "account.login.signInDescription":
     "Oturum açmak veya hesap oluşturmak için e-postanızı kullanın. Size tek kullanımlık bir kod göndereceğiz.",
+  "account.login.keyringChangedDescription":
+    "Sistem anahtarlığı son oturumunuzu kaybetti. OpenBot artık oturumları bu bilgisayardaki kendi dosyasında saklıyor. Bir kez daha oturum açın.",
   "account.login.codeAccepted": "Kodunuz kabul edildi.",
   "account.login.codeSent": "{email} adresine bir kod gönderdik.",
   "account.login.connectingSecurely": "Güvenli bir şekilde bağlanılıyor…",
@@ -101,4 +103,5 @@ export const messages = {
   "account.language.previous": "Önceki dil",
   "account.language.next": "Sonraki dil",
   "account.language.continue": "Devam et",
+  "account.language.change": "Dili değiştir",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,5 +1,6 @@
 // Reads the logins of a password export in CSV format: Chrome, Edge, Safari, Firefox, 1Password,
-// Bitwarden and LastPass all write a header row that names the address, user name and password columns.
+// Bitwarden, LastPass and Proton Pass all write a header row that names the address, user name and password
+// columns.
 
 import { sourceText } from "@openbot/i18n/source";
 
@@ -62,7 +63,8 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
   const website = column(COLUMNS.website);
   const password = column(COLUMNS.password);
   if (website < 0 || password < 0) throw new Error(sourceText("error.vault.csvInvalid"));
-  const username = column(COLUMNS.username);
+  // Proton Pass writes an email and a username column, and a login can fill only one of them.
+  const userNames = names.flatMap((name, index) => (COLUMNS.username.some((choice) => choice === name) ? [index] : []));
   const notes = column(COLUMNS.notes);
   const type = column(COLUMNS.type);
   const logins: CsvLogin[] = [];
@@ -74,7 +76,7 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
     }
     logins.push({
       website: cells[website]?.trim() ?? "",
-      username: username < 0 ? "" : (cells[username]?.trim() ?? ""),
+      username: userNames.map((index) => cells[index]?.trim()).find(Boolean) ?? "",
       password: cells[password] ?? "",
       notes: notes < 0 ? "" : (cells[notes]?.trim() ?? ""),
     });

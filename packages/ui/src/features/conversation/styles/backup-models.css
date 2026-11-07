@@ -50,7 +50,8 @@
   min-height: 40px;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-1) var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
 }
 
 .backup-models-number {

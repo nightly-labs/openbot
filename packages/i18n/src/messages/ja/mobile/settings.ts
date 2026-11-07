@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "システムの設定",
   "mobile.settings.language.footer":
     "「システムの設定」は、スマートフォンの設定で最初に表示される言語に従います。まだ翻訳されていないテキストは英語で表示されます。",
+  "mobile.settings.language.restartTitle": "OpenBot を再起動しますか？",
+  "mobile.settings.language.restartBody":
+    "この言語は逆方向に読みます。OpenBot を次に起動したときに画面の向きが切り替わります。再起動後も画面がおかしい場合は、App スイッチャーで OpenBot を閉じてから開き直してください。",
+  "mobile.settings.language.restartNow": "今すぐ再起動",
+  "mobile.settings.language.restartFailed":
+    "OpenBot を再起動できませんでした。次に OpenBot を開いたときに画面の向きが切り替わります。",
   "mobile.settings.dictation.language": "音声入力の言語",
   "mobile.settings.about.development": "開発版",
   "mobile.settings.about.openFailed": "リンクを開けませんでした。もう一度お試しください。",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "サポート",
   "mobile.settings.home.supportHint": "ヘルプとサポートログの保存",
   "mobile.settings.support.help": "ヘルプ",
+  "mobile.settings.support.discord": "Discord でチケットを作成",
+  "mobile.settings.support.discordHint": "いちばん早くサポートを受けられます",
   "mobile.settings.support.message": "X でメッセージを送る",
   "mobile.settings.support.issues": "GitHub で問題を報告",
   "mobile.settings.support.helpFooter":
-    "何がいつ起きたかをお知らせください。GitHub の Issue にサポートログのファイルを添付してください。",
+    "何がいつ起きたかをお知らせください。Discord のチケットまたは GitHub の Issue にサポートログのファイルを添付してください。",
   "mobile.settings.support.log": "サポートログ",
+  "mobile.settings.support.show": "ログを表示",
   "mobile.settings.support.save": "ログファイルを保存",
   "mobile.settings.support.events": { other: "{count} 件のイベント" },
   "mobile.settings.support.clear": "ログを消去",
@@ -34,9 +43,8 @@ export const messages = {
     "ログはこのスマートフォンに保存され、OpenBot が送信することはありません。接続の手順、リクエスト、エラーを記録します。メッセージやファイルは記録せず、パスワードとトークンは伏せて記録します。共有する前にファイルの内容を確認してください。",
   "mobile.settings.support.saveFailed": "ログファイルを保存できませんでした。もう一度お試しください。",
   "mobile.settings.support.sharingUnavailable": "このスマートフォンでは共有を利用できません。",
-  "mobile.settings.support.recent": "最近のイベント",
-  "mobile.settings.support.recentFooter":
-    "新しい順に表示しています。保存したファイルにはすべてのイベントが含まれます。",
+  "mobile.settings.support.newestFirst": "新しい順に表示しています。",
+  "mobile.settings.support.showOlder": "以前のイベントを表示",
   "mobile.settings.support.empty": "まだイベントはありません。",
   "mobile.settings.sessions.kindDesktop": "デスクトップ",
   "mobile.settings.sessions.kindMobile": "モバイル",
@@ -71,12 +79,9 @@ export const messages = {
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
   "mobile.settings.animations.all": "アニメーション",
-  "mobile.settings.animations.chatZoom": "チャットへのズーム",
-  "mobile.settings.animations.chatZoomFooter":
-    "チャットはリストのアバターから開き、閉じるとアバターに戻ります。オフにすると、チャットは横からスライドして開きます。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
-    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
+    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動かず、ようこそ画面と空のホーム画面のキャラクターも浮遊しなくなります。",
   "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
   "mobile.settings.animations.composerResizeFooter":
     "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",
@@ -122,7 +127,6 @@ export const messages = {
     "通知とライブアクティビティはこのサウンドを再生します。ライブアクティビティは画面も点灯します。OpenBot のサウンドは、デスクトップアプリがタスク完了時に鳴らすサウンドです。その次の 4 つは、デスクトップアプリのサウンドテーマのサウンドです。",
   "mobile.settings.notifications.soundFooterAndroid":
     "通知はこのサウンドを再生します。OpenBot のサウンドは、デスクトップアプリがタスク完了時に鳴らすサウンドです。その次の 4 つは、デスクトップアプリのサウンドテーマのサウンドです。",
-  "mobile.settings.notifications.notifyAbout": "通知する内容",
   "mobile.settings.notifications.level.all": "すべてのアクティビティ",
   "mobile.settings.notifications.level.needsMe": "自分が必要なときのみ",
   "mobile.settings.notifications.level.nothing": "なし",
@@ -139,12 +143,31 @@ export const messages = {
     "このサーバーのどのイベントをこのスマートフォンに通知するかを選びます。デスクトップアプリには別の設定があります。",
   "mobile.settings.notifications.serverUnsupported":
     "このサーバーは通知を送信できません。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
+  "mobile.settings.notifications.thisPhone": "このスマートフォン",
+  "mobile.settings.notifications.whatYouHear": "通知を受け取る内容",
+  "mobile.settings.notifications.wholeServer": "サーバー全体",
+  "mobile.settings.notifications.levelShort.all": "すべて",
+  "mobile.settings.notifications.levelShort.needsMe": "要対応",
+  "mobile.settings.notifications.levelShort.nothing": "オフ",
+  "mobile.settings.notifications.thisPhoneOnly": "このスマートフォンのみ",
+  "mobile.settings.notifications.offForEveryone": "このサーバーの全員に対してオフ",
+  "mobile.settings.notifications.turnOn": "オンにする",
+  "mobile.settings.notifications.turnOnFor": "このサーバーの全員に対して {name} の通知をオンにする",
+  "mobile.settings.notifications.chooseAgent": "エージェントごとに選ぶ",
+  "mobile.settings.notifications.chooseAnotherAgent": "別のエージェントを選ぶ",
+  "mobile.settings.notifications.levelsFooter":
+    "エージェントのレベルをもう一度タップすると、サーバーの設定に従います。",
+  "mobile.settings.notifications.agentsUnsupported":
+    "エージェントごとに選ぶには、このサーバーの OpenBot をアップデートしてください。",
+  "mobile.settings.notifications.agentsOffline": "このサーバーがオンラインになると、エージェントが表示されます。",
+  "mobile.settings.notifications.scopeFooter":
+    "選んだ内容はあなたのすべてのデバイスに適用されます。ミュートはこのスマートフォンだけに適用されます。",
   "mobile.settings.notifications.channel": "エージェントの通知（{sound}）",
   "mobile.settings.notifications.channelSilent": "エージェントの通知（サウンドなし）",
   "mobile.settings.privacy.title": "プライバシー",
   "mobile.settings.privacy.footer":
-    "このスマートフォンの機能の使用状況と接続結果を共有します。メッセージの内容とファイルは送信されません。",
-  "mobile.settings.privacy.analytics": "製品の分析データを共有",
+    "このスマートフォンの機能の使用状況と接続結果は、常に OpenBot の分析基盤に送信されます。オン: アカウント ID とメールアドレスとともに送信。オフ: ランダムなインストール ID のみとともに送信。メッセージの内容とファイルは送信されません。",
+  "mobile.settings.privacy.analytics": "分析データをアカウントに関連付ける",
   "mobile.settings.privacy.retry": "プライバシー設定をもう一度保存",
   "mobile.settings.conversations.title": "会話",
   "mobile.settings.conversations.hiddenChats": "非表示のチャット",
@@ -248,6 +271,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "聞き取り",
   "mobile.settings.voice.tab.speaking": "読み上げ",
+  "mobile.settings.voice.pause.title": "送信までの間",
+  "mobile.settings.voice.pause.label": "新しい言葉を待つ時間",
+  "mobile.settings.voice.pause.footer":
+    "音声会話では、この長さだけ新しい言葉を認識しないと OpenBot が言葉を送信します。言葉のない雑音では聞き取りは続きません。ゆっくり話す場合や考えるために止まる場合は、長めの間を選んでください。",
+  "mobile.settings.voice.pause.seconds": "{seconds} 秒",
+  "mobile.settings.voice.speed.title": "返信の速度",
+  "mobile.settings.voice.speed.footer": "OpenBot が読み上げる返信の速度です。音声会話にも適用されます。",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot は 1 回限りのトークンで音声を ElevenLabs にストリーミングし、料金は ElevenLabs のアカウントに請求されます。キーはこの端末に保存されます。",
 } as const satisfies PartialTranslation<typeof source>;

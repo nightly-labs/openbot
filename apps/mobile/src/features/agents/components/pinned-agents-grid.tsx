@@ -14,14 +14,20 @@ import Animated, {
 import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import {
+  AgentDragPreview,
+  ChatDragArea,
+  PIN_AREA_KEY,
+  useChatDrag,
+  useChatDropTarget,
+  useHoldMenu,
+} from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnreadCount, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -38,13 +44,29 @@ const PINNED_EXIT = FadeOut.duration(140).easing(EASE_OUT).reduceMotion(ReduceMo
 const PINNED_COLUMNS = 4;
 const PINNED_PADDING_X = 12;
 
-/** The pinned agents, then `children`: the pinned channels. */
-export function PinnedAgentsGrid({ agents, children }: PropsWithChildren<{ agents: MobileAgent[] }>) {
+/**
+ * The pinned agents, then `children`: the pinned channels. `animateLayout` false stops the grid from
+ * animating to a new place, while something above it changes height on every frame.
+ */
+export function PinnedAgentsGrid({
+  agents,
+  animateLayout = true,
+  dropZone = false,
+  children,
+}: PropsWithChildren<{
+  agents: MobileAgent[];
+  animateLayout?: boolean;
+  /** Shows an empty place for a new pin, while the user drags a chat and nothing is pinned. */
+  dropZone?: boolean;
+}>) {
+  const dropTarget = useChatDropTarget(PIN_AREA_KEY);
   return (
-    <Animated.View layout={PINNED_LAYOUT}>
+    <Animated.View layout={animateLayout ? PINNED_LAYOUT : undefined}>
       {agents.length > 0 || children ? (
         <Animated.View exiting={PINNED_EXIT} style={{ width: "100%" }}>
           <View
+            ref={dropTarget}
+            collapsable={false}
             style={{
               flexDirection: "row",
               flexWrap: "wrap",
@@ -60,19 +82,46 @@ export function PinnedAgentsGrid({ agents, children }: PropsWithChildren<{ agent
             {children}
           </View>
         </Animated.View>
+      ) : dropZone ? (
+        <PinDropZone dropTarget={dropTarget} />
       ) : null}
+    </Animated.View>
+  );
+}
+
+function PinDropZone({ dropTarget }: { dropTarget: ReturnType<typeof useChatDropTarget> }) {
+  const { t } = useText();
+  const [border] = useThemeColor(["border"]);
+  return (
+    <Animated.View entering={PINNED_ENTER} exiting={PINNED_EXIT} style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+      <View
+        ref={dropTarget}
+        collapsable={false}
+        className="h-24 items-center justify-center rounded-3xl border-2"
+        style={{ borderColor: border, borderStyle: "dashed" }}
+      >
+        <Typography.Paragraph className="text-muted" style={typeScale.caption}>
+          {t("mobile.agent.drag.pinHere")}
+        </Typography.Paragraph>
+      </View>
     </Animated.View>
   );
 }
 
 const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
-  const [background, accent] = useThemeColor(["background", "accent"]);
   const agentChatPreview = useAgentChatPreview(agent);
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
-  const isUnread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const drag = useChatDrag("pin", () => ({
+    chat: { kind: "agent", id: agent.id },
+    pinned: true,
+    name: agent.name,
+    preview: <AgentDragPreview agent={agent} />,
+  }));
+  const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
+  const unreadCount = useAgentListUnreadCount(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
 
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -83,38 +132,40 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       accessibilityLabel={
         waitReason
           ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : openLabel
+          : unreadCount > 0
+            ? t("mobile.agent.list.withState", {
+                label: openLabel,
+                state: t("mobile.agent.list.unread", { count: unreadCount }),
+              })
+            : openLabel
       }
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
       onPressIn={agentChatPreview.onPressIn}
       delayLongPress={longPressDelay}
-      onLongPress={() => {
-        void haptics.longPress();
-        if (isAndroid) setMenuKey((key) => key + 1);
-      }}
+      onLongPress={holdMenu.onLongPress}
+      onPressOut={holdMenu.onPressOut}
       style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
     >
-      <ChatZoomSource>
-        <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
-          <BloubAvatar
-            agentId={agent.id}
-            serverId={agent.serverId}
-            hue={agent.avatarHue}
-            seed={agent.avatarSeed}
-            size={64}
-            animateIdle={false}
-            rings
-          />
-          {isUnread ? (
-            <View
-              className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-              style={{ borderColor: background, backgroundColor: accent }}
-            />
-          ) : null}
-          {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
-        </AgentPinAvatar>
-      </ChatZoomSource>
+      <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
+        <BloubAvatar
+          agentId={agent.id}
+          serverId={agent.serverId}
+          hue={agent.avatarHue}
+          color={agent.avatarColor}
+          seed={agent.avatarSeed}
+          size={64}
+          animateIdle={false}
+          rings
+          withThreads
+        />
+        {/* As on the desktop, a wait outranks the unread count in the corner of the avatar. */}
+        {waitReason ? (
+          <AgentWaitBadge reason={waitReason} size={22} />
+        ) : unreadCount > 0 ? (
+          <AgentUnreadBadge count={unreadCount} avatarSize={64} />
+        ) : null}
+      </AgentPinAvatar>
       <View className="w-full gap-0.5">
         <Typography.Paragraph
           align="center"
@@ -135,18 +186,20 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   );
   return (
     <PinnedChatItem>
-      {isAndroid ? (
-        <View className="w-full">
-          <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
-            <Link.Trigger>{trigger}</Link.Trigger>
-          </Link>
-          {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}
-        </View>
-      ) : (
-        <AgentContextMenuLink agent={agent} preview={agentChatPreview.preview}>
-          {trigger}
-        </AgentContextMenuLink>
-      )}
+      <ChatDragArea drag={drag} fill>
+        {isAndroid ? (
+          <View className="w-full">
+            <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+              <Link.Trigger>{trigger}</Link.Trigger>
+            </Link>
+            {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}
+          </View>
+        ) : (
+          <AgentContextMenuLink agent={agent} preview={agentChatPreview.preview}>
+            {trigger}
+          </AgentContextMenuLink>
+        )}
+      </ChatDragArea>
     </PinnedChatItem>
   );
 });

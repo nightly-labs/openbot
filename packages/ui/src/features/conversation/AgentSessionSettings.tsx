@@ -5,7 +5,7 @@ import type {
   AgentSessionSettings as Settings,
 } from "@openbot/contracts/ipc";
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Text } from "@openbot/ui";
-import { SettingsField, SettingsLinkGroup } from "@openbot/ui/components/SettingsPanel";
+import { SettingsLinkGroup } from "@openbot/ui/components/SettingsPanel";
 import { createEffect, createStore, For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -99,19 +99,21 @@ export function AgentSessionSettings(props: {
   ];
   return (
     <Show when={ids().length > 0 || state.error}>
-      <SettingsLinkGroup title={t("agentSettings.session.title")}>
+      <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.session.title")}>
         <Show when={state.error}>
           {(message) => (
-            <>
+            <div class="agent-session-setting-notes">
               <Text role="alert">{message()}</Text>
-              <Button variant="ghost" onClick={() => reload?.()}>
+              <Button variant="outline" size="sm" onClick={() => reload?.()}>
                 {t("common.retry")}
               </Button>
-            </>
+            </div>
           )}
         </Show>
         <Show when={state.data?.pending}>
-          <Text tone="muted">{t("agentSettings.session.pending")}</Text>
+          <div class="agent-session-setting-notes">
+            <Text tone="muted">{t("agentSettings.session.pending")}</Text>
+          </div>
         </Show>
         <For each={ids()}>
           {(id) => {
@@ -136,52 +138,60 @@ export function AgentSessionSettings(props: {
               );
             };
             return (
-              <div>
-                <SettingsField label={option()?.name ?? id}>
-                  <Show
-                    when={option()?.type === "boolean"}
-                    fallback={
-                      <Select<string>
-                        options={choices().map((item) => item.value)}
-                        value={typeof value() === "string" ? String(value()) : null}
-                        disabled={state.busy || !option()}
-                        onChange={(next) => {
-                          if (next !== null && next !== value()) void change(id, next);
-                        }}
-                        itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
-                      >
-                        <SelectTrigger aria-label={option()?.name ?? id}>
-                          <SelectValue<string>>{() => label(String(value() ?? ""))}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent />
-                      </Select>
-                    }
-                  >
+              <div class="agent-session-setting">
+                <Show
+                  when={option()?.type === "boolean"}
+                  fallback={
+                    <Select<string>
+                      options={choices().map((item) => item.value)}
+                      value={typeof value() === "string" ? String(value()) : null}
+                      disabled={state.busy || !option()}
+                      onChange={(next) => {
+                        if (next !== null && next !== value()) void change(id, next);
+                      }}
+                      itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
+                    >
+                      <SelectTrigger class="agent-settings-runtime-row" aria-label={option()?.name ?? id}>
+                        <span class="agent-settings-runtime-label">{option()?.name ?? id}</span>
+                        <SelectValue<string>>{() => label(String(value() ?? ""))}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent />
+                    </Select>
+                  }
+                >
+                  <div class="agent-settings-switch-row">
+                    <span class="settings-link-label">{option()?.name ?? id}</span>
                     <Switch
+                      size="sm"
                       aria-label={option()?.name ?? id}
                       checked={value() === true}
                       disabled={state.busy}
                       onChange={(next) => void change(id, next)}
                     />
+                  </div>
+                </Show>
+                <div class="agent-session-setting-notes">
+                  <Show when={option()?.description}>{(description) => <Text tone="muted">{description()}</Text>}</Show>
+                  <Show when={unavailable()}>
+                    <Text role="status">
+                      {t("agentSettings.session.unavailable", { value: String(value() ?? "") })}
+                    </Text>
                   </Show>
-                </SettingsField>
-                <Show when={option()?.description}>{(description) => <Text tone="muted">{description()}</Text>}</Show>
-                <Show when={unavailable()}>
-                  <Text role="status">{t("agentSettings.session.unavailable", { value: String(value() ?? "") })}</Text>
-                </Show>
-                <Show when={saved() !== undefined}>
-                  <Text tone="muted">
-                    {t("agentSettings.session.effective", { value: String(option()?.currentValue ?? "") })}
-                  </Text>
-                  <Button
-                    variant="ghost"
-                    aria-label={t("agentSettings.session.resetNamed", { name: option()?.name ?? id })}
-                    disabled={state.busy}
-                    onClick={() => void change(id)}
-                  >
-                    {t("agentSettings.session.reset")}
-                  </Button>
-                </Show>
+                  <Show when={saved() !== undefined}>
+                    <Text tone="muted">
+                      {t("agentSettings.session.effective", { value: String(option()?.currentValue ?? "") })}
+                    </Text>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={t("agentSettings.session.resetNamed", { name: option()?.name ?? id })}
+                      disabled={state.busy}
+                      onClick={() => void change(id)}
+                    >
+                      {t("agentSettings.session.reset")}
+                    </Button>
+                  </Show>
+                </div>
               </div>
             );
           }}

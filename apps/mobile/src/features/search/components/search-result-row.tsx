@@ -4,7 +4,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
 import Bell from "lucide-react-native/icons/bell";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import ChartColumn from "lucide-react-native/icons/chart-column";
+import ChartArea from "lucide-react-native/icons/chart-area";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import FileIcon from "lucide-react-native/icons/file";
 import FileImage from "lucide-react-native/icons/file-image";
@@ -22,12 +22,13 @@ import Trash2 from "lucide-react-native/icons/trash";
 import UserRound from "lucide-react-native/icons/user-round";
 import UsersRound from "lucide-react-native/icons/users-round";
 import Vibrate from "lucide-react-native/icons/vibrate";
-import { type ReactNode, useContext, useMemo } from "react";
+import WorkflowIcon from "lucide-react-native/icons/workflow";
+import { type ReactNode, useMemo } from "react";
 import { Pressable, View } from "react-native";
-
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
+import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
+import { showsAsImage } from "@/features/chat/components/attachment-preview";
 import {
   type MobileSearchResult,
   type MobileSearchSettingId,
@@ -124,6 +125,7 @@ function AgentAvatar({ agent }: { agent: MobileAgent }) {
       agentId={agent.id}
       serverId={agent.serverId}
       hue={agent.avatarHue}
+      color={agent.avatarColor}
       seed={agent.avatarSeed}
       size={AVATAR_SIZE}
       animateIdle={false}
@@ -148,7 +150,7 @@ const SETTING_ICON = {
   serverOptions: Server,
   serverMembers: UsersRound,
   serverRoutines: CalendarClock,
-  serverUsage: ChartColumn,
+  serverUsage: ChartArea,
 } as const satisfies Record<MobileSearchSettingId, LucideIcon>;
 
 /** Opens a settings page in its sheet. The sheet stack puts its first page under it, for the back button. */
@@ -192,7 +194,7 @@ function openSetting(id: MobileSearchSettingId, serverId: string) {
 }
 
 function fileIcon(file: Extract<MobileSearchResult, { kind: "file" }>["file"]): LucideIcon {
-  if (file.attachment.kind === "image") return FileImage;
+  if (showsAsImage(file.attachment)) return FileImage;
   return file.attachment.previewKind === "pdf" || file.attachment.previewKind === "text" ? FileText : FileIcon;
 }
 
@@ -216,13 +218,15 @@ export function MobileSearchResultRow({
   onLeave: () => void;
 }) {
   const { t, format } = useText();
-  const gate = useContext(ChatNavigationGateContext);
-  // A chat opened through its home row zooms back into the row when it closes. A chat opened at a
-  // message slides in.
+  const pane = useChatListPane();
+  // In the chat list pane, the chat takes the place of the open one.
   const openChat = (agentId: string, messageId?: string) => {
     onLeave();
-    if (messageId) router.push({ pathname: "/chat/[agentId]", params: { agentId, messageId } });
-    else if (!gate?.openFromHome(agentId)) router.push({ pathname: "/chat/[agentId]", params: { agentId } });
+    if (pane)
+      openChatFromPane(pane, messageId ? undefined : agentId, () =>
+        router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } }),
+      );
+    else router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } });
   };
   const snippet = useMemo(
     () => (result.kind === "message" ? mobileSearchSnippet(result.text, query) : ""),
@@ -255,8 +259,10 @@ export function MobileSearchResultRow({
           query={query}
           onPress={() => {
             onLeave();
-            if (!gate?.openFromHome(channel.id))
+            const open = () =>
               router.push({ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } });
+            if (pane) openChatFromPane(pane, channel.id, open);
+            else open();
           }}
         />
       );
@@ -314,7 +320,7 @@ export function MobileSearchResultRow({
       const { routine, owner } = result;
       return (
         <SearchRow
-          leading={<RowIcon icon={CalendarClock} />}
+          leading={<RowIcon icon={WorkflowIcon} />}
           title={routine.name}
           detail={owner.name}
           trailing={routine.active ? undefined : t("mobile.search.routinePaused")}

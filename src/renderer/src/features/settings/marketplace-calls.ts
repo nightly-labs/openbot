@@ -7,12 +7,18 @@ import { type AgentSkillCalls, agentSkillCalls, type SkillsPort, skillsPort } fr
  * browser client reads the catalog on its own origin and changes its host over the Team API.
  */
 export interface MarketplaceCalls {
-  skills: Pick<SkillsPort["skills"], "get" | "list">;
-  agents: Pick<SkillsPort["marketplaceAgents"], "get" | "list">;
+  skills: Pick<SkillsPort["skills"], "get" | "getBySlug" | "list">;
+  agents: Pick<SkillsPort["marketplaceAgents"], "get" | "getListing" | "list">;
   agentSkills: (hostServerId?: string) => AgentSkillCalls;
   mcp: Pick<
     SkillsPort["agent"],
-    "listMcpServers" | "listMcpSignIns" | "removeMcpServer" | "saveMcpServer" | "signInMcpServer" | "testMcpServer"
+    | "cancelMcpSignIn"
+    | "listMcpServers"
+    | "listMcpSignIns"
+    | "removeMcpServer"
+    | "saveMcpServer"
+    | "signInMcpServer"
+    | "testMcpServer"
   >;
   /** `serverId` absent: this computer, which is also the only place an installed agent is updated. */
   addAgent: (input: InstallMarketplaceAgentInput, serverId: string | undefined) => Promise<AddedAgent>;
@@ -21,6 +27,11 @@ export interface MarketplaceCalls {
   signInRelay?: MarketplaceSignInRelay | undefined;
   /** Asks macOS on this computer for Automation access to Apple apps. Absent: this client cannot. */
   macAutomation?: SkillsPort["macAutomation"]["request"] | undefined;
+  /**
+   * The origin of a copied agent or skill link. Absent: `openbot.run`, as for a plugin link. The
+   * browser client gives the local Worker's origin while a developer runs it.
+   */
+  shareOrigin?: string | undefined;
 }
 
 /** The relayed sign-in of the app at `url` on the joined server `serverId`, while it waits. */
@@ -28,7 +39,6 @@ export interface MarketplaceSignInRelay {
   page: (url: string, serverId: string) => Promise<McpSignInRelayPage | null>;
   open: (url: string, serverId: string) => Promise<void>;
   paste: (url: string, address: string, serverId: string) => Promise<void>;
-  cancel: (url: string, serverId: string) => Promise<void>;
 }
 
 /** Read on each call, as `skillsPort` is: tests and stories replace `window.openbot` per case. */
@@ -46,7 +56,6 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
       page: (url, serverId) => port.agent.mcpSignInRelay({ url }, serverId),
       open: (url, serverId) => port.agent.openMcpSignInRelay({ url }, serverId),
       paste: (url, address, serverId) => port.agent.completeMcpSignInRelay({ url, address }, serverId),
-      cancel: (url, serverId) => port.agent.cancelMcpSignIn({ url }, serverId),
     },
     macAutomation: (targets) => port.macAutomation.request(targets),
   };

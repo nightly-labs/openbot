@@ -7,6 +7,7 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useAgentWaits } from "@/features/workspace/components/use-agent-activity";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -110,12 +111,14 @@ export function useChatQueue(
   // The person can close the rows when every teammate is done, as on desktop. A closed row that
   // works again shows.
   const { hiddenReplyIds, hideReplies } = useHiddenReplies();
+  // A teammate that waits for the person in its own chat says so in its row.
+  const waits = useAgentWaits(serverId, online);
   const waiting = useMemo(
     () =>
-      awaitingReplies(messages, replies).filter(
+      awaitingReplies(messages, replies, waits).filter(
         (row) => !(hiddenReplyIds.has(row.id) && (row.state === "replied" || row.state === "failed")),
       ),
-    [messages, replies, hiddenReplyIds],
+    [messages, replies, waits, hiddenReplyIds],
   );
   // Persist typing after a pause, without blocking each key event. The edit identity is
   // persisted synchronously BEFORE requesting the host hold, so a restart can recover it.

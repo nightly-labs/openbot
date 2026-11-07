@@ -1,13 +1,15 @@
-import type { ClientSideConnection, SessionConfigOption } from "@agentclientprotocol/sdk";
-import type {
-  AgentSessionSettingOption,
-  AgentSessionSettingsSnapshot,
-  AgentSessionSettingValue,
+import { type ClientSideConnection, RequestError, type SessionConfigOption } from "@agentclientprotocol/sdk";
+import {
+  type AgentSessionSettingOption,
+  type AgentSessionSettingsSnapshot,
+  type AgentSessionSettingValue,
+  isReasoningEffort,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Fiber, type Scope } from "effect";
+import { Effect, Fiber, type Scope, Semaphore } from "effect";
+import type { AcpConnection } from "./acp-connection";
 import type { AgentProvider } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
@@ -73,6 +75,8 @@ export interface AcpConfigurationState {
   currentModelId: string | null;
   /** The session's own values of the options that an unlisted model changed, set back for a listed one. */
   unlistedOverrides?: Map<string, string>;
+  /** The process of a session that has one of its own (`AcpFlavor.sessionProcesses`). */
+  transport?: AcpConnection | null;
 }
 export interface AcpConfigurationOptions {
   connection(): ClientSideConnection;
@@ -81,10 +85,32 @@ export interface AcpConfigurationOptions {
   provider: AgentProvider;
   requestTimeoutMs: number;
   discoveryCwd?: (() => string) | undefined;
+  /** `AcpFlavor.processWideModel`. */
+  processWideModel?: boolean;
+  /** `AcpFlavor.modelSetUnsaved`. */
+  modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  /** `AcpFlavor.configSetUnsaved`. */
+  configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  /**
+   * `AcpFlavor.closeKeepsSession` with `session/resume`: a closed session keeps its resources until
+   * the process ends, so each discovery resumes the probe session of the process, not a new one.
+   */
+  keepProbeSession?: () => boolean;
 }
 
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
 export class AcpConfiguration {
+  /** The model this agent process last took, for an agent whose model belongs to the process. */
+  #processModel: { connection: ClientSideConnection; value: string } | null = null;
+  /** Model sets sent and not answered. Sets that overlap can apply in an order their answers do not show. */
+  #modelSetsInFlight = 0;
+  #modelSetsOverlapped = false;
+  /** A set that timed out or was interrupted can still apply later, so on this connection each set is sent. */
+  #modelSetTimedOut: ClientSideConnection | null = null;
+  /** The probe session that discovery resumes on this connection (`keepProbeSession`). */
+  #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
+  /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
+  readonly #probeLock = Semaphore.makeUnsafe(1);
   constructor(private readonly options: AcpConfigurationOptions) {}
   readonly discoverModels = Effect.fn("AcpConfiguration.discoverModels")(function* (
     this: AcpConfiguration,
@@ -96,19 +122,22 @@ export class AcpConfiguration {
     // caller's own timeout: what the sweep may spend is what a slow `session/new` left of the time
     // the caller gave `model/list`. A sweep that timed the caller out would return no catalog at all.
     const deadline = Date.now() + requestTimeoutMs - MODEL_DISCOVERY_RETURN_MS;
+    const sweep = Effect.acquireUseRelease(
+      this.#openProbe(connection),
+      (probe) => this.#modelReasoningEffortsEffect(connection, probe, modelsFromSessionSetup(probe), deadline),
+      (probe) =>
+        this.options.keepProbeSession?.()
+          ? Effect.sync(() => {
+              this.#probe = { connection, sessionId: probe.sessionId };
+            })
+          : Effect.forkIn(
+              providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
+              this.options.scope(),
+              { startImmediately: true },
+            ).pipe(Effect.asVoid),
+    );
     const discovery = yield* Effect.forkIn(
-      Effect.acquireUseRelease(
-        providerCall(() =>
-          connection.newSession({ cwd: this.options.discoveryCwd?.() ?? process.cwd(), mcpServers: [] }),
-        ),
-        (probe) => this.#modelReasoningEffortsEffect(connection, probe, modelsFromSessionSetup(probe), deadline),
-        (probe) =>
-          Effect.forkIn(
-            providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
-            this.options.scope(),
-            { startImmediately: true },
-          ).pipe(Effect.asVoid),
-      ),
+      this.options.keepProbeSession?.() ? this.#probeLock.withPermit(sweep) : sweep,
       this.options.scope(),
     );
     return yield* Fiber.join(discovery).pipe(
@@ -128,6 +157,30 @@ export class AcpConfiguration {
       }),
     );
   });
+
+  /** The process of the session when it has one of its own, otherwise the agent's. */
+  #connection(thread: AcpConfigurationState): ClientSideConnection {
+    return thread.transport ? thread.transport.requireConnection() : this.options.connection();
+  }
+
+  /** A new probe session, or the kept one resumed. A kept session that does not resume is replaced. */
+  #openProbe(
+    connection: ClientSideConnection,
+  ): Effect.Effect<SessionSetupResponse & { sessionId: string }, ProviderClientOperationError> {
+    const cwd = this.options.discoveryCwd?.() ?? process.cwd();
+    const opened = providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
+    const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
+    if (!kept || !this.options.keepProbeSession?.()) return opened;
+    this.#probe = null;
+    // A resume that lists no models cannot give the catalog, so a new session gives it.
+    return providerCall(() => connection.resumeSession({ sessionId: kept, cwd, mcpServers: [] })).pipe(
+      Effect.flatMap((response) => {
+        const probe = { ...response, sessionId: kept };
+        return modelsFromSessionSetup(probe).length > 0 ? Effect.succeed(probe) : opened;
+      }),
+      Effect.catch(() => opened),
+    );
+  }
 
   /**
    * A discovery request that gives up at `until`, and reports any failure as `null`.
@@ -199,6 +252,8 @@ export class AcpConfiguration {
     const probed: AcpModel[] = [];
     let answered = 0;
     let selected = opening;
+    // The sweep selects models on the process too, also while a turn sets its own.
+    this.#processModel = null;
     for (const model of models) {
       const response = yield* this.#requestBeforeEffect(
         () => connection.setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id }),
@@ -231,6 +286,7 @@ export class AcpConfiguration {
         "session/set_config_option",
       );
     }
+    this.#processModel = null;
     logger.info("An agent reported the reasoning efforts of its models.", {
       provider: this.options.provider,
       models: models.length,
@@ -256,12 +312,13 @@ export class AcpConfiguration {
       if (category === "thought_level" && thread.currentModelId) {
         const currentModel = models.find((candidate) => candidate.id === thread.currentModelId);
         if (currentModel && currentModel.usesModelReasoningEffort !== null) {
-          if (currentModel.usesModelReasoningEffort && currentModel.supportedReasoningEfforts.includes(value)) {
+          const effort = listedEffort(value, (level) => currentModel.supportedReasoningEfforts.includes(level));
+          if (currentModel.usesModelReasoningEffort && effort) {
             yield* this.#timed("session/set_model", () =>
-              this.options.connection().request("session/set_model", {
+              this.#connection(thread).request("session/set_model", {
                 sessionId: thread.id,
                 modelId: thread.currentModelId,
-                _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(value) ?? value },
+                _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(effort) ?? effort },
               }),
             );
           }
@@ -274,7 +331,7 @@ export class AcpConfiguration {
       if (category === "model" && !unlisted && thread.unlistedOverrides) {
         for (const [configId, original] of thread.unlistedOverrides) {
           const response = yield* this.#timed("session/set_config_option", () =>
-            this.options.connection().setSessionConfigOption({ sessionId: thread.id, configId, value: original }),
+            this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value: original }),
           );
           thread.configOptions = response.configOptions;
         }
@@ -294,10 +351,20 @@ export class AcpConfiguration {
         options[0];
       if (!option) {
         if (category === "model" && thread.currentModelId !== value) {
+          this.#processModel = null;
           yield* this.#timed("session/set_model", () =>
-            this.options.connection().request("session/set_model", {
+            this.#connection(thread).request("session/set_model", {
               sessionId: thread.id,
               modelId: value,
+            }),
+          ).pipe(
+            Effect.catch((failure) => {
+              const unsaved = this.options.modelSetUnsaved;
+              if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
+              logger.warn("An agent changed the session model but did not save it as its default.", {
+                provider: this.options.provider,
+              });
+              return Effect.void;
             }),
           );
           thread.currentModelId = value;
@@ -307,8 +374,7 @@ export class AcpConfiguration {
       // An effort travels by OpenBot's name, and the agent's own name for it is read from the option
       // this session published, not from the catalog: the session is the one that has to accept it.
       const values = selectValues(option);
-      const wanted =
-        category === "thought_level" ? reasoningEffortWireValues(values.map((entry) => entry.value)).get(value) : value;
+      const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
       if (!selected) continue;
@@ -318,17 +384,61 @@ export class AcpConfiguration {
         thread.unlistedOverrides ??= new Map();
         if (!thread.unlistedOverrides.has(configId)) thread.unlistedOverrides.set(configId, required.currentValue);
         const response = yield* this.#timed("session/set_config_option", () =>
-          this.options.connection().setSessionConfigOption({ sessionId: thread.id, configId, value: configValue }),
+          this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value: configValue }),
         );
         thread.configOptions = response.configOptions;
       }
-      const response = yield* this.#timed("session/set_config_option", () =>
-        this.options.connection().setSessionConfigOption({
+      // The process runs every session on the model it took last, so the set is sent only for a change.
+      // A new process is a new connection. A failed set, or one that another set overlapped, leaves
+      // the model unknown.
+      const connection = yield* providerSync(() => this.#connection(thread));
+      const processWide = category === "model" && this.options.processWideModel === true;
+      if (processWide) {
+        if (this.#processModel?.connection === connection && this.#processModel.value === selected) {
+          thread.currentModelId = selected;
+          thread.configOptions = thread.configOptions.map((entry) =>
+            entry === option ? { ...option, currentValue: selected } : entry,
+          );
+          continue;
+        }
+        this.#processModel = null;
+        if (this.#modelSetsInFlight > 0) this.#modelSetsOverlapped = true;
+        this.#modelSetsInFlight += 1;
+      }
+      const request = this.#setConfigOption(thread, option.id, selected, () =>
+        connection.setSessionConfigOption({
           sessionId: thread.id,
           configId: option.id,
           value: selected,
         }),
       );
+      const response = processWide
+        ? yield* request.pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                if (!this.#modelSetsOverlapped && this.#modelSetTimedOut !== connection) {
+                  this.#processModel = { connection, value: selected };
+                }
+              }),
+            ),
+            Effect.tapError((error) =>
+              Effect.sync(() => {
+                if (error.cause instanceof TimeoutError) this.#modelSetTimedOut = connection;
+              }),
+            ),
+            Effect.onInterrupt(() =>
+              Effect.sync(() => {
+                this.#modelSetTimedOut = connection;
+              }),
+            ),
+            Effect.ensuring(
+              Effect.sync(() => {
+                this.#modelSetsInFlight -= 1;
+                if (this.#modelSetsInFlight === 0) this.#modelSetsOverlapped = false;
+              }),
+            ),
+          )
+        : yield* request;
       thread.configOptions = response.configOptions;
       if (category === "model") thread.currentModelId = selected;
     }
@@ -349,14 +459,37 @@ export class AcpConfiguration {
     ) {
       return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
     }
-    const response = yield* this.#timed("session/set_config_option", () =>
+    const response = yield* this.#setConfigOption(thread, configId, value, () =>
       typeof value === "boolean"
-        ? this.options.connection().setSessionConfigOption({ sessionId: thread.id, configId, value, type: "boolean" })
-        : this.options.connection().setSessionConfigOption({ sessionId: thread.id, configId, value }),
+        ? this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value, type: "boolean" })
+        : this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
     );
     thread.configOptions = response.configOptions;
     return sessionSettingsSnapshot(thread.configOptions);
   });
+
+  /**
+   * A `session/set_config_option`. After a failure that `configSetUnsaved` accepts, the session
+   * already has the value and only its save as the default failed, so the option changes here.
+   */
+  #setConfigOption(
+    thread: AcpConfigurationState,
+    configId: string,
+    value: AgentSessionSettingValue,
+    request: () => Promise<{ configOptions: SessionConfigOption[] }>,
+  ): Effect.Effect<{ configOptions: SessionConfigOption[] }, ProviderClientOperationError> {
+    return this.#timed("session/set_config_option", request).pipe(
+      Effect.catch((failure) => {
+        const unsaved = this.options.configSetUnsaved;
+        if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
+        logger.warn("An agent changed a session setting but did not save it as its default.", {
+          provider: this.options.provider,
+          configId,
+        });
+        return Effect.succeed({ configOptions: withCurrentValue(thread.configOptions, configId, value) });
+      }),
+    );
+  }
 
   /**
    * A configuration request, which fails at the request timeout. A turn sends these before its
@@ -371,6 +504,19 @@ export class AcpConfiguration {
       }),
     );
   }
+}
+
+/** The options with the current value of one option changed, when the value has its type. */
+function withCurrentValue(
+  options: readonly SessionConfigOption[],
+  configId: string,
+  value: AgentSessionSettingValue,
+): SessionConfigOption[] {
+  return options.map((option) => {
+    if (option.id !== configId) return option;
+    if (option.type === "boolean") return typeof value === "boolean" ? { ...option, currentValue: value } : option;
+    return typeof value === "string" ? { ...option, currentValue: value } : option;
+  });
 }
 
 /** Permission and secret controls stay outside the generic settings path. */
@@ -603,11 +749,10 @@ function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) 
 /**
  * What OpenBot's effort names are sent as, keyed by the OpenBot name.
  *
- * The exact name wins over an alias, whichever comes first. OpenCode offers
- * `["minimal", "low", "medium", "high", "xhigh"]`, where `minimal` also reads as low effort: first
- * value per key would make OpenBot's `low` send `minimal`, and a user who asks for low effort would
- * silently get the lowest one the model has. An alias is still kept for a key the agent has no exact
- * name for, which is how a model with `minimal` and no `low` stays reachable.
+ * The exact name wins over an alias, whichever comes first. An agent can offer `off` and `none`
+ * for the same level: first value per key would make OpenBot's `none` send `off`. An alias is kept
+ * for a key the agent has no exact name for, which is how a model with `off` and no `none` stays
+ * reachable.
  */
 function reasoningEffortWireValues(values: string[]): Map<string, string> {
   const result = new Map<string, string>();
@@ -624,12 +769,27 @@ function reasoningEffortWireValues(values: string[]): Map<string, string> {
   return result;
 }
 
+function effortWireValue(values: { value: string }[], effort: string): string | undefined {
+  const wireValues = reasoningEffortWireValues(values.map((entry) => entry.value));
+  const listed = listedEffort(effort, (level) => wireValues.has(level));
+  return listed ? wireValues.get(listed) : undefined;
+}
+
+/**
+ * The level to send for a saved effort. `minimal`, `none` and `off` were `low` before OpenBot had a
+ * name for them, so an agent saved as `low` on a model without it still sends the lowest level.
+ */
+function listedEffort(effort: string, listed: (level: string) => boolean): string | undefined {
+  if (listed(effort)) return effort;
+  return effort === "low" ? ["minimal", "none"].find(listed) : undefined;
+}
+
 function normalizeEffort(value: string): string | null {
   const normalized = value.toLowerCase().replaceAll("-", "_");
-  if (["low", "medium", "high", "xhigh", "max"].includes(normalized)) return normalized;
-  if (["minimal", "none", "off"].includes(normalized)) return "low";
-  // OpenCode offers MiniMax M3 `none` and `thinking` only. Without this the model listed `low`, which
-  // turns thinking off, as its one effort.
+  if (isReasoningEffort(normalized)) return normalized;
+  if (normalized === "off") return "none";
+  // OpenCode offers MiniMax M3 `none` and `thinking` only. Without this the model listed `none` as
+  // its one effort.
   if (normalized === "thinking") return "high";
   if (["extra_high", "very_high"].includes(normalized)) return "xhigh";
   return null;

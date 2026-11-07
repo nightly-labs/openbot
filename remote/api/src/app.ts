@@ -7,6 +7,16 @@ import {
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
 import {
+  GITHUB_DELIVERY_BODY_BYTES_LIMIT,
+  GITHUB_DELIVERY_HEADER,
+  GITHUB_DELIVERY_ID_PATTERN,
+  GITHUB_EVENT_HEADER,
+  GITHUB_EVENT_PATTERN,
+  GITHUB_EVENTS_PATH,
+  GITHUB_SIGNATURE_HEADER,
+  GITHUB_SIGNATURE_PATTERN,
+} from "@openbot/contracts/signal-protocol/github-route";
+import {
   WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
   type WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
@@ -23,6 +33,9 @@ import {
   type TelegramUploadAnswer,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import {
+  STANDARD_WEBHOOK_HEADER_SETS,
+  STANDARD_WEBHOOK_SIGNATURE_PATTERN,
+  STANDARD_WEBHOOKS_FORMAT,
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_DELIVERY_ID_PATTERN,
   WEBHOOK_EVENTS_PATH,
@@ -31,16 +44,27 @@ import {
   WEBHOOK_SIGNATURE_PATTERN,
   WEBHOOK_TIMESTAMP_HEADER,
   WEBHOOK_TIMESTAMP_PATTERN,
+  type WebhookSignatureFormat,
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { Effect, type ManagedRuntime, Result } from "effect";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
 import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
+import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
-import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
+import {
+  type SignalService,
+  type SignalSocket,
+  type SignalTokens,
+  type SlackDeliveryResponse,
+  WEBHOOK_ANSWER_STATUSES,
+  type WebhookAnswerStatus,
+  type WebhookDelivery,
+} from "./signal-service";
 import { telegramFailure } from "./telegram";
-import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
+import { verifyGitHubSignature, verifySlackSignature, verifyWebhookSignature } from "./tokens";
+import type { TurnRelays } from "./turn-relays";
 
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
@@ -51,6 +75,12 @@ const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
 const DISCORD_UPLOAD_BODY_BYTES_LIMIT = DISCORD_UPLOAD_BYTES_LIMIT + 64 * 1024;
 // An account event is one small JSON object.
 const AUTH_EVENT_BODY_BYTES_LIMIT = 64 * 1024;
+
+// The only parts of a GitHub event that Signal reads: they pick the hosts.
+const githubRequestSchema = z.object({
+  installation: z.object({ id: z.int().positive() }),
+  repository: z.object({ id: z.int().positive() }),
+});
 
 const slackRequestSchema = z.object({
   type: z.string().optional(),
@@ -72,11 +102,28 @@ const slackRequestSchema = z.object({
     .catch(undefined),
 });
 
-// The only parts of a Telegram update that Signal reads: the chat, the callback query, and the text
-// of a message, only to find a link code.
-const telegramChatSchema = z.object({ id: z.int() });
+// The only parts of a Telegram update that Signal reads: the chat, the callback query, the text of a
+// message, only to find a link code, and, to know whether a message can address OpenBot, the chat
+// type, the entity types, and whether it replies, is in a thread, or renames or leaves the chat.
+const telegramChatSchema = z.object({ id: z.int(), type: z.string().optional().catch(undefined) });
+const telegramEntitiesSchema = z
+  .array(z.object({ type: z.string() }))
+  .optional()
+  .catch(undefined);
 const telegramUpdateSchema = z.object({
-  message: z.object({ chat: telegramChatSchema, text: z.string().optional() }).optional(),
+  message: z
+    .object({
+      chat: telegramChatSchema,
+      text: z.string().optional(),
+      entities: telegramEntitiesSchema,
+      caption_entities: telegramEntitiesSchema,
+      reply_to_message: z.unknown().optional(),
+      message_thread_id: z.unknown().optional(),
+      new_chat_title: z.unknown().optional(),
+      left_chat_member: z.unknown().optional(),
+      migrate_to_chat_id: z.unknown().optional(),
+    })
+    .optional(),
   edited_message: z.object({ chat: telegramChatSchema }).optional(),
   callback_query: z.object({ id: z.string(), message: z.object({ chat: telegramChatSchema }).optional() }).optional(),
   my_chat_member: z.object({ chat: telegramChatSchema }).optional(),
@@ -127,12 +174,27 @@ export function createRemoteApiApp(
   config: RemoteApiConfig,
   signal: SignalService,
   runtime: ManagedRuntime.ManagedRuntime<SignalTokens, never>,
-  // Null when Signal has no Discord bot token: the Discord route answers 503.
-  discord: DiscordApi | null = null,
+  turnRelays: TurnRelays,
+  // The bots and `ingress` sockets go to the entry machine only. Another machine answers their webhooks 503.
+  entry: SignalEntry,
+  // Null when Signal has no Discord bot token, or while the Gateway is stopped because this machine is
+  // not the entry: the Discord route answers 503.
+  discordApi: () => DiscordApi | null = () => null,
 ) {
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
+    // For the status page: Signal can answer while the TURN relay refuses every allocation. This is the
+    // relay of `TURN_HOST`; the Signal on the machine of each other relay reports that relay. The route is
+    // public, so the probe result is kept for a minute (`TurnRelays`).
+    .get("/health/turn", async ({ set }) => {
+      const result = await runtime.runPromise(turnRelays.localProbe.pipe(Effect.result));
+      if (Result.isSuccess(result)) return { service: "openbot-turn", status: "ready" };
+      set.status = 503;
+      return result.failure.reason === "full"
+        ? { error: { code: "turn_full", message: "The TURN relay has no free allocation." } }
+        : { error: { code: "turn_unavailable", message: "The TURN relay did not allocate a relay address." } };
+    })
     .post("/internal/auth-events", async ({ request, set }) => {
       const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
       const signature = request.headers.get("OpenBot-Signature") ?? "";
@@ -169,7 +231,7 @@ export function createRemoteApiApp(
     .post(
       SLACK_EVENTS_PATH,
       async ({ request, server }) => {
-        if (config.slackSigningSecrets.length === 0) return slackResponse({ status: 503 });
+        if (config.slackSigningSecrets.length === 0 || !entry.isEntry) return slackResponse({ status: 503 });
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) {
           return slackResponse({ status: 413 });
@@ -209,6 +271,7 @@ export function createRemoteApiApp(
               retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
               body,
               wakes: slack.wakes,
+              chatter: slack.chatter,
             }),
             { signal: request.signal },
           ),
@@ -222,38 +285,84 @@ export function createRemoteApiApp(
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,
       async ({ request, params, server }) => {
+        const answer = (status: WebhookAnswerStatus) => {
+          signal.recordWebhookAnswer(status);
+          return webhookResponse(status);
+        };
+        if (!entry.isEntry) return answer(503);
         const routeId = params.routeId;
-        if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return webhookResponse(404);
+        if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return answer(404);
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) {
-          return webhookResponse(413);
+          return answer(413);
         }
         const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-        if (mediaType !== "application/json") return webhookResponse(415);
-        const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER) ?? "";
-        const deliveryId = request.headers.get(WEBHOOK_DELIVERY_ID_HEADER) ?? "";
-        const signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER) ?? "";
-        if (
-          !WEBHOOK_TIMESTAMP_PATTERN.test(timestamp) ||
-          !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId) ||
-          !WEBHOOK_SIGNATURE_PATTERN.test(signature)
-        ) {
-          return webhookResponse(401);
-        }
-        if (!signal.holdsWebhookRoute(routeId)) return webhookResponse(503);
+        if (mediaType !== "application/json") return answer(415);
+        const signed = webhookSignedHeaders(request.headers);
+        if (!signed) return answer(401);
+        if (!signal.holdsWebhookRoute(routeId)) return answer(503);
+        // An older host refuses the signature of this format, so the request cannot authenticate.
+        if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return answer(401);
         const address = signalClientIp(
           server?.requestIP(request)?.address,
           request.headers.get("x-forwarded-for"),
           config.trustProxy,
         );
-        if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return webhookResponse(429);
+        if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return answer(429);
         const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
-        if (!body) return webhookResponse(413);
-        const result = await runtime.runPromise(
-          signal.deliverWebhook(routeId, { timestamp, deliveryId, signature, body }),
-          { signal: request.signal },
-        );
-        return webhookResponse(result.status);
+        if (!body) return answer(413);
+        const result = await runtime.runPromise(signal.deliverWebhook(routeId, { ...signed, body }), {
+          signal: request.signal,
+        });
+        return answer(result.status);
+      },
+      { parse: "none" },
+    )
+    // The OpenBot GitHub App's one webhook URL, for the events of every installation. Signal checks
+    // the App's signature, reads only the installation and repository IDs, and passes the exact body
+    // to the ingress socket of every host whose GitHub route names the repository. Nothing here
+    // stores or logs the body.
+    .post(
+      GITHUB_EVENTS_PATH,
+      async ({ request, server }) => {
+        const secret = config.githubWebhookSecret;
+        if (!secret || !entry.isEntry) return emptyResponse(503);
+        const declaredLength = Number(request.headers.get("content-length") ?? "0");
+        if (!Number.isFinite(declaredLength) || declaredLength > GITHUB_DELIVERY_BODY_BYTES_LIMIT) {
+          await request.body?.cancel();
+          return emptyResponse(413);
+        }
+        const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+        if (mediaType !== "application/json") return emptyResponse(415);
+        const event = request.headers.get(GITHUB_EVENT_HEADER) ?? "";
+        const deliveryId = request.headers.get(GITHUB_DELIVERY_HEADER) ?? "";
+        const signature = request.headers.get(GITHUB_SIGNATURE_HEADER) ?? "";
+        const address = () =>
+          signalClientIp(
+            server?.requestIP(request)?.address,
+            request.headers.get("x-forwarded-for"),
+            config.trustProxy,
+          );
+        if (
+          !GITHUB_EVENT_PATTERN.test(event) ||
+          !GITHUB_DELIVERY_ID_PATTERN.test(deliveryId) ||
+          !GITHUB_SIGNATURE_PATTERN.test(signature)
+        ) {
+          await request.body?.cancel();
+          return emptyResponse(signal.acceptGitHubRequest(`address:${address()}`) ? 401 : 429);
+        }
+        const body = await readBounded(request, GITHUB_DELIVERY_BODY_BYTES_LIMIT);
+        if (!body) return emptyResponse(413);
+        if (!verifyGitHubSignature(body, signature, secret))
+          return emptyResponse(signal.acceptGitHubRequest(`address:${address()}`) ? 401 : 429);
+        // `ping` and the events of an installation itself name no repository: nothing to pass on.
+        const github = githubRequest(body);
+        if (!github) return emptyResponse(204);
+        if (!signal.acceptGitHubRequest(`installation:${github.installationId}`)) return emptyResponse(429);
+        const result = await runtime.runPromise(signal.deliverGitHub({ ...github, event, deliveryId, body }), {
+          signal: request.signal,
+        });
+        return emptyResponse(result.status);
       },
       { parse: "none" },
     )
@@ -263,6 +372,7 @@ export function createRemoteApiApp(
     .post(
       DISCORD_API_PATH,
       async ({ request }) => {
+        const discord = discordApi();
         if (!discord) return discordError(503, "unavailable");
         const token = DISCORD_SESSION_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
         const session = token ? signal.discordCaller(token, null) : null;
@@ -287,10 +397,12 @@ export function createRemoteApiApp(
     // The webhook of each OpenBot Telegram bot. Signal checks the bot's secret header, reads only the
     // chat, the callback query and a link code, and passes the exact body to the ingress socket of
     // the chat's host. Nothing here stores or logs the body. A signed update is always answered 200:
-    // Telegram holds back the bot's other updates while one fails.
+    // Telegram holds back the bot's other updates while one fails. A machine that is not the entry
+    // answers 503, and Telegram sends the update again through the entry name.
     .post(
       `${TELEGRAM_UPDATES_PATH}/:botId`,
       async ({ params, request, server }) => {
+        if (!entry.isEntry) return emptyResponse(503);
         const telegram = signal.telegram;
         const botId = params.botId;
         if (!telegram?.bot.hasBot(botId)) return emptyResponse(404);
@@ -358,7 +470,9 @@ export function createRemoteApiApp(
     .ws("/v1/signal", {
       idleTimeout: 120,
       maxPayloadLength: 64 * 1024,
-      backpressureLimit: 256 * 1024,
+      // Above the delivery budget of a host (`DEFAULT_INGRESS_DELIVERY_LIMITS`), so that the largest
+      // GitHub event fits with the frames of other routes.
+      backpressureLimit: 1024 * 1024,
       closeOnBackpressureLimit: true,
       perMessageDeflate: false,
       sendPings: true,
@@ -425,12 +539,13 @@ function slackDeliveryKind(contentType: string | null): SlackDeliveryKind | null
  * The only parts of a signed Slack request that Signal reads: the `url_verification` challenge, which
  * Signal answers itself, or the workspace ID that picks the host. Events carry it as `team_id`, and
  * button presses as `payload.team.id`. `wakes`: a button press, a mention, a direct message or a
- * thread reply from a person, which can start a hosted server that sleeps.
+ * thread reply from a person, which can start a hosted server that sleeps. `chatter`: any other
+ * message, which a host that is not connected does not need again.
  */
 function slackRequest(
   kind: SlackDeliveryKind,
   body: Uint8Array,
-): { challenge: string } | { appId: string; teamId: string; wakes: boolean } | null {
+): { challenge: string } | { appId: string; teamId: string; wakes: boolean; chatter: boolean } | null {
   let value: unknown;
   try {
     const text = new TextDecoder().decode(body);
@@ -455,7 +570,21 @@ function slackRequest(
       event.subtype !== "message_deleted" &&
       (event.channel_type === "im" || event.thread_ts !== undefined));
   return teamId && appId && SLACK_ID_PATTERN.test(teamId) && SLACK_ID_PATTERN.test(appId)
-    ? { appId, teamId, wakes }
+    ? { appId, teamId, wakes, chatter: kind === "events" && event?.type === "message" && !wakes }
+    : null;
+}
+
+/** The installation and repository of a signed GitHub event, or `null` when it names none. */
+function githubRequest(body: Uint8Array): { installationId: number; repositoryId: number } | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return null;
+  }
+  const parsed = githubRequestSchema.safeParse(value);
+  return parsed.success
+    ? { installationId: parsed.data.installation.id, repositoryId: parsed.data.repository.id }
     : null;
 }
 
@@ -484,6 +613,55 @@ async function readBody(request: Request, limit: number): Promise<Uint8Array<Arr
     return null;
   }
   return readBounded(request, limit);
+}
+
+interface WebhookHeaderSet {
+  deliveryId: string;
+  timestamp: string;
+  signature: string;
+  pattern: RegExp;
+  format?: WebhookSignatureFormat;
+}
+
+// The signed header sets of a generic webhook request, in order: `X-OpenBot-*`, then Standard Webhooks.
+const WEBHOOK_HEADER_SETS: readonly WebhookHeaderSet[] = [
+  {
+    deliveryId: WEBHOOK_DELIVERY_ID_HEADER,
+    timestamp: WEBHOOK_TIMESTAMP_HEADER,
+    signature: WEBHOOK_SIGNATURE_HEADER,
+    pattern: WEBHOOK_SIGNATURE_PATTERN,
+  },
+  ...STANDARD_WEBHOOK_HEADER_SETS.map(
+    (names): WebhookHeaderSet => ({
+      ...names,
+      pattern: STANDARD_WEBHOOK_SIGNATURE_PATTERN,
+      format: STANDARD_WEBHOOKS_FORMAT,
+    }),
+  ),
+];
+
+/**
+ * The three signed header values of the first header set that the request uses. Null when that set
+ * is not complete and valid. Signal does not check the signature: the host does.
+ */
+function webhookSignedHeaders(headers: Headers): Omit<WebhookDelivery, "body"> | null {
+  for (const names of WEBHOOK_HEADER_SETS) {
+    const timestamp = headers.get(names.timestamp);
+    const deliveryId = headers.get(names.deliveryId);
+    const signature = headers.get(names.signature);
+    if (timestamp === null && deliveryId === null && signature === null) continue;
+    if (
+      timestamp === null ||
+      deliveryId === null ||
+      signature === null ||
+      !WEBHOOK_TIMESTAMP_PATTERN.test(timestamp) ||
+      !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId) ||
+      !names.pattern.test(signature)
+    )
+      return null;
+    return { timestamp, deliveryId, signature, ...(names.format ? { format: names.format } : {}) };
+  }
+  return null;
 }
 
 function webhookResponse(status: WebhookDeliveryStatus | 415): Response {
@@ -588,9 +766,34 @@ function telegramUpdate(
     chatId,
     callbackQueryId: callbackQueryId.length > 0 && callbackQueryId.length <= 128 ? callbackQueryId : null,
     linkCode: update.message?.text?.match(TELEGRAM_START_PATTERN)?.[1] ?? null,
-    // A message or a button press can start a hosted server that sleeps; a member change cannot.
-    wakes: update.message !== undefined || update.callback_query !== undefined,
+    wakes:
+      update.callback_query !== undefined || (update.message !== undefined && telegramMessageWakes(update.message)),
   };
+}
+
+// Entity types that can name OpenBot: `@username`, a mention of a user without a username, and a
+// command such as `/stop@bot`. Signal reads only the type, not the text, so a mention of another
+// person also counts.
+const TELEGRAM_ADDRESSING_ENTITIES = new Set(["mention", "text_mention", "bot_command"]);
+
+/**
+ * True when a message can address OpenBot, so it can start a hosted server that sleeps: a direct
+ * message, a reply, a message in a thread, a message with a mention or a command, or a rename or a
+ * removal that the host must see. The bot gets every group message, and the host answers none of the
+ * others.
+ */
+function telegramMessageWakes(message: NonNullable<z.output<typeof telegramUpdateSchema>["message"]>): boolean {
+  return (
+    message.chat.type === "private" ||
+    message.reply_to_message !== undefined ||
+    message.message_thread_id !== undefined ||
+    message.new_chat_title !== undefined ||
+    message.left_chat_member !== undefined ||
+    message.migrate_to_chat_id !== undefined ||
+    [...(message.entities ?? []), ...(message.caption_entities ?? [])].some((entity) =>
+      TELEGRAM_ADDRESSING_ENTITIES.has(entity.type),
+    )
+  );
 }
 
 function decodeAuthEvent(body: string): RemoteAuthEvent | null {
@@ -602,9 +805,21 @@ function decodeAuthEvent(body: string): RemoteAuthEvent | null {
   }
 }
 
-export function prometheusMetrics(signal: SignalService): string {
+export function prometheusMetrics(signal: SignalService, turnRelays: TurnRelays, entry: SignalEntry): string {
   const metrics = signal.metrics();
+  const relays = turnRelays.states().filter((relay) => relay.available !== null);
+  const entryLabel = entry.signalId ? `{signal="${entry.signalId}"}` : "";
   return [
+    // 1 while this machine is the entry, 0 while another machine is. Absent without the entry rule.
+    ...(entry.enabled
+      ? [
+          "# TYPE openbot_remote_signal_entry gauge",
+          `openbot_remote_signal_entry${entryLabel} ${entry.isEntry ? 1 : 0}`,
+        ]
+      : []),
+    // 1 when the last probe of the relay allocated, 0 when it failed. A relay that has no probe yet is absent.
+    "# TYPE openbot_remote_turn_relay_available gauge",
+    ...relays.map((relay) => `openbot_remote_turn_relay_available{host="${relay.host}"} ${relay.available ? 1 : 0}`),
     "# TYPE openbot_remote_signal_sockets gauge",
     `openbot_remote_signal_sockets ${metrics.activeSockets}`,
     "# TYPE openbot_remote_peer_connections gauge",
@@ -621,6 +836,20 @@ export function prometheusMetrics(signal: SignalService): string {
     `openbot_remote_slack_deliveries_total ${metrics.slackDeliveries}`,
     "# TYPE openbot_remote_slack_deliveries_unavailable_total counter",
     `openbot_remote_slack_deliveries_unavailable_total ${metrics.slackDeliveriesUnavailable}`,
+    "# TYPE openbot_remote_webhook_answers_total counter",
+    ...WEBHOOK_ANSWER_STATUSES.map(
+      (status) => `openbot_remote_webhook_answers_total{status="${status}"} ${metrics.webhookAnswers[status]}`,
+    ),
+    "# TYPE openbot_remote_webhook_waits_total counter",
+    `openbot_remote_webhook_waits_total ${metrics.webhookWaits}`,
+    "# TYPE openbot_remote_webhook_wait_milliseconds_total counter",
+    `openbot_remote_webhook_wait_milliseconds_total ${metrics.webhookWaitMilliseconds}`,
+    "# TYPE openbot_remote_webhook_slow_waits_total counter",
+    `openbot_remote_webhook_slow_waits_total ${metrics.webhookSlowWaits}`,
+    "# TYPE openbot_remote_github_deliveries_total counter",
+    `openbot_remote_github_deliveries_total ${metrics.githubDeliveries}`,
+    "# TYPE openbot_remote_github_deliveries_unavailable_total counter",
+    `openbot_remote_github_deliveries_unavailable_total ${metrics.githubDeliveriesUnavailable}`,
     "# TYPE openbot_remote_telegram_deliveries_total counter",
     `openbot_remote_telegram_deliveries_total ${metrics.telegramDeliveries}`,
     "# TYPE openbot_remote_telegram_deliveries_unrouted_total counter",

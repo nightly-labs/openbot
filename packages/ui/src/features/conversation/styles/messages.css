@@ -15,10 +15,17 @@
   padding-inline: var(--openbot-space-1);
 }
 
-/* Keep the face beside the bubble, independent of the author name and footer height. */
+/* Keep the face beside the bubble, independent of the author name and footer height. The face is a
+   little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
+.message-entry-with-author,
+.message-author-gutter {
+  --message-author-face-size: var(--openbot-space-8);
+  --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
+}
+
 .message-entry-with-author {
   display: grid;
-  grid-template-columns: calc(var(--openbot-space-6) + var(--openbot-space-1)) minmax(0, 1fr);
+  grid-template-columns: var(--message-author-column) minmax(0, 1fr);
   column-gap: var(--openbot-space-2);
   row-gap: var(--openbot-space-1);
 }
@@ -38,6 +45,8 @@
 }
 
 .message-author-avatar {
+  width: var(--message-author-column);
+  height: var(--message-author-column);
   grid-column: 1;
   grid-row: 2;
   align-self: end;
@@ -47,10 +56,10 @@
 }
 
 .message-author-avatar .agent-avatar {
-  --agent-avatar-optical-offset: -3px;
+  --agent-avatar-optical-offset: -4px;
 
-  width: var(--openbot-space-6);
-  height: var(--openbot-space-6);
+  width: var(--message-author-face-size);
+  height: var(--message-author-face-size);
 }
 
 .message-author-avatar-button {
@@ -69,8 +78,8 @@
  * with one agent draws no faces at all, so it never asks for the column.
  */
 .message-author-gutter {
-  width: 28px;
-  flex: 0 0 28px;
+  width: var(--message-author-column);
+  flex: 0 0 var(--message-author-column);
 }
 
 .message-author-name {
@@ -106,8 +115,20 @@
  * The keyframes alone hide a new row, so a row whose animation is off (reduced motion, which
  * Windows reports while its animation effects are off) still shows.
  */
+/* The row is as wide as the chat, so each bubble grows from its own side and does not move toward the middle. */
 .message-entry-animated {
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: left bottom;
+  animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+
+.message-entry-animated.message-entry-user {
+  transform-origin: right bottom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .message-entry-animated.message-entry-user {
+    animation: message-sent-in 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
 }
 
 .message-entry-agent {
@@ -125,6 +146,23 @@
 
 .message-entry-user .message-shell {
   justify-content: flex-end;
+}
+
+/* A person's images stand above the bubble, outside it, with a small gap. */
+.message-stack {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  justify-items: end;
+  gap: var(--openbot-space-1);
+}
+
+.message-media-before {
+  width: min(420px, 100%);
+}
+
+.message-media-before:has(.image-gallery) {
+  width: min(520px, 100%);
 }
 
 .message-actions {
@@ -170,9 +208,85 @@
   opacity: 1;
 }
 
+/* A channel shows an agent's actions beside the bubble, in the same line. They go under the bubble
+   only when the line has no room, so only a long answer keeps space for them. */
+.message-entry-actions-beside .message-shell {
+  flex-wrap: wrap;
+  row-gap: var(--openbot-space-1);
+}
+
+/* The face stays at the end of the bubble when the actions go under it. */
+/* Each row scopes its anchor name, so an engine with no anchor-scope keeps the face in the flow. */
+@supports (position-anchor: --message-bubble) and (anchor-scope: --message-bubble) {
+  .message-entry-actions-beside {
+    anchor-scope: --message-bubble;
+  }
+
+  .message-entry-actions-beside .message-shell .ui-bubble {
+    anchor-name: --message-bubble;
+  }
+
+  .message-entry-actions-beside .message-author-avatar {
+    position: absolute;
+    bottom: anchor(--message-bubble bottom);
+    left: 0;
+  }
+}
+
+/* The steps of the turn: a quiet summary at the end of the action row, shown with the actions. */
+.message-steps {
+  min-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.message-steps > .agent-steps {
+  margin-bottom: 0;
+}
+
+/* The general steps row rules load later, so these name the steps block too. */
+/* The steps button matches the action buttons beside it: their height, and their hover as one unit. */
+.message-steps .agent-steps .agent-steps-header {
+  height: 24px;
+  margin-inline-start: 0;
+  padding-block: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  transition:
+    background var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease;
+}
+
+.message-steps .agent-steps .agent-steps-header:is(:hover, :focus-visible) {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+  outline: none;
+}
+
+.message-steps .agent-steps-header :is(.agent-steps-duration, .agent-steps-chevron) {
+  color: inherit;
+  transition:
+    color var(--openbot-duration-hover) ease,
+    rotate var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.message-steps .agent-steps-summary {
+  font-weight: var(--openbot-weight-regular);
+}
+
+.message-entry:hover .message-steps,
+.message-entry:focus-within .message-steps,
+.message-entry:has(.message-actions-open) .message-steps {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (hover: none), (pointer: coarse) {
   .message-actions,
-  .message-time {
+  .message-time,
+  .message-steps {
     opacity: 1;
     pointer-events: auto;
   }
@@ -191,12 +305,136 @@
 }
 
 /* Their bubble takes a tint of their name colour, so it does not read as the reader's own. */
+.ui-bubble.message-bubble-member {
+  --message-bubble-tint: var(--message-author-color, var(--openbot-accent));
+  --message-bubble-tint-amount: 22%;
+}
+
+/*
+ * A chat color tints the bubble: the reader's own, an agent's, or another person's. The author sets
+ * it in Settings or in the agent settings, and everyone in the chat sees the same tint.
+ */
+.ui-bubble.message-bubble-colored {
+  --message-bubble-tint: var(--message-chat-color);
+  --message-bubble-tint-amount: 30%;
+}
+
+/* 22% of a color on the dark surface is dull, so the dark theme takes more of a chat color. */
+:root[data-openbot-color-scheme="light"] .ui-bubble.message-bubble-colored {
+  --message-bubble-tint-amount: 22%;
+}
+
+/*
+ * The bubble keeps the plain surface values, because its content sets the same tokens again and a
+ * token cannot refer to itself. A tinted bubble mixes the tint into the raised surface; an agent's
+ * muted bubble mixes it into the surface.
+ */
+.ui-bubble:is(.message-bubble-member, .message-bubble-colored) {
+  --message-plain-canvas: var(--openbot-bg-canvas);
+  --message-plain-sidebar: var(--openbot-bg-sidebar);
+  --message-plain-surface: var(--openbot-bg-surface);
+  --message-plain-surface-raised: var(--openbot-bg-surface-raised);
+  --message-plain-control: var(--openbot-bg-control);
+  --message-plain-control-hover: var(--openbot-bg-control-hover);
+  --message-plain-control-active: var(--openbot-bg-control-active);
+  --message-bubble-base: var(--openbot-bg-surface-raised);
+}
+
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored {
+  --message-bubble-base: var(--openbot-bg-surface);
+}
+
 .ui-bubble.message-bubble-member > .ui-bubble-content {
   background: color-mix(
     in srgb,
-    var(--message-author-color, var(--openbot-accent)) 22%,
-    var(--openbot-bg-surface-raised)
+    var(--message-bubble-tint) var(--message-bubble-tint-amount),
+    var(--message-bubble-base)
   );
+}
+
+/*
+ * Code, tables, quotes, file chips and cards in a bubble with a chat color take the same tint as the bubble, so
+ * they do not stand on it as neutral panels. Each surface keeps its step from the next one, as in a
+ * plain bubble, and a little of the text colour lifts them all from the bubble: lighter in the dark
+ * theme, darker in the light theme. Without the lift, a block on a tinted bubble shows only its
+ * border.
+ */
+.message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+  --message-surface-lift: 5%;
+  --openbot-bg-canvas: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-canvas))
+  );
+  --openbot-bg-sidebar: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-sidebar))
+  );
+  --openbot-bg-surface: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-surface))
+  );
+  --openbot-bg-surface-raised: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(
+      in srgb,
+      var(--message-bubble-tint) var(--message-bubble-tint-amount),
+      var(--message-plain-surface-raised)
+    )
+  );
+  --openbot-bg-control: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-control))
+  );
+  --openbot-bg-control-hover: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-control-hover))
+  );
+  --openbot-bg-control-active: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(
+      in srgb,
+      var(--message-bubble-tint) var(--message-bubble-tint-amount),
+      var(--message-plain-control-active)
+    )
+  );
+
+  background: color-mix(
+    in srgb,
+    var(--message-bubble-tint) var(--message-bubble-tint-amount),
+    var(--message-bubble-base)
+  );
+}
+
+/* A menu, a tooltip or a popover that opens in a bubble with a chat color covers the chat, so it stays plain. */
+.ui-bubble.message-bubble-colored
+:is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+  --openbot-bg-canvas: var(--message-plain-canvas);
+  --openbot-bg-sidebar: var(--message-plain-sidebar);
+  --openbot-bg-surface: var(--message-plain-surface);
+  --openbot-bg-surface-raised: var(--message-plain-surface-raised);
+  --openbot-bg-control: var(--message-plain-control);
+  --openbot-bg-control-hover: var(--message-plain-control-hover);
+  --openbot-bg-control-active: var(--message-plain-control-active);
+}
+
+/*
+ * A file icon tile is a clear tint of the file colour. On a chat color that tint would mix with the
+ * chat color, so the tile lays it on the plain control and keeps its own colour. An audio or video
+ * card keeps its neutral control tile, which takes the tint of the bubble as the other cards do.
+ */
+:is(
+  .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
+  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
+) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
+  background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
 
 .message-action-button {
@@ -214,11 +452,12 @@
     color var(--openbot-duration-hover) ease;
 }
 
+/* Every button of the row, the reaction trigger too, takes the hover of a ghost button. */
 .message-action-button:hover,
 .message-action-button:focus-visible,
 .message-action-button[aria-expanded="true"] {
-  background: var(--openbot-border);
-  color: var(--openbot-text-secondary);
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
   outline: none;
 }
 
@@ -357,7 +596,7 @@
 }
 
 .message-reaction-anchor .ui-bubble-reaction-overflow {
-  padding-right: 6px;
+  padding-inline-end: 6px;
 }
 
 .message-reaction-pill:hover {
@@ -380,11 +619,13 @@
 
 .chat-action-entry-animated {
   width: 100%;
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: left bottom;
+  animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
 }
 
+/* The line's padding, the 32px face, and its lower padding. */
 .agent-activity-slot[data-reserved="true"] {
-  min-height: 44px;
+  min-height: 52px;
 }
 
 .agent-activity-entry {
@@ -405,6 +646,14 @@
   grid-template-rows: 0fr;
 }
 
+/* The slot keeps the room of a plain line, so that line enters and leaves in place: only its face and
+   text animate, and the messages above do not move. A line with steps is taller, so it still opens. */
+.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"],
+.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"][data-state="exiting"] {
+  grid-template-rows: 1fr;
+  transition: none;
+}
+
 .agent-activity-content {
   min-height: 0;
   display: flex;
@@ -412,7 +661,10 @@
   gap: 8px;
   overflow: clip;
   overflow-clip-margin: var(--openbot-space-3);
-  padding: 4px 0 8px 8px;
+  /* The working face's felt dots reach about 10px above it. The top padding keeps them in this line,
+     so they do not cover the message above. */
+  padding-block: var(--openbot-space-3) 8px;
+  padding-inline: 8px 0;
   opacity: 1;
   filter: blur(0);
   transform: translateY(0);
@@ -438,7 +690,7 @@
 }
 
 .agent-activity-avatar {
-  --agent-avatar-optical-offset: -2px;
+  --agent-avatar-optical-offset: calc(32px * -0.14);
 
   width: 32px;
   height: 32px;
@@ -449,14 +701,27 @@
   will-change: transform;
 }
 
-@starting-style {
-  .agent-activity-avatar {
-    transform: translateY(3px) scale(0.96);
+/* The face of a working agent pops in from half size, rises from its lower edge, and settles with a
+   small bounce, as a new bubble does. `backwards`, so the exit transition can shrink it afterwards. */
+.agent-activity-entry .agent-activity-avatar {
+  transform-origin: center bottom;
+  animation: agent-activity-avatar-in 420ms cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+}
+
+@keyframes agent-activity-avatar-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
+/* The face leaves the way it came: it shrinks to its lower edge while the line fades. */
 .agent-activity-entry[data-state="exiting"] .agent-activity-avatar {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(4px) scale(0.6);
 }
 
 .agent-activity-label {
@@ -492,6 +757,58 @@
   background: none;
   color: var(--openbot-text-secondary);
   -webkit-text-fill-color: currentColor;
+}
+
+/* The plain line draws a label as Grok Bot does: each new step label rises 5px into place in 350ms,
+   with no exit, and a soft light runs over it in 60 steps. */
+.agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 0%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 25%,
+    var(--openbot-text-primary) 60%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 75%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation:
+    agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards,
+    agent-activity-label-shine 2.2s steps(60, end) infinite;
+}
+
+.agent-activity-entry[data-plain="true"][data-waiting="true"] .agent-activity-label {
+  animation: agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+@keyframes agent-activity-label-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+@keyframes agent-activity-label-shine {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes agent-activity-label-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-activity-entry[data-plain="true"] .agent-activity-label,
+  .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+    animation: agent-activity-label-fade 120ms ease-out backwards;
+  }
 }
 
 .agent-activity-elapsed {
@@ -554,6 +871,12 @@
 }
 
 .ui-button.chat-action-history-toggle {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+/* The link to the routine's own thread, where the run's answer and work are. */
+.ui-button.chat-action-routine-thread {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
 }
@@ -666,7 +989,7 @@
   padding: var(--openbot-space-1-5) var(--openbot-space-2);
   border-inline-start: 1px solid var(--openbot-border-grouped);
   list-style: none;
-  text-align: left;
+  text-align: start;
 }
 
 .chat-action-history-entry {
@@ -775,7 +1098,7 @@
   font: inherit;
   line-height: inherit;
   outline: none;
-  text-align: left;
+  text-align: start;
   white-space: nowrap;
   transition:
     background-color var(--openbot-duration-hover) var(--openbot-ease-out),
@@ -909,7 +1232,7 @@ button.chat-action-target:active,
 }
 
 .chat-action-avatar-stack .chat-action-agent-avatar + .chat-action-agent-avatar {
-  margin-left: -6px;
+  margin-inline-start: -6px;
 }
 
 /* An open group lists each message as its own marker, centred like the row that holds them. */
@@ -1004,8 +1327,19 @@ button.chat-action-target:active,
   letter-spacing: -0.15px;
 }
 
+/*
+ * Bubbles grow with the chat column, between a minimum and a maximum, so a big screen shows more of a
+ * reply and a narrow pane is not wasted. A percentage refers to the message row. An agent reply, code,
+ * and a table use the wide width; a person's message uses the narrow width, and leaves a gap at the
+ * other side on a narrow pane.
+ */
+:root {
+  --message-wide-bubble-width: min(100%, max(720px, 70%), 1200px);
+  --message-narrow-bubble-width: min(92%, max(420px, 50%), 800px);
+}
+
 .message-entry-agent .ui-bubble {
-  max-width: min(720px, 100%);
+  max-width: var(--message-wide-bubble-width);
 }
 
 .message-entry-agent .ui-bubble:has(.choice-card) {
@@ -1013,12 +1347,13 @@ button.chat-action-target:active,
   max-width: min(500px, 100%);
 }
 
-.message-entry-agent .ui-bubble:has(.image-generation) {
+/* An image keeps its size in a person's bubble too: the bubble does not shrink to the text. */
+.message-entry .ui-bubble:has(.image-generation) {
   width: min(420px, 100%);
   max-width: min(420px, 100%);
 }
 
-.message-entry-agent .ui-bubble:has(.image-gallery) {
+.message-entry .ui-bubble:has(.image-gallery) {
   width: min(520px, 100%);
   max-width: min(520px, 100%);
 }
@@ -1028,6 +1363,10 @@ button.chat-action-target:active,
     :is(.choice-card, .image-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
   )
   > .ui-bubble-content {
+  width: 100%;
+}
+
+.message-entry-user .ui-bubble:has(:is(.image-generation, .image-gallery)) > .ui-bubble-content {
   width: 100%;
 }
 
@@ -1154,7 +1493,7 @@ button.chat-action-target:active,
   position: absolute;
   z-index: 1;
   top: 8px;
-  right: 8px;
+  inset-inline-end: 8px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
   padding: 2px 7px;
@@ -1170,7 +1509,7 @@ button.chat-action-target:active,
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  text-align: left;
+  text-align: start;
 }
 
 .image-generation-label {
@@ -1250,7 +1589,7 @@ button.chat-action-target:active,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  right: 10px;
+  inset-inline-end: 10px;
   bottom: 10px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
@@ -1423,4 +1762,61 @@ button.chat-action-target:active,
 .pending-send-error::before {
   content: "·";
   margin-inline-end: var(--openbot-space-1);
+}
+
+/*
+ * The reader's own actions stand before the bubble, in the same line. The stack takes the width of
+ * the bubble, not the line, so the actions fit beside it. A message with images keeps the full
+ * line, and its actions go under it.
+ */
+.message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) {
+  width: auto;
+  max-width: min(80%, 720px);
+  flex: 0 1 auto;
+}
+
+.message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) > .ui-bubble {
+  max-width: 100%;
+}
+
+.message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) + .message-action-row {
+  order: -1;
+}
+
+/*
+ * A run of messages by one sender reads as one block: where two bubbles of the run meet, their
+ * corners on the sender's side are small, at the start for an agent and at the end for the reader.
+ * Only a row that the timeline groups with the row above it, and that starts with its message (no
+ * marker or steps above it), joins the bubble above.
+ */
+.virtual-chat-row[data-grouped="sender"]
+  > .message-entry-agent:first-child
+  .message-shell
+  > .ui-bubble
+  > .ui-bubble-content {
+  border-start-start-radius: var(--openbot-radius-sm);
+}
+
+.virtual-chat-row[data-grouped="sender"]
+  > .message-entry-user:first-child
+  .message-stack
+  > .ui-bubble:first-child
+  > .ui-bubble-content {
+  border-start-end-radius: var(--openbot-radius-sm);
+}
+
+.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-agent:first-child)
+  > .message-entry-agent:last-child
+  .message-shell
+  > .ui-bubble
+  > .ui-bubble-content {
+  border-end-start-radius: var(--openbot-radius-sm);
+}
+
+.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-user:first-child)
+  > .message-entry-user:last-child
+  .message-stack
+  > .ui-bubble:last-child
+  > .ui-bubble-content {
+  border-end-end-radius: var(--openbot-radius-sm);
 }

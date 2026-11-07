@@ -11,6 +11,9 @@
 // (`./discord-api.ts`).
 // Telegram is the third: the OpenBot bot's updates come to Signal, which passes each to the host of
 // its chat, and the host calls the Bot API through Signal, which holds the token (`./telegram-route.ts`).
+// GitHub is the fourth: the OpenBot GitHub App's events come to Signal, which checks the App's
+// signature and passes each to every host whose GitHub triggers watch its repository
+// (`./github-route.ts`).
 //
 // Three parties speak this and none of them ships together: the service
 // (`remote/api/src/signal-service.ts`), the shared client that mobile and the future web client run
@@ -31,8 +34,10 @@
 // negotiated on the data channels is a different number entirely.
 
 import type { DiscordDelivery } from "./discord-api";
+import type { GitHubDeliveryStatus } from "./github-route";
 import type { TelegramCallFailure, TelegramCallMethod, TelegramCallParams, TelegramCallResult } from "./telegram-route";
 import type { RemoteMemberRole } from "./ticket";
+import type { WebhookSignatureFormat } from "./webhook-route";
 
 export const SIGNAL_PROTOCOL_VERSION = 1;
 export type SignalProtocolVersion = typeof SIGNAL_PROTOCOL_VERSION;
@@ -147,12 +152,19 @@ export type SignalClientMessage =
       // `ingress` only: the generic webhook route ticket (`./webhook-route.ts`) that names the
       // opaque webhook routes whose requests this socket receives.
       webhookRoute?: string;
+      // `ingress` only, and optional: the GitHub route ticket (`./github-route.ts`) that names the
+      // repositories whose GitHub events this socket receives.
+      githubRoute?: string;
       // `ingress` only, and optional: the Telegram route ticket (`./telegram-route.ts`) that names
       // the Telegram chats whose updates this socket receives.
       telegramRoute?: string;
       // `ingress` only, and optional: the host's queue key (`./ingress-queue.ts`). With it, Signal
       // keeps the events of a route for this host while the host starts.
       queueKey?: string;
+      // `ingress` only, and optional: the webhook signature formats that this host checks in addition
+      // to `X-OpenBot-Signature` (`./webhook-route.ts`). An older Signal ignores it, and Signal ignores
+      // a format that it does not know.
+      webhookFormats?: string[];
     }
   // An `ingress` socket's Bot API call, sent only to a Signal whose `ready` named the `telegram`
   // capability. Signal answers with one `telegram-call-result` of the same `requestId`.
@@ -185,6 +197,14 @@ export type SignalClientMessage =
       version: SignalProtocolVersion;
       requestId: string;
       status: WebhookDeliveryStatus;
+    }
+  // An ingress socket's answer to one `github-delivery`: 202 after the host saved the event, 404
+  // when no GitHub trigger of the host watches the repository now.
+  | {
+      type: "github-delivery-result";
+      version: SignalProtocolVersion;
+      requestId: string;
+      status: GitHubDeliveryStatus;
     }
   | SignalRelayMessage;
 
@@ -266,6 +286,20 @@ export type SignalServerMessage =
   // service ignores the optional hello field and never emits this frame, so the host can gate the
   // webhook feature on this acknowledgement.
   | { type: "webhook-ready"; version: SignalProtocolVersion }
+  // Sent after `ready` when the ingress hello carried a GitHub route ticket, as `webhook-ready` is.
+  // From this frame on, the host receives the GitHub events of the repositories in the ticket.
+  | { type: "github-ready"; version: SignalProtocolVersion }
+  // One GitHub event of a repository in this socket's GitHub route. Signal checked the App's
+  // signature and passes the exact body and GitHub's event name and delivery ID. The host answers
+  // with `github-delivery-result`.
+  | {
+      type: "github-delivery";
+      version: SignalProtocolVersion;
+      requestId: string;
+      event: string;
+      deliveryId: string;
+      bodyBase64: string;
+    }
   // One Discord event of a guild routed to this `ingress` socket. Signal already acknowledged a button
   // press to Discord; nothing is answered.
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }
@@ -284,5 +318,8 @@ export type SignalServerMessage =
       deliveryId: string;
       signature: string;
       bodyBase64: string;
+      // Absent for an `X-OpenBot-Signature` request. Present only when the host named the format in
+      // its `ingress` hello.
+      format?: WebhookSignatureFormat;
     }
   | SignalRelayMessage;

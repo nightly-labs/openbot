@@ -13,6 +13,7 @@ import { BrowserHost } from "../src/backend/browser-host";
 import { BROWSER_DYNAMIC_TOOLS } from "../src/backend/browser-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
+import { parseBrowserToolText } from "./browser-snapshot-text";
 
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -36,7 +37,7 @@ const cases: string[] = [];
 const snapshotSchema = z.object({
   tabId: z.string(),
   revision: z.number(),
-  elements: z.array(z.object({ ref: z.string(), name: z.string(), tag: z.string() })),
+  elements: z.array(z.object({ ref: z.string(), name: z.string(), tag: z.string().optional() })),
 });
 const outcomeSchema = z.object({
   tabId: z.string(),
@@ -138,7 +139,7 @@ async function main(): Promise<void> {
     const json = (result: DynamicToolResult) => {
       const text = result.contentItems.find((item) => item.type === "inputText");
       assert(text?.type === "inputText", "Missing fixture tool text.");
-      return z.json().parse(JSON.parse(text.text));
+      return z.json().parse(parseBrowserToolText(text.text));
     };
     const open = async (mode = "ordinary") => {
       const id = `form-${++sequence}`;
@@ -187,7 +188,11 @@ async function main(): Promise<void> {
         text: "reverse",
       });
       await drain(form.contents);
-      assert(typed.success && recorded(form.id).at(-1)?.values.f8 === "reverse", "Single-field reverse input failed.");
+      // Each typed character posts its own event, so the events can arrive in any order.
+      assert(
+        typed.success && recorded(form.id).some((event) => event.values.f8 === "reverse"),
+        "Single-field reverse input failed.",
+      );
     };
     assert(
       BROWSER_DYNAMIC_TOOLS.some((namespace) => namespace.tools.some((tool) => tool.name === "fill_fields")),
@@ -473,6 +478,7 @@ async function main(): Promise<void> {
               tabId: form.tab.id,
               target: { kind: "ref", ref, revision: current.revision },
               text: field.text,
+              snapshot: true,
             });
             assert(result.success, "Warm single fill failed.");
             bytes += Buffer.byteLength(JSON.stringify(result));
@@ -481,8 +487,11 @@ async function main(): Promise<void> {
           await drain(form.contents);
         }
         const milliseconds = performance.now() - start;
+        // A batch gives one input event per field. `type` gives one per character.
+        const events = recorded(form.id);
         assert(
-          recorded(form.id).length === 8 && recorded(form.id).every((event) => event.trusted && !event.submitted),
+          (batch ? events.length === 8 : new Set(events.map((event) => event.field)).size === 8) &&
+            events.every((event) => event.trusted && !event.submitted),
           "Warm fixture input evidence failed.",
         );
         const snapshots = counts.snapshot();
@@ -780,9 +789,11 @@ async function interruptionCases(
         if (form.contents.debugger.isAttached()) form.contents.debugger.detach();
         await form.contents.executeJavaScript("window.fixtureDrain()", false);
       }
-      // Reverse input adds one event only in the interrupted cases.
+      // Reverse input adds one event only in the interrupted cases. `type` sends one key per
+      // character, so each prefix of "reverse" is reverse input too.
+      const reverseInput = (value: string | undefined) => !!value && "reverse".startsWith(value);
       assert(
-        recorded(form.id).filter((event) => event.values.f8 !== "reverse").length === 1,
+        recorded(form.id).filter((event) => !reverseInput(event.values.f8)).length === 1,
         "An undispatched field received input after abort.",
       );
       await runCauseEffect(host.close(form.tab.id));

@@ -11,6 +11,31 @@ const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for sessio
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 
 /**
+ * A failed MCP server start, which ends the turn. Antigravity 1.4.4 writes `mcp_load_failed_message`:
+ * "The MCP server '<name>' failed to initialize: <reason>. Fix the MCP server, or remove it from your
+ * configuration and start a new session, to continue." Before it, the SDK text came as it is:
+ * "Agent execution error: MCP load failed for <name>: <reason>". The SDK limits names to these
+ * characters.
+ */
+const GEMINI_MCP_LOAD_FAILURES = [
+  /^\s*The MCP server '([A-Za-z0-9_-]+)' failed to initialize(?:: ([\s\S]*?))?\.? Fix the MCP server\b/u,
+  /\bMCP load failed for ([A-Za-z0-9_-]+): ([\s\S]*)$/u,
+] as const;
+
+function geminiMcpLoadFailure(text: string): { name: string; reason: string } | null {
+  for (const pattern of GEMINI_MCP_LOAD_FAILURES) {
+    const match = pattern.exec(text);
+    // With no reason, Antigravity's own sentence is the reason, so the report is not empty.
+    if (match?.[1])
+      return {
+        name: match[1],
+        reason: (match[2] || match[0].replace(/\s*Fix the MCP server\b.*$/su, "")).replace(/\s+/gu, " ").trim(),
+      };
+  }
+  return null;
+}
+
+/**
  * The kind of a Gemini request failure, first match wins. Gemini reports usage only for a Google
  * sign-in on 1.4.1 or later, so a limit often has no usage notice to explain it, and the raw Google
  * status left the user unsure whether waiting or another model helps (#1676). The patterns follow
@@ -57,6 +82,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Gemini models only, also when the plan includes the others. The server also sends the name and
   // version to Google in its User-Agent (`_surface`), so Google sees these requests as `zed/0.1.0`.
   clientInfo: { name: "zed", title: "OpenBot", version: "0.1.0" },
+  // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own
+  // routines, and a workflow runs agents that OpenBot does not show. Antigravity keeps the filter with
+  // the session; a load or resume sends it again, so a session from an earlier release gets it too.
+  sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   // Antigravity 1.3.0 has three exact forms: a load or resume puts the ID in data.sessionId, a
   // configuration change uses the SDK's resource URI `session <id>`, and a prompt raises a plain
   // error that the SDK wraps as an internal error.
@@ -66,6 +95,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
   },
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
+  // Antigravity 1.4.5 ends a turn whose quota is spent with the stop reason `refusal`
+  // (`_to_acp_stop_reason` of QUOTA_EXHAUSTED).
+  failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_EXECUTION_ERROR_ANSWER,
@@ -79,6 +111,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
         ? sourceText("error.provider.antigravityQuotaReached", { detail: shownFailureDetail(quota[1]?.trim() ?? "") })
         : null;
     },
+    mcpLoadFailure: geminiMcpLoadFailure,
   },
   // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then rebuild the
   // harness through session/resume before accepting another prompt.
@@ -93,4 +126,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   promptOpenForBackgroundTasks: true,
   // Antigravity 1.3.0 sends `usage_update` but has no ACP method or command that compacts.
   contextCompaction: "handoff",
+  // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it
+  // after `session/close`, which it does not advertise, until its process ends (#3925).
+  closeKeepsSession: true,
+  // Also on Windows, where each process start unpacks about 310 MB (`antigravityTemp`) that a new or
+  // reopened session waits for. One shared process kept a harness for each session it opened (#5497).
+  sessionProcesses: true,
 };

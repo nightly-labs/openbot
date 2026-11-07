@@ -22,8 +22,22 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
-import { useWorkflowDetail } from "@/features/workflows/model/use-workflows";
+import {
+  SlackTriggerFields,
+  TelegramTriggerFields,
+  useChatAccess,
+} from "@/features/workflows/components/workflow-chat-fields";
+import { DiscordTriggerFields } from "@/features/workflows/components/workflow-discord-fields";
+import { GitHubTriggerFields } from "@/features/workflows/components/workflow-github-fields";
+import { useWorkflowDetail, useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
+import {
+  SLACK_TRIGGER_DEFAULTS,
+  slackWorkspaces,
+  TELEGRAM_TRIGGER_DEFAULTS,
+  telegramChats,
+} from "@/features/workflows/model/workflow-chats";
 import { useWorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import { GITHUB_TRIGGER_DEFAULTS } from "@/features/workflows/model/workflow-github";
 import { triggerType } from "@/features/workflows/model/workflow-steps";
 import {
   useMobileWorkspaceActions,
@@ -39,7 +53,47 @@ const CHOICES = [
   { type: "manual", title: "mobile.workflow.trigger.manual", description: "mobile.workflow.trigger.manualHint" },
   { type: "schedule", title: "mobile.workflow.trigger.schedule", description: "mobile.workflow.trigger.scheduleHint" },
   { type: "webhook", title: "mobile.workflow.trigger.webhook", description: "mobile.workflow.trigger.webhookHint" },
-] as const satisfies readonly { type: WorkflowTriggerType; title: MobileTextKey; description: MobileTextKey }[];
+] as const satisfies readonly TriggerChoice[];
+
+interface TriggerChoice {
+  type: WorkflowTriggerType;
+  title: MobileTextKey;
+  description: MobileTextKey;
+}
+
+const GITHUB_CHOICE: TriggerChoice = {
+  type: "github",
+  title: "mobile.workflow.trigger.github",
+  description: "mobile.workflow.trigger.githubHint",
+};
+const MESSAGE_CHOICE: TriggerChoice = {
+  type: "message",
+  title: "mobile.workflow.trigger.message",
+  description: "mobile.workflow.trigger.messageHint",
+};
+const DISCORD_CHOICE: TriggerChoice = {
+  type: "discord",
+  title: "mobile.workflow.trigger.discord",
+  description: "mobile.workflow.discord.triggerComputerOnly",
+};
+const TELEGRAM_CHOICE: TriggerChoice = {
+  type: "telegram",
+  title: "mobile.workflow.trigger.telegram",
+  description: "mobile.workflow.trigger.telegramHint",
+};
+const SLACK_CHOICE: TriggerChoice = {
+  type: "slack",
+  title: "mobile.workflow.trigger.slack",
+  description: "mobile.workflow.trigger.slackHint",
+};
+
+/** The trigger types that act as the host's GitHub App or messaging bot, with the fields a new one stores. */
+const HOST_TYPES: readonly WorkflowTriggerType[] = ["github", "discord", "telegram", "slack"];
+const TRIGGER_DEFAULTS: Partial<Record<WorkflowTriggerType, Record<string, string>>> = {
+  github: GITHUB_TRIGGER_DEFAULTS,
+  telegram: TELEGRAM_TRIGGER_DEFAULTS,
+  slack: SLACK_TRIGGER_DEFAULTS,
+};
 
 /** The editor sheet > Trigger: what starts the workflow, and its schedule or webhook. */
 export function WorkflowTriggerScreen() {
@@ -53,6 +107,8 @@ export function WorkflowTriggerScreen() {
   const admin = useMobileWorkspaceSelector((current) =>
     canAdministerServer(current.servers.find((server) => server.id === draft?.serverId)?.role),
   );
+  const githubSupported = useWorkflowGitHubSupported(draft?.serverId ?? "");
+  const chats = useChatAccess(draft);
   const { rotateWorkflowWebhookSecret } = useMobileWorkspaceActions();
   const [schedule, setScheduleDraft] = useState<RoutineScheduleDraft>(() =>
     routineScheduleToDraft(node?.schedule ?? NEW_SCHEDULE),
@@ -73,8 +129,13 @@ export function WorkflowTriggerScreen() {
   const choose = (next: WorkflowTriggerType) => {
     if (next === type) return;
     void haptics.selection();
+    // A new GitHub, Telegram or Slack trigger stores the fields that its rows show, as on desktop. Each of
+    // these triggers keeps an `event`, so a change from one to another writes the defaults again.
+    const defaults = TRIGGER_DEFAULTS[next];
+    const fromOther = HOST_TYPES.includes(type);
     setFields(node.id, {
       trigger: next,
+      ...(defaults && (node.fields.event === undefined || fromOther) ? defaults : {}),
       // A schedule needs a time zone; a trigger without one runs in the zone of the server.
       ...(next === "schedule" && !timezone ? { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : {}),
     });
@@ -113,6 +174,8 @@ export function WorkflowTriggerScreen() {
     }
   };
 
+  const telegramOffered = chats.editable && telegramChats(chats.options ?? []).length > 0;
+  const slackOffered = chats.editable && slackWorkspaces(chats.options ?? []).length > 0;
   const webhookSaved = Boolean(draft.workflowId) && savedTrigger?.type === "webhook";
   const webhookNote = !webhookSaved
     ? t("mobile.workflow.webhook.saveFirst")
@@ -150,22 +213,32 @@ export function WorkflowTriggerScreen() {
       <SettingsSection title={t("mobile.workflow.trigger.startsWhen")}>
         {[
           ...CHOICES,
-          ...(type === "message"
-            ? [
-                {
-                  type: "message",
-                  title: "mobile.workflow.trigger.message",
-                  description: "mobile.workflow.trigger.messageHint",
-                } as const,
-              ]
-            : []),
+          // Only an owner or admin adds a GitHub trigger, on a host that runs it, as on desktop.
+          ...((admin && githubSupported) || type === "github" ? [GITHUB_CHOICE] : []),
+          ...(type === "message" ? [MESSAGE_CHOICE] : []),
+          // Only the computer that runs OpenBot has the Discord roles. An owner or admin adds a Telegram or
+          // Slack trigger on a host that has a linked chat or workspace, as on desktop.
+          ...(type === "discord" ? [DISCORD_CHOICE] : []),
+          ...(telegramOffered || type === "telegram" ? [TELEGRAM_CHOICE] : []),
+          ...(slackOffered || type === "slack" ? [SLACK_CHOICE] : []),
         ].map((choice) => (
           <SettingsRow
             key={choice.type}
             checked={choice.type === type}
             disclosure={false}
-            disabled={!editable || choice.type === "message"}
-            supportingText={t(choice.description)}
+            // A change to or from a GitHub, Discord, Telegram or Slack trigger needs an owner or admin.
+            disabled={
+              !editable ||
+              choice.type === "message" ||
+              choice.type === "discord" ||
+              ((choice.type === "telegram" || choice.type === "slack") && !chats.editable) ||
+              (!admin && (HOST_TYPES.includes(choice.type) || HOST_TYPES.includes(type)))
+            }
+            supportingText={
+              (choice.type === "telegram" || choice.type === "slack") && !chats.editable
+                ? t("mobile.workflow.discord.triggerComputerOnly")
+                : t(choice.description)
+            }
             trailing={choice.type === type ? <Check size={18} color={accent} strokeWidth={2} /> : null}
             onPress={() => choose(choice.type)}
           >
@@ -198,6 +271,10 @@ export function WorkflowTriggerScreen() {
         </>
       ) : null}
       {type === "webhook" ? webhookSection : null}
+      {type === "github" ? <GitHubTriggerFields node={node} draft={draft} /> : null}
+      {type === "discord" ? <DiscordTriggerFields node={node} /> : null}
+      {type === "telegram" ? <TelegramTriggerFields node={node} draft={draft} /> : null}
+      {type === "slack" ? <SlackTriggerFields node={node} draft={draft} /> : null}
     </SettingsContent>
   );
 }

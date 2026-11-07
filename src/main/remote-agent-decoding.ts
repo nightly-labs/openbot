@@ -6,23 +6,32 @@ import {
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isConversationSnapshot,
   isHiddenAgentsSnapshot,
+  isSidebarPinsSnapshot,
 } from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
 import type {
   AccountUsage,
+  AgentExclusionChange,
+  AgentFastModeSettings,
+  AgentFolderChange,
   AgentMemory,
+  AgentNewChatSettings,
   AgentStatus,
   AgentSummary,
+  AgentTaskReadState,
   ClientAgentModelOption,
   ClientAgentSummary,
   DraftAttachment,
@@ -36,9 +45,18 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentColors,
+  isAgentExclusionChange,
+  isAgentFolderBrowse,
+  isAgentFolderChange,
+  isAgentFolderList,
+  isAgentInstructionsFile,
   isAgentMemory,
+  isAgentModel,
+  isAgentProvider,
   isAgentStatus,
   isAttachmentSummary,
+  isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
   isQueuedMessageReceipt,
@@ -50,14 +68,28 @@ import {
   isSidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
+export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
+export const decodeRemoteChatColors = guardedDecoder(isChatColors, "chat colors response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
+export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
+export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
+  isAgentNotificationLevelsSnapshot,
+  "agent notification levels response",
+);
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
+export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
+export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
+const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
+export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
+  return decodeTaskReadStates(decodeRecord(value, "remote thread reads").reads);
+}
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");
@@ -133,6 +165,35 @@ function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSourc
   };
 }
 
+// The `agent-folders-v1` and `agent-instructions-v1` replies. The preload has its own `FromMain`
+// decoders for the same shapes, because the main process is a different sender from a joined server.
+export const decodeRemoteAgentFolderList = guardedDecoder(isAgentFolderList, "remote agent folders");
+export const decodeRemoteAgentFolderBrowse = guardedDecoder(isAgentFolderBrowse, "remote agent folder browse");
+export const decodeRemoteAgentInstructionsFile = guardedDecoder(isAgentInstructionsFile, "remote agent instructions");
+
+export function decodeRemoteAgentFolderChange(value: unknown): AgentFolderChange {
+  if (!isDynamicRecord(value) || !isAgentFolderChange(value)) throw new Error("Invalid remote agent folder change.");
+  return value;
+}
+
+export function decodeRemoteAgentExclusionChange(value: unknown): AgentExclusionChange {
+  if (!isDynamicRecord(value) || !isAgentExclusionChange(value)) throw new Error("Invalid remote agent folder change.");
+  return value;
+}
+
+// The `agent-new-chat-v1` and `agent-fast-mode-v1` replies. The preload reads the same shapes from main
+// with its own decoders.
+export function decodeRemoteAgentNewChatSettings(value: unknown): AgentNewChatSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid remote new chat setting.");
+  return { allowNewChat: value.allowNewChat };
+}
+
+export function decodeRemoteAgentFastModeSettings(value: unknown): AgentFastModeSettings {
+  if (!isDynamicRecord(value) || (value.fastMode !== null && !isBoolean(value.fastMode)))
+    throw new Error("Invalid remote fast mode setting.");
+  return { fastMode: value.fastMode };
+}
+
 export function decodeAgentStatusFromHost(value: unknown): AgentStatus {
   if (!isAgentStatus(value)) {
     throw new Error("Invalid remote agent status.");
@@ -143,6 +204,18 @@ export function decodeAgentStatusFromHost(value: unknown): AgentStatus {
 /** The `provider-accounts-v1` list, as the web client also reads it: an unknown provider is left out. */
 export function decodeHostProviderAccountsFromHost(value: unknown): HostProviderAccounts {
   return decodeHostProviderAccounts(value);
+}
+
+/**
+ * The `provider-default-v1` snapshot. A newer host can name a provider that this build does not know,
+ * which reads as none, and its model with it.
+ */
+export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultProvider {
+  const { provider, model } = decodeRecord(value, "default provider");
+  if (provider !== null && !isString(provider)) throw new Error("Invalid default provider.");
+  if (!isAgentProvider(provider)) return { preferredProvider: null, preferredModel: null };
+  if (model !== null && !isAgentModel(model)) throw new Error("Invalid default model.");
+  return { preferredProvider: provider, preferredModel: model };
 }
 
 /** The `provider-usage-reset-v1` list: an unknown provider is left out. */
@@ -231,8 +304,9 @@ export function decodeAgentAnalyticsFromHost(value: unknown) {
   return decodeAgentAnalytics(value);
 }
 
+/** A remote report has no skills: the frozen wire has no such field, so one that a host sends is not read. */
 export function decodeHostAnalyticsFromHost(value: unknown) {
-  return decodeHostAnalytics(value);
+  return decodeHostAnalytics(isDynamicRecord(value) ? { ...value, skills: undefined } : value);
 }
 
 export function decodeAgentSessionSettingsFromHost(value: unknown): AgentSessionSettings {

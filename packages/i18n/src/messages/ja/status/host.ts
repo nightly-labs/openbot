@@ -10,4 +10,5 @@ export const messages = {
   "status.host.ready": "この OpenBot は WebRTC 接続の準備ができています。",
   "status.host.stopping": "この OpenBot を非公開にしています…",
   "status.host.private": "この OpenBot は非公開です。",
+  "status.host.removed": "この OpenBot はアカウントから削除されました。共有するには、もう一度公開してください。",
 } as const satisfies PartialTranslation<typeof source>;

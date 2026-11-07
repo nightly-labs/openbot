@@ -3,6 +3,7 @@ import {
   type GitHubConnectorRepositories,
   type GitHubConnectorStatus,
 } from "@openbot/contracts/ipc";
+import type { GitHubConnectorPanelProps } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, onSettled } from "solid-js";
 import {
@@ -12,6 +13,11 @@ import {
   NO_WATCH,
 } from "./connector-controller";
 import { type GitHubConnectorPort, githubConnectorPort } from "./github-connector-port";
+
+/** A controller whose page is the GitHub page, for a view that shows a part of it. */
+export interface GitHubConnectorController extends ConnectorController {
+  readonly detail: { id: "github"; props: GitHubConnectorPanelProps };
+}
 
 /**
  * The GitHub connection of this computer or of a joined server. Reads the status once and then
@@ -28,7 +34,7 @@ export function createGitHubConnector(
   port: () => GitHubConnectorPort = githubConnectorPort,
   /** The joined server whose connection this is, or undefined for this computer's. */
   hostName: () => string | undefined = () => undefined,
-): ConnectorController {
+): GitHubConnectorController {
   const [status, setStatus] = createSignal<GitHubConnectorStatus>(DISCONNECTED_GITHUB_CONNECTOR);
   const [repositories, setRepositories] = createSignal<GitHubConnectorRepositories | null>(null);
   const [repositoriesError, setRepositoriesError] = createSignal<string | null>(null);

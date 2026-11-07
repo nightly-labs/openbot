@@ -1,37 +1,71 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
+import { type ConversationUiBlock, UI_CHOICE_QUESTION_ID } from "@openbot/contracts/ui-blocks";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import MessageSquareText from "lucide-react-native/icons/message-square-text";
-import Send from "lucide-react-native/icons/send";
 import X from "lucide-react-native/icons/x";
-import { TextInput, View } from "react-native";
+import { View } from "react-native";
+import {
+  answeredSelect,
+  ChatChoicePrompt,
+  ChatConfirmPrompt,
+  ConfirmBody,
+  choiceBlockOf,
+  confirmBlockOf,
+  PromptStatus,
+  QuestionText,
+} from "@/features/chat/components/chat-ui-block-cards";
+import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
-import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function ChatQuestionPrompt({
+  serverId,
   prompt,
+  uiBlock,
   controller,
   canSend,
   onActivate,
 }: {
+  serverId: string;
   prompt: ConversationQuestionPrompt;
+  uiBlock?: ConversationUiBlock | undefined;
   controller?: QuestionPromptController;
   canSend: boolean;
   onActivate?: () => void;
 }) {
   const { t } = useText();
-  const [foreground, muted, accentForeground] = useThemeColor(["foreground", "muted", "accent-foreground"]);
+  const [muted, accentForeground] = useThemeColor(["muted", "accent-foreground"]);
+  const vaultRequest = vaultRequestOf(uiBlock);
+  if (vaultRequest && uiBlock)
+    return (
+      <ChatVaultRequest
+        serverId={serverId}
+        prompt={prompt}
+        uiBlock={uiBlock}
+        request={vaultRequest}
+        controller={controller}
+        canSend={canSend}
+        onActivate={onActivate}
+      />
+    );
+  const confirm = confirmBlockOf(prompt, uiBlock);
+  const choice = choiceBlockOf(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
-        <Typography>{prompt.questions[0]?.question}</Typography>
+      <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
+        {confirm ? (
+          <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
+        ) : (
+          <QuestionText question={prompt.questions[0]?.question ?? ""} variant="body" />
+        )}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
         </Button>
@@ -43,47 +77,64 @@ export function ChatQuestionPrompt({
   if (resolution) {
     return (
       <View
-        className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3"
+        className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="flex-row items-center gap-2">
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">
             {resolution.status === "answered"
-              ? t("mobile.chat.question.answersSent")
+              ? confirm && prompt.questions[0]
+                ? uiBlock?.state.autoAnswer?.done
+                  ? t("mobile.chat.question.autoAnswered", {
+                      outcome: promptAnswerLabel(prompt.questions[0], resolution, t),
+                    })
+                  : promptAnswerLabel(prompt.questions[0], resolution, t)
+                : t("mobile.chat.question.answersSent")
               : resolution.status === "cancelled"
                 ? t("mobile.chat.question.formCancelled")
                 : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
-        {resolution.status === "answered"
-          ? prompt.questions.map((item) => (
-              <View key={item.id} className="gap-1">
-                <Typography type="body-sm" className="text-text-secondary">
-                  {item.question}
+        {/* A closed form keeps what it asked, as on desktop, so the person can still read the draft. */}
+        {confirm ? (
+          <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
+        ) : (
+          prompt.questions.map((item) => (
+            <View key={item.id} className="gap-1">
+              <QuestionText question={item.question} variant="secondary" />
+              {resolution.status === "answered" ? (
+                <Typography>
+                  {/* The options of a choice with more than one answer come as lines; show them as a list. */}
+                  {item.id === UI_CHOICE_QUESTION_ID
+                    ? promptAnswerLabel(item, resolution, t).split("\n").filter(Boolean).join(", ")
+                    : promptAnswerLabel(item, resolution, t)}
                 </Typography>
-                <Typography>{promptAnswerLabel(item, resolution, t)}</Typography>
-              </View>
-            ))
-          : null}
+              ) : item.options?.length ? (
+                <Typography type="body-sm">{item.options.map((option) => option.label).join(", ")}</Typography>
+              ) : null}
+            </View>
+          ))
+        )}
       </View>
     );
   }
 
   if (!controller?.question) return null;
-  const { question, index, disabled, pending, failedAnswers, setIndex, answer, submit, replyInChat, setReplyInChat } =
-    controller;
+  if (confirm) return <ChatConfirmPrompt spec={confirm} uiBlock={uiBlock} controller={controller} canSend={canSend} />;
+  if (choice) return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} />;
+  const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat } = controller;
 
   return (
     <View
-      className="w-full max-w-[88%] self-start gap-1 rounded-[30px] bg-control/60 px-4 py-3"
+      className="w-full max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
       style={{ borderCurve: "circular" }}
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">
-        <Typography weight="medium" className="min-w-0 flex-1">
-          {question.question}
-        </Typography>
+        <View className="min-w-0 flex-1">
+          <QuestionText question={question.question} variant="title" />
+        </View>
         <Button
           variant="ghost"
           size="sm"
@@ -108,7 +159,7 @@ export function ChatQuestionPrompt({
             isDisabled={disabled || index === 0}
             onPress={() => setIndex(index - 1)}
           >
-            <ChevronLeft color={String(muted)} size={18} />
+            <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
           </Button>
           <Button
             variant="ghost"
@@ -118,7 +169,7 @@ export function ChatQuestionPrompt({
             isDisabled={disabled || index === prompt.questions.length - 1}
             onPress={() => setIndex(index + 1)}
           >
-            <ChevronRight color={String(muted)} size={18} />
+            <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
           </Button>
         </View>
       ) : null}
@@ -186,8 +237,9 @@ export function ChatQuestionPrompt({
       </View>
       <View className="flex-row items-center justify-between gap-2">
         {question.isSecret ? (
+          // The private answer is typed in the masked field that takes the composer's place.
           <Typography type="body-xs" className="flex-1 text-text-secondary">
-            {t("mobile.chat.question.orTypeAnswer")}
+            {t("mobile.chat.question.secretBelow")}
           </Typography>
         ) : (
           <View className="flex-1" />
@@ -206,59 +258,7 @@ export function ChatQuestionPrompt({
           </Typography>
         </Button>
       </View>
-      {/* The composer answers in the chat. Only a private answer keeps its own masked field. */}
-      {question.isSecret ? (
-        <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
-          <TextInput
-            accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!disabled}
-            maxLength={INPUT_LIMITS.promptAnswerText}
-            placeholder={t("mobile.chat.question.privatePlaceholder")}
-            placeholderTextColor={muted}
-            secureTextEntry
-            {...selectionColorProps(foreground)}
-            className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
-            value={controller.draft}
-            onChangeText={controller.setDraft}
-            onSubmitEditing={() => {
-              const answerText = controller.draft.trim();
-              if (answerText) answer([answerText]);
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
-            isDisabled={disabled || !controller.draft.trim()}
-            onPress={() => answer([controller.draft.trim()])}
-          >
-            <Send color={String(muted)} size={18} />
-          </Button>
-        </View>
-      ) : null}
-      {pending ? (
-        <Typography type="body-xs" accessibilityLiveRegion="polite">
-          {t("mobile.chat.question.sending")}
-        </Typography>
-      ) : null}
-      {!canSend ? (
-        <Typography type="body-xs" className="text-text-secondary">
-          {t("mobile.chat.question.reconnect")}
-        </Typography>
-      ) : null}
-      {failedAnswers ? (
-        <View className="flex-row items-center gap-2">
-          <Typography type="body-xs" className="flex-1" accessibilityRole="alert">
-            {t("mobile.chat.question.sendFailed")}
-          </Typography>
-          <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => void submit(failedAnswers)}>
-            <Button.Label>{t("common.retry")}</Button.Label>
-          </Button>
-        </View>
-      ) : null}
+      <PromptStatus controller={controller} canSend={canSend} />
     </View>
   );
 }

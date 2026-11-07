@@ -6,6 +6,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { parakeetSupported, useParakeetModel } from "@/features/voice/model/parakeet-model";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
@@ -237,6 +238,8 @@ function useSystemDictation({
       speechRecognition.addListener("start", () => {
         if (owner !== id || !session.current?.native || phaseRef.current !== "starting") return;
         session.current.listeningAt ??= performance.now();
+        // The recognizer's session silences haptics, and the composer's controls tap while the user speaks.
+        speechNative?.allowHapticsWhileRecording?.();
         update("listening");
         void haptics.impact("light");
       }),
@@ -393,6 +396,9 @@ function useSystemDictation({
 
   useEffect(
     () => () => {
+      // No recognizer event reaches this hook after it unmounts, so a `finish` that waits would wait
+      // forever. The draft already holds the last result.
+      for (const resolve of finished.current.splice(0)) resolve();
       if (owner !== id) return;
       // The draft already holds the last result, so leaving the chat keeps it.
       speechRecognition?.abort();
@@ -427,13 +433,10 @@ function useActiveRecognition(): "system" | ModelRecognition {
 export function useVoiceDictation({
   enabled,
   onDraft,
-  onSpeaking,
 }: {
   /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
   onDraft: (text: string) => void;
-  /** The user speaks now. Only Parakeet and ElevenLabs report it, about ten times a second. */
-  onSpeaking?: () => void;
 }): VoiceDictation {
   const engine = useActiveRecognition();
   const system = useSystemDictation({ enabled: enabled && engine === "system", onDraft });
@@ -441,7 +444,6 @@ export function useVoiceDictation({
     engine: engine === "system" ? null : engine,
     enabled: enabled && engine !== "system",
     onDraft,
-    onSpeaking,
   });
   return engine === "system" ? system : model;
 }

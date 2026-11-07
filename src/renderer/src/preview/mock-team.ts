@@ -12,6 +12,7 @@ import type {
   InviteSummary,
   JoinServerInput,
   OpenBotDesktopApi,
+  RemoteControlPolicy,
   RemoteDesktopSession,
   SendDirectMessageInput,
   ServerSummary,
@@ -22,6 +23,7 @@ import type {
   TeamSessionSummary,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { DEFAULT_REMOTE_CONTROL_POLICY } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
   STORY_DIRECT_SNAPSHOTS,
@@ -66,6 +68,7 @@ export function createMockTeam(
   let teamMembers = clone(options.teamMembers ?? STORY_TEAM_MEMBERS);
   let invites = clone(options.invites ?? STORY_INVITES);
   let sessions = clone(options.sessions ?? STORY_SESSIONS);
+  let remoteControlPolicy: RemoteControlPolicy = { ...DEFAULT_REMOTE_CONTROL_POLICY };
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let directMessageCounter = 10;
   const serverListeners = new Set<Listener<ServerSummary[]>>();
@@ -399,6 +402,17 @@ export function createMockTeam(
     revokeSession: async (sessionId) => {
       sessions = sessions.filter((session) => session.id !== sessionId);
     },
+    getRemoteControlPolicy: async () => clone(remoteControlPolicy),
+    setRemoteControlPolicy: async (policy) => {
+      remoteControlPolicy = { access: policy.access, askOnHost: policy.askOnHost };
+      return clone(remoteControlPolicy);
+    },
+    // The preview's sessions end at once, as the host's do.
+    stopRemoteControl: async () => {
+      hostStatus = { ...hostStatus, remoteDesktopActiveSessions: 0 };
+      emitHostStatus(hostStatus);
+      return clone(hostStatus);
+    },
     listInvites: async () => clone(invites),
     revokeInvite: async (inviteId) => {
       invites = invites.filter((invite) => invite.id !== inviteId);
@@ -464,8 +478,39 @@ export function createMockTeam(
     },
   };
 
+  const localServersApi: OpenBotDesktopApi["localServers"] = {
+    create: async (name) => {
+      const server: ServerSummary = {
+        id: `local-server-${servers.length + 1}`,
+        name: name.trim(),
+        logoUrl: null,
+        notificationsMuted: false,
+        notificationsMutedUntil: null,
+        notificationLevel: "all",
+        kind: "remote",
+        thisComputer: true,
+        state: "online",
+        apiUrl: "http://127.0.0.1:0",
+        remoteDesktopAvailable: false,
+        role: "owner",
+        active: true,
+      };
+      servers = [...servers.map((candidate) => ({ ...candidate, active: false })), server];
+      emit(serverListeners, servers);
+      return clone(server);
+    },
+    restart: async (serverId) => {
+      if (!servers.some((server) => server.id === serverId && server.thisComputer)) throw new Error("Server not found");
+    },
+    delete: async (serverId) => {
+      servers = servers.filter((server) => server.id !== serverId);
+      emit(serverListeners, servers);
+    },
+  };
+
   return {
     servers: serversApi,
+    localServers: localServersApi,
     /** The server the preview shows, which its agent events belong to. */
     activeServerId: () => servers.find((server) => server.active)?.id ?? "local",
     host,

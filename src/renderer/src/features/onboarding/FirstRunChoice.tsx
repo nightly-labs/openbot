@@ -3,6 +3,7 @@ import { Button, ChevronRight, Spinner } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import { createUniqueId, For, Show } from "solid-js";
+import { AnalyticsConsentRow, ConsentNotice } from "./AnalyticsConsent";
 import type { OnboardingAvatarVariant } from "./onboarding-avatars";
 
 export interface FirstRunChoiceProps {
@@ -11,17 +12,25 @@ export interface FirstRunChoiceProps {
   disabled: boolean;
   /** The user started free and setup ends when the free provider is ready. */
   loading: boolean;
-  /** Why "Start free" still waits, or why the free provider failed. Empty when nothing blocks it. */
+  /** Why "Use free models" still waits, or why the free provider failed. Empty when nothing blocks it. */
   reason: string;
   onStartFree: () => void;
   /** Opens the list of plan providers. */
   onUsePlan: () => void;
+  /**
+   * Starts ticked only in a region that allows analytics by default. A tick by the user thanks them.
+   * An answer accepts the Terms of Service.
+   */
+  analytics: boolean;
+  onAnalyticsChange: (enabled: boolean) => void;
+  onOpenTerms: () => void;
+  onOpenPrivacy: () => void;
 }
 
 const PLAN_LOGOS: readonly ProviderLogoVariant[] = ["codex", "claude", "grok"];
 
 /**
- * The first question of first run: start free now, or connect a subscription the user already has.
+ * The first question of first run: use free models now, or connect an AI subscription the user already has.
  * The two answers are rows of one grouped list, with the same weight.
  */
 export function FirstRunChoice(props: FirstRunChoiceProps) {
@@ -39,7 +48,6 @@ export function FirstRunChoice(props: FirstRunChoiceProps) {
               seed={member.seed}
               hue={member.hue}
               motion="idle"
-              cycleOffset={member.cycleOffset}
               animationOffset={member.animationOffset}
               followPointer
               class="first-run-choice-avatar"
@@ -94,7 +102,14 @@ export function FirstRunChoice(props: FirstRunChoiceProps) {
           </span>
           <ChevronRight class="first-run-choice-row-chevron" aria-hidden="true" />
         </Button>
+        <AnalyticsConsentRow
+          checked={props.analytics}
+          disabled={props.disabled}
+          agents={props.team.slice(2, 5)}
+          onChange={(enabled) => props.onAnalyticsChange(enabled)}
+        />
       </div>
+      <ConsentNotice onOpenTerms={() => props.onOpenTerms()} onOpenPrivacy={() => props.onOpenPrivacy()} />
       <Show when={props.reason}>
         {(reason) => (
           <p class="onboarding-next-reason first-run-choice-reason" id={reasonId}>

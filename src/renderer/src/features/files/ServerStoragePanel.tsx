@@ -1,12 +1,10 @@
-import { LOCAL_SERVER_ID, type TeamMemberSummary } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "@openbot/ui/data";
+import { LOCAL_SERVER_ID, type RemovableRuntimes, type TeamMemberSummary } from "@openbot/contracts/ipc";
 import { MachineResources } from "@openbot/ui/features/files/MachineResources";
 import { StorageOverview } from "@openbot/ui/features/files/StorageOverview";
-import { createEffect, createSignal, Show, untrack } from "solid-js";
-import { toAgentProfile } from "../../app-message-projection";
+import { createEffect, createSignal, Show } from "solid-js";
 import { type FilesPort, filesPort } from "./files-port";
 import { createMachineResources } from "./machine-resources";
-import { createStorageUsage } from "./storage-usage";
+import { createServerAgents, createStorageUsage } from "./storage-usage";
 
 export interface ServerStorageOptions {
   /** The computer the numbers belong to, such as "This Mac" or the server name. */
@@ -30,32 +28,17 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
   const calls = () => props.calls ?? filesPort();
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), calls);
   const machine = createMachineResources(() => ({ serverId: props.serverId, canManage: props.canManage }), calls);
-  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
-  createEffect(
-    () => props.serverId,
-    (serverId) => {
-      let current = true;
-      untrack(calls)
-        .agent.listAgents(serverId)
-        .then((list) => {
-          if (current) setAgents(list.map(toAgentProfile));
-        })
-        // Without names the rows still show sizes; the storage read reports its own failure.
-        .catch(() => undefined);
-      return () => {
-        current = false;
-      };
-    },
-  );
+  const agents = createServerAgents(() => props.serverId, calls);
 
   // Only this computer: a server removes its own old versions, and its store is not reachable here.
   const runtimes = () => {
-    const { getOldRuntimeVersions, removeOldRuntimeVersions } = calls().storage;
-    return props.serverId === LOCAL_SERVER_ID && getOldRuntimeVersions && removeOldRuntimeVersions
-      ? { getOldRuntimeVersions, removeOldRuntimeVersions }
+    const { getRemovableRuntimes, removeRemovableRuntimes } = calls().storage;
+    return props.serverId === LOCAL_SERVER_ID && getRemovableRuntimes && removeRemovableRuntimes
+      ? { getRemovableRuntimes, removeRemovableRuntimes }
       : undefined;
   };
-  const [oldRuntimeBytes, setOldRuntimeBytes] = createSignal(0);
+  const noRuntimes: RemovableRuntimes = { bytes: 0, providers: [] };
+  const [removableRuntimes, setRemovableRuntimes] = createSignal<RemovableRuntimes>(noRuntimes);
   // Read again after each scan, so "Measure again" and a removal both show the new size.
   createEffect(
     () => [storage.state.usage, runtimes()] as const,
@@ -63,13 +46,13 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
       if (!scan || !port) return;
       let current = true;
       port
-        .getOldRuntimeVersions()
-        .then((old) => {
-          if (current) setOldRuntimeBytes(old.bytes);
+        .getRemovableRuntimes()
+        .then((removable) => {
+          if (current) setRemovableRuntimes(removable);
         })
         // Hide the row rather than show an old size; the storage read reports its own failures.
         .catch(() => {
-          if (current) setOldRuntimeBytes(0);
+          if (current) setRemovableRuntimes(noRuntimes);
         });
       return () => {
         current = false;
@@ -77,11 +60,11 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
     },
   );
 
-  async function removeOldRuntimes(): Promise<void> {
+  async function removeRuntimes(): Promise<void> {
     const port = runtimes();
     if (!port) return;
     try {
-      setOldRuntimeBytes((await port.removeOldRuntimeVersions()).bytes);
+      setRemovableRuntimes(await port.removeRemovableRuntimes());
     } finally {
       await storage.refresh(true);
     }
@@ -109,8 +92,9 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
         if (agentId) props.onOpenAgent(agentId);
       }}
       onClear={storage.clear}
-      oldRuntimeBytes={runtimes() ? oldRuntimeBytes() : 0}
-      onRemoveOldRuntimes={removeOldRuntimes}
+      runtimeBytes={runtimes() ? removableRuntimes().bytes : 0}
+      runtimeProviders={removableRuntimes().providers}
+      onRemoveRuntimes={removeRuntimes}
       // Settings has no preview pane, so a preview opens the file in its app.
       onPreviewFile={(file) => void storage.fileAction(file, "open", { onShowInChat: () => undefined })}
       machine={

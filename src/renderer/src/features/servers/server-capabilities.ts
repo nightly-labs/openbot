@@ -11,6 +11,7 @@ import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protoco
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
+import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 
 /**
@@ -27,6 +28,7 @@ export function serverSupportsCapability(
       capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "channel-attention-v1" ||
+      capability === "channel-isolation-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||
@@ -37,10 +39,15 @@ export function serverSupportsCapability(
       capability === "mcp-servers-v1" ||
       capability === "mcp-sign-in-v1" ||
       capability === "mcp-sign-in-app-v1" ||
+      capability === "mcp-accounts-v1" ||
+      capability === "mcp-member-access-v1" ||
+      capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
+      capability === "password-managers-v1" ||
+      capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
       capability === "vault-v2" ||
       capability === "browser-secret-vault-v1" ||
@@ -53,6 +60,7 @@ export function serverSupportsCapability(
       capability === "agent-host-settings-v1" ||
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
+      capability === "agent-plan-card-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
       capability === "skills-admin-v1" ||
@@ -64,6 +72,7 @@ export function serverSupportsCapability(
       capability === "providers-v3" ||
       capability === "providers-v4" ||
       capability === "providers-v5" ||
+      capability === "custom-provider-harness-v1" ||
       capability === "agent-session-settings-v1" ||
       capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
@@ -72,22 +81,44 @@ export function serverSupportsCapability(
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
       capability === "agent-memory-limit-v1" ||
+      capability === "memory-review-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
+      capability === "codex-api-key-v1" ||
+      capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
+      capability === "sidebar-folders-v1" ||
+      capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
       capability === "routine-recovery-v1" ||
+      capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
+      capability === "webhook-sender-secret-v1" ||
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
       capability === "agent-hidden-v1" ||
       capability === "agent-tasks-v1" ||
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
-      capability === "side-question-v1") &&
+      capability === "agent-thread-branches-v1" ||
+      capability === "agent-thread-pages-v1" ||
+      capability === "agent-thread-replies-v1" ||
+      capability === "channel-task-cancel-v1" ||
+      capability === "side-question-v1" ||
+      capability === "workflows-github-v1" ||
+      capability === "agent-notification-levels-v1" ||
+      capability === "sidebar-pins-v1" ||
+      capability === "agent-new-chat-v1" ||
+      capability === "agent-folders-v1" ||
+      capability === "agent-fast-mode-v1" ||
+      capability === "context-compact-v1" ||
+      capability === "agent-instructions-v1" ||
+      capability === "message-delete-v1" ||
+      capability === "conversation-unread-from-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -106,6 +137,11 @@ export function remoteRoutineRecovery(server: ServerSummary | undefined): boolea
 /** Whether the routine editor can ask the host for a test event: this computer, or a joined server with `webhook-tests-v1`. */
 export function serverSendsWebhookTests(server: ServerSummary | undefined): boolean {
   return serverCanAdminister(server, "webhook-tests-v1");
+}
+
+/** Whether a webhook routine can use a secret that the sender made: this computer, or a joined server with `webhook-sender-secret-v1`. */
+export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined): boolean {
+  return serverCanAdminister(server, "webhook-sender-secret-v1");
 }
 
 /**
@@ -172,13 +208,25 @@ export function serverCanAdminister(
  * it also has `providers-v3`, which only a host that can run a pasted code advertises. A host with
  * `providers-v3` alone signs in its own list, and a host with `providers-v1` alone Codex only. The
  * providers that a host signs in on a page are in `hostSignInProviders` and `relaySignInProviders`.
+ *
+ * A host with `providers-v8` also signs in each later provider that has a device code, such as Kimi
+ * and Hermes: it takes any provider id, and the descriptor's `localCodeSignIn` mirrors the driver's
+ * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. The
+ * mobile app's `codeSignInProviders` uses the same rule.
  */
 export function serverCodeRouteProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
   if (server?.kind !== "remote") return [];
   if (serverSupportsCapability(server, "providers-v4")) {
     const paste = serverSupportsCapability(server, "providers-v3");
-    return PROVIDERS_V4_SIGN_IN_PROVIDERS.filter(
+    const v4: readonly AgentProviderId[] = PROVIDERS_V4_SIGN_IN_PROVIDERS.filter(
       (provider) => paste || agentProviderDescriptor(provider).localCodeSignIn !== "paste",
+    );
+    if (!serverSupportsCapability(server, PROVIDERS_V8_CAPABILITY)) return v4;
+    const earlier: readonly AgentProviderId[] = [...PROVIDERS_V4_SIGN_IN_PROVIDERS, ...SIGN_IN_RELAY_PROVIDERS];
+    return AGENT_PROVIDERS.filter(
+      (provider) =>
+        v4.includes(provider) ||
+        (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
@@ -198,12 +246,30 @@ export function localCodeSignInProviders(platform: string | undefined): readonly
   });
 }
 
+/**
+ * Whether this window may manage the MCP servers of `server`: as for `serverCanAdminister` with
+ * `mcp-servers-v1`, or as a member of a joined server with `mcp-member-access-v1`. The host lets a
+ * member change only the servers that the member added, and refuses the others.
+ */
+export function serverCanManageMcp(server: ServerSummary | undefined): server is ServerSummary {
+  if (!server || !serverSupportsCapability(server, "mcp-servers-v1")) return false;
+  return serverRoleCanAdminister(server) || serverSupportsCapability(server, "mcp-member-access-v1");
+}
+
 /** `server` when it is a joined server this account may manage through `capability`, otherwise undefined. */
 export function remoteAdminServer(
   server: ServerSummary | undefined,
   capability: TeamCurrentCapability,
 ): ServerSummary | undefined {
   return server?.kind === "remote" && serverCanAdminister(server, capability) ? server : undefined;
+}
+
+/**
+ * Whether the settings of the active server show Providers: this computer, or a joined host that the
+ * account administers with `providers-v1`. `providerSettings` in `WorkspaceOverlays.tsx` has the same rule.
+ */
+export function activeServerHasProviderSettings(server: ServerSummary): boolean {
+  return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
 }
 
 /**

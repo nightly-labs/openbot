@@ -1,5 +1,11 @@
 import { parseBillingSessionUrl, parseBillingState } from "@openbot/contracts/billing";
-import { parseLicenseCheckoutUrl, parseLicenseState } from "@openbot/contracts/license";
+import {
+  PRICING_ORDER_PARAMS,
+  type PricingOrder,
+  parseLicenseCheckoutUrl,
+  parseLicenseState,
+  parsePricingOrder,
+} from "@openbot/contracts/license";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { BillingCalls } from "@openbot/ui/features/billing/billing-store";
 import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
@@ -57,6 +63,7 @@ export function createWebLicenseCalls(
       navigate(url);
     },
     setUsers: (users) => state("v1/me/license/users", JSON.stringify(users)),
+    changePlan: (plan) => state("v1/me/license/plan", JSON.stringify(plan)),
     setRenewal: (renewal) => state("v1/me/license/renewal", JSON.stringify(renewal)),
   };
 }
@@ -89,3 +96,24 @@ function errorMessage(value: unknown): string {
 
 /** The Customer Portal returns to `/app?billing=portal`. */
 export const WEB_APP_BILLING_PARAM = "billing";
+
+/** The pricing page sends `/app?start=server` or `/app?start=license`, with the order of its form. */
+const WEB_APP_START_PARAM = "start";
+/**
+ * What a pricing page button opens: the add server dialog or Billing, where the license is. With the order, the
+ * dialog fills it in and goes on to Checkout. An old link has no order.
+ */
+export interface WebAppStart {
+  kind: "server" | "license";
+  order: PricingOrder | null;
+}
+
+/** Reads the pricing page link and removes it from the URL, so a reload does not buy again. */
+export function takeWebAppStart(url: URL): WebAppStart | null {
+  const start = url.searchParams.get(WEB_APP_START_PARAM);
+  if (start === null) return null;
+  const order = parsePricingOrder(url.searchParams);
+  url.searchParams.delete(WEB_APP_START_PARAM);
+  for (const param of PRICING_ORDER_PARAMS) url.searchParams.delete(param);
+  return start === "server" || start === "license" ? { kind: start, order } : null;
+}

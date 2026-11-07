@@ -1,11 +1,19 @@
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import { ConfirmDialog } from "@openbot/ui";
+import { AgentUpdateDialog } from "@openbot/ui/features/marketplace/AgentUpdateDialog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import type { MarketplaceApp } from "@openbot/ui/features/marketplace/marketplace-model";
 import { createMarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
 import { McpConnectDialog } from "@openbot/ui/features/settings/McpConnectDialog";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
-import { createMarketplaceController, type MarketplaceControllerProps } from "./marketplace-controller";
+import {
+  createMarketplaceController,
+  type MarketplaceControllerProps,
+  type PendingSkillConfirm,
+} from "./marketplace-controller";
 
 export interface MarketplaceModalProps extends MarketplaceControllerProps {
   /**
@@ -24,12 +32,30 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
    * a second link to the same listing reads as a new request instead of no change.
    */
   onInitialPluginSlugConsumed?: (() => void) | undefined;
+  /**
+   * The agent or skill a Marketplace link names. The page opens on its listing when the catalog has
+   * it; a link never adds, so the user still decides on the page.
+   */
+  initialListing?: MarketplaceListingLink | undefined;
+  /** Runs after the modal consumes `initialListing`, as `onInitialPluginSlugConsumed` does. */
+  onInitialListingConsumed?: (() => void) | undefined;
 }
 
 /** The Marketplace on this computer's or a joined server's data, with the dialogs it opens. */
 export function MarketplaceModal(props: MarketplaceModalProps) {
+  const { t } = useText();
   const nav = createMarketplaceNavigation();
   const controller = createMarketplaceController(props);
+  const skillConfirmTitle = (confirm: PendingSkillConfirm) =>
+    t(confirm.kind === "replace" ? "skill.confirm.replaceTitle" : "skill.confirm.removeTitle");
+  const skillConfirmBody = (confirm: PendingSkillConfirm) =>
+    `${t(confirm.kind === "replace" ? "skill.confirm.replaceBody" : "skill.confirm.removeModifiedBody")} ${t(
+      "skill.marketplace.confirmAgents",
+      { agents: confirm.agents },
+    )}`;
+  const skillConfirmLabel = (confirm: PendingSkillConfirm) =>
+    t(confirm.kind === "replace" ? "skill.confirm.replace" : "skill.confirm.remove");
+  const skillConfirmTone = (confirm: PendingSkillConfirm) => (confirm.kind === "replace" ? "default" : "destructive");
   /**
    * A Connect press from a chat card. It runs when the listing is in the apps and their states are
    * read, so an installed app is not installed again.
@@ -65,6 +91,32 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     },
   );
 
+  /* A newer link, or a close, drops the answer to an older one. */
+  let listingRequest = 0;
+  createEffect(
+    () => (props.open ? props.initialListing : undefined),
+    (link) => {
+      // The owner clears the link when it is consumed, and that run must keep the answer it waits for.
+      if (!link) return;
+      listingRequest += 1;
+      const request = listingRequest;
+      // A link replaces the page on screen, as a plugin link does.
+      nav.reset();
+      untrack(() => props.onInitialListingConsumed)?.();
+      void controller.readListing(link).then((listing) => {
+        if (request !== listingRequest) return;
+        if (listing?.kind === "agent")
+          nav.show("agents", { kind: "agent", listing: listing.detail, detail: listing.detail });
+        else if (listing?.kind === "skill") nav.show("skills", { kind: "skill", listing: listing.skill });
+        else
+          nav.set((draft) => {
+            draft.tab = link.kind === "agent" ? "agents" : "skills";
+            draft.missingListing = link.kind;
+          });
+      });
+    },
+  );
+
   /* GitHub joins the apps only when its status read ends. A link that came first opens its page then. */
   createEffect(
     () => {
@@ -93,7 +145,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       untrack(() => startConnect(slug));
     },
   );
-  // Slack, Discord and Telegram change with no event from main, so each available connector is
+  // Slack, Discord, Telegram and WhatsApp change with no event from main, so each available connector is
   // followed while the window is open.
   createEffect(
     () => (props.open ? props.connectors?.available() : undefined),
@@ -108,7 +160,9 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
   createEffect(
     () => props.open,
     (open) => {
-      if (!open) setConnectWhenReady(null);
+      if (open) return;
+      setConnectWhenReady(null);
+      listingRequest += 1;
     },
   );
 
@@ -128,6 +182,31 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
           />
         )}
       </Show>
+      <Show when={controller.skillConfirm()} keyed>
+        {(confirm) => (
+          <ConfirmDialog
+            open={true}
+            onCancel={() => confirm.settle(false)}
+            onConfirm={() => confirm.settle(true)}
+            title={skillConfirmTitle(confirm)}
+            description={skillConfirmBody(confirm)}
+            tone={skillConfirmTone(confirm)}
+            confirmLabel={skillConfirmLabel(confirm)}
+            initialFocus="cancel"
+          />
+        )}
+      </Show>
+      <Show when={controller.agentUpdate()} keyed>
+        {(pending) => (
+          <AgentUpdateDialog
+            agentName={pending.agentName}
+            changed={pending.changed}
+            othersCount={pending.othersCount}
+            onCancel={() => pending.settle(null)}
+            onConfirm={(replaceSkillIds) => pending.settle(replaceSkillIds)}
+          />
+        )}
+      </Show>
       <Show when={controller.connecting()} keyed>
         {(pending) => (
           <McpConnectDialog
@@ -140,7 +219,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             onOpenUrl={controller.openPluginUrl}
             hostName={props.pluginHostName}
             signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
-            onCancelSignIn={controller.cancelSignInRelay}
+            onCancelSignIn={controller.cancelSignIn}
             signInExtra={
               /* The page opens in this computer's browser; the paste field is the way back when the
                  browser cannot reach this computer's listener. */
@@ -153,7 +232,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
                     page={relay.page}
                     onOpen={controller.openSignInRelay}
                     onPaste={controller.pasteSignInRelay}
-                    onCancel={controller.cancelSignInRelay}
+                    onCancel={controller.cancelSignIn}
                   />
                 )}
               </Show>

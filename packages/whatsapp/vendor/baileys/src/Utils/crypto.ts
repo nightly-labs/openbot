@@ -1,0 +1,143 @@
+import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes } from 'crypto'
+// OPENBOT PATCH: curve operations come from OpenBot's own Signal module, not libsignal (GPL-3.0).
+import * as curve from '../../../../src/signal/curve'
+import { KEY_BUNDLE_TYPE } from '../Defaults'
+import type { KeyPair } from '../Types'
+
+// OPENBOT PATCH: md5 and hkdf were imported from whatsapp-rust-bridge, which compiles AGPL-3.0 code.
+export function md5(buffer: Uint8Array) {
+	return createHash('md5').update(buffer).digest()
+}
+
+/** HKDF-SHA256 (RFC 5869). */
+export function hkdf(buffer: Uint8Array, expandedLength: number, info: { salt?: Uint8Array; info?: string }) {
+	return Buffer.from(hkdfSync('sha256', buffer, info.salt ?? new Uint8Array(0), info.info ?? '', expandedLength))
+}
+
+// insure browser & node compatibility
+const { subtle } = globalThis.crypto
+
+/** prefix version byte to the pub keys, required for some curve crypto functions */
+export const generateSignalPubKey = (pubKey: Uint8Array | Buffer) =>
+	pubKey.length === 33 ? pubKey : Buffer.concat([KEY_BUNDLE_TYPE, pubKey])
+
+export const Curve = {
+	generateKeyPair: (): KeyPair => {
+		const { public: publicKey, private: privateKey } = curve.generateKeyPair()
+		return { private: Buffer.from(privateKey), public: Buffer.from(publicKey) }
+	},
+	sharedKey: (privateKey: Uint8Array, publicKey: Uint8Array) => Buffer.from(curve.sharedKey(privateKey, publicKey)),
+	sign: (privateKey: Uint8Array, buf: Uint8Array) => Buffer.from(curve.sign(privateKey, buf)),
+	verify: (pubKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => curve.verify(pubKey, message, signature)
+}
+
+export const signedKeyPair = (identityKeyPair: KeyPair, keyId: number) => {
+	const preKey = Curve.generateKeyPair()
+	const pubKey = generateSignalPubKey(preKey.public)
+
+	const signature = Curve.sign(identityKeyPair.private, pubKey)
+
+	return { keyPair: preKey, signature, keyId }
+}
+
+const GCM_TAG_LENGTH = 128 >> 3
+
+/**
+ * encrypt AES 256 GCM;
+ * where the tag tag is suffixed to the ciphertext
+ * */
+export function aesEncryptGCM(plaintext: Uint8Array, key: Uint8Array, iv: Uint8Array, additionalData: Uint8Array) {
+	const cipher = createCipheriv('aes-256-gcm', key, iv)
+	cipher.setAAD(additionalData)
+	return Buffer.concat([cipher.update(plaintext), cipher.final(), cipher.getAuthTag()])
+}
+
+/**
+ * decrypt AES 256 GCM;
+ * where the auth tag is suffixed to the ciphertext
+ * */
+export function aesDecryptGCM(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array, additionalData: Uint8Array) {
+	const decipher = createDecipheriv('aes-256-gcm', key, iv)
+	// decrypt additional adata
+	const enc = ciphertext.slice(0, ciphertext.length - GCM_TAG_LENGTH)
+	const tag = ciphertext.slice(ciphertext.length - GCM_TAG_LENGTH)
+	// set additional data
+	decipher.setAAD(additionalData)
+	decipher.setAuthTag(tag)
+
+	return Buffer.concat([decipher.update(enc), decipher.final()])
+}
+
+export function aesEncryptCTR(plaintext: Uint8Array, key: Uint8Array, iv: Uint8Array) {
+	const cipher = createCipheriv('aes-256-ctr', key, iv)
+	return Buffer.concat([cipher.update(plaintext), cipher.final()])
+}
+
+export function aesDecryptCTR(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array) {
+	const decipher = createDecipheriv('aes-256-ctr', key, iv)
+	return Buffer.concat([decipher.update(ciphertext), decipher.final()])
+}
+
+/** decrypt AES 256 CBC; where the IV is prefixed to the buffer */
+export function aesDecrypt(buffer: Uint8Array, key: Uint8Array) {
+	return aesDecryptWithIV(buffer.subarray(16), key, buffer.subarray(0, 16))
+}
+
+/** decrypt AES 256 CBC */
+export function aesDecryptWithIV(buffer: Uint8Array, key: Uint8Array, IV: Uint8Array) {
+	const aes = createDecipheriv('aes-256-cbc', key, IV)
+	return Buffer.concat([aes.update(buffer), aes.final()])
+}
+
+// encrypt AES 256 CBC; where a random IV is prefixed to the buffer
+export function aesEncrypt(buffer: Uint8Array, key: Uint8Array) {
+	const IV = randomBytes(16)
+	const aes = createCipheriv('aes-256-cbc', key, IV)
+	return Buffer.concat([IV, aes.update(buffer), aes.final()]) // prefix IV to the buffer
+}
+
+// encrypt AES 256 CBC with a given IV
+export function aesEncrypWithIV(buffer: Buffer, key: Buffer, IV: Buffer) {
+	const aes = createCipheriv('aes-256-cbc', key, IV)
+	return Buffer.concat([aes.update(buffer), aes.final()]) // prefix IV to the buffer
+}
+
+// sign HMAC using SHA 256
+export function hmacSign(
+	buffer: Buffer | Uint8Array,
+	key: Buffer | Uint8Array,
+	variant: 'sha256' | 'sha512' = 'sha256'
+) {
+	return createHmac(variant, key).update(buffer).digest()
+}
+
+export function sha256(buffer: Buffer) {
+	return createHash('sha256').update(buffer).digest()
+}
+
+export async function derivePairingCodeKey(pairingCode: string, salt: Buffer): Promise<Buffer> {
+	// Convert inputs to formats Web Crypto API can work with
+	const encoder = new TextEncoder()
+	const pairingCodeBuffer = encoder.encode(pairingCode)
+	const saltBuffer = new Uint8Array(salt instanceof Uint8Array ? salt : new Uint8Array(salt))
+
+	// Import the pairing code as key material
+	const keyMaterial = await subtle.importKey('raw', pairingCodeBuffer as BufferSource, { name: 'PBKDF2' }, false, [
+		'deriveBits'
+	])
+
+	// Derive bits using PBKDF2 with the same parameters
+	// 2 << 16 = 131,072 iterations
+	const derivedBits = await subtle.deriveBits(
+		{
+			name: 'PBKDF2',
+			salt: saltBuffer as BufferSource,
+			iterations: 2 << 16,
+			hash: 'SHA-256'
+		},
+		keyMaterial,
+		32 * 8 // 32 bytes * 8 = 256 bits
+	)
+
+	return Buffer.from(derivedBits)
+}

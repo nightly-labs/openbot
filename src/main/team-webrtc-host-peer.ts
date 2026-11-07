@@ -2,12 +2,15 @@ import { createHash, randomBytes, verify } from "node:crypto";
 import { openAsBlob } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
@@ -21,6 +24,16 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  addUiBlockAutoAnswers,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  withUiBlockAutoAnswers,
+} from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
+  addUiBlockVaultRequests,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  withUiBlockVaultRequests,
+} from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -67,6 +80,11 @@ import {
   decodeTeamProtocolV8WebRtcHttpRequest,
   encodeTeamProtocolV8WebRtcHttpResponse,
 } from "@openbot/contracts/team-protocol/v8-webrtc-adapter";
+import {
+  decodeTeamProtocolSupportV9,
+  TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
+  TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+} from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
@@ -81,7 +99,7 @@ import {
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
-import { type ReceivedWebRtcFile, TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
+import { type ReceivedWebRtcFile, TeamFileTooLargeError, TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
@@ -98,6 +116,10 @@ export interface TeamWebRtcHostPeerOptions {
   closeSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   /** The path of the session failed or came back. The peer and the session stay open. */
   pathChanged?: (sessionId: string, lost: boolean) => void;
+  /** A session opened for a membership that this host has not read from the account directory yet. */
+  unknownMemberConnected?: (membershipId: string) => void;
+  /** The peer is signed in as a membership, or (`null`) it is not signed in any more. */
+  peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | undefined;
@@ -132,6 +154,10 @@ export class TeamWebRtcHostPeer {
   readonly #files: TeamWebRtcFileTransfer;
   readonly #closeSession: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   readonly #pathChanged: (sessionId: string, lost: boolean) => void;
+  readonly #unknownMemberConnected: (membershipId: string) => void;
+  readonly #peerMemberChanged: (peerId: string, membershipId: string | null) => void;
+  /** The membership of the open session. */
+  #sessionMembershipId: string | null = null;
   readonly #verifyClientTicket:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | null;
@@ -195,6 +221,8 @@ export class TeamWebRtcHostPeer {
     );
     this.#closeSession = options.closeSession ?? (() => Effect.void);
     this.#pathChanged = options.pathChanged ?? (() => undefined);
+    this.#unknownMemberConnected = options.unknownMemberConnected ?? (() => undefined);
+    this.#peerMemberChanged = options.peerMemberChanged ?? (() => undefined);
     this.#verifyClientTicket = options.verifyClientTicket ?? null;
     this.#bridge.on("connected", this.#onConnected);
     this.#bridge.on("data", this.#onData);
@@ -213,6 +241,11 @@ export class TeamWebRtcHostPeer {
     yield* this.#beginDisposal();
     if (peerId) yield* this.#bridge.disconnectPeer(peerId).pipe(Effect.catch(() => Effect.void));
   }).bind(this);
+
+  #setPeerAuthenticated(peerId: string, authenticated: boolean): void {
+    this.#files.setPeerAuthenticated(peerId, authenticated);
+    this.#peerMemberChanged(peerId, authenticated ? this.#sessionMembershipId : null);
+  }
 
   /** Whether this device has a file transfer moving right now, either direction. */
   hasActiveTransfers(): boolean {
@@ -284,7 +317,7 @@ export class TeamWebRtcHostPeer {
       this.#sessionBinding.remoteFingerprint === binding.remoteFingerprint
     ) {
       this.#pendingConnection = null;
-      this.#files.setPeerAuthenticated(peerId, true);
+      this.#setPeerAuthenticated(peerId, true);
       return;
     }
     this.#dispatch(this.#closeLocalSession(false));
@@ -308,7 +341,9 @@ export class TeamWebRtcHostPeer {
     const session = yield* remoteDecode(() => this.#store.openRemoteSession({ ...connection, expiresAt }));
     this.#localSessionToken = session.sessionToken;
     this.#localSessionId = connection.sessionId;
+    this.#sessionMembershipId = connection.membershipId;
     this.#scheduleSessionExpiration(expiresAt);
+    if (!this.#store.getMember(connection.membershipId)) this.#unknownMemberConnected(connection.membershipId);
   });
 
   #scheduleSessionExpiration(expiresAt: number): void {
@@ -367,7 +402,7 @@ export class TeamWebRtcHostPeer {
 
   readonly #onDisconnected = (peerId: string): void => {
     if (peerId === this.#peerId) {
-      this.#files.setPeerAuthenticated(peerId, false);
+      this.#setPeerAuthenticated(peerId, false);
       this.#sessionPreparation = null;
       this.#pendingConnection = null;
       this.#peerBinding = null;
@@ -482,7 +517,7 @@ export class TeamWebRtcHostPeer {
     if (!this.#peerBinding)
       return yield* new RemoteWorkflowError({ cause: new Error("The WebRTC fingerprint binding is unavailable.") });
     this.#sessionBinding = { ...this.#peerBinding };
-    this.#files.setPeerAuthenticated(peerId, true);
+    this.#setPeerAuthenticated(peerId, true);
     yield* HostPeerTransport.use((transport) =>
       transport.send(
         peerId,
@@ -566,14 +601,21 @@ export class TeamWebRtcHostPeer {
     }).pipe(
       Effect.catch(({ cause: error }) =>
         Effect.gen({ self: this }, function* () {
-          const status = error instanceof GatewayError ? error.status : 500;
+          // A file above the protocol limit is a refusal that the peer can show, not a host failure.
+          const status =
+            error instanceof GatewayError ? error.status : error instanceof TeamFileTooLargeError ? 413 : 500;
           return yield* remoteDecode(() =>
             decodeTeamProtocolV2RpcFrame({
               version: 2,
               type: "response",
               requestId: request.requestId,
               error: {
-                code: error instanceof GatewayError ? error.code : "host_error",
+                code:
+                  error instanceof GatewayError
+                    ? error.code
+                    : error instanceof TeamFileTooLargeError
+                      ? "file_too_large"
+                      : "host_error",
                 message: error instanceof Error ? error.message : sourceText("error.remote.hostRequestFailed"),
                 retryable: status >= 500,
                 status,
@@ -633,21 +675,25 @@ export class TeamWebRtcHostPeer {
     uploaded: ReceivedWebRtcFile | null,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, HostPeerTransport> {
     const sideRoute = teamSideRouteCodec(input.path);
-    const protocol = peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-      ? 8
-      : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-        ? 7
-        : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-          ? 6
-          : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-            ? 5
-            : peerCapabilities.has("opencode")
-              ? 4
-              : isTeamProtocolV3OnlyRoute(input.method, input.path)
-                ? 3
-                : 1;
+    // Protocol 9 is the protocol 8 wire. Its marker is in the bootstrap list too, so the first
+    // compatibility read of a protocol 9 peer gets the full capability list.
+    const protocol = peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+      ? 9
+      : peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
+        ? 8
+        : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
+          ? 7
+          : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
+            ? 6
+            : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+              ? 5
+              : peerCapabilities.has("opencode")
+                ? 4
+                : isTeamProtocolV3OnlyRoute(input.method, input.path)
+                  ? 3
+                  : 1;
     const decodeRequest =
-      protocol === 8
+      protocol >= 8
         ? decodeTeamProtocolV8WebRtcHttpRequest
         : protocol === 7
           ? decodeTeamProtocolV7WebRtcHttpRequest
@@ -666,16 +712,25 @@ export class TeamWebRtcHostPeer {
           : input.body === null
             ? undefined
             : yield* remoteDecode(() => {
-                if (sideRoute) return JSON.stringify(sideRoute.request(input.path, input.body));
+                if (sideRoute)
+                  return JSON.stringify(
+                    sideRoute.request(input.path, input.body, {
+                      channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+                    }),
+                  );
                 const decoded = decodeRequest(input.method, input.path, input.body, {
                   preserveSemanticTags,
                   agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
                 });
                 // The local Team API decodes the body again, and with semantic tags its frozen projection
                 // reads only the wire keys: `ownerAgentId` is dropped where `ownerBotId` is kept. So the
-                // decoded frame goes back to the wire key names first.
+                // decoded frame goes back to the wire key names first. The secure authentication answer and
+                // the agent profile routes read `agentId` on the wire, so they keep their keys.
+                const currentKeysOnWire =
+                  (input.method === "POST" && input.path === BROWSER_SECRET_RESPONSE_PATH) ||
+                  isAgentProfileRoute(input.method, input.path);
                 return JSON.stringify(
-                  decoded !== null && typeof decoded === "object" && !Array.isArray(decoded)
+                  decoded !== null && typeof decoded === "object" && !Array.isArray(decoded) && !currentKeysOnWire
                     ? toWireAgentKeysObjectForPath(input.path, decoded)
                     : decoded,
                 );
@@ -736,6 +791,7 @@ export class TeamWebRtcHostPeer {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
             channelAttention: peerCapabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
+            channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -743,25 +799,35 @@ export class TeamWebRtcHostPeer {
           };
           return yield* remoteDecode(() => ({
             status: response.status,
-            body: sideRoute
-              ? sideRoute.response(input.path, response.status, body, responseOptions)
-              : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-                  ? encodeTeamProtocolV8WebRtcHttpResponse
-                  : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-                    ? encodeTeamProtocolV7WebRtcHttpResponse
-                    : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-                      ? encodeTeamProtocolV6WebRtcHttpResponse
-                      : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                        ? encodeTeamProtocolV5WebRtcHttpResponse
-                        : peerCapabilities.has("opencode")
-                          ? encodeTeamProtocolV4WebRtcHttpResponse
-                          : encodeTeamProtocolV3WebRtcHttpResponse)(
-                  input.method,
-                  input.path,
-                  response.status,
-                  body,
-                  responseOptions,
-                ),
+            body: withBlockExtensions(
+              peerCapabilities,
+              body,
+              sideRoute
+                ? sideRoute.response(input.path, response.status, body, responseOptions)
+                : // A protocol 9 peer reads more capabilities than the protocol 7 and 8 encoders allow.
+                  peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
+                    input.method === "GET" &&
+                    input.path === TEAM_API_ROUTES.compatibility &&
+                    response.status === 200
+                  ? { ...decodeTeamProtocolSupportV9(body) }
+                  : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
+                      ? encodeTeamProtocolV8WebRtcHttpResponse
+                      : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
+                        ? encodeTeamProtocolV7WebRtcHttpResponse
+                        : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
+                          ? encodeTeamProtocolV6WebRtcHttpResponse
+                          : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+                            ? encodeTeamProtocolV5WebRtcHttpResponse
+                            : peerCapabilities.has("opencode")
+                              ? encodeTeamProtocolV4WebRtcHttpResponse
+                              : encodeTeamProtocolV3WebRtcHttpResponse)(
+                      input.method,
+                      input.path,
+                      response.status,
+                      body,
+                      responseOptions,
+                    ),
+            ),
           }));
         }),
       (response) =>
@@ -826,6 +892,9 @@ export class TeamWebRtcHostPeer {
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
               }),
         );
+        if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
+          frame = withUiBlockAutoAnswers(frame, event);
+        if (this.#peerCapabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) frame = withUiBlockVaultRequests(frame, event);
       } catch {
         return;
       }
@@ -925,7 +994,7 @@ export class TeamWebRtcHostPeer {
 
   readonly #failProtocol = Effect.fn("TeamHostPeer.failProtocol")(function* (this: TeamWebRtcHostPeer, peerId: string) {
     if (peerId !== this.#peerId) return;
-    this.#files.setPeerAuthenticated(peerId, false);
+    this.#setPeerAuthenticated(peerId, false);
     yield* this.#closeLocalSession();
     yield* this.#bridge.disconnectPeer(peerId).pipe(Effect.catch(() => Effect.void));
   });
@@ -1036,7 +1105,7 @@ export class TeamWebRtcHostPeer {
     endLogicalSession = true,
   ) {
     const closingSessionId = this.#localSessionId;
-    if (this.#peerId) this.#files.setPeerAuthenticated(this.#peerId, false);
+    if (this.#peerId) this.#setPeerAuthenticated(this.#peerId, false);
     if (this.#sessionExpirationTimer) clearTimeout(this.#sessionExpirationTimer);
     this.#sessionExpirationTimer = null;
     this.#closeDesktopSockets();
@@ -1050,6 +1119,7 @@ export class TeamWebRtcHostPeer {
     }
     this.#localSessionId = null;
     this.#localSessionToken = null;
+    this.#sessionMembershipId = null;
     this.#sessionBinding = null;
     this.#sessionPreparation = null;
     this.#authenticationCompletion = null;
@@ -1104,10 +1174,12 @@ function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json &
     (value.capabilities === undefined ||
       (Array.isArray(value.capabilities) &&
         value.capabilities.length <=
-          (value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
-          value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
-            ? 128
-            : 64) &&
+          (value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+            ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT
+            : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
+                value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
+              ? 128
+              : 64) &&
         value.capabilities.every(isString))) &&
     (value.bodyTransferId === undefined || isString(value.bodyTransferId)) &&
     (value.contentType === undefined || isString(value.contentType))
@@ -1157,4 +1229,18 @@ class GatewayError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
+ * and its Vault request, for a peer with `ui-block-vault-v1`.
+ */
+function withBlockExtensions(
+  capabilities: ReadonlySet<string>,
+  source: unknown,
+  encoded: TeamProtocolV2Json,
+): TeamProtocolV2Json {
+  if (capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)) addUiBlockAutoAnswers(encoded, source);
+  if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
+  return encoded;
 }

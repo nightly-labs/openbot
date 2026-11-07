@@ -1,3 +1,4 @@
+import { rasterImageMimeType } from "@openbot/contracts/attachment-files";
 import {
   attachmentReferenceIds,
   expandAttachmentReferences,
@@ -14,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import {
   type ComposerPasteResult,
   type ComposerSelection,
@@ -21,10 +23,17 @@ import {
 } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
 import { playActionSound } from "../../../action-sounds";
-import { claimDictatedSend } from "../../speech/speech-replies";
+import { claimDictatedSend, forgetDictatedMessage } from "../../speech/speech-replies";
 import { rememberAttachmentKinds } from "../attachment-analytics";
 import { type PastedComposerCopy, rememberComposerFile } from "../composer-clipboard";
-import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
+import {
+  copyComposerDraft,
+  EMPTY_DRAFT,
+  insertAtSelection,
+  insertPastedText,
+  QUEUE_EDIT_STORAGE_KEY,
+  type StoredQueueEdit,
+} from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
@@ -42,11 +51,74 @@ export interface VoiceSend {
   onFailed: () => void;
 }
 
+/** A pasted image that is still importing. The composer shows it until the import ends. */
+export interface PastePreview {
+  id: string;
+  draftKey: string;
+  name: string;
+  /** A `data:` URL: the desktop CSP allows no `blob:` image. */
+  url: string;
+}
+
+/** A paste that imports faster than this shows no preview, so the row does not flash. */
+const PASTE_PREVIEW_DELAY_MS = 150;
+
+/** The local previews of the raster images in `files`. A file that cannot be read gets none. */
+async function readPastePreviews(files: readonly File[], draftKey: string): Promise<PastePreview[]> {
+  const previews = await Promise.all(
+    files.map(async (file) => {
+      const type = rasterImageMimeType(file.name);
+      if (!type) return null;
+      const url = await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(new Blob([file], { type }));
+      });
+      return url ? { id: crypto.randomUUID(), draftKey, name: file.name, url } : null;
+    }),
+  );
+  return previews.filter((preview) => preview !== null);
+}
+
+type SetPastePreviews = (update: (current: readonly PastePreview[]) => readonly PastePreview[]) => void;
+
+/**
+ * Shows the local previews of a paste that imports for longer than `PASTE_PREVIEW_DELAY_MS`.
+ * `onAccepted` starts it when the files pass the limits; `stop` removes the previews.
+ */
+export function pastePreviewTracker(draftKey: string, setPastePreviews: SetPastePreviews) {
+  let importing = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const ids = new Set<string>();
+  return {
+    onAccepted(files: readonly File[]): void {
+      timer = setTimeout(() => {
+        void readPastePreviews(files, draftKey).then((ready) => {
+          if (!importing || ready.length === 0) return;
+          for (const preview of ready) ids.add(preview.id);
+          setPastePreviews((current) => [...current, ...ready]);
+        });
+      }, PASTE_PREVIEW_DELAY_MS);
+    },
+    stop(): void {
+      importing = false;
+      clearTimeout(timer);
+      if (ids.size) setPastePreviews((current) => current.filter((preview) => !ids.has(preview.id)));
+    },
+  };
+}
+
 export interface ComposerActionsDeps {
   props: ConversationProps;
   agentReady: () => boolean;
-  attachmentBusy: () => boolean;
-  setAttachmentBusy: (busy: boolean) => void;
+  /** True while a file import for the chat, the current one by default, waits. */
+  attachmentBusy: (target?: ConversationTarget) => boolean;
+  /** A failed upload chip of the chat. A typed send waits for Retry or remove. */
+  uploadFailed: () => boolean;
+  /** Reads the chats that wait for an import again from `attachmentImports`. */
+  syncAttachmentImports: () => void;
+  setPastePreviews: SetPastePreviews;
   attachmentImports: Map<string, ConversationTarget>;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
@@ -67,6 +139,8 @@ export interface ComposerActionsDeps {
   submitting: () => boolean;
   setSubmitting: (submitting: boolean) => void;
   voicePhase: () => string;
+  /** The side thread that the recording is for. Undefined for the agent's own chat. */
+  voiceThreadKey: () => string | undefined;
   /** `cause` is the failure behind `error`. The banner shows its code. */
   setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
@@ -97,11 +171,14 @@ export interface ComposerActionsDeps {
   clearConversationError: (target: ConversationTarget) => void;
   clearSubmittedDraft: (target: ConversationTarget, submitted: ComposerDraft) => void;
   setConversationError: (target: ConversationTarget, message: string) => void;
-  setStickToLatest: (value: boolean) => void;
+  /** The chat follows the latest message again and goes to the sent message at once. */
+  followSentMessage: () => void;
   pendingSends: PendingSendStore;
   attachmentPicker: () => HTMLInputElement | undefined;
   /** False in a chat window (#2964): the stored queue edit is one slot, and the main window owns it. */
   persistQueueEdit: boolean;
+  /** The open question form of this conversation, which takes the composer text as its answer. */
+  promptComposerAnswer: () => QuestionPromptComposerAnswer | undefined;
 }
 
 /**
@@ -112,6 +189,7 @@ export async function importPastedFiles(
   files: ReadonlyArray<File | Promise<File>>,
   attached: () => number,
   importData: (data: AttachmentDataInput[]) => Promise<DraftAttachment[]>,
+  onAccepted?: (files: readonly File[]) => void,
 ): Promise<DraftAttachment[]> {
   const originals = await Promise.all(files);
   if (originals.length + attached() > INPUT_LIMITS.attachments)
@@ -121,6 +199,7 @@ export async function importPastedFiles(
     throw new Error(t("error.attachment.fileTooLarge"));
   if (originals.reduce((total, file) => total + file.size, 0) > ATTACHMENT_LIMITS.totalBytes)
     throw new Error(t("error.attachment.totalTooLarge"));
+  onAccepted?.(originals);
   const data = await Promise.all(
     originals.map(async (file) => ({
       name: file.name,
@@ -235,10 +314,15 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return accepted;
   }
 
+  /**
+   * Imports pasted files and puts their references at the selection. `text` is the text of a long paste
+   * that `files` holds: when no file comes, that text goes at the selection, so the paste loses nothing.
+   */
   async function pasteFiles(
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
     copy?: Pick<PastedComposerCopy, "text" | "sourceIds">,
+    text?: string,
   ): Promise<ComposerPasteResult | undefined> {
     const target = deps.currentTarget();
     if (!target || deps.submitting()) return;
@@ -247,48 +331,59 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     // Puts `text` at the selection. A view can unmount during import, so newer edits stay and the
     // text goes at the end. Returns undefined when the message would be too long.
     const insert = (text: string): ComposerPasteResult | undefined => {
-      const current = deps.drafts()[key] ?? EMPTY_DRAFT;
-      const next =
-        current.text === before
-          ? `${before.slice(0, selection.start)}${text}${before.slice(selection.end)}`
-          : [current.text, text].filter(Boolean).join(" ");
-      if (next.length > INPUT_LIMITS.messageText) return;
-      deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: next } }));
-      return { value: next, caret: current.text === before ? selection.start + text.length : next.length };
+      const result = insertAtSelection((deps.drafts()[key] ?? EMPTY_DRAFT).text, text, { before, selection });
+      if (result.value.length > INPUT_LIMITS.messageText) return;
+      deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: result.value } }));
+      return result;
+    };
+    // When no file comes, the text of a copy comes with their names, as in another app.
+    const fallback = (): ComposerPasteResult | undefined => {
+      if (copy?.text) return insert(expandAttachmentReferences(copy.text));
+      if (text === undefined) return;
+      const result = insertPastedText((deps.drafts()[key] ?? EMPTY_DRAFT).text, text, { before, selection });
+      if (result)
+        deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: result.value } }));
+      return result;
     };
     const requestId = crypto.randomUUID();
     const runtime = conversationRuntime(deps.props);
     deps.attachmentImports.set(requestId, target);
-    deps.setAttachmentBusy(true);
+    deps.syncAttachmentImports();
     deps.clearConversationError(target);
+    const previews = pastePreviewTracker(key, deps.setPastePreviews);
     try {
       const imported = await importPastedFiles(
         files,
         () => (deps.drafts()[key] ?? EMPTY_DRAFT).attachments.length,
         (data) => runtime.agent.importAttachmentData(data, target.serverId),
+        previews.onAccepted,
       );
       const accepted = await addAttachments(imported, target);
-      // The draft refused the files and shows why. The text of a copy still comes, with their names.
-      if (!accepted.length) return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
+      // The draft refused the files and shows why. The pasted text still comes.
+      if (!accepted.length) return fallback();
       const replacements = new Map((copy?.sourceIds ?? []).map((id, index) => [id, accepted[index]]));
-      const text =
+      // Each file goes in the text where it was pasted. An image also shows in the thumbnail row.
+      const inserted =
         copy === undefined
           ? accepted.map((attachment) => serializeAttachmentReference(attachment.name, attachment.id)).join(" ")
           : rewriteAttachmentReferences(copy.text, (reference) => {
               const attachment = replacements.get(reference.attachmentId);
               return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
             });
-      const result = insert(text);
-      // The files stay in the row, so a paste that does not fit loses no file.
-      if (!result) throw new Error(t("error.agent.messageTooLong"));
-      return result;
+      const result = insert(inserted);
+      if (result) return result;
+      // The files stay in the row, so a paste that does not fit loses no file. The text of a long paste
+      // is in its file, so it does not also go in the message.
+      if (text === undefined) throw new Error(t("error.agent.messageTooLong"));
+      deps.setConversationError(target, t("error.agent.messageTooLong"));
+      return;
     } catch (error) {
       deps.setConversationError(target, errorMessage(error, t("composer.error.keepAttachments")));
-      // When the files of a copy cannot come, its text comes with their names, as in another app.
-      return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
+      return fallback();
     } finally {
+      previews.stop();
       deps.attachmentImports.delete(requestId);
-      deps.setAttachmentBusy(deps.attachmentImports.size > 0);
+      deps.syncAttachmentImports();
     }
   }
 
@@ -346,10 +441,6 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     if (!picker) return;
     picker.value = "";
     picker.click();
-  }
-
-  function openAttachmentPickerFromKey(event: KeyboardEvent) {
-    if (event.key === "Enter" || event.key === " ") openAttachmentPicker();
   }
 
   async function editQueuedMessage(delivery: QueueDelivery) {
@@ -506,7 +597,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const serverId = target?.serverId ?? deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const deliveryId = target?.deliveryId ?? deps.editingDeliveryId();
     const draft = draftOverride ?? deps.currentDraft();
-    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy()) return false;
+    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy({ agentId, serverId })) return false;
     const editId = deps.editingEditId();
     if (
       !editId &&
@@ -681,14 +772,37 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     );
   }
 
-  /** `voice` is set when a voice conversation sends the draft. */
+  /**
+   * While the agent asks a question, the composer text answers it and does not steer the turn. Files,
+   * a reply to a message and a queued message edit still go as a message. A channel message is for
+   * the whole channel, so it does not answer one agent.
+   */
+  function promptAnswerFor(
+    draft: ComposerDraft,
+    target: ConversationTarget | undefined,
+  ): QuestionPromptComposerAnswer | undefined {
+    const answer = deps.promptComposerAnswer();
+    const active = deps.currentTarget();
+    if (deps.props.channel || !answer?.available() || !target || !active) return undefined;
+    if (target.agentId !== active.agentId || target.serverId !== active.serverId) return undefined;
+    if (draft.attachments.length > 0 || draft.replyToMessageId) return undefined;
+    return answer;
+  }
+
+  /** Whether a send from the composer now answers the open question. */
+  function composerAnswersPrompt(): boolean {
+    return !deps.currentEditingDeliveryId() && Boolean(promptAnswerFor(deps.currentDraft(), deps.currentTarget()));
+  }
+
+  /** `voice` is set when a voice conversation sends the draft. `steer` takes it into the running turn. */
   async function submitMessage(
     draftOverride?: ComposerDraft,
     targetOverride?: ConversationTarget,
     submittedSnapshot?: ComposerDraft,
     voice?: VoiceSend,
+    steer = false,
   ): Promise<boolean> {
-    if (deps.attachmentBusy()) return false;
+    if (deps.attachmentBusy(targetOverride)) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
       return saveQueuedMessageEdit();
     }
@@ -696,6 +810,21 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const target = targetOverride ?? (agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined);
     const draft = copyComposerDraft(draftOverride ?? deps.currentDraft());
     const text = expandComposerMentions(draft.text);
+    const promptAnswer = promptAnswerFor(draft, target);
+    if (promptAnswer && target) {
+      if (deps.submitting() || !promptAnswer.answer(text)) return false;
+      // An answer is not a message, so no spoken reply or voice recording belongs to it.
+      if (claimDictatedSend(target)) forgetDictatedMessage(target);
+      if (voice?.recordingDraftId)
+        void conversationRuntime(deps.props)
+          .agent.discardDraftAttachment(voice.recordingDraftId, LOCAL_SERVER_ID)
+          .catch(() => {});
+      stopTeamTyping();
+      deps.setComposerError(null, target);
+      deps.clearConversationError(target);
+      deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
+      return true;
+    }
     if (!agentId || !target || deps.submitting() || (!text.trim() && draft.attachments.length === 0)) return false;
     const provider =
       deps.props.agent?.id === agentId
@@ -709,7 +838,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     stopTeamTyping();
     deps.setComposerError(null, target);
     deps.clearConversationError(target);
-    queueSend(target, draft, text, voice);
+    queueSend(target, draft, text, voice, steer);
     deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
     return true;
   }
@@ -718,13 +847,29 @@ export function createComposerActions(deps: ComposerActionsDeps) {
    * Shows a message at once and sends it after the earlier sends of its chat, so the host stores the
    * chat's messages in the order the user sent them. `draft` is what Edit puts back in the composer.
    */
-  function queueSend(target: ConversationTarget, draft: ComposerDraft, text: string, voice?: VoiceSend): void {
-    const activeTarget = deps.currentTarget();
-    if (activeTarget && activeTarget.agentId === target.agentId && activeTarget.serverId === target.serverId) {
-      deps.setStickToLatest(true);
-    }
-    // Read the send function now: the send outlives this view when the user switches server.
+  function queueSend(
+    target: ConversationTarget,
+    draft: ComposerDraft,
+    text: string,
+    voice?: VoiceSend,
+    steer = false,
+  ): void {
+    const onScreen = () => {
+      const activeTarget = deps.currentTarget();
+      return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
+    };
+    if (onScreen()) deps.followSentMessage();
+    // A message to a working agent waits behind its turn or its queue. A channel has no such queue.
+    // An earlier send that has not failed is about to start a turn, so this one waits behind it.
+    const queued =
+      onScreen() &&
+      !deps.props.channel &&
+      (Boolean(deps.props.activeTurnId) ||
+        deps.orderedQueuedDeliveries().length > 0 ||
+        deps.pendingSends.list(target).some((send) => send.state !== "failed"));
+    // Read the send functions now: the send outlives this view when the user switches server.
     const send = deps.props.onSendMessage;
+    const steerQueued = deps.props.onSteerQueuedMessage;
     const server = deps.props.server;
     // A deferred voice send can name a server that is no longer on screen. Its capabilities are not
     // known here, so only the local host, which always drops a repeat, is safe to retry then.
@@ -735,7 +880,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
           Boolean(server.compatibility?.capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY))));
     const voiceRecordingDraftId = voice?.recordingDraftId ?? null;
     const dictatedSent = claimDictatedSend(target);
-    deps.pendingSends.add(target, { draft, text, retrySafe, voiceRecordingDraftId }, async (pending) => {
+    deps.pendingSends.add(target, { draft, text, retrySafe, voiceRecordingDraftId, queued }, async (pending) => {
       rememberAttachmentKinds(pending.draft.attachments);
       const result = await send(
         pending.text,
@@ -748,7 +893,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       if ("error" in result) {
         playActionSound("error");
         voice?.onFailed();
-      } else dictatedSent?.(result.messageId);
+      } else {
+        dictatedSent?.(result.messageId);
+        // The id is the delivery's. Steer acts on the chat on screen, so not after a switch.
+        if (steer && onScreen()) steerQueued(result.messageId);
+      }
       return result;
     });
   }
@@ -790,9 +939,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   }
 
   function submitComposer(): void {
-    if (deps.attachmentBusy()) return;
+    if (deps.attachmentBusy() || deps.uploadFailed()) return;
     const phase = deps.voicePhase();
-    if (phase === "recording") {
+    // A recording for a side thread sends to that thread, not to this message box.
+    if (phase === "recording" && deps.voiceThreadKey() === undefined) {
       const agentId = deps.voice.agentId;
       const serverId = deps.voice.serverId;
       if (!agentId || !serverId) return;
@@ -830,6 +980,16 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
+  /**
+   * Sends the draft into the running turn: Send, then Steer on its queue row, in one key. An agent
+   * that steers each message sent while it works does that itself, so a second steer is not asked.
+   */
+  function steerComposer(): void {
+    if (deps.attachmentBusy() || deps.uploadFailed() || deps.voicePhase() !== "idle" || !deps.agentReady()) return;
+    const hostSteers = (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
+    void submitMessage(undefined, undefined, undefined, undefined, !hostSteers);
+  }
+
   /** An instruction about selected text is a reply to that message. A failure shows on its row. */
   async function sendSelectionInstruction(messageId: string, body: string): Promise<boolean> {
     const target = deps.currentTarget();
@@ -855,13 +1015,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     pasteFiles,
     releaseCutAttachments,
     openAttachmentPicker,
-    openAttachmentPickerFromKey,
     editQueuedMessage,
     cancelQueuedMessageEdit,
     saveQueuedMessageEdit,
     reorderPresentedQueue,
     submitMessage,
     submitComposer,
+    steerComposer,
+    composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
     retryPendingSend,

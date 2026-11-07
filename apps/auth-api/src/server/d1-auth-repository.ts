@@ -1,3 +1,4 @@
+import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession, MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { Context, Effect, Layer, Schema } from "effect";
 import { sha256 } from "./crypto";
@@ -17,6 +18,8 @@ interface UserRow {
   email: string;
   name: string | null;
   avatar_url: string | null;
+  analytics_enabled: number | null;
+  chat_color: string | null;
 }
 
 interface AuthenticatedUserRow extends UserRow {
@@ -313,7 +316,7 @@ export class D1AuthRepository implements AuthRepository {
       const row = yield* storeCall(() =>
         database
           .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url, auth_sessions.last_used_at
+            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
          FROM auth_sessions
          JOIN users ON users.id = auth_sessions.user_id
          WHERE auth_sessions.token_hash = ?
@@ -343,7 +346,7 @@ export class D1AuthRepository implements AuthRepository {
       const row = yield* storeCall(() =>
         database
           .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url, auth_sessions.last_used_at
+            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
          FROM auth_sessions
          JOIN users ON users.id = auth_sessions.user_id
          WHERE auth_sessions.token_hash = ?
@@ -420,9 +423,64 @@ export class D1AuthRepository implements AuthRepository {
           .prepare(
             `UPDATE users SET name = ?, updated_at = ?
          WHERE id = ?
-         RETURNING id, email, name, avatar_url`,
+         RETURNING id, email, name, avatar_url, analytics_enabled, chat_color`,
           )
           .bind(name, now, userId)
+          .first<UserRow>(),
+      );
+      if (!row) return yield* new AuthStoreError({ message: "User not found." });
+      return mapUser(row);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly updateUserAnalytics = Effect.fn("D1AuthRepository.updateUserAnalytics")(
+    function* (
+      this: D1AuthRepository,
+      userId: string,
+      enabled: boolean,
+      answeredAt: number,
+      now: number,
+    ): Effect.fn.Return<AuthUser, AuthStoreError, AuthDatabase> {
+      const database = yield* AuthDatabase;
+      // An answer older than the saved one changes nothing; the caller gets the saved answer.
+      yield* storeCall(() =>
+        database
+          .prepare(
+            `UPDATE users SET analytics_enabled = ?, analytics_answered_at = ?, updated_at = ?
+         WHERE id = ? AND (analytics_answered_at IS NULL OR analytics_answered_at <= ?)`,
+          )
+          .bind(enabled ? 1 : 0, answeredAt, now, userId, answeredAt)
+          .run(),
+      );
+      const row = yield* storeCall(() =>
+        database
+          .prepare("SELECT id, email, name, avatar_url, analytics_enabled, chat_color FROM users WHERE id = ?")
+          .bind(userId)
+          .first<UserRow>(),
+      );
+      if (!row) return yield* new AuthStoreError({ message: "User not found." });
+      return mapUser(row);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly updateUserChatColor = Effect.fn("D1AuthRepository.updateUserChatColor")(
+    function* (
+      this: D1AuthRepository,
+      userId: string,
+      chatColor: AvatarColor | null,
+      now: number,
+    ): Effect.fn.Return<AuthUser, AuthStoreError, AuthDatabase> {
+      const database = yield* AuthDatabase;
+      const row = yield* storeCall(() =>
+        database
+          .prepare(
+            `UPDATE users SET chat_color = ?, updated_at = ?
+         WHERE id = ?
+         RETURNING id, email, name, avatar_url, analytics_enabled, chat_color`,
+          )
+          .bind(chatColor, now, userId)
           .first<UserRow>(),
       );
       if (!row) return yield* new AuthStoreError({ message: "User not found." });
@@ -445,7 +503,7 @@ export class D1AuthRepository implements AuthRepository {
           .prepare(
             `UPDATE users SET avatar_url = ?, updated_at = ?
          WHERE id = ? AND avatar_url IS ?
-         RETURNING id, email, name, avatar_url`,
+         RETURNING id, email, name, avatar_url, analytics_enabled, chat_color`,
           )
           .bind(avatarUrl, now, userId, expectedAvatarUrl)
           .first<UserRow>(),
@@ -561,7 +619,7 @@ export class D1AuthRepository implements AuthRepository {
       const row = yield* storeCall(() =>
         database
           .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url
+            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color
          FROM team_auth_tickets
          JOIN users ON users.id = team_auth_tickets.user_id
          WHERE team_auth_tickets.ticket_hash = ?`,
@@ -831,7 +889,7 @@ export class D1AuthRepository implements AuthRepository {
       const row = yield* storeCall(() =>
         database
           .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url, auth_sessions.last_used_at
+            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
          FROM auth_sessions
          JOIN mobile_auth_sessions ON mobile_auth_sessions.session_id = auth_sessions.id
          JOIN users ON users.id = auth_sessions.user_id
@@ -1049,7 +1107,7 @@ export class D1AuthRepository implements AuthRepository {
       const row = yield* storeCall(() =>
         database
           .prepare(
-            `SELECT users.id, users.email, users.name, users.avatar_url
+            `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color
          FROM auth_sessions JOIN users ON users.id = auth_sessions.user_id
          WHERE auth_sessions.id = ?`,
           )
@@ -1085,7 +1143,10 @@ export class D1AuthRepository implements AuthRepository {
   ): Effect.fn.Return<{ user: AuthUser; created: boolean }, AuthStoreError, AuthDatabase> {
     const database = yield* AuthDatabase;
     const existing = yield* storeCall(() =>
-      database.prepare("SELECT id, email, name, avatar_url FROM users WHERE email = ?").bind(email).first<UserRow>(),
+      database
+        .prepare("SELECT id, email, name, avatar_url, analytics_enabled, chat_color FROM users WHERE email = ?")
+        .bind(email)
+        .first<UserRow>(),
     );
     if (existing) return { user: mapUser(existing), created: false };
     const id = crypto.randomUUID();
@@ -1099,7 +1160,7 @@ export class D1AuthRepository implements AuthRepository {
         .bind(id, `email:${email}`, email, now, now)
         .run(),
     );
-    return { user: { id, email, name: null, avatarUrl: null }, created: true };
+    return { user: { id, email, name: null, avatarUrl: null, analyticsEnabled: null, chatColor: null }, created: true };
   });
 }
 
@@ -1155,7 +1216,14 @@ function storeHash(value: string): Effect.Effect<string, AuthStoreError> {
 }
 
 function mapUser(row: UserRow): AuthUser {
-  return { id: row.id, email: row.email, name: row.name, avatarUrl: row.avatar_url };
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    avatarUrl: row.avatar_url,
+    analyticsEnabled: row.analytics_enabled === null ? null : row.analytics_enabled === 1,
+    chatColor: isAvatarColor(row.chat_color) ? row.chat_color : null,
+  };
 }
 
 function constantTimeEqual(left: string, right: string): boolean {

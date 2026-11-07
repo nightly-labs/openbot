@@ -1,9 +1,11 @@
+import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession } from "@openbot/contracts/mobile-connect";
 import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
-import type { SmtpContactMessage, SmtpFailure, SmtpWelcomeMessage } from "./smtp-email-delivery";
+import { observedD1 } from "./observed-d1";
+import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
   DB: D1Database;
@@ -23,21 +25,47 @@ export interface WorkerBindings {
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
   EMAIL_FROM?: string;
+  /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
+  EMAIL_LICENSE_FROM?: string;
+  /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
+  EMAIL_RELAY?: Fetcher;
+  /**
+   * Cloudflare Email Service. It sends a message only when the SMTP mailbox surely did not, such as
+   * when its hourly sender limit is spent. Without it, an SMTP failure is final.
+   */
+  EMAIL_FALLBACK?: SendEmail;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
   SITE_REPORT_HASH_SECRET?: string;
+  /** Encrypts the client secrets of company sign-in and signs its DNS records. At least 32 bytes. */
+  COMPANY_SIGN_IN_SECRET?: string;
   SITE_COOKIE_ISOLATION_READY?: string;
   SITE_PUBLISH_ENABLED?: string;
   SITE_LOCAL_ORIGIN?: string;
   REMOTE_TICKET_PRIVATE_JWK?: string;
   REMOTE_TICKET_PUBLIC_JWKS?: string;
   REMOTE_TICKET_KEY_ID?: string;
+  /** The entry Signal: released hosts, ingress, bots, and hosts with no home. */
   REMOTE_SIGNAL_URL?: string;
+  /**
+   * The Signal machines that a host can have as its home, as `id=url,id=url`. Empty = no homes, and
+   * each ticket names `REMOTE_SIGNAL_URL`.
+   */
+  REMOTE_SIGNAL_HOMES?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
+  /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
+  REMOTE_AUTH_WEBHOOK_URLS?: string;
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
+  /**
+   * The Cloudflare zone of the `REMOTE_SIGNAL_URL` name. With `SIGNAL_ENTRY_DNS_TOKEN` and two homes, the
+   * cron moves that name to a home that answers when its machine stops (`signal-entry-failover.ts`).
+   */
+  SIGNAL_ENTRY_ZONE_ID?: string;
+  /** A Cloudflare API token that can read and edit the DNS records of `SIGNAL_ENTRY_ZONE_ID` only. */
+  SIGNAL_ENTRY_DNS_TOKEN?: string;
   /** Signs Slack route tickets. Its public key must also be in `REMOTE_TICKET_PUBLIC_JWKS`. */
   SLACK_ROUTE_PRIVATE_JWK?: string;
   SLACK_ROUTE_KEY_ID?: string;
@@ -68,6 +96,11 @@ export interface WorkerBindings {
   /** A Stripe sandbox (`sk_test_`) key in development and test. */
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /**
+   * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
+   * a new license is paid at once.
+   */
+  LICENSE_TRIAL_END?: string;
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
@@ -141,11 +174,18 @@ function isWorkerBindings(value: unknown): value is WorkerBindings {
   return true;
 }
 
+const observedBindings = new WeakMap<WorkerBindings, WorkerBindings>();
+
+/** The bindings of the Worker. `DB` logs each failed call and runs an overloaded read once more (`observed-d1.ts`). */
 export function requireWorkerBindings(value: unknown): WorkerBindings {
   if (!isWorkerBindings(value)) {
     throw new Error("Cloudflare worker bindings are unavailable.");
   }
-  return value;
+  const known = observedBindings.get(value);
+  if (known) return known;
+  const observed = { ...value, DB: observedD1(value.DB) };
+  observedBindings.set(value, observed);
+  return observed;
 }
 
 export interface MobileAuthSessionResult {
@@ -159,6 +199,10 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The latest product analytics answer from any device. Null until the user answers. */
+  analyticsEnabled: boolean | null;
+  /** The tint of the user's own chat bubbles, which members of every server of the user see. */
+  chatColor: AvatarColor | null;
 }
 
 export interface MobileAuthDevice {
@@ -196,11 +240,15 @@ export interface TeamInviteEmailDelivery {
 }
 
 export interface WelcomeEmailDelivery {
-  send(message: SmtpWelcomeMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpWelcomeMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
+}
+
+export interface LicenseEmailDelivery {
+  send(message: SmtpLicenseMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface ContactMessageDelivery {
-  send(message: SmtpContactMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpContactMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export type EmailVerificationResult =
@@ -258,6 +306,17 @@ export interface AuthRepository {
   revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
   revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;
   updateUserName(userId: string, name: string, now: number): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserAnalytics(
+    userId: string,
+    enabled: boolean,
+    answeredAt: number,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserChatColor(
+    userId: string,
+    chatColor: AvatarColor | null,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(
     userId: string,
     avatarUrl: string | null,

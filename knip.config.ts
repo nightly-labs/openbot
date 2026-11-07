@@ -48,8 +48,12 @@ const config: KnipConfig = {
     "osascript",
     // Makes the FIFO whose opens never finish in the exit watchdog E2E script.
     "mkfifo",
+    // Runs variant D of the manual browser tools bench, only when the developer installed it.
+    "browser-harness",
     // Reads the memory that programs can still use on macOS, for the machine part of Storage.
     "vm_stat",
+    // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
+    "dbus-run-session",
   ],
   workspaces: {
     ".": {
@@ -77,14 +81,27 @@ const config: KnipConfig = {
         // `@openbot/team-client` imports it, and the main bundle keeps it external through this
         // entry. Bundled, a JSDoc `import` line in it takes the `__dirname` shim of electron-vite.
         "@noble/hashes",
+        // The vendored Baileys in `@openbot/whatsapp` imports these at runtime. The main bundle keeps
+        // them external, so electron-builder packs them only from these root entries.
+        "@cacheable/node-cache",
+        "@hapi/boom",
+        "@noble/curves",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
       ],
       // Scripts start other scripts by path (`bun scripts/<name>.ts`), relative to the repository
       // root. Every file in scripts/ is already an entry.
       ignoreUnresolved: ["scripts/.+\\.ts"],
     },
     "apps/auth-api": {
-      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc.
-      entry: ["*.ts"],
+      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc only. The
+      // email relay Worker's `main` is in wrangler.email-relay.jsonc.
+      entry: ["*.ts", "src/email-relay-entry.ts"],
       project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "*.ts"],
       // `cloudflare:workers` is a runtime module of the Workers platform, not an npm package.
       ignoreDependencies: ["cloudflare"],
@@ -108,6 +125,8 @@ const config: KnipConfig = {
       ignoreDependencies: [
         // `expo` installs it; Expo config plugins import it by this name.
         "@expo/config-plugins",
+        // Expo CLI loads it as a dev tools plugin (the simulators in a browser tab); no code imports it.
+        "expo-device-hub",
         // `expo` installs it too; plugins/with-share-target.js edits the extension's plist files with it.
         "@expo/plist",
         // A native module that `expo-router` imports. The direct entry keeps its native version
@@ -115,8 +134,10 @@ const config: KnipConfig = {
         "expo-symbols",
       ],
     },
-    // src/index.ts is a default entry of knip.
+    // src/index.ts is a default entry of knip. The capacity-report Compose service runs
+    // src/capacity-report.ts.
     "remote/api": {
+      entry: ["src/capacity-report.ts"],
       project: ["src/**/*.ts"],
     },
     "packages/i18n": {
@@ -124,6 +145,26 @@ const config: KnipConfig = {
       // Metro resolves mobile-catalogs.native.ts in place of mobile-catalogs.ts.
       entry: ["src/lazy-catalogs.ts", "src/mobile-catalogs.native.ts"],
       project: ["src/**/*.{ts,tsx,css}"],
+    },
+    "packages/whatsapp": {
+      entry: ["src/*.ts", "scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/*.ts"],
+      // The vendored Baileys imports these. Knip does not read the vendor, which keeps upstream's code
+      // as it is (vendor/baileys/OPENBOT-PATCHES.md).
+      ignoreDependencies: [
+        "@cacheable/node-cache",
+        "@hapi/boom",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
+        "ws",
+        // The vendor's own type check reads these types.
+        "@types/ws",
+      ],
     },
     "packages/*": {
       project: ["src/**/*.{ts,tsx,css}"],

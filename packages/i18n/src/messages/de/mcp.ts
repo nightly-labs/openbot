@@ -44,7 +44,7 @@ export const messages = {
   "mcp.status.didNotStart": "Nicht gestartet",
   "mcp.status.unreachable": "Nicht erreichbar",
   "mcp.server.providerLimitNote":
-    "Nur Claude: Ein Server mit Arbeitsverzeichnis wird den anderen Anbietern nicht bereitgestellt.",
+    "Nur Claude und Codex: Ein Server mit Arbeitsverzeichnis wird den anderen Anbietern nicht bereitgestellt.",
   "mcp.server.runtimeDownloading":
     "Die Laufzeitumgebung zum Starten von STDIO-Servern wird heruntergeladen. Ein Server kann möglicherweise erst danach starten.",
   "mcp.server.runtimeDownloadingProgress":
@@ -86,7 +86,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Weitergegebene Variable {position} entfernen",
   "mcp.panel.workingDirectory": "Arbeitsverzeichnis",
   "mcp.panel.workingDirectoryDescription":
-    "Claude-Agenten und der Verbindungstest starten den Server hier. Lass das Feld leer, um diesen Server allen Anbietern bereitzustellen. Kein anderer Anbieter kann ein Verzeichnis festlegen und überspringt deshalb Server, die eines angeben.",
+    "Claude- und Codex-Agenten und der Verbindungstest starten den Server hier. Lass das Feld leer, um diesen Server allen Anbietern bereitzustellen. Die anderen Anbieter können kein Verzeichnis festlegen und überspringen deshalb Server, die eines angeben.",
   "mcp.panel.endpointTitle": "Endpunkt",
   "mcp.panel.endpointDescription": "Jeder Anbieter kann einen HTTP-MCP-Server verwenden.",
   "mcp.panel.serverUrl": "Server-URL",
@@ -146,11 +146,11 @@ export const messages = {
   "mcp.panel.appSaved": "App gespeichert. Melde dich an, um sie zu verwenden.",
   "mcp.panel.appRemoved": "App entfernt.",
   "mcp.signIn.relayDescription":
-    "Prüfe, ob die Anmeldeseite auf {page} liegt, und öffne sie dann in deinem Browser. Wenn du fertig bist, sendet OpenBot die Anmeldung an {host}.",
+    "Melde dich in deinem Browser auf {page} an. Wenn du fertig bist, sendet OpenBot die Anmeldung an {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Öffne die Anmeldeseite von {page} in deinem Browser. Wenn du fertig bist, füge die angezeigte Adresse hier ein. OpenBot sendet die Anmeldung dann an {host}.",
+    "Melde dich in deinem Browser auf {page} an. Wenn du fertig bist, füge die angezeigte Adresse hier ein. OpenBot sendet die Anmeldung dann an {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Prüfe, ob die Anmeldeseite auf {page} liegt, öffne sie dann in deinem Browser und schließe die Anmeldung dort ab. {host} erkennt die Anmeldung selbst.",
+    "Melde dich in deinem Browser auf {page} an und schließe die Anmeldung dort ab. {host} erkennt die Anmeldung selbst.",
   "mcp.signIn.relayOpen": "Anmeldeseite öffnen",
   "mcp.signIn.relayPasteHint":
     "Wenn der Browser nicht zu OpenBot zurückkehrt, kopiere die angezeigte Adresse und füge sie hier ein.",

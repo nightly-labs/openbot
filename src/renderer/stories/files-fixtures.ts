@@ -1,4 +1,4 @@
-import type { AttachmentKind, AttachmentPreviewKind } from "@openbot/contracts/ipc";
+import type { AttachmentKind, AttachmentPreviewKind, RemovableRuntimes } from "@openbot/contracts/ipc";
 import type {
   AgentStorageRow,
   ConversationStorageRow,
@@ -344,8 +344,11 @@ export const FILES_BREAKDOWN: StorageBreakdown[] = (
   ] satisfies StorageBreakdown[]
 ).map((entry) => ({ ...entry, bytes: Math.round(entry.bytes) }));
 
-/** The part of the `runtimes` row above that older provider CLI versions take. */
-export const FILES_OLD_RUNTIME_BYTES = Math.round(640 * MB);
+/** The part of the `runtimes` row above that can go: older versions, and the Claude and OpenCode downloads. */
+export const FILES_REMOVABLE_RUNTIMES: RemovableRuntimes = {
+  bytes: Math.round(840 * MB),
+  providers: ["claude", "opencode"],
+};
 
 /** A server with years of agent work, for the widths and units of a large total. */
 export const FILES_BREAKDOWN_LARGE: StorageBreakdown[] = (

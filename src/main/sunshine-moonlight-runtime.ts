@@ -301,7 +301,15 @@ const sunshineTestSchema = Schema.Struct({
   code: Schema.String.check(Schema.isPattern(/^(?:[0-9]{4})?$/u)),
 });
 const sunshineDisplaysSchema = Schema.Struct({
-  displays: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString, name: Schema.NonEmptyString })),
+  displays: Schema.Array(
+    Schema.Struct({
+      id: Schema.NonEmptyString,
+      name: Schema.NonEmptyString,
+      // A Windows host also reports where the display starts, in physical pixels.
+      x: Schema.optionalKey(Schema.Int),
+      y: Schema.optionalKey(Schema.Int),
+    }),
+  ),
 });
 const sunshinePairingsSchema = Schema.Struct({
   pairings: Schema.Array(
@@ -338,6 +346,8 @@ interface SunshineMoonlightRuntimeOptions {
   platform: "darwin" | "win32" | "linux";
   credentials: { username: string; password: string };
   getDisplays: () => RemoteDesktopDisplay[];
+  /** Where a display from `getDisplays` starts, in physical pixels. Only a Windows host supplies it. */
+  getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteDesktopOperationError>;
   spawnProcess?: RemoteRuntimeSpawn;
   onDiagnostic?: ((source: "sunshine" | "moonlight", message: string) => void) | undefined;
@@ -662,6 +672,10 @@ export class SunshineMoonlightRuntime {
       // The Linux runtime is built with X11 capture and no hardware encoder, so Sunshine does not
       // probe the others.
       ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
+      // The macOS tray changes its status item from the pairing and stream threads, and macOS 27 stops
+      // a process that changes AppKit off the main thread. OpenBot runs its own main loop and pairing
+      // UI, so the tray has no use.
+      ...(this.#options.platform === "darwin" ? ["system_tray = disabled"] : []),
     ];
     yield* desktopCall(() =>
       Promise.all([
@@ -935,8 +949,16 @@ export class SunshineMoonlightRuntime {
     // Sunshine also lists outputs that have no monitor: an X server with a dummy driver has 16, and
     // only one is connected. Electron lists only connected monitors, so an output with no match is
     // not a screen to show, and its size is unknown.
+    // Windows ids are device ids that Electron does not know, and the two lists can have a different
+    // order, so a Windows display is found by where it starts.
     const displays = native.displays.flatMap((display, index) => {
-      const metadata = local.find((candidate) => candidate.id === display.id) ?? local[index];
+      const metadata =
+        local.find((candidate) => candidate.id === display.id) ??
+        local.find((candidate) => {
+          const origin = this.#options.getDisplayScreenOrigin?.(candidate.id);
+          return origin !== undefined && origin.x === display.x && origin.y === display.y;
+        }) ??
+        local[index];
       if (!metadata) return [];
       return [
         {

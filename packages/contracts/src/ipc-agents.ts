@@ -1,10 +1,13 @@
 import { type AgentProviderRef, isAgentProviderRef } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { isAgentAdditionalFolders } from "./ipc-agent-folders";
 import {
   type AgentModelId,
   type AgentReasoningEffort,
+  type AvatarColor,
   type AvatarHue,
   isAgentModel,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isReasoningEffort,
@@ -48,17 +51,66 @@ export function agentComputerUseEnabled(agent: { computerUse?: boolean | undefin
 /** The agent settings that have an account default. An agent with no value of its own follows it. */
 export const AGENT_DEFAULT_KEYS = ["allowAutomation", "allowNewChat", "quickAcknowledgement"] as const;
 export type AgentDefaultKey = (typeof AGENT_DEFAULT_KEYS)[number];
-export type AgentDefaults = Record<AgentDefaultKey, boolean>;
+export type AgentDefaults = Record<AgentDefaultKey, boolean> & {
+  /**
+   * How long the plan card waits before it starts the work by itself, for all agents. `null` waits
+   * until a person presses Start.
+   */
+  planStartAfterMs: number | null;
+  /**
+   * How many messages and routine runs local scripts can send each agent in one hour. It stops a
+   * script that loops from spending the user's provider quota.
+   */
+  automationRunsPerHour: number;
+};
+
+/** The plan card start time that every agent had before the setting existed. */
+export const DEFAULT_PLAN_START_AFTER_MS = 10_000;
+export const MIN_PLAN_START_AFTER_MS = 5_000;
+/** The longest `setTimeout` delay. A longer one runs at once. */
+export const MAX_PLAN_START_AFTER_MS = 2_147_483_647;
+
+/** The local script limit that every agent had before the setting existed. */
+export const DEFAULT_AUTOMATION_RUNS_PER_HOUR = 30;
+export const MIN_AUTOMATION_RUNS_PER_HOUR = 1;
+export const MAX_AUTOMATION_RUNS_PER_HOUR = 10_000;
 
 /** Off, which is what every agent had before the defaults existed. */
 export const DEFAULT_AGENT_DEFAULTS: AgentDefaults = {
   allowAutomation: false,
   allowNewChat: false,
   quickAcknowledgement: false,
+  planStartAfterMs: DEFAULT_PLAN_START_AFTER_MS,
+  automationRunsPerHour: DEFAULT_AUTOMATION_RUNS_PER_HOUR,
 };
 
+export function isAutomationRunsPerHour(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= MIN_AUTOMATION_RUNS_PER_HOUR &&
+    value <= MAX_AUTOMATION_RUNS_PER_HOUR
+  );
+}
+
+export function isPlanStartAfterMs(value: unknown): value is number | null {
+  return (
+    value === null ||
+    (typeof value === "number" &&
+      Number.isSafeInteger(value) &&
+      value % 1_000 === 0 &&
+      value >= MIN_PLAN_START_AFTER_MS &&
+      value <= MAX_PLAN_START_AFTER_MS)
+  );
+}
+
 export function isAgentDefaults(value: unknown): value is AgentDefaults {
-  return isDynamicRecord(value) && AGENT_DEFAULT_KEYS.every((key) => isBoolean(value[key]));
+  return (
+    isDynamicRecord(value) &&
+    AGENT_DEFAULT_KEYS.every((key) => isBoolean(value[key])) &&
+    isPlanStartAfterMs(value.planStartAfterMs) &&
+    isAutomationRunsPerHour(value.automationRunsPerHour)
+  );
 }
 
 export function agentAutomationAllowed(
@@ -218,6 +270,16 @@ export interface AgentSummary {
    */
   access?: AgentAccess;
   /**
+   * The folders that the user gave the agent besides its workspace and the shared folder, as absolute
+   * paths. Local-only, like `access`. Absent means none. Only `agentFolders` changes them.
+   */
+  additionalFolders?: string[];
+  /**
+   * Folders in the workspace, the shared folder or `additionalFolders` that the agent must not change
+   * in Workspace only. Local-only, like `access`. Absent means none. Only `agentFolders` changes them.
+   */
+  excludedFolders?: string[];
+  /**
    * Whether the agent gets the Computer Use tools. Local-only, like `access`. Absent means on; see
    * `agentComputerUseEnabled`.
    */
@@ -293,6 +355,17 @@ export interface AgentSummary {
   updatedAt: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, when it is not one of the hues. `avatarHue` then holds the nearest hue for
+   * released apps and peers. Absent or null means that `avatarHue` is the colour. A remote client reads
+   * it through `agent-colors-v1`.
+   */
+  avatarColor?: AvatarColor | null;
+  /**
+   * The chat colour: a soft tint of the agent's chat bubbles, `#rrggbb` in lower case. It is not the
+   * avatar colour. Absent means no chat colour. A remote client reads it through `chat-colors-v1`.
+   */
+  chatColor?: AvatarColor;
   avatarUrl: string | null;
   marketplaceSource?: {
     listingId: string;
@@ -329,6 +402,8 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.sessionSettingOverrides === undefined || isAgentSessionSettingOverrides(value.sessionSettingOverrides)) &&
     (value.sessionSettingResets === undefined || isAgentSessionSettingResets(value.sessionSettingResets)) &&
     (value.access === undefined || isAgentAccess(value.access)) &&
+    (value.additionalFolders === undefined || isAgentAdditionalFolders(value.additionalFolders)) &&
+    (value.excludedFolders === undefined || isAgentAdditionalFolders(value.excludedFolders)) &&
     (value.computerUse === undefined || isBoolean(value.computerUse)) &&
     (value.allowAutomation === undefined || isBoolean(value.allowAutomation)) &&
     (value.allowNewChat === undefined || isBoolean(value.allowNewChat)) &&
@@ -349,6 +424,8 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.updatedAt === null || isBoundedString(value.updatedAt, 160)) &&
     isAvatarSeed(value.avatarSeed) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
+    (value.avatarColor === undefined || value.avatarColor === null || isAvatarColor(value.avatarColor)) &&
+    (value.chatColor === undefined || isAvatarColor(value.chatColor)) &&
     (value.avatarUrl === null || isBoundedString(value.avatarUrl, INPUT_LIMITS.avatarUrl)) &&
     (value.marketplaceSource === undefined || isAgentMarketplaceSource(value.marketplaceSource))
   );
@@ -359,6 +436,8 @@ export interface CreateAgentInput {
   description: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** See `AgentSummary.avatarColor`. The store sets `avatarHue` to the nearest hue of the colour. */
+  avatarColor?: AvatarColor | null;
   initialMessage: string;
   /**
    * The provider and model the agent starts on, applied before the initial message is queued.
@@ -369,6 +448,11 @@ export interface CreateAgentInput {
   provider?: AgentProviderId;
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
+  /**
+   * The provider account the agent starts on. It applies only with `provider` and `model`. Absent
+   * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
+   */
+  providerAccountId?: string;
 }
 
 export interface UpdateAgentInput {
@@ -401,7 +485,12 @@ export interface UpdateAgentInput {
    */
   leaveUsageLimit?: boolean;
   avatarSeed?: string;
+  /** A hue without `avatarColor` also clears the colour, so that a released app can change the colour. */
   avatarHue?: AvatarHue | null;
+  /** A colour also sets `avatarHue` to its nearest hue. `null` clears the colour. */
+  avatarColor?: AvatarColor | null;
+  /** See `AgentSummary.chatColor`. `null` removes the chat colour. It does not change the avatar colour. */
+  chatColor?: AvatarColor | null;
 }
 
 export interface DuplicateAgentResult {

@@ -4,6 +4,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useCallback } from "react";
 import { Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
@@ -11,6 +12,7 @@ import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function AgentChatScreen() {
   const { t } = useText();
@@ -18,6 +20,7 @@ export function AgentChatScreen() {
 
   const { agentId, messageId } = useLocalSearchParams<{ agentId: string; messageId?: string }>();
   const foreground = useThemeColor("foreground");
+  const insets = useSafeAreaInsets();
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
   const resolvedMessageId = Array.isArray(messageId) ? messageId[0] : messageId;
   // Only this agent: a change elsewhere in the workspace does not render the whole chat again.
@@ -35,7 +38,8 @@ export function AgentChatScreen() {
   if (agent) {
     return (
       <MobileChatView
-        key={`${agent.serverId}:${agent.id}`}
+        // A new message, such as the source of a branch, opens the chat again at that message.
+        key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}`}
         agent={agent}
         focusMessageId={resolvedMessageId || undefined}
         onLeave={leaveChat}
@@ -44,7 +48,10 @@ export function AgentChatScreen() {
   }
 
   return (
-    <View className="flex-1 items-center justify-center gap-5 bg-background px-8">
+    <View
+      className="flex-1 items-center justify-center gap-5 bg-background"
+      style={{ paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }}
+    >
       <Typography.Heading type="h4" align="center">
         {t("mobile.chat.agentUnavailable.title")}
       </Typography.Heading>
@@ -59,7 +66,7 @@ export function AgentChatScreen() {
           leaveChat();
         }}
       >
-        <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />
+        <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
         <Typography.Paragraph weight="semibold">{t("mobile.chat.agentUnavailable.goBack")}</Typography.Paragraph>
       </Pressable>
     </View>

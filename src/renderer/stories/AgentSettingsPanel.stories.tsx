@@ -1,4 +1,5 @@
-import { type BrowserProfileSummary, nextBrowserProfileHue } from "@openbot/contracts/ipc";
+import { type AgentFolderList, type BrowserProfileSummary, nextBrowserProfileHue } from "@openbot/contracts/ipc";
+import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
 import AgentSettingsPanel from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { createStore } from "solid-js";
 import { fn } from "storybook/test";
@@ -33,6 +34,7 @@ const meta = {
     maxWidth: () => 640,
     onClose: fn(),
     onStartNewChat: fn(async () => {}),
+    onDeleteHistory: fn(async () => {}),
     onResize: fn(),
     onResizeEnd: fn(),
     onUpdateAgent: fn(async () => undefined),
@@ -52,7 +54,59 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Working: Story = { args: { working: true } };
+/** A Codex model with a fast tier: the Model picker menu shows Effort and the Fast switch, as in the chat header. */
+export const FastMode: Story = {
+  args: {
+    agent: { ...STORY_AGENT, provider: "codex", model: "gpt-6-luna", reasoningEffort: "high", fastMode: true },
+    runtimeSettings: { provider: "codex", model: "gpt-6-luna", reasoningEffort: "high" },
+    fastMode: true,
+    onFastModeChange: fn(),
+  },
+};
+/** The user's own level of the agent. The row opens the notification settings, the one place that changes it. */
+export const NotificationLevel: Story = {
+  args: { notificationLevel: { current: null, serverLevel: "needs-me", onOpen: fn() } },
+};
 export const WorkspaceOnly: Story = { args: { agent: { ...STORY_AGENT, access: "workspace" } } };
+
+const STORY_FOLDERS: AgentFolderList = {
+  workspace: "/Users/sam/OpenBot/Agents/Chief",
+  shared: "/Users/sam/OpenBot/Shared",
+  folders: [
+    { path: "/Users/sam/Projects/Leads", found: true },
+    { path: "/Users/sam/Documents/Contracts 2026", found: false },
+  ],
+  excluded: ["/Users/sam/Projects/Leads/Clients/Private", "/Users/sam/OpenBot/Agents/Chief/archive"],
+};
+
+function storyFolderCalls(): AgentFolderCalls {
+  const change = async () => ({ outcome: "cancelled", list: STORY_FOLDERS }) as const;
+  return {
+    list: async () => STORY_FOLDERS,
+    choose: change,
+    add: change,
+    remove: change,
+    drop: change,
+    exclude: change,
+    addExclusion: change,
+    include: change,
+  };
+}
+
+/**
+ * Two added folders; one was moved, so the row and the Folders page say that it is not found. Two
+ * folders in them are excluded.
+ */
+export const WorkspaceOnlyFolders: Story = {
+  args: {
+    agent: {
+      ...STORY_AGENT,
+      access: "workspace",
+      additionalFolders: STORY_FOLDERS.folders.map((folder) => folder.path),
+    },
+    folders: storyFolderCalls(),
+  },
+};
 /** Full reach, but the agent asks before it acts. */
 export const AskFirst: Story = { args: { agent: { ...STORY_AGENT, access: "full" }, autoApprove: false } };
 /** The agent steers messages sent while it works, whatever the app default says. */
@@ -107,24 +161,6 @@ export const NewBrowserProfile: Story = {
         />
       </main>
     );
-  },
-};
-/** An OpenCode model with no reasoning setting: OpenCode decides, and the row says so. */
-export const ReasoningSetByProvider: Story = {
-  args: {
-    runtimeSettings: { provider: "opencode", model: "opencode/big-pickle", reasoningEffort: "medium" },
-    modelOptions: [
-      ...STORY_MODELS,
-      {
-        provider: "opencode",
-        id: "opencode/big-pickle",
-        name: "Big Pickle",
-        description: "Free OpenCode model.",
-        defaultReasoningEffort: "medium",
-        supportedReasoningEfforts: ["medium"],
-        reasoningEffortConfigurable: false,
-      },
-    ],
   },
 };
 export const SaveFailure: Story = {

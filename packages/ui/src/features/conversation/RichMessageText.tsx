@@ -1,7 +1,7 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Blocks, Button, Puzzle, TextQuote } from "@openbot/ui";
+import { AppWindow, Blocks, Button, Puzzle, Split, TextQuote } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -30,10 +30,16 @@ export interface RichMessageTextProps {
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onOpenAttachment?: ((attachment: AttachmentSummary) => void) | undefined;
-  onOpenSharedFile?: ((path: string) => void) | undefined;
-  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
+  /**
+   * Opens a file chip. `asWritten` is the code span text when the chip joined it to the folder that the
+   * message names; it opens in the workspace when the joined path does not.
+   */
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
+  onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  /** Shows the browser tab or opens the thread that a tag names. Without it, the chip does nothing. */
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   showCitationFooter?: boolean;
   /** The characters of a streaming body after this text. It fades the words revealed last. */
   streamingTailAfter?: number | undefined;
@@ -50,19 +56,33 @@ const UNAVAILABLE_TAG_LABELS = {
   mcp: "chat.tag.unavailableMcp",
 } as const satisfies Record<UnavailableTagKind, AppTextKey>;
 
-/* A quote carries its own text, so it never depends on something that can go away. */
-type UnavailableTagKind = Exclude<ChatTagKind, "quote">;
+/*
+ * A quote carries its own text, so it never depends on something that can go away. A tab or a thread
+ * keeps the name it had when the message was sent, as an MCP server does: the message records what
+ * the user asked.
+ */
+type UnavailableTagKind = Exclude<ChatTagKind, "quote" | "tab" | "thread">;
 
 export function RichMessageText(props: RichMessageTextProps) {
   const { t } = useText();
+  // The parent gives new props when an agent changes. These memos keep the same lists, so the maps
+  // below, the parsed parts and their chips are not made again.
+  const citationList = createMemo(() => props.citations);
+  const attachmentList = createMemo(() => props.attachments);
+  const skillList = createMemo(() => props.skills);
   const citationsByNumber = createMemo(
-    () => new Map((props.citations ?? []).map((citation) => [citation.number, citation])),
+    () => new Map((citationList() ?? []).map((citation) => [citation.number, citation])),
   );
   const attachmentsById = createMemo(
-    () => new Map((props.attachments ?? []).map((attachment) => [attachment.id, attachment])),
+    () => new Map((attachmentList() ?? []).map((attachment) => [attachment.id, attachment])),
   );
+  // The parser reads only the id and the name of each agent. So a new avatar does not parse each
+  // message again and build its chips again: a chip gets its agent's avatar from `agentsById`.
+  const taggedAgents = createMemo(() => props.agents, { equals: sameAgentNames });
+  const agentsById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
+  const liveAgent = (agent: ComposerAgent) => agentsById().get(agent.id) ?? agent;
   const parts = createMemo(() =>
-    richMessageParts(props.body, props.agents, props.skills ?? [], citationsByNumber(), attachmentsById()),
+    richMessageParts(props.body, taggedAgents(), skillList() ?? [], citationsByNumber(), attachmentsById()),
   );
   const trail = useStreamingReveal();
   const tailAfter = createMemo(
@@ -135,7 +155,9 @@ export function RichMessageText(props: RichMessageTextProps) {
                 }}
               >
                 <AttachmentReferenceVisual name={name} />
-                <span class="inline-file-reference-name">{name}</span>
+                <span class="inline-file-reference-name" dir="auto">
+                  {name}
+                </span>
               </Button>
             );
           }
@@ -144,6 +166,7 @@ export function RichMessageText(props: RichMessageTextProps) {
               <MessageLink
                 url={part.url}
                 title={linkTitle(part.text, part.url)}
+                isolate={linkTitle(part.text, part.url) === undefined}
                 favicon={props.linkFavicons !== false}
                 onOpenLink={props.onOpenLink}
               >
@@ -151,14 +174,15 @@ export function RichMessageText(props: RichMessageTextProps) {
               </MessageLink>
             );
           }
-          if (part.agent) {
+          const agent = part.agent;
+          if (agent) {
             return (
               <ReferenceChip
                 kind="agent"
-                name={part.agent.name}
+                name={agent.name}
                 class="message-reference-chip message-agent-tag"
-                icon={<AgentAvatar agent={part.agent} />}
-                onClick={() => props.onSelectAgent(part.agent?.id ?? "")}
+                icon={<AgentAvatar agent={liveAgent(agent)} />}
+                onClick={() => props.onSelectAgent(agent.id)}
               />
             );
           }
@@ -183,11 +207,24 @@ export function RichMessageText(props: RichMessageTextProps) {
               />
             );
           }
+          if (part.reference) {
+            const reference = part.reference;
+            const onOpenTag = props.onOpenTag;
+            return (
+              <ReferenceChip
+                kind={reference.kind}
+                name={part.text}
+                class="message-reference-chip"
+                icon={reference.kind === "tab" ? <AppWindow /> : <Split />}
+                onClick={onOpenTag ? () => onOpenTag(reference.kind, reference.id) : undefined}
+              />
+            );
+          }
           if (part.unavailableKind) {
             return (
               <span class="message-tag-unavailable">
                 <span class="sr-only">{t(UNAVAILABLE_TAG_LABELS[part.unavailableKind])} </span>
-                {part.text}
+                <span dir="auto">{part.text}</span>
               </span>
             );
           }
@@ -242,7 +279,9 @@ export function RichMessageText(props: RichMessageTextProps) {
                 }}
               >
                 <span class="message-citation-mark">{citation.number}</span>
-                <span class="message-citation-ref-label">{citation.label}</span>
+                <span class="message-citation-ref-label" dir="auto">
+                  {citation.label}
+                </span>
                 <span class="message-citation-separator" aria-hidden="true">
                   ·
                 </span>
@@ -299,12 +338,18 @@ export function MessageLink(props: {
   children: JSX.Element;
   /** False keeps the request for the linked site's favicon from being made. */
   favicon?: boolean;
+  /**
+   * True when the link text is the URL. The URL then gets its own direction, so its punctuation
+   * does not mix with the text around it in a right-to-left paragraph.
+   */
+  isolate?: boolean | undefined;
   onOpenLink: (url: string) => void;
 }) {
   return (
     <a
       class="message-link"
       href={props.url}
+      dir={props.isolate ? "auto" : undefined}
       data-cuelume-navigate=""
       data-cuelume-emphasis="subtle"
       title={props.title}
@@ -338,6 +383,7 @@ function plainTextPart(part: RichMessagePart): boolean {
     part.skill ||
     part.mcpName ||
     part.quote ||
+    part.reference ||
     part.unavailableKind ||
     part.citation ||
     part.attachment ||
@@ -356,11 +402,21 @@ interface RichMessagePart {
   mcpName?: string;
   /** Text the user quoted from a message of this chat. */
   quote?: { messageId: string; text: string };
+  /** A browser tab, by tab id, or a side thread, by task id. */
+  reference?: { kind: "tab" | "thread"; id: string };
   unavailableKind?: UnavailableTagKind;
   citation?: MessageCitation;
   attachment?: AttachmentSummary;
   sharedPath?: string;
   url?: string;
+}
+
+/** True when both lists have the same agents, in the same order, with the same names. */
+function sameAgentNames(left: ComposerAgent[], right: ComposerAgent[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((agent, index) => agent.id === right[index]?.id && agent.name === right[index]?.name)
+  );
 }
 
 function richMessageParts(
@@ -377,6 +433,7 @@ function richMessageParts(
       taggedReference.skill ||
       taggedReference.mcpName ||
       taggedReference.quote ||
+      taggedReference.reference ||
       taggedReference.unavailableKind
     ) {
       parts.push(taggedReference);
@@ -418,6 +475,8 @@ function semanticTagParts(body: string, agents: ComposerAgent[], skills: Compose
       parts.push({ text: reference.name, mcpName: reference.name });
     } else if (reference.kind === "quote") {
       parts.push({ text: reference.name, quote: { messageId: reference.id, text: reference.name } });
+    } else if (reference.kind === "tab" || reference.kind === "thread") {
+      parts.push({ text: reference.name, reference: { kind: reference.kind, id: reference.id } });
     } else {
       const skill = skills.find(
         (candidate) => candidate.skillId === reference.id && candidate.state !== "needs-repair",

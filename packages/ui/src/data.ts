@@ -2,10 +2,14 @@ import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import type {
   AgentAccess,
   AgentExchangeSummary,
+  AgentInstructionsChange,
   AgentModelId,
   AgentReasoningEffort,
+  AgentTask,
   AttachmentSummary,
+  AvatarColor,
   AvatarHue,
+  BrowserTab,
   ChannelRoutingConversationEvent,
   ClientAgentSummary,
   ConversationMemoryChange,
@@ -77,6 +81,8 @@ export interface AgentMessageMarkerModel {
   replyToMessageId: string | null;
   /** The sender asked for no answer, so the marker names it as information rather than a request. */
   expectsReply: boolean;
+  /** The sender's side thread that sent an incoming message. The sender link opens it. */
+  senderTaskId?: string;
   /** Set when the chat has the text of the message: whether the text shows under the marker. */
   expanded?: boolean;
 }
@@ -154,6 +160,19 @@ export type ChatActionMarkerModel =
   /** A member agent changed the channel at a person's request. `text` is the host's note. */
   | { kind: "channel-change"; text: string; timestamp: string }
   | { kind: "vault-change"; text: string; timestamp: string }
+  /** The agent continues by itself, because its plan still has open steps. `text` is the host's note. */
+  | { kind: "plan-continuation"; text: string; timestamp: string }
+  /**
+   * The agent changed its instruction file in a turn. `text` is the host's note. `change` is absent on a
+   * remote client and for a text longer than the editor saves: then the line has no Undo.
+   */
+  | {
+      kind: "instructions-change";
+      agentId: string | null;
+      change: AgentInstructionsChange | null;
+      text: string;
+      timestamp: string;
+    }
   | {
       kind: "unavailable";
       label: string;
@@ -213,6 +232,8 @@ export interface AgentMessage {
   itemIds?: string[];
   /** When the host wrote each of `items`, to place them between a turn's progress lines. */
   itemCreatedAt?: string[];
+  /** Whether the host still writes each of `items`. */
+  itemStreaming?: boolean[];
   plan?: AgentMessagePlan | undefined;
   /** The subagents that the agent started in this turn, on a `subagents` message. */
   subagents?: ConversationSubagent[] | undefined;
@@ -261,6 +282,10 @@ export interface AgentProfile {
   taskLimit?: ClientAgentSummary["taskLimit"];
   /** Absent means ask before a switch at a usage limit. Absent for an agent on a remote host too. */
   backupModels?: ClientAgentSummary["backupModels"];
+  /** The folders the user gave the agent besides its workspace. Absent for none, and on a remote host. */
+  additionalFolders?: ClientAgentSummary["additionalFolders"];
+  /** The folders in them that the agent must not change. Absent for none, and on a remote host. */
+  excludedFolders?: ClientAgentSummary["excludedFolders"];
   /** Set while the agent works on a backup model for a usage limit: the model it goes back to. */
   usageLimitReturn?: ClientAgentSummary["usageLimitReturn"];
   /** Set while a turn or task still runs on the previous provider. The next turn uses this runtime. */
@@ -270,6 +295,10 @@ export interface AgentProfile {
   workspacePath?: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour, which wins over `avatarHue`. Absent on a host without `agent-colors-v1`. */
+  avatarColor?: AvatarColor | null;
+  /** The tint of the agent's chat bubbles. Absent for no tint, and on a host without `chat-colors-v1`. */
+  chatColor?: AvatarColor | undefined;
   avatarUrl: string | null;
   marketplaceSource?: NonNullable<ClientAgentSummary["marketplaceSource"]>;
   updatedAt?: string | null;
@@ -280,7 +309,7 @@ export interface AgentProfile {
 /** The agent fields that the composer, the queue, rich text and the browser dock read. */
 export type ComposerAgent = Pick<
   AgentProfile,
-  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
 >;
 
 /** The skill fields that the composer, the queue and rich text read. */
@@ -294,3 +323,9 @@ export type ComposerMcpServer = Pick<
   McpServerConfig,
   "id" | "name" | "enabled" | "transport" | "command" | "args" | "url"
 >;
+
+/** A browser tab of the agent that the composer can tag. */
+export type ComposerBrowserTab = Pick<BrowserTab, "id" | "title" | "url">;
+
+/** A side thread of the agent that the composer can tag. Its id is the task id. */
+export type ComposerThread = Pick<AgentTask, "id" | "title" | "state" | "outcome" | "progress" | "error">;

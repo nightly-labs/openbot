@@ -5,28 +5,42 @@ import {
 import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { Effect, Result } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
-// The server name, logo, timezone, agent memory limit, prompt cache time and app update of one
-// server's host. On a joined server the request goes to the host. Identity, timezone, memory limit,
-// prompt cache time, settings, cancellation, and forced restarts require an owner or admin.
+// The server name, logo, timezone, agent memory limit, memory review, prompt cache time, model list
+// and app update of one server's host. On a joined server the request goes to the host. Identity,
+// timezone, memory limit, memory review, prompt cache time, model list, settings, cancellation, and
+// forced restarts require an owner or admin.
 // Ordinary members can check and request an idle update through host-member-update-v1.
 
 import {
   type AgentAccessChange,
   type AgentAccessSnapshot,
+  type AgentProviderRef,
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
+  decodeHostMemoryReview,
+  decodeHostPersonality,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
+  decodeProviderModelVisibility,
+  decodeServerAuditLog,
+  type HostPersonality,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
+  hostMemoryReview,
   isPromptCacheTtl,
+  LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type PromptCacheTtl,
+  type ProviderModelVisibilityChange,
   parseAgentAccessChange,
+  parseProviderModelVisibilityChange,
+  parseProviderModelVisibilityProvider,
+  type ServerAuditLog,
+  type ServerAuditName,
   type ServerSummary,
   UPDATE_RESTART_MODES,
   type UpdateHostIdentityInput,
@@ -40,27 +54,41 @@ import {
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import {
+  HOST_PERSONALITY_CAPABILITY,
+  HOST_PERSONALITY_ROUTES,
+} from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
 import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
+import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { ServerAuditStore } from "../server-audit-store";
+import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
-import { parseAgentMemoryLimitPreference, parseHostUpdateSettings } from "./app-inputs";
+import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { parseHostIdentity } from "./server-inputs";
@@ -82,13 +110,19 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
+  memoryReview: MemoryReviewPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
+  serverAudit: Pick<ServerAuditStore, "read">;
   /** The server ID of this computer's host, when it has one. Roles are stored by it. */
   localServerId: () => string | undefined;
   localAgentIds: () => string[];
+  /** The owner member of this computer's host, who makes each local change, for the audit log. */
+  localOwner: () => ServerAuditName | null;
 }
 
 // The user of this computer owns its server, so the roles give them every agent.
@@ -101,12 +135,17 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  serverPersonality,
   agentMemoryLimit,
+  memoryReview,
   machineAlerts,
   promptCacheTtl,
+  modelVisibility,
   agentAccess,
+  serverAudit,
   localServerId,
   localAgentIds,
+  localOwner,
 }: HostAdminIpcDependencies): Pick<IpcGroupHandlers, "hostAdmin"> {
   function remoteUpdate(serverId: string, route: string, body: HostUpdateBody): Promise<HostUpdateStatus> {
     const role = remoteServers.list().find((server) => server.id === serverId)?.role;
@@ -125,10 +164,18 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
   }
+  function remotePersonality(serverId: string, route: string, body: Record<string, never> | HostPersonality) {
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostPersonality, { method: "POST", body }));
+  }
   function remoteMemoryLimit(serverId: string, route: string, body: { limit?: number }) {
     if (!remoteServers.supportsCapability(serverId, AGENT_MEMORY_LIMIT_CAPABILITY))
       throw new Error(sourceText("error.team.agentMemoryLimitUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostAgentMemoryLimit, { method: "POST", body }));
+  }
+  function remoteMemoryReview(serverId: string, route: string, body: { interval?: number }) {
+    if (!remoteServers.supportsCapability(serverId, MEMORY_REVIEW_CAPABILITY))
+      throw new Error(sourceText("error.team.memoryReviewUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostMemoryReview, { method: "POST", body }));
   }
   function remoteMachineAlerts(serverId: string, route: string, body: MachineAlertSettings | Record<string, never>) {
     if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY))
@@ -140,6 +187,17 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.promptCacheTtlUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodePromptCacheTtlSetting, { method: "POST", body }),
+    );
+  }
+  function remoteModelVisibility(
+    serverId: string,
+    route: string,
+    body: { provider: AgentProviderRef } | ProviderModelVisibilityChange,
+  ) {
+    if (!remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_CAPABILITY))
+      throw new Error(sourceText("error.team.modelVisibilityUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeProviderModelVisibility, { method: "POST", body }),
     );
   }
   function localAccessServerId(): string {
@@ -236,6 +294,22 @@ export function hostAdminIpcHandlers({
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
       }),
+      // A host before host-personality-v1 uses the classic prompt.
+      getPersonality: scopedQueryHandler({
+        local: () => serverPersonality.get(),
+        remote: async (serverId) =>
+          remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY)
+            ? remotePersonality(serverId, HOST_PERSONALITY_ROUTES.settings, {})
+            : { responseStyle: LEGACY_RESPONSE_STYLE },
+      }),
+      setPersonality: scopedHandler(parseServerPersonality, {
+        local: (personality) => runCauseEffect(serverPersonality.set(personality)),
+        remote: (personality, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY))
+            throw new Error(sourceText("error.team.hostPersonalityUnsupported"));
+          return remotePersonality(serverId, HOST_PERSONALITY_ROUTES.update, personality);
+        },
+      }),
       getAgentMemoryLimit: scopedQueryHandler({
         local: () => hostAgentMemoryLimit(agentMemoryLimit.get()),
         remote: (serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.settings, {}),
@@ -245,6 +319,16 @@ export function hostAdminIpcHandlers({
         local: async (limit) =>
           hostAgentMemoryLimit(await runCauseEffect(agentMemoryLimit.set(parseAgentMemoryLimitPreference({ limit })))),
         remote: (limit, serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.update, { limit }),
+      }),
+      getMemoryReview: scopedQueryHandler({
+        local: () => hostMemoryReview(memoryReview.get()),
+        remote: (serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.settings, {}),
+      }),
+      // The host checks the value against its own choices, so a remote value is any count; 0 is off.
+      setMemoryReview: scopedHandler(parseMemoryReviewCount, {
+        local: async (interval) =>
+          hostMemoryReview(await runCauseEffect(memoryReview.set(parseMemoryReviewPreference({ interval })))),
+        remote: (interval, serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.update, { interval }),
       }),
       getMachineAlerts: scopedQueryHandler({
         local: () => machineAlerts.alerts(),
@@ -267,6 +351,14 @@ export function hostAdminIpcHandlers({
         local: (ttl) => runCauseEffect(promptCacheTtl.set(ttl)),
         remote: (ttl, serverId) => remotePromptCacheTtl(serverId, PROMPT_CACHE_TTL_ROUTES.update, { ttl }),
       }),
+      getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
+        local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
+        remote: (provider, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.settings, { provider }),
+      }),
+      setModelVisibility: scopedHandler(parseProviderModelVisibilityChange, {
+        local: (change) => runCauseEffect(modelVisibility.set(change)),
+        remote: (change, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.update, change),
+      }),
       getAgentAccess: scopedQueryHandler({
         local: () => {
           const serverId = localAccessServerId();
@@ -279,7 +371,9 @@ export function hostAdminIpcHandlers({
           const serverId = localAccessServerId();
           // The local owner sees every agent of this host.
           const shown = new Set(localAgentIds());
-          const saved = await Effect.runPromise(Effect.result(agentAccess.set(serverId, change, shown, shown)));
+          const saved = await Effect.runPromise(
+            Effect.result(agentAccess.set(serverId, change, shown, shown, localOwner())),
+          );
           if (Result.isFailure(saved)) {
             if (saved.failure._tag === "AgentAccessStale") throw new Error(sourceText("error.team.agentAccessStale"));
             throw saved.failure.cause;
@@ -287,6 +381,23 @@ export function hostAdminIpcHandlers({
           return agentAccessSnapshot(agentAccess.levels(serverId), LOCAL_OWNER, [...shown]);
         },
         remote: (change, serverId) => remoteAccess(serverId, AGENT_ACCESS_ROUTES.set, change),
+      }),
+      getAuditLog: scopedQueryHandler({
+        // A computer that does not host a server has no changes to show.
+        local: (): ServerAuditLog => {
+          const serverId = localServerId();
+          return serverId ? serverAudit.read(serverId) : { entries: [] };
+        },
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SERVER_AUDIT_CAPABILITY))
+            throw new Error(sourceText("error.team.serverAuditUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SERVER_AUDIT_ROUTES.read, decodeServerAuditLog, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
       }),
     },
   };
@@ -307,6 +418,12 @@ function wireIdentity(input: UpdateHostIdentityInput) {
 
 function parsePromptCacheTtl(value: unknown): PromptCacheTtl {
   if (!isPromptCacheTtl(value)) throw new Error("Prompt cache time is required.");
+  return value;
+}
+
+function parseMemoryReviewCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+    throw new Error("Memory review interval is required.");
   return value;
 }
 

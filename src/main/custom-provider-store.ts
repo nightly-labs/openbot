@@ -9,13 +9,25 @@
 
 import { readFile } from "node:fs/promises";
 import type {
+  CustomProviderHarness,
   CustomProviderHeader,
   CustomProviderHeaderInput,
+  CustomProviderInputKind,
+  CustomProviderModel,
+  CustomProviderReasoningEffort,
   CustomProviderSummary,
   SaveCustomProviderInput,
   UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { sameCustomProviderOrigin } from "@openbot/contracts/ipc";
+import {
+  CUSTOM_PROVIDER_HARNESSES,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  isCustomProviderContextWindow,
+  isCustomProviderInputs,
+  isCustomProviderMaxOutput,
+  isCustomProviderReasoningEfforts,
+  sameCustomProviderOrigin,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
@@ -35,7 +47,22 @@ export interface CustomProviderCipher {
   decrypt: (value: Buffer) => string;
 }
 
-const modelSchema = z.object({ id: z.string(), name: z.string() });
+/**
+ * `contextWindow`, `maxOutput`, `reasoningEfforts` and `inputs` were added in later releases: a file
+ * without them still reads, and an older build drops them. A value out of range is dropped, not refused, so that it cannot hide every
+ * saved endpoint.
+ */
+const modelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  contextWindow: z.number().refine(isCustomProviderContextWindow).optional().catch(undefined),
+  maxOutput: z.number().refine(isCustomProviderMaxOutput).optional().catch(undefined),
+  reasoningEfforts: z
+    .custom<CustomProviderReasoningEffort[]>(isCustomProviderReasoningEfforts)
+    .optional()
+    .catch(undefined),
+  inputs: z.custom<CustomProviderInputKind[]>(isCustomProviderInputs).optional().catch(undefined),
+});
 const headerSchema = z.object({ name: z.string(), value: z.string() });
 
 /**
@@ -49,6 +76,11 @@ const entrySchema = z.object({
   models: z.array(modelSchema),
   /** One ciphertext for the key and every header value together, or absent for an endpoint with neither. */
   secret: z.string().nullish(),
+  /**
+   * Added in a later release, and written only for an endpoint that does not run on OpenCode. A file
+   * without it, and a value this build does not know, run on OpenCode; an older build drops it.
+   */
+  harness: z.enum(CUSTOM_PROVIDER_HARNESSES).optional().catch(undefined),
 });
 
 const fileSchema = z.object({ version: z.literal(1), providers: z.array(entrySchema) });
@@ -134,7 +166,8 @@ export class CustomProviderStore {
       hasApiKey: Boolean(secret?.apiKey),
       headerNames: (secret?.headers ?? []).map((header) => header.name),
       // Copied, not shared: the renderer's list must not alias the stored entry.
-      models: stored.models.map((model) => ({ id: model.id, name: model.name })),
+      models: stored.models.map(copyModel),
+      harness: harnessOf(stored),
     }));
   }
 
@@ -145,8 +178,9 @@ export class CustomProviderStore {
       name: stored.name,
       baseUrl: stored.baseUrl,
       apiKey: secret?.apiKey ?? null,
-      models: stored.models,
+      models: stored.models.map(copyModel),
       headers: secret?.headers ?? [],
+      harness: harnessOf(stored),
     }));
   }
 
@@ -170,8 +204,9 @@ export class CustomProviderStore {
             id: input.id,
             name: input.name,
             baseUrl: input.baseUrl,
-            models: input.models.map((model) => ({ id: model.id, name: model.name })),
+            models: input.models.map(copyModel),
             secret: secret ? this.#cipher.encrypt(JSON.stringify(secret)).toString("base64") : null,
+            ...storedHarness(input.harness),
           },
           secret,
         },
@@ -205,8 +240,9 @@ export class CustomProviderStore {
           id: current.stored.id,
           name: input.name,
           baseUrl: input.baseUrl,
-          models: input.models.map((model) => ({ id: model.id, name: model.name })),
+          models: input.models.map(copyModel),
           secret: sealed,
+          ...storedHarness(input.harness ?? current.stored.harness),
         },
         secret,
       };
@@ -321,6 +357,27 @@ export class CustomProviderStore {
       Effect.mapError(({ cause }) => new CustomProviderFailure({ cause })),
     );
   });
+}
+
+function harnessOf(stored: StoredEntry): CustomProviderHarness {
+  return stored.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+}
+
+/** OpenCode is not written, so a file with OpenCode endpoints only stays as an older build wrote it. */
+function storedHarness(harness: CustomProviderHarness | undefined): { harness?: CustomProviderHarness } {
+  return harness && harness !== DEFAULT_CUSTOM_PROVIDER_HARNESS ? { harness } : {};
+}
+
+/** The parse keeps an invalid `contextWindow`, `maxOutput`, `reasoningEfforts` or `inputs` key as undefined. The copy drops that key. */
+function copyModel(model: z.infer<typeof modelSchema>): CustomProviderModel {
+  return {
+    id: model.id,
+    name: model.name,
+    ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+    ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
+    ...(model.reasoningEfforts !== undefined ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+    ...(model.inputs !== undefined ? { inputs: [...model.inputs] } : {}),
+  };
 }
 
 /** The same names in the same order, each with its saved value. */

@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "In {path} schreiben, außerhalb des Agentenarbeitsbereichs, des geteilten Ordners und der temporären Ordner.",
   "status.agent.contextCleared": "Kontext geleert. Hier beginnt ein neuer Chat.",
+  "status.agent.instructionsChanged": "Hat seine Anweisungen aktualisiert",
   "status.agent.modelSwitchedForLimit": "Nutzungslimit erreicht. Zu {model} gewechselt.",
   "status.agent.modelReturnedAfterLimit": "Nutzungslimit beendet. Zurück zu {model} gewechselt.",
   "status.agent.modelSwitchedForError": "Anbieterfehler. Zu {model} gewechselt.",
@@ -17,6 +18,8 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} hat die Routine {routine} erstellt. {person} hat darum gebeten.",
   "status.agent.channelRoutineUpdated": "{agent} hat die Routine {routine} geändert. {person} hat darum gebeten.",
   "status.agent.channelRoutineDeleted": "{agent} hat die Routine {routine} gelöscht. {person} hat darum gebeten.",
+  "status.agent.channelTaskCancelled":
+    "{agent} hat die Aufgabe „{task}“ und ihre Teilaufgaben abgebrochen. {person} hat darum gebeten.",
   "status.agent.screenCaptureScreen": "Den Hauptbildschirm aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureChannel":
     "Das Bild erscheint im Kanal {channel}, und jedes Mitglied dieses Servers, das den Kanal liest, kann es sehen.",
@@ -24,6 +27,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Das Fenster {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureRegion":
     "Den Bildschirmbereich bei {x}, {y}, {width} × {height} Punkten aufnehmen und das Bild an das Modell des Agenten senden.",
+  "status.agent.workflowDelete":
+    "Den Workflow {title} mit seinen Ausführungen und Versionen löschen. Seine offenen Schritte werden beendet.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
   "status.agent.screenCaptureReviewing": "Bildschirmaufnahme wird geprüft…",
   "status.agent.browserOpening": "Webseite wird geöffnet…",
@@ -40,7 +45,39 @@ export const messages = {
   "status.agent.memoriesUpdating": "Erinnerungen werden aktualisiert…",
   "status.agent.skillUsing": "Fähigkeit {name} wird verwendet…",
   "status.agent.skillReading": "Fähigkeit wird gelesen…",
+  "status.agent.toolStepFailed":
+    "Ein Tool-Schritt ist fehlgeschlagen; das Ergebnis wird geprüft und entschieden, was als Nächstes versucht wird…",
+  "status.agent.toolResultReviewing": "Das letzte Tool-Ergebnis wird geprüft…",
+  "status.agent.sourcesSearching": "Nach aktuellen Informationen wird gesucht…",
+  "status.agent.sourcesReviewing": "Die gefundenen Quellen und Informationen werden geprüft…",
+  "status.agent.informationGathering": "Die relevanten Informationen werden gesammelt…",
+  "status.agent.informationReviewing": "Die gesammelten Informationen werden geprüft…",
+  "status.agent.workChecking": "Die Arbeit wird geprüft…",
+  "status.agent.workReviewing": "Die Verifizierungsergebnisse werden geprüft…",
+  "status.agent.changesMaking": "Die gewünschten Änderungen werden vorgenommen…",
+  "status.agent.changesReviewing": "Die vorgenommenen Änderungen werden geprüft…",
+  "status.agent.agentCoordinating": "Es wird mit einem anderen Agenten abgestimmt…",
+  "status.agent.agentResponseReviewing": "Die Antwort des anderen Agenten wird geprüft…",
+  "status.agent.commandRunningUnnamed": "Befehl wird ausgeführt…",
+  "status.agent.toolStepWorking": "Der nächste toolgestützte Schritt wird abgearbeitet…",
+  "status.agent.webSearching": "Suche im Web nach „{query}“…",
+  "status.agent.urlFetching": "{host} wird geöffnet…",
+  "status.agent.fileReading": "{name} wird gelesen…",
+  "status.agent.filesReading": "Dateien werden gelesen…",
+  "status.agent.filesListing": "{path} wird durchgesehen…",
+  "status.agent.filesLooking": "Dateien werden durchgesehen…",
+  "status.agent.textSearching": "Suche nach „{query}“…",
+  "status.agent.filesSearchingText": "Dateien werden durchsucht…",
+  "status.agent.folderSizesMeasuring": "Ordnergrößen werden gemessen…",
+  "status.agent.diskSpaceChecking": "Freier Speicherplatz wird geprüft…",
+  "status.agent.processesChecking": "Laufende Prozesse werden geprüft…",
+  "status.agent.gitChecking": "Git-Repository wird geprüft…",
+  "status.agent.commandRunning": "{program} wird ausgeführt…",
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
   "status.agent.memoryChangesWithConflicts":
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
+  "status.agent.nextStepContinues":
+    "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
+  "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
+  "status.agent.branchTitle": "Abgezweigter Chat",
 } as const satisfies PartialTranslation<typeof source>;

@@ -88,6 +88,17 @@ export const messages = {
   "server.add.billing.monthly": "Aylık",
   "server.add.billing.yearly": "Yıllık",
   "server.add.billing.save": "%{percent} tasarruf",
+  "server.add.use.label": "Kullanım",
+  "server.add.use.personal": "Kişisel",
+  "server.add.use.work": "İş",
+  "server.add.license.people": "İşteki kişiler",
+  "server.add.license.minimum": {
+    one: "Sunucularınızı şu anda {count} kişi kullanıyor, bu yüzden daha azını seçemezsiniz.",
+    other: "Sunucularınızı şu anda {count} kişi kullanıyor, bu yüzden daha azını seçemezsiniz.",
+  },
+  "server.add.license.bundle": "Paket −%{percent}",
+  "server.add.license.included": "Dahil: {license}",
+  "server.add.license.includedTrial": "Dahil: {license}, {date} tarihine kadar ücretsiz",
   "server.add.billedMonthly": "Aylık faturalandırılır",
   "server.add.billedYearly": "Yıllık {price} faturalandırılır",
   // {amount} "€120" gibi biçimlendirilmiş bir tutardır. Yıllık fiyatın ardından gelir.
@@ -100,8 +111,22 @@ export const messages = {
   "server.add.custom.description":
     "Özel altyapı, ek depolama alanı veya iş akışınıza göre uyarlanmış özellikler edinin.",
   "server.add.custom.action": "Bize ulaşın",
-  "server.add.join.title": "Davetiniz var mı?",
   "server.add.join.action": "Sunucuya katıl",
+  "server.add.otherOptions": "Diğer seçenekler",
+  "server.local.createTitle": "Bu bilgisayarda yeni sunucu",
+  "server.local.createDescription":
+    "Sunucunun kendi ajanları, sohbetleri ve dosyaları vardır. Bu bilgisayarda çalışır.",
+  "server.local.nameLabel": "Sunucu adı",
+  "server.local.create": "Sunucu oluştur",
+  "server.local.creating": "Sunucu oluşturuluyor…",
+  "server.local.createFailed": "Sunucu oluşturulamadı.",
+  "server.local.limitReached":
+    "Bu bilgisayarda en fazla {limit} sunucunuz olabilir. Yeni bir sunucu oluşturmak için birini silin.",
+  "server.local.deleteConfirmTitle": "{name} silinsin mi?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot sunucuyu durdurur ve ajanlarını, sohbetlerini ve dosyalarını çöp kutusuna taşır.",
+  "server.local.deleting": "Sunucu siliniyor…",
+  "server.local.deletedTitle": "{name} silindi",
   // Hesap maksimum sayıda barındırılan sunucuya sahip olduğunda gösterilir. Planlar devre dışıdır.
   "server.add.limit.title": "Bu hesap maksimum sunucu sayısına ulaştı",
   "server.add.limit.description": {
@@ -110,6 +135,13 @@ export const messages = {
   },
   // Kullanıcının birini silebileceği, hesabın barındırılan sunucular listesini açar.
   "server.add.limit.manage": "Sunucuları yönet",
+  "server.upgrade.title": "Ajanlarınızın alanı tükeniyor",
+  "server.upgrade.description":
+    "{server} üzerinde az boş alan kaldı. Ajanlarınızın kesintisiz çalışmaya devam etmesi için planınızı yükseltin.",
+  "server.upgrade.used": "{total} alanın {used} kadarı kullanılıyor",
+  "server.upgrade.current": "{plan} (şu anki)",
+  "server.upgrade.price": "Fiyat",
+  "server.upgrade.action": "{plan} planına yükselt",
   "server.hosted.progressTitle": "{name} kuruluyor",
   // Kurulum tarayıcıdaki Stripe sayfasında ilk ödemeyi bekler.
   "server.hosted.paymentTitle": "Ödemeyi tarayıcınızda tamamlayın",
@@ -171,6 +203,7 @@ export const messages = {
   "server.rail.addRemote": "Uzak sunucu ekle",
   "server.rail.add": "Bir sunucu ekle",
   "server.rail.buttonLabel": "{name} sunucusu",
+  "server.rail.thisComputer": "bu bilgisayarda",
   "server.rail.notificationsMuted": "bildirimler sessize alındı",
   "server.rail.actions": "Sunucu eylemleri",
   "server.rail.unmute": "Sunucunun sesini aç",
@@ -181,6 +214,8 @@ export const messages = {
   "server.rail.restart": "Sunucuyu yeniden başlat",
   "server.rail.leave": "Sunucudan ayrıl",
   "server.rail.delete": "Sunucuyu sil",
+  "server.rail.hide": "Sunucuyu gizle",
+  "server.rail.showLocal": "{name} sunucusunu göster",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
@@ -274,19 +309,13 @@ export const messages = {
   "server.settings.addLogo": "Sunucu logosu ekle",
   "server.settings.removeLogo": "Sunucu logosunu kaldır",
   "server.settings.access": "Erişim",
+  "server.companySignIn.desktopOnly": "Çoklu oturum açmayı OpenBot masaüstü uygulamasında ayarlayın.",
   "server.settings.publish": "Bu sunucuyu yayımla",
   "server.settings.published": "Sunucu yayımlandı",
   "server.settings.setUpDesktopTitle": "Uzak masaüstünü ayarlayın",
   "server.settings.setUpDesktopDescription": "Bu Mac'i başka bir bilgisayardan görüntüleyin ve kontrol edin.",
   "server.settings.later": "Daha sonra",
   "server.settings.setUp": "Ayarla",
-  "server.settings.notifications": "Bildirimler",
-  "server.settings.muteNotifications": "Bildirimleri sessize al",
-  "server.settings.muteDescription":
-    "Bu sunucudan gelen masaüstü bildirimlerini, sesleri ve MacBook çentik güncellemelerini durdurun.",
-  "server.settings.mutedUntilDescription": "{until}. Şimdi sesi açmak için kapatın.",
-  "server.settings.notifyAbout": "Şunun hakkında bildir",
-  "server.settings.notifyAboutDescription": "Hangi ajan olaylarının bir masaüstü bildirimi göstereceği.",
   "server.settings.agents": "Ajanlar",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
@@ -296,6 +325,12 @@ export const messages = {
   "server.settings.memoryLimit": "Ajan başına bellek",
   "server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",
+  "server.settings.memoryReview": "Bellek incelemesi",
+  "server.settings.memoryReviewDescription":
+    "Bu sunucudaki ajanların sohbetlerindeki kalıcı bilgileri arka planda ne sıklıkla kaydettiği.",
+  "server.settings.memoryReviewOff": "Kapalı",
+  "server.settings.memoryReviewTurns": { one: "Her {count} turda", other: "Her {count} turda" },
+  "server.settings.memoryReviewLoadFailed": "Bellek incelemesi ayarı yüklenemedi.",
   "server.settings.remoteOnline": "Ana makine çevrim içi. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.remoteOffline": "Ana makine çevrim dışı. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.reachable": "Çevrim içi erişilebilir. Yalnızca davet edilen kişiler oturum açabilir.",
@@ -311,6 +346,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Mevcut anahtar ve yeni anahtar bir devri birlikte imzalar. Üyelerin uygulamaları yeniden bağlandığında yeni anahtara geçer. Anahtar dosyası kopyalandıysa veya açığa çıktıysa bunu yapın.",
   "server.settings.hostKeyRotated": "Sunucu anahtarı değiştirildi",
+  "server.settings.hostKeyChanged": "Son değişiklik",
+  "server.settings.hostKeyChangedDescription": "{date}. Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
   "server.settings.hostKeyLocalOnly": "Burada yalnızca bu bilgisayardaki sunucu anahtarını değiştirebilir.",
   "server.settings.removeTitle": "Sunucuyu kaldır",
   "server.settings.removeDescription":
@@ -393,7 +430,10 @@ export const messages = {
   "server.invite.showQr": "Davet QR kodunu göster",
   "server.invite.permaHint":
     "Süresi asla dolmaz ve birçok kez kullanılabilir. Bu bağlantıya sahip olan herkes katılabilir; devre dışı bırakmak için iptal edin.",
-  "server.invite.full": "Bu sunucu {limit} üye sınırına ulaştı. Yeni bir kişiyi davet etmek için bir üyeyi kaldırın.",
+  "server.invite.full": {
+    one: "Bu sunucu {count} üye sınırına ulaştı. Yeni bir kişiyi davet etmek için bir üyeyi kaldırın.",
+    other: "Bu sunucu {count} üye sınırına ulaştı. Yeni bir kişiyi davet etmek için bir üyeyi kaldırın.",
+  },
   "server.invite.qrLabel": "Davet QR kodu",
   "server.invite.qrDescription": "Bu sunucuya katılmak için bu kodu OpenBot Mobile uygulamasında tarayın.",
   "server.invite.accepted": "Davet kabul edildi",
@@ -418,8 +458,8 @@ export const messages = {
   "server.invite.revokeTitle": "Bu davet iptal edilsin mi?",
   "server.invite.revokeDescription": "Davet artık çalışmaz. Bu davetle katılanlar üye olarak kalır.",
   "server.desktop.accessTitle": "Uzak masaüstü erişimi",
-  "server.desktop.gatewayDescription":
-    "Her etkin sunucu üyesi bu ana makineyi kontrol edebilir. Ayrı bir uzak masaüstü şifresi yoktur.",
+  "server.desktop.gatewayPolicyDescription":
+    "Uzak masaüstü için ayrı bir parola yok. Bu bilgisayarı kimin kontrol edebileceğini aşağıdaki ayarlar belirler.",
   "server.desktop.componentInstalled": "Ana makine bileşeni yüklendi",
   "server.desktop.componentNotInstalled": "Ana makine bileşeni yüklenmedi",
   "server.desktop.sessions": "Katılımsız: {unattended} · Etkin oturumlar: {active}/{max}",
@@ -432,12 +472,25 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Masaüstünü açmadan önce ana makineye yeniden bağlanın.",
   "server.desktop.hostUpdateDescription": "Uzaktan kontrolü kullanmak için ana makinedeki OpenBot'u güncelleyin.",
   "server.desktop.serviceAvailable": "Hizmet kullanılabilir",
-  "server.desktop.serviceAvailableDescription": "WebRTC kontrolü tüm etkin üyeler için kullanılabilir.",
   "server.desktop.serviceNotReady": "Hizmet hazır değil",
   "server.desktop.serviceNotReadyDescription":
     "Ana makine bileşenlerini ve izinlerini kontrol etmek için Uzaktan kontrolü başlatın. Ana makine her türlü kurulum hatasını bildirecektir.",
   "server.desktop.remoteControl": "Uzaktan kontrol",
   "server.desktop.startHint": "Sunucu başlığındaki monitör düğmesinden Uzaktan kontrolü başlatın.",
+  "server.desktop.accessLabel": "Bu bilgisayarı kim kontrol edebilir",
+  "server.desktop.accessDescription": "Bu bilgisayarın masaüstünü başka bir cihazdan açabilen üyeler.",
+  "server.desktop.accessOwner": "Yalnızca sahip",
+  "server.desktop.accessAdmins": "Sahip ve yöneticiler",
+  "server.desktop.accessMembers": "Tüm üyeler",
+  "server.desktop.askLabel": "Bu bilgisayarda sor",
+  "server.desktop.askDescription":
+    "Her oturum, bu bilgisayarın başındaki bir kişi izin verene kadar bekler. 30 saniye içinde yanıt gelmezse OpenBot oturumu reddeder.",
+  "server.desktop.activeTitle": "Etkin uzak masaüstü oturumları: {active}",
+  "server.desktop.activeDescription": "Her oturumu hemen sonlandırır. Üyeler yeniden isteyebilir.",
+  "server.desktop.stopAll": "Tüm uzaktan kontrolü durdur",
+  "server.desktop.policyLoadFailed": "Uzaktan kontrol ayarları yüklenemedi.",
+  "server.desktop.policySaveFailed": "Uzaktan kontrol ayarları kaydedilemedi.",
+  "server.desktop.stopFailed": "Uzaktan kontrol durdurulamadı.",
   "server.settings.providersTitle": "Sağlayıcılar",
   "server.settings.providersDescription": "Bu sunucuyu çalıştıran bilgisayarın yapay zeka sağlayıcılarını yönetin.",
   "server.settings.providersSwitchNote": "Yapay zeka sağlayıcılarını yönetmek için {name} sunucusuna geçin.",
@@ -568,4 +621,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name}, güncellemeyi yüklemek için yeniden başlatılıyor",
   "server.restartNotice.restartingDescription": "{name} geri geldiğinde OpenBot otomatik olarak tekrar bağlanır.",
   "server.restartNotice.backTitle": "{name} tekrar çevrim içi",
+  "server.settings.personalityTitle": "Kişilik",
+  "server.settings.personalityDescription": "Bu sunucudaki ajanların sizinle nasıl konuşacağını seçin.",
+  "server.settings.responseStyle": "Yanıt stili",
+  "server.settings.responseStyleDescription":
+    "Doğal: ajanlar çalışırken kısa güncellemeler gönderir ve sohbet bunları gösterir. Klasik: ajanlar bitirdiklerinde bir kez yanıt verir.",
+  "server.settings.responseStyleNatural": "Doğal",
+  "server.settings.responseStyleClassic": "Klasik",
+  "server.settings.personalityLoadFailed": "Sunucu kişiliği yüklenemedi.",
 } as const satisfies PartialTranslation<typeof source>;

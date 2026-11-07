@@ -40,7 +40,8 @@ export const messages = {
   "mcp.status.noAnswer": "Yanıt yok",
   "mcp.status.didNotStart": "Başlamadı",
   "mcp.status.unreachable": "Ulaşılamıyor",
-  "mcp.server.providerLimitNote": "Yalnızca Claude: Çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
+  "mcp.server.providerLimitNote":
+    "Yalnızca Claude ve Codex: Çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
   "mcp.server.runtimeDownloading":
     "Bir STDIO sunucusunun başlatıldığı çalışma zamanı indiriliyor. Tamamlanana kadar başlatılamayabilir.",
   "mcp.server.runtimeDownloadingProgress":
@@ -82,7 +83,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "{position}. aktarım değişkenini kaldır",
   "mcp.panel.workingDirectory": "Çalışma dizini",
   "mcp.panel.workingDirectoryDescription":
-    "Claude ajanları ve bağlantı testi sunucuyu burada başlatır. Bu sunucuyu her sağlayıcıya vermek için boş bırakın: başka hiçbir sağlayıcı bir dizin ayarlayamaz, bu yüzden dizin belirten bir sunucuyu atlar.",
+    "Claude ve Codex ajanları ve bağlantı testi sunucuyu burada başlatır. Bu sunucuyu her sağlayıcıya vermek için boş bırakın: diğer sağlayıcılar bir dizin ayarlayamaz, bu yüzden dizin belirten bir sunucuyu atlarlar.",
   "mcp.panel.endpointTitle": "Uç nokta",
   "mcp.panel.endpointDescription": "Her sağlayıcı bir HTTP MCP sunucusu kullanabilir.",
   "mcp.panel.serverUrl": "Sunucu URL'si",
@@ -141,11 +142,11 @@ export const messages = {
   "mcp.panel.appSaved": "Uygulama kaydedildi. Kullanmak için oturum açın.",
   "mcp.panel.appRemoved": "Uygulama kaldırıldı.",
   "mcp.signIn.relayDescription":
-    "Oturum açma sayfasının {page} üzerinde olduğunu kontrol edin, sonra tarayıcınızda açın. Bitirdiğinizde OpenBot oturum açmayı {host} sunucusuna gönderir.",
+    "Tarayıcınızda {page} üzerinde oturum açın. Bitirdiğinizde OpenBot oturum açmayı {host} sunucusuna gönderir.",
   "mcp.signIn.relayOpenDescription":
-    "{page} oturum açma sayfasını tarayıcınızda açın. Bitirdiğinizde tarayıcının gösterdiği adresi buraya yapıştırın. OpenBot ardından oturum açmayı {host} sunucusuna gönderir.",
+    "Tarayıcınızda {page} üzerinde oturum açın. Bitirdiğinizde tarayıcının gösterdiği adresi buraya yapıştırın. OpenBot ardından oturum açmayı {host} sunucusuna gönderir.",
   "mcp.signIn.relayDeviceDescription":
-    "Oturum açma sayfasının {page} üzerinde olduğunu kontrol edin, sonra tarayıcınızda açıp oturum açmayı orada bitirin. {host} oturum açmayı kendisi algılar.",
+    "Tarayıcınızda {page} üzerinde oturum açın ve işlemi orada bitirin. {host} oturum açmayı kendisi algılar.",
   "mcp.signIn.relayOpen": "Oturum açma sayfasını aç",
   "mcp.signIn.relayPasteHint": "Tarayıcı OpenBot'a geri dönmezse gösterdiği adresi kopyalayıp buraya yapıştırın.",
   "mcp.signIn.relayPasteRequired":

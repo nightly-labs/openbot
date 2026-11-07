@@ -8,6 +8,10 @@ export const messages = {
     "OpenBot kon Computerbesturing niet registreren in de configuratie van Codex. Controleer of je Codex-config.toml geldig en beschrijfbaar is en start OpenBot opnieuw. Je kunt Computerbesturing uitzetten in de instellingen van de teamgenoot om zonder door te gaan.",
   "error.provider.codexUnresponsive": "Codex reageerde niet meer, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
+  "error.provider.acpSignInLost":
+    "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
   "error.provider.endpointsReadOnly":
     "De opgeslagen endpoints zijn geschreven door een nieuwere versie van OpenBot, of het bestand kan niet worden gelezen. Werk OpenBot bij om ze te wijzigen.",
   "error.provider.endpointNoSecureStorage":
@@ -97,6 +101,12 @@ export const messages = {
   "error.provider.modelsTooMany": "Er zijn te veel modellen.",
   "error.provider.modelIdCharacter": "Een model-ID bevat een onbruikbaar teken.",
   "error.provider.modelIdDuplicate": "Twee modellen hebben dezelfde ID.",
+  "error.provider.contextWindowInvalid":
+    "Het contextvenster van een model moet een geheel aantal tokens zijn van {min} tot {max}.",
+  "error.provider.maxOutputInvalid":
+    "De maximale output van een model moet een geheel aantal tokens zijn van {min} tot {max}.",
+  "error.provider.reasoningEffortsInvalid": "De redeneerniveaus van een model zijn niet geldig.",
+  "error.provider.inputsInvalid": "De invoersoorten van een model zijn niet geldig.",
   "error.provider.headersTooMany": "Er zijn te veel headers.",
   "error.provider.headerNameCharacter": "Een headernaam bevat een teken dat HTTP niet toestaat.",
   "error.provider.headerNameTooLong": "Een headernaam is te lang.",
@@ -121,16 +131,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT is gedownload, maar kon niet worden gestart. Download het opnieuw in OpenBot.",
   "error.provider.codexMissing": "ChatGPT is niet gedownload. Download het in OpenBot om door te gaan.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex heeft {count} instelling in de configuratie genegeerd: {settings}. Corrigeer of verwijder deze, of werk Codex bij.",
-    other:
-      "Codex heeft {count} instellingen in de configuratie genegeerd: {settings}. Corrigeer of verwijder ze, of werk Codex bij.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex heeft {count} instelling in de configuratie genegeerd. Corrigeer of verwijder deze, of werk Codex bij.",
-    other:
-      "Codex heeft {count} instellingen in de configuratie genegeerd. Corrigeer of verwijder ze, of werk Codex bij.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} is te oud. OpenBot vereist 2.1.232 of nieuwer.",
   "error.provider.claudeNotStarted": "Claude CLI is gevonden, maar kon niet worden gestart.",
   "error.provider.claudeNotStartedHint":
@@ -181,14 +181,22 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} gaf geen geverifieerd account terug.",
   "error.provider.signInExpired": "Je inlog bij {provider} is verlopen. Log opnieuw in om door te gaan.",
   "error.provider.cliActivateFailed": "OpenBot kon de beheerde CLI niet activeren.",
+  "error.provider.noMainlandChinaSignIn": "{provider} heeft geen aanmelding voor het Chinese vasteland.",
+  "error.provider.cliNewVersionNotStarted": "De nieuwe versie is niet gestart.",
   "error.provider.cliBusyReconnect":
     "De {provider} CLI werkt aan een beurt. Wacht tot die klaar is en verbind dan opnieuw.",
+  "error.provider.cliBusySignOut":
+    "De {provider}-CLI verwerkt een beurt. Wacht tot die klaar is en verbreek dan de verbinding.",
   "error.provider.opencodeCredentialsRejected":
     "De modelaanbieder heeft de API-sleutel geweigerd. Corrigeer de OpenCode-sleutel in Instellingen, of de sleutel van de aanbieder met `opencode auth login`. Probeer het daarna opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeAuthRequired":
     "OpenCode heeft geen inlog voor de modelaanbieder “{provider}”. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode heeft geen inlog voor de aanbieder van dit model. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
+  "error.provider.customEndpointKeyRefused":
+    "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointKeyMissing":
+    "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeServiceFailure":
@@ -207,6 +215,10 @@ export const messages = {
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT bereidt na een eerdere start nog de lokale geschiedenis voor. Wacht een paar minuten en probeer het opnieuw.",
+  "error.provider.realtimeLimitZero":
+    "Linux heeft de provider gestopt, omdat OpenBot een realtime-CPU-limiet van 0 heeft. De limiet komt van je systeem. Installeer en start rtkit (`rtkit-daemon`), voer `systemctl --user restart xdg-desktop-portal` uit en start OpenBot daarna opnieuw. Alleen xdg-desktop-portal opnieuw starten helpt niet zolang rtkit ontbreekt.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
   "error.provider.opencodeNoAnswer":
@@ -228,6 +240,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "De Gemini-release heeft een onverwachte vorm.",
   "error.provider.antigravityMissing": "Gemini is niet gedownload. Download het in OpenBot om door te gaan.",
   "error.provider.antigravityNotStarted": "De Gemini-server is gevonden, maar de versie kan niet worden gelezen.",
+  "error.provider.antigravityOverrideInvalid":
+    "De Gemini-server in OPENBOT_ANTIGRAVITY_PATH ontbreekt of is niet uitvoerbaar. Corrigeer het pad of verwijder de variabele en start OpenBot daarna opnieuw.",
   "error.provider.antigravityVersionUnreadable": "Kan de versie van de Gemini-server niet lezen.",
   "error.provider.antigravitySignIn": "Log in met Google om Gemini te gebruiken.",
   "error.provider.antigravityRateLimited":
@@ -254,13 +268,33 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline kon niet starten. Voer `cline --version` uit in een terminal.",
   "error.provider.clineVersionUnreadable": "Kan de versie van Cline CLI niet lezen.",
   "error.provider.clineSignIn": "Log in met Cline of stel CLINE_API_KEY in om Cline te gebruiken.",
+  "error.provider.kimiArchivePath": "Het Kimi-archief heeft een onverwacht pad.",
+  "error.provider.kimiChecksum": "Checksum van de Kimi-runtime komt niet overeen.",
+  "error.provider.kimiLicenseChecksum": "Checksum van de Kimi-licentie komt niet overeen.",
+  "error.provider.kimiMissing": "Kimi is niet gedownload. Download het in OpenBot om door te gaan.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} is te oud. OpenBot vereist 1.52.0 of nieuwer.",
+  "error.provider.kimiNotStarted": "Kimi kon niet starten. Voer `kimi --version` uit in een terminal.",
+  "error.provider.kimiVersionUnreadable": "Kan de versie van Kimi CLI niet lezen.",
+  "error.provider.kimiSignIn": "Log in met Kimi Code om Kimi te gebruiken.",
+  "error.provider.devinSignIn": "Log in met Devin om Devin te gebruiken.",
+  "error.provider.copilotSignIn": "Log in met GitHub of stel COPILOT_GITHUB_TOKEN in om GitHub Copilot te gebruiken.",
+  "error.provider.mistralSignIn": "Log in met Mistral of stel MISTRAL_API_KEY in om Mistral te gebruiken.",
+  "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
+  "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
+  "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
+  "error.provider.hermesSignIn":
+    "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
+  "error.provider.claudeApiKeyNoCredit":
+    "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.museMcpStartupFault":
     "Muse kon een MCP-server niet starten en heeft MCP in deze sessie geblokkeerd. OpenBot heeft een nieuwe Muse-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, zet dan Computerbesturing of de mislukte MCP-server uit voor deze agent.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
   "error.provider.acpSignInTimedOut": "Het inloggen duurde te lang.",
   "error.provider.acpSignInStopped": "Het inloggen is gestopt voordat het klaar was.",
@@ -270,6 +304,8 @@ export const messages = {
     "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
+  "error.provider.acpSignOutFailed": "Het uitloggen is niet voltooid.",
+  "error.provider.acpSignOutFailedReason": "Het uitloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Deze aanbieder biedt deze inlog niet aan op deze computer. Werk de aanbieder bij en probeer het opnieuw.",
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
@@ -307,6 +343,8 @@ export const messages = {
     "Deze computer heeft geen beveiligde opslag, dus omgevingswaarden kunnen niet worden opgeslagen. Verwijder ze en probeer het opnieuw.",
   "error.provider.customAgentNotSaved":
     "Deze aangepaste agent is niet opgeslagen. Vernieuw de lijst en probeer het opnieuw.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. ‘Alleen werkruimte’ blokkeert dit. Probeer ‘Volledige toegang’.",
   "error.provider.customAgentTooMany": "Je kunt maximaal {count} aangepaste agents opslaan.",
   "error.provider.customAgentEnvValueMissing": "Voer een waarde in voor {name}.",
   "error.provider.off": "{provider} staat uit in OpenBot. Zet het eerst aan in de instellingen voor aanbieders.",
@@ -319,6 +357,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} kan maar één account hebben.",
   "error.provider.accountNeedsConnection": "Verbind {provider} voordat je nog een account toevoegt.",
   "error.provider.usageResetUnsupported": "{provider} kan gebruikslimieten niet resetten.",
+  "error.provider.signOutUnsupported": "OpenBot kan de {provider}-aanmelding niet verbreken.",
   "error.provider.usageResetNotConnected": "Log opnieuw in bij dit {provider}-account voordat je het gebruik reset.",
   "error.provider.accountLimit": "{provider} kan maximaal {limit} accounts hebben.",
   "error.provider.accountNotFound":
@@ -399,6 +438,9 @@ export const messages = {
     "De aangepaste agent is gewijzigd tijdens de installatie. Probeer het opnieuw.",
   "error.provider.registryInstallFailed":
     "De installatie van de agent is mislukt. De vorige installatie is ongewijzigd.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent is niet geïnstalleerd. Probeer het opnieuw, of gebruik de installatiegids.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent heeft git en curl nodig. Installeer ze en probeer het opnieuw.",
   "error.provider.registryRemoveBusy":
     "Wacht tot de installatie van de agent en het actieve ACP-werk klaar zijn voordat je de agent verwijdert.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,4 +1,4 @@
-import type { AccountSession, AvatarImageInput } from "@openbot/contracts/ipc";
+import type { AccountSession, AvatarColor, AvatarImageInput } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
 
@@ -8,7 +8,14 @@ import { currentText } from "@openbot/ui/text";
  */
 export interface WebAccountCalls {
   updateName: (name: string) => Promise<void>;
+  /**
+   * Saves the user's analytics answer on the account, so their other devices follow it. `ageMs` is
+   * the age of the choice. Returns the account's answer: a newer answer from another device stays.
+   */
+  updateAnalytics: (enabled: boolean, ageMs: number) => Promise<boolean | null>;
   updateAvatar: (image: AvatarImageInput | null) => Promise<void>;
+  /** Saves the chat color on the account. Members of each server of the user see it. */
+  setChatColor: (color: AvatarColor | null) => Promise<void>;
   listSessions: () => Promise<AccountSession[]>;
   revokeSession: (sessionId: string) => Promise<void>;
 }
@@ -49,6 +56,12 @@ export function createWebAccountCalls(
       await request("v1/me/profile", { method: "PATCH", body: JSON.stringify({ name }) });
       await onAccountChanged();
     },
+    async updateAnalytics(enabled, ageMs) {
+      const response = await request("v1/me/analytics", { method: "PUT", body: JSON.stringify({ enabled, ageMs }) });
+      const user = await response.json().catch(() => null);
+      await onAccountChanged();
+      return isDynamicRecord(user) && isBoolean(user.analyticsEnabled) ? user.analyticsEnabled : null;
+    },
     async updateAvatar(image) {
       await request(
         "v1/me/avatar",
@@ -56,6 +69,10 @@ export function createWebAccountCalls(
           ? { method: "PUT", body: new Uint8Array(image.bytes), contentType: image.mimeType }
           : { method: "DELETE", body: "{}" },
       );
+      await onAccountChanged();
+    },
+    async setChatColor(color) {
+      await request("v1/me/chat-color", { method: "PUT", body: JSON.stringify({ chatColor: color }) });
       await onAccountChanged();
     },
     async listSessions() {

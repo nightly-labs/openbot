@@ -182,6 +182,16 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
     }
   }
 
+  /** Uses a secret that the sender made. Undefined when the host cannot do this. */
+  function senderSecret(): ((secret: string) => Promise<void>) | undefined {
+    const set = props.api.setSecret;
+    if (!set) return undefined;
+    return async (secret) => {
+      await set({ owner: plainOwner(routine()), id: routine().id, secret });
+      props.onSecret(null);
+    };
+  }
+
   return (
     <RoutineWebhookCard
       action={props.action}
@@ -194,6 +204,7 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
         const result = await props.api.rotateSecret({ owner: plainOwner(routine()), id: routine().id });
         props.onSecret(result.secret);
       }}
+      onUseSenderSecret={senderSecret()}
       eventType={card.eventType}
       filters={card.filters}
       onEventTypeChange={(eventType) =>

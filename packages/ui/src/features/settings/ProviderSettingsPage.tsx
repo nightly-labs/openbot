@@ -1,23 +1,29 @@
 /**
  * Settings > Providers: a short list, and one page for each provider. A list row shows one line, and
  * a badge only when the provider needs the user. The provider page has its accounts or its sign-in,
- * its key, its runtime and its use, each as a settings card with at most one button on a row.
+ * its key, its runtime, its use and its deletion, each as a settings card with at most one button on a row.
  */
 
 import { ProviderLogo } from "@openbot/brand";
+import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import {
+  type AgentModelId,
   type AgentProviderId,
+  type AgentProviderStatus,
+  agentProviderName,
   type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
   type ProviderAccountState,
+  type ProviderModelVisibility,
   type ProviderRuntimeDownload,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
+import type { AppFormat, AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -29,6 +35,7 @@ import {
   DropdownMenu,
   Ellipsis,
   Gauge,
+  Globe2,
   Input,
   Item,
   ItemActions,
@@ -40,6 +47,7 @@ import {
   KeyRound,
   Link,
   LogIn,
+  LogOut,
   Pencil,
   Plus,
   Popover,
@@ -56,6 +64,7 @@ import {
   Smartphone,
   Spinner,
   Switch,
+  Text,
   Trash2,
   UserRoundPlus,
   X,
@@ -77,10 +86,11 @@ import {
   showProviderInUse,
 } from "../../components/provider-row";
 import { useText } from "../../text";
+import { toast } from "../../toast";
 import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
 import { providerUpdateAvailable } from "../provider-updates/provider-update";
-import { DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
+import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
 
 /** The provider page on screen. The settings window puts "Providers ›" before its title. */
 export interface ProviderSettingsDetail {
@@ -100,6 +110,26 @@ export interface ProviderPromptCache {
   onChange: (ttl: PromptCacheTtl) => void;
 }
 
+/** Whether Claude loads the user's own Claude Code setup. `value` is null until main answers. */
+export interface ProviderClaudeUserSetup {
+  value: boolean | null;
+  pending: boolean;
+  /** A load or a save that failed. */
+  error: string | null;
+  onChange: (enabled: boolean) => void;
+}
+
+/** The models of one provider, and the ones the model picker shows. `list` is null until the host answers. */
+export interface ProviderModelVisibilityControl {
+  list: ProviderModelVisibility | null;
+  /** A load or a save that failed. */
+  error: string | null;
+  /** Shows the change at once and saves it. */
+  onChange: (shown: AgentModelId[]) => void;
+  /** Gives each model back the host's default. */
+  onReset: () => void;
+}
+
 export interface ProviderSettingsPageProps extends ProviderRowHost {
   options: ProviderPickerOption[];
   /** The default for new agents. A joined server has none: its default is not this computer's. */
@@ -114,7 +144,7 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /** Turns a provider on or off. A provider that an agent uses stays on and names its agents. */
   onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
-  /** The downloaded CLI of a provider that is off, which `onRemoveProviderDownload` frees. */
+  /** What `onRemoveProviderDownload` frees now: nothing while the provider is on. */
   onMeasureProviderDownload?: ((provider: AgentProviderId) => Promise<ProviderRuntimeDownload>) | undefined;
   /** Removes the downloaded CLI of a provider that is off. This computer only. */
   onRemoveProviderDownload?: ((provider: AgentProviderId) => Promise<void>) | undefined;
@@ -130,12 +160,24 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
    * joined server's rows have no Edit.
    */
   onEditCustomProvider?: ((provider: CustomProviderSummary) => void) | undefined;
+  /**
+   * This computer runs an endpoint on OpenCode or Pi, and each row names its provider. A joined
+   * server's host runs every endpoint on OpenCode.
+   */
+  customProviderHarnesses?: boolean | undefined;
   /** Runs after the user accepts the removal question. */
   onRemoveCustomProvider?: ((provider: CustomProviderSummary) => void) | undefined;
   removingCustomProvider?: string | null | undefined;
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   /** On the Claude page. Only for a host with `prompt-cache-ttl-v1` that this account administers. */
   promptCache?: ProviderPromptCache | undefined;
+  /** On the Claude page. This computer only: a joined server has no route for it. */
+  claudeUserSetup?: ProviderClaudeUserSetup | undefined;
+  /**
+   * The model list of one provider page. Called once when the page opens, so the control lives as
+   * long as the page. Only for a host with `model-visibility-v1` that this account administers.
+   */
+  modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
   /** Below the list: what the host found, and the other agents the user can add. */
   footer?: JSX.Element;
 }
@@ -394,14 +436,13 @@ interface DefaultChoice {
 /** The default provider as one select, so the rows need no radio. */
 function DefaultProviderRow(props: ProviderSettingsPageProps) {
   const { t } = useText();
-  const openCode = () => props.options.find((option) => option.id === "opencode");
   const choices = (): DefaultChoice[] => {
     const value = props.defaultProvider?.value ?? null;
     const providers = props.options
       .filter((option) => (option.state === "available" && !option.off) || option.id === value)
       .map((option) => ({ id: option.id, name: option.name }));
     const custom =
-      (props.customProviders?.length ?? 0) > 0 && servesCustomProvider(openCode()) && props.onAddCustomProvider;
+      (props.customProviders?.length ?? 0) > 0 && servesCustomEndpoints(props) && props.onAddCustomProvider;
     return custom || value === "custom" ? [...providers, { id: "custom", name: t("provider.custom.name") }] : providers;
   };
   const selected = () => choices().find((choice) => choice.id === props.defaultProvider?.value) ?? null;
@@ -495,6 +536,11 @@ function ProviderPage(props: PageProps) {
   const keyShown = () =>
     Boolean(props.onSignInProvider) &&
     (props.option.id === "opencode" || props.option.id === "muse" || row.apiKeyOffered());
+  // The source can arrive after the page opens, such as when the host's capabilities load.
+  // Each status makes a new option, so the section keeps its list until the provider or the source changes.
+  const provider = createMemo(() => props.option.id);
+  const modelVisibility = createMemo(() => props.modelVisibility);
+  const models = createMemo(() => modelVisibility()?.(provider()));
   return (
     <>
       <DetailHeader
@@ -515,9 +561,13 @@ function ProviderPage(props: PageProps) {
         <Show when={props.option.id === "claude" && props.promptCache}>
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
+        <Show when={props.option.id === "claude" && props.claudeUserSetup}>
+          {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
+        </Show>
+        <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
       <UseSection {...props} row={row} />
-      <DownloadSection {...props} row={row} />
+      <DeleteSection {...props} row={row} />
     </>
   );
 }
@@ -537,30 +587,76 @@ function MenuTrigger(props: { label: string; disabled?: boolean | undefined }) {
   );
 }
 
-/** The second way in, from a ⋯ menu: a code, or the address that the browser shows at its end. */
+/**
+ * The other ways in, from a ⋯ menu: a code, or the address that the browser shows at its end, and
+ * the provider's mainland China site.
+ */
 function AlternativeItem(props: { row: ProviderRow }) {
   const { t } = useText();
   return (
-    <Show when={props.row.alternative()}>
-      {(kind) => (
-        <DropdownMenu.Item onSelect={props.row.signInAlternative}>
-          <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
-            <Link aria-hidden="true" />
-          </Show>
-          {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
-        </DropdownMenu.Item>
-      )}
-    </Show>
+    <>
+      <Show when={props.row.alternative()}>
+        {(kind) => (
+          <DropdownMenu.Item onSelect={props.row.signInAlternative}>
+            <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
+              <Link aria-hidden="true" />
+            </Show>
+            {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
+          </DropdownMenu.Item>
+        )}
+      </Show>
+      <Show when={props.row.mainlandChinaSite()}>
+        {(site) => (
+          <DropdownMenu.Item onSelect={props.row.connectInMainlandChina}>
+            <Globe2 aria-hidden="true" />
+            {t("provider.action.signInMainlandChina", { site: site() })}
+          </DropdownMenu.Item>
+        )}
+      </Show>
+    </>
   );
 }
 
 /* ---------------------------------------------- Accounts */
+
+/** The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`). */
+const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
+  "claude",
+  "codex",
+  "grok",
+  "muse",
+  "cursor",
+  "devin",
+  "copilot",
+  "mistral",
+]);
+
+/** The confirmation text of a Disconnect of the provider's own sign-in. */
+function disconnectDescription(
+  t: AppTranslate,
+  format: AppFormat,
+  options: { provider: string; local: boolean; usedBy: readonly string[]; otherAccounts: boolean },
+): string {
+  const { provider, usedBy } = options;
+  return [
+    options.local
+      ? t("provider.settings.disconnectLocal", { provider })
+      : t("provider.settings.disconnectHost", { provider }),
+    usedBy.length > 0
+      ? t("provider.settings.accountBlocked", { agents: format.list(usedBy) })
+      : t("provider.settings.removeUnused"),
+    options.otherAccounts ? t("provider.settings.disconnectOthers", { provider }) : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
   const accounts = () => props.option.accounts ?? [];
   const [removing, setRemoving] = createSignal<ProviderPickerAccount | null>(null);
   const [resetting, setResetting] = createSignal<ProviderPickerAccount | null>(null);
+  const [disconnecting, setDisconnecting] = createSignal<ProviderPickerAccount | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   /** How the last usage reset ended, when it did not fail. */
   const [notice, setNotice] = createSignal<string | null>(null);
@@ -661,6 +757,11 @@ function AccountsSection(props: SectionProps) {
               accounts={accounts()}
               run={run}
               onRemove={() => setRemoving({ ...account() })}
+              onDisconnect={
+                props.accountActions?.signOut && SIGN_OUT_PROVIDERS.has(props.option.id)
+                  ? () => setDisconnecting({ ...account() })
+                  : undefined
+              }
               resetsLeft={props.accountActions?.resetUsage ? resetsLeft(account().id) : 0}
               onResetUsage={() => setResetting({ ...account() })}
             />
@@ -706,6 +807,32 @@ function AccountsSection(props: SectionProps) {
         }}
       />
       <ConfirmDialog
+        open={disconnecting() !== null}
+        tone="destructive"
+        title={t("provider.settings.disconnectTitle", {
+          name: disconnecting() ? providerAccountName(t, accounts(), disconnecting()?.id ?? "") : "",
+        })}
+        description={
+          disconnecting()
+            ? disconnectDescription(t, format, {
+                provider: props.option.name,
+                local: Boolean(props.accountActions?.local),
+                usedBy: disconnecting()?.usedBy ?? [],
+                otherAccounts: accounts().length > 1,
+              })
+            : ""
+        }
+        confirmLabel={t("provider.account.disconnect")}
+        onCancel={() => setDisconnecting(null)}
+        onConfirm={() => {
+          const target = disconnecting();
+          setDisconnecting(null);
+          if (target) {
+            run(providerAccountName(t, accounts(), target.id), () => props.accountActions?.signOut?.(props.option.id));
+          }
+        }}
+      />
+      <ConfirmDialog
         open={resetting() !== null}
         tone="default"
         icon={<Gauge aria-hidden="true" />}
@@ -735,6 +862,12 @@ const ACCOUNT_STATE_TEXT = {
   error: "provider.account.failed",
 } as const satisfies Record<ProviderAccountState, AppTextKey>;
 
+/** The Version line names the CLI that runs: the one the user installed, or OpenBot's download. */
+const VERSION_SOURCE = {
+  system: "provider.settings.versionInstalledByUser",
+  managed: "provider.settings.versionDownloaded",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+
 /** One account. Its text says what is wrong; the right edge has at most one button, then the ⋯ menu. */
 function AccountRow(
   props: SectionProps & {
@@ -742,6 +875,8 @@ function AccountRow(
     accounts: readonly ProviderPickerAccount[];
     run: (name: string, action: () => Promise<void> | undefined) => void;
     onRemove: () => void;
+    /** Absent where the provider's own sign-in cannot be signed out here. */
+    onDisconnect: (() => void) | undefined;
     /** The usage reset credits the provider gave this account; the menu offers a reset only when there is one. */
     resetsLeft: number;
     onResetUsage: () => void;
@@ -885,6 +1020,17 @@ function AccountRow(
                   {t("provider.account.remove")}
                 </DropdownMenu.Item>
               </Show>
+              <Show when={own() && state() === "connected" && props.onDisconnect}>
+                {(disconnect) => (
+                  <>
+                    <DropdownMenu.Separator />
+                    <DropdownMenu.Item onSelect={() => disconnect()()}>
+                      <LogOut aria-hidden="true" />
+                      {t("provider.account.disconnect")}
+                    </DropdownMenu.Item>
+                  </>
+                )}
+              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -948,8 +1094,27 @@ function LowUsageBadge(props: { reading: AccountUsageProviderRow; name: string; 
 
 /** The provider's one sign-in: the same buttons that its onboarding row has, on a card. */
 function SignInSection(props: SectionProps & { keyShown: boolean }) {
-  const { t, format, sourceText } = useText();
+  const { t, format, sourceText, errorMessage } = useText();
   const row = () => props.row;
+  /**
+   * A saved OpenBot key keeps the provider connected; the key dialog removes it. Muse offers
+   * Disconnect only where its key status is known, on this computer.
+   */
+  const disconnectOffered = () =>
+    Boolean(props.accountActions?.signOut) &&
+    SIGN_OUT_PROVIDERS.has(props.option.id) &&
+    row().available() &&
+    !row().connecting() &&
+    (props.option.id === "muse" ? props.option.keyStatus === "missing" : props.option.keyStatus !== "saved");
+  const [disconnecting, setDisconnecting] = createSignal(false);
+  const [disconnectError, setDisconnectError] = createSignal<string | null>(null);
+  const disconnect = () => {
+    setDisconnecting(false);
+    setDisconnectError(null);
+    void Promise.resolve(props.accountActions?.signOut?.(props.option.id)).catch((failure: unknown) =>
+      setDisconnectError(errorMessage(failure, t("provider.account.actionFailed", { name: props.option.name }))),
+    );
+  };
   /** Download, its cancel and its retry are on the Version row. */
   const connectAction = () => {
     const action = row().runtimeAction();
@@ -966,7 +1131,10 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
       row().hostSignInHint() ? t("provider.gemini.hostSignIn") : null,
       row().signingIn() ? t("provider.connecting.browserHint") : null,
     ].filter((text): text is string => Boolean(text));
-  const error = () => row().connectError() ?? (row().statusMessage() ? sourceText(row().statusMessage() ?? "") : null);
+  const error = () =>
+    row().connectError() ??
+    disconnectError() ??
+    (row().statusMessage() ? sourceText(row().statusMessage() ?? "") : null);
   return (
     <SettingsSection title={t("provider.settings.signIn")}>
       <ItemGroup class="settings-modal-card">
@@ -980,6 +1148,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                   class={{
                     "provider-settings-error":
                       Boolean(row().connectError()) ||
+                      Boolean(disconnectError()) ||
                       row().state() === "error" ||
                       row().runtimeStatus()?.phase === "download-error",
                   }}
@@ -1066,7 +1235,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 {t("provider.action.signIn")}
               </Button>
             </Show>
-            <Show when={row().alternative()}>
+            <Show when={row().alternative() || row().mainlandChinaSite() || disconnectOffered()}>
               <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                 <MenuTrigger
                   label={t("provider.aria.moreActions", { name: props.option.name })}
@@ -1075,6 +1244,15 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
                   <DropdownMenu.Content>
                     <AlternativeItem row={row()} />
+                    <Show when={disconnectOffered()}>
+                      <Show when={row().alternative() || row().mainlandChinaSite()}>
+                        <DropdownMenu.Separator />
+                      </Show>
+                      <DropdownMenu.Item onSelect={() => setDisconnecting(true)}>
+                        <LogOut aria-hidden="true" />
+                        {t("provider.account.disconnect")}
+                      </DropdownMenu.Item>
+                    </Show>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
@@ -1082,6 +1260,20 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
           </ItemActions>
         </Item>
       </ItemGroup>
+      <ConfirmDialog
+        open={disconnecting()}
+        tone="destructive"
+        title={t("provider.settings.disconnectTitle", { name: props.option.email ?? props.option.name })}
+        description={disconnectDescription(t, format, {
+          provider: props.option.name,
+          local: Boolean(props.accountActions?.local),
+          usedBy: props.option.usedBy ?? [],
+          otherAccounts: false,
+        })}
+        confirmLabel={t("provider.account.disconnect")}
+        onCancel={() => setDisconnecting(false)}
+        onConfirm={disconnect}
+      />
     </SettingsSection>
   );
 }
@@ -1108,7 +1300,11 @@ function ApiKeySection(props: SectionProps) {
                   ? t("provider.settings.geminiKeyInUse")
                   : props.option.id === "claude" && saved()
                     ? t("provider.settings.claudeKeyInUse")
-                    : t("provider.settings.keyAlternative", { name: props.option.name })}
+                    : props.option.id === "codex"
+                      ? saved()
+                        ? t("provider.settings.codexKeyInUse")
+                        : t("provider.settings.codexKeyAlternative")
+                      : t("provider.settings.keyAlternative", { name: props.option.name })}
             </ItemDescription>
           </ItemContent>
           <ItemActions>
@@ -1158,7 +1354,9 @@ function RuntimeSection(props: SectionProps) {
     if (row().updatable() && installed) {
       return t("provider.settings.versionAvailable", { installed, available: props.option.availableVersion ?? "" });
     }
-    return installed;
+    // Names the CLI that runs, so a failure of the user's own install does not read as OpenBot's (#4375).
+    const source = props.option.cliSource;
+    return installed && source ? t(VERSION_SOURCE[source], { version: installed }) : installed;
   };
   /** The sign-in card already shows a check error, so the same text does not show twice. */
   const lastError = () =>
@@ -1353,6 +1551,157 @@ function PromptCacheSection(props: {
   );
 }
 
+/* ---------------------------------------------- Claude Code setup */
+
+/**
+ * Claude only. Off, the agents load no user settings, CLAUDE.md, skills, agents, hooks or plugins
+ * from the user's own Claude Code, so each turn sends a shorter prompt. A change applies to the next
+ * Claude process.
+ */
+function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disabled: boolean | undefined }) {
+  const { t } = useText();
+  return (
+    <SettingsSection title={t("provider.settings.claudeSetup")}>
+      <ItemGroup class="settings-modal-card">
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle id="provider-settings-claude-setup-label">{t("provider.settings.claudeUserSetup")}</ItemTitle>
+            <Show
+              when={props.setup.error}
+              fallback={<ItemDescription>{t("provider.settings.claudeUserSetupDescription")}</ItemDescription>}
+            >
+              {(message) => (
+                <ItemDescription class="provider-settings-error" role="alert">
+                  {message()}
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <Show when={props.setup.value !== null}>
+            <ItemActions>
+              <Switch
+                checked={props.setup.value === true}
+                disabled={Boolean(props.disabled || props.setup.pending)}
+                aria-busy={props.setup.pending ? "true" : "false"}
+                aria-labelledby="provider-settings-claude-setup-label"
+                onChange={(enabled: boolean) => props.setup.onChange(enabled)}
+              />
+            </ItemActions>
+          </Show>
+        </Item>
+      </ItemGroup>
+    </SettingsSection>
+  );
+}
+
+/* ---------------------------------------------- Models */
+
+/**
+ * Every model of the provider, each with a switch for the model picker. The shown models come
+ * first, in the order of the first answer, and keep their place while the user changes them.
+ */
+function ModelsSection(props: { control: ProviderModelVisibilityControl }) {
+  const { t } = useText();
+  const [query, setQuery] = createSignal("");
+  const order = createMemo<readonly AgentModelId[]>((previous = []) => {
+    const list = props.control.list;
+    if (!list) return previous;
+    const listed = new Set(list.models.map((model) => model.id));
+    const kept = previous.filter((id) => listed.has(id));
+    const placed = new Set(kept);
+    const shown = new Set(list.shown);
+    const added = list.models.map((model) => model.id).filter((id) => !placed.has(id));
+    // Only the first answer, or models that came later, are sorted by their switch.
+    return [...kept, ...added.filter((id) => shown.has(id)), ...added.filter((id) => !shown.has(id))];
+  });
+  const names = createMemo(() => new Map((props.control.list?.models ?? []).map((model) => [model.id, model.name])));
+  const shown = createMemo(() => new Set(props.control.list?.shown ?? []));
+  const rows = createMemo(() => {
+    const needle = query().trim().toLowerCase();
+    return order()
+      .map((id) => ({ id, name: names().get(id) ?? id }))
+      .filter((model) => !needle || `${model.name} ${model.id}`.toLowerCase().includes(needle));
+  });
+  const total = () => props.control.list?.models.length ?? 0;
+  const set = (id: AgentModelId, on: boolean) => {
+    const next = order().filter((candidate) => (candidate === id ? on : shown().has(candidate)));
+    props.control.onChange(next);
+  };
+  return (
+    <Show when={total() > 0 || props.control.error}>
+      <SettingsSection
+        title={t("provider.settings.models")}
+        description={t("provider.settings.modelsDescription", { shown: shown().size, count: total() })}
+        actions={
+          <Show when={total() > 0}>
+            <Show when={props.control.list?.changed}>
+              <Button type="button" variant="ghost" size="xs" onClick={() => props.control.onReset()}>
+                {t("provider.settings.modelsReset")}
+              </Button>
+            </Show>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => props.control.onChange(shown().size === 0 ? [...order()] : [])}
+            >
+              {shown().size === 0 ? t("provider.settings.modelsShowAll") : t("provider.settings.modelsHideAll")}
+            </Button>
+          </Show>
+        }
+      >
+        <Show when={props.control.error}>
+          {(message) => (
+            <Text variant="body-sm" class="provider-settings-models-error" role="alert">
+              {message()}
+            </Text>
+          )}
+        </Show>
+        <Show when={total() > 0}>
+          <Input
+            aria-label={t("provider.settings.modelsSearch")}
+            placeholder={t("provider.settings.modelsSearch")}
+            value={query()}
+            onValueChange={setQuery}
+          />
+          <ItemGroup class="settings-modal-card provider-settings-models">
+            <Show
+              when={rows().length > 0}
+              fallback={
+                <Text variant="body-sm" tone="muted" class="provider-settings-models-empty" role="status">
+                  {t("provider.settings.modelsNoMatch")}
+                </Text>
+              }
+            >
+              <ul class="provider-settings-models-list">
+                <For each={rows()} keyed={(model) => model.id}>
+                  {(model) => (
+                    <li class="provider-settings-models-row">
+                      <span class="provider-settings-models-name">
+                        <Text as="span" variant="body-sm">
+                          {model().name}
+                        </Text>
+                        <Text as="span" variant="caption" tone="muted" class="provider-settings-models-id">
+                          {model().id}
+                        </Text>
+                      </span>
+                      <Switch
+                        checked={shown().has(model().id)}
+                        aria-label={t("provider.settings.modelShow", { name: model().name, id: model().id })}
+                        onChange={(on: boolean) => set(model().id, on)}
+                      />
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </ItemGroup>
+        </Show>
+      </SettingsSection>
+    </Show>
+  );
+}
+
 /* ---------------------------------------------- Use */
 
 /** The default and the switch, at the end of the page, as the other settings pages keep their switches. */
@@ -1455,174 +1804,122 @@ function UseSection(props: SectionProps) {
 }
 
 /**
- * The downloaded CLI of a provider that is off, with the action that removes it. The confirmation
- * stays in the card: a removal names its size there, and the provider downloads the CLI again later.
+ * The last section: turns the provider off and deletes the CLI that OpenBot downloaded for it.
+ * Accounts, sign-ins and agents stay, and turning the provider on downloads the CLI again. A provider
+ * that an agent uses stays, and the button names the agents. This computer only.
  */
-function DownloadSection(props: SectionProps) {
+function DeleteSection(props: SectionProps) {
   const { t, format, errorMessage } = useText();
-  const [download, setDownload] = createStore<{
-    bytes: number;
-    versions: number;
-    confirming: boolean;
-    removing: boolean;
-    /** Set by a removal on this page. An off provider can run a CLI the user installed instead. */
-    removed: boolean;
-    error: string | null;
-  }>({ bytes: 0, versions: 0, confirming: false, removing: false, removed: false, error: null });
+  const [state, setState] = createStore({ bytes: 0, busy: false });
+  const usedBy = () => props.option.usedBy ?? [];
+  const offered = () =>
+    Boolean(props.onSetProviderOn && props.onRemoveProviderDownload) && isManagedRuntimeProvider(props.option.id);
+  /**
+   * A provider that is on runs a CLI. Only one that OpenBot downloaded has a download to delete. Pi
+   * also runs the key-only providers, so the host can keep its CLI after Pi turns off; Pi offers
+   * Delete only when it is off and the host measured a download.
+   */
+  const onWithDownload = () =>
+    props.option.id !== "pi" &&
+    !props.row.off() &&
+    props.option.runtimeStatus?.phase === "ready" &&
+    props.option.cliSource !== "system";
   let reads = 0;
-  const measure = (provider: AgentProviderId, read: ProviderSettingsPageProps["onMeasureProviderDownload"]) => {
+  /** What a deletion frees. The host measures nothing while the provider is on. */
+  async function measure(provider: AgentProviderId, read = props.onMeasureProviderDownload): Promise<number> {
     const serial = ++reads;
-    const apply = (measured: ProviderRuntimeDownload) => {
-      if (serial === reads)
-        setDownload((state) => {
-          state.bytes = measured.bytes;
-          state.versions = measured.versions;
-        });
-    };
-    if (read) void read(provider).then(apply, () => apply({ bytes: 0, versions: 0 }));
-    else apply({ bytes: 0, versions: 0 });
-  };
-  const offered = () => props.row.off() && Boolean(props.onRemoveProviderDownload);
-  // Measured again when the provider is turned off. A provider that is off downloads nothing, and
-  // a removal measures again itself.
-  createEffect(
-    () => ({ provider: props.option.id, read: offered() ? props.onMeasureProviderDownload : undefined }),
-    ({ provider, read }) => {
-      setDownload((state) => {
-        state.removed = false;
+    const bytes = read
+      ? await read(provider).then(
+          (download) => download.bytes,
+          () => 0,
+        )
+      : 0;
+    if (serial === reads)
+      setState((draft) => {
+        draft.bytes = bytes;
       });
-      measure(provider, read);
+    return bytes;
+  }
+  createEffect(
+    () => ({ provider: props.option.id, off: offered() && props.row.off(), read: props.onMeasureProviderDownload }),
+    ({ provider, off, read }) => {
+      if (off) void measure(provider, read);
+      else
+        setState((draft) => {
+          draft.bytes = 0;
+        });
     },
   );
-  const detail = () => {
-    const values = { count: download.versions, size: format.fileSize(download.bytes) };
-    const version = props.option.runtimeStatus?.version;
-    return version
-      ? t("provider.settings.downloadDetail", { ...values, version })
-      : t("provider.settings.downloadVersions", values);
-  };
+  /**
+   * The size shows only once the host has measured it. While a provider that was on turns off, the
+   * measure has not returned yet, so the text still says what the deletion does.
+   */
+  const description = () =>
+    props.row.off() && state.bytes > 0
+      ? t("provider.settings.deleteOff", { name: props.option.name, size: format.fileSize(state.bytes) })
+      : t("provider.settings.deleteOn", { name: props.option.name });
   async function remove() {
-    setDownload((state) => {
-      state.removing = true;
-      state.error = null;
+    const provider = props.option.id;
+    setState((draft) => {
+      draft.busy = true;
     });
     try {
-      await props.onRemoveProviderDownload?.(props.option.id);
-      setDownload((state) => {
-        state.confirming = false;
-        state.removed = true;
-      });
+      if (!props.row.off()) await props.onSetProviderOn?.(provider, false);
     } catch (error) {
-      setDownload((state) => {
-        state.error = errorMessage(error, t("provider.settings.removeDownloadFailed"));
+      toast.error(errorMessage(error, t("error.provider.useChangeFailed")));
+      setState((draft) => {
+        draft.busy = false;
       });
-    } finally {
-      setDownload((state) => {
-        state.removing = false;
-      });
+      return;
     }
-    measure(props.option.id, props.onMeasureProviderDownload);
+    try {
+      // A provider that runs the user's own CLI has nothing to delete, and the host refuses it.
+      if ((await measure(provider)) > 0) await props.onRemoveProviderDownload?.(provider);
+    } catch (error) {
+      toast.error(errorMessage(error, t("provider.settings.removeDownloadFailed")));
+    }
+    await measure(provider);
+    setState((draft) => {
+      draft.busy = false;
+    });
   }
   return (
-    <Show when={offered() && (download.bytes > 0 || download.removed)}>
-      <SettingsSection title={t("provider.settings.download")}>
-        <ItemGroup class="settings-modal-card">
-          <Show
-            when={download.bytes > 0}
-            fallback={
-              <Item class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>{t("provider.status.notDownloaded")}</ItemTitle>
-                  <ItemDescription>{t("provider.settings.downloadAgain", { name: props.option.name })}</ItemDescription>
-                </ItemContent>
-              </Item>
-            }
-          >
-            <Item class="settings-modal-row">
-              <ItemContent>
-                <ItemTitle>{t("provider.settings.downloadedCli", { name: props.option.name })}</ItemTitle>
-                <ItemDescription>{detail()}</ItemDescription>
-              </ItemContent>
-              <Show when={!download.confirming}>
-                <ItemActions>
-                  <Button
-                    type="button"
-                    variant="destructive-ghost"
-                    size="sm"
-                    disabled={props.disabled}
-                    onClick={() =>
-                      setDownload((state) => {
-                        state.error = null;
-                        state.confirming = true;
-                      })
-                    }
-                  >
-                    <Trash2 aria-hidden="true" />
-                    {t("provider.settings.removeDownload")}
-                  </Button>
-                </ItemActions>
-              </Show>
-            </Item>
-            <Show when={download.confirming}>
-              <Item class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>
-                    {t("provider.settings.removeDownloadConfirm", { size: format.fileSize(download.bytes) })}
-                  </ItemTitle>
-                  <Show
-                    when={download.error}
-                    fallback={<ItemDescription>{t("provider.settings.removeDownloadKeeps")}</ItemDescription>}
-                  >
-                    {(message) => (
-                      <ItemDescription class="provider-settings-error" role="alert">
-                        {message()}
-                      </ItemDescription>
-                    )}
-                  </Show>
-                </ItemContent>
-                <ItemActions>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={download.removing}
-                    onClick={() =>
-                      setDownload((state) => {
-                        state.confirming = false;
-                        state.error = null;
-                      })
-                    }
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    loading={download.removing}
-                    loadingLabel={t("provider.settings.removingDownload")}
-                    disabled={props.disabled}
-                    onClick={() => void remove()}
-                  >
-                    {t("common.remove")}
-                  </Button>
-                </ItemActions>
-              </Item>
-            </Show>
-          </Show>
-        </ItemGroup>
-      </SettingsSection>
+    <Show when={offered() && !props.disabled && (state.busy || onWithDownload() || state.bytes > 0)}>
+      <DangerZone
+        title={t("provider.settings.deleteTitle", { name: props.option.name })}
+        description={description()}
+        action={t("common.delete")}
+        busy={state.busy}
+        confirm={usedBy().length === 0}
+        onAction={() => {
+          if (usedBy().length > 0) showProviderInUse(t, usedBy(), props.option.name);
+          else void remove();
+        }}
+      />
     </Show>
   );
 }
 
 /* ------------------------------------------------------------------ Custom endpoints */
 
+/** OpenCode can run a custom endpoint, or Pi can where this computer offers it. */
+function servesCustomEndpoints(props: ProviderSettingsPageProps): boolean {
+  const option = (id: AgentProviderId) => props.options.find((candidate) => candidate.id === id);
+  return (
+    servesCustomProvider(option("opencode")) ||
+    Boolean(props.customProviderHarnesses && servesCustomProvider(option("pi")))
+  );
+}
+
 function CustomEndpointsPage(props: ProviderSettingsPageProps) {
   const { t, format } = useText();
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
-  const ready = () => servesCustomProvider(engine());
+  const ready = () => servesCustomEndpoints(props);
+  const runsOn = (endpoint: CustomProviderSummary) =>
+    t("customProvider.list.runsOn", {
+      name: agentProviderName(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS),
+    });
   const [confirming, setConfirming] = createSignal<CustomProviderSummary | null>(null);
   return (
     <>
@@ -1679,6 +1976,7 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
                         count: endpoint().models.length,
                       })}
                       {endpoint().hasApiKey ? ` · ${t("customProvider.list.apiKeySaved")}` : ""}
+                      {props.customProviderHarnesses ? ` · ${runsOn(endpoint())}` : ""}
                     </ItemDescription>
                   </ItemContent>
                   <Show when={props.onEditCustomProvider || props.onRemoveCustomProvider}>

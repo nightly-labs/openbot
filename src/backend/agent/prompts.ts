@@ -6,13 +6,27 @@ import type {
   AgentPromptResolution,
   RespondToBrowserTakeoverInput,
 } from "@openbot/contracts/ipc";
-import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
+import {
+  COMPUTER_USE_MCP_SERVER_NAME,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
+  vaultExpiryText,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { normalizeUiBlockSpec, type UiBlockResponse, type UiBlockSpec } from "@openbot/contracts/ui-blocks";
+import {
+  normalizeUiBlockSpec,
+  UI_API_KEY_SCOPE_FIELD_ID,
+  UI_VAULT_REQUEST_FIELDS,
+  UI_VAULT_SECRET_FIELDS,
+  type UiBlockResponse,
+  type UiBlockSpec,
+  type UiFormField,
+  type UiVaultRequestField,
+} from "@openbot/contracts/ui-blocks";
+import { sourceText } from "@openbot/i18n/source";
 import type { SavedApiKey } from "../agent-api-keys";
+import type { BrowserToolArguments } from "../browser-tools";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
-const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 const MCP_ELICITATION_DECLINE = "Don't allow";
@@ -26,7 +40,7 @@ export function secretElicitationField(id: string, property: DynamicRecord | und
   return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
 }
 
-export function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
+function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
@@ -73,6 +87,12 @@ export function commandText(params: unknown): string | null {
   return null;
 }
 
+/** The short line under a question, when the request has one. */
+function promptQuestionDetail(question: DynamicRecord): { detail?: string } {
+  const detail = getString(question, "detail")?.trim();
+  return detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {};
+}
+
 export function promptQuestions(params: unknown): AgentPromptQuestion[] {
   return getArray(params, "questions")
     .filter(isRecord)
@@ -80,6 +100,7 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
       id: getString(question, "id") ?? randomUUID(),
       header: getString(question, "header") ?? "Question",
       question: getString(question, "question") ?? "The agent needs more information.",
+      ...promptQuestionDetail(question),
       isSecret: question.isSecret === true,
       options: Array.isArray(question.options)
         ? question.options.filter(isRecord).map((option) => ({
@@ -98,7 +119,7 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   const subject = serverName === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : (serverName ?? "this plugin");
   const persistence = getArray(getRecord(params, "_meta"), "persist").filter(isString);
   return {
-    id: MCP_ELICITATION_DECISION_ID,
+    id: MCP_ELICITATION_DECISION_QUESTION_ID,
     header: subject.slice(0, INPUT_LIMITS.promptHeader),
     question: message.slice(0, INPUT_LIMITS.promptQuestion),
     isSecret: false,
@@ -112,18 +133,24 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   };
 }
 
-/** One question per requested field, so a plugin can collect an API key or any other value. */
-function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+/**
+ * One question per requested field, so a plugin can collect an API key or any other value. When a
+ * field has its own text, the request message goes under the first question, so it is not lost.
+ */
+export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
-  const message = getString(params, "message")?.trim();
-  return Object.entries(properties).flatMap(([id, property]) => {
+  const message = getString(params, "message")?.trim() || undefined;
+  return Object.entries(properties).flatMap(([id, property], index) => {
     if (!isRecord(property)) return [];
-    const question = getString(property, "description") ?? message ?? `${subject} needs more information.`;
+    const description = getString(property, "description");
+    const question = description ?? message ?? `${subject} needs more information.`;
+    const detail = index === 0 && description && message && message !== description ? message : undefined;
     return [
       {
         id,
         header: (getString(property, "title") ?? id).slice(0, INPUT_LIMITS.promptHeader),
         question: question.slice(0, INPUT_LIMITS.promptQuestion),
+        ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
         options: elicitationOptions(property),
       },
@@ -153,7 +180,7 @@ const CODEX_MCP_TOOL_CALL_APPROVAL_KIND = "mcp_tool_call";
 
 /** The card answer "Allow once", which `mcpElicitationResult` turns into one accepted consent. */
 export const MCP_TOOL_CONSENT_ALLOW_ONCE: Record<string, string[]> = {
-  [MCP_ELICITATION_DECISION_ID]: [MCP_ELICITATION_ALLOW_ONCE],
+  [MCP_ELICITATION_DECISION_QUESTION_ID]: [MCP_ELICITATION_ALLOW_ONCE],
 };
 
 /**
@@ -181,7 +208,7 @@ export function mcpElicitationResult(
   if (properties && Object.keys(properties).length > 0) {
     return elicitationFieldResult(params, properties, answers);
   }
-  const selected = answers[MCP_ELICITATION_DECISION_ID]?.[0];
+  const selected = answers[MCP_ELICITATION_DECISION_QUESTION_ID]?.[0];
   if (selected === MCP_ELICITATION_ALLOW_ONCE) {
     return { action: "accept", content: {}, _meta: null };
   }
@@ -313,16 +340,26 @@ export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolR
 /** The id of the one secret field in the form of `request_api_key`. */
 export const API_KEY_FIELD_ID = "key";
 
+/** The id of the field of the `request_api_key` form that selects who can use the key. */
+export const API_KEY_SCOPE_FIELD_ID = UI_API_KEY_SCOPE_FIELD_ID;
+
+/** The option of the scope field that keeps the key for the asking agent only. */
+export const API_KEY_SCOPE_AGENT = sourceText("status.agent.apiKeyScope.agent");
+
 /**
  * The form of `request_api_key`: one required secret field. Its label is the variable name, because
- * the user finds the key by that name at the service. Null when the contract refuses it.
+ * the user finds the key by that name at the service. With `vault`, a second field saves the key in the
+ * Vault for every agent, which is the first option, or for the asking agent only. Null when the contract
+ * refuses it.
  */
 export function apiKeyFormSpec(input: {
   name: string;
   title: string;
   placeholder?: string | undefined;
   submit?: string | undefined;
+  vault?: boolean | undefined;
 }): UiBlockSpec | null {
+  const allAgents = sourceText("status.agent.apiKeyScope.vault");
   return normalizeUiBlockSpec({
     type: "form",
     title: input.title,
@@ -335,6 +372,18 @@ export function apiKeyFormSpec(input: {
         secret: true,
         ...(input.placeholder ? { placeholder: input.placeholder } : {}),
       },
+      ...(input.vault
+        ? [
+            {
+              id: API_KEY_SCOPE_FIELD_ID,
+              kind: "segmented",
+              label: sourceText("status.agent.apiKeyScope.label"),
+              options: [allAgents, API_KEY_SCOPE_AGENT],
+              required: true,
+              value: allAgents,
+            },
+          ]
+        : []),
     ],
     ...(input.submit ? { submit: input.submit } : {}),
   });
@@ -346,7 +395,95 @@ export function apiKeyFormSpec(input: {
  */
 export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): DynamicToolResult {
   const value = saved
-    ? { status: "saved", blockId, name: saved.name, path: saved.path }
+    ? {
+        status: "saved",
+        blockId,
+        name: saved.name,
+        path: saved.path,
+        ...(saved.source ? { source: saved.source } : {}),
+      }
+    : { status: "skipped", blockId };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+type VaultRequestArguments = BrowserToolArguments<"request_vault_item">;
+
+/** The arguments that an agent may fill in, for each kind. A secret field is never one of them. */
+const VAULT_REQUEST_PREFILL: Record<VaultRequestArguments["kind"], readonly string[]> = {
+  login: ["website", "username"],
+  card: ["label", "nameOnCard", "expMonth", "expYear"],
+  contact: UI_VAULT_REQUEST_FIELDS.contact,
+};
+
+const VAULT_REQUEST_REQUIRED: readonly UiVaultRequestField[] = ["website", "password", "number", "expiry"];
+
+const VAULT_REQUEST_LABEL = {
+  website: sourceText("status.agent.vaultField.website"),
+  username: sourceText("status.agent.vaultField.username"),
+  password: sourceText("status.agent.vaultField.password"),
+  label: sourceText("status.agent.vaultField.label"),
+  nameOnCard: sourceText("status.agent.vaultField.nameOnCard"),
+  number: sourceText("status.agent.vaultField.number"),
+  expiry: sourceText("status.agent.vaultField.expiry"),
+  securityCode: sourceText("status.agent.vaultField.securityCode"),
+  fullName: sourceText("status.agent.vaultField.fullName"),
+  address: sourceText("status.agent.vaultField.address"),
+  address2: sourceText("status.agent.vaultField.address2"),
+  city: sourceText("status.agent.vaultField.city"),
+  region: sourceText("status.agent.vaultField.region"),
+  postalCode: sourceText("status.agent.vaultField.postalCode"),
+  country: sourceText("status.agent.vaultField.country"),
+  phone: sourceText("status.agent.vaultField.phone"),
+  email: sourceText("status.agent.vaultField.email"),
+} as const satisfies Record<UiVaultRequestField, string>;
+
+/** Two-digit month and year, as the Vault dialog shows an expiry. */
+function vaultRequestValue(args: VaultRequestArguments, field: UiVaultRequestField): string | undefined {
+  if (field === "expiry")
+    return args.expMonth !== undefined && args.expYear !== undefined
+      ? vaultExpiryText(args.expMonth, args.expYear)
+      : undefined;
+  if (UI_VAULT_SECRET_FIELDS.includes(field)) return undefined;
+  const value = Object.entries(args).find(([key]) => key === field)?.[1];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * The form of `request_vault_item`: the fields of the Vault dialog for the kind, with the values the
+ * agent gave. A secret field has no value. A string tells the agent what is wrong with the arguments.
+ */
+export function vaultRequestFormSpec(args: VaultRequestArguments): UiBlockSpec | string {
+  const allowed = VAULT_REQUEST_PREFILL[args.kind];
+  const misplaced = Object.entries(args).find(
+    ([key, value]) => value !== undefined && key !== "kind" && key !== "title" && !allowed.includes(key),
+  );
+  if (misplaced) return `${misplaced[0]} is not a field of a ${args.kind}. You can fill in: ${allowed.join(", ")}.`;
+  if ((args.expMonth === undefined) !== (args.expYear === undefined)) return "Give expMonth and expYear together.";
+  const fields = UI_VAULT_REQUEST_FIELDS[args.kind].map((id): UiFormField => {
+    const value = vaultRequestValue(args, id);
+    return {
+      id,
+      kind: "text",
+      label: VAULT_REQUEST_LABEL[id],
+      ...(VAULT_REQUEST_REQUIRED.includes(id) ? { required: true } : {}),
+      ...(UI_VAULT_SECRET_FIELDS.includes(id) ? { secret: true } : {}),
+      ...(id === "expiry" ? { placeholder: sourceText("status.agent.vaultExpiryHint") } : {}),
+      ...(value === undefined ? {} : { value }),
+    };
+  });
+  return (
+    normalizeUiBlockSpec({ type: "form", title: args.title, fields, submit: sourceText("status.agent.vaultSave") }) ??
+    "OpenBot could not show this form. Use a shorter title or shorter values and retry."
+  );
+}
+
+/** The `request_vault_item` result: what the user saved, or a skip. It never holds a form value. */
+export function vaultPromptResult(
+  blockId: string,
+  saved: { id: string; kind: string; name: string } | null,
+): DynamicToolResult {
+  const value = saved
+    ? { status: "saved", blockId, id: saved.id, kind: saved.kind, name: saved.name }
     : { status: "skipped", blockId };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
@@ -355,6 +492,7 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
+  vaultSkipped?: string,
 ): DynamicToolResult {
   return {
     success: true,
@@ -364,6 +502,7 @@ export function browserTakeoverResult(
         text: JSON.stringify({
           status: decision === "complete" ? "completed" : "cancelled",
           ...(vault ? { vault } : {}),
+          ...(vaultSkipped ? { vaultSkipped } : {}),
           ...(decision === "complete" ? { next: "Take a fresh snapshot and continue the task." } : {}),
         }),
       },

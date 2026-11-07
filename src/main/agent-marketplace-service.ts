@@ -4,6 +4,7 @@ import type {
   AgentSubmission,
   AgentSummary,
   AvatarImageInput,
+  InstalledSkill,
   InstallMarketplaceAgentInput,
   InstallMarketplaceAgentResult,
   MarketplaceAgentDetail,
@@ -87,6 +88,7 @@ interface AgentMarketplaceAgents {
 }
 
 interface AgentMarketplaceSkills {
+  listInstalled(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure>;
   listPublishable(agentId: string): Effect.Effect<MarketplaceAgentSkill[], SkillMarketplaceFailure>;
   installVersion(input: {
     agentId: string;
@@ -118,6 +120,24 @@ export class AgentMarketplaceService {
       const detail = yield* this.auth
         .requestAuthorized(
           `/v1/marketplace/agents/${encodeURIComponent(listingId)}`,
+          { method: "GET" },
+          decodeMarketplaceAgentDetail,
+        )
+        .pipe(toAgentMarketplaceFailure);
+      return this.withAbsoluteAvatar(detail);
+    });
+  }
+
+  /**
+   * The agent a shared link names: the approved version, else the version that waits for its first
+   * review, marked `pending`. The listing page shows it, and Add installs it, so that Add works on a
+   * pending agent that its creator shared.
+   */
+  getListing(agentId: string): Effect.Effect<MarketplaceAgentDetail, AgentMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceAgentDetail, AgentMarketplaceFailure> {
+      const detail = yield* this.auth
+        .requestAuthorized(
+          `/v1/marketplace/agents/${encodeURIComponent(agentId)}/listing`,
           { method: "GET" },
           decodeMarketplaceAgentDetail,
         )
@@ -189,7 +209,7 @@ export class AgentMarketplaceService {
         return yield* new AgentMarketplaceFailure({
           cause: new Error(sourceText("error.marketplace.timezoneInvalid")),
         });
-      const detail = yield* this.get(input.listingId);
+      const detail = yield* this.getListing(input.listingId);
       const existing = input.agentId
         ? this.agents.listAgents().find((candidate) => candidate.id === input.agentId)
         : undefined;
@@ -227,11 +247,21 @@ export class AgentMarketplaceService {
             avatarHue: detail.avatarHue,
           })
           .pipe(toAgentMarketplaceFailure));
+      // An update keeps each skill that has local changes, so it never overwrites the user's edits.
+      // The skill then offers its own update, which asks before it replaces them.
+      const modified = existing
+        ? new Set(
+            (yield* this.skills.listInstalled(agent.id).pipe(toAgentMarketplaceFailure))
+              .filter((skill) => skill.state === "modified")
+              .map((skill) => skill.skillId),
+          )
+        : new Set<string>();
       const createdRoutineIds: string[] = [];
       {
         const outcome = yield* Effect.result(
           Effect.gen({ self: this }, function* () {
             for (const skill of detail.skills) {
+              if (modified.has(skill.skillId)) continue;
               yield* this.skills
                 .installVersion({ agentId: agent.id, skillId: skill.skillId, versionId: skill.versionId })
                 .pipe(toAgentMarketplaceFailure);
@@ -267,7 +297,7 @@ export class AgentMarketplaceService {
             agent = yield* this.agents.setAvatar(agent.id, avatar).pipe(toAgentMarketplaceFailure);
             const nextSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
             for (const skillId of existing?.marketplaceSource?.skillIds ?? []) {
-              if (!nextSkillIds.has(skillId))
+              if (!nextSkillIds.has(skillId) && !modified.has(skillId))
                 yield* this.skills.uninstall({ agentId: agent.id, skillId }).pipe(toAgentMarketplaceFailure);
             }
             agent = yield* marketplaceSync(() =>

@@ -7,7 +7,7 @@ import type {
   UiFormBlock as UiFormSpec,
   UiQuickRepliesBlock as UiQuickRepliesSpec,
 } from "@openbot/contracts/ui-blocks";
-import { uiBlockOutcomeText } from "@openbot/contracts/ui-blocks";
+import { UI_API_KEY_SCOPE_FIELD_ID, uiBlockOutcomeText } from "@openbot/contracts/ui-blocks";
 import { UiChoiceBlock } from "@openbot/ui/features/conversation/ui-blocks/UiChoiceBlock";
 import { UiConfirmBlock } from "@openbot/ui/features/conversation/ui-blocks/UiConfirmBlock";
 import { UiFormBlock } from "@openbot/ui/features/conversation/ui-blocks/UiFormBlock";
@@ -130,6 +130,8 @@ interface LiveProps<Spec extends UiBlockSpec> {
   onRespond: (response: UiBlockResponse) => void;
   disabled?: boolean;
   busy?: boolean;
+  onSkip?: () => void;
+  footerFieldId?: string | undefined;
 }
 
 /** Keeps the answer in the story, so a pending card freezes the way it does in the chat. */
@@ -144,10 +146,12 @@ function live<Spec extends UiBlockSpec>(
         state={state()}
         disabled={props.disabled ?? false}
         busy={props.busy ?? false}
+        footerFieldId={props.footerFieldId}
         onRespond={(response) => {
           props.onRespond(response);
           setState(answered(props.spec, response));
         }}
+        onSkip={() => setState({ status: "closed" })}
       />
     );
   };
@@ -196,7 +200,7 @@ export const ConfirmExpired: Story = {
   render: (args) => <LiveConfirm spec={confirmSpec} state={{ status: "expired" }} onRespond={args.onRespond} />,
 };
 
-/** A draft taller than the preview box scrolls inside it, and "Show all" under it opens the rest. */
+/** A draft taller than the preview box fades out at its end, and "Show all" under it opens the rest. */
 export const ConfirmLongPreview: Story = {
   render: (args) => (
     <LiveConfirm
@@ -277,6 +281,57 @@ export const FormAnswered: Story = {
       onRespond={args.onRespond}
     />
   ),
+};
+
+const vaultLoginSpec: UiFormSpec = {
+  type: "form",
+  title: "Test account for the Hetzner console (ask Sam for the password)",
+  fields: [
+    { id: "website", kind: "text", label: "Website", required: true, value: "console.hetzner.com" },
+    { id: "username", kind: "text", label: "Username or email", value: "ada@example.com" },
+    { id: "password", kind: "text", label: "Password", required: true, secret: true },
+  ],
+  submit: "Save to Vault",
+};
+
+/** A form that asks for a secret. Once answered, its values show as rows and the secret shows as hidden. */
+export const SecretFormPending: Story = {
+  render: (args) => <LiveForm spec={vaultLoginSpec} onRespond={args.onRespond} />,
+};
+
+export const SecretFormAnswered: Story = {
+  render: (args) => (
+    <LiveForm
+      spec={vaultLoginSpec}
+      state={answered(vaultLoginSpec, {
+        actionId: "submit",
+        values: { website: "console.hetzner.com", username: "ada@example.com" },
+      })}
+      onRespond={args.onRespond}
+    />
+  ),
+};
+
+/** The form of `request_api_key` with `vault`: the key, and who can use it, small next to the submit button. */
+const apiKeySpec: UiFormSpec = {
+  type: "form",
+  title: "PrivateMail app password for the CRM sync",
+  fields: [
+    { id: "key", kind: "text", label: "PRIVATEMAIL_APP_PASSWORD", required: true, secret: true },
+    {
+      id: UI_API_KEY_SCOPE_FIELD_ID,
+      kind: "segmented",
+      label: "Save for",
+      options: ["All agents (Vault)", "Only this agent"],
+      required: true,
+      value: "All agents (Vault)",
+    },
+  ],
+  submit: "Save securely",
+};
+
+export const ApiKeyPending: Story = {
+  render: (args) => <LiveForm spec={apiKeySpec} footerFieldId={UI_API_KEY_SCOPE_FIELD_ID} onRespond={args.onRespond} />,
 };
 
 export const Narrow: Story = {

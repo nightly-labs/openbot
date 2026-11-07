@@ -1,0 +1,167 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
+index 6f935c145068b68e0233faa668cc70f8c411169f..7e01fc6ddfc89dad6a2b98dd775ba1c7a782bf9e 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
+@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentManager
+ import androidx.fragment.app.FragmentTransaction
+ import com.facebook.react.ReactRootView
+ import com.facebook.react.bridge.ReactContext
++import com.facebook.react.bridge.UiThreadUtil
+ import com.facebook.react.modules.core.ReactChoreographer
+ import com.facebook.react.uimanager.ThemedReactContext
+ import com.facebook.react.uimanager.UIManagerHelper
+@@ -44,6 +45,9 @@ open class ScreenContainer(
+         }
+     private var parentScreenWrapper: ScreenFragmentWrapper? = null
+ 
++    // The fragment manager whose removal of this container's fragments waits for its transaction to end.
++    private var deferredFragmentRemoval: FragmentManager? = null
++
+     override fun shouldDelayChildPressedState(): Boolean = false
+ 
+     override fun onLayout(
+@@ -278,6 +282,8 @@ open class ScreenContainer(
+     override fun onAttachedToWindow() {
+         super.onAttachedToWindow()
+         isAttached = true
++        // Fragments that are still added would not get their views back, so remove them first.
++        runDeferredFragmentRemoval()
+         setupFragmentManager()
+     }
+ 
+@@ -315,8 +321,7 @@ open class ScreenContainer(
+         // attempt to reattach previously registered fragments that are not removed
+         fragmentManager?.let {
+             if (!it.isDestroyed) {
+-                removeMyFragments(it)
+-                it.executePendingTransactions()
++                removeMyFragmentsOrDefer(it)
+             }
+         }
+ 
+@@ -342,6 +347,37 @@ open class ScreenContainer(
+         }
+     }
+ 
++    /**
++     * Reanimated can mount a Fabric removal from an event that a view sends while the fragment
++     * manager executes a transaction, for example when a fragment view attaches. A nested transaction
++     * then throws, so remove the fragments after the current transaction instead.
++     */
++    private fun removeMyFragmentsOrDefer(fragmentManager: FragmentManager) {
++        try {
++            removeMyFragments(fragmentManager)
++            fragmentManager.executePendingTransactions()
++        } catch (e: IllegalStateException) {
++            // `commitNow` and `executePendingTransactions` throw this before they change state, and a
++            // second removal skips fragments that are already removed, so the removal can run again.
++            if (e.message != FRAGMENT_MANAGER_EXECUTING_MESSAGE) {
++                throw e
++            }
++            deferredFragmentRemoval = fragmentManager
++            UiThreadUtil.runOnUiThread {
++                runDeferredFragmentRemoval()
++                performUpdates()
++            }
++        }
++    }
++
++    private fun runDeferredFragmentRemoval() {
++        val fragmentManager = deferredFragmentRemoval ?: return
++        deferredFragmentRemoval = null
++        if (!fragmentManager.isDestroyed) {
++            removeMyFragmentsOrDefer(fragmentManager)
++        }
++    }
++
+     override fun onMeasure(
+         widthMeasureSpec: Int,
+         heightMeasureSpec: Int,
+@@ -380,7 +416,12 @@ open class ScreenContainer(
+     }
+ 
+     fun performUpdates() {
+-        if (!needsUpdate || !isAttached || fragmentManager == null || fragmentManager?.isDestroyed == true) {
++        if (!needsUpdate ||
++            !isAttached ||
++            deferredFragmentRemoval != null ||
++            fragmentManager == null ||
++            fragmentManager?.isDestroyed == true
++        ) {
+             return
+         }
+         needsUpdate = false
+@@ -456,4 +497,8 @@ open class ScreenContainer(
+     protected open fun notifyContainerUpdate() {
+         topScreen?.fragmentWrapper?.onContainerUpdate()
+     }
++
++    private companion object {
++        const val FRAGMENT_MANAGER_EXECUTING_MESSAGE = "FragmentManager is already executing transactions"
++    }
+ }
+diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
+index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacadd1430adf 100644
+--- a/ios/RNSScreenStack.mm
++++ b/ios/RNSScreenStack.mm
+@@ -1247,10 +1247,48 @@ RNS_IGNORE_SUPER_CALL_END
+   return NO;
+ }
+ 
++// The full screen swipe back starts anywhere in the screen, so a pan of react-native-gesture-handler
++// inside the top screen, such as a swipe on a list row, gets the touch first.
++- (BOOL)isFullScreenSwipeGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
++{
++  if ([gestureRecognizer isKindOfClass:[RNSPanGestureRecognizer class]]) {
++    return YES;
++  }
+ #if RNS_IPHONE_OS_VERSION_AVAILABLE(26_0)
++  if (@available(iOS 26, *)) {
++    return gestureRecognizer == _controller.interactiveContentPopGestureRecognizer;
++  }
++#endif // check for iOS >= 26
++  return NO;
++}
++
++- (BOOL)isGestureHandlerPanInTopScreen:(UIGestureRecognizer *)gestureRecognizer
++{
++  static Class gestureHandlerPanClass;
++  static dispatch_once_t onceToken;
++  dispatch_once(&onceToken, ^{
++    gestureHandlerPanClass = NSClassFromString(@"RNBetterPanGestureRecognizer");
++  });
++  // A preloaded screen can be above the screen that shows, as in shouldReceivePressOrTouchEvent.
++  RNSScreenView *topScreen = _reactSubviews.lastObject;
++  for (RNSScreenView *screen in _reactSubviews.reverseObjectEnumerator) {
++    if (screen.activityState == RNSActivityStateOnTop) {
++      topScreen = screen;
++      break;
++    }
++  }
++  return gestureHandlerPanClass != nil && topScreen != nil && gestureRecognizer.isEnabled &&
++      [gestureRecognizer isKindOfClass:gestureHandlerPanClass] && [gestureRecognizer.view isDescendantOfView:topScreen];
++}
++
+ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+     shouldRequireFailureOfGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+ {
++  if ([self isFullScreenSwipeGestureRecognizer:gestureRecognizer] &&
++      [self isGestureHandlerPanInTopScreen:otherGestureRecognizer]) {
++    return YES;
++  }
++#if RNS_IPHONE_OS_VERSION_AVAILABLE(26_0)
+   if (@available(iOS 26, *)) {
+     if (gestureRecognizer == _controller.interactiveContentPopGestureRecognizer &&
+         [self isScrollViewPanGestureRecognizer:otherGestureRecognizer]) {
+@@ -1260,10 +1298,10 @@ RNS_IGNORE_SUPER_CALL_END
+       return [self scrollViewHasHorizontalPart:static_cast<UIScrollView *>(otherGestureRecognizer.view)];
+     }
+   }
++#endif // check for iOS >= 26
+ 
+   return NO;
+ }
+-#endif // check for iOS >= 26
+ 
+ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+     shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer

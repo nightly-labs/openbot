@@ -9,6 +9,7 @@ import {
   remoteConnectionFailureDetails,
 } from "@openbot/team-client";
 import { REMOTE_PEER_LOST_AFTER_MS, type RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
+import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -36,6 +37,11 @@ function endsQuietResume(status: RemoteRecoveryStatus): boolean {
 export interface ServerConnectionHandle {
   client: RemoteTeamTransportRef;
   refresh(): void;
+  /**
+   * The phone shows this server from its cache, so the first attempt after the start runs in a quiet
+   * time, as a return to the app does. Only once, and only before that attempt ends.
+   */
+  quietStart(): void;
 }
 
 export interface ServerLoadContext {
@@ -59,6 +65,8 @@ interface Props {
   ): void;
   onMembershipChanged?(): Promise<void>;
   onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
+  /** An attempt of this server failed in the foreground, or Signal says that its host is offline. */
+  onUnavailable?(hostId: string): void;
 }
 
 /**
@@ -75,7 +83,10 @@ export const ServerConnection = memo(function ServerConnection({
   onStatus,
   onTeamEvent,
   onMembershipChanged,
+  onUnavailable,
 }: Props) {
+  const onUnavailableRef = useRef(onUnavailable);
+  onUnavailableRef.current = onUnavailable;
   const [client, setClient] = useState<RemoteTeamTransportRef | null>(null);
   const controller = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
   const activeRef = useRef(active);
@@ -102,6 +113,16 @@ export const ServerConnection = memo(function ServerConnection({
     if (last && last.status.phase !== "online") onStatusRef.current(hostId, last.status, last.failure, false);
   }, [hostId]);
   useEffect(() => () => clearTimeout(resumeTimer.current), []);
+  const quietStartUsed = useRef(false);
+  const quietStart = useCallback(() => {
+    const last = lastStatus.current;
+    if (quietStartUsed.current || !activeRef.current || resuming.current || inactiveSince.current !== null) return;
+    quietStartUsed.current = true;
+    if (last && (last.status.phase !== "connecting" || last.status.attempt > 1)) return;
+    resuming.current = true;
+    resumeTimer.current = setTimeout(endResume, QUIET_RESUME_MS);
+    if (last) onStatusRef.current(hostId, last.status, last.failure, true);
+  }, [hostId, endResume]);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
   const onMembershipChangedRef = useRef(onMembershipChanged);
   onMembershipChangedRef.current = onMembershipChanged;
@@ -115,8 +136,9 @@ export const ServerConnection = memo(function ServerConnection({
       supportLog.add(
         update.state === "offline" ? "warn" : "info",
         "connection",
-        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
+        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.reference ? ` [${update.reference}]` : ""}${update.hostOffline ? ", host not on Signal" : ""}${update.resync ? ", resync" : ""}`,
       );
+      if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
       if (update.state === "offline") {
         if (activeRef.current) analytics.lost();
         if (update.code === "session_revoked") {
@@ -155,11 +177,15 @@ export const ServerConnection = memo(function ServerConnection({
             supportLog.add("info", "connection", `${hostId} attempt ${attempt} loaded (${Date.now() - started} ms)`);
           },
           (error) => {
-            if (initiatingContext.isCurrent()) finish("failed", initiatingContext.stage);
+            if (initiatingContext.isCurrent()) {
+              finish("failed", initiatingContext.stage);
+              onUnavailableRef.current?.(hostId);
+            }
+            const reference = errorReference(error);
             supportLog.add(
               "warn",
               "connection",
-              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}`,
+              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}${reference ? ` [${reference}]` : ""}`,
             );
             throw error;
           },
@@ -191,7 +217,7 @@ export const ServerConnection = memo(function ServerConnection({
       },
     );
     controller.current = recovery;
-    register(hostId, { client, refresh: () => recovery.refresh() });
+    register(hostId, { client, refresh: () => recovery.refresh(), quietStart });
     recovery.setActive(activeRef.current);
     return () => {
       disposed = true;
@@ -200,7 +226,7 @@ export const ServerConnection = memo(function ServerConnection({
       controller.current = null;
       register(hostId, null);
     };
-  }, [client, hostId, publicKey, register, load, onStatus, analytics]);
+  }, [client, hostId, publicKey, register, load, onStatus, analytics, quietStart]);
 
   useEffect(() => {
     const returned = active && inactiveSince.current !== null;
@@ -243,6 +269,7 @@ export const ServerConnection = memo(function ServerConnection({
   return (
     <RemoteTeamTransport
       ref={attach}
+      hostId={hostId}
       active={active}
       directory={directory}
       onMembershipChanged={onMembershipChanged}

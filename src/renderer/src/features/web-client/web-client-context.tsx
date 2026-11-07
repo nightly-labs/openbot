@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
+  AgentColorEntry,
   AgentEvent,
   AgentRuntimeApproval,
   AgentStatus,
@@ -8,6 +9,8 @@ import type {
   BrowserControlState,
   BrowserTab,
   BrowserTakeoverRequest,
+  ChannelSummary,
+  ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
   ConversationMessage,
@@ -16,6 +19,7 @@ import type {
   HostedServerIssue,
   HostedServerSleep,
   HostedServerStart,
+  MemberChatColorEntry,
   QueueSnapshot,
   RespondToApprovalInput,
   RespondToPromptInput,
@@ -25,8 +29,14 @@ import type {
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { canAdministerServer } from "@openbot/contracts/ipc";
-import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_COLORS_CAPABILITY,
+  AGENT_HIDDEN_CAPABILITY,
+  CHAT_COLORS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
@@ -37,6 +47,7 @@ import {
   type RemoteRecoveryStatus,
 } from "@openbot/team-client/remote-recovery";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
@@ -45,13 +56,19 @@ import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
+import {
+  deleteRemoteWorkspaceFrame,
+  deleteRemoteWorkspaceFrames,
+  readRemoteWorkspaceFrame,
+  saveRemoteWorkspaceFrame,
+} from "../servers/remote-workspace-frame";
 import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
-import type { WebHostState } from "./web-host-lock";
+import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
   WebHostConnectionError,
@@ -76,6 +93,8 @@ interface WebConversation {
 
 /** The messages that a conversation keeps when it is not open, as on the desktop. */
 const LATEST_PAGE_SIZE = 50;
+/** The recently opened agents whose latest page a new page reads after the open one. */
+const PRELOADED_AGENTS = 3;
 
 /**
  * Releases the older pages of a conversation that is not open. Only the open conversation gets new
@@ -107,6 +126,10 @@ interface WebWorkspaceState {
   agents: ClientAgentSummary[];
   /** The host answered an agent list. Until then, an empty `agents` does not mean the host has none. */
   agentsLoaded: boolean;
+  /** `agents` come from the saved frame, which holds no message text, until the host answers. */
+  agentsFromFrame: boolean;
+  /** The channel rows of the saved frame, with no text. The sidebar shows them until the host lists channels. */
+  frameChannels: ChannelSummary[];
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
   /** The queues read from the host, by agent. Each agent's queue is read on connect and on each change. */
@@ -114,7 +137,7 @@ interface WebWorkspaceState {
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
   prompts: Array<Extract<AgentEvent, { type: "prompt" }>>;
   /** The latest progress detail of each agent's running turn. */
-  progress: Record<string, { turnId: string; detail: string }>;
+  progress: Record<string, { turnId: string; detail: string; running?: boolean; activity?: string }>;
   takeovers: BrowserTakeoverRequest[];
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
@@ -135,8 +158,12 @@ interface WebWorkspaceState {
   connectionError: UserErrorDetails | null;
   /** Signal holds the connection because the host is not online. */
   hostOffline: boolean;
+  /** Another tab of this browser has the host open. The workspace shows this in full, with "Use here". */
+  otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
+  /** The host answered once. A saved frame sets `workspaceLoaded` before that, so the first-load screen waits for this. */
+  synced: boolean;
   panelsFailed: boolean;
   panelsLoading: boolean;
   agentStatus: AgentStatus | null;
@@ -167,6 +194,13 @@ interface WebWorkspaceState {
   sidebarLayout: SidebarLayoutSnapshot;
   /** The agents that a user hid on the host (`agent-hidden-v1`). Not the same as `hiddenIds`. */
   userHiddenAgents: HiddenAgent[];
+  /** The exact agent colours on the host (`agent-colors-v1`). The released agent list does not carry them. */
+  agentColors: AgentColorEntry[];
+  /**
+   * The chat colours of the agents and members on the host (`chat-colors-v1`). The released agent list
+   * and presence do not carry them. `presence` already has the member chat colours.
+   */
+  chatColors: ChatColors;
 }
 
 export type WebRuntimeFactory = (
@@ -196,6 +230,8 @@ export function createWebWorkspace(
     host: null,
     agents: [],
     agentsLoaded: false,
+    agentsFromFrame: false,
+    frameChannels: [],
     selectedId: null,
     conversations: {},
     queues: {},
@@ -214,8 +250,10 @@ export function createWebWorkspace(
     hostedStart: null,
     connectionError: null,
     hostOffline: false,
+    otherTab: false,
     recovery: null,
     workspaceLoaded: false,
+    synced: false,
     panelsFailed: false,
     panelsLoading: false,
     agentStatus: null,
@@ -235,6 +273,8 @@ export function createWebWorkspace(
     duplicatingAgentIds: [],
     sidebarLayout: defaultSidebarLayout(),
     userHiddenAgents: [],
+    agentColors: [],
+    chatColors: { agents: [], members: [] },
   });
   // Every progress line of the newest turns, by turn, for the steps under the activity line.
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
@@ -306,6 +346,13 @@ export function createWebWorkspace(
     recovery.offline();
     recovery.setActive(!document.hidden);
   }
+  /** The user is back on the page. `offline` keeps the wait after failed attempts, up to two minutes; this ends it. */
+  function recoverNow() {
+    if (disposed || !hostId || recoveryBlocked) return;
+    if (state.recovery?.phase !== "waiting" && state.recovery?.phase !== "cooldown") return recover();
+    recovery.refresh();
+    recovery.setActive(!document.hidden);
+  }
   const hostLifecycle = createWebHostLifecycle({
     accountFetch: props.accountFetch,
     hostId: () => hostId,
@@ -350,6 +397,19 @@ export function createWebWorkspace(
           });
       },
       hostSessionRevoked: () => void retryHosts(),
+      hostTaken(id) {
+        if (disposed || id !== hostId) return;
+        // The user moved the host to another tab. This tab waits for "Use here" and does not reconnect.
+        generation += 1;
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.otherTab = true;
+          draft.status = "offline";
+          draft.connectionError = null;
+        });
+      },
       connection(update) {
         if (disposed || update.hostId !== hostId) return;
         if (recoveryBlocked && update.state === "offline" && !update.code) return;
@@ -440,7 +500,7 @@ export function createWebWorkspace(
         for (const listener of hostEventListeners) listener(event);
         if (event.type === "team-presence")
           setState((draft) => {
-            draft.presence = event.snapshot;
+            draft.presence = presenceWithChatColors(event.snapshot, draft.chatColors.members);
           });
         if (event.type === "host-restart")
           setState((draft) => {
@@ -484,7 +544,12 @@ export function createWebWorkspace(
           });
         } else if (event.type === "turn-progress") {
           setState((draft) => {
-            draft.progress[event.agentId] = { turnId: event.turnId, detail: cleanAgentMessageText(event.detail) };
+            draft.progress[event.agentId] = {
+              turnId: event.turnId,
+              detail: cleanAgentMessageText(event.detail),
+              ...(event.running ? { running: true } : {}),
+              ...(event.activity ? { activity: event.activity } : {}),
+            };
           });
           setStepLines((current) => appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail)));
         } else if (event.type === "turn-started") {
@@ -574,6 +639,13 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.userHiddenAgents = event.agents;
           });
+        if (event.type === "agent-colors-changed")
+          setState((draft) => {
+            draft.agentColors = event.agents;
+          });
+        if (event.type === "chat-colors-changed") receiveChatColors({ agents: event.agents, members: event.members });
+        if (event.type === "sidebar-pins-changed")
+          preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
         // A read loads only the open conversation, so the events of other agents do not start one.
         const changed = changedConversation(event);
         if (changed !== undefined && changed === selectedId) void refresh();
@@ -581,14 +653,50 @@ export function createWebWorkspace(
     },
     props.accountFetch,
   );
+  const pinScope = () => (state.host ? `${props.accountId}:${state.host.hostId}` : "");
+  /**
+   * The scopes whose host said at its last connect that it keeps the pins (`sidebar-pins-v1`). A change
+   * while the host is away stays pending and goes to the host at the next connect.
+   */
+  const pinScopes = new Set<string>();
+  /**
+   * Only the open host takes a request; a pin change of another host waits for its next connect. A
+   * request while the host is away fails and stays pending. This does not read `state.status`: the
+   * connect sets it in the same tick as the first sync, and the store shows it only at the next flush.
+   */
+  const openHostPins = (scope: string) => {
+    const pins = runtime.sidebarPins;
+    if (!pins || scope !== pinScope()) throw new Error(currentText().t("error.team.sidebarPinsUnsupported"));
+    return pins;
+  };
   const preferences = createSidebarPreferences({
-    scope: () => (state.host ? `${props.accountId}:${state.host.hostId}` : ""),
+    scope: pinScope,
+    sync: {
+      supports: (scope) => pinScopes.has(scope),
+      read: async (scope) => openHostPins(scope).read(),
+      set: async (scope, items) => openHostPins(scope).set(items),
+      seed: async (scope, items) => openHostPins(scope).seed(items),
+    },
   });
   // The other tabs show the opened host with the state this tab has for it.
   createEffect(
     () => ({ id: state.host?.hostId, status: state.status }),
     ({ id, status }) => {
       if (id) runtime.hosts?.reportSelected(id, status);
+    },
+  );
+  // A hide, a restore or a move updates the frame at once, so the next page does not show the old sidebar.
+  createEffect(
+    () =>
+      state.status === "online" && state.host && !state.panelsLoading && !state.panelsFailed
+        ? { hostId: state.host.hostId, sidebarLayout: state.sidebarLayout, hiddenAgents: state.userHiddenAgents }
+        : null,
+    (frame) => {
+      if (frame)
+        saveRemoteWorkspaceFrame(props.accountId, frame.hostId, {
+          sidebarLayout: frame.sidebarLayout,
+          hiddenAgents: frame.hiddenAgents,
+        });
     },
   );
   // A hosted server keeps running while this tab is visible and has focus (`focus-use-v1`).
@@ -639,9 +747,13 @@ export function createWebWorkspace(
   createEffect(
     () => ({
       hostId: state.host?.hostId ?? null,
-      sources: state.agents.flatMap((agent) =>
-        agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
-      ),
+      // A saved frame shows its agents before the host connects. Their images wait for the connection.
+      sources:
+        state.status === "online"
+          ? state.agents.flatMap((agent) =>
+              agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
+            )
+          : [],
     }),
     ({ hostId, sources }) => {
       if (hostId !== avatarHost) {
@@ -660,13 +772,32 @@ export function createWebWorkspace(
       loadAvatars();
     },
   );
-  const shownAgents = createMemo(() =>
-    state.agents.map((agent) => {
+  const shownAgents = createMemo(() => {
+    const colors = new Map(state.agentColors.map((entry) => [entry.agentId, entry.color]));
+    const chatColors = new Map(state.chatColors.agents.map((entry) => [entry.agentId, entry.color]));
+    return state.agents.map((agent) => {
       const avatar = avatars().get(agent.id);
-      return avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
+      const {
+        avatarColor: _avatarColor,
+        chatColor: _chatColor,
+        ...shown
+      } = avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
+      const color = colors.get(agent.id);
+      const chatColor = chatColors.get(agent.id);
+      return {
+        ...shown,
+        ...(color ? { avatarColor: color } : {}),
+        ...(chatColor ? { chatColor } : {}),
+      };
+    });
+  });
+  // A frame agent's last message is not known: its row shows no preview, not "No messages yet".
+  const profiles = createMemo(() =>
+    shownAgents().map((agent) => {
+      const profile = toAgentProfile(agent);
+      return state.agentsFromFrame ? { ...profile, preview: "" } : profile;
     }),
   );
-  const profiles = createMemo(() => shownAgents().map(toAgentProfile));
   const selected = createMemo(() => profiles().find((agent) => agent.id === state.selectedId));
   const conversation = createMemo(() => (state.selectedId ? state.conversations[state.selectedId] : undefined));
 
@@ -711,6 +842,25 @@ export function createWebWorkspace(
     if (!capabilities.includes(AGENT_HIDDEN_CAPABILITY) || !read) return [];
     return (await read()).agents;
   }
+  /** A host without `agent-colors-v1` has no exact colours. */
+  async function readAgentColors(capabilities: readonly string[]): Promise<AgentColorEntry[]> {
+    const read = runtime.listAgentColors;
+    if (!capabilities.includes(AGENT_COLORS_CAPABILITY) || !read) return [];
+    return (await read()).agents;
+  }
+  /** A host without `chat-colors-v1` has no chat colours. */
+  async function readChatColors(capabilities: readonly string[]): Promise<ChatColors> {
+    const read = runtime.listChatColors;
+    if (!capabilities.includes(CHAT_COLORS_CAPABILITY) || !read) return { agents: [], members: [] };
+    return read();
+  }
+  /** Keeps the chat colours, and puts the member chat colours on the presence that this tab has. */
+  function receiveChatColors(colors: ChatColors): void {
+    setState((draft) => {
+      draft.chatColors = colors;
+      if (draft.presence) draft.presence = presenceWithChatColors(draft.presence, colors.members);
+    });
+  }
   function reconcileAgents(agents: ClientAgentSummary[]): void {
     const ids = new Set(agents.map((agent) => agent.id));
     const nextSelected = selectedId && ids.has(selectedId) ? selectedId : null;
@@ -719,6 +869,7 @@ export function createWebWorkspace(
       const removed = draft.agents.filter((agent) => !ids.has(agent.id)).map((agent) => agent.id);
       draft.agents = agents;
       draft.agentsLoaded = true;
+      draft.agentsFromFrame = false;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
       for (const id of removed) {
@@ -749,8 +900,15 @@ export function createWebWorkspace(
         draft.hostsError = null;
       });
       try {
+        markRemoteSync("hosts-start");
         const hosts = await runtime.listHosts();
+        markRemoteSync("hosts");
         if (disposed) return;
+        // A server that left the list takes its frame with it.
+        deleteRemoteWorkspaceFrames(
+          props.accountId,
+          hosts.map((host) => host.hostId),
+        );
         const activeGeneration = refreshGeneration === generation && refreshHostId === hostId;
         if (!activeGeneration) return;
         if (refreshHostId && !hosts.some((host) => host.hostId === refreshHostId)) {
@@ -763,6 +921,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.host = null;
             draft.workspaceLoaded = false;
+            draft.synced = false;
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
@@ -779,6 +938,8 @@ export function createWebWorkspace(
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
             draft.userHiddenAgents = [];
+            draft.agentColors = [];
+            draft.chatColors = { agents: [], members: [] };
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
@@ -874,11 +1035,13 @@ export function createWebWorkspace(
     // A revoked session must not leave private conversations visible while the directory
     // decides whether this membership still exists. Keep the host shell for a possible
     // authorized reconnect, but invalidate every private read and pending action now.
+    if (hostId) deleteRemoteWorkspaceFrame(props.accountId, hostId);
     generation += 1;
     selectedId = null;
     setState((draft) => {
       draft.revocationRevision += 1;
       draft.workspaceLoaded = false;
+      draft.synced = false;
       draft.agents = [];
       draft.agentsLoaded = false;
       draft.conversations = {};
@@ -894,6 +1057,8 @@ export function createWebWorkspace(
       draft.browserControlState = { sessions: [] };
       draft.sidebarLayout = defaultSidebarLayout();
       draft.userHiddenAgents = [];
+      draft.agentColors = [];
+      draft.chatColors = { agents: [], members: [] };
       draft.capabilities = [];
       draft.presence = null;
       draft.duplicatingAgentIds = [];
@@ -939,32 +1104,43 @@ export function createWebWorkspace(
       throw new Error(currentText().t("webClient.error.invitationOffline"));
     acceptedInvite = null;
   }
-  async function connect(host: RemoteTeamHost) {
+  /** With `takeOver`, the tab that has the host open gives it to this tab. */
+  async function connect(host: RemoteTeamHost, takeOver = false) {
     recoveryBlocked = false;
     recovery.dispose();
     recovery = makeRecovery();
     if (!connectionPromise || connectionPromise.hostId !== host.hostId) hostLifecycle.endSleep();
     try {
-      await attemptConnection(host, true);
+      await attemptConnection(host, true, takeOver);
     } catch (error) {
       if (!disposed && hostId === host.hostId) noteConnectionFailure(error);
       if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
     }
   }
-  function attemptConnection(host: RemoteTeamHost, opened = false): Promise<void> {
+  /** Moves the opened host from another tab of this browser to this tab. */
+  async function useHere(): Promise<void> {
+    const host = state.host;
+    if (host && state.otherTab) await connect(host, true);
+  }
+  function attemptConnection(host: RemoteTeamHost, opened = false, takeOver = false): Promise<void> {
     if (connectionPromise?.hostId === host.hostId) return connectionPromise.promise;
-    const promise = connectWorkspace(host, opened).finally(() => {
+    const promise = connectWorkspace(host, opened, takeOver).finally(() => {
       if (connectionPromise?.promise === promise) connectionPromise = null;
     });
     connectionPromise = { hostId: host.hostId, opened, promise };
     return promise;
   }
-  async function connectWorkspace(host: RemoteTeamHost, opened: boolean) {
+  async function connectWorkspace(host: RemoteTeamHost, opened: boolean, takeOver: boolean) {
     const current = ++generation;
     const sameHost = hostId === host.hostId;
     // A hosted server that sleeps or wakes keeps the workspace visible, so each retry keeps its agents and the selection.
     const keepWorkspace = sameHost && state.workspaceLoaded;
-    const previousSelected = sameHost ? selectedId : null;
+    // A new page shows the frame of the last load while it connects (`remote-workspace-frame`).
+    const savedFrame = keepWorkspace ? null : readRemoteWorkspaceFrame(props.accountId, host.hostId);
+    const frame = savedFrame?.agents.length ? savedFrame : null;
+    const frameSelected = frame?.agents.find((agent) => agent.id === frame.selectedAgentId) ?? frame?.agents[0];
+    const previousSelected = (sameHost ? selectedId : null) ?? frameSelected?.id ?? null;
+    const recentAgentIds = frame?.recentAgentIds ?? [];
     hostId = host.hostId;
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
@@ -975,8 +1151,10 @@ export function createWebWorkspace(
       // A retry keeps the last failure on screen until it ends.
       if (!sameHost) draft.connectionError = null;
       if (!sameHost) draft.hostOffline = false;
+      if (!sameHost) draft.otherTab = false;
       if (!sameHost) {
         draft.workspaceLoaded = false;
+        draft.synced = false;
         draft.agentStatus = null;
         draft.models = [];
       }
@@ -986,6 +1164,8 @@ export function createWebWorkspace(
       if (!keepWorkspace) {
         draft.agents = [];
         draft.agentsLoaded = false;
+        draft.agentsFromFrame = false;
+        draft.frameChannels = [];
         draft.selectedId = null;
       }
       if (!sameHost) {
@@ -1003,6 +1183,8 @@ export function createWebWorkspace(
         draft.activeBrowserTabId = null;
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
+        draft.agentColors = [];
+        draft.chatColors = { agents: [], members: [] };
         draft.duplicatingAgentIds = [];
         draft.capabilities = [];
         draft.presence = null;
@@ -1011,12 +1193,51 @@ export function createWebWorkspace(
       draft.incompatibility = null;
     });
     try {
-      const capabilities = await runtime.connect(host);
-      const [agents, agentStatus, models] = await Promise.all([
-        runtime.listAgents(),
-        runtime.status(),
-        runtime.models(),
-      ]);
+      markRemoteSync("connect-start");
+      // The connect starts first: the frame render then runs while the connect waits for the network.
+      // With the host protocol of the last visit, the gate reads go beside the compatibility read.
+      const early: { gate: Promise<[ClientAgentSummary[], AgentStatus, ClientAgentModelOption[]]> | null } = {
+        gate: null,
+      };
+      const readGate = () => Promise.all([runtime.listAgents(), runtime.status(), runtime.models()]);
+      const connecting = runtime.connect(host, {
+        takeOver,
+        early: {
+          start: () => {
+            early.gate = readGate();
+            early.gate.catch(() => undefined);
+          },
+          drop: () => {
+            early.gate = null;
+          },
+        },
+      });
+      // The frame is read-only: no capabilities, so no feature reads the host before it connects.
+      if (frame) {
+        // A retry after a failed connect keeps the workspace and reads no frame, so it needs this selection.
+        if (frameSelected) selectedId = frameSelected.id;
+        setState((draft) => {
+          draft.agents = frame.agents;
+          draft.agentsLoaded = true;
+          draft.agentsFromFrame = true;
+          draft.workspaceLoaded = true;
+          draft.models = frame.models;
+          draft.sidebarLayout = frame.sidebarLayout ?? {
+            ...defaultSidebarLayout(),
+            agentOrder: frame.agents.map((agent) => agent.id),
+          };
+          draft.userHiddenAgents = frame.hiddenAgents;
+          draft.frameChannels = frame.channels;
+          if (frameSelected) {
+            draft.selectedId = frameSelected.id;
+            draft.conversations[frameSelected.id] ??= { page: null, draft: "", attachments: [], loading: true };
+          }
+        });
+        markRemoteSync("workspace-frame");
+      }
+      const capabilities = await connecting;
+      markRemoteSync("connected");
+      const [agents, agentStatus, models] = await (early.gate ?? readGate());
       if (disposed || current !== generation) return;
       revokedReconnect = false;
       hostLifecycle.endSleep();
@@ -1033,19 +1254,37 @@ export function createWebWorkspace(
         draft.capabilities = capabilities;
         draft.agents = agents;
         draft.agentsLoaded = true;
+        draft.agentsFromFrame = false;
         draft.workspaceLoaded = true;
+        draft.synced = true;
         draft.agentStatus = agentStatus;
         draft.models = models;
         draft.connectionError = null;
+        draft.otherTab = false;
         draft.status = "online";
       });
       syncedAt = Date.now();
+      markRemoteSync("workspace-ready");
+      // From the read values: the store applies the write above only at the next flush.
+      saveRemoteWorkspaceFrame(props.accountId, host.hostId, { agents, models });
+      if (capabilities.includes(SIDEBAR_PINS_CAPABILITY)) pinScopes.add(pinScope());
+      else pinScopes.delete(pinScope());
+      preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
+      void preferences.syncActiveServerPins().catch(() => undefined);
+      // The open conversation and its queue go out first. One queue read for each agent sent before
+      // them held the first page behind ~50 answers on a large host (`bun run perf:remote`).
+      // An agent the user opened in the frame stays open.
+      const wanted = selectedId ?? previousSelected;
+      const first = agents.find((agent) => agent.id === wanted) ?? agents[0];
+      const opened = first ? select(first.id) : null;
+      if (first) loadQueue(first.id);
       void loadPanels(
         capabilities,
         agents.map((agent) => agent.id),
-      );
-      preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
-      for (const agent of agents) loadQueue(agent.id);
+      ).then(() => {
+        if (!disposed && current === generation) saveFrame();
+        markRemoteSync("panels-ready");
+      });
       void runtime
         .currentMemberId?.()
         .then((memberId) => {
@@ -1060,17 +1299,27 @@ export function createWebWorkspace(
         (presence) => {
           if (!disposed && current === generation && !state.presence)
             setState((draft) => {
-              draft.presence = presence;
+              draft.presence = presenceWithChatColors(presence, draft.chatColors.members);
             });
         },
         () => undefined,
       );
-      const first = agents.find((agent) => agent.id === previousSelected) ?? agents[0];
-      if (first) await select(first.id);
+      if (opened) {
+        await opened;
+        markRemoteSync("conversation-ready");
+      }
+      if (disposed || current !== generation) return;
+      void preloadRecent(
+        recentAgentIds.filter((id) => id !== first?.id && agents.some((agent) => agent.id === id)),
+        current,
+      );
+      // The other queues only give the sidebar its marks.
+      for (const agent of agents) if (agent.id !== first?.id) loadQueue(agent.id);
     } catch (error) {
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.status = "offline";
+        draft.otherTab = error instanceof WebHostOtherTabError;
         // The workspace shows an incompatible host in full, so it is not also reported as an error.
         if (error instanceof WebHostIncompatibleError)
           draft.incompatibility = {
@@ -1082,7 +1331,15 @@ export function createWebWorkspace(
           };
       });
       if (blockAccess(error)) throw error;
-      if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
+      // The server can run while another tab holds it. A wake would show a start that never ends.
+      if (error instanceof WebHostOtherTabError) {
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.connectionError = null;
+        });
+      } else if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
@@ -1100,6 +1357,17 @@ export function createWebWorkspace(
       }
       throw error;
     }
+  }
+  /** Saves the frame of the open host for the next page. The layout waits for its read. */
+  function saveFrame(): void {
+    if (state.status !== "online" || !state.host) return;
+    const panelsRead = !state.panelsLoading && !state.panelsFailed;
+    saveRemoteWorkspaceFrame(props.accountId, state.host.hostId, {
+      agents: state.agents,
+      models: state.models,
+      selectedAgentId: state.selectedId,
+      ...(panelsRead ? { sidebarLayout: state.sidebarLayout, hiddenAgents: state.userHiddenAgents } : {}),
+    });
   }
   async function loadPanels(capabilities = state.capabilities, agentIds = state.agents.map((agent) => agent.id)) {
     const current = generation;
@@ -1142,6 +1410,21 @@ export function createWebWorkspace(
             });
         })
         .catch(failed),
+      // The colours are not a panel. If the read fails, the agents keep their nearest hue.
+      readAgentColors(capabilities)
+        .then((colors) => {
+          if (isCurrent())
+            setState((draft) => {
+              draft.agentColors = colors;
+            });
+        })
+        .catch(() => undefined),
+      // The chat colours are not a panel. If the read fails, the bubbles keep the default colour.
+      readChatColors(capabilities)
+        .then((colors) => {
+          if (isCurrent()) receiveChatColors(colors);
+        })
+        .catch(() => undefined),
     ]);
     if (isCurrent())
       setState((draft) => {
@@ -1306,6 +1589,8 @@ export function createWebWorkspace(
   async function select(id: string) {
     const current = generation;
     selectedId = id;
+    if (state.status === "online" && state.host)
+      saveRemoteWorkspaceFrame(props.accountId, state.host.hostId, { selectedAgentId: id });
     setState((draft) => {
       const previous = draft.selectedId;
       if (previous && previous !== id) {
@@ -1329,11 +1614,30 @@ export function createWebWorkspace(
       report(error);
     }
   }
+  /**
+   * Reads the latest page of recently opened agents, one at a time, so that the first switch to one
+   * shows its messages at once. An agent with a kept page is not read again. The page stays trimmed:
+   * a closed conversation gets no events, so the read on open replaces it with the host page.
+   */
+  async function preloadRecent(ids: readonly string[], current: number) {
+    for (const id of ids.slice(0, PRELOADED_AGENTS)) {
+      if (disposed || current !== generation) return;
+      if (state.conversations[id]) continue;
+      setState((draft) => {
+        draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
+      });
+      try {
+        await load(id);
+      } catch {
+        // A failed early read only costs the early page. The agent loads when it opens.
+      }
+    }
+  }
   async function resync() {
     const current = generation;
     try {
       // A hide on another device can land while this tab is offline, and the event is then lost.
-      const [{ agents, sidebarLayout }, userHiddenAgents] = await Promise.all([
+      const [{ agents, sidebarLayout }, userHiddenAgents, agentColors, chatColors] = await Promise.all([
         // The layout read needs the agent ids.
         runtime.listAgents().then(async (agents) => ({
           agents,
@@ -1343,6 +1647,10 @@ export function createWebWorkspace(
           ),
         })),
         readUserHiddenAgents(state.capabilities),
+        // A failed colour read keeps the colours that this tab has.
+        readAgentColors(state.capabilities).catch(() => state.agentColors),
+        // A failed chat colour read keeps the chat colours that this tab has.
+        readChatColors(state.capabilities).catch(() => state.chatColors),
       ]);
       if (disposed || current !== generation) return;
       syncedAt = Date.now();
@@ -1350,7 +1658,9 @@ export function createWebWorkspace(
       setState((draft) => {
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
         draft.userHiddenAgents = userHiddenAgents;
+        draft.agentColors = agentColors;
       });
+      receiveChatColors(chatColors);
       for (const agent of agents) loadQueue(agent.id);
       if (!selectedId && agents[0]) await select(agents[0].id);
       await refresh();
@@ -1487,7 +1797,7 @@ export function createWebWorkspace(
           // While the host stays online, its events keep the workspace current. A focus soon after a
           // full read, such as a switch between windows, does not read the host again.
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
-          if (state.recovery?.phase !== "suspended") recover();
+          if (state.recovery?.phase !== "suspended") recoverNow();
         })
         .catch(report);
     };
@@ -1499,7 +1809,7 @@ export function createWebWorkspace(
         recovery.setActive(false);
       } else {
         hostLifecycle.resume();
-        if (state.status !== "online" && state.recovery?.phase !== "suspended") recover();
+        if (state.status !== "online" && state.recovery?.phase !== "suspended") recoverNow();
       }
     };
     const network = () => {
@@ -1560,6 +1870,7 @@ export function createWebWorkspace(
     removeOwnedHost,
     retryHosts,
     reconnect,
+    useHere,
     joinInvite,
     connect,
     select,
@@ -1568,7 +1879,16 @@ export function createWebWorkspace(
     cancelQueued: (deliveryId: string) => changeQueue((agentId) => runtime.cancelQueued({ agentId, deliveryId })),
     steerQueued(deliveryId: string) {
       const expectedTurnId = conversation()?.page?.activeTurnId;
-      if (expectedTurnId) changeQueue((agentId) => runtime.steerQueued({ agentId, deliveryId, expectedTurnId }));
+      if (!expectedTurnId) return;
+      changeQueue((agentId) =>
+        runtime.steerQueued({ agentId, deliveryId, expectedTurnId }).catch((error: unknown) => {
+          // A message that left the queue is in the turn already: an agent that steers each message
+          // sent while it works can take it first.
+          const delivery = state.queues[agentId]?.deliveries.find((item) => item.id === deliveryId);
+          if (delivery && delivery.status !== "queued") return;
+          throw error;
+        }),
+      );
     },
     reorderQueue: (deliveryIds: string[]) => changeQueue((agentId) => runtime.reorderQueue({ agentId, deliveryIds })),
     async updateQueued(
@@ -1596,6 +1916,27 @@ export function createWebWorkspace(
     },
     markRead,
     markAllRead,
+    /**
+     * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
+     * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
+     * dialog that asked.
+     */
+    async deleteMessage(agentId: string, messageId: string): Promise<void> {
+      const remove = runtime.deleteMessage;
+      if (state.status !== "online" || !remove || !state.capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      const current = generation;
+      await remove({ kind: "agent", agentId, messageId });
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        const item = draft.conversations[agentId];
+        const page = item?.page;
+        if (!item || !page) return;
+        page.messages = page.messages.filter((message) => message.id !== messageId);
+        delete page.references[messageId];
+        item.missingReferences = { ...item.missingReferences, [messageId]: true };
+      });
+    },
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));
@@ -1927,4 +2268,19 @@ function changedConversation(event: AgentEvent | TeamRealtimeEvent): string | un
     default:
       return undefined;
   }
+}
+
+/** The presence with the chat colour of each member that has one. Presence on the wire has none. */
+function presenceWithChatColors(
+  presence: TeamPresenceSnapshot,
+  colors: readonly MemberChatColorEntry[],
+): TeamPresenceSnapshot {
+  const byMember = new Map(colors.map((entry) => [entry.memberId, entry.color]));
+  return {
+    ...presence,
+    members: presence.members.map(({ chatColor: _chatColor, ...member }) => {
+      const color = byMember.get(member.id);
+      return color ? { ...member, chatColor: color } : member;
+    }),
+  };
 }

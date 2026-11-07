@@ -1,27 +1,42 @@
 import type { WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
-import { View } from "react-native";
+import { useRef } from "react";
+import { Pressable, View } from "react-native";
+import { useUniwind } from "uniwind";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
 import { readingOrder, workflowOutline } from "@/features/workflows/model/workflow-outline";
 import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** One step of a workflow, read-only: its kind and what it does. */
+/** The actions that a step row offers, such as Run from here. A step without actions has no menu. */
+export interface WorkflowStepMenu {
+  actions: (node: WorkflowNode) => MenuAction[];
+  onAction: (node: WorkflowNode, actionId: string) => void;
+}
+
+/** One step of a workflow, read-only: its kind and what it does. A tap opens its menu, when it has one. */
 function WorkflowStepLine({
   node,
   agents,
   inset = false,
+  menu,
 }: {
   node: WorkflowNode;
   agents: readonly MobileAgent[];
   /** A step of a condition path sits under the condition. */
   inset?: boolean;
+  menu?: WorkflowStepMenu | undefined;
 }) {
   const { t } = useText();
-  return (
+  const { theme } = useUniwind();
+  const ref = useRef<MenuComponentRef | null>(null);
+  const actions = menu?.actions(node) ?? [];
+  const line = (
     <View className={`min-h-12 flex-row items-center gap-3 py-2.5 pr-4 ${inset ? "pl-12" : "pl-4"}`}>
       <WorkflowKindTile kind={node.kind} trigger={node.kind === "trigger" ? triggerType(node) : undefined} size={26} />
       <View className="min-w-0 flex-1">
@@ -33,6 +48,24 @@ function WorkflowStepLine({
         </Typography.Paragraph>
       </View>
     </View>
+  );
+  if (!menu || actions.length === 0) return line;
+  return (
+    <MenuView
+      {...(isAndroid ? { ref, colorScheme: theme === "dark" ? ("dark" as const) : ("light" as const) } : null)}
+      actions={actions}
+      onPressAction={(event) => menu.onAction(node, event.nativeEvent.event)}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("mobile.workflow.editor.stepMenu", { step: stepLabel(node, agents, t) })}
+        onPress={() => {
+          if (isAndroid) ref.current?.show();
+        }}
+      >
+        {line}
+      </Pressable>
+    </MenuView>
   );
 }
 
@@ -50,15 +83,22 @@ function PathLabel({ text }: { text: string }) {
  * The steps of a workflow as rows of one group. A workflow of the outline shape shows its condition
  * paths under the condition; any other one shows its steps from left to right, as the canvas does.
  */
-export function workflowStepRows(graph: WorkflowGraph, agents: readonly MobileAgent[], t: MobileTranslate) {
+export function workflowStepRows(
+  graph: WorkflowGraph,
+  agents: readonly MobileAgent[],
+  t: MobileTranslate,
+  menu?: WorkflowStepMenu,
+) {
   const outline = workflowOutline(graph);
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   const line = (id: string, inset = false) => {
     const node = byId.get(id);
-    return node ? <WorkflowStepLine key={id} node={node} agents={agents} inset={inset} /> : null;
+    return node ? <WorkflowStepLine key={id} node={node} agents={agents} inset={inset} menu={menu} /> : null;
   };
   if (!outline)
-    return readingOrder(graph).map((node) => <WorkflowStepLine key={node.id} node={node} agents={agents} />);
+    return readingOrder(graph).map((node) => (
+      <WorkflowStepLine key={node.id} node={node} agents={agents} menu={menu} />
+    ));
   const rows = [line(outline.trigger), ...outline.main.map((id) => line(id))];
   if (outline.condition) {
     rows.push(line(outline.condition));

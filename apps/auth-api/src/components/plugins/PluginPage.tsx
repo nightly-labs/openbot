@@ -5,8 +5,8 @@ import { For, onSettled, Show } from "solid-js";
 import { findPluginGuide } from "../../content/plugins";
 import { landingAnalytics } from "../../lib/analytics";
 import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
+import { MARKETPLACE_APPS_ROUTE } from "../../lib/marketplace-routes";
 import {
-  PLUGIN_INDEX_ROUTE,
   pluginCategoryLabel,
   pluginConnectSteps,
   pluginExternalHref,
@@ -183,7 +183,7 @@ export function PluginPage(props: PluginPageProps) {
       <main class="post-main">
         <article class="post-container post-article-body">
           <header class="post-article-header" data-enter="post-copy">
-            <Link class="post-article-back" to={PLUGIN_INDEX_ROUTE}>
+            <Link class="post-article-back" to={MARKETPLACE_APPS_ROUTE}>
               All plugins
             </Link>
             {/* The name of the listing and the only thing on the page a reader acts on, on one

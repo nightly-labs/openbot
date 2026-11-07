@@ -7,6 +7,13 @@ export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip"] as const;
 /** MP4 came after `media-attachments`, so a remote host advertises it with its own capability. */
 export const MP4_ATTACHMENT_EXTENSIONS = ["mp4"] as const;
 
+/**
+ * SVG came after the other types, so a remote host advertises it with its own capability. An SVG is
+ * a `file` attachment, not an `image` one: providers take only raster image blocks, so the agent gets
+ * the path and reads the SVG text.
+ */
+export const SVG_ATTACHMENT_EXTENSIONS = ["svg"] as const;
+
 export const CONTEXT_ATTACHMENT_EXTENSIONS = [
   "pdf",
   "doc",
@@ -80,6 +87,7 @@ export const ATTACHMENT_FILE_EXTENSIONS = [
   ...MEDIA_ATTACHMENT_EXTENSIONS,
   ...ARCHIVE_ATTACHMENT_EXTENSIONS,
   ...MP4_ATTACHMENT_EXTENSIONS,
+  ...SVG_ATTACHMENT_EXTENSIONS,
   ...CONTEXT_ATTACHMENT_EXTENSIONS,
 ] as const;
 
@@ -111,21 +119,28 @@ export const OPENABLE_ATTACHMENT_EXTENSIONS = [
   "log",
 ] as const;
 
-/** What a host accepts beyond the base list. An older remote host rejects EML, MP3, MOV, ZIP, and MP4. */
+/**
+ * What a host accepts beyond the base list. An older remote host rejects EML, MP3, MOV, ZIP, MP4, and
+ * SVG. A host with `anyFile` also takes a file whose name has no known type, as an opaque `file`.
+ */
 export interface AttachmentSupport {
   eml: boolean;
   media: boolean;
   zip: boolean;
   mp4: boolean;
+  svg: boolean;
+  anyFile: boolean;
 }
 
-export function supportedAttachmentExtensions(support: AttachmentSupport): string[] {
+/** The extensions of the picker filter for a host without `anyFile`. A host with it gets no filter. */
+export function supportedAttachmentExtensions(support: Omit<AttachmentSupport, "anyFile">): string[] {
   return ATTACHMENT_FILE_EXTENSIONS.filter(
     (extension) =>
       (support.eml || extension !== "eml") &&
       (support.media || !MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)) &&
       (support.zip || !ARCHIVE_ATTACHMENT_EXTENSIONS.some((archive) => archive === extension)) &&
-      (support.mp4 || !MP4_ATTACHMENT_EXTENSIONS.some((mp4) => mp4 === extension)),
+      (support.mp4 || !MP4_ATTACHMENT_EXTENSIONS.some((mp4) => mp4 === extension)) &&
+      (support.svg || !SVG_ATTACHMENT_EXTENSIONS.some((svg) => svg === extension)),
   );
 }
 
@@ -159,24 +174,34 @@ export function isOpenableAttachmentName(name: string): boolean {
 }
 
 /**
- * The name check for a surface that picks files for one host, such as mobile. It accepts the same
- * files as the desktop picker filter that `supportedAttachmentExtensions` builds for that host.
+ * The raster image type for a local preview of a file, or null. The type comes from the name, not
+ * from the file, so a preview is never a type that a browser runs as a page (HTML, SVG).
+ */
+export function rasterImageMimeType(name: string): string | null {
+  const extension = attachmentFileExtension(name);
+  return IMAGE_ATTACHMENT_EXTENSIONS.some((image) => image === extension) ? attachmentMimeTypeForName(name) : null;
+}
+
+/**
+ * The name check for a surface that picks files for one host, such as mobile. Without `anyFile`, it
+ * accepts the same files as the desktop picker filter that `supportedAttachmentExtensions` builds for
+ * that host.
  */
 export function isSupportedAttachmentNameFor(name: string, support: AttachmentSupport): boolean {
-  if (!isSupportedAttachmentName(name)) return false;
+  if (!isSupportedAttachmentName(name)) return support.anyFile;
   const extension = attachmentFileExtension(name);
   if (extension === "eml") return support.eml;
   if (MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)) return support.media;
   if (ARCHIVE_ATTACHMENT_EXTENSIONS.some((archive) => archive === extension)) return support.zip;
   if (MP4_ATTACHMENT_EXTENSIONS.some((mp4) => mp4 === extension)) return support.mp4;
+  if (SVG_ATTACHMENT_EXTENSIONS.some((svg) => svg === extension)) return support.svg;
   return true;
 }
 
 /**
- * The one rejection message for an unsupported attachment. Both import paths throw it: the renderer
- * drop and file-picker handlers in `src/main/ipc/attachment-handlers.ts`, and the draft and transfer
- * operations in `src/backend/attachment-files.ts`. A user must not read two different sentences for
- * the same refused file.
+ * The one rejection message for a file that a remote host without `any-file-attachments` refuses.
+ * The desktop upload handlers in `src/main/ipc/attachment-handlers.ts` and the web client throw it.
+ * A user must not read two different sentences for the same refused file.
  */
 export function assertSupportedAttachmentName(name: string): void {
   if (isSupportedAttachmentName(name)) return;
@@ -208,9 +233,8 @@ export function attachmentMimeTypeForName(name: string) {
       return "application/zip";
     case "pdf":
       return "application/pdf";
-    // SVG is not in ATTACHMENT_FILE_EXTENSIONS, so it cannot be attached: an attachment with an
-    // `image/*` type becomes `kind: "image"` and reaches the provider as a raster image block.
-    // The file preview panel previews any workspace file, so it still needs the type.
+    // An SVG attachment keeps this type for its preview, but it is a `file` attachment, not an
+    // `image` one (see `SVG_ATTACHMENT_EXTENSIONS`).
     case "svg":
       return "image/svg+xml";
     case "eml":

@@ -11,15 +11,19 @@ import type { AgentActivityLabel } from "@openbot/ui/features/conversation/Agent
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
+import { actionToast } from "../../action-toast";
 import type { ChatSearchMatch } from "./chat-search";
 import {
-  appendPluginPrompt,
+  appendDraftText,
   appendSkillCreationRequest,
   appendSkillExample,
   EMPTY_DRAFT,
   QUEUE_EDIT_STORAGE_KEY,
   readStoredQueueEdit,
+  readStoredThreadQueueEdit,
   type StoredQueueEdit,
+  type StoredThreadQueueEdit,
+  THREAD_QUEUE_EDIT_STORAGE_KEY,
 } from "./composer-draft";
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
@@ -33,9 +37,12 @@ import type {
   VoiceLiveTranscript,
 } from "./conversation-types";
 import type { TurnRuntime } from "./stores/activity-store";
+import { createAttachmentUploadStore } from "./stores/attachment-upload-store";
+import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
+import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
 const BROWSER_PANEL_DEFAULT = 380;
@@ -79,6 +86,8 @@ interface ConversationResources {
   voiceMeterStop: (() => void) | undefined;
   voiceAgentId: string | undefined;
   voiceServerId: string | undefined;
+  /** The thread sends its draft when the recording's text is in it. */
+  voiceThreadSend: boolean;
   voiceSubmitRequest:
     | {
         agentId: string;
@@ -131,8 +140,16 @@ export function createStableConversationState(
   });
   /** Keyed by channel id. A channel id is a UUID, so it does not need its server in the key. */
   const [channelDrafts, setChannelDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.channels ?? {});
-  /** The message box of each side thread, keyed by `threadDraftKey`. */
-  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.threads ?? {});
+  const restoredThreadEdit = persistDrafts ? readStoredThreadQueueEdit() : null;
+  /** The message box of each side thread, keyed by `threadDraftKey`. A restored queue edit wins, as above. */
+  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>({
+    ...storedDrafts?.threads,
+    ...(restoredThreadEdit ? { [restoredThreadEdit.draftKey]: restoredThreadEdit.draft } : {}),
+  });
+  /** The queue edit in the message box of a side thread. Its draft is the thread's draft. */
+  const [threadQueueEdit, setThreadQueueEdit] = createSignal<Omit<StoredThreadQueueEdit, "draft"> | null>(
+    restoredThreadEdit,
+  );
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(restoredEdit?.agentId ?? null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(restoredEdit?.serverId ?? null);
   const [editingEditId, setEditingEditId] = createSignal<string | null>(restoredEdit?.editId ?? null);
@@ -147,6 +164,8 @@ export function createStableConversationState(
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
+  // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
+  const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   /** The provider and model of the run behind each conversation error, keyed like `conversationErrors`. */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
@@ -207,6 +226,35 @@ export function createStableConversationState(
       };
     },
   );
+  // The thread edit is stored with its draft, so a restart can save or cancel the edit that the host holds.
+  createEffect(
+    () => {
+      const edit = threadQueueEdit();
+      return edit ? { ...edit, draft: threadDrafts()[edit.draftKey] ?? EMPTY_DRAFT } : null;
+    },
+    (edit) => {
+      if (!edit || !persistDrafts) return;
+      const persist = () => {
+        // A newer edit, or the end of this one, owns the record. Read fresh state: a pending Save set
+        // after this effect ran must not be overwritten by the previous snapshot without it.
+        const current = threadQueueEdit();
+        if (current?.editId !== edit.editId) return;
+        try {
+          window.localStorage.setItem(
+            THREAD_QUEUE_EDIT_STORAGE_KEY,
+            JSON.stringify({ ...current, draft: threadDrafts()[current.draftKey] ?? EMPTY_DRAFT }),
+          );
+        } catch {
+          actionToast.error(currentText().t("composer.error.saveEditLocally"));
+        }
+      };
+      const timer = setTimeout(persist, 300);
+      return () => {
+        clearTimeout(timer);
+        persist();
+      };
+    },
+  );
   if (storedDrafts && persistDrafts)
     writeComposerDraftsOnChange({
       drafts,
@@ -215,6 +263,7 @@ export function createStableConversationState(
       editingAgentId,
       editingServerId,
       editingDraftBackup,
+      threadQueueEdit,
       unsentTexts: pendingSends.unsentTexts,
     });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
@@ -226,6 +275,8 @@ export function createStableConversationState(
   const [voiceModelProgress, setVoiceModelProgress] = createSignal<number | null>(null);
   const [voiceElapsedSeconds, setVoiceElapsedSeconds] = createSignal(0);
   const [voiceLiveTranscript, setVoiceLiveTranscript] = createSignal<VoiceLiveTranscript | null>(null);
+  /** The side thread draft that the last recording was started for. Undefined for the agent's own chat. */
+  const [voiceThreadKey, setVoiceThreadKey] = createSignal<string | undefined>(undefined);
   const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
   /** The conversation whose last recording stopped at the time limit. */
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
@@ -250,6 +301,7 @@ export function createStableConversationState(
     voiceMeterStop: undefined,
     voiceAgentId: undefined,
     voiceServerId: undefined,
+    voiceThreadSend: false,
     voiceSubmitRequest: undefined,
     voiceDisposed: false,
     voiceRequestGeneration: 0,
@@ -302,7 +354,13 @@ export function createStableConversationState(
     },
     appendPluginPrompt(target: { serverId: string; agentId: string }, prompt: string) {
       const key = composerDraftKey(target);
-      setDrafts((current) => ({ ...current, [key]: appendPluginPrompt(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
+    appendChannelText(target: { serverId: string; channelId: string }, text: string) {
+      const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
+      setChannelDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));
       setComposerFocusRequest((value) => value + 1);
     },
     stopComposerTyping,
@@ -312,6 +370,8 @@ export function createStableConversationState(
     setChannelDrafts,
     threadDrafts,
     setThreadDrafts,
+    threadQueueEdit,
+    setThreadQueueEdit,
     editingAgentId,
     setEditingAgentId,
     editingServerId,
@@ -330,6 +390,7 @@ export function createStableConversationState(
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
@@ -346,6 +407,8 @@ export function createStableConversationState(
     setVoiceElapsedSeconds,
     voiceLiveTranscript,
     setVoiceLiveTranscript,
+    voiceThreadKey,
+    setVoiceThreadKey,
     voiceLevels,
     setVoiceLevels,
     voiceLimitReached,
@@ -370,11 +433,11 @@ export function createStableConversationState(
  * shared owner would carry "the computer panel is open for chief" from one
  * server to the next and open the wrong panel on arrival.
  *
- * `attachmentBusy` and `submitting` are
- * here for the same reason by a different route: they carry no key at all. Each
- * describes the composer on screen right now - "a send is in flight" - so a
- * shared owner would disable the arriving server's composer for the length of
- * the server it was left on. What has to outlive the conversation goes in
+ * `submitting` is here for the same reason by a different route: it carries no
+ * key at all. It describes the composer on screen right now - "a send is in
+ * flight" - so a shared owner would disable the arriving server's composer for
+ * the length of the server it was left on. `importingDrafts` is keyed by chat,
+ * but it stays with `submitting`, as the busy flag that it replaces did. What has to outlive the conversation goes in
  * `conversationErrors` and `composerErrors` instead, which are keyed by
  * chat/conversation and sit in the stable half so one chat's banner never
  * leaks into another chat on the same server.
@@ -384,12 +447,14 @@ export function createStableConversationState(
  */
 export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
-  const [attachmentBusy, setAttachmentBusy] = createSignal(false);
+  // The draft keys of the chats that wait for a file import. Other chats send as normal.
+  const [importingDrafts, setImportingDrafts] = createSignal<ReadonlySet<string>>(new Set());
+  const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
   const [submitting, setSubmitting] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
-  const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {} });
+  const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
@@ -418,12 +483,16 @@ export function createServerConversationState() {
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
+  // A voice conversation lives as long as its Voice tab, not its view.
+  const voiceSessions = createVoiceSessions(sidePanels);
 
   return {
     showComposerActions,
     setShowComposerActions,
-    attachmentBusy,
-    setAttachmentBusy,
+    importingDrafts,
+    setImportingDrafts,
+    pastePreviews,
+    setPastePreviews,
     submitting,
     setSubmitting,
     markingRead,
@@ -466,6 +535,7 @@ export function createServerConversationState() {
     setHiddenAwaitingReplyIds,
     sideQuestions,
     setSideQuestions,
+    voiceSessions,
   };
 }
 

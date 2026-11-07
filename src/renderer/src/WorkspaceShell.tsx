@@ -1,4 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   ConversationLoadNotice,
   ServerConnectionNotice,
@@ -6,8 +7,9 @@ import {
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
+import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
 import { useChannels } from "./features/channels/channels-context";
@@ -18,11 +20,13 @@ import { useDirectMessages } from "./features/conversation/direct-messages-conte
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agent-usage-polling";
+import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
+import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
@@ -30,7 +34,9 @@ import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
+import { TasksPanel } from "./features/tasks/TasksPanel";
 import { createHostRestartToasts, type HostRestartView } from "./features/updates/host-restart-toast";
+import { useUsage } from "./features/usage/usage-context";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -53,21 +59,32 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  *
  * The order of the children is the paint order the stylesheet expects, and the
  * middle-pane `<Show>`s are mutually exclusive by construction: a blocked remote
- * server wins over everything, then a joined server's provider step,
+ * server wins over everything, then the Tasks page of the rail, then a joined server's provider step,
  * then the Agent form, then a channel, then a person, then a Agent: its chat, or on the Routines view
- * its routine canvas. The other pages of the rail - schedule, usage or settings - sit outside that
+ * its routine canvas. The Tasks page hides the agent list until the user shows it. A row of the list
+ * closes the page, as each row calls `showAgents`. The other pages of the rail - schedule, usage or settings - sit outside that
  * group and inert it.
  */
-export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
+export function WorkspaceShell(props: {
+  account: () => CentralAuthUser;
+  /**
+   * The startup splash covers the window and does not let heavy views mount yet. The first load then
+   * shows no screen of its own, only its toast, and the chat waits to mount.
+   */
+  behindSplash?: () => boolean;
+  /** The first load does not cover the window any more, so the startup splash can go. */
+  onStartupReady?: () => void;
+}) {
   const platform = usePlatform();
   /** A window that main opened for one chat shows that chat alone, with no rail and no sidebar. */
   const chatWindow = platform.chatWindow !== null;
-  const { sourceText } = useText();
+  const { sourceText, t } = useText();
   const scope = useServerScope();
   const settings = useSettings();
   const channels = useChannels();
   const channelOpen = () => channels.state.selectedId !== null;
   const windowPage = useWindowPage();
+  const usage = useUsage();
   useAccountUsagePolling();
   useCustomAgentUsagePolling();
   const layout = useLayout();
@@ -81,13 +98,20 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
     refreshServers,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
+  const agentDockPlacement = useAgentDockPlacement();
+  /* The dock in the window keeps a column at the right edge, so it does not cover the panes. */
+  const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
   const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
   const { activeDirectMember } = useDirectMessages();
-  /** The pane in the middle: the Agent form, then a channel, then a person, then the Agent or its routines. */
+  /**
+   * The pane in the middle. The Tasks page wins, as it covered the panes when it was a page over them.
+   * Then the Agent form, then a channel, then a person, then the Agent or its routines.
+   */
   const middlePane = createMemo(() => {
     if (chatWindow) return "agent";
+    if (windowPage.page() === "tasks") return "tasks";
     if (agentSetupOpen()) return "agent-setup";
     if (channelOpen()) return "channel";
     if (activeDirectMember()) return "direct";
@@ -109,6 +133,39 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       },
     );
   }
+  /**
+   * The Tasks page follows a server switch. An older joined server has no task routes and no Tasks button,
+   * so the page closes when the server answers the compatibility check without them.
+   */
+  const tasksSupported = () => activeServerSupportsCapability(AGENT_TASKS_CAPABILITY);
+  createEffect(
+    () => {
+      const server = activeServer();
+      return middlePane() === "tasks" && !tasksSupported() && !!server?.compatibility?.hostAppVersion;
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
+  /** The Library follows a server switch too. An older joined server has no storage routes and no Library button. */
+  createEffect(
+    () => {
+      const server = activeServer();
+      if (usage.state.serverId === null || usage.state.view !== "library") return false;
+      return !!server?.compatibility?.hostAppVersion && !serverHasStorage(server);
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
+  /** The list stays while a connection screen covers the page: the screen does not span the sidebar. */
+  const tasksAgentsHidden = () =>
+    middlePane() === "tasks" &&
+    !windowPage.tasksAgentsOpen() &&
+    scope.loaded() &&
+    !scope.connection.panelsFailed &&
+    !blockedRemoteServer();
+
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
@@ -122,6 +179,11 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   const remote = () => activeServer()?.kind === "remote";
+  createRemoteSyncMarks({
+    "workspace-shell": () => remote() && serversLoaded(),
+    "workspace-ready": () => remote() && scope.loaded(),
+    "conversation-ready": () => remote() && activeConversation()?.loaded === true,
+  });
   // Only Signal knows that the computer is off. A remote server is also "offline" before its first connection.
   const offlineUpsell = createHostedUpsellOffline(
     () => remote() && activeServer()?.issue?.reference === "signal/host_unavailable",
@@ -160,6 +222,80 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         : null;
     });
 
+  const connectionShown = () =>
+    (!serversLoaded() || !scope.connection.synced || (remote() && !scope.loaded())) && !blockedRemoteServer();
+  const connectionPhase = () =>
+    serverWorkspacePhase({
+      hostedSleep: activeServer()?.hostedSleep,
+      updating: activeServer()?.hostRestart?.state === "restarting",
+      blocked: serversLoadFailed(),
+      waiting: scope.connection.failed,
+      loading: activeServer()?.state === "online",
+      hasContent: scope.connection.synced,
+    });
+  // The first load covers the whole window. A server that is offline, sleeps, fails or waits shows its
+  // screen in the pane only, so the user can select another server from the rail.
+  const fullWindowLoading = () =>
+    connectionShown() &&
+    !scope.connection.synced &&
+    (connectionPhase() === "loading" || connectionPhase() === "connecting") &&
+    (!serversLoaded() ||
+      activeServer()?.state === "online" ||
+      activeServer()?.state === "connecting" ||
+      // Main reports a remote server as offline before its first connection; only a reported issue ends the cover.
+      (activeServer()?.state === "offline" && !activeServer()?.issue));
+  // The full-window screen stays after the load ends, so its crew hop out before it goes. A new
+  // first load after its exit mounts a new screen.
+  const [loadingCover, setLoadingCover] = createSignal(false);
+  const [coverOpen, setCoverOpen] = createSignal(false);
+  // The chat is the heaviest view to mount. It waits while a loading screen moves its crew, so they do
+  // not stutter, and mounts while the screen fades.
+  const chatHeld = () => !!props.behindSplash?.() || (loadingCover() && !coverOpen());
+  createEffect(
+    // The landing demo loads its mock data at once, so it shows no loading screen.
+    () => !platform.landingPreview && fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
+    (show) => {
+      if (!show) return;
+      setCoverOpen(false);
+      setLoadingCover(true);
+    },
+  );
+  createEffect(
+    () => (fullWindowLoading() ? undefined : props.onStartupReady),
+    (onStartupReady) => {
+      onStartupReady?.();
+    },
+  );
+  const connectionNotice = (cover = false, screen = true) => (
+    <ServerConnectionNotice
+      screen={screen}
+      name={activeServer()?.name ?? ""}
+      initial={cover || !scope.connection.synced}
+      ready={cover ? !fullWindowLoading() : undefined}
+      onExited={cover ? () => setLoadingCover(false) : undefined}
+      onMountViews={cover ? () => setCoverOpen(true) : undefined}
+      issue={activeServer()?.hostedIssue ?? null}
+      start={activeServer()?.hostedStart ?? null}
+      detail={connectionFailure()?.message ?? null}
+      reference={connectionFailure()?.reference ?? null}
+      updateVersion={activeServer()?.hostRestart?.version ?? null}
+      phase={connectionPhase()}
+      fullWindow={fullWindowLoading()}
+      remainingSeconds={
+        scope.connection.recovery.phase === "waiting" || scope.connection.recovery.phase === "cooldown"
+          ? scope.connection.recovery.remainingSeconds
+          : 0
+      }
+      busy={
+        activeServer()?.state === "connecting" ||
+        (activeServer()?.state === "online" && scope.connection.recovery.phase === "connecting")
+      }
+      onRetry={retry}
+      onManage={() => settings.openAppSettings(null, "hosted-servers")}
+      upsell={offlineUpsell()}
+    />
+  );
+
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
       server.kind === "remote"
@@ -187,47 +323,12 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />
         <WorkspaceFrame
-          class={chatWindow ? "app-frame-chat-window" : undefined}
+          class={chatWindow ? "app-frame-chat-window" : windowAgentDock() ? "app-frame-agent-dock" : undefined}
           compact={layout.leftPanelCompact()}
-          initialLoading={!serversLoaded() || !scope.connection.hasContent}
+          initialLoading={!serversLoaded() || !scope.connection.synced}
           connection={
             <>
-              <Show
-                when={
-                  (!serversLoaded() || !scope.connection.hasContent || (remote() && !scope.loaded())) &&
-                  !blockedRemoteServer()
-                }
-              >
-                <ServerConnectionNotice
-                  name={activeServer()?.name ?? ""}
-                  initial={!scope.connection.hasContent}
-                  issue={activeServer()?.hostedIssue ?? null}
-                  start={activeServer()?.hostedStart ?? null}
-                  detail={connectionFailure()?.message ?? null}
-                  reference={connectionFailure()?.reference ?? null}
-                  updateVersion={activeServer()?.hostRestart?.version ?? null}
-                  phase={serverWorkspacePhase({
-                    hostedSleep: activeServer()?.hostedSleep,
-                    updating: activeServer()?.hostRestart?.state === "restarting",
-                    blocked: serversLoadFailed(),
-                    waiting: scope.connection.failed,
-                    loading: activeServer()?.state === "online",
-                    hasContent: scope.connection.hasContent,
-                  })}
-                  remainingSeconds={
-                    scope.connection.recovery.phase === "waiting" || scope.connection.recovery.phase === "cooldown"
-                      ? scope.connection.recovery.remainingSeconds
-                      : 0
-                  }
-                  busy={
-                    activeServer()?.state === "connecting" ||
-                    (activeServer()?.state === "online" && scope.connection.recovery.phase === "connecting")
-                  }
-                  onRetry={retry}
-                  onManage={() => settings.openAppSettings(null, "hosted-servers")}
-                  upsell={offlineUpsell()}
-                />
-              </Show>
+              <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
               <Show when={scope.loaded() && agentChatOpen() && !serverOnboardingOpen()}>
                 <ConversationLoadNotice
                   name={activeAgent()?.name ?? ""}
@@ -245,6 +346,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           blockedServer={blockedRemoteServer()}
           onRetryServer={retryServerConnection}
           windowPage={windowPage.page()}
+          sidebarHidden={tasksAgentsHidden()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
@@ -257,11 +359,23 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               <WorkspaceOverlays account={props.account} />
               <Show when={!chatWindow}>
                 <ServerUpdateDialogHost hosts={remoteHosts()} />
+                <AgentDockHost />
               </Show>
             </>
           }
         >
-          <Show when={serverOnboardingOpen()}>
+          <Show when={middlePane() === "tasks" && tasksSupported() ? usage.state.serverId : null}>
+            {(serverId) => (
+              <TasksPanel
+                serverId={serverId()}
+                hostName={servers().find((server) => server.id === serverId())?.name ?? t("app.page.serverFallback")}
+                onBack={usage.closeUsage}
+                agentsOpen={!tasksAgentsHidden()}
+                onToggleAgents={() => windowPage.setTasksAgentsOpen(tasksAgentsHidden())}
+              />
+            )}
+          </Show>
+          <Show when={serverOnboardingOpen() && middlePane() !== "tasks"}>
             <WorkspaceServerOnboarding />
           </Show>
           <Show when={middlePane() === "agent-setup" && !serverOnboardingOpen()}>
@@ -271,7 +385,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           <Show when={activePeopleEnabled() && middlePane() === "direct" && activeDirectMember()?.id} keyed>
             <Show when={activeDirectMember()}>{(member) => <WorkspaceDirectConversation member={member()} />}</Show>
           </Show>
-          <Show when={agentChatOpen()}>
+          <Show when={agentChatOpen() && !chatHeld()}>
             <WorkspaceConversation account={props.account} />
           </Show>
           <Show when={middlePane() === "routines"}>
@@ -281,6 +395,10 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
             <WorkspaceChannelConversation account={props.account} />
           </Show>
         </WorkspaceFrame>
+        <Show when={loadingCover()}>{connectionNotice(true)}</Show>
+        <Show when={fullWindowLoading() && !loadingCover() && props.behindSplash?.()}>
+          {connectionNotice(true, false)}
+        </Show>
       </div>
     </ConnectorsProvider>
   );

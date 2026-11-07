@@ -13,15 +13,18 @@ import { createOpenBotLogger } from "@openbot/logging";
 // - a French or Japanese key that English does not have, a placeholder English does not have, or
 //   a string where English has plural forms (and the reverse);
 // - a source template that more than one source key can match, so the reverse lookup is ambiguous;
-// - an English key no code names. Write keys as literals, so this check and a search find them.
+// - an English key no code names. Write keys as literals, so this check and a search find them;
+// - a key that a locale does not translate and packages/i18n/untranslated.json does not list.
 //
-// Reports, and does not fail on, keys that are not translated yet and translated modules whose keys
-// are not in the English order. `--fix` puts those keys in the English order; it moves each
-// key with the comments and blank lines above it and does not change the text. `--json` writes the
-// report to .openbot-build/i18n-report.json.
+// Reports, and does not fail on, translated modules whose keys are not in the English order.
+// `--fix` puts those keys in the English order; it moves each key with the comments and blank lines
+// above it and does not change the text. `--fix` also removes translated keys from
+// untranslated.json. `--json` writes the report to .openbot-build/i18n-report.json.
 
 const ROOT = resolve(import.meta.dirname, "..");
 const MESSAGES = resolve(ROOT, "packages/i18n/src/messages");
+/** For each key, the locales that did not translate it when the check started to fail on new gaps. */
+const GAPS = resolve(ROOT, "packages/i18n/untranslated.json");
 /** Files that spread area modules together. They hold no keys of their own. */
 const AGGREGATORS = new Set(["index", "mobile", "source", "shared"]);
 /** Where code that names a key lives. The catalogs themselves are left out. */
@@ -40,6 +43,10 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.taskOpenLimitReached",
   "error.backend.taskRemoteUnsupported",
   "error.backend.taskMoveRefused",
+  // A channel task from v0.22.0 can keep this text as its stored error.
+  "error.backend.channelHistoryArriving",
+  // A channel task from v0.59.0 can keep this text as its stored error.
+  "error.backend.channelHistoryLeadRequired",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");
@@ -253,6 +260,49 @@ for (const locale of TRANSLATED_LOCALES.filter((locale) => locale !== "en")) {
     entry.total += Object.keys(source).length;
     coverage[locale][area] = entry;
   }
+}
+
+// A key that a locale does not translate must be in GAPS for that locale, so new text does not ship
+// in English. `--fix` removes the keys that are now translated; it never adds one. `--accept=<tag>`
+// adds all keys that the locale does not translate, for a new language.
+const gapsFile = relative(ROOT, GAPS);
+const known = JSON.parse(readFileSync(GAPS, "utf8"));
+const listed = new Map<string, readonly unknown[]>();
+if (isDynamicRecord(known)) {
+  for (const [key, locales] of Object.entries(known)) {
+    if (Array.isArray(locales)) listed.set(key, locales);
+    else failures.push(`${gapsFile}: ${key} must have a list of locale tags.`);
+  }
+} else {
+  failures.push(`${gapsFile} must be an object of keys and locale tags.`);
+}
+const accept = process.argv.find((arg) => arg.startsWith("--accept="))?.slice("--accept=".length);
+if (accept !== undefined && !(accept in untranslated)) failures.push(`--accept=${accept} is not a translated locale.`);
+const gaps = new Map<string, string[]>();
+const missing = Object.entries(untranslated).map(([locale, keys]) => [locale, new Set(keys)] as const);
+// Sorted, so the file does not depend on the order in which the file system lists the modules.
+for (const key of [...owner.keys()].sort()) {
+  const locales: string[] = [];
+  for (const [locale, keys] of missing) {
+    if (!keys.has(key)) continue;
+    if (listed.get(key)?.includes(locale) || locale === accept) locales.push(locale);
+    else failures.push(`${locale}/${owner.get(key)}.ts: ${key} is not translated. Translate it; see docs/i18n.md.`);
+  }
+  if (locales.length > 0) gaps.set(key, locales);
+}
+if (fix || accept) {
+  const entries = [...gaps];
+  const lines = entries.map(([key, locales], index) => {
+    const line = `  ${JSON.stringify(key)}: [${locales.map((locale) => JSON.stringify(locale)).join(", ")}]`;
+    // Biome's line width is 120, with the comma that follows each entry but the last.
+    if (line.length + (index < entries.length - 1 ? 1 : 0) <= 120) return line;
+    return `  ${JSON.stringify(key)}: [\n${locales.map((locale) => `    ${JSON.stringify(locale)}`).join(",\n")}\n  ]`;
+  });
+  writeFileSync(GAPS, `{\n${lines.join(",\n")}\n}\n`);
+} else if (
+  [...listed].some(([key, locales]) => locales.some((locale) => !gaps.get(key)?.some((tag) => tag === locale)))
+) {
+  failures.push(`${gapsFile} lists keys that are translated or removed. Run \`bun run i18n:check --fix\`.`);
 }
 
 // Each source template, with a number for {count} and its own placeholder text for the rest, must

@@ -1,8 +1,12 @@
 import {
+  type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
   type HiddenAgentsSnapshot,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isHiddenAgentsSnapshot,
+  isSidebarPinsSnapshot,
+  type SidebarPinsSnapshot,
 } from "@openbot/contracts/ipc";
 // What main answers for agents: provider status, models, the agents themselves, memories, routines,
 // shared tables and the sidebar layout.
@@ -23,11 +27,13 @@ import {
   decodeOptionalHostAnalytics,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAccountUsage,
   isAgentHostSettings,
   isAgentMemory,
   isAgentMemorySelectionState,
+  isAgentModel,
   isAgentProvider,
   isAgentRuntimeSnapshot,
   isAgentStatus,
@@ -133,6 +139,14 @@ export function decodeProviderUsageResetOutcomeFromMain(value: unknown): Provide
   return decodeProviderUsageResetOutcome(value);
 }
 
+/** Main has already read a provider that this build does not know as none. */
+export function decodeHostDefaultProviderFromMain(value: unknown): HostDefaultProvider {
+  const { preferredProvider, preferredModel } = decodeRecord(value, "default provider");
+  if (preferredProvider !== null && !isAgentProvider(preferredProvider)) throw new Error("Invalid default provider.");
+  if (preferredModel !== null && !isAgentModel(preferredModel)) throw new Error("Invalid default model.");
+  return { preferredProvider, preferredModel };
+}
+
 /** Main has already left out the providers that this build does not know, so each one must be known. */
 export function decodeHostProviderAccountsFromMain(value: unknown): HostProviderAccounts {
   const invalid = () => new Error("Invalid provider accounts response.");
@@ -177,6 +191,11 @@ export function decodeAgents(value: unknown): ClientAgentSummary[] {
     throw new Error("Invalid agent list response.");
   }
   return value;
+}
+
+/** The agents that the `Cmd + Q` hint names, or null when the hint is hidden. */
+export function decodeQuitShortcutHint(value: unknown): ClientAgentSummary[] | null {
+  return value === null ? null : decodeAgents(value);
 }
 
 export function decodeMemory(value: unknown): AgentMemory {
@@ -227,5 +246,15 @@ export function decodeAgentSessionSettingsFromMain(value: unknown): AgentSession
 
 export function decodeHiddenAgentsFromMain(value: unknown): HiddenAgentsSnapshot {
   if (!isHiddenAgentsSnapshot(value)) throw new Error("Invalid hidden agents response.");
+  return value;
+}
+
+export function decodeSidebarPinsFromMain(value: unknown): SidebarPinsSnapshot {
+  if (!isSidebarPinsSnapshot(value)) throw new Error("Invalid pinned chats response.");
+  return value;
+}
+
+export function decodeAgentNotificationLevelsFromMain(value: unknown): AgentNotificationLevelsSnapshot {
+  if (!isAgentNotificationLevelsSnapshot(value)) throw new Error("Invalid agent notification levels response.");
   return value;
 }

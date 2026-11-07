@@ -15,9 +15,9 @@
 #   openbot-hosted-update request openbot-update-request.service, when OpenBot asks for an update in
 #                                 Server Settings. Runs `stage`, or stops OpenBot, runs `apply` and
 #                                 starts it again.
-#   openbot-hosted-update trigger openbot.service, as root before OpenBot starts. Installs the units
-#                                 of `request` and the boat pre-stop hook when an older release moved
-#                                 this one into place.
+#   openbot-hosted-update trigger openbot.service, as root before OpenBot starts. Repairs the modes
+#                                 of the release, and installs the units of `request` and the boat
+#                                 pre-stop hook when an older release moved this one into place.
 #
 # The manifest is the one that the Linux desktop updater reads, so a server trusts the same source as
 # a desktop install. A server only moves to a newer version: an older OpenBot cannot open a database
@@ -46,6 +46,8 @@ UNITS=(openbot.service openbot-update.service openbot-update.timer openbot-updat
 # boat runs this file as `user` before it saves the disk at a stop (openbot-boat-pre-stop).
 BOAT_USER=user
 BOAT_PRE_STOP=/home/$BOAT_USER/.boat/pre-stop
+# boat does not save the paths in this file. It must be in the home of `user`.
+BOAT_IGNORE=/home/$BOAT_USER/.boatignore
 # All that `install_hosting` reads from a release.
 RELEASE_FILES=(packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
 
@@ -161,9 +163,22 @@ prepare_release() {
 # boat saves /opt by the paths that change. It does not look into a directory that a rename moves,
 # so after the next stop that directory is empty or has its old files. A release gets to its place
 # in /opt as a copy of each file, never with `mv`.
+# `cp -a` makes each directory and file with mode 0700 and gives it its mode only when its copy ends.
+# boat can save a path in that time and keep 0700 after a wake, and then the service user cannot run
+# OpenBot. Without the owner, cp makes each path with its mode at once. Root owns the source, and root
+# copies it, so the owner and the SUID helper do not change.
 copy_release() {
   rm -rf "$2"
-  cp -a "$1" "$2"
+  cp -a --no-preserve=ownership "$1" "$2"
+}
+
+# The service user must read and run each file of the release (`prepare_release`). A release that an
+# older script copied can have 0700 after a wake (`copy_release`). Only paths with a wrong mode change,
+# so boat does not save the full release again.
+repair_release_modes() {
+  [ -d "$INSTALL/app" ] || return 0
+  find "$INSTALL/app" ! -type l \( ! -perm -o=r -o \( -type d ! -perm -o=x \) \) \
+    -printf 'Repaired the mode of %p.\n' -exec chmod u+rwX,go=rX {} +
 }
 
 # Copies the staged release into place. `.applying` and `staged` stay until `finish_swap`, after the
@@ -220,8 +235,10 @@ install_hosting() {
     mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
   done
   install -m 0644 "$source/openbot-hosted.apparmor" /etc/apparmor.d/openbot-hosted
+  # A container, for example on LXC, can show AppArmor and still not load a profile (#5256).
   if command -v apparmor_parser >/dev/null && [ -d /sys/kernel/security/apparmor ]; then
-    apparmor_parser --replace /etc/apparmor.d/openbot-hosted
+    apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
+      echo "The AppArmor profile is not loaded." >&2
   fi
   for unit in "${UNITS[@]}"; do
     sed "s/@SERVICE_USER@/$user/g" "$source/$unit" >"$INSTALL/hosted/.unit.new"
@@ -239,6 +256,8 @@ install_hosting() {
     ln -sfn "$INSTALL/hosted/openbot" /usr/local/bin/openbot
   fi
   install_pre_stop "$source" || echo "The boat pre-stop hook is not installed." >&2
+  install_boat_ignore || echo "The boat ignore file is not installed." >&2
+  remove_lazy_harnesses || echo "The install-on-first-run agent commands of boat are not removed." >&2
 }
 
 self_hosted() {
@@ -258,6 +277,44 @@ install_pre_stop() {
   runuser -u "$BOAT_USER" -- cmp -s "$source" "$BOAT_PRE_STOP" 2>/dev/null && return 0
   runuser -u "$BOAT_USER" -- install -D -m 0755 "$source" "${BOAT_PRE_STOP%/*}/.pre-stop.new"
   runuser -u "$BOAT_USER" -- mv -f "${BOAT_PRE_STOP%/*}/.pre-stop.new" "$BOAT_PRE_STOP"
+}
+
+# Writes the boat ignore file of a hosted server. Each saved file is a file that a wake restores
+# before the restore ends; the npm cache is about 200 MB that no start reads. A file that OpenBot did
+# not write stays.
+install_boat_ignore() {
+  local marker='# openbot-boatignore: installed by openbot-hosted-update. Changes to this file are replaced.'
+  local content
+  if self_hosted || ! id "$BOAT_USER" >/dev/null 2>&1; then return 0; fi
+  content=$(printf '%s\n' "$marker" '/.npm/_cacache/')
+  if [ -L "$BOAT_IGNORE" ] || { [ -e "$BOAT_IGNORE" ] && [ ! -f "$BOAT_IGNORE" ]; } ||
+    { [ -f "$BOAT_IGNORE" ] && ! runuser -u "$BOAT_USER" -- grep -qxF "$marker" "$BOAT_IGNORE"; }; then
+    echo "$BOAT_IGNORE is not from OpenBot. It stays." >&2
+    return 0
+  fi
+  [ -f "$BOAT_IGNORE" ] && [ "$(runuser -u "$BOAT_USER" -- cat "$BOAT_IGNORE")" = "$content" ] && return 0
+  printf '%s\n' "$content" | runuser -u "$BOAT_USER" -- tee "${BOAT_IGNORE%/*}/.boatignore.new" >/dev/null
+  runuser -u "$BOAT_USER" -- mv -f "${BOAT_IGNORE%/*}/.boatignore.new" "$BOAT_IGNORE"
+}
+
+# The boat image has commands for some agent CLIs (Hermes, Cursor, OpenClaw, Vibe) that install the
+# CLI the first time they run. OpenBot runs each provider command when it starts, so each hosted
+# server installed Hermes and Cursor, about 3 GB that the user did not ask for, and each wake then
+# restored them before the server was fast again. OpenBot downloads these CLIs itself when the user
+# turns the provider on. So remove each command that is still such a placeholder; a CLI that is
+# installed stays.
+remove_lazy_harnesses() {
+  local harnesses=/usr/local/lib/ascii-harnesses/bin launcher name
+  if self_hosted || [ ! -d "$harnesses" ]; then return 0; fi
+  for launcher in "$harnesses"/*; do
+    [ -f "$launcher" ] && [ ! -L "$launcher" ] || continue
+    case $(sed -n '2{p;q;}' "$launcher") in "# ascii-lazy-harness "*) ;; *) continue ;; esac
+    name=${launcher##*/}
+    if [ "$(sed -n '2{p;q;}' "/usr/local/bin/$name" 2>/dev/null)" = "# ascii-harness-shim" ]; then
+      rm -f "/usr/local/bin/$name"
+    fi
+    rm -f "$launcher"
+  done
 }
 
 stage() {
@@ -355,6 +412,7 @@ boot() {
 # installed only the units that it knew. The start of OpenBot does not wait for the update lock.
 trigger() {
   local source=$INSTALL/app/resources/hosting unit changed=0
+  repair_release_modes || echo "The modes of the release are not repaired." >&2
   for unit in "${REQUEST_UNITS[@]}"; do
     if [ ! -e "$UNIT_DIRECTORY/$unit" ] && [ -f "$source/$unit" ]; then
       install -m 0644 "$source/$unit" "$UNIT_DIRECTORY/$unit"
@@ -366,6 +424,8 @@ trigger() {
     systemctl enable --quiet openbot-update-request.path
   fi
   install_pre_stop "$source" || echo "The boat pre-stop hook is not installed." >&2
+  install_boat_ignore || echo "The boat ignore file is not installed." >&2
+  remove_lazy_harnesses || echo "The install-on-first-run agent commands of boat are not removed." >&2
   [ -e "$UNIT_DIRECTORY/openbot-update-request.path" ] || return 0
   # Without --no-block, a start during the start of openbot.service could wait for it.
   systemctl is-active --quiet openbot-update-request.path ||

@@ -59,6 +59,13 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    `{name, plan, interval, currency}` and an `Idempotency-Key`. The Worker stores a row in
    `awaiting_payment` with no claim and no sandbox, makes the Stripe customer, and returns a Stripe
    Checkout URL (35 minutes). A repeated request expires the old Checkout and returns a new one.
+   An optional `license: {tier, users}` adds the commercial license at the bundle price to the same
+   page, so one payment buys both. The first sync moves the license to its own subscription that
+   renews on the same day as the server ([Commercial license](architecture/servers.md#commercial-license)).
+   While the license promotion (`LICENSE_TRIAL_END`) runs, the page has the server line only, and the
+   license starts with a free trial until the promotion ends.
+   Refunds are by email only: email licenses@openbot.run within 24 hours of the first payment for a
+   refund less a €3 / $3.60 / 13.20 zł fee, once per account. There are no refunds for later changes.
    The desktop main process opens the URL only when it is an `https://checkout.stripe.com` URL; the
    renderer never gets it. The web client goes to the page in the same tab, and Stripe returns to
    `/app?hosting=checkout&hosted_server=<id>` (`&cancelled=1` when the user went back).
@@ -164,8 +171,27 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    machine in memory and continue it at a resume with no boot: the resume answers `"status":
    "running"`, and the file stays. Then the Worker runs a command on the machine that removes the
    file and starts `openbot.service` (`HELD_RESUME_START_COMMAND`). With no file the command does
-   nothing. If boat does not complete the stop after the hook, OpenBot stays stopped until the next
-   stop and resume. A hook that OpenBot did not write stays, and a self-hosted server gets no hook.
+   nothing. boat can also cancel the stop after the hook, for example when it cannot pause a Docker
+   container that restarts ("Final snapshot failed; stop aborted"). The machine then runs with the
+   file, and OpenBot stays stopped. Two paths start it again, both only for a file older than 5
+   minutes: boat runs the hook again before each new try of the stop, so a newer file can belong to a
+   save that still runs. The hook sets a transient systemd timer (`openbot-pre-stop-restart`) that
+   fires 15 minutes after the last hook. A client wake or a connector event for a server that boat
+   reports as running makes the Worker run `FAILED_STOP_START_COMMAND` after the reply. boat tries
+   the stop again every 4 to 10 minutes (seen on 2026-11-05), and each try stops OpenBot again. Thus
+   the timer fires only after boat stops its tries, and a wake keeps OpenBot running only until the
+   next try. boat reports these tries as `stop.status: "failing"` and keeps the sandbox state
+   `idle`. On 2026-11-05 a save failed this way for 18 hours, while the restore of the disk stalled,
+   and the start command failed with `sandbox_restoring`. Thus the Worker reads a failing stop as
+   `stopping`, not `running`, and logs `Hosted server stop is failing.` at each check. A `sandbox.ready`
+   webhook for a stopping server makes the Worker read the sandbox again, so the webhook does not hide
+   the failing stop. Each client wake and connector event still sends `FAILED_STOP_START_COMMAND`. The Worker does not end the stop. Only a resume ends it
+   (`superseded`), but boat does not say if that resume keeps the disk or restores the last saved
+   disk. A forced stop keeps only the last saved disk and loses what was written after it. An
+   operator decides: compare `snapshotCompletedAt` with the last writes of OpenBot before a force,
+   then wake the server. A machine that stopped
+   runs no timer. A hook that OpenBot did not write stays, and a self-hosted server gets
+   no hook.
 
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
    it stopped the main thread for 77 seconds to about 4 minutes. A clean close removes
@@ -282,10 +308,28 @@ a Claude subscription on a server, read [provider terms](provider-terms.md#claud
 
 ## Members
 
-The plan sets the number of active members, owner included: Starter 3, Standard 10 and Pro 25
-(`BILLING_PLANS`). A host with no plan has 3 (`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the plan
+The plan sets the number of active members, owner included: Starter 1, Standard 5 and Pro 10
+(`BILLING_PLANS`). A host with no plan, such as a self-hosted server, takes the users of its owner's
+license (`ownerLicenseForHost`): Starter 1, Team 2 to 10. Only a license that is `active`, `trialing`, or
+`past_due` until the end of its period gives these seats. A host with no plan and no such license has 3
+(`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the limit in this order: a `server_member_limits` row,
+a hosted plan, the license, the default. A self-hosted host can keep a plan from before the license; it
+takes the larger of that plan and the license users. When an account has two open licenses, an
+entitled one comes first. When the limit comes from the license, a full server refuses a
+join with `409 license_users_full`. When a license ends, its servers go back to 3; members who are
+active stay. Any open license, also an `unpaid` one, refuses a join after its users, so the host list
+shows the lower of the limit and those users. When a license opens or closes, changes its users, or
+starts or stops giving them, the Worker sends `account-servers-changed` to each active member of the
+owner's servers, so their devices read the new limit. A renewal sends nothing. A `past_due` license that
+passes its period end sends it when the lapse sweep reads the license. A server made before
+these limits keeps the old limits of `LEGACY_MEMBER_LIMITS`: Starter 3, Standard 10 and Pro 25.
+Migration `0041` sets `hosted_servers.legacy_member_limits` to 1 for each existing row, and the
+Worker writes 0 for a new server. A self-hosted host with a plan has no hosted row, so it also keeps
+the old limits. `getServerEntitlement` returns the
+limit as `memberLimit`. The Worker reads the plan
 with `getServerEntitlement` when a member joins or is reactivated, and refuses a member over the limit
-(`409 member_limit_reached`). This also applies to a self-hosted host that has a plan.
+(`409 member_limit_reached`). A lower limit removes no member who is already active. This also applies to a
+self-hosted host that has a plan.
 
 - A row in the D1 table `server_member_limits` replaces the plan's limit for one server, such as an
   enterprise customer's, from 1 to 100. The row names the account that owns the server and applies
@@ -681,8 +725,8 @@ routine runs and teammate messages, and the oldest first in each group. No turn 
 that another turn holds, because a message to a teammate ends the turn that sends it. A queued
 message counts as use, so the server does not stop while messages wait.
 
-An agent's browser tab that nobody uses for 30 minutes unloads its page and keeps a blank page, as a
-restored tab does. The tab stays in the list with its URL, title and last preview. The next use by the agent or
+An agent's browser tab that nobody uses for 30 minutes unloads its page and ends its renderer
+process. A tab restored at start has no renderer process until it is used. The tab stays in the list with its URL, title and last preview. The next use by the agent or
 a person loads the page again, without its history and page state. When memory is `low`, a tab
 unloads after 5 minutes. The active tab, a popup and its opener, and a tab with a
 takeover, a secret, a recording, a live view, staged uploads or sound do not unload. This also

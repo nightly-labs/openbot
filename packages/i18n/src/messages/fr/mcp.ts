@@ -41,7 +41,7 @@ export const messages = {
   "mcp.status.didNotStart": "Non démarré",
   "mcp.status.unreachable": "Injoignable",
   "mcp.server.providerLimitNote":
-    "Claude uniquement : un serveur avec un répertoire de travail n’est pas transmis aux autres fournisseurs.",
+    "Claude et Codex uniquement : un serveur avec un répertoire de travail n’est pas transmis aux autres fournisseurs.",
   "mcp.server.runtimeDownloading":
     "Téléchargement de l’environnement d’exécution des serveurs STDIO. Un serveur peut ne pas démarrer avant la fin.",
   "mcp.server.runtimeDownloadingProgress":
@@ -83,7 +83,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Supprimer la variable transmise {position}",
   "mcp.panel.workingDirectory": "Répertoire de travail",
   "mcp.panel.workingDirectoryDescription":
-    "Les agents Claude et le test de connexion démarrent le serveur ici. Laissez vide pour donner ce serveur à tous les fournisseurs : aucun autre fournisseur ne peut définir de répertoire, il ignore donc un serveur qui en indique un.",
+    "Les agents Claude et Codex et le test de connexion démarrent le serveur ici. Laissez vide pour donner ce serveur à tous les fournisseurs : les autres fournisseurs ne peuvent pas définir de répertoire, ils ignorent donc un serveur qui en indique un.",
   "mcp.panel.endpointTitle": "Point de terminaison",
   "mcp.panel.endpointDescription": "Tous les fournisseurs peuvent utiliser un serveur MCP HTTP.",
   "mcp.panel.serverUrl": "URL du serveur",
@@ -144,11 +144,11 @@ export const messages = {
   "mcp.panel.appSaved": "App enregistrée. Connectez-vous pour l’utiliser.",
   "mcp.panel.appRemoved": "App supprimée.",
   "mcp.signIn.relayDescription":
-    "Vérifiez que la page de connexion est sur {page}, puis ouvrez-la dans votre navigateur. Quand vous avez terminé, OpenBot envoie la connexion à {host}.",
+    "Connectez-vous sur {page} dans votre navigateur. Quand vous avez terminé, OpenBot envoie la connexion à {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Ouvrez la page de connexion de {page} dans votre navigateur. Quand vous avez terminé, collez ici l’adresse affichée. OpenBot envoie ensuite la connexion à {host}.",
+    "Connectez-vous sur {page} dans votre navigateur. Quand vous avez terminé, collez ici l’adresse affichée. OpenBot envoie ensuite la connexion à {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Vérifiez que la page de connexion est sur {page}, puis ouvrez-la dans votre navigateur et terminez-y la connexion. {host} détecte la connexion lui-même.",
+    "Connectez-vous sur {page} dans votre navigateur et terminez-y la connexion. {host} détecte la connexion lui-même.",
   "mcp.signIn.relayOpen": "Ouvrir la page de connexion",
   "mcp.signIn.relayPasteHint":
     "Si le navigateur ne revient pas vers OpenBot, copiez l’adresse qu’il affiche et collez-la ici.",

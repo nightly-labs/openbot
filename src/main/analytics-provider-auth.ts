@@ -27,6 +27,7 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
     case "codex": {
       if (addedAccount) return "unknown";
       const account = facts.account("codex");
+      if (account?.type === "apiKey") return "api_key";
       if (account?.type !== "chatgpt") return "unknown";
       return account.planType === "free" ? "free" : "subscription";
     }
@@ -54,8 +55,21 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
     case "cursor":
       if (facts.envKey("CURSOR_API_KEY")) return "api_key";
       return facts.account("cursor") ? "subscription" : "unknown";
+    case "devin":
+      // Devin signs in only with a Devin account, and takes no API key.
+      return facts.account("devin") ? "subscription" : "unknown";
+    case "copilot":
+      // Copilot runs only on a Copilot plan, from a GitHub sign-in or a GitHub token.
+      return facts.account("copilot") ? "subscription" : "unknown";
+    case "mistral":
+      // Each Mistral Vibe sign-in saves an API key, and the host cannot tell a Le Chat plan key from a
+      // pay-as-you-go key.
+      return "unknown";
     case "cline":
       return model.startsWith("cline-free/") ? "free" : "unknown";
+    case "hermes":
+      // Hermes names each model `provider:model`; `nous` is the Nous Portal subscription.
+      return model.startsWith("nous:") ? "subscription" : "unknown";
     case "opencode": {
       const prefix = model.slice(0, Math.max(0, model.indexOf("/")));
       if (prefix && facts.customProviderIds().includes(prefix)) return "custom";

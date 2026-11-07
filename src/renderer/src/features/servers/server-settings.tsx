@@ -456,15 +456,17 @@ const ServerSettings = createSimpleContext({
     async function leaveConfirmedServer(): Promise<void> {
       const server = leaveConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
-      await removeMembership(server);
+      if (server.thisComputer) await serversPort().localServers.delete(server.id);
+      else await removeMembership(server);
       if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
     }
 
-    /** Restarts the hosted server that the confirmation from the server menu asks about. */
+    /** Restarts the hosted server, or the server on this computer, that the confirmation from the server menu asks about. */
     async function restartConfirmedServer(): Promise<void> {
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
-      await serversPort().hostedServers.restart(server.id);
+      if (server.thisComputer) await serversPort().localServers.restart(server.id);
+      else await serversPort().hostedServers.restart(server.id);
     }
 
     async function removeMembership(server: ServerSummary): Promise<void> {

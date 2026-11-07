@@ -166,14 +166,34 @@ class SlackAdapter implements MessagingAdapter {
       );
   });
 
+  /** Adds one reaction by its Slack name, for a workflow's Slack output. */
+  readonly addEmoji = Effect.fnUntraced(function* (
+    this: SlackAdapter,
+    target: MessageTarget,
+    messageId: string,
+    emoji: string,
+  ) {
+    yield* this.#api
+      .call("reactions.add", { channel: target.platformChannelId, timestamp: messageId, name: emoji })
+      .pipe(
+        Effect.catch((failure) =>
+          failure.cause instanceof SlackApiError && failure.cause.code === "already_reacted"
+            ? Effect.void
+            : Effect.fail(failure),
+        ),
+      );
+  });
+
   readonly postAnswer = Effect.fnUntraced(function* (
     this: SlackAdapter,
     target: MessageTarget,
     markdown: string,
     replaceMessageId: string | null,
   ) {
-    const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown));
+    const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown, true));
+    let firstId: string;
     if (replaceMessageId) {
+      firstId = replaceMessageId;
       const updated = yield* Effect.result(
         this.#api.call("chat.update", {
           channel: target.platformChannelId,
@@ -186,10 +206,11 @@ class SlackAdapter implements MessagingAdapter {
         yield* this.#api
           .call("chat.delete", { channel: target.platformChannelId, ts: replaceMessageId })
           .pipe(Effect.catch(() => Effect.void));
-        yield* this.#postText(target, first);
+        firstId = yield* this.#postText(target, first);
       }
-    } else yield* this.#postText(target, first);
+    } else firstId = yield* this.#postText(target, first);
     for (const chunk of rest) yield* this.#postText(target, chunk);
+    return firstId;
   });
 
   readonly upload = Effect.fnUntraced(function* (
@@ -451,9 +472,8 @@ class SlackAdapter implements MessagingAdapter {
   });
 
   /**
-   * A marker, not Slack markup: status text is escaped as a whole, which would make `<@U…>` inert.
-   * `#statusText` turns the marker back into a mention after the escape. The answer of an agent never
-   * goes through it, so an answer cannot mention anyone.
+   * A marker, not Slack markup: status text is escaped as a whole. `#statusText` turns the marker back
+   * into a mention after the escape.
    */
   mention(userId: string): string {
     return /^[A-Z0-9]+$/.test(userId) ? `\uE000@${userId}\uE000` : userId;
@@ -467,14 +487,17 @@ class SlackAdapter implements MessagingAdapter {
     this: SlackAdapter,
     target: MessageTarget,
     text: string,
-  ): Effect.fn.Return<void, MessagingAdapterError> {
-    yield* this.#api.call("chat.postMessage", {
+  ): Effect.fn.Return<string, MessagingAdapterError> {
+    const response = yield* this.#api.call("chat.postMessage", {
       channel: target.platformChannelId,
       thread_ts: target.replyThreadId ?? undefined,
       text,
       unfurl_links: false,
       unfurl_media: false,
     });
+    if (!isString(response.ts))
+      return yield* new MessagingAdapterError({ cause: new SlackApiError("chat.postMessage", "no_ts") });
+    return response.ts;
   });
 
   /** Status text is written by the host, so it is only escaped. Buttons become Block Kit. */

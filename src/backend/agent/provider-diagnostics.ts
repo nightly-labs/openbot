@@ -1,45 +1,3 @@
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-
-/**
- * Codex's text record of a completed fallback, as Codex 0.163 writes it when `LOG_FORMAT` is not
- * `json`: `<time>  WARN codex_otel::auth_storage: credential storage file fallback completed
- * credential_kind="codex" … outcome="not_found" … secure_error="none" …`.
- */
-const CODEX_FALLBACK_LINE =
-  /^(?:\S+\s+)?(?:TRACE|DEBUG|INFO|WARN)\s+codex_otel::auth_storage: credential storage file fallback completed\s/u;
-
-/**
- * Codex can finish a credential-store fallback while the provider keeps working. The record has a
- * `secure_error` field even when its value is `none`, so a keyword search reads it as an error.
- * Codex writes the record only when `RUST_LOG` lets warnings through, as text or, with
- * `LOG_FORMAT=json`, as JSON. Keep only this completed, non-error fallback in the log. Failed
- * storage operations and authentication replies still use the normal failure paths.
- */
-export function isCodexCredentialFallbackDiagnostic(message: string): boolean {
-  if (CODEX_FALLBACK_LINE.test(message)) {
-    // A space before the name, so `secure_outcome` is not read as `outcome`.
-    return /\ssecure_error="none"(?:\s|$)/u.test(message) && /\soutcome="(?:success|not_found)"(?:\s|$)/u.test(message);
-  }
-  try {
-    const record = JSON.parse(message);
-    if (!isDynamicRecord(record)) return false;
-    if (!("target" in record) || record.target !== "codex_otel::auth_storage") return false;
-    if (!("level" in record) || !["TRACE", "DEBUG", "INFO", "WARN"].includes(String(record.level))) return false;
-    if (!("fields" in record) || typeof record.fields !== "object" || record.fields === null) return false;
-    const fields = record.fields;
-    return (
-      "message" in fields &&
-      fields.message === "credential storage file fallback completed" &&
-      "secure_error" in fields &&
-      fields.secure_error === "none" &&
-      "outcome" in fields &&
-      (fields.outcome === "success" || fields.outcome === "not_found")
-    );
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
  *
@@ -50,9 +8,9 @@ export function isCodexCredentialFallbackDiagnostic(message: string): boolean {
  * list. That belongs in the log, not in an error the user is asked to read.
  *
  * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
- * this app. So does a server this app configured - the user asked for it here, and the reason it
- * does not start is something only they can fix. `configuredNames` is what separates the two: a
- * server the user configured in their own provider files is still nobody's failure but theirs.
+ * this app. A server this app configured is an MCP line too. The caller finds that server and
+ * reports it as the server's failure, not the provider's: the user asked for it here, and only they
+ * can fix it.
  *
  * Grok's CLI also loads the servers in `~/.claude.json`, `~/.cursor/mcp.json` and `.mcp.json`. One
  * there that asks for OAuth ends its transport with the `rmcp` worker's own sentence,
@@ -61,10 +19,22 @@ export function isCodexCredentialFallbackDiagnostic(message: string): boolean {
  * error" toast (#1199). The worker's sentence is matched as it stands, because no other part of a
  * provider writes it.
  */
-export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
+export function isMcpSubsystemDiagnostic(message: string): boolean {
   if (/openbot/i.test(message)) return false;
-  if (configuredNames.some((name) => name && message.includes(name))) return false;
   return /\b(mcp|rmcp)\b|\bworker quit with (?:fatal|join error|reason):/i.test(message);
+}
+
+/**
+ * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
+ *
+ * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
+ * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. A bare `401` is
+ * not enough: a port, an id or a line number can be 401.
+ */
+export function isMcpSignInDiagnostic(message: string): boolean {
+  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot authenticated\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+    message,
+  );
 }
 
 /**
@@ -163,11 +133,6 @@ function bracketBalance(line: string) {
  * and can try again, and the chat marks the step as failed. The user met it as a "Provider error"
  * toast during an embedded-browser click, with nothing to do about it. It belongs in the log.
  *
- * Codex logs each failed tool call as `codex_core::tools::router: error=…`, such as a cancelled
- * dynamic tool call or a failed image generation. It sends the error to the model as the tool's
- * result, and the turn continues. The toast had no chat, so it stayed over each chat the user
- * opened (#2965). Only a `Fatal error:` stops the turn, and it stays visible.
- *
  * Antigravity logs failed MCP calls as `error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL:`,
  * followed by the tool's error (`Error: …` or `calling "tools/call": Error: …`) or its own call
  * timeout. These records describe one tool call, which the agent reads as the tool's result (#1524).
@@ -175,7 +140,6 @@ function bracketBalance(line: string) {
  */
 export function isToolCallDiagnostic(message: string): boolean {
   return (
-    /^[^\r\n]*\bcodex_core:[^\r\n]*\brouter:\s*error=(?!Fatal error:)/.test(message) ||
     /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message) ||
     /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:\s*(?:calling "tools\/call":\s*)?Error:/.test(
       message,
@@ -184,21 +148,6 @@ export function isToolCallDiagnostic(message: string): boolean {
       message,
     )
   );
-}
-
-/**
- * Whether a provider diagnostic reports a background refresh that the CLI retries by itself.
- *
- * Codex refreshes its model list and its remote settings on a timer, and logs each failed attempt
- * on stderr. A computer that wakes without internet access writes one line per attempt, and the user
- * met them as a stack of "Provider error" toasts to close one by one (#717). No turn reads either
- * refresh: OpenBot reads the model catalogue itself and reports that failure where it happens.
- *
- * Only these two refreshes count. Any other failure, a network failure included, stays visible.
- */
-export function isBackgroundRefreshDiagnostic(message: string): boolean {
-  if (/openbot/i.test(message)) return false;
-  return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
 }
 
 /**
@@ -218,18 +167,17 @@ export function isUsageReadDiagnostic(message: string): boolean {
 }
 
 /**
- * Whether a provider diagnostic is Codex's notice that it uses its bundled bubblewrap.
+ * Whether a provider diagnostic is Grok's own record of a `git` command that could not start.
  *
- * On Linux, Codex looks for `bwrap` on PATH for its sandbox. When it is not there, it writes "Codex
- * could not find bubblewrap on PATH" at `ERROR` level, and then "Codex will use the bundled bubblewrap
- * in the meantime". Codex starts and works. The user of a Docker server met the line as a "Provider
- * error" toast on each connect, with no way to know if the provider worked (#2177). The release
- * installs `bubblewrap` now; a server with an older package list still writes the notice.
+ * Grok's CLI runs `git` to read the repository state, and logs `ERROR git_cli: Command::output()
+ * FAILED (spawn error) error=program not found` on stderr when `git` is not on the PATH, as on a
+ * Windows computer without Git. Grok continues without the repository state. The user met the line
+ * as a "Grok error" toast with nothing failing (#4789). It belongs in the log.
  *
- * Only the notice with the fallback counts. A bubblewrap failure that has no fallback stays visible.
+ * Only a spawn failure counts. A `git` command that ran and failed stays visible.
  */
-export function isBundledSandboxFallbackDiagnostic(message: string): boolean {
-  return /\bcould not find bubblewrap on PATH\b[\s\S]*\bwill use the bundled bubblewrap\b/i.test(message);
+export function isGitSpawnDiagnostic(message: string): boolean {
+  return /\bERROR\s+git_cli:\s+Command::output\(\) FAILED \(spawn error\)/.test(message);
 }
 
 /**
@@ -246,34 +194,20 @@ export function isAcpHandlerDiagnostic(message: string): boolean {
   return /^Error handling (?:request|notification)\b/.test(message);
 }
 
-const IGNORED_CONFIG_SUMMARY = /\bCodex is ignoring (\d+) unrecognized configuration settings?\b/;
+const IGNORED_CONFIG_SUMMARY = /\bCodex is ignoring \d+ unrecognized configuration settings?\b/;
 
 /**
  * Whether a provider diagnostic is Codex's summary of the settings it ignored in its configuration.
  *
  * Codex writes this at `ERROR` level when a configuration layer holds a key it does not know: a
- * typo, a removed setting, or a key that a newer Codex wrote into the shared `~/.codex/config.toml`.
- * The keys are on the indented lines after the summary, which reach OpenBot as records of their
- * own, so the user read only the summary as a "Provider error", once per reconnect, with no key to
- * fix (#997). Codex starts and works either way. The same text arrives as a `configWarning`
- * notification, which names the keys and is reported from there, so this copy belongs in the log.
+ * typo, a removed setting, or a key that another Codex app wrote into the shared
+ * `~/.codex/config.toml`. Codex starts and works either way. The user read it as a "Provider
+ * error", once per reconnect (#997), and then as a warning for a key the Codex desktop app writes
+ * and needs (#4179), so it belongs in the log. The same text also arrives as a `configWarning`
+ * notification, which names the keys and is logged from there.
  */
 export function isIgnoredConfigDiagnostic(message: string): boolean {
   return IGNORED_CONFIG_SUMMARY.test(message);
-}
-
-/**
- * What a Codex `configWarning` summary names as ignored, or `null` for any other warning.
- *
- * `count` is the total from the first line. Codex names up to three of them, one per line, as
- * ``  user (/path/config.toml): `tools.x` is ignored.``, and adds "... and N more" for the rest.
- * Only the keys are kept: the layer label carries a path, which the renderer does not show.
- */
-export function ignoredCodexSettings(summary: string): { count: number; keys: string[] } | null {
-  const count = IGNORED_CONFIG_SUMMARY.exec(summary)?.[1];
-  if (!count) return null;
-  const keys = [...summary.matchAll(/`([^`\n]+)` is ignored\./g)].flatMap((match) => (match[1] ? [match[1]] : []));
-  return { count: Number(count), keys: [...new Set(keys)] };
 }
 
 /**
@@ -295,6 +229,25 @@ const GLOG_RECORD =
 export function isGlogBelowErrorDiagnostic(message: string): boolean {
   const severity = GLOG_RECORD.exec(message)?.[1];
   return severity === "I" || severity === "W";
+}
+
+/**
+ * A Rust log record whose own level is below error, as in
+ * `2026-11-04T23:00:00.123456Z  INFO devin::acp: request failed, will retry` (`tracing`) or
+ * `[2026-11-04T23:00:00Z INFO  devin::acp] …` (`env_logger`).
+ *
+ * ACP gives stderr to the agent for its logs; a failure reaches OpenBot as an answer or as the exit.
+ * Devin CLI 3000.11.234 writes its info records to stderr, and a word such as "failed" in one let it
+ * through as a provider error (#5064). The level of the record decides instead.
+ *
+ * Only a record that opens with the level, after an optional timestamp, counts. An `ERROR` record,
+ * or text without a level - a Rust panic included - stays visible.
+ */
+const RUST_LOG_RECORD =
+  /^\[?(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+)?(?:TRACE|DEBUG|INFO|WARN)\s/u;
+
+export function isRustLogBelowErrorDiagnostic(message: string): boolean {
+  return RUST_LOG_RECORD.test(message);
 }
 
 /**
@@ -328,17 +281,50 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 /**
  * Whether a provider says that a plan window is spent, a limit that resets by itself: "You've hit
  * your session limit · resets 8:40pm", "You've hit your usage limit. Try again at 10:34 AM.",
- * "You've reached your weekly usage limit for your plan. Your limit resets at …". A
- * spent credit balance or quota does not reset, so it is not one: holding work for it would wait
- * forever and hide the provider's reason. A short request-rate throttle says "rate limit".
+ * "You've reached your weekly usage limit for your plan. Your limit resets at …". The OpenCode Go
+ * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
+ * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
+ * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
+ * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
+ * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
+ * Usage resets over a rolling 24-hour window" (#4869). A spent credit
+ * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
+ * the provider's reason. A short request-rate throttle says "rate limit".
  */
 export function isPlanLimitDiagnostic(message: string): boolean {
   // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
   if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
     /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
-    /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message)
+    /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
+    /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
+    /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
+    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message) ||
+    /\bsubscription:free-usage-exhausted\b/u.test(message)
   );
+}
+
+const RESET_DELAY_UNIT = "(?:days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])";
+const RESET_DELAY = new RegExp(
+  String.raw`\bresets? (?:in|after) ((?:\d+(?:\.\d+)?\s*${RESET_DELAY_UNIT}(?:,?\s*(?:and\s+)?))+)`,
+  "iu",
+);
+const RESET_DELAY_PART = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*(${RESET_DELAY_UNIT})`, "giu");
+const RESET_DELAY_UNIT_MS: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1_000 };
+
+/**
+ * The wait until a limit resets that a provider error names, in milliseconds, or null. A spent
+ * Gemini quota reads "Your limit will reset in 2 days, 18 hours." (#4368), and an Antigravity
+ * capacity error "Your quota will reset after 18h31m10s".
+ */
+export function providerResetDelayMs(message: string): number | null {
+  const named = RESET_DELAY.exec(message)?.[1];
+  if (!named) return null;
+  let delay = 0;
+  for (const [, amount, unit] of named.matchAll(RESET_DELAY_PART)) {
+    delay += Number(amount) * (RESET_DELAY_UNIT_MS[unit?.[0]?.toLowerCase() ?? ""] ?? 0);
+  }
+  return delay > 0 ? delay : null;
 }
 
 /** Whether a provider's text names money or a quota, which no wait gives back. */

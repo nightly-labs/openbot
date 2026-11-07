@@ -1,12 +1,18 @@
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
+import type { LiveVoiceEvent } from "./team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
 // wire value the main process, the preload bridge and the renderer all compare against, so it lives
 // beside the types they share instead of being retyped at each comparison.
 export const LOCAL_SERVER_ID = "local";
+
+// The most servers that a user can create on this computer, in addition to "Local". Each one is a
+// full OpenBot process that runs all the time, so main refuses one more and the dialog says why.
+export const LOCAL_SERVER_LIMIT = 5;
 
 export type ServerConnectionState = "online" | "connecting" | "offline" | "error" | "incompatible";
 export type TeamRole = "owner" | "admin" | "member";
@@ -87,6 +93,16 @@ export interface ServerSummary {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /**
+   * When the host last changed its key, in milliseconds since the epoch. Only a change that both the
+   * previous and the new key signed. Absent when the server list has no such change.
+   */
+  keyChangedAt?: number;
+  /**
+   * A local server: a second server on this computer, which this app runs as its child process. It
+   * is reached as a joined server, so `kind` stays `"remote"`. Absent for every other server.
+   */
+  thisComputer?: true;
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
@@ -178,6 +194,8 @@ export interface TeamMemberSummary {
   email: string | null;
   name: string | null;
   avatarUrl?: string | null;
+  /** The chat colour from the member's OpenBot account. Absent means no chat colour. Peers read it through `chat-colors-v1`. */
+  chatColor?: AvatarColor;
   role: TeamRole;
   createdAt: string;
   disabled: boolean;
@@ -301,6 +319,7 @@ export type TeamRealtimeEvent =
       typing: boolean;
     }
   | HostRestartEvent
+  | LiveVoiceEvent
   | MachineAlertEvent;
 
 export type DirectMessageRealtimeEvent = Extract<TeamRealtimeEvent, { type: "team-direct-message" }>;
@@ -352,6 +371,7 @@ function isTeamPresenceMember(value: unknown): value is TeamPresenceMember {
     (value.email === null || isLimitedString(value.email, INPUT_LIMITS.email)) &&
     (value.name === null || isLimitedString(value.name, INPUT_LIMITS.accountName)) &&
     (value.avatarUrl === undefined || value.avatarUrl === null || isHttpUrl(value.avatarUrl, INPUT_LIMITS.avatarUrl)) &&
+    (value.chatColor === undefined || isAvatarColor(value.chatColor)) &&
     (value.role === "owner" || value.role === "admin" || value.role === "member") &&
     isTimestamp(value.createdAt) &&
     isBoolean(value.disabled) &&
@@ -492,6 +512,31 @@ export const REMOTE_DESKTOP_ERROR_CODES = [
 
 export type RemoteDesktopErrorCode = (typeof REMOTE_DESKTOP_ERROR_CODES)[number];
 
+/**
+ * Who may control this computer through remote desktop. `members` is every member, as before the
+ * setting existed; `admins` is the owner and the admins; `owner` is only the owner.
+ */
+export const REMOTE_CONTROL_ACCESS_LEVELS = ["owner", "admins", "members"] as const;
+export type RemoteControlAccess = (typeof REMOTE_CONTROL_ACCESS_LEVELS)[number];
+
+/** The host owner's remote control choices, as they are stored and as they cross IPC. */
+export interface RemoteControlPolicy {
+  access: RemoteControlAccess;
+  /** Ask the person at this computer to allow each remote control session before it starts. */
+  askOnHost: boolean;
+}
+
+export const DEFAULT_REMOTE_CONTROL_POLICY: RemoteControlPolicy = { access: "members", askOnHost: false };
+
+export function isRemoteControlAccess(value: unknown): value is RemoteControlAccess {
+  return isOneOf(REMOTE_CONTROL_ACCESS_LEVELS, value);
+}
+
+export function remoteControlAllowsRole(access: RemoteControlAccess, role: TeamRole): boolean {
+  if (access === "members") return true;
+  return access === "admins" ? canAdministerServer(role) : role === "owner";
+}
+
 export interface RemoteDesktopSession {
   id: string;
   serverId: string;
@@ -530,4 +575,4 @@ export interface RemoteDesktopSelectDisplayInput {
 }
 
 import { INPUT_LIMITS } from "./input-limits";
-import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";

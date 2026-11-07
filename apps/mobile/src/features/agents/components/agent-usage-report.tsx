@@ -8,7 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { usageSeries, usageTotalSeries } from "@openbot/team-client/usage-series";
 import { Typography } from "heroui-native";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
@@ -23,21 +23,20 @@ const providerName = (value: string) => (isAgentProvider(value) ? agentProviderC
 /** A row of the per-agent split of a server report, with the name the phone knows for the agent. */
 export interface UsageAgentRow extends AnalyticsAgent {
   name: string;
+  /** The avatar of an agent the phone lists. A removed agent has none. */
+  avatar?: ReactNode;
+  /** Opens the agent's own usage. A removed agent has no page to open. */
+  onPress?: () => void;
 }
 
-/**
- * The report of one agent, or of a server. A server report also passes its per-agent split;
- * a press on an agent row narrows the report to that agent.
- */
+/** The report of one agent, or of a server. A server report also passes its per-agent split. */
 export function AgentUsageReport({
   result,
   agents,
-  onSelectAgent,
 }: {
   /** A host report also splits the days by provider, which draws one area per provider. */
   result: Omit<AgentAnalytics, "agentId"> & { providerDaily?: AnalyticsProviderDay[] };
   agents?: UsageAgentRow[];
-  onSelectAgent?: (agentId: string) => void;
 }) {
   const { t, format } = useText();
   const number = (value: number | null) =>
@@ -98,7 +97,7 @@ export function AgentUsageReport({
         {date(result.startDate, true)} – {date(result.endDate, true)} · {result.timeZone}
       </Typography>
       <View className="flex-row gap-3">
-        <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
+        <View className="flex-1 justify-between gap-1 rounded-grouped bg-grouped p-4">
           <Typography type="body-xs" className="text-grouped-secondary">
             {t("mobile.agent.usage.tokensWithoutCacheReads")}
           </Typography>
@@ -106,7 +105,7 @@ export function AgentUsageReport({
             <Typography className="text-2xl font-semibold">{number(analyticsTokens(totals))}</Typography>
           </UsageValue>
         </View>
-        <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
+        <View className="flex-1 justify-between gap-1 rounded-grouped bg-grouped p-4">
           <Typography type="body-xs" className="text-grouped-secondary">
             {t("mobile.agent.usage.estimatedCost")}
           </Typography>
@@ -228,7 +227,8 @@ export function AgentUsageReport({
             byTokens(agents).map((agent) => (
               <SettingsRow
                 key={agent.agentId}
-                onPress={onSelectAgent ? () => onSelectAgent(agent.agentId) : undefined}
+                leading={agent.avatar}
+                onPress={agent.onPress}
                 supportingText={t("mobile.server.usage.agentLine", {
                   tokens: number(analyticsTokens(agent)),
                   cost: money(agent.estimatedCostUsd),

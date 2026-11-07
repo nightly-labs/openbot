@@ -3,6 +3,13 @@
   gap: var(--openbot-space-1);
 }
 
+.hosted-sites-usage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
 .hosted-sites-list .hosted-sites-row {
   min-height: 72px;
   align-items: center;
@@ -19,7 +26,7 @@
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-md);
-  text-align: left;
+  text-align: start;
 }
 
 .hosted-sites-link-label {

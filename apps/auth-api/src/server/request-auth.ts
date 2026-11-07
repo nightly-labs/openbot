@@ -10,6 +10,7 @@ import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
+import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
@@ -20,7 +21,7 @@ import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
-import { resolveHostedSiteScope } from "./hosted-site-server";
+import { adoptUnlinkedHostedSites, resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
 import { JsonBodyError } from "./json-body";
 import { type ApnsRelaySender, sharedApnsSender } from "./live-activity-relay";
@@ -47,6 +48,7 @@ function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input, init) => fetch(input, init),
     schedule,
+    database: bindings.DB,
   });
 }
 
@@ -68,7 +70,28 @@ export function requestAuthService(): AuthService {
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,
     attribution: new AccountAttribution({ database: bindings.DB, analytics }),
+    usesCompanySignIn: (email) =>
+      new CompanySignInService(bindings)
+        .usesCompanySignIn(email)
+        .pipe(Effect.mapError(() => new AuthOperationError({ message: "Account operation failed." }))),
   });
+}
+
+export function requestCompanySignIn(): CompanySignInService {
+  const bindings = requireWorkerBindings(env);
+  const remote = new RemoteControlPlane(bindings, { schedule });
+  return new CompanySignInService(bindings, {
+    // The revocation is already written and the cron redelivers it, so the answer does not wait.
+    flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
+    revokeMembership: (actorUserId, hostId, membershipId) =>
+      remote.changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
+    joinServer: (hostId, userId, options) => remote.joinByCompanySignIn(hostId, userId, options),
+  });
+}
+
+export function companySignInErrorResponse(error: unknown): Response {
+  if (error instanceof CompanySignInError) return apiError(error.status, error.code, error.message);
+  return remoteControlPlaneErrorResponse(error);
 }
 
 export function requestAvatarBucket(): R2Bucket {
@@ -92,6 +115,11 @@ export function requestAgentTemplates(): AgentTemplates {
 /** The sites that a signed-in `/v1/sites` request can see and change. See `resolveHostedSiteScope`. */
 export function requestHostedSiteScope(request: Request, userId: string) {
   return resolveHostedSiteScope(requireWorkerBindings(env).DB, userId, request);
+}
+
+/** Moves the account's sites from before a self-hosted server registered into it. See `adoptUnlinkedHostedSites`. */
+export function requestAdoptUnlinkedHostedSites(userId: string, serverId: string) {
+  return adoptUnlinkedHostedSites(requireWorkerBindings(env).DB, userId, serverId, Date.now());
 }
 
 export function requestHostedSiteService(): HostedSiteService {
@@ -314,6 +342,7 @@ function requestHostedBilling(developerKey: string | null = null) {
     removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
     developerKey,
     planChanged: (hostId) => remote.planChanged(hostId),
+    licenseChanged: (userId) => remote.licenseChanged(userId),
     schedule,
   });
 }
@@ -341,6 +370,12 @@ export function remoteControlPlaneErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
+/** A GitHub route ticket checks the host credential and then the GitHub sign-in. */
+export function githubRouteErrorResponse(error: unknown): Response {
+  if (error instanceof RemoteControlPlaneError) return remoteControlPlaneErrorResponse(error);
+  return githubInstallationTokensErrorResponse(error);
+}
+
 export function requestSlackApp(): SlackAppService {
   const bindings = requireWorkerBindings(env);
   // The events are already in D1 and the cron redelivers them, so the answer does not wait.
@@ -365,13 +400,6 @@ export function requestDiscordApp(): DiscordAppService {
 export function discordAppErrorResponse(error: unknown): Response {
   if (error instanceof DiscordAppError) return apiError(error.status, error.code, error.message);
   return authErrorResponse(error);
-}
-
-export function requestRemoteSignalUrl(): string {
-  const value = requireWorkerBindings(env).REMOTE_SIGNAL_URL?.trim();
-  if (!value)
-    throw new RemoteControlPlaneError(503, "remote_not_configured", "The Remote Signal URL is not configured.");
-  return value;
 }
 
 export function bearerToken(request: Request): string | null {

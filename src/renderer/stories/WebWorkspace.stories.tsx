@@ -8,8 +8,10 @@ import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/pr
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { Toaster } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { saveRemoteWorkspaceFrame } from "../src/features/servers/remote-workspace-frame";
 import { WebWorkspace } from "../src/features/web-client/WebWorkspace";
 import type { WebRuntimeFactory } from "../src/features/web-client/web-client-context";
+import { WebHostOtherTabError } from "../src/features/web-client/web-host-lock";
 import { WebHostIncompatibleError } from "../src/features/web-client/web-runtime";
 import { createBenchWebRuntime } from "../src/preview/bench-web-runtime";
 import { mockAccountCatalogFetch } from "../src/preview/mock-account-catalog";
@@ -71,12 +73,17 @@ const failedHostsRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
-const otherTabRuntime: WebRuntimeFactory = (...args) => ({
-  ...createMockWebRuntime(...args),
-  connect: async () => {
-    throw new Error("This host is open in another tab. Close that connection before trying again.");
-  },
-});
+/** Another tab has the host open until "Use here" takes it. */
+const otherTabRuntime: WebRuntimeFactory = (...args) => {
+  const runtime = createMockWebRuntime(...args);
+  return {
+    ...runtime,
+    connect: async (host, options) => {
+      if (!options?.takeOver) throw new WebHostOtherTabError();
+      return runtime.connect(host, options);
+    },
+  };
+};
 
 const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
   ...createMockWebRuntime(...args),
@@ -88,6 +95,35 @@ const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
+/** How long the host takes to answer in `SavedFrameSlowConnect`, so the loading screen and its exit both show. */
+const SLOW_CONNECT_MS = 6_000;
+
+/** The last visit saved a frame of the workspace, and the host answers slowly. */
+const savedFrameSlowRuntime: WebRuntimeFactory = (accountId, events) => {
+  const mock = createMockOpenBot();
+  const runtime = mockWebRuntimeFor(mock, events);
+  const saved = mock.api.agent.listAgents().then((agents) => {
+    saveRemoteWorkspaceFrame(accountId, "preview-host", { agents, selectedAgentId: agents[0]?.id ?? null });
+  });
+  return {
+    ...runtime,
+    // The frame is read when the connect starts, so the host list waits for the write.
+    listHosts: async () => {
+      await saved;
+      return runtime.listHosts();
+    },
+    connect: async (host, options) => {
+      await new Promise((resolve) => setTimeout(resolve, SLOW_CONNECT_MS));
+      return runtime.connect(host, options);
+    },
+  };
+};
+
+/** A new page with a saved frame: the chat shows the loader of its history until the host answers. */
+export const SavedFrameSlowConnect: Story = {
+  args: { createRuntime: savedFrameSlowRuntime },
+};
+
 export const NoHost: Story = {
   args: { accountEmail: "you@example.com", createRuntime: noHostRuntime },
 };
@@ -96,7 +132,7 @@ export const HostsFailed: Story = {
   args: { accountEmail: "you@example.com", createRuntime: failedHostsRuntime },
 };
 
-export const Disconnected: Story = {
+export const OpenInAnotherTab: Story = {
   args: { accountEmail: "you@example.com", createRuntime: otherTabRuntime },
 };
 
@@ -328,4 +364,24 @@ const sleepingFetch: typeof fetch = async (input, init) => {
 
 export const HostedServerAsleep: Story = {
   args: { createRuntime: sleepingRuntime, accountFetch: sleepingFetch },
+};
+
+/** Another tab has the cloud server open. The server rail opens the other server. */
+const otherTabServersRuntime: WebRuntimeFactory = (...args) => {
+  const runtime = createMockWebRuntime(...args);
+  return {
+    ...runtime,
+    listHosts: async () => {
+      const [computer] = await runtime.listHosts();
+      return computer ? [{ ...computer, hostId: NEW_SERVER_ID, name: "Cloud server" }, computer] : [];
+    },
+    connect: async (host, options) => {
+      if (host.hostId === NEW_SERVER_ID && !options?.takeOver) throw new WebHostOtherTabError();
+      return runtime.connect(host, options);
+    },
+  };
+};
+
+export const OpenInAnotherTabWithServers: Story = {
+  args: { accountEmail: "you@example.com", createRuntime: otherTabServersRuntime },
 };

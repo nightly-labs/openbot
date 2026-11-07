@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "Не удалось удалить этот канал. Повторите попытку.",
   "mobile.channel.list.open": "Открыть канал {name}",
   "mobile.channel.list.openWithTitle": "Открыть канал {name}, {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": {
     one: "{count} непрочитанное сообщение",
     few: "{count} непрочитанных сообщения",
@@ -26,6 +27,7 @@ export const messages = {
   "mobile.channel.task.paused": "Приостановлена",
   "mobile.channel.task.resume": "Возобновить",
   "mobile.channel.task.reassign": "Переназначить",
+  "mobile.channel.task.cancel": "Отменить задачу",
   "mobile.channel.loadFailed": "Не удалось загрузить каналы. Повторите попытку.",
   "mobile.channel.actions.historyStale": "Задача изменена, но историю чата обновить не удалось.",
   "mobile.channel.actions.refreshFailed": "Не удалось обновить историю задачи. Повторите попытку.",

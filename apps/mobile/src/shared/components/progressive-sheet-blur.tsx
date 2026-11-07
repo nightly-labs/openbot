@@ -1,7 +1,15 @@
 import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
-import { memo, useId } from "react";
-import { type StyleProp, StyleSheet, useColorScheme, View, type ViewStyle } from "react-native";
+import { memo, useId, useState } from "react";
+import {
+  Dimensions,
+  type LayoutChangeEvent,
+  type StyleProp,
+  StyleSheet,
+  useColorScheme,
+  View,
+  type ViewStyle,
+} from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 // Overlapping weak blurs approximate a radius ramp. Each layer is transparent
@@ -11,6 +19,7 @@ const BLUR_LAYER_ENDS = [OUTER_BLUR_LAYER_END, 0.8, 0.66, 0.52, 0.38, 0.24];
 // The dark system material is lighter than the dark surface, so a masked
 // surface color pulls the blurred edge back to the surface's tone.
 const DARK_SHEET_TINT_OPACITY = 0.7;
+const MASK_WIDTH = Math.ceil(Math.max(Dimensions.get("screen").width, Dimensions.get("screen").height));
 const FADE_STOPS = Array.from({ length: 17 }, (_, index) => {
   const progress = index / 16;
   return { progress, opacity: 1 - progress * progress * (3 - 2 * progress) };
@@ -28,10 +37,21 @@ export const ProgressiveSheetBlur = memo(function ProgressiveSheetBlur({
 }) {
   const id = useId().replaceAll(":", "");
   const colorScheme = useColorScheme();
+  // A mask keeps the size that it first drew at, so a percent size goes stale when the view resizes:
+  // a rotation, or a column that the user resizes. The fade runs down the view only, so the masks are
+  // as wide as the longest side of the screen, which no width outgrows, and take only the measured
+  // height. A column that the user drags wider or narrower then does not render the blur again.
+  const [height, setHeight] = useState<number | null>(null);
+  const measure = (event: LayoutChangeEvent) => {
+    const measured = event.nativeEvent.layout.height;
+    setHeight((current) => (current === measured ? current : measured));
+  };
+  const size = height === null ? null : { width: MASK_WIDTH, height };
 
-  function fadeMask(maskId: string, end: number) {
+  function fadeMask(maskId: string, end: number, { width, height }: { width: number; height: number }) {
     return (
-      <Svg width="100%" height="100%">
+      // A new size mounts a new mask, so the masked view takes it as its mask again.
+      <Svg key={`${width}x${height}`} width={width} height={height}>
         <Defs>
           <LinearGradient
             id={maskId}
@@ -45,7 +65,7 @@ export const ProgressiveSheetBlur = memo(function ProgressiveSheetBlur({
             ))}
           </LinearGradient>
         </Defs>
-        <Rect width="100%" height="100%" fill={`url(#${maskId})`} />
+        <Rect width={width} height={height} fill={`url(#${maskId})`} />
       </Svg>
     );
   }
@@ -56,17 +76,23 @@ export const ProgressiveSheetBlur = memo(function ProgressiveSheetBlur({
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={style}
+      onLayout={measure}
     >
-      {BLUR_LAYER_ENDS.map((end, index) => {
-        const maskId = `sheet-blur-${id}-${index}`;
-        return (
-          <MaskedView key={end} style={StyleSheet.absoluteFill} maskElement={fadeMask(maskId, end)}>
-            <BlurView tint="systemUltraThinMaterial" intensity={12} style={StyleSheet.absoluteFill} />
-          </MaskedView>
-        );
-      })}
-      {colorScheme === "dark" ? (
-        <MaskedView style={StyleSheet.absoluteFill} maskElement={fadeMask(`sheet-tint-${id}`, OUTER_BLUR_LAYER_END)}>
+      {size === null
+        ? null
+        : BLUR_LAYER_ENDS.map((end, index) => {
+            const maskId = `sheet-blur-${id}-${index}`;
+            return (
+              <MaskedView key={end} style={StyleSheet.absoluteFill} maskElement={fadeMask(maskId, end, size)}>
+                <BlurView tint="systemUltraThinMaterial" intensity={12} style={StyleSheet.absoluteFill} />
+              </MaskedView>
+            );
+          })}
+      {colorScheme === "dark" && size !== null ? (
+        <MaskedView
+          style={StyleSheet.absoluteFill}
+          maskElement={fadeMask(`sheet-tint-${id}`, OUTER_BLUR_LAYER_END, size)}
+        >
           <View
             className={surface === "sheet" ? "flex-1 bg-sheet" : "flex-1 bg-background"}
             style={{ opacity: DARK_SHEET_TINT_OPACITY }}

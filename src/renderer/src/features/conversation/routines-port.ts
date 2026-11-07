@@ -9,6 +9,7 @@ import type {
   RoutineResultDelivery,
   RoutineResultDestination,
   RoutineRunFields,
+  RoutineRunPlace,
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import type { EventRoutine, EventRoutineOwner, EventRoutineTriggerInput } from "@openbot/contracts/ipc-events";
@@ -25,6 +26,8 @@ interface RoutineSaveInput {
   limitPolicy?: RoutineLimitPolicy;
   /** Left out, an update keeps the saved policy. */
   missedPolicy?: RoutineMissedPolicy;
+  /** Left out, an update keeps the saved place. */
+  runIn?: RoutineRunPlace;
   /** Only the event API reads it. Schedule-only adapters save `schedule`. */
   trigger?: EventRoutineTriggerInput;
 }
@@ -68,6 +71,12 @@ export interface RoutinesPort {
    * API cannot carry the `once` kind, so a remote host hides such routines.
    */
   onceSchedule: boolean;
+  /**
+   * Whether the host keeps where an agent routine runs: the agent's chat or the routine's own thread.
+   * This computer's host does, and a remote host with `routine-run-place-v1`. The released routine
+   * routes drop the field, so the remote adapters send it on that capability's routes.
+   */
+  runIn: boolean;
   list: () => Promise<RoutineEditorRecord[]>;
   listRuns: (routineId: string, limit: number) => Promise<RoutineRunFields[]>;
   save: (input: RoutineSaveInput) => Promise<RoutineSaveResult>;
@@ -104,6 +113,7 @@ export function agentRoutinesPort(
   automation = false,
   localHost = false,
   api: AgentRoutinesApi = window.openbot.agent,
+  runPlace = localHost,
 ): RoutinesPort {
   return {
     ownerId: agentId,
@@ -111,12 +121,15 @@ export function agentRoutinesPort(
     limitPolicy: localHost,
     missedPolicy: localHost,
     onceSchedule: localHost,
+    runIn: runPlace,
     list: () => api.listRoutines(agentId),
     listRuns: (routineId, limit) => api.listRoutineRuns({ agentId, routineId, limit }),
-    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy }) => {
-      const policy = localHost
-        ? { ...(limitPolicy ? { limitPolicy } : {}), ...(missedPolicy ? { missedPolicy } : {}) }
-        : {};
+    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy, runIn }) => {
+      const policy = {
+        ...(localHost && limitPolicy ? { limitPolicy } : {}),
+        ...(localHost && missedPolicy ? { missedPolicy } : {}),
+        ...(runPlace && runIn ? { runIn } : {}),
+      };
       return (
         routineId
           ? api.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })
@@ -161,6 +174,7 @@ export function channelRoutinesPort(
     limitPolicy: localHost,
     missedPolicy: localHost,
     onceSchedule: localHost,
+    runIn: false,
     list: () => api.listChannelRoutines(channelId),
     listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy }) => {
@@ -194,7 +208,10 @@ export function channelRoutinesPort(
 export function eventRoutinesPort(
   owner: EventRoutineOwner,
   api: EventRoutinesApi,
-  legacy: Pick<RoutinesPort, "listRuns" | "subscribe" | "runCommand" | "missedPolicy" | "onceSchedule" | "results">,
+  legacy: Pick<
+    RoutinesPort,
+    "listRuns" | "subscribe" | "runCommand" | "missedPolicy" | "onceSchedule" | "runIn" | "results"
+  >,
 ): RoutinesPort {
   const { runCommand, results } = legacy;
   const recoveryRuns = api.listRuns;
@@ -205,6 +222,7 @@ export function eventRoutinesPort(
     limitPolicy: true,
     missedPolicy: missedPolicyKept,
     onceSchedule: legacy.onceSchedule,
+    runIn: legacy.runIn,
     list: () => api.listRoutines({ owner }),
     // The released run routes leave out the records of missed occurrences.
     // An agent run names its agent so that the history opens the message the run posted.
@@ -217,7 +235,7 @@ export function eventRoutinesPort(
         }
       : legacy.listRuns,
     events: { owner, api },
-    save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy, missedPolicy }) =>
+    save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy, missedPolicy, runIn }) =>
       api.saveRoutine({
         ...(routineId ? { id: routineId } : {}),
         owner,
@@ -228,6 +246,7 @@ export function eventRoutinesPort(
         trigger: trigger ?? { kind: "schedule", schedule },
         ...(limitPolicy ? { limitPolicy } : {}),
         ...(missedPolicyKept && missedPolicy ? { missedPolicy } : {}),
+        ...(legacy.runIn && runIn ? { runIn } : {}),
       }),
     remove: (routineId) => api.deleteRoutine({ id: routineId, owner }),
     test: (routineId) => api.testRoutine({ id: routineId, owner }),

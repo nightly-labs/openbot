@@ -16,15 +16,13 @@
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
-  box-shadow:
-    0 0 0 1px var(--openbot-border-strong),
-    0 24px 64px var(--openbot-shadow-dialog);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
 }
 
 .join-server-close {
   position: absolute;
   top: var(--openbot-space-6);
-  right: var(--openbot-space-6);
+  inset-inline-end: var(--openbot-space-6);
   z-index: 2;
   color: var(--openbot-text-muted);
 }
@@ -306,7 +304,7 @@
 
   .join-server-close {
     top: var(--openbot-space-3);
-    right: var(--openbot-space-3);
+    inset-inline-end: var(--openbot-space-3);
   }
 
   .join-server-content {

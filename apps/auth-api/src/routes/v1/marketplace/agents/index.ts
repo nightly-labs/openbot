@@ -29,11 +29,15 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
               return apiError(400, "invalid_category", "Unknown agent category.");
             const sort = url.searchParams.get("sort") ?? undefined;
             if (sort && sort !== "installs") return apiError(400, "invalid_sort", "Unknown agent sort order.");
+            const verifiedParam = url.searchParams.get("verified");
+            if (verifiedParam !== null && verifiedParam !== "true" && verifiedParam !== "false")
+              return apiError(400, "invalid_verified", "The verified filter must be true or false.");
             return publicMarketplaceJson(
               yield* requestAgentMarketplace().list({
                 ...(category ? { category } : {}),
                 query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
                 featured: url.searchParams.get("featured") === "true",
+                verified: verifiedParam === null ? undefined : verifiedParam === "true",
                 sort: sort === "installs" ? sort : undefined,
                 cursor: url.searchParams.get("cursor") ?? undefined,
                 limit: parseMarketplaceLimit(url.searchParams.get("limit")),

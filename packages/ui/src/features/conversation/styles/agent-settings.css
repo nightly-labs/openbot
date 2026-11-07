@@ -31,14 +31,15 @@
   height: 128%;
 }
 
-.agent-settings-avatar:hover {
+/* A photo keeps its own colours, as on mobile, so only a generated face lights up. */
+.agent-settings-avatar:hover:not(:has(.agent-avatar-custom)) {
   filter: brightness(1.08);
 }
 
 /* The pencil badge of the mobile edit screen: it shows that the face opens an editor. */
 .agent-settings-avatar-badge {
   position: absolute;
-  right: -4px;
+  inset-inline-end: -4px;
   bottom: -4px;
   display: grid;
   width: 24px;
@@ -77,36 +78,45 @@
 }
 
 .agent-routines-list {
-  gap: 0;
+  gap: var(--openbot-space-2);
 }
 
+/* One card for each routine: the row opens the routine, and the switch at the end pauses it. */
 .agent-routine-list-item {
   display: grid;
+  min-height: 52px;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px;
+  gap: var(--openbot-space-3);
   align-items: center;
+  padding-inline-end: var(--openbot-space-4);
 }
 
 .agent-routine-row {
   display: grid;
   width: 100%;
-  min-height: 48px;
+  height: auto;
+  align-self: stretch;
   grid-template-columns: 16px minmax(0, 1fr);
-  gap: 9px;
+  gap: var(--openbot-space-3);
   align-items: center;
-  border: 1px solid transparent;
-  border-radius: var(--openbot-radius-md);
+  border: 0;
+  border-radius: 0;
   background: transparent;
-  padding: 5px 7px;
-  text-align: left;
-  transition:
-    border-color var(--openbot-duration-hover) ease,
-    background-color var(--openbot-duration-hover) ease;
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-4) 0;
+  text-align: start;
 }
 
 .agent-routine-row:focus-visible {
+  outline: none;
+}
+
+.agent-routine-card {
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.agent-routine-card:has(.agent-routine-row:focus-visible) {
   border-color: var(--openbot-border-strong);
-  background: var(--openbot-hover);
 }
 
 .agent-routine-row > span:nth-child(2) {
@@ -155,15 +165,22 @@
 
 .agent-routine-status-icon-active > svg,
 .agent-routine-status-icon-paused > svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/*
+ * Only the card shows hover. The ghost button hover would paint the row a second colour, so the row
+ * and the switch area would not match.
+ */
 @media (hover: hover) and (pointer: fine) {
-  .agent-routine-row:hover {
-    border-color: var(--openbot-border);
+  .agent-routine-card:has(.agent-routine-row:hover) {
     background: var(--openbot-hover);
+  }
+
+  .agent-routine-list-item > .agent-routine-row:hover:not(:disabled) {
+    background: transparent;
   }
 }
 
@@ -184,6 +201,11 @@
 
 .agent-routine-active-toggle {
   justify-content: space-between;
+}
+
+/* The switch label starts where the labels of the fields above it start. */
+.agent-routine-run-in {
+  padding-inline-start: var(--openbot-space-2);
 }
 
 .agent-routine-active-toggle > span {
@@ -279,6 +301,15 @@
 }
 
 .agent-routines-body::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-routines-footer {
+  flex: none;
+  padding: 0 15px 15px;
+}
+
+.agent-routines-footer:empty {
   display: none;
 }
 
@@ -379,7 +410,8 @@
 
 /* What a field misses, under its control, where the field limit goes. */
 .agent-routine-field-error {
-  margin: var(--openbot-space-1-5) 0 0 var(--openbot-space-2);
+  margin-block: var(--openbot-space-1-5) 0;
+  margin-inline: var(--openbot-space-2) 0;
 }
 
 /* Schedule or webhook: two equal choices above the trigger. */
@@ -402,7 +434,8 @@
 /* The schedule and history are fields, so their headings match the field labels. */
 .agent-routine-when h3,
 .agent-routine-history h3 {
-  margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
+  margin-block: 0 var(--openbot-space-1-5);
+  margin-inline: var(--openbot-space-2) 0;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
   font-weight: inherit;
@@ -441,7 +474,7 @@
   padding: 5px var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  text-align: left;
+  text-align: start;
 }
 
 .ui-button.agent-routine-run-link {
@@ -569,7 +602,8 @@
   justify-content: space-between;
   gap: var(--openbot-space-3);
   border-bottom: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
 }
 
 .agent-memories-heading {
@@ -632,53 +666,12 @@
   height: var(--openbot-icon-sm);
 }
 
-.agent-memories-add-button {
-  color: var(--openbot-text-secondary);
-}
-
 .agent-memories-body {
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding: var(--openbot-space-2);
-}
-
-.agent-memory-composer {
-  display: grid;
-  gap: var(--openbot-space-2);
-  margin: 0 0 var(--openbot-space-3);
-  padding: var(--openbot-space-1) var(--openbot-space-1) 0;
-}
-
-.agent-memory-input {
-  min-height: 64px;
-  resize: none;
-  border-color: var(--openbot-border);
-  background: transparent;
-}
-
-.agent-memory-input:focus-visible {
-  border-color: var(--openbot-border-strong);
-  outline: 0;
-  box-shadow: none;
-}
-
-.agent-memory-composer-actions,
-.agent-memory-editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--openbot-space-1);
-}
-
-.agent-memory-inclusion-actions {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-1);
 }
 
 .agent-memory-list {
@@ -731,7 +724,7 @@
   padding: var(--openbot-space-2) var(--openbot-space-3);
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .agent-memory-row-main:focus-visible {
@@ -764,19 +757,6 @@
   color: var(--openbot-text-muted);
 }
 
-.agent-memory-editor {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: var(--openbot-space-2);
-  background: transparent;
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-2);
-}
-
-.agent-memory-row:has(.agent-memory-editor),
-.agent-memory-row:has(.agent-memory-editor):hover {
-  background: transparent;
-}
-
 .agent-memory-state,
 .agent-memory-limit,
 .agent-memory-error {
@@ -805,7 +785,122 @@
 }
 
 /*
- * The dialog before its first memory: a faint copy of the list above the pitch. The newest sample
+ * Agent settings > Memories. It covers the settings in the pane. A wide pane keeps the page in one
+ * column of reading width.
+ */
+.agent-memories-view {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+/* A memory title is up to 100 characters; the header has the height of one line. */
+.agent-memories-view .settings-panel-header h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-memories-page {
+  display: grid;
+  width: min(100%, 680px);
+  gap: var(--openbot-space-6);
+  margin-inline: auto;
+}
+
+.agent-memories-page .settings-link-group,
+.agent-memories-page :is(.agent-memory-state, .agent-memory-limit, .agent-memory-error) {
+  margin: 0;
+}
+
+/* The search field has the size of a list row, and its icon and text line up with the New memory row. */
+.agent-memories-search {
+  position: relative;
+  min-width: 0;
+}
+
+.agent-memories-search-icon {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: calc(var(--openbot-space-3) + 1px);
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+  pointer-events: none;
+  stroke-width: var(--openbot-icon-stroke);
+  transform: translateY(-50%);
+}
+
+.agent-memories-search .agent-memories-search-input {
+  width: 100%;
+  height: 42px;
+  padding-inline: calc(var(--openbot-space-3) + var(--openbot-icon-sm) + var(--openbot-space-2)) var(--openbot-space-3);
+  border-color: var(--openbot-border);
+  background: var(--openbot-bg-surface);
+  font-size: var(--openbot-text-md);
+}
+
+.agent-memories-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.agent-memories-reading {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.agent-memories-text {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent-memories-meta {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.agent-memories-actions,
+.agent-memories-clear {
+  display: flex;
+  gap: var(--openbot-space-2);
+}
+
+.agent-memories-editor {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.agent-memories-field {
+  min-height: 0;
+  max-height: 320px;
+  field-sizing: content;
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
+}
+
+.agent-memories-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+}
+
+/* The empty state fills the height the dialog gave it. */
+.agent-memories-view-empty {
+  display: flex;
+  min-height: 456px;
+  flex-direction: column;
+}
+
+/*
+ * The page before its first memory: a faint copy of the list above the pitch. The newest sample
  * writes itself in handwriting; when the next one comes, it becomes a typed row and steps back.
  */
 .agent-memories-empty {
@@ -928,6 +1023,15 @@
   to {
     clip-path: inset(-0.4em -0.2em -0.4em -0.2em);
   }
+}
+
+/* In right-to-left text, each line writes itself from right to left. */
+:dir(rtl) .agent-memories-empty-hand {
+  transform-origin: right top;
+}
+
+:dir(rtl) .agent-memories-empty-line {
+  clip-path: inset(-0.4em -0.2em -0.4em calc(100% + 0.2em));
 }
 
 .agent-memories-empty-meta {
@@ -1061,13 +1165,6 @@
   gap: var(--openbot-space-1);
 }
 
-.agent-memories-footer {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  padding: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
-}
-
 .agent-skill-empty {
   min-height: 160px;
   display: grid;
@@ -1108,7 +1205,7 @@
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-1);
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .agent-skill-open:hover {
@@ -1286,7 +1383,7 @@
   }
 
   .agent-memories-header {
-    padding-left: var(--openbot-space-3);
+    padding-inline-start: var(--openbot-space-3);
   }
 }
 
@@ -1320,6 +1417,27 @@
 
 .agent-settings-switch-row > .settings-link-label {
   flex: 1 1 auto;
+}
+
+/* A provider setting: its row, then the notes under it. The row rounds with the card at an end. */
+.agent-session-setting > .ui-select,
+.agent-session-setting .agent-settings-runtime-row {
+  border-radius: inherit;
+}
+
+.agent-session-setting-notes {
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.agent-session-setting > .agent-session-setting-notes {
+  padding-top: 0;
+}
+
+.agent-session-setting-notes:empty {
+  display: none;
 }
 
 .agent-settings-runtime-rows .provider-model-trigger-field,
@@ -1357,7 +1475,7 @@
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
   line-height: 18px;
-  text-align: left;
+  text-align: start;
 }
 
 .agent-settings-runtime-rows .provider-model-trigger-field .provider-model-trigger-name,

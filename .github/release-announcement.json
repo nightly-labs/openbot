@@ -1,10 +1,10 @@
 {
-  "version": "0.53.1",
+  "version": "0.64.0",
   "highlights": [
-    "Usage now shows an estimated cost for Gemini (Antigravity) turns.",
-    "Queued messages show Steer only for providers that can steer a running turn, so Steer no longer fails for Gemini, OpenCode, Cursor, Cline and custom agents.",
-    "The model picker shows the Gemini models also when Gemini starts slowly.",
-    "The activity line now says when the agent waits for your answer or approval.",
-    "Server settings › Storage no longer shows machine use and alerts for now."
+    "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Use my Claude Code setup in Settings → Providers → Claude.",
+    "Put your agents on the new agent dock at the edge of your Mac screen, and chat with them from there.",
+    "Agents now write short updates while they work. Choose Classic in Server settings to keep the old style.",
+    "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
+    "Attach a file of any type to a chat, and send files of up to 100 MB from the web app."
   ]
 }

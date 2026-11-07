@@ -2,8 +2,8 @@ import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-prot
 import { FIRST_AGENT_SUGGESTIONS, FirstAgentSetup } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useProviders } from "../../providers";
+import { useAuth } from "../account/account-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
-import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -31,9 +31,6 @@ export function WorkspaceAgentSetup() {
   } = useAgents();
   const { createAgent } = useAgentActions();
   const { setupState } = useSetup();
-  // Not gated on the server: the picker needs these IDs to label a model it is already showing,
-  // and a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
-  const { customProviders } = useCustomProviders();
   const { customAgents } = useCustomAgents();
   const { activeServer, activeServerSupportsCapability } = useServers();
   const {
@@ -43,8 +40,15 @@ export function WorkspaceAgentSetup() {
     cancelProviderRuntimeDownload,
     connectProvider,
     providerAdminServerId,
+    activeCustomProviders,
   } = useProviders();
   const { openServerSettings } = useServerSettings();
+  const auth = useAuth();
+  /**
+   * The released Team API create route does not carry the account, so only an agent of this computer
+   * can start on an account other than the provider's own sign-in.
+   */
+  const accountChoice = createMemo(() => activeServer()?.kind === "local");
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
@@ -107,8 +111,10 @@ export function WorkspaceAgentSetup() {
       error={agentSetupError()}
       modelOptions={createModelSupported() ? modelOptions() : undefined}
       agentStatus={agentStatus()}
+      accountChoice={accountChoice()}
+      accountUsage={accountChoice() ? auth.accountUsage() : undefined}
       runtimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
-      customProviders={customProviders()}
+      customProviders={activeCustomProviders()}
       // The custom agents are this computer's. A joined host's picker counts its own from its models.
       customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
@@ -121,7 +127,8 @@ export function WorkspaceAgentSetup() {
         if (
           next.provider !== current.provider ||
           next.model !== current.model ||
-          next.reasoningEffort !== current.reasoningEffort
+          next.reasoningEffort !== current.reasoningEffort ||
+          next.providerAccountId !== current.providerAccountId
         )
           setModelTouched(true);
         setAgentSetupDraft(next);

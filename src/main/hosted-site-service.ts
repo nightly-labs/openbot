@@ -4,11 +4,15 @@ import { lstat, open, readdir, readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   checkHostedSitePath,
+  HOSTED_SITE_ACCOUNT_LIMIT,
   HOSTED_SITE_HOST_ID_HEADER,
   HOSTED_SITE_HOST_TOKEN_HEADER,
   HOSTED_SITE_MIME_TYPES,
+  HOSTED_SITE_UNLINKED_LIMIT,
   HOSTED_SITE_UPLOAD_LIMITS,
+  type HostedSiteLimitReason,
   type HostedSitePathProblem,
+  parseHostedSiteLimitReason,
   parseHostedSiteList,
   parseHostedSiteSummary,
 } from "@openbot/contracts/hosted-sites";
@@ -58,6 +62,8 @@ interface PendingUpload {
   uploadedPaths: Set<string>;
   createdAt: number;
   inFlight: Deferred.Deferred<HostedSiteSummary, HostedSiteFailure> | null;
+  /** The bucket of the last session request. A site limit names the limit of that bucket. */
+  serverScoped: boolean;
 }
 
 export interface HostedSiteAuthClient {
@@ -134,9 +140,7 @@ export class HostedSiteDesktopService {
       if (credential) {
         const result = yield* Effect.result(this.deleteSite(siteId, key, serverHeaders(credential)));
         if (Result.isSuccess(result)) return;
-        const error = result.failure.cause;
-        if (!(error instanceof Error && "code" in error && error.code === "site_other_server"))
-          return yield* result.failure;
+        if (authErrorCode(result.failure.cause) !== "site_other_server") return yield* result.failure;
       }
       yield* this.deleteSite(siteId, key, {}, UNLINKED_SCOPE);
     });
@@ -182,9 +186,7 @@ export class HostedSiteDesktopService {
       if (!credential) return yield* create({});
       const result = yield* Effect.result(create(serverHeaders(credential)));
       if (Result.isSuccess(result)) return result.success;
-      const error = result.failure.cause;
-      if (siteId === null || !(error instanceof Error && "code" in error && error.code === "site_other_server"))
-        return yield* result.failure;
+      if (siteId === null || authErrorCode(result.failure.cause) !== "site_other_server") return yield* result.failure;
       return yield* create({}, UNLINKED_SCOPE);
     });
   }
@@ -228,6 +230,7 @@ export class HostedSiteDesktopService {
         uploadedPaths: new Set(),
         createdAt: Date.now(),
         inFlight: null,
+        serverScoped: false,
       };
       this.#pendingUploads.set(signature, pending);
     }
@@ -236,6 +239,7 @@ export class HostedSiteDesktopService {
     pending.inFlight = done;
     const entry = pending;
     return yield* this.performUpload(input, siteId, prepared, entry).pipe(
+      Effect.catch((failure) => this.siteLimitFailure(failure, entry.serverScoped)),
       Effect.tap(() => Effect.sync(() => this.#pendingUploads.delete(signature))),
       Effect.onExit((exit) => Deferred.done(done, exit)),
       Effect.ensuring(
@@ -253,8 +257,9 @@ export class HostedSiteDesktopService {
     pending: PendingUpload,
   ): Effect.Effect<HostedSiteSummary, HostedSiteFailure> {
     return Effect.gen({ self: this }, function* () {
-      const createSession = (headers: Record<string, string>, query = "") =>
-        retryTransport(() =>
+      const createSession = (headers: Record<string, string>, query = "") => {
+        pending.serverScoped = HOSTED_SITE_HOST_ID_HEADER in headers;
+        return retryTransport(() =>
           this.auth.requestAuthorized(
             `/v1/sites/${query}`,
             {
@@ -278,6 +283,7 @@ export class HostedSiteDesktopService {
             decodeUploadSession,
           ),
         );
+      };
       const session = pending.session ?? (yield* this.createSession(createSession, siteId));
       pending.session = session;
       for (const file of prepared.files) {
@@ -308,6 +314,33 @@ export class HostedSiteDesktopService {
         ),
       );
     });
+  }
+
+  /**
+   * The Worker's `site_limit` text is English and does not tell the agent or the user what to do. The list of the
+   * bucket that refused the site supplies the limit and its `limitReason`. When a server's list fails, the Worker's
+   * own failure stays; when the unlinked list fails, the text names the unlinked limit.
+   */
+  private siteLimitFailure(failure: HostedSiteFailure, serverScoped: boolean): Effect.Effect<never, HostedSiteFailure> {
+    if (authErrorCode(failure.cause) !== "site_limit") return Effect.fail(failure);
+    const credential = serverScoped ? this.serverCredential() : null;
+    const list = credential
+      ? this.auth.requestAuthorized(
+          "/v1/sites/",
+          { method: "GET", headers: serverHeaders(credential) },
+          decodeSiteSlots,
+        )
+      : this.auth.requestAuthorized(`/v1/sites/${UNLINKED_SCOPE}`, { method: "GET" }, decodeSiteSlots);
+    const unlinkedFailure = new HostedSiteFailure({
+      cause: new Error(sourceText("error.site.unlinkedLimit", { count: HOSTED_SITE_UNLINKED_LIMIT })),
+    });
+    return list.pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.fail(credential ? failure : unlinkedFailure),
+        onSuccess: (slots) =>
+          Effect.fail(new HostedSiteFailure({ cause: new Error(siteLimitText(slots, credential !== null)) })),
+      }),
+    );
   }
 
   private prunePendingUploads(): void {
@@ -493,6 +526,18 @@ function decodeSiteList(value: unknown): HostedSiteList {
   return list;
 }
 
+/** The limit of a site list and why other sites can take its slots. */
+function decodeSiteSlots(value: unknown): { limit: number; reason: HostedSiteLimitReason | null } {
+  return { limit: decodeSiteList(value).limit, reason: parseHostedSiteLimitReason(value) };
+}
+
+/** The text of a site limit. Only a shared pool or the account cap can give a limit of 0. */
+function siteLimitText(slots: { limit: number; reason: HostedSiteLimitReason | null }, server: boolean): string {
+  if (slots.reason === "account") return sourceText("error.site.accountLimit", { count: HOSTED_SITE_ACCOUNT_LIMIT });
+  if (slots.reason === "shared") return sourceText("error.site.sharedLimit");
+  return sourceText(server ? "error.site.serverLimit" : "error.site.unlinkedLimit", { count: slots.limit });
+}
+
 function serverHeaders(credential: HostedSiteServerCredential | null): Record<string, string> {
   if (!credential) return {};
   return { [HOSTED_SITE_HOST_ID_HEADER]: credential.hostId, [HOSTED_SITE_HOST_TOKEN_HEADER]: credential.machineToken };
@@ -539,6 +584,11 @@ function uploadSignature(input: PublishHostedSiteInput, siteId: string | null, p
   );
   for (const file of prepared.files) hash.update(file.bytes);
   return hash.digest("hex");
+}
+
+/** The error code of an account service response, such as `site_limit`. */
+function authErrorCode(error: unknown): string | null {
+  return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : null;
 }
 
 function retryTransport<A>(

@@ -1,6 +1,9 @@
-import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
-import type { AgentModelId } from "./ipc-agent-identity";
+import type { InstallerProviderId, ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
+import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
+import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
+import { decodeRecord, nullableNumber, requiredBoolean, requiredNumber, requiredString } from "./ipc-decoding";
+import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
@@ -12,6 +15,13 @@ export interface AppInfo {
   variant: AppVariant;
   /** Set only in an unpackaged build that a local analytics capture server reads. */
   analyticsCaptureUrl?: string;
+  /** The random analytics ID of this install, for events that do not go with the account. */
+  analyticsInstallId?: string;
+  /**
+   * True when Chromium draws the windows on the CPU: hardware acceleration is off, or the GPU is
+   * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
+   */
+  softwareRendering?: boolean;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -159,7 +169,7 @@ export interface ProviderRuntimeSnapshot {
    * managed runtime is absent from `ManagedProviderId`, so it needs no fake entry here, and every
    * provider that is in the tuple has a real status.
    */
-  providers: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  providers: Record<ManagedProviderId, ProviderRuntimeStatus> & InstallerRuntimeStatuses;
   /**
    * The tool runtimes, in a field of their own rather than mixed in above.
    *
@@ -169,6 +179,14 @@ export interface ProviderRuntimeSnapshot {
    */
   toolRuntimes: Record<ManagedToolRuntimeId, ProviderRuntimeStatus>;
 }
+
+/**
+ * The status of a provider that OpenBot installs with the provider's own installer: `ready` where
+ * its CLI is found, so that a server's row offers Connect. Absent where the CLI is missing and this
+ * computer cannot run the installer, and on a host before the installer: the row then shows the
+ * install guide, not Download.
+ */
+export type InstallerRuntimeStatuses = { [Provider in InstallerProviderId]?: ProviderRuntimeStatus };
 
 export interface ExportResult {
   saved: boolean;
@@ -190,12 +208,44 @@ export interface SaveSetupInput {
   preferredModel: AgentModelId | null;
 }
 
+/**
+ * The default provider of a joined server's host (`provider-default-v1`). A provider that this build
+ * does not know reads as none.
+ */
+export type HostDefaultProvider = Pick<AppSetupState, "preferredProvider" | "preferredModel">;
+
 export interface AnalyticsPreference {
   enabled: boolean;
 }
 
+/**
+ * Renderer timing for host analytics: counts and milliseconds only. The renderer sends it at most
+ * once a minute, and once when the main window's workspace finished its first load.
+ */
+/** The bounds of one renderer timing report. The renderer keeps to them and main rejects a report outside them. */
+export const RENDERER_TIMING_LIMITS = {
+  longTasks: 10_000,
+  inputs: 100_000,
+  /** Timed inputs in one report. Inputs past this count are left out of `inputs` too. */
+  inputDelays: 64,
+  inputDelayMs: 600_000,
+} as const;
+
+export interface RendererTimingReport {
+  /** The main window's workspace finished its first load. Main times it on its own clock. */
+  workspaceReady?: true;
+  /** Renderer tasks of more than 200 ms since the last report. */
+  longTasks: number;
+  /** Key presses and pointer presses since the last report. */
+  inputs: number;
+  /** The input delay of each of those inputs that the browser timed (16 ms or more of handling), in ms. */
+  inputDelaysMs: number[];
+}
+
 export interface SetAnalyticsPreferenceInput {
   enabled: boolean;
+  /** True when the user chose this value. Only a choice is sent to the account; a default is not. */
+  chosen?: boolean;
 }
 
 export interface CentralAuthUser {
@@ -203,6 +253,16 @@ export interface CentralAuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /**
+   * The latest product analytics answer of the account, from any device. Null or missing: the user
+   * never answered, or the account service is older.
+   */
+  analyticsEnabled?: boolean | null;
+  /**
+   * The tint of the user's own chat bubbles, which members of each server of the user see. Null or
+   * missing: no chat color, or the account service is older.
+   */
+  chatColor?: AvatarColor | null;
 }
 
 export interface CentralAuthIssue {
@@ -213,9 +273,15 @@ export interface CentralAuthIssue {
   reference?: string;
 }
 
+export type CentralAuthSignedOutReason = "keyring_changed";
+
 export type CentralAuthState =
   | { status: "loading" }
-  | { status: "signed_out" }
+  /**
+   * `keyring_changed`: the Linux keyring did not open the saved sign-in, so OpenBot now keeps its
+   * secrets in its own key file and the user signs in one more time.
+   */
+  | { status: "signed_out"; reason?: CentralAuthSignedOutReason }
   | { status: "signing_in" }
   | {
       status: "code_sent";
@@ -226,8 +292,95 @@ export type CentralAuthState =
       developmentCode?: string;
       issue?: CentralAuthIssue | undefined;
     }
+  /** The email signs in with the company's provider. The browser has the sign-in page. */
+  | { status: "company_sign_in"; email: string; issue?: CentralAuthIssue | undefined }
   | { status: "signed_in"; user: CentralAuthUser }
   | { status: "error"; issue: CentralAuthIssue };
+
+/** The company provider (OpenID Connect) that a server owner connected. */
+export interface CompanySignInConnection {
+  issuer: string;
+  clientId: string;
+  domains: string[];
+  /** True: email codes are refused for the domains, and people sign in with the provider. */
+  enabled: boolean;
+  testedAt: number;
+  /** When the SCIM token was made, or null when the server has none. */
+  scimTokenCreatedAt: number | null;
+}
+
+export interface CompanySignInSettings {
+  /** The address to add to the app at the provider. */
+  redirectUri: string;
+  /** The SCIM base address for user sync. */
+  scimUrl: string;
+  /** The DNS TXT record that proves a domain: `<name>.<domain>` holds `value`. */
+  domainRecord: { name: string; value: string };
+  /** False on a development account service, which does not read DNS. */
+  domainCheck: boolean;
+  connection: CompanySignInConnection | null;
+}
+
+/** The values of the setup dialog. An empty client secret keeps the saved one. */
+export interface TestCompanySignInInput {
+  serverId: string;
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  domains: string[];
+}
+
+/** A test that passed saved the values. `email` is the account that signed in at the provider. */
+export interface TestCompanySignInResult {
+  email: string;
+}
+
+export interface SetCompanySignInEnabledInput {
+  serverId: string;
+  enabled: boolean;
+}
+
+/** Shown once. The account service keeps only its hash. */
+export interface CompanySignInScimToken {
+  token: string;
+  createdAt: number;
+}
+
+/** Decodes the settings that the account service answers, and that main sends the renderer. */
+export function decodeCompanySignInSettings(value: unknown): CompanySignInSettings {
+  const settings = decodeRecord(value, "company sign-in settings");
+  const record = decodeRecord(settings.domainRecord, "company sign-in domain record");
+  return {
+    redirectUri: requiredString(settings, "redirectUri"),
+    scimUrl: requiredString(settings, "scimUrl"),
+    domainRecord: { name: requiredString(record, "name"), value: requiredString(record, "value") },
+    domainCheck: requiredBoolean(settings, "domainCheck"),
+    connection: settings.connection === null ? null : decodeCompanySignInConnection(settings.connection),
+  };
+}
+
+function decodeCompanySignInConnection(value: unknown): CompanySignInConnection {
+  const connection = decodeRecord(value, "company sign-in connection");
+  const { domains } = connection;
+  if (!Array.isArray(domains) || !domains.every(isString)) throw new Error("Invalid company sign-in domains.");
+  return {
+    issuer: requiredString(connection, "issuer"),
+    clientId: requiredString(connection, "clientId"),
+    domains,
+    enabled: requiredBoolean(connection, "enabled"),
+    testedAt: requiredNumber(connection, "testedAt"),
+    scimTokenCreatedAt: nullableNumber(connection, "scimTokenCreatedAt"),
+  };
+}
+
+export function decodeCompanySignInScimToken(value: unknown): CompanySignInScimToken {
+  const token = decodeRecord(value, "SCIM token");
+  return { token: requiredString(token, "token"), createdAt: requiredNumber(token, "createdAt") };
+}
+
+export function decodeTestCompanySignInResult(value: unknown): TestCompanySignInResult {
+  return { email: requiredString(decodeRecord(value, "company sign-in test"), "email") };
+}
 
 /** The sign-in code the user typed, with the challenge `requestEmailCode` answered. */
 export interface VerifyEmailCodeInput {
@@ -262,6 +415,37 @@ export const MAC_AUTOMATION_STATUSES = ["granted", "denied", "failed"] as const;
 export interface MacAutomationResult {
   target: MacAutomationTarget;
   status: (typeof MAC_AUTOMATION_STATUSES)[number];
+}
+
+/**
+ * A program that an agent started and left running after its tool call, such as a dev server that
+ * `nohup ... &` started. The system adopted it, so no provider process of OpenBot holds it now.
+ */
+export interface BackgroundProcess {
+  /** The pid and the start time: a pid is reused. Stop takes it. */
+  id: string;
+  pid: number;
+  /** The command line with secrets redacted. */
+  command: string;
+  /** Milliseconds since the epoch. */
+  startedAt: number;
+  /** The TCP ports that the process or its children listen on. */
+  ports: number[];
+  /** The agent whose workspace holds the working folder of the process, or null when none does. */
+  agentId: string | null;
+}
+
+export function isBackgroundProcess(value: unknown): value is BackgroundProcess {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    integerInRange(value.pid, 1, Number.MAX_SAFE_INTEGER) &&
+    isString(value.command) &&
+    isFiniteNumber(value.startedAt) &&
+    Array.isArray(value.ports) &&
+    value.ports.every((port) => integerInRange(port, 1, 65_535)) &&
+    (value.agentId === null || isIdentifier(value.agentId))
+  );
 }
 
 /**
@@ -372,11 +556,22 @@ export interface ChatWindowTarget {
   agentId: string;
 }
 
+/**
+ * The messages that the user sent to agents on this computer, from the database. The social toast
+ * reads it, so a user who used OpenBot before the toast shipped gets it on time.
+ */
+export interface SentMessageStats {
+  /** When the first message was written, as ISO 8601 text, or null before the first message. */
+  firstSentAt: string | null;
+  sentCount: number;
+}
+
 export type ExternalDestination =
   | "opencode-install"
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
+  | "hermes-install"
   | "feedback"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
@@ -384,8 +579,26 @@ export type ExternalDestination =
   | "changelog"
   | "guides"
   | "discord"
-  // The OpenBot account on X, from the community card of the sidebar.
+  // The OpenBot repository, from the toast that asks for a GitHub star.
+  | "github"
+  // The OpenBot account on X, from the community card of the sidebar and the social toast.
   | "x"
+  // The OpenBot profiles and community that the social toast asks the user to follow or join.
+  | "threads"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "linkedin"
+  | "reddit"
+  // The pages that start a post about OpenBot, from the social toast. Main writes the first post
+  // in the app language.
+  | "x-post"
+  | "threads-post"
+  | "linkedin-post"
+  | "reddit-post"
+  | "facebook-post"
+  | "instagram-post"
+  | "tiktok-post"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.

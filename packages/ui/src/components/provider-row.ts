@@ -1,4 +1,4 @@
-import { agentProviderDescriptor, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, isInstallerProvider, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
@@ -94,6 +94,11 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     codeFallback.startedWithCode();
     host.connection?.alternative(option().id);
   };
+  /** The mainland China site that the ⋯ menu signs in with, while the row is not signed in. */
+  const mainlandChinaSite = (): string | null =>
+    browserConnect() && !off() && state() !== "available"
+      ? (host.connection?.mainlandChinaSite?.(option().id) ?? null)
+      : null;
   /** A Connect that failed before the sign-in started. The status reports the rest. */
   const [connectError, setConnectError] = createSignal<string | null>(null);
   const connect = () => {
@@ -107,6 +112,13 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     else codeFallback.startedWithCode();
     setConnectError(null);
     void Promise.resolve(host.connection?.connect(option().id)).catch((error: unknown) =>
+      setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
+    );
+  };
+  const connectInMainlandChina = () => {
+    codeFallback.startedInBrowser();
+    setConnectError(null);
+    void Promise.resolve(host.connection?.connectInMainlandChina?.(option().id)).catch((error: unknown) =>
       setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
     );
   };
@@ -133,9 +145,10 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
   };
   /**
    * A sign-in that Connect started and that waits for the browser. A download or an update also
-   * marks the row connecting, until its new runtime is ready.
+   * marks the row connecting, until its new runtime is ready, and so does a check again after a key
+   * change or a restart, which `signInPending` marks false.
    */
-  const signingIn = () => connecting() && browserConnect() && runtimeReady();
+  const signingIn = () => connecting() && option().signInPending !== false && browserConnect() && runtimeReady();
   const hostSignInHint = () =>
     !off() &&
     option().id === "antigravity" &&
@@ -163,8 +176,12 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * action checks for one.
    */
   // A provider that is off gets no update offer from main, so a check there could only say "up to date".
+  // An installer provider updates itself: OpenBot runs its installer once and checks no versions.
   const updateOffered = () =>
-    Boolean(host.onUpdateProvider) && !off() && (runtimeStatus()?.phase === "ready" || updatable());
+    Boolean(host.onUpdateProvider) &&
+    !off() &&
+    !isInstallerProvider(option().id) &&
+    (runtimeStatus()?.phase === "ready" || updatable());
   const restartOffered = () =>
     Boolean(host.onRestartProvider) && (option().restartPending || (available() && !connecting()));
   const diagnosticsOffered = () => Boolean(option().lastError && option().diagnostics);
@@ -206,11 +223,16 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * stays reachable in every state, Connected included: a refused key must stay replaceable and
    * removable. A released host stores a Gemini key but never reads it, so only this computer offers it.
    * Claude's key works the same way. Its row has a key status only where the host reads the key.
+   * Codex's key is a login on the host, so its row has a key status only where the host makes that
+   * login: this computer, or a joined server with `codex-api-key-v1`.
    */
   const apiKeyOffered = () =>
     Boolean(host.onSignInProvider) &&
     ((option().id === "antigravity" && browserConnect() && runtimeStatus()?.phase === "ready") ||
-      (option().id === "claude" && option().keyStatus !== undefined && runtimeReady() && state() !== "not-installed"));
+      ((option().id === "claude" || option().id === "codex") &&
+        option().keyStatus !== undefined &&
+        runtimeReady() &&
+        state() !== "not-installed"));
   /** OpenCode runs free models while no key is saved. */
   const freeKey = () =>
     option().id === "opencode" && (option().keyStatus === "missing" || option().keyStatus === "unreadable");
@@ -233,6 +255,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     runtimeAction,
     codeFallbackOffered,
     signInAlternative,
+    mainlandChinaSite,
+    connectInMainlandChina,
     connectError,
     connect,
     runAction,

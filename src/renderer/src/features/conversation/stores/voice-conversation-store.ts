@@ -129,6 +129,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let ready = false;
   let livePreview = false;
   let streamed = false;
+  /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
+  let cloud = false;
   // The logic reads these copies: a store read shows a write only after the next flush.
   let step: VoiceConversationStep = "starting";
   let muted = false;
@@ -137,7 +139,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   /** The turns that were sent to the chat. */
   let sentTurns = 0;
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
-  const transcription = () => (streamed ? "cloud" : "local");
+  // True when the user's own voice server takes the dictation.
+  let ownServer = false;
+  const transcription = () => {
+    if (ownServer) return "server";
+    return cloud ? "cloud" : "local";
+  };
   const elapsedMs = (since: number) => Math.max(0, Math.round(performance.now() - since));
 
   function setStep(next: VoiceConversationStep): void {
@@ -188,7 +195,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const startingAt = performance.now();
     try {
       const speech = speechPort().voice;
-      if ((await speech.getSpeechModelStatus()).phase !== "ready") {
+      const server = await speech.getServer();
+      // The user's own server reads the replies, so the speech model is not necessary.
+      if (!server?.routes.speech && (await speech.getSpeechModelStatus()).phase !== "ready") {
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
           analytics.track("speech_model_action", {
@@ -217,8 +226,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       if (model.phase !== "ready")
         throw new Error(currentText().errorMessage(model.message, currentText().t("composer.voice.prepareFailed")));
       const selected = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
-      streamed = selected?.kind === "cloud";
-      livePreview = !streamed && (selected?.livePreview ?? true);
+      // The user's own server takes the whole recording once: it has no live preview or stream.
+      ownServer = server?.routes.dictation === true;
+      cloud = !ownServer && selected?.kind === "cloud";
+      // Only ElevenLabs streams. Groq takes the whole recording once, as the user's own server does.
+      streamed = selected?.kind === "cloud" && selected.provider === "elevenlabs" && !ownServer;
+      livePreview = !ownServer && !streamed && (selected?.livePreview ?? true);
       ready = true;
       analytics.track("voice_conversation_action", {
         action: "start",
@@ -589,7 +602,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         .catch(() => {});
   }
 
-  /** A cloud model hears through a stream: the whole recording is sent, then the stream ends. */
+  /** ElevenLabs hears through a stream: the whole recording is sent, then the stream ends. */
   async function transcribeStreamed(recording: Blob): Promise<{ text: string }> {
     const pcm = encodePcm16(await recordingToSamples(recording));
     const { streamId } = await deps.voice.startStream();

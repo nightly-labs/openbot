@@ -45,6 +45,12 @@
       "detailSha256": "5ead5bab31fb150bf62410b0f4f59106c1e0aa6b00c8449bd8a0d0557cfd48c5"
     },
     {
+      "slug": "ticktick",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d78a41e454da4e0134d57a11d7da29b5b8c38accf4f5d4dfde2e28bf38601a93"
+    },
+    {
       "slug": "trello",
       "version": "1.0.0",
       "featured": false,
@@ -69,6 +75,18 @@
       "detailSha256": "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548"
     },
     {
+      "slug": "higgsfield",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271"
+    },
+    {
+      "slug": "elevenlabs",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "89647f4be8ae4d078a7c42cf3a2ccd1046c15454d2af9e60057b03208996fd77"
+    },
+    {
       "slug": "apple-apps",
       "version": "1.1.0",
       "featured": false,
@@ -79,6 +97,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1"
+    },
+    {
+      "slug": "gitlab",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "bc2e946ad9f54d21a16c8fe618ed2ad7734fe4a023dec71d341193f15ed8a23c"
     },
     {
       "slug": "vercel",
@@ -147,6 +171,12 @@
       "detailSha256": "1f73a94236d3a0be9a31ee48b56eaa2a2dca91e9e1a5fb476e38aa13f67b5846"
     },
     {
+      "slug": "revenuecat",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "3e0e70a7291ef90ef651bb5b88550e9ecd00ccc5090969aa586050aff8cf0f18"
+    },
+    {
       "slug": "posthog",
       "version": "1.0.0",
       "featured": false,
@@ -177,10 +207,34 @@
       "detailSha256": "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24"
     },
     {
+      "slug": "omnisend",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80"
+    },
+    {
       "slug": "composio",
       "version": "1.1.0",
       "featured": false,
       "detailSha256": "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f"
+    },
+    {
+      "slug": "clickup",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449"
+    },
+    {
+      "slug": "coinbase",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "acd33c814b13821ce8a0529dad8699f262529f978fe0d7865f200bfa7ac736d5"
+    },
+    {
+      "slug": "robinhood",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939"
     }
   ]
 }

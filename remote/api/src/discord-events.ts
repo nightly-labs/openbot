@@ -2,12 +2,14 @@
 // delivery for a host. Everything here is pure and in memory: the Gateway adapter
 // (`./discord-gateway.ts`) gives it the events and does the actions it returns.
 //
-// Signal keeps only the names and the channel-to-guild map of the guilds that the bot is in, and
-// the pending button presses. It keeps no message.
+// Signal keeps only the names, the channel-to-guild map and the bot's own role of the guilds that
+// the bot is in, and the pending button presses. It keeps no message.
 
 import {
   DISCORD_ATTACHMENTS_LIMIT,
   DISCORD_CUSTOM_ID_PREFIX,
+  DISCORD_EMBED_TEXT_LIMIT,
+  DISCORD_EMBEDS_LIMIT,
   DISCORD_QUOTE_TEXT_LIMIT,
   DISCORD_ROLES_LIMIT,
   type DiscordDelivery,
@@ -41,13 +43,33 @@ type DiscordAttachmentData = {
   url: string;
 };
 
-/** The text and files of a message, and of a forwarded message in `message_snapshots`. */
+/** The parts of an embed that Signal reads. Discord leaves out each part that the embed does not have. */
+type DiscordEmbedData = {
+  title?: string | undefined;
+  description?: string | undefined;
+  url?: string | undefined;
+  author?: { name?: string | undefined; url?: string | undefined } | undefined;
+  fields?: { name: string; value: string }[] | undefined;
+  footer?: { text?: string | undefined } | undefined;
+  image?: { url?: string | undefined } | undefined;
+  thumbnail?: { url?: string | undefined } | undefined;
+  video?: { url?: string | undefined } | undefined;
+};
+
+/** The text, files and embeds of a message, and of a forwarded message in `message_snapshots`. */
 type DiscordBodyData = {
   content?: string | undefined;
   attachments?: DiscordAttachmentData[] | undefined;
+  embeds?: DiscordEmbedData[] | undefined;
   message_reference?: { type?: number | undefined; message_id?: string | undefined } | undefined;
   message_snapshots?:
-    | { message: { content?: string | undefined; attachments?: DiscordAttachmentData[] | undefined } }[]
+    | {
+        message: {
+          content?: string | undefined;
+          attachments?: DiscordAttachmentData[] | undefined;
+          embeds?: DiscordEmbedData[] | undefined;
+        };
+      }[]
     | undefined;
 };
 
@@ -62,6 +84,7 @@ export interface DiscordMessageData {
   author: { id: string; username: string; global_name?: string | null; bot?: boolean };
   member?: { nick?: string | null; roles?: string[] };
   mentions: { id: string }[];
+  mention_roles?: string[];
   message_reference?: { type?: number; message_id?: string };
   referenced_message?:
     | (DiscordBodyData & {
@@ -96,19 +119,32 @@ export function discordAuthorName(message: {
   return message.member?.nick ?? message.author.global_name ?? message.author.username;
 }
 
-/** Removes each mention of the bot user: a host does not know the bot user ID. */
-function stripBotMention(content: string, botUserId: string | null): string {
-  if (!botUserId) return content.trim();
-  return content.split(`<@${botUserId}>`).join("").split(`<@!${botUserId}>`).join("").trim();
+/**
+ * Removes each mention of the bot user, and of the bot's own role: a host knows neither ID. Discord
+ * makes that role when the bot joins, with the bot's name, so a person can choose it instead of the bot.
+ */
+function stripBotMention(content: string, botUserId: string | null, botRoleId: string | null = null): string {
+  const mentions = [
+    ...(botUserId ? [`<@${botUserId}>`, `<@!${botUserId}>`] : []),
+    ...(botRoleId ? [`<@&${botRoleId}>`] : []),
+  ];
+  return mentions.reduce((text, mention) => text.split(mention).join(""), content).trim();
 }
 
 /**
  * The delivery for one guild message, or null when the host must not receive it: a bot or webhook
- * wrote it, or it does not mention the bot.
+ * wrote it, or it mentions neither the bot nor the bot's own role.
  */
-function normalizeGuildMessage(message: DiscordMessageData, botUserId: string): DiscordInboundMessage | null {
+function normalizeGuildMessage(
+  message: DiscordMessageData,
+  botUserId: string,
+  botRoleId: string | null,
+): DiscordInboundMessage | null {
   if (!message.guild_id || message.author.bot === true || message.webhook_id) return null;
-  if (!message.mentions.some((user) => user.id === botUserId)) return null;
+  const mentioned =
+    message.mentions.some((user) => user.id === botUserId) ||
+    (botRoleId !== null && (message.mention_roles ?? []).includes(botRoleId));
+  if (!mentioned) return null;
   const reference = message.message_reference;
   let replyTo: DiscordInboundMessage["replyTo"] = null;
   const repliedId = message.referenced_message?.id ?? reference?.message_id;
@@ -119,7 +155,7 @@ function normalizeGuildMessage(message: DiscordMessageData, botUserId: string): 
       messageId: repliedId,
       authorIsBot,
       rootId: authorIsBot ? (referenced?.message_reference?.message_id ?? null) : null,
-      quote: authorIsBot || !referenced ? null : quoteOf(referenced, botUserId),
+      quote: authorIsBot || !referenced ? null : quoteOf(referenced, botUserId, botRoleId),
     };
   }
   return {
@@ -128,7 +164,7 @@ function normalizeGuildMessage(message: DiscordMessageData, botUserId: string): 
     authorId: message.author.id,
     authorName: discordAuthorName(message),
     authorRoleIds: message.member?.roles?.slice(0, DISCORD_ROLES_LIMIT) ?? null,
-    content: stripBotMention(message.content, botUserId),
+    content: stripBotMention(message.content, botUserId, botRoleId),
     replyTo,
     attachments: attachmentsOf(message.attachments),
     sentAt: message.timestamp,
@@ -153,39 +189,87 @@ function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[
 }
 
 /**
- * The text and files of a message. A forward has none of its own: Discord gives the forwarded
- * message's in its snapshot.
+ * The text of each embed, up to Discord's limits: one part on each line, and the links of its
+ * images. An embed without text or links is left out. Colors, icons, timestamps and the provider
+ * name are left out, and so are the components of a message, such as buttons.
+ */
+function embedsOf(list: DiscordEmbedData[]): string[] {
+  const embeds: string[] = [];
+  let remaining = DISCORD_EMBED_TEXT_LIMIT;
+  for (const embed of list.slice(0, DISCORD_EMBEDS_LIMIT)) {
+    if (remaining <= 0) break;
+    const fields = (embed.fields ?? []).map((field) =>
+      [embedPart(field.name), embedPart(field.value)].filter(Boolean).join(": "),
+    );
+    const text = [
+      labelled("Author", embed.author?.name),
+      embedPart(embed.title),
+      labelled("Link", embed.url),
+      embedPart(embed.description),
+      ...fields,
+      labelled("Footer", embed.footer?.text),
+      labelled("Image", embed.image?.url),
+      labelled("Thumbnail", embed.thumbnail?.url),
+      labelled("Video", embed.video?.url),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    if (!text) continue;
+    embeds.push(text.slice(0, remaining));
+    remaining -= text.length;
+  }
+  return embeds;
+}
+
+/** An embed part without the zero-width spaces that bots use for an empty field name. */
+function embedPart(value: string | undefined): string {
+  return (value ?? "").replaceAll("\u200b", "").trim();
+}
+
+function labelled(label: string, value: string | undefined): string {
+  const part = embedPart(value);
+  return part ? `${label}: ${part}` : "";
+}
+
+/**
+ * The text, files and embeds of a message. A forward has none of its own: Discord gives the
+ * forwarded message's in its snapshot.
  */
 export function messageBody(
   message: DiscordBodyData,
   botUserId: string | null,
-): { content: string; attachments: DiscordInboundAttachment[]; forwarded: boolean } {
+  botRoleId: string | null = null,
+): { content: string; attachments: DiscordInboundAttachment[]; embeds: string[]; forwarded: boolean } {
   const forwarded = message.message_reference?.type === MessageReferenceType.Forward;
   const body = forwarded ? (message.message_snapshots?.[0]?.message ?? {}) : message;
   return {
-    content: stripBotMention(body.content ?? "", botUserId),
+    content: stripBotMention(body.content ?? "", botUserId, botRoleId),
     attachments: attachmentsOf(body.attachments ?? []),
+    embeds: embedsOf(body.embeds ?? []),
     forwarded,
   };
 }
 
 /**
- * The replied-to message of a person, or null when Discord gave neither text nor attachments:
- * without the Message Content intent, Discord gives them only for a message that mentions the bot.
+ * The replied-to message of a person or of another bot, or null when Discord gave no text,
+ * attachments or embeds: without the Message Content intent, Discord gives them only for a message
+ * that mentions the bot.
  * A forward is kept without them, so that the host can say that its content is not available.
  */
 function quoteOf(
   referenced: NonNullable<DiscordMessageData["referenced_message"]>,
   botUserId: string,
+  botRoleId: string | null,
 ): DiscordInboundQuote | null {
-  const { content, attachments, forwarded } = messageBody(referenced, botUserId);
-  if ((!content && attachments.length === 0 && !forwarded) || !referenced.timestamp) return null;
+  const { content, attachments, embeds, forwarded } = messageBody(referenced, botUserId, botRoleId);
+  if ((!content && attachments.length === 0 && embeds.length === 0 && !forwarded) || !referenced.timestamp) return null;
   return {
     authorId: referenced.author.id,
     authorName: referenced.author.global_name ?? referenced.author.username ?? referenced.author.id,
     content: content.slice(0, DISCORD_QUOTE_TEXT_LIMIT),
     sentAt: referenced.timestamp,
     attachments,
+    embeds,
     forwarded,
   };
 }
@@ -214,6 +298,8 @@ export class DiscordState {
   readonly #closedShards = new Set<number>();
   // Channel or thread ID to its guild and name.
   readonly #channels = new Map<string, { guildId: string; name: string }>();
+  // Guild ID to the ID of the role that Discord made for the bot in that guild.
+  readonly #botRoles = new Map<string, string>();
   readonly #interactions = new Map<string, StoredInteraction>();
   // User ID to the time of the last reply to a direct message from that user.
   readonly #directReplies = new Map<string, number>();
@@ -260,6 +346,17 @@ export class DiscordState {
     return this.#applicationId ?? this.#configuredApplicationId;
   }
 
+  /** The role that Discord made for the bot in the guild, or null when the Gateway did not give it. */
+  botRoleId(guildId: string): string | null {
+    return this.#botRoles.get(guildId) ?? null;
+  }
+
+  /** Keeps or drops the guild's bot role. Its `bot_id` tag names the bot user, the same ID as the app. */
+  #rememberRole(guildId: string, role: { id: string; tags?: { bot_id?: string } | undefined }): void {
+    if (role.tags?.bot_id === (this.#botUserId ?? this.applicationId)) this.#botRoles.set(guildId, role.id);
+    else if (this.#botRoles.get(guildId) === role.id) this.#botRoles.delete(guildId);
+  }
+
   channel(channelId: string): { guildId: string; name: string } | null {
     return this.#channels.get(channelId) ?? null;
   }
@@ -295,6 +392,7 @@ export class DiscordState {
         const guild = payload.d;
         this.#guilds.set(guild.id, guild.name);
         if (this.#shardCount !== null) this.#shardGuilds.get(this.#shardOf(guild.id))?.add(guild.id);
+        for (const role of guild.roles ?? []) this.#rememberRole(guild.id, role);
         if (payload.t === GatewayDispatchEvents.GuildCreate) {
           for (const channel of [...(payload.d.channels ?? []), ...(payload.d.threads ?? [])]) {
             this.#channels.set(channel.id, { guildId: guild.id, name: channel.name ?? "" });
@@ -308,6 +406,13 @@ export class DiscordState {
         this.#forgetGuild(payload.d.id);
         return [{ type: "deliver", guildId: payload.d.id, delivery: { kind: "removed" } }];
       }
+      case GatewayDispatchEvents.GuildRoleCreate:
+      case GatewayDispatchEvents.GuildRoleUpdate:
+        this.#rememberRole(payload.d.guild_id, payload.d.role);
+        return [];
+      case GatewayDispatchEvents.GuildRoleDelete:
+        if (this.#botRoles.get(payload.d.guild_id) === payload.d.role_id) this.#botRoles.delete(payload.d.guild_id);
+        return [];
       case GatewayDispatchEvents.ChannelCreate:
       case GatewayDispatchEvents.ChannelUpdate:
       case GatewayDispatchEvents.ThreadCreate:
@@ -339,7 +444,7 @@ export class DiscordState {
   #message(message: DiscordMessageData, now: number): DiscordAction[] {
     if (!message.guild_id) return this.#directMessage(message, now);
     if (!this.#botUserId) return [];
-    const normalized = normalizeGuildMessage(message, this.#botUserId);
+    const normalized = normalizeGuildMessage(message, this.#botUserId, this.botRoleId(message.guild_id));
     return normalized
       ? [{ type: "deliver", guildId: message.guild_id, delivery: { kind: "message", message: normalized } }]
       : [];
@@ -401,6 +506,7 @@ export class DiscordState {
 
   #forgetGuild(guildId: string): void {
     this.#guilds.delete(guildId);
+    this.#botRoles.delete(guildId);
     if (this.#shardCount !== null) this.#shardGuilds.get(this.#shardOf(guildId))?.delete(guildId);
     for (const [channelId, channel] of this.#channels) {
       if (channel.guildId === guildId) this.#channels.delete(channelId);

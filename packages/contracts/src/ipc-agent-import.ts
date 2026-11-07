@@ -25,9 +25,23 @@ export type AgentImportSkillSource = (typeof AGENT_IMPORT_SKILL_SOURCES)[number]
  */
 export const HERMES_EXPORT_SKILL_ID = "nightly-labs/openbot/resources/agent-import/hermes-agent";
 
+/** What the user types in a Hermes chat to install the export skill. */
+export const HERMES_SKILL_COMMAND = `/skills install ${HERMES_EXPORT_SKILL_ID}`;
+
+/**
+ * What the user says to the Grok Bot export agent, and what runs the Hermes export skill. The export
+ * agent and skill answer these exact words, so each app copies the same text.
+ */
+export const AGENT_IMPORT_PROMPT = "Export my agents for OpenBot";
+export const HERMES_EXPORT_PROMPT = "/openbot-export";
+
+/** The name of the export agent on its Grok Bot page. */
+export const AGENT_IMPORT_EXPORT_AGENT_NAME = "OpenBot export";
+
 export const AGENT_IMPORT_LIMITS = {
-  archiveBytes: 500 * 1024 * 1024,
-  files: 5_000,
+  /** The same as the instance transfer: the file is read into memory, so it stays below 2 GiB. */
+  archiveBytes: 2 * 1024 ** 3 - 1,
+  files: 50_000,
   /** One key names one agent in the archive: lowercase letters, digits and hyphens. */
   key: 64,
   sourceApp: 64,

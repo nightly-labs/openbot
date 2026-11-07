@@ -36,7 +36,7 @@ export const messages = {
   "mcp.status.noAnswer": "无响应",
   "mcp.status.didNotStart": "未启动",
   "mcp.status.unreachable": "无法连接",
-  "mcp.server.providerLimitNote": "仅限 Claude：带工作目录的服务器不会提供给其他服务商。",
+  "mcp.server.providerLimitNote": "仅限 Claude 和 Codex：带工作目录的服务器不会提供给其他服务商。",
   "mcp.server.runtimeDownloading": "正在下载 STDIO 服务器启动所需的运行时，下载完成前它可能无法启动。",
   "mcp.server.runtimeDownloadingProgress":
     "正在下载 STDIO 服务器启动所需的运行时（{percent}%），下载完成前它可能无法启动。",
@@ -76,7 +76,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "移除透传变量 {position}",
   "mcp.panel.workingDirectory": "工作目录",
   "mcp.panel.workingDirectoryDescription":
-    "Claude 助手和连接测试会在该目录启动服务器。留空可把该服务器提供给所有服务商：其他服务商无法设置目录，所以会跳过指定了目录的服务器。",
+    "Claude 和 Codex 助手和连接测试会在该目录启动服务器。留空可把该服务器提供给所有服务商：其他服务商无法设置目录，所以会跳过指定了目录的服务器。",
   "mcp.panel.endpointTitle": "端点",
   "mcp.panel.endpointDescription": "所有服务商都可以使用 HTTP MCP 服务器。",
   "mcp.panel.serverUrl": "服务器 URL",
@@ -133,11 +133,10 @@ export const messages = {
   "mcp.panel.removeApp": "移除应用",
   "mcp.panel.appSaved": "应用已保存，登录后即可使用。",
   "mcp.panel.appRemoved": "应用已移除。",
-  "mcp.signIn.relayDescription":
-    "确认登录页面是 {page}，然后在浏览器中打开它。完成后，OpenBot 会把登录结果发送到 {host}。",
+  "mcp.signIn.relayDescription": "在浏览器中登录 {page}。完成后，OpenBot 会把登录结果发送到 {host}。",
   "mcp.signIn.relayOpenDescription":
-    "在浏览器中打开 {page} 的登录页面。完成后，把浏览器显示的地址粘贴到这里，OpenBot 会把登录结果发送到 {host}。",
-  "mcp.signIn.relayDeviceDescription": "确认登录页面是 {page}，然后在浏览器中打开并完成。{host} 会自动获取登录结果。",
+    "在浏览器中登录 {page}。完成后，把浏览器显示的地址粘贴到这里，OpenBot 会把登录结果发送到 {host}。",
+  "mcp.signIn.relayDeviceDescription": "在浏览器中登录 {page} 并完成。{host} 会自动获取登录结果。",
   "mcp.signIn.relayOpen": "打开登录页面",
   "mcp.signIn.relayPasteHint": "如果浏览器没有跳回 OpenBot，请复制它显示的地址并粘贴到这里。",
   "mcp.signIn.relayPasteRequired": "OpenBot 无法自行从浏览器获取登录结果。完成后，请复制浏览器显示的地址并粘贴到这里。",

@@ -12,6 +12,7 @@ import { BROWSER_DYNAMIC_TOOLS } from "../src/backend/browser-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
 import type { VaultCardSecret } from "../src/backend/vault-items";
+import { parseBrowserToolText } from "./browser-snapshot-text";
 
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -41,7 +42,7 @@ const snapshotSchema = z.object({
   tabId: z.string(),
   revision: z.number(),
   title: z.string(),
-  elements: z.array(z.object({ ref: z.string(), name: z.string(), tag: z.string() })),
+  elements: z.array(z.object({ ref: z.string(), name: z.string(), tag: z.string().optional() })),
 });
 const fillSchema = z.object({
   filled: z.array(z.string()),
@@ -207,16 +208,17 @@ async function main(): Promise<void> {
     const open = async (url: string, frames = 1) => {
       const opened = await call("open", { url: `${url}${url.includes("?") ? "&" : "?"}n=${++sequence}` });
       assert(opened.success, "Fixture tab did not open.");
-      const tab = z.object({ tab: z.object({ id: z.string(), url: z.string() }) }).parse(JSON.parse(text(opened))).tab;
+      // open returns the first snapshot of the tab.
+      const tab = z.object({ tabId: z.string(), url: z.string() }).parse(JSON.parse(text(opened)));
       const contents = contentsOf(tab.url);
       await loaded(contents, frames);
-      return { tabId: tab.id, contents };
+      return { tabId: tab.tabId, contents };
     };
     const snapshot = async (tabId: string) => {
       const result = await call("snapshot", { tabId, image: "never" });
       assert(result.success, "Fixture snapshot failed.");
       assertHidden(text(result), "a snapshot");
-      return snapshotSchema.parse(JSON.parse(text(result)));
+      return snapshotSchema.parse(parseBrowserToolText(text(result)));
     };
     const ref = (current: z.infer<typeof snapshotSchema>, name: string) => {
       const element = current.elements.find((item) => item.name === name);
@@ -264,7 +266,7 @@ async function main(): Promise<void> {
     assert(mainFill.success, `Main-frame fill failed: ${redactText(text(mainFill))}`);
     assert.equal(approvals.length, 2, "The approved fill did not ask the owner once.");
     assertHidden(text(mainFill), "the fill result");
-    const mainResult = fillSchema.parse(JSON.parse(text(mainFill)));
+    const mainResult = fillSchema.parse(parseBrowserToolText(text(mainFill)));
     assert.deepEqual(
       [...mainResult.filled].sort(),
       ["expMonth", "expYear", "nameOnCard", "number", "securityCode"],

@@ -5,6 +5,8 @@
  */
 
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
+import { INPUT_LIMITS } from "./input-limits";
+import { isAgentModel } from "./ipc-agent-identity";
 import { isAgentTaskLimit } from "./ipc-agent-tasks";
 import {
   type AgentAccess,
@@ -15,7 +17,7 @@ import {
   isAgentBackupModels,
   isAgentUsageLimitReturn,
 } from "./ipc-agents";
-import { isIdentifier } from "./ipc-bounded-values";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
 
@@ -236,6 +238,114 @@ export function decodeAgentTaskLimitSettings(value: unknown): AgentTaskLimitSett
 export function parseUpdateAgentTaskLimitInput(value: unknown): UpdateAgentTaskLimitInput {
   if (!isDynamicRecord(value) || !isIdentifier(value.agentId)) throw new Error("Invalid task limit.");
   return { agentId: value.agentId, taskLimit: decodeTaskLimit(value.taskLimit) };
+}
+
+/**
+ * Whether the agent may start a new chat itself when its chat gets long. The read gives the value
+ * that applies: the agent's own choice, else the host default. A change saves the agent's own choice.
+ */
+export interface AgentNewChatSettings {
+  allowNewChat: boolean;
+}
+
+export interface UpdateAgentNewChatInput {
+  agentId: string;
+  allowNewChat: boolean;
+}
+
+export function decodeAgentNewChatSettings(value: unknown): AgentNewChatSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat setting.");
+  return { allowNewChat: value.allowNewChat };
+}
+
+export function parseUpdateAgentNewChatInput(value: unknown): UpdateAgentNewChatInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.allowNewChat))
+    throw new Error("Invalid new chat setting.");
+  return { agentId: value.agentId, allowNewChat: value.allowNewChat };
+}
+
+/**
+ * Whether one agent shows its plan card before a long task. The local window reads it from the agent
+ * summary and the app defaults; an owner or admin of a joined server reads it here, as the value that
+ * applies on the host.
+ */
+export interface AgentPlanCardSettings {
+  quickAcknowledgement: boolean;
+}
+
+export interface UpdateAgentPlanCardInput {
+  agentId: string;
+  quickAcknowledgement: boolean;
+}
+
+export function decodeAgentPlanCardSettings(value: unknown): AgentPlanCardSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.quickAcknowledgement)) throw new Error("Invalid plan card setting.");
+  return { quickAcknowledgement: value.quickAcknowledgement };
+}
+
+export function parseUpdateAgentPlanCardInput(value: unknown): UpdateAgentPlanCardInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.quickAcknowledgement))
+    throw new Error("Invalid plan card setting.");
+  return { agentId: value.agentId, quickAcknowledgement: value.quickAcknowledgement };
+}
+
+/**
+ * Whether one agent asks its provider for the fast service tier. The local window reads it from the
+ * agent summary; a member of a joined server reads it on `agent-fast-mode-v1`. Null: never set, so
+ * the host sends no tier and the provider keeps its own.
+ */
+export interface AgentFastModeSettings {
+  fastMode: boolean | null;
+}
+
+export interface UpdateAgentFastModeInput {
+  agentId: string;
+  fastMode: boolean;
+}
+
+export function decodeAgentFastModeSettings(value: unknown): AgentFastModeSettings {
+  if (!isDynamicRecord(value) || (value.fastMode !== null && !isBoolean(value.fastMode)))
+    throw new Error("Invalid fast mode setting.");
+  return { fastMode: value.fastMode };
+}
+
+export function parseUpdateAgentFastModeInput(value: unknown): UpdateAgentFastModeInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.fastMode))
+    throw new Error("Invalid fast mode setting.");
+  return { agentId: value.agentId, fastMode: value.fastMode };
+}
+
+/** A model of a host that has a fast service tier, and the tier id that the host sends for it. */
+export interface AgentFastModel {
+  provider: string;
+  id: string;
+  fastServiceTier: string;
+}
+
+/** A model entry that this build cannot read is left out, as the released model list does. */
+export function decodeAgentFastModels(value: unknown): AgentFastModel[] {
+  if (!isDynamicRecord(value) || !Array.isArray(value.models)) throw new Error("Invalid fast models.");
+  return value.models.flatMap((model: unknown) =>
+    isDynamicRecord(model) &&
+    isIdentifier(model.provider) &&
+    isAgentModel(model.id) &&
+    isBoundedString(model.fastServiceTier, INPUT_LIMITS.serviceTier) &&
+    model.fastServiceTier
+      ? [{ provider: model.provider, id: model.id, fastServiceTier: model.fastServiceTier }]
+      : [],
+  );
+}
+
+/** Puts the fast tiers of `agent-fast-mode-v1` back on a host's model list, which drops them. */
+export function withFastServiceTiers<Model extends { provider: string; id: string; fastServiceTier?: string }>(
+  models: Model[],
+  fast: AgentFastModel[],
+): Model[] {
+  const tiers = new Map(fast.map((model) => [`${model.provider}\u0000${model.id}`, model.fastServiceTier]));
+  return models.map((model) => {
+    const fastServiceTier = tiers.get(`${model.provider}\u0000${model.id}`);
+    return fastServiceTier ? { ...model, fastServiceTier } : model;
+  });
 }
 
 /** The agent a host added from a marketplace listing or a shared template. The agent list has the rest. */

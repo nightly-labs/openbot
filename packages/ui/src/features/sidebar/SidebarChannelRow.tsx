@@ -10,11 +10,12 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
+import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -32,6 +33,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const { t, format } = useText();
   const active = () => props.activeChannelId === rowProps.channel.id;
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
+  const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
   const wait = () => (rowProps.waiting ? channelWait() : undefined);
   const waitLabel = () => {
     const current = channelWait();
@@ -40,11 +42,17 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const draggable = () => !rowProps.channel.archived && layoutMutable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
+  // A row from a saved frame has no last message yet: it shows no preview and no time until the list loads.
+  const previewPending = () => props.channelPreviewsPending === true && !rowProps.channel.lastMessage;
   /* Running work is a prefix on the preview line rather than a word beside the name: one line
    * carries both and the row keeps the height every other row in the list has. */
+  const time = () =>
+    previewPending() ? "" : sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format);
   const preview = () => {
     // A waiting row previews the question, as on the agent row.
-    const text = wait()?.detail || (rowProps.channel.lastMessage?.text ?? t("sidebar.channel.noMessages"));
+    const text =
+      wait()?.detail ||
+      (rowProps.channel.lastMessage?.text ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
     return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
   // The wait label already reads the question, so the label does not say it twice, unless the
@@ -71,44 +79,34 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
         }}
       >
         <span class="agent-row-avatar">
-          <ChannelAvatar members={rowProps.channel.members} agents={props.agents} layout="cluster" />
-          <Show
-            when={channelWait()}
-            fallback={
-              <Show when={rowProps.channel.unreadCount > 0}>
-                <Badge class="person-unread-badge" variant="primary-light" aria-hidden="true">
-                  {Math.min(rowProps.channel.unreadCount, 99)}
-                </Badge>
-              </Show>
-            }
-          >
-            <SidebarAgentIndicator state={channelWait} />
-          </Show>
+          <ChannelAvatar
+            members={rowProps.channel.members}
+            agents={props.agents}
+            layout="cluster"
+            icon={rowProps.channel.icon}
+            imageUrl={rowProps.channel.imageUrl}
+          />
+          <SidebarAgentIndicator state={badgeState} />
         </span>
         <span class="agent-row-copy">
           <span class="agent-row-heading">
             <span class="agent-row-title">
-              <strong>{rowProps.channel.name}</strong>
+              <strong dir="auto">{rowProps.channel.name}</strong>
               <Show when={title()}>
                 {(label) => (
                   <Badge class="agent-role-badge" title={label()}>
-                    <span>{label()}</span>
+                    <span dir="auto">{label()}</span>
                   </Badge>
                 )}
               </Show>
             </span>
-            <Show
-              when={wait()}
-              fallback={
-                <span class="agent-row-time">
-                  {sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format)}
-                </span>
-              }
-            >
+            <Show when={wait()} fallback={<span class="agent-row-time">{time()}</span>}>
               {(current) => <SidebarWaitChip reason={current().reason} />}
             </Show>
           </span>
-          <span class="agent-row-preview">{preview()}</span>
+          <span class="agent-row-preview" dir="auto">
+            {preview()}
+          </span>
         </span>
         <Show when={rowProps.channel.unreadCount > 0}>
           <span class="sr-only">{t("sidebar.channel.unread", { count: rowProps.channel.unreadCount })}</span>

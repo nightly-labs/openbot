@@ -1,7 +1,7 @@
 # Messaging connections
 
-The agents of this computer can answer in an external chat platform. Slack, Discord and Telegram
-are supported today. The design notes are in
+The agents of this computer can answer in an external chat platform. Slack, Discord, Telegram and
+WhatsApp are supported today. The design notes are in
 [architecture/channels-and-messaging.md](architecture/channels-and-messaging.md#messaging-connections),
 the Slack launch steps in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md), and the Discord app
 settings in [apps/discord-app/README.md](../apps/discord-app/README.md).
@@ -56,6 +56,8 @@ browser. A joined server shows no Slack page.
 - The agent can read more of the channel or thread when a message refers to something earlier.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. ✅, ❌ or ⏹ shows the end.
   Every post comes from OpenBot and names no agent.
+- A new post that mentions a person as `<@user ID>` pings that person. A post never pings a channel,
+  `@here`, `@everyone` or a user group.
 - An approval appears in the thread with **Approve** and **Deny**. Only the person who wrote the
   message can answer it there. The OpenBot host can always answer it.
 - `stop` or `cancel` in the thread, or the **Stop** button, stops the request of the person who
@@ -113,7 +115,7 @@ again.
   An approval has **Approve** and **Deny** buttons, and a status post has **Stop**. Only the person
   who wrote the request can press them; another person gets a reply that only they see. A reply to
   an OpenBot post with only `stop` or `cancel` stops the request of the person who sends it.
-- A post never pings anyone, also when it names a person.
+- A new post that mentions a person pings that person. A post never pings a role or `@everyone`.
 - An answer longer than 2,000 characters is sent in more than one post. A file larger than 10 MB is
   not sent, and the conversation says which files were not sent.
 
@@ -144,20 +146,67 @@ agents.
   gives each reply chain its own thread, so a reply to the bot, or to a message in the chain, reaches
   the same agent without a mention. In a forum, each topic is one conversation. A direct chat is one
   conversation.
-- With privacy mode on (Telegram's default), Telegram sends the bot only messages that mention it,
-  replies to it and commands. Other messages of the chat do not reach this computer.
+- The OpenBot bot has privacy mode off, so Telegram sends it every message of a group, and Signal
+  passes each one to this computer. OpenBot answers only a mention, a reply to the bot, or a message
+  of a reply chain that an agent answers. It keeps the others in memory only, and an agent can read
+  the last of them with `messaging_history`. With privacy mode on, Telegram does not send a plain
+  mention to a bot that is not an admin of the group.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. 👌, 💔 or 🫡 shows the end.
+- An answer or a post that mentions a person as `@username` or `@<user ID>` pings that person. An
+  edit pings nobody, so an answer with a mention is a new message, and "Working on it…" is deleted.
 - An approval appears with **Approve** and **Deny**. Only the person who wrote the message can answer
   it there. When another person presses a button, the bot answers in the chat that only the requester
   can do it.
 - `@<bot> stop` or a reply `stop` to the bot, or the **Stop** button, stops the request.
 - Files up to 20 MB go both ways.
 
+## Connect WhatsApp
+
+A WhatsApp number links to this computer as a device, as WhatsApp Web does. The messages go directly
+between this computer and WhatsApp: no OpenBot service and no OpenBot account takes part. OpenBot uses
+an unofficial client, and WhatsApp can restrict or block a number that it sees as automated. A number
+used only by OpenBot is safer than your personal one.
+
+1. Open **Marketplace → Apps → WhatsApp** and select **Link WhatsApp**.
+2. Select whose number it is:
+   - **My personal number**: only your own "Message yourself" chat, and the contacts and groups you
+     allow, reach the agents. OpenBot never writes to anyone else first.
+   - **A number only for OpenBot**: a person you did not allow gets one message with a 6-character
+     code, and the request shows in OpenBot. Select **Approve** to allow the person.
+3. Select **QR code** and scan it in WhatsApp → **Linked devices** → **Link a device**, or select
+   **Pairing code**, type the number of the phone, and type the code that OpenBot shows on the phone.
+4. Pick the model of the WhatsApp Orchestrator and select **Add agent**. One orchestrator answers every
+   linked number. It goes in the **Integrations** section of the sidebar. OpenBot posts a 👋 welcome in
+   the number's own "Message yourself" chat, so the chat shows at the top of WhatsApp.
+5. Under **Who can write**, add contacts by phone number, and groups from the list of the number's
+   groups.
+
+**Disconnect** logs the device out, deletes its keys on this computer, and keeps the conversations,
+the workspace memories and the allowed senders, so the same number linked again gets them back. When
+OpenBot was off, also remove the device in WhatsApp → **Linked devices**. When it is the last number,
+the WhatsApp Orchestrator is deleted with its conversations, as for Slack.
+
+## What happens in WhatsApp
+
+- A direct chat is one conversation. In a group, a mention of the number starts a conversation, and
+  a reply to a message of it continues it without a mention. Other messages of the group start nothing.
+- 👀 on your message means it arrived. "Working on it…" is replaced by the answer within 15 minutes;
+  later, the answer is a new message. ✅ (done), ❌ (failed) or 🫡 (stopped) on your message shows the end.
+- An answer or a post that mentions a person as `@<user ID>` (the phone number) pings that person. An
+  edit pings nobody, so an answer with a mention is a new message, and "Working on it…" is deleted.
+- Personal WhatsApp has no buttons. An approval ends with "Reply 1 to approve or 2 to deny." Only the
+  person who wrote the request can answer it. `stop` stops the request.
+- Short messages that one person sends within 1.5 seconds become one request.
+- Files up to 64 MB go both ways. A voice message arrives as an audio file.
+- A message that arrives while OpenBot is off waits on WhatsApp's servers and arrives when the number
+  connects again. OpenBot answers messages up to one day old.
+
 ## Test Telegram locally
 
 Telegram must reach Signal over public HTTPS.
 
-1. Make a development bot with [@BotFather](https://t.me/BotFather). Keep privacy mode on.
+1. Make a development bot with [@BotFather](https://t.me/BotFather). Turn privacy mode off
+   (`/setprivacy`), or mentions reach the bot only when it is a group admin.
 2. Start a tunnel to the local Signal, for example `cloudflared tunnel --url http://127.0.0.1:<signal port>`.
 3. Give Signal `TELEGRAM_BOT_TOKENS` (the bot token), `TELEGRAM_WEBHOOK_SECRET` (32 bytes or more) and
    `TELEGRAM_WEBHOOK_ORIGIN` (the tunnel address). Signal sets the bot's webhook when it starts.
@@ -208,7 +257,8 @@ The workspace row says what is wrong.
 
 ## Workspace memories
 
-Each connection (a Slack workspace, a Discord server or a Telegram chat) has its own list of facts.
+Each connection (a Slack workspace, a Discord server, a Telegram chat or a WhatsApp number) has its own
+list of facts.
 The agent that answers saves a fact with `openbot.messaging_remember` and deletes one with
 `openbot.messaging_forget_memory`. Every prompt of every conversation of that connection shows the
 whole list, with the ID of each fact. The prompt marks the facts as data, not instructions.
@@ -239,9 +289,9 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
   and post in, or the Telegram chat itself.
 - `openbot.messaging_post` posts markdown as OpenBot to `place`. `replyTo` puts the post in a
   thread: a Slack thread ts, a Discord message ID, a Telegram message ID, or `t<topic ID>` for a
-  Telegram forum topic. The text is redacted before it leaves this computer. A Discord post pings
-  nobody; a Telegram `@username` notifies that person. A Telegram connection posts only in its own
-  chat.
+  Telegram forum topic. The text is redacted before it leaves this computer. A Slack or Discord
+  `<@user ID>` or a Telegram `@username` notifies that person. A Telegram connection posts only in
+  its own chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
 - A long text goes in more than one post. When a later part fails, the earlier parts stay posted.
 - A routine posts only when its run calls the tool. The scheduler does not post the run's answer.
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the
@@ -290,6 +340,18 @@ while this computer has no Signal connection is lost, except for a hosted server
   disconnect it, and add the bot again.
 - Telegram has no history API. The agent sees as context only the messages that this computer saw
   since it started, and the message that a request answers.
+- WhatsApp is an unofficial client. WhatsApp can restrict or block a number that it sees as automated,
+  and a protocol change of WhatsApp can stop the connection until OpenBot updates. Use a number only
+  for OpenBot when you can.
+- WhatsApp removes a linked device after about 14 days without a connection. Link the number again.
+- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw since
+  it started. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
+  server connects. A message older than one day gets no answer.
+- WhatsApp has one session per linked device. A second OpenBot profile that opens the same store
+  stops with "locked"; link it as its own device.
+- An owner or admin of a joined server links and manages the host's numbers from their own computer
+  or the browser client (`whatsapp-connector-v1`). The host's session gets the QR code or the pairing
+  code, and the client shows it. The phone app shows no WhatsApp page.
 
 ## Adding a platform
 
@@ -309,6 +371,7 @@ core changes:
 | Slack | The Events API through Signal | `thread_ts`, or the message `ts` that starts a thread | Implemented. |
 | Discord | The Gateway in Signal (`@discordjs/ws`), which passes mentions to the host; calls go through Signal | The id of the first message of a reply chain | Implemented. No privileged intent. |
 | Telegram | The webhook of the one OpenBot bot through Signal, which holds the token | `message_thread_id`, the topic in a forum, `dm` in a direct chat | Implemented. No history API: the host keeps what the bot sees, in memory. |
+| WhatsApp | A linked device: this computer's own socket to WhatsApp (vendored Baileys, `packages/whatsapp`) | `dm` in a direct chat; in a group, the id of the message that mentioned the number | Implemented. No history: the host keeps what it saw, in memory. Sender rules in `whatsapp-senders.ts`. |
 
 Then add the platform to `MESSAGING_PLATFORMS`, a page in Marketplace → Apps, and its i18n
 keys. The database needs no migration: `platform` has no `CHECK`.

@@ -86,6 +86,23 @@ export const messages = defineMessages("server", {
   "server.add.billing.monthly": "Monthly",
   "server.add.billing.yearly": "Yearly",
   "server.add.billing.save": "Save {percent}%",
+  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
+  "server.add.use.label": "Use",
+  "server.add.use.personal": "Personal",
+  "server.add.use.work": "Work",
+  // The row under the plans that sets the users of the license. It is disabled for personal use.
+  "server.add.license.people": "People at work",
+  // A toast when "Fewer members" is at the people who use the account's servers now. The license must include them.
+  "server.add.license.minimum": {
+    one: "{count} person uses your servers now, so you cannot choose fewer.",
+    other: "{count} people use your servers now, so you cannot choose fewer.",
+  },
+  // On each plan that the people fit, for work. {percent} is a whole number, such as 20.
+  "server.add.license.bundle": "Bundle −{percent}%",
+  // The plan summary for work: the price includes the license. {license} is the license line, such as
+  // "Team license, 5 members".
+  "server.add.license.included": "Includes {license}",
+  "server.add.license.includedTrial": "Includes {license}, free until {date}",
   "server.add.billedMonthly": "Billed monthly",
   "server.add.billedYearly": "{price} billed yearly",
   // {amount} is a formatted amount, such as "€120". It follows the yearly price.
@@ -98,8 +115,22 @@ export const messages = defineMessages("server", {
   "server.add.custom.description":
     "Get dedicated infrastructure, additional storage, or features tailored to your workflow.",
   "server.add.custom.action": "Contact us",
-  "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // A small menu in the top corner of the hosted server plans, with the ways to add a server without a plan.
+  "server.add.otherOptions": "Other options",
+  // An item in the "Other options" menu of the hosted server plans. The server runs on this computer, with its own agents, chats and files.
+  "server.local.createTitle": "New server on this computer",
+  "server.local.createDescription": "The server has its own agents, chats and files. It runs on this computer.",
+  "server.local.nameLabel": "Server name",
+  "server.local.create": "Create server",
+  "server.local.creating": "Creating server…",
+  "server.local.createFailed": "Could not create the server.",
+  "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "server.local.deleteConfirmTitle": "Delete {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stops the server and moves its agents, chats and files to the trash.",
+  "server.local.deleting": "Deleting server…",
+  "server.local.deletedTitle": "Deleted {name}",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -131,6 +162,16 @@ export const messages = defineMessages("server", {
   "server.upsell.offline": "An OpenBot server stays on 24/7, so routines keep running.",
   "server.upsell.seePlans": "See plans",
   "server.upsell.notNow": "Not now",
+  // The dialog that offers the next plan when the disk of a hosted server is almost full.
+  "server.upgrade.title": "Your agents are running out of space",
+  "server.upgrade.description":
+    "{server} has little free space left. Upgrade to keep your agents working without interruptions.",
+  // Under the disk meter, for example "11 GB of 12 GB used".
+  "server.upgrade.used": "{used} of {total} used",
+  // The column of the plan that the server has now, for example "Starter (now)".
+  "server.upgrade.current": "{plan} (now)",
+  "server.upgrade.price": "Price",
+  "server.upgrade.action": "Upgrade to {plan}",
   "server.hosted.progressTitle": "Setting up {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",
@@ -191,6 +232,8 @@ export const messages = defineMessages("server", {
   "server.rail.addRemote": "Add remote server",
   "server.rail.add": "Add a server",
   "server.rail.buttonLabel": "{name} server",
+  // Added to the tooltip of a server that runs on this computer, after its name.
+  "server.rail.thisComputer": "on this computer",
   "server.rail.notificationsMuted": "notifications muted",
   "server.rail.actions": "Server actions",
   "server.rail.unmute": "Unmute server",
@@ -202,6 +245,10 @@ export const messages = defineMessages("server", {
   "server.rail.restart": "Restart server",
   "server.rail.leave": "Leave server",
   "server.rail.delete": "Delete server",
+  // Hides the server on this computer from the server list while the user has other servers.
+  "server.rail.hide": "Hide server",
+  // Brings the hidden server on this computer back to the server list. {name} is its name, "Local".
+  "server.rail.showLocal": "Show {name}",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",
@@ -296,18 +343,53 @@ export const messages = defineMessages("server", {
   "server.settings.addLogo": "Add server logo",
   "server.settings.removeLogo": "Remove server logo",
   "server.settings.access": "Access",
+  "server.companySignIn.title": "Company sign-in",
+  "server.companySignIn.sso": "Single sign-on",
+  "server.companySignIn.badgeOn": "On",
+  "server.companySignIn.badgeOff": "Off",
+  "server.companySignIn.off": "People sign in with an email code.",
+  "server.companySignIn.onStatus": "{provider} · {domains}",
+  "server.companySignIn.testedStatus": "Tested for {domains}. Turn it on to use it.",
+  "server.companySignIn.setUp": "Set up",
+  "server.companySignIn.edit": "Edit",
+  "server.companySignIn.desktopOnly": "Set up single sign-on in the OpenBot desktop app.",
+  "server.companySignIn.loadFailed": "OpenBot couldn’t load company sign-in.",
+  "server.companySignIn.scim": "User sync (SCIM)",
+  "server.companySignIn.scimOff": "Off",
+  "server.companySignIn.createToken": "Create token",
+  "server.companySignIn.copyScimUrl": "Copy URL",
+  "server.companySignIn.revokeToken": "Revoke token",
+  "server.companySignIn.newTokenTitle": "SCIM token",
+  "server.companySignIn.newTokenDescription": "Copy it now. OpenBot shows it only once.",
+  "server.companySignIn.revokeTitle": "Revoke the SCIM token?",
+  "server.companySignIn.revokeDescription":
+    "Your identity provider can no longer sync users until you create a new token.",
+  "server.companySignIn.removeTitle": "Remove company sign-in?",
+  "server.companySignIn.removeDescription": "People with these email domains sign in with an email code again.",
+  "server.companySignIn.setUpTitle": "Set up single sign-on",
+  "server.companySignIn.editTitle": "Edit single sign-on",
+  "server.companySignIn.dialogSubtitle":
+    "Use an OpenID Connect app, such as Microsoft Entra ID, Okta or Google Workspace.",
+  "server.companySignIn.redirectUrl": "Redirect URL",
+  "server.companySignIn.issuer": "Issuer URL",
+  "server.companySignIn.clientId": "Client ID",
+  "server.companySignIn.clientSecret": "Client secret",
+  "server.companySignIn.clientSecretAgain": "Enter the secret again to test",
+  "server.companySignIn.domains": "Email domains",
+  "server.companySignIn.dnsRecord": "DNS record",
+  "server.companySignIn.dnsRecordDescription": "Add a TXT record named {name} with this value:",
+  "server.companySignIn.test": "Test sign-in",
+  "server.companySignIn.testing": "Waiting for your browser…",
+  "server.companySignIn.testPassed": "Signed in as {email}",
+  "server.companySignIn.testFailed": "The test sign-in did not pass. Check the values and try again.",
+  "server.companySignIn.turnOn": "Turn on",
+  "server.companySignIn.turnOff": "Turn off",
   "server.settings.publish": "Publish this server",
   "server.settings.published": "Server is published",
   "server.settings.setUpDesktopTitle": "Set up remote desktop",
   "server.settings.setUpDesktopDescription": "View and control this Mac from another computer.",
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
-  "server.settings.notifications": "Notifications",
-  "server.settings.muteNotifications": "Mute notifications",
-  "server.settings.muteDescription": "Stop desktop notifications, sounds and MacBook notch updates from this server.",
-  "server.settings.mutedUntilDescription": "{until}. Turn off to unmute now.",
-  "server.settings.notifyAbout": "Notify me about",
-  "server.settings.notifyAboutDescription": "Which agent events show a desktop notification.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
@@ -317,9 +399,18 @@ export const messages = defineMessages("server", {
   "server.settings.memoryLimit": "Memories per agent",
   "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
+  "server.settings.memoryReview": "Memory review",
+  "server.settings.memoryReviewDescription":
+    "How often agents on this server save lasting facts from their chats in the background.",
+  "server.settings.memoryReviewOff": "Off",
+  "server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
+  "server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
   "server.settings.rolesTitle": "Roles",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
+  "server.settings.auditTitle": "Audit log",
+  "server.settings.auditDescription":
+    "Changes to the members, roles and agent access of this server, newest first. The host keeps the newest 500 changes.",
   "server.settings.remoteOnline": "The host is online. Publication is controlled by its owner.",
   "server.settings.remoteOffline": "The host is offline. Publication is controlled by its owner.",
   "server.settings.reachable": "Reachable online. Only invited people can sign in.",
@@ -336,6 +427,9 @@ export const messages = defineMessages("server", {
   "server.settings.hostKeyConfirmDescription":
     "The current key and the new key both sign a handover. Apps of members change to the new key when they connect again. Do this if the key file was copied or exposed.",
   "server.settings.hostKeyRotated": "Server key changed",
+  "server.settings.hostKeyChanged": "Last change",
+  // {date} is the date and time of the change.
+  "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
   "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":
@@ -409,6 +503,28 @@ export const messages = defineMessages("server", {
   "server.roles.setAll": "Set all",
   "server.roles.setAllLabel": "Set all: access of {role} to all agents",
   "server.roles.loadFailed": "Could not load the roles of this server.",
+  "server.audit.changes": "Changes",
+  "server.audit.filter": "Kind of change",
+  "server.audit.filterAll": "All changes",
+  "server.audit.filterMembers": "Members",
+  "server.audit.filterRoles": "Roles",
+  "server.audit.filterAgents": "Agent access",
+  "server.audit.search": "Search changes",
+  "server.audit.empty": "No changes yet.",
+  "server.audit.noMatch": "No change matches.",
+  "server.audit.loadFailed": "Could not load the audit log of this server.",
+  "server.audit.unknownActor": "Unknown member",
+  "server.audit.to": "to",
+  "server.audit.memberJoined": "{member} joined as {role}",
+  "server.audit.memberLeft": "{member} left the server",
+  "server.audit.memberRemoved": "{member} was removed from the server",
+  "server.audit.memberRole": "{member}: {change}",
+  "server.audit.roleCreated": "Created the {role} role",
+  "server.audit.roleRenamed": "Renamed {change}",
+  "server.audit.roleDeleted": "Deleted the {role} role",
+  "server.audit.roleMemberAdded": "Added {member} to {role}",
+  "server.audit.roleMemberRemoved": "Removed {member} from {role}",
+  "server.audit.agentLevel": "{agent} for {role}: {change}",
   "server.agentAccess.level.none": "No access",
   "server.agentAccess.level.view": "Can view",
   "server.agentAccess.level.chat": "Can chat",
@@ -436,7 +552,10 @@ export const messages = defineMessages("server", {
   "server.invite.showQr": "Show invitation QR code",
   "server.invite.permaHint":
     "Never expires and can be used many times. Anyone with this link can join; revoke it to disable.",
-  "server.invite.full": "This server has the maximum of {limit} members. Remove a member to invite a new person.",
+  "server.invite.full": {
+    one: "This server has the maximum of {count} member. Remove a member to invite a new person.",
+    other: "This server has the maximum of {count} members. Remove a member to invite a new person.",
+  },
   "server.invite.qrLabel": "Invitation QR code",
   "server.invite.qrDescription": "Scan this code in OpenBot Mobile to join this server.",
   "server.invite.accepted": "Invitation accepted",
@@ -458,8 +577,8 @@ export const messages = defineMessages("server", {
   "server.invite.revokeTitle": "Revoke this invitation?",
   "server.invite.revokeDescription": "The invitation stops working. People who joined with it stay members.",
   "server.desktop.accessTitle": "Remote desktop access",
-  "server.desktop.gatewayDescription":
-    "Every active server member can control this host. There is no separate remote desktop password.",
+  "server.desktop.gatewayPolicyDescription":
+    "There is no separate remote desktop password. The settings below choose who can control this computer.",
   "server.desktop.componentInstalled": "Host component installed",
   "server.desktop.componentNotInstalled": "Host component not installed",
   "server.desktop.sessions": "Unattended: {unattended} · Active sessions: {active}/{max}",
@@ -472,12 +591,27 @@ export const messages = defineMessages("server", {
   "server.desktop.hostOfflineDescription": "Reconnect to the host before you open its desktop.",
   "server.desktop.hostUpdateDescription": "Update OpenBot on the host to use remote control.",
   "server.desktop.serviceAvailable": "Service available",
-  "server.desktop.serviceAvailableDescription": "WebRTC control is available for all active members.",
+  "server.desktop.serviceAvailablePolicyDescription":
+    "This computer can share its screen. Its owner chooses which roles can control it.",
   "server.desktop.serviceNotReady": "Service not ready",
   "server.desktop.serviceNotReadyDescription":
     "Start Remote Control to check the host components and permissions. The host will report any setup error.",
   "server.desktop.remoteControl": "Remote control",
   "server.desktop.startHint": "Start Remote Control from the monitor button in the server header.",
+  "server.desktop.accessLabel": "Who can control this computer",
+  "server.desktop.accessDescription": "The members who can open the desktop of this computer from another device.",
+  "server.desktop.accessOwner": "Only the owner",
+  "server.desktop.accessAdmins": "Owner and admins",
+  "server.desktop.accessMembers": "All members",
+  "server.desktop.askLabel": "Ask on this computer",
+  "server.desktop.askDescription":
+    "Each session waits until a person at this computer allows it. With no answer in 30 seconds, OpenBot refuses it.",
+  "server.desktop.activeTitle": "Active remote desktop sessions: {active}",
+  "server.desktop.activeDescription": "Ends each session now. Members can ask again.",
+  "server.desktop.stopAll": "Stop all remote control",
+  "server.desktop.policyLoadFailed": "Could not load the remote control settings.",
+  "server.desktop.policySaveFailed": "Could not save the remote control settings.",
+  "server.desktop.stopFailed": "Could not stop remote control.",
   "server.settings.providersTitle": "Providers",
   "server.settings.providersDescription": "Manage the AI providers of the computer that runs this server.",
   "server.settings.providersSwitchNote": "Switch to {name} to manage its AI providers.",
@@ -605,4 +739,12 @@ export const messages = defineMessages("server", {
   "server.restartNotice.restartingTitle": "{name} is restarting to install an update",
   "server.restartNotice.restartingDescription": "OpenBot connects again automatically when {name} is back.",
   "server.restartNotice.backTitle": "{name} is back online",
+  "server.settings.personalityTitle": "Personality",
+  "server.settings.personalityDescription": "Choose how the agents on this server talk to you.",
+  "server.settings.responseStyle": "Response style",
+  "server.settings.responseStyleDescription":
+    "Natural: agents send short updates while they work, and the chat shows them. Classic: agents answer once, when they are done.",
+  "server.settings.responseStyleNatural": "Natural",
+  "server.settings.responseStyleClassic": "Classic",
+  "server.settings.personalityLoadFailed": "Could not load the server personality.",
 });

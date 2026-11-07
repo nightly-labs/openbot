@@ -2,10 +2,7 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "답변 필요",
   "uiBlock.status.answered": "답변 완료",
-  "uiBlock.status.expired": "만료됨",
-  "uiBlock.status.closed": "종료됨",
   "uiBlock.outcome.expired": "제시간에 답변이 없었어요",
   "uiBlock.outcome.closed": "답변 없이 종료되었어요",
   "uiBlock.outcome.autoAnswered": "{outcome} (제시간에 답변한 사람이 없었어요)",
@@ -13,13 +10,12 @@ export const messages = {
   "uiBlock.confirm.prompt": "{action}을(를) 확인할까요?",
   "uiBlock.confirm.accept": "확인",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds}초",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "미리 보기",
   "uiBlock.confirm.showFullPreview": "모두 보기",
   "uiBlock.confirm.hideFullPreview": "간단히 보기",
   "uiBlock.choice.submit": "보내기",
   "uiBlock.choice.shortcutHint": "{first}~{last}을(를) 눌러 선택하세요",
-  "uiBlock.choice.selectedCount": { other: "{count}개 선택됨" },
-  "uiBlock.choice.noneSelected": "선택한 항목 없음",
   "uiBlock.quick.label": "빠른 답장",
   "uiBlock.quick.textLabel": "직접 답장",
   "uiBlock.quick.textPlaceholder": "또는 직접 답장을 입력하세요",
@@ -29,6 +25,7 @@ export const messages = {
   "uiBlock.form.choose": "옵션을 선택하세요",
   "uiBlock.form.notSet": "설정 안 됨",
   "uiBlock.form.invalid": "올바르지 않은 답변이 있어요. 확인한 다음 다시 시도해 주세요.",
+  "uiBlock.form.hiddenValue": "숨김",
   "uiBlock.skip": "건너뛰기",
   "uiBlock.error.answerFailed": "답변을 보내지 못했어요. 다시 시도해 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -35,12 +35,23 @@ export const messages = {
   "marketplace.agents.loadingDetail": "Ajan ayrıntıları yükleniyor…",
   "marketplace.agents.skills": "Beceriler",
   "marketplace.agents.routines": "Rutinler",
-  "marketplace.agents.routineActive": "Etkin",
   "marketplace.agents.routineInactive": "Devre dışı",
+  "marketplace.agents.by": "{name} tarafından",
+  "marketplace.agents.routineCount": { one: "{count} rutin", other: "{count} rutin" },
+  "marketplace.agents.yours": "Ajanlarınız",
+  "marketplace.agents.all": "Tüm ajanlar",
+  "marketplace.agents.missing": "Bu ajan Pazaryerinde yok.",
+  "marketplace.agents.trust.reviewed":
+    "Başka bir OpenBot kullanıcısı tarafından yapıldı. OpenBot yayınlanmadan önce inceledi.",
+  "marketplace.agents.trust.reviewedBeforeAdd":
+    "Başka bir OpenBot kullanıcısı tarafından yapıldı. OpenBot yayınlanmadan önce inceledi. Eklendiğinde sizin adınıza işlem yapabilir.",
+  "marketplace.agents.trust.pending": "OpenBot incelemeden önce yapan kişi tarafından paylaşıldı.",
+  "marketplace.agents.trust.pendingBeforeAdd":
+    "OpenBot incelemeden önce yapan kişi tarafından paylaşıldı. Eklendiğinde sizin adınıza işlem yapabilir.",
+  "marketplace.agents.source.pending": "Henüz incelenmedi",
 
   // The skill page, and why Try is off.
   "marketplace.skill.loading": "Beceri yükleniyor",
-  "marketplace.skill.update": "Beceriyi güncelle",
   "marketplace.try.readFailed": "OpenBot bu ajanın becerilerini okuyamadı. Tekrar deneyin.",
   "marketplace.try.enable": "Bu beceriyi denemek için ajan ayarlarından etkinleştirin.",
   "marketplace.try.repair": "Bu beceriyi denemek için ajan ayarlarından onarın.",
@@ -57,15 +68,6 @@ export const messages = {
     one: "{installs} yükleme",
     other: "{installs} yükleme",
   },
-  "marketplace.filter": "Filtre",
-  "marketplace.filter.on": "Filtre: {filters}",
-  "marketplace.filter.all": "Tümü",
-  "marketplace.filter.status": "Durum",
-  "marketplace.filter.category": "Kategori",
-  "marketplace.filter.added": "Eklendi",
-  "marketplace.filter.notAdded": "Eklenmedi",
-  "marketplace.filter.installed": "Kurulu",
-  "marketplace.filter.notInstalled": "Kurulu değil",
   "marketplace.filter.clear": "Filtreleri temizle",
   "marketplace.noMatch.apps": "Bu aramayla eşleşen uygulama yok.",
   "marketplace.noMatch.filters": "Filtrelerle eşleşen öğe yok.",
@@ -84,8 +86,6 @@ export const messages = {
   "marketplace.empty.agents": "Pazaryerinde henüz ajan yok.",
   "marketplace.empty.apps": "Pazaryerinde henüz uygulama yok.",
   "marketplace.empty.skills": "Pazaryerinde henüz beceri yok.",
-  "marketplace.properties.agent": "Bu ajan hakkında",
-  "marketplace.properties.skill": "Bu beceri hakkında",
   "marketplace.properties.creator": "Geliştirici",
   "marketplace.properties.category": "Kategori",
   "marketplace.properties.version": "Sürüm",
@@ -117,7 +117,9 @@ export const messages = {
   "marketplace.app.slackTagline": "Slack'te bahsetmeler ve doğrudan mesajlar",
   "marketplace.app.discordTagline": "Discord'da bahsetmeler ve doğrudan mesajlar",
   "marketplace.app.telegramTagline": "Telegram'da gruplar ve doğrudan sohbetler",
+  "marketplace.app.whatsappTagline": "WhatsApp'ta kendi sohbetiniz ve izin verdiğiniz kişiler",
   "marketplace.app.bitwardenTagline": "Paylaşılan bir klasördeki oturum bilgileriyle sitelerde oturum açın",
+  "marketplace.app.protonPassTagline": "Paylaşılan bir kasadaki oturum bilgileriyle sitelerde oturum açın",
   // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "Oturum açma ve kimlik bilgisi yönetimi",
   "marketplace.app.yourApps": "Uygulamalarınız",
@@ -138,6 +140,7 @@ export const messages = {
   "marketplace.app.setup.account": "Tarayıcıda {name} hesabınızla oturum açın.",
   "marketplace.app.setup.key": "{name} hesabınızdan bir API anahtarı gerekir.",
   "marketplace.app.setup.keySaved": "{field}, {host} üzerinde kayıtlı.",
+  "marketplace.app.account.removeDescription": "OpenBot bu hesabın oturum bilgilerini {host} üzerinde siler.",
   "marketplace.app.setup.desktop": "{name} masaüstü uygulamasında {address} adresinde çalışır.",
   "marketplace.app.setup.desktopConnected": "{address} adresine bağlı.",
   "marketplace.app.setup.open": "Oturum açma veya anahtar gerekmez.",
@@ -232,6 +235,23 @@ export const messages = {
     "Bu depodaki stilleri kullan ve Paper'da bir ayarlar sayfası tasarla.",
   "marketplace.plugin.paper.prompt.tokens":
     "Açık Paper dosyasındaki tasarım token'larını listele ve temamızla karşılaştır.",
+  "marketplace.plugin.higgsfield.tagline": "Yapay zekâ ile görsel, video ve ses",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield, ajanların Seedance, Kling, Veo ve MiniMax Hailuo gibi Higgsfield modelleriyle görsel, video, karakter ve ses üretmesini, kredi bakiyesini kontrol etmesini ve Asset Library'ye göz atmasını sağlar. Sonuçlar kullanıcının Higgsfield Assets alanına kaydedilir. Her kullanıcı tarayıcıda kendi Higgsfield hesabına giriş yapar. Her üretim, sınırsız planda da o hesabın kredilerini standart ücretle kullanır.",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield MCP sunucusu üzerinden, tarayıcıda girişle görsel, video ve ses üretimi, karakterler, krediler ve varlıklar.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Kaç Higgsfield kredim var?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield ile ahşap masa üzerinde seramik bir kupanın ürün fotoğrafını yap.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield ile gün batımında dalgaların 5 saniyelik bir videosunu yap.",
+  "marketplace.plugin.elevenlabs.tagline": "Konuşma, sesler ve sesli ajanlar",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs, ajanların metni konuşmaya çevirmesini, seslerle çalışmasını ve ElevenLabs sesli ajanlarını ve konuşmalarını oluşturmasını, test etmesini ve incelemesini sağlar. Üretilen ses kısa ömürlü bir indirme bağlantısı olarak gelir. Her kullanıcı tarayıcıda kendi ElevenLabs hesabına giriş yapar ve her üretim o hesabın kredilerini kullanır.",
+  "marketplace.plugin.elevenlabs.app":
+    "Metinden konuşmaya, sesler ve sesli ajan yönetimi, tarayıcıda giriş ile ElevenLabs'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.elevenlabs.prompt.speech": "Bu paragrafı sakin bir ElevenLabs sesiyle oku ve sesi bana ver.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "ElevenLabs sesli ajanlarımı ve her birinin kullandığı sesi listele.",
+  "marketplace.plugin.elevenlabs.prompt.conversations": "Destek sesli ajanımın son on konuşmasını özetle.",
   "marketplace.plugin.appleApps.tagline": "Mac'inizde Mail, Takvim ve daha fazlası",
   "marketplace.plugin.appleApps.description":
     "Apple apps, ajanların bu Mac'te Mail, Takvim, Kişiler, Anımsatıcılar, Notlar, Mesajlar ve Safari'yi kullanmasını sağlar. Yalnızca macOS'te çalışır. OpenBot, Apple veya OpenBot tarafından yapılmamış bir topluluk sunucusu olan mcp-icloud'u başlatır. Sunucu uygulamaları bu bilgisayarda AppleScript ile kontrol eder ve hesap ya da anahtar gerektirmez. Yükleme sırasında OpenBot, macOS'ten bu uygulamaların tümüne tek seferde erişim isteyebilir; her uygulama için bir istem gösterilir. İstemezseniz, bir ajan bir uygulamayı ilk kez kullandığında macOS sorar. Bunu daha sonra değiştirmek için Sistem Ayarları › Gizlilik ve Güvenlik › Otomasyon'u açın. Ajanlar e-posta ve iMessage gönderebilir, etkinlikleri, kişileri ve anımsatıcıları değiştirebilir veya silebilir; bu yüzden her yazma işlemini onaylamadan önce gözden geçirin. Araçların okuduğu içerik, örneğin e-posta metni, ajanın model sağlayıcısına gider.",
@@ -249,6 +269,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "Dünkü dağıtımdan bu yana hangi yeni hatalar çıktı?",
   "marketplace.plugin.sentry.prompt.topCrash": "Mobil projedeki en sık çökmeyi ve olası nedenini açıkla.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Güncel sürüm bir öncekine göre ne kadar sağlıklı?",
+  "marketplace.plugin.gitlab.tagline": "Sorunlar, birleştirme istekleri ve işlem hatları",
+  "marketplace.plugin.gitlab.description":
+    "GitLab, ajanların GitLab.com'da projeleri aramasına, sorunları okuyup oluşturmasına, birleştirme isteklerini incelemesine ve güncellemesine, depo dosyalarını ve commit'leri okumasına, CI işlem hatlarını ve işlerini kontrol etmesine olanak tanır. Her kullanıcı tarayıcı üzerinden kendi GitLab hesabında oturum açar. Ajanlar kullanıcıyla aynı izinlere sahiptir: commit gönderebilir, sorunları ve birleştirme isteklerini değiştirebilir ve bunları birleştirebilir. Kendi sunucunuzdaki GitLab için MCP sunucuları ayarlarında GitLab adresinizin sonuna /api/v4/mcp eklenmiş bir sunucu ekleyin ve orada oturum açın.",
+  "marketplace.plugin.gitlab.app":
+    "Projeler, sorunlar, birleştirme istekleri, depolar ve CI işlem hatları, tarayıcıda oturum açmayla GitLab'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Hangi birleştirme istekleri incelememi bekliyor?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Varsayılan daldaki son işlem hattı neden başarısız oldu?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Eşitleme kuyruğundaki çökme için yeniden oluşturma adımlarıyla bir sorun kaydı aç.",
   "marketplace.plugin.vercel.tagline": "Dağıtımlar, derleme günlükleri ve projeler",
   "marketplace.plugin.vercel.description":
     "Vercel, ajanların projeleri ve son dağıtımları listelemesine, derleme ve çalışma zamanı günlüklerini okumasına ve bir derlemenin neden başarısız olduğunu bulmasına olanak tanır. Her kullanıcı tarayıcı üzerinden kendi Vercel hesabında oturum açar ve ajanların kullanabileceği ekipleri seçer. Bu ekiplerde ajanlar, kullanıcının hesabıyla aynı yetkilere sahiptir. Ortam değişkenlerini, alan adlarını, DNS kayıtlarını ve dağıtımları da değiştirebilir, alan adı da satın alabilirler.",
@@ -289,6 +318,17 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Bu ödemeyi bul ve neden başarısız olduğunu açıkla.",
   "marketplace.plugin.stripe.prompt.customer": "Bu müşterinin faturalarını ve ödenmemiş bakiyesini özetle.",
   "marketplace.plugin.stripe.prompt.link": "Pro planı için aylık 49 tutarında bir ödeme bağlantısı taslağı hazırla.",
+  "marketplace.plugin.revenuecat.tagline": "Abonelikler, ürünler ve paywall'lar",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat, ajanların uygulama içi aboneliklerinizin ayarlarını okumasını ve değiştirmesini sağlar: uygulamalar, ürünler, entitlement'lar, offering'ler, paketler, paywall'lar ve deneyler. Ajanlar müşterileri ve satın alımlarını da arayabilir, grafikleri ve metrikleri okuyabilir. Gizli bir RevenueCat API anahtarı tek bir Authorization başlığına girer. Anahtar bir projeye erişir. Salt okunur bir anahtarla ajanlar yalnızca okuyabilir. Yazma anahtarıyla ajanlar ürünleri App Store incelemesine gönderebilir, müşterilere entitlement verebilir ve paketleri, hedefleme kurallarını ve webhook'ları silebilir.",
+  "marketplace.plugin.revenuecat.app":
+    "Gizli bir API anahtarıyla RevenueCat'in MCP sunucusu üzerinden ürünler, entitlement'lar, offering'ler, paywall'lar ve metrikler.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "RevenueCat projemde hangi offering'ler ve paketler var?",
+  "marketplace.plugin.revenuecat.prompt.revenue": "Bu ay RevenueCat gelirim ve aktif aboneliklerim nasıl değişti?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Bu RevenueCat müşterisinin hangi entitlement'ları var ve ne zaman sona eriyorlar?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat panelinde projenizin API keys sayfasını açın ve gizli bir API anahtarı oluşturun. Verileri görmek için salt okunur bir anahtar yeterlidir.",
   "marketplace.plugin.posthog.tagline": "Ürün analitiği ve bayraklar",
   "marketplace.plugin.posthog.description":
     "PostHog, ajanların olayları ve hunileri sorgulamasına, özellik bayraklarını incelemesine ve bir sürümden sonra neyin değiştiğini özetlemesine olanak tanır. Proje ayarlarındaki kişisel API anahtarı tek bir Authorization başlığına girer.",
@@ -339,6 +379,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Lansman duyurusu taslağını beta listesine gönder.",
   "marketplace.plugin.resend.prompt.status": "Fatura e-postası müşteriye ulaştı mı?",
   "marketplace.plugin.resend.prompt.template": "Yeni akış için bir parola sıfırlama e-postası taslağı hazırla.",
+  "marketplace.plugin.omnisend.tagline": "E-posta ve SMS pazarlaması",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı tarayıcıda kendi Omnisend hesabına giriş yapar ve onay ekranında erişim düzeyini seçer. Yazma erişimiyle ajanlar kampanya da gönderebilir ve veri silebilir. Ajanlar yalnızca rapora ihtiyaç duyuyorsa salt okunur erişimi seç.",
+  "marketplace.plugin.omnisend.app":
+    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; tarayıcıda giriş ile Omnisend'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
   "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",
@@ -409,6 +458,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Bugün hangi Todoist görevlerinin süresi doluyor?",
   "marketplace.plugin.todoist.prompt.capture": "Bu yapılacak maddeleri Todoist Gelen Kutuma ekle.",
   "marketplace.plugin.todoist.prompt.overdue": "Geciken Todoist görevlerimi yarına taşı.",
+  "marketplace.plugin.ticktick.tagline": "Görevler, listeler, alışkanlıklar ve odak",
+  "marketplace.plugin.ticktick.description":
+    "TickTick, ajanların görevleri aramasını ve filtrelemesini, görev ekleyip değiştirmesini ve listeleri, bölümleri, klasörleri, etiketleri ve yorumları yönetmesini sağlar. Ajanlar alışkanlıkları ve odak kayıtlarını da okuyup değiştirebilir ve TickTick'e bağlı takvimlerdeki etkinlikleri okuyabilir. Her kullanıcı tarayıcıda kendi TickTick hesabına giriş yapar. Ajanlar okuma ve yazma erişimi alır: görevleri tamamlayabilir, taşıyabilir ve silebilir, etiketleri ve odak kayıtlarını silebilir.",
+  "marketplace.plugin.ticktick.app":
+    "Görevler, listeler, alışkanlıklar ve odak kayıtları, tarayıcıda girişle TickTick'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.ticktick.prompt.today": "Bugün hangi TickTick görevlerinin süresi doluyor?",
+  "marketplace.plugin.ticktick.prompt.capture": "Bu eylem maddelerini TickTick Gelen Kutuma ekle.",
+  "marketplace.plugin.ticktick.prompt.week": "Geçen hafta hangi TickTick görevlerini tamamladım?",
   "marketplace.plugin.trello.tagline": "Panolar, listeler ve kartlar",
   "marketplace.plugin.trello.description":
     "Trello ile ajanlar panoları, listeleri, kartları, kontrol listelerini ve yorumları arayıp okur, pano ve kart oluşturur, listeleri ve kartları taşır, kartları tamamlandı olarak işaretler ve kontrol listesi, yorum ve etiket ekler. Ajanlar ayrıca kullanıcının Trello Gelen Kutusu'ndaki kartları okuyup kart ekleyebilir ve bağlı bir Google veya Outlook takviminden gelebilen Planner etkinliklerini okuyabilir. Her kullanıcı tarayıcıda kendi Trello hesabına giriş yapar ve bir onay ekranında çalışma alanlarını seçer. Ajanlar bu çalışma alanlarında kullanıcıyla aynı izinlere sahiptir. Kartları ve listeleri arşivleyebilirler, ancak sunucu hiçbir şeyi kalıcı olarak silemez.",
@@ -417,6 +474,33 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Bana hangi Trello kartları atanmış?",
   "marketplace.plugin.trello.prompt.board": "Trello panomda devam eden işleri özetle.",
   "marketplace.plugin.trello.prompt.newCards": "Bu yapılacak maddeleri Trello panoma kart olarak ekle.",
+  "marketplace.plugin.clickup.tagline": "Görevler, belgeler ve ekip güncellemeleri",
+  "marketplace.plugin.clickup.description":
+    "ClickUp, ajanların görevlerde, belgelerde, yorumlarda ve sohbetlerde arama yapmasını, görev, liste ve belge oluşturup güncellemesini, yorum eklemesini, sohbet mesajı göndermesini ve süre kaydetmesini sağlar. Her kullanıcı tarayıcıdan kendi ClickUp hesabında oturum açar. Ajanlar kullanıcıyla aynı izinlere sahip olur. Görevleri çöp kutusuna taşıyabilir ve yorumları silebilirler.",
+  "marketplace.plugin.clickup.app":
+    "Görevler, belgeler, yorumlar, sohbet ve süre takibi; tarayıcıda oturum açılan ClickUp MCP sunucusu üzerinden.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Bu hafta süresi dolan açık ClickUp görevlerimi bul.",
+  "marketplace.plugin.clickup.prompt.createTask": "Bu yapılacak maddelerden bir ClickUp görevi oluştur ve bana ata.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "ClickUp'taki en son proje güncellemesini bul ve açık soruları özetle.",
+  "marketplace.plugin.coinbase.tagline": "Kripto fiyatları, portföyler ve alım satım",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase, ajanların Coinbase Advanced Trade'deki fiyatları, bakiyeleri, portföyleri, emirleri ve ücretleri okumasını, emirleri önizleyip vermesini, varlıklar arasında dönüşüm yapmasını ve portföyler arasında fon taşımasını sağlar. Her kullanıcı tarayıcıda kendi Coinbase hesabına giriş yapar. Ajanlar kullanıcıyla aynı izinlere sahiptir. Emirler ve dönüşümler gerçek fon kullanır ve ajanlar x402 isteklerinin ücretini USDC bakiyesinden ödeyebilir.",
+  "marketplace.plugin.coinbase.app":
+    "Fiyatlar, bakiyeler, portföyler, emirler ve dönüşümler; Coinbase'in MCP sunucusu ve tarayıcıda giriş ile.",
+  "marketplace.plugin.coinbase.prompt.balances": "Coinbase'de her portföydeki bakiyelerim nedir?",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase'de BTC-USD fiyatını ve bu hafta nasıl hareket ettiğini göster.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase'de 50 USD'lik piyasa fiyatından ETH alımını önizle. Emri verme.",
+  "marketplace.plugin.robinhood.tagline": "Aracı kurum hesapları ve ajanlarla alım satım",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood, ajanların bir Robinhood müşterisinin hesaplarını, pozisyonlarını, bakiyelerini, işlem geçmişini ve izleme listelerini ve piyasa verilerini okumasını, hisse senedi, opsiyon ve kripto emirleri vermesini sağlar. Her kullanıcı tarayıcıda kendi Robinhood hesabına giriş yapar. İlk girişte Robinhood, kullanıcıdan ayrı bir Agentic hesabı açmasını ister. Ajanlar yalnızca o hesapta işlem yapabilir ve varsayılan olarak her emir için kullanıcı onayı istemeden emir verir.",
+  "marketplace.plugin.robinhood.app":
+    "Hesaplar, pozisyonlar, piyasa verileri ve işlemler; Robinhood'un MCP sunucusu ve tarayıcıda giriş ile.",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Robinhood pozisyonlarımı ve bugün nasıl hareket ettiklerini özetle.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Robinhood izleme listemdeki her hisse bu hafta nasıl hareket etti?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Robinhood Agentic hesabımda ne kadar nakit var?",
   "marketplace.plugin.huggingface.tagline": "Hub'daki modeller, veri kümeleri ve makaleler",
   "marketplace.plugin.huggingface.description":
     "Hugging Face, ajanların Hugging Face Hub'da modelleri, veri kümelerini, Spaces'i, koleksiyonları ve makaleleri aramasına, model kartlarını ve depo dosyalarını okumasına, veri kümelerini önizlemesine ve Hugging Face belgelerinde arama yapmasına olanak tanır. Herkese açık Hub verilerini kullanır ve hesap ya da anahtar gerektirmez. Araçlar yalnızca okur: ajanlar depo oluşturamaz ve iş (job) çalıştıramaz.",
@@ -432,20 +516,72 @@ export const messages = {
   "marketplace.auth.createKey": "Anahtar oluştur",
 
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
-  "marketplace.skill.installMenu.install": "Kur",
-  "marketplace.skill.installMenu.installNamed": "Kur: {name}",
-  "marketplace.skill.installMenu.allAgents": "Tüm ajanlar",
-  "marketplace.skill.installMenu.agents": {
-    one: "{count} ajan",
-    other: "{count} ajan",
-  },
-  "marketplace.skill.installMenu.here": "Buradasınız",
-  "marketplace.skill.installMenu.change": {
-    one: "{label} üzerinde {name} var. Değiştir",
-    other: "{label} üzerinde {name} var. Değiştir",
-  },
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "{name} içinde dene",
+  "marketplace.skills.yours": "Becerileriniz",
+  "marketplace.skills.seeAll": "Tümünü gör",
+  "marketplace.skills.seeAllName": "Tümünü gör: {name}",
+  "marketplace.skills.none": "Henüz hiçbir ajanın becerisi yok.",
+  "marketplace.skills.noneHint":
+    "Beceri, bir ajana tek bir görevi öğretir. Aşağıdan bir beceri ekleyin veya kendi becerinizi oluşturun.",
+  "marketplace.skills.sourceLabel": "Kaynak",
+  "marketplace.skills.source.all": "Tümü",
+  "marketplace.skills.source.verified": "Doğrulanmış",
+  "marketplace.skills.source.public": "Herkese açık",
+  "marketplace.skills.source.verifiedLong": "OpenBot tarafından doğrulandı",
+  "marketplace.skills.source.publicLong": "OpenBot tarafından incelendi",
+  "marketplace.skills.sortLabel": "Sırala",
+  "marketplace.skills.sortName": "Sırala: {name}",
+  "marketplace.skills.sort.installs": "En çok kullanılan",
+  "marketplace.skills.sort.updated": "Son güncellenen",
+  "marketplace.skills.sort.name": "Ad",
+  "marketplace.skills.featured": "Öne çıkanlar",
+  "marketplace.skills.all": "Tüm beceriler",
+  "marketplace.skills.count": { one: "{count} beceri", other: "{count} beceri" },
+  "marketplace.skills.searchIn": "{name} içinde ara",
+  "marketplace.skills.missing": "Bu beceri Pazaryerinde yok.",
+  "marketplace.skills.state.off": "Kapalı",
+  "marketplace.skills.state.repair": "Onarılmalı",
+  "marketplace.skills.state.update": "Güncelleme var",
+  "marketplace.skills.state.modified": "Sizin tarafınızdan değiştirildi",
+  "marketplace.skills.stateOn": "{agents}: {state}",
+  "marketplace.skills.version": "Sürüm {version}",
+  "marketplace.skills.origin.local": "Bu bilgisayarda oluşturuldu",
+  "marketplace.skills.origin.workspace": "Bu ajanın klasöründe",
+  "marketplace.skills.origin.marketplace": "Pazaryerinden · sürüm {version}",
+  "marketplace.skills.status.notAdded": "Eklenmedi",
+  "marketplace.skills.status.on": "Açık: {agents}",
+  "marketplace.skills.agentCount": { one: "{count} ajan", other: "{count} ajan" },
+  "marketplace.skills.allAgents": "tüm ajanlar",
+  "marketplace.skills.agentsTitle": "Ajanlar · {total}",
+  "marketplace.skills.agents.search": "Ajan ara",
+  "marketplace.skills.agents.searchName": "{name} becerisine sahip ajanları ara",
+  "marketplace.skills.agents.noMatch": "“{query}” ile eşleşen ajan yok.",
+  "marketplace.skills.agents.removeAll": "Tümünü kaldır",
+  "marketplace.skills.agents.removeAllName": {
+    one: "{name} becerisini {count} ajandan kaldır",
+    other: "{name} becerisini tüm {count} ajandan kaldır",
+  },
+  "marketplace.skills.agent.toggle": "{agent} için {name}",
+  "marketplace.skills.agent.remove": "Kaldır",
+  "marketplace.skills.agent.removeName": "{name} becerisini kaldır: {agent}",
+  "marketplace.skills.add": "Ekle",
+  "marketplace.skills.addName": "{name} becerisini ajanlara ekle",
+  "marketplace.skills.addToAgents": "Ajanlara ekle",
+  "marketplace.skills.onOf": "{total} ajandan {have} tanesinde açık",
+  "marketplace.skills.chooseAgents": "{name} şu ajanlarda var: {agents}. Ajanları seç",
+  "marketplace.skills.dialog.list": "{name} becerisine sahip ajanlar",
+  "marketplace.skills.dialog.search": { one: "{count} ajan içinde ara", other: "{count} ajan içinde ara" },
+  "marketplace.skills.dialog.all": { one: "{count} ajan", other: "Tüm {count} ajan" },
+  "marketplace.skills.dialog.allMatches": { one: "{count} eşleşme", other: "Tüm {count} eşleşme" },
+  "marketplace.skills.dialog.checked": "{checked} / {total}",
+  "marketplace.skills.dialog.save": "Kaydet",
+  "marketplace.skills.dialog.saveBoth": "Kaydet: {added} ekle, {removed} kaldır",
+  "marketplace.skills.dialog.addTo": "Ekle: {agents}",
+  "marketplace.skills.dialog.removeFrom": "Kaldır: {agents}",
+  "marketplace.skills.dialog.full": "Beceri sınırına ulaşıldı",
+  "marketplace.skills.dialog.unread": "Beceriler okunamadı",
+  "marketplace.skills.local.gone": "Şu anda hiçbir ajanda bu beceri yok.",
 
   // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "{name} eklendi.",

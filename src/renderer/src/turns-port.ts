@@ -12,6 +12,7 @@ export interface TurnsPort {
     | "clearContext"
     | "compactContext"
     | "compactTaskContext"
+    | "deleteHistory"
     | "interrupt"
     | "listQueue"
     | "listRoutines"

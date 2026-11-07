@@ -19,6 +19,9 @@ export const AgentTemplateInstall = lazy(() =>
 export const AgentUsagePanel = lazy(() =>
   import("./features/usage/AgentUsagePanel").then((module) => ({ default: module.AgentUsagePanel })),
 );
+export const LibraryPanel = lazy(() =>
+  import("./features/files/LibraryPanel").then((module) => ({ default: module.LibraryPanel })),
+);
 export const AccountLogin = lazy(() =>
   import("@openbot/ui/features/account/AccountLogin").then((module) => ({ default: module.AccountLogin })),
 );
@@ -35,6 +38,11 @@ export const InitialSetup = lazy(() =>
 );
 export const AddServerDialog = lazy(() =>
   import("@openbot/ui/features/servers/AddServerDialog").then((module) => ({ default: module.AddServerDialog })),
+);
+export const CreateLocalServerDialog = lazy(() =>
+  import("@openbot/ui/features/servers/CreateLocalServerDialog").then((module) => ({
+    default: module.CreateLocalServerDialog,
+  })),
 );
 export const JoinServerDialog = lazy(() =>
   import("@openbot/ui/features/servers/JoinServerDialog").then((module) => ({ default: module.JoinServerDialog })),
@@ -64,6 +72,9 @@ export const WorkflowsPage = lazy(() =>
 );
 export const ScheduleView = lazy(() =>
   import("./features/schedule/SchedulePanel").then((module) => ({ default: module.ScheduleView })),
+);
+export const TasksView = lazy(() =>
+  import("./features/tasks/TasksView").then((module) => ({ default: module.TasksView })),
 );
 export const ServerOnboarding = lazy(() =>
   import("./features/onboarding/ServerOnboarding").then((module) => ({ default: module.ServerOnboarding })),

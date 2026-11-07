@@ -1,5 +1,6 @@
 import type {
   LicenseCheckoutRequest,
+  LicensePlanRequest,
   LicenseRenewalRequest,
   LicenseState,
   LicenseUsersRequest,
@@ -16,10 +17,12 @@ export interface LicenseCalls {
   /** Opens the Stripe Checkout page for a new license. */
   openCheckout: (request: LicenseCheckoutRequest) => Promise<void>;
   setUsers: (request: LicenseUsersRequest) => Promise<LicenseState>;
+  /** Moves the license to Team, or a monthly Team license to yearly. */
+  changePlan: (request: LicensePlanRequest) => Promise<LicenseState>;
   setRenewal: (request: LicenseRenewalRequest) => Promise<LicenseState>;
 }
 
-export type LicenseAction = "checkout" | "users" | "renewal";
+export type LicenseAction = "checkout" | "users" | "plan" | "renewal";
 
 /** One license step, for the consumer's analytics. The store sends nothing itself. */
 export interface LicenseStoreEvent {
@@ -27,6 +30,7 @@ export interface LicenseStoreEvent {
     | "buy_opened"
     | "checkout_opened"
     | "users_change_requested"
+    | "plan_change_requested"
     | "cancel_requested"
     | "cancel_kept"
     | "renewal_resumed"
@@ -148,6 +152,8 @@ export function createLicenseStore(
       if (current !== undefined && users !== current) event.direction = users > current ? "up" : "down";
       return run("users", event, (api) => api.setUsers({ users }));
     },
+    changePlan: (request: LicensePlanRequest) =>
+      run("plan", { action: "plan_change_requested", direction: "up" }, (api) => api.changePlan(request)),
     setRenewal: (cancel: boolean) =>
       run("renewal", { action: cancel ? "cancel_requested" : "renewal_resumed" }, (api) => api.setRenewal({ cancel })),
     /** Reports a step that has no call, such as an opened form. */

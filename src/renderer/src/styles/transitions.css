@@ -15,9 +15,21 @@
   }
 }
 
+/* The digits are flex items, so the group lays them out left to right in every page direction.
+   `DigitRuns` puts the runs of a right-to-left value in the order they show in. */
 .t-digit-group {
   display: inline-flex;
   align-items: baseline;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.t-digit-run {
+  display: inline-flex;
+  align-items: baseline;
+}
+/* A flex item drops the spaces at its ends; they are the gap between the number and its unit. */
+.t-digit-word {
+  white-space: pre;
 }
 .t-digit {
   display: inline-block;
@@ -148,6 +160,13 @@
 }
 .t-page-slide .t-page[data-page-id="2"] {
   --t-page-from-x: var(--page-slide-distance);
+}
+/* Right to left, the first page comes from the right and the second from the left. */
+.t-page-slide .t-page[data-page-id="1"]:dir(rtl) {
+  --t-page-from-x: var(--page-slide-distance);
+}
+.t-page-slide .t-page[data-page-id="2"]:dir(rtl) {
+  --t-page-from-x: calc(var(--page-slide-distance) * -1);
 }
 .t-page-slide .t-page {
   position: absolute;

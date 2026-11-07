@@ -1,5 +1,18 @@
-import type { AgentEvent, ChannelSummary, ClientAgentSummary, ServerNotificationLevel } from "@openbot/contracts/ipc";
-import { type AgentNotificationChannel, agentEventRequestThread } from "@openbot/team-client/agent-notifications";
+import {
+  type AgentEvent,
+  type AgentNotificationLevelsSnapshot,
+  agentNotificationLevelMap,
+  type ChannelSummary,
+  type ClientAgentSummary,
+  type ServerNotificationLevel,
+} from "@openbot/contracts/ipc";
+import {
+  type AgentNotificationChannel,
+  agentEventAgentId,
+  agentEventRequestThread,
+  agentNotificationLevel,
+  notificationRequestKey,
+} from "@openbot/team-client/agent-notifications";
 import { channelReplyNotifications } from "@openbot/team-client/channel-notifications";
 import type { TextValue } from "@openbot/ui/text";
 import { onCleanup, untrack } from "solid-js";
@@ -19,7 +32,9 @@ import {
 
 /**
  * The browser notifications and sounds of host events. As on desktop, mute and the notification level
- * decide what a host's event says; the sound follows them too.
+ * decide what a host's event says; the sound follows them too. The level that the user chose for an
+ * agent replaces the server level for the events of that agent. The server level is the level that
+ * the host keeps for all devices of the user, else the level of this browser.
  */
 export function createWebNotificationRouting(options: {
   workspace: Pick<WebWorkspace, "state" | "onHostEvent" | "onHostNotice">;
@@ -31,12 +46,58 @@ export function createWebNotificationRouting(options: {
   onOpenChannel: (hostId: string, channelId: string) => void;
   /** The channel of a thread on the open host, from its channel list, or null. */
   channelForThread: (hostId: string, threadId: string) => AgentNotificationChannel | null;
+  /** The user's own level for each agent of a host. Absent, the server level applies to each agent. */
+  readAgentLevels?: ((hostId: string) => Promise<AgentNotificationLevelsSnapshot>) | undefined;
 }) {
   const { workspace, notifications } = options;
+  /** The last levels that each host gave, for a read that fails. */
+  const agentLevels = new Map<string, ReadonlyMap<string, ServerNotificationLevel>>();
+  /** The requests whose notification waits for the levels. An answer on any device removes its key. */
+  const waitingRequests = new Set<string>();
+
+  async function levelsOf(hostId: string): Promise<ReadonlyMap<string, ServerNotificationLevel> | null> {
+    const read = options.readAgentLevels;
+    if (!read) return null;
+    try {
+      const snapshot = await read(hostId);
+      const levels = agentNotificationLevelMap(snapshot);
+      agentLevels.set(hostId, levels);
+      notifications.setSyncedLevel(hostId, snapshot.server);
+      return levels;
+    } catch {
+      return agentLevels.get(hostId) ?? null;
+    }
+  }
+  /** Reads the levels of a host again, such as after it comes online. Another device can have changed them. */
+  function refreshLevels(hostId: string): void {
+    void levelsOf(hostId);
+  }
   function notify(hostId: string, event: AgentEvent, agents: ClientAgentSummary[]): void {
     withdrawWebAgentNotification(hostId, event);
+    const requestKey = notificationRequestKey(hostId, event);
+    if (event.type === "agent-input-resolved" || event.type === "browser-takeover-resolved") {
+      if (requestKey) waitingRequests.delete(requestKey);
+      return;
+    }
     const { muted, level } = untrack(() => notifications.state(hostId));
-    if (muted || level === "nothing") return;
+    if (muted) return;
+    const agentId = agentEventAgentId(event);
+    if (agentId === null) {
+      show(hostId, event, agents, level);
+      return;
+    }
+    if (requestKey) waitingRequests.add(requestKey);
+    void levelsOf(hostId).then((levels) => {
+      if (requestKey && !waitingRequests.delete(requestKey)) return;
+      // The user can mute the server or change its level while the read runs. The read also gives
+      // the server level that the host keeps for the user.
+      const current = untrack(() => notifications.state(hostId));
+      if (current.muted) return;
+      show(hostId, event, agents, agentNotificationLevel(current.level, levels, agentId));
+    });
+  }
+  function show(hostId: string, event: AgentEvent, agents: ClientAgentSummary[], level: ServerNotificationLevel) {
+    if (level === "nothing") return;
     if (event.type === "turn-completed" && level === "all") playCompletionSoundForAgentEvent(event, agents);
     const threadId = agentEventRequestThread(event);
     showWebAgentNotification({
@@ -67,6 +128,7 @@ export function createWebNotificationRouting(options: {
     if (!muted) requestWebNotificationPermission(true);
     notifications.setMuted(hostId, muted, durationMs);
   }
+  /** Sets the level of this browser. The notification settings also write it to a host that keeps it. */
   function setNotificationLevel(hostId: string, level: ServerNotificationLevel) {
     if (level !== "nothing") requestWebNotificationPermission(true);
     notifications.setLevel(hostId, level);
@@ -99,5 +161,5 @@ export function createWebNotificationRouting(options: {
       playAgentEventSound(event);
     }),
   );
-  return { setMuted, setNotificationLevel, notifyChannelReplies };
+  return { setMuted, setNotificationLevel, notifyChannelReplies, refreshLevels };
 }

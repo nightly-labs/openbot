@@ -46,7 +46,9 @@ export function RoutineChipSelect(props: RoutineChipSelectProps) {
         );
       }}
       onChange={(option) => {
-        if (!option) return;
+        // Kobalte also reports the value it already has when the options change. That is not a pick:
+        // a consumer that saves on close would save its older draft over a newer saved value.
+        if (!option || option.value === props.value) return;
         props.onChange(option.value);
         if (!open) props.onClose?.();
       }}

@@ -8,6 +8,10 @@ export const messages = {
     "OpenBot は Codex の設定に Computer Use を登録できませんでした。Codex の config.toml が有効で書き込み可能であることを確認してから、OpenBot を再起動してください。Computer Use なしで続行するには、エージェントの設定で Computer Use をオフにできます。",
   "error.provider.codexUnresponsive": "Codex が応答しなくなったため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpUnresponsive": "{provider} が時間内に応答しなかったため、OpenBot がそのプロセスを終了しました。",
+  "error.provider.acpSignInLost":
+    "{provider} のサインインが失われたため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} が OpenBot のツールを読み込まなかったため、このエージェントはツールを使えず、チームメイトにも連絡できません。{provider} のチームポリシーがローカル MCP サーバーをブロックしている可能性があります。チーム管理者に許可を依頼してから、もう一度お試しください。",
   "error.provider.endpointsReadOnly":
     "保存されたエンドポイントは新しいバージョンの OpenBot で書き込まれたか、ファイルを読み取れません。変更するには OpenBot を更新してください。",
   "error.provider.endpointNoSecureStorage":
@@ -63,6 +67,7 @@ export const messages = {
   "error.provider.removeWhileDownloading": "ダウンロードが終わってから削除してください。",
   "error.provider.removeIncomplete":
     "この CLI のファイルを別のプログラムが使用しています。閉じてから、もう一度お試しください。",
+  "error.provider.removeDownloadsFailed": "{providers} の CLI のダウンロードを削除できませんでした。",
   "error.provider.cliOverride": "OpenBot で更新する前に、明示的な CLI パスの指定を削除してください。",
   "error.provider.runtimeUpdateIncomplete": "ランタイムの更新が完了しませんでした。",
   "error.provider.downloadHttp": "ランタイムのダウンロードが HTTP {status} で失敗しました。",
@@ -101,6 +106,11 @@ export const messages = {
   "error.provider.modelsTooMany": "モデルが多すぎます。",
   "error.provider.modelIdCharacter": "モデル ID に使用できない文字が含まれています。",
   "error.provider.modelIdDuplicate": "2 つのモデルの ID が同じです。",
+  "error.provider.contextWindowInvalid":
+    "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
+  "error.provider.maxOutputInvalid": "モデルの最大出力は {min} から {max} までの整数のトークン数にしてください。",
+  "error.provider.reasoningEffortsInvalid": "モデルの推論の強さが無効です。",
+  "error.provider.inputsInvalid": "モデルの入力の種類が無効です。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",
@@ -125,14 +135,6 @@ export const messages = {
     "ChatGPT はダウンロード済みですが、起動できませんでした。OpenBot でもう一度ダウンロードしてください。",
   "error.provider.codexMissing":
     "ChatGPT はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
-  "error.provider.codexConfigIgnored": {
-    other:
-      "Codex は設定ファイルの {count} 件の設定を無視しました: {settings}。設定を修正または削除するか、Codex を更新してください。",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    other:
-      "Codex は設定ファイルの {count} 件の設定を無視しました。設定を修正または削除するか、Codex を更新してください。",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} は古すぎます。OpenBot には 2.1.232 以降が必要です。",
   "error.provider.claudeNotStarted": "Claude CLI は見つかりましたが、起動できませんでした。",
   "error.provider.claudeNotStartedHint":
@@ -186,13 +188,20 @@ export const messages = {
   "error.provider.signInExpired":
     "{provider} のサインインの有効期限が切れました。続けるには、もう一度サインインしてください。",
   "error.provider.cliActivateFailed": "OpenBot は管理対象 CLI を有効にできませんでした。",
+  "error.provider.noMainlandChinaSignIn": "{provider} には中国本土向けのログインがありません。",
+  "error.provider.cliNewVersionNotStarted": "新しいバージョンが起動しませんでした。",
   "error.provider.cliBusyReconnect": "{provider} CLI はターンを処理中です。終わるまで待ってから再接続してください。",
+  "error.provider.cliBusySignOut": "{provider} CLI はターンを処理中です。終わるまで待ってから切断してください。",
   "error.provider.opencodeCredentialsRejected":
     "モデルプロバイダーが API キーを拒否しました。設定で OpenCode のキーを修正するか、`opencode auth login` でプロバイダーのキーを修正してください。その後、もう一度お試しいただくか、別のモデルを選択してください。\n{detail}",
   "error.provider.opencodeAuthRequired":
     "OpenCode はモデルプロバイダー「{provider}」にサインインしていません。「無料」ラベルのモデルを選択するか、プロバイダーを接続してください。OpenCode の設定に OpenCode Go のキーを貼り付けるか、ターミナルで `opencode auth login` を実行します。その後、もう一度お試しください。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode はこのモデルのプロバイダーにサインインしていません。「無料」ラベルのモデルを選択するか、プロバイダーを接続してください。OpenCode の設定に OpenCode Go のキーを貼り付けるか、ターミナルで `opencode auth login` を実行します。その後、もう一度お試しください。",
+  "error.provider.customEndpointKeyRefused":
+    "エンドポイント「{provider}」が API キーまたはヘッダーを拒否しました。サーバー設定 → プロバイダーでもう一度入力してから、もう一度お試しください。",
+  "error.provider.customEndpointKeyMissing":
+    "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeServiceFailure":
@@ -211,6 +220,10 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT は前回の起動後、まだローカル履歴を準備しています。数分待ってから、もう一度お試しください。",
+  "error.provider.realtimeLimitZero":
+    "OpenBot のリアルタイム CPU 制限が 0 のため、Linux がプロバイダーを停止しました。この制限はシステムから来ています。rtkit をインストールして起動し (`rtkit-daemon`)、`systemctl --user restart xdg-desktop-portal` を実行してから OpenBot を再起動してください。rtkit がない間は、xdg-desktop-portal を再起動するだけでは解決しません。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":
@@ -233,6 +246,8 @@ export const messages = {
   "error.provider.antigravityMissing":
     "Gemini はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
   "error.provider.antigravityRateLimited":
@@ -260,13 +275,37 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline を起動できませんでした。ターミナルで `cline --version` を実行してください。",
   "error.provider.clineVersionUnreadable": "Cline CLI のバージョンを読み取れません。",
   "error.provider.clineSignIn": "Cline を使うには Cline でサインインするか、CLINE_API_KEY を設定してください。",
+  "error.provider.kimiArchivePath": "Kimi のアーカイブに予期しないパスがあります。",
+  "error.provider.kimiChecksum": "Kimi ランタイムのチェックサムが一致しません。",
+  "error.provider.kimiLicenseChecksum": "Kimi のライセンスのチェックサムが一致しません。",
+  "error.provider.kimiMissing": "Kimi はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
+  "error.provider.kimiOutdated": "Kimi CLI {version} は古すぎます。OpenBot には 1.52.0 以降が必要です。",
+  "error.provider.kimiNotStarted": "Kimi を起動できませんでした。ターミナルで `kimi --version` を実行してください。",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI のバージョンを読み取れません。",
+  "error.provider.kimiSignIn": "Kimi を使うには Kimi Code でサインインしてください。",
+  "error.provider.devinSignIn": "Devin を使うには Devin でサインインしてください。",
+  "error.provider.copilotSignIn":
+    "GitHub Copilot を使うには GitHub でサインインするか、COPILOT_GITHUB_TOKEN を設定してください。",
+  "error.provider.mistralSignIn":
+    "Mistral を使うには、Mistral でサインインするか、MISTRAL_API_KEY を設定してください。",
+  "error.provider.hermesMissing":
+    "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
+  "error.provider.hermesNotStarted":
+    "Hermes Agent を起動できませんでした。ターミナルで `hermes --version` を実行してください。",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent のバージョンを読み取れません。",
+  "error.provider.hermesSignIn":
+    "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
+  "error.provider.claudeApiKeyNoCredit":
+    "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.museMcpStartupFault":
     "Muse が MCP サーバーを起動できず、このセッションで MCP をブロックしました。OpenBot はチャット履歴を引き継いだ新しい Muse セッションを開始しました。もう一度お試しください。エラーが続く場合は、このエージェントの Computer Use または失敗した MCP サーバーをオフにしてください。",
+  "error.provider.claudeSessionMissing":
+    "Claude Code はこのチャットの保存済みセッションを見つけられませんでした。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",
   "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
@@ -276,6 +315,8 @@ export const messages = {
     "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
+  "error.provider.acpSignOutFailed": "サインアウトが完了しませんでした。",
+  "error.provider.acpSignOutFailedReason": "サインアウトが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":
     "このプロバイダーはこのコンピューターでこのサインイン方法を提供していません。プロバイダーを更新してから、もう一度お試しください。",
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",
@@ -315,6 +356,8 @@ export const messages = {
     "このコンピューターには安全なストレージがないため、環境変数の値を保存できません。値を削除して、もう一度お試しください。",
   "error.provider.customAgentNotSaved":
     "このカスタムエージェントは保存されていません。一覧を更新して、もう一度お試しください。",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}。「ワークスペースのみ」がこれをブロックしています。「フルアクセス」をお試しください。",
   "error.provider.customAgentTooMany": "保存できるカスタムエージェントは最大 {count} 個です。",
   "error.provider.customAgentEnvValueMissing": "{name} の値を入力してください。",
   "error.provider.off": "{provider} は OpenBot でオフになっています。まずプロバイダーの設定でオンにしてください。",
@@ -327,6 +370,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} で使えるアカウントは 1 つだけです。",
   "error.provider.accountNeedsConnection": "別のアカウントを追加する前に {provider} に接続してください。",
   "error.provider.usageResetUnsupported": "{provider} は使用量の上限をリセットできません。",
+  "error.provider.signOutUnsupported": "OpenBot は {provider} のサインインを切断できません。",
   "error.provider.usageResetNotConnected":
     "使用量をリセットする前に、この {provider} アカウントにもう一度サインインしてください。",
   "error.provider.accountLimit": "{provider} で使えるアカウントは最大 {limit} 個です。",
@@ -411,6 +455,10 @@ export const messages = {
     "インストール中にカスタムエージェントが変更されました。もう一度お試しください。",
   "error.provider.registryInstallFailed":
     "エージェントのインストールに失敗しました。以前のインストールは変更されていません。",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent をインストールできませんでした。もう一度試すか、インストールガイドを使ってください。",
+  "error.provider.hermesNeedsGitCurl":
+    "Hermes Agent には git と curl が必要です。インストールしてから、もう一度試してください。",
   "error.provider.registryRemoveBusy":
     "削除する前に、エージェントのインストールと実行中の ACP の作業が終わるまでお待ちください。",
 } as const satisfies PartialTranslation<typeof source>;

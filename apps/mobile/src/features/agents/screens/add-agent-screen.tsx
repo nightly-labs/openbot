@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarHue, CreateAgentInput } from "@openbot/contracts/ipc";
+import type { CreateAgentInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router, Stack } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -7,7 +7,7 @@ import { Typography } from "heroui-native";
 import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
@@ -33,19 +33,23 @@ export function AddAgentScreen() {
   const [description, setDescription] = useState("");
   const [runtime, setRuntime] = useState<AgentRuntimeChoice>({});
   const [avatarSeed, setAvatarSeed] = useState(() => `mobile:${Crypto.randomUUID().replaceAll("-", "")}`);
-  const [avatarHue, setAvatarHue] = useState<AvatarHue | null>(null);
+  const [avatarColor, setAvatarColor] = useState<AgentColorValue>({ hue: null, color: null });
   const [initialAvatarSeed] = useState(avatarSeed);
   const pending = useRef(false);
   const [finished, setFinished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = name.trim().length > 0 && !instructionsTooLong(description);
+  // The name error shows after the first Create, not while the person still fills in the form.
+  const [triedCreate, setTriedCreate] = useState(false);
+  const nameMissing = name.trim().length === 0;
+  const valid = !nameMissing && !instructionsTooLong(description);
 
   const dirty = Boolean(
     name.trim() ||
       description.trim() ||
       avatarSeed !== initialAvatarSeed ||
-      avatarHue !== null ||
+      avatarColor.hue !== null ||
+      avatarColor.color !== null ||
       runtime.provider !== undefined,
   );
   // Discard turns prevention off before it repeats the action, so the hook does not warn.
@@ -69,6 +73,11 @@ export function AddAgentScreen() {
   }, [finished]);
 
   async function submit(): Promise<void> {
+    if (nameMissing) {
+      setTriedCreate(true);
+      void haptics.notification("error");
+      return;
+    }
     if (!valid || pending.current || finished) return;
     pending.current = true;
     setSaving(true);
@@ -79,7 +88,8 @@ export function AddAgentScreen() {
         description: description.trim(),
         initialMessage: agentInitialMessage(description),
         avatarSeed,
-        avatarHue,
+        avatarHue: avatarColor.hue,
+        avatarColor: avatarColor.color,
         ...(workspace().activeServer.id === serverId ? runtime : {}),
       });
       void haptics.notification("success");
@@ -94,7 +104,6 @@ export function AddAgentScreen() {
 
   return (
     <SheetScrollView
-      clearHeader
       className="bg-sheet"
       contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
@@ -129,7 +138,8 @@ export function AddAgentScreen() {
       )}
       <SheetSaveAction
         dirty={dirty}
-        canSave={valid && !finished}
+        // Create stays on without a name, so that it can show why the agent needs one.
+        canSave={!instructionsTooLong(description) && !finished}
         pending={saving}
         label={t("mobile.agent.add.create")}
         pendingLabel={t("mobile.agent.add.creating")}
@@ -137,7 +147,8 @@ export function AddAgentScreen() {
       />
       <AgentAppearancePicker
         seed={avatarSeed}
-        hue={avatarHue}
+        hue={avatarColor.hue}
+        color={avatarColor.color}
         name={name}
         colorGlow
         nameField={
@@ -149,12 +160,13 @@ export function AddAgentScreen() {
             maxLength={INPUT_LIMITS.agentName}
             placeholder={t("mobile.agent.add.namePlaceholder")}
             value={name}
+            error={triedCreate && nameMissing ? t("mobile.agent.add.nameRequired") : undefined}
             onChangeText={setName}
           />
         }
         disabled={saving}
         onSeedChange={setAvatarSeed}
-        onHueChange={setAvatarHue}
+        onColorChange={setAvatarColor}
       />
 
       <SheetFormField
@@ -175,11 +187,6 @@ export function AddAgentScreen() {
         onChange={(value) => setRuntime((current) => ({ ...current, ...value }))}
       />
 
-      {dirty && !name.trim() ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {t("mobile.agent.add.nameRequired")}
-        </Typography.Paragraph>
-      ) : null}
       {error ? (
         <Typography.Paragraph accessibilityRole="alert" align="center" className="text-danger-text">
           {error}

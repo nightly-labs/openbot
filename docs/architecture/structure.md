@@ -20,6 +20,7 @@ packages/
   telemetry/         Safe error reports, bounded retry queue, and local storage/HTTP adapters
   team-client/       Shared team connection, recovery, WebRTC framing, Dynamic Island state, and routine schedules
   user-errors/       Shared user-facing error messages for desktop and mobile
+  whatsapp/          WhatsApp client: vendored Baileys without its copyleft parts, clean-room Signal code, device store
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, TURN credentials, and the Slack, Discord, Telegram and webhook relays
   scripts/           Bun checks and update commands for Signal and coturn
@@ -85,8 +86,8 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   recovery. They do not create a second copy of messages already saved by the live turn.
 - `ConversationRuntime` keeps active work and a bounded recent cache. Released full-history APIs
   build their responses from SQLite for each request. They do not set the working cache.
-- `~/.codex`, `~/.claude`, `~/.grok`, `~/.gemini`, `~/.cursor`, `~/.cline`, `~/.pi`, and the OpenCode
-  and Muse XDG folders are provider-owned login and resume state. They are not OpenBot
+- `~/.codex`, `~/.claude`, `~/.grok`, `~/.gemini`, `~/.cursor`, `~/.cline`, `~/.kimi`, `~/.pi`, `~/.devin`, `~/.copilot`, `~/.vibe`, and the OpenCode,
+  Muse and Devin XDG folders are provider-owned login and resume state. They are not OpenBot
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
 - Stripe is the source of truth for paid plans. D1 `billing_subscriptions` is a copy that the Stripe
@@ -108,6 +109,13 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   Workspace only agent keeps its card; a Computer Use tool does not. OpenBot keeps Codex's `approvalPolicy`
   at `on-request`, because `never` denies MCP tool calls and rejects elicitations. Other questions, MCP
   forms and sign-in requests, and browser takeovers remain interactive.
+- A Workspace only agent can change files in its workspace, the shared folder, and the folders that the
+  user added (`AgentSummary.additionalFolders`, in `agent_json`, real paths, at most 32). One function,
+  `workspaceWritableRoots`, gives these roots to every provider sandbox, and the agent's developer
+  instructions name them. Only the local `agentFolders` IPC endpoints change the list; an agent cannot
+  add a folder to itself. Main refuses a disk root, the home folder, and a folder that holds OpenBot data.
+  A folder that is not on the disk stays in the list but is not a root. The list is local, like
+  `access`: the Team API does not carry it.
 - `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
   migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
   carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.

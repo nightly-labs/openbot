@@ -10,6 +10,7 @@ import type {
   ResetAgentSessionSettingInput,
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
+import type { ServerAuditLog } from "./ipc-server-audit";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -26,7 +27,7 @@ import type {
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { ManagedProviderId } from "./agent-providers";
+import type { AgentProviderRef, DownloadableProviderId, ManagedProviderId } from "./agent-providers";
 import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from "./app-appearance";
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
@@ -44,22 +45,47 @@ import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
+  AgentFastModeSettings,
   AgentHostSettings,
+  AgentNewChatSettings,
+  AgentPlanCardSettings,
   AgentTaskLimitSettings,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
+  UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
+  UpdateAgentNewChatInput,
+  UpdateAgentPlanCardInput,
   UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
+import type {
+  AgentDockAction,
+  AgentDockDisplayInfo,
+  AgentDockDragPhase,
+  AgentDockOffset,
+  AgentDockPresentation,
+  SetAgentDockInteractiveInput,
+} from "./ipc-agent-dock";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
-import type { ClientAgentModelOption } from "./ipc-agent-identity";
+import type {
+  AddAgentFolderInput,
+  AgentExclusionChange,
+  AgentFolderBrowse,
+  AgentFolderChange,
+  AgentFolderInput,
+  AgentFolderList,
+  BrowseAgentFoldersInput,
+  ChooseAgentFolderInput,
+} from "./ipc-agent-folders";
+import type { AvatarColor, ClientAgentModelOption } from "./ipc-agent-identity";
 import type {
   AgentImportPreview,
   AgentImportResult,
   AgentImportSkillSource,
   ApplyAgentImportInput,
 } from "./ipc-agent-import";
+import type { AgentInstructionsFile, SaveAgentInstructionsInput } from "./ipc-agent-instructions";
 import type {
   AgentMemory,
   AgentMemoryLimitPreference,
@@ -67,9 +93,11 @@ import type {
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   HostAgentMemoryLimit,
+  HostMemoryReview,
   SetAgentMemoryInclusionInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
+import type { AgentNotificationLevelsSnapshot, SetAgentNotificationLevelInput } from "./ipc-agent-notification-levels";
 import type {
   AgentProfileDraft,
   GenerateAgentProfileInput,
@@ -100,9 +128,12 @@ import type {
 import type {
   AgentTask,
   AgentTaskInput,
+  AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
   StartAgentTaskInput,
@@ -129,13 +160,17 @@ import type {
   AnalyticsPreference,
   AppInfo,
   AppSetupState,
+  BackgroundProcess,
   CentralAuthState,
   ChatWindowTarget,
+  CompanySignInScimToken,
+  CompanySignInSettings,
   ComputerUseHighlightPlacement,
   ComputerUsePermissionApp,
   ComputerUseState,
   ExportResult,
   ExternalDestination,
+  HostDefaultProvider,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   IdleRestartTarget,
@@ -143,8 +178,13 @@ import type {
   MacAutomationTarget,
   MacPermissionId,
   ProviderRuntimeSnapshot,
+  RendererTimingReport,
   SaveSetupInput,
+  SentMessageStats,
   SetAnalyticsPreferenceInput,
+  SetCompanySignInEnabledInput,
+  TestCompanySignInInput,
+  TestCompanySignInResult,
   UpdatePreference,
   UpdatePreferenceChange,
   UpdateRestartMode,
@@ -159,6 +199,8 @@ import type {
 } from "./ipc-approvals";
 import type {
   AttachmentDataInput,
+  AttachmentDownloadProgress,
+  AttachmentImportProgress,
   ChooseAttachmentsInput,
   DownloadAttachmentsInput,
   DraftAttachment,
@@ -198,6 +240,14 @@ import type {
   UpdateAgentBrowserProfileInput,
   UpdateBrowserProfileInput,
 } from "./ipc-browser-profiles";
+import type {
+  BrowserComputerSharing,
+  BrowserProxyList,
+  BrowserProxySummary,
+  DeleteBrowserProxyInput,
+  SaveBrowserProxyInput,
+  SetBrowserProfileProxyInput,
+} from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
@@ -214,7 +264,16 @@ import type {
   TestChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
-import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  Channel,
+  ChannelCommand,
+  ChannelPage,
+  ChannelReadInput,
+  ChannelSummary,
+  DeleteChannelMessageInput,
+  SetChannelImageInput,
+} from "./ipc-chat-channels";
+import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -223,7 +282,9 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   ConversationWithReadState,
+  DeleteConversationMessageInput,
   MarkConversationReadInput,
+  MarkConversationUnreadInput,
   OpenMessageLinkInput,
   PasteMessageLinkInput,
   ReadConversationPageInput,
@@ -269,6 +330,7 @@ import type {
   ListEventRoutinesInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
+  SetWebhookSecretInput,
   WebhookSecret,
   WebhookTestResult,
 } from "./ipc-events";
@@ -282,6 +344,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type {
@@ -299,6 +362,7 @@ import type {
   InstanceTransferResult,
   InstanceTransferSummary,
 } from "./ipc-instance-transfer";
+import type { LinkAccountStatus } from "./ipc-link-account";
 import type { MachineAlertSettings, MachineMetrics } from "./ipc-machine-resources";
 import type {
   AgentPublicationPreview,
@@ -332,6 +396,8 @@ import type {
   AddSlackOrchestratorInput,
   AddSlackOrchestratorResult,
   AddTelegramOrchestratorInput,
+  AddWhatsAppOrchestratorInput,
+  AnswerWhatsAppRequestInput,
   ConnectTelegramChatInput,
   DiscordAccess,
   DiscordRoleList,
@@ -344,21 +410,30 @@ import type {
   HostSetMessagingEnabledInput,
   MessagingOverview,
   MessagingWorkspaceInput,
+  RemoveWhatsAppSenderInput,
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
+  SetWhatsAppOwnNumberInput,
   SlackOverview,
   SlackWorkspaceInput,
+  StartWhatsAppLinkInput,
   TelegramChatInput,
   TelegramOverview,
+  WhatsAppGroupList,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSenderInput,
 } from "./ipc-messaging";
+import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   OnePasswordConnectInput,
   OnePasswordConnectorStatus,
   OnePasswordHostConnectInput,
 } from "./ipc-onepassword-connector";
+import type { PasswordManagerConnectInput, PasswordManagerId, PasswordManagerStatus } from "./ipc-password-managers";
 import type { PromptCacheTtl, PromptCacheTtlSetting } from "./ipc-prompt-cache";
 import type {
   DetectedModelServer,
@@ -420,6 +495,7 @@ import type {
 } from "./ipc-routines";
 import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
+import type { SetSidebarPinsInput, SidebarPinsSnapshot } from "./ipc-sidebar-pins";
 import type {
   CreateLocalSkillInput,
   InstalledSkill,
@@ -440,10 +516,10 @@ import type {
   ClearStorageInput,
   DeleteStoredFileInput,
   GetStorageUsageInput,
-  OldRuntimeVersions,
   OpenStorageLocationInput,
   OpenStoredFileInput,
   ProviderRuntimeDownload,
+  RemovableRuntimes,
   StorageDisk,
   StorageUsage,
 } from "./ipc-storage";
@@ -463,6 +539,7 @@ import type {
   LoginServerInput,
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
+  RemoteControlPolicy,
   RemoteDesktopConnectInput,
   RemoteDesktopConnectResult,
   RemoteDesktopSelectDisplayInput,
@@ -485,13 +562,22 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
 import type {
+  SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
   SpeechModelStatus,
   SpeechSettings,
   VoiceApiKeyInput,
+  VoiceLiveEvent,
+  VoiceLiveSession,
+  VoiceLiveStart,
+  VoiceLiveStop,
   VoiceModelRequest,
   VoiceModelStatus,
+  VoiceServerConnection,
+  VoiceServerProbe,
+  VoiceServerSave,
+  VoiceServerSettings,
   VoiceSettings,
   VoiceStream,
   VoiceStreamAudio,
@@ -499,6 +585,13 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type {
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubLastEventInput,
+  WorkflowGitHubRepositoryInput,
+  WorkflowGitHubRepositoryOptions,
+} from "./ipc-workflow-github";
 import type {
   CreateWorkflowInput,
   DecideWorkflowStepInput,
@@ -520,7 +613,14 @@ import type {
   WorkflowVersionInput,
   WorkflowWebhookSecret,
 } from "./ipc-workflows";
-import type { LicenseCheckoutRequest, LicenseRenewalRequest, LicenseState, LicenseUsersRequest } from "./license";
+import type {
+  LicenseCheckoutRequest,
+  LicensePlanRequest,
+  LicenseRenewalRequest,
+  LicenseState,
+  LicenseUsersRequest,
+} from "./license";
+import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
 
 declare const payloadType: unique symbol;
@@ -614,7 +714,13 @@ export const IPC_ENDPOINTS = {
     // so main tells the window.
     setupState: event<AppSetupState>()("app:setup-state"),
     getAnalyticsPreference: request<undefined, AnalyticsPreference>()("app:get-analytics-preference"),
+    // The first value of the first-run analytics box, from the region of this computer.
+    getAnalyticsDefault: request<undefined, AnalyticsPreference>()("app:get-analytics-default"),
+    // Main follows the account's answer from another device, so it tells the window.
+    analyticsPreference: event<AnalyticsPreference>()("app:analytics-preference"),
     setAnalyticsPreference: request<SetAnalyticsPreferenceInput, AnalyticsPreference>()("app:set-analytics-preference"),
+    // Host analytics only: `system_startup` and the renderer part of `system_resources`.
+    reportRendererTiming: request<RendererTimingReport, void>()("app:report-renderer-timing"),
     getApprovalAutomation: request<undefined, ApprovalAutomationPreference>()("app:get-approval-automation"),
     // A remote owner or admin can change a grant from a phone or the web client, so main tells the
     // window instead of the window only reading the value at start.
@@ -675,7 +781,12 @@ export const IPC_ENDPOINTS = {
     // the renderer, so the menu click is broadcast rather than handled: every window opens its
     // own Settings.
     openSettings: event<undefined>()("app:open-settings"),
+    // The native Check for Updates menu item opens the Updates tab, because only that tab shows
+    // the check and its result.
+    openUpdateSettings: event<undefined>()("app:open-update-settings"),
     openExternal: request<ExternalDestination, void>()("app:open-external"),
+    // Read only. The social toast asks for it to know how long and how much the user used OpenBot.
+    getSentMessageStats: request<undefined, SentMessageStats>()("app:get-sent-message-stats"),
     openUrl: request<string, void>()("app:open-url"),
     getExternalLinkPreference: request<undefined, ExternalLinkPreference>()("app:get-external-link-preference"),
     setExternalLinkPreference: request<ExternalLinkPreference, ExternalLinkPreference>()(
@@ -694,6 +805,10 @@ export const IPC_ENDPOINTS = {
     getChatWindows: request<undefined, ChatWindowTarget[]>()("app:get-chat-windows"),
     // The main window marks each chat that has a window, so main tells it when one opens or closes.
     chatWindows: event<ChatWindowTarget[]>()("app:chat-windows"),
+    // Main reads `Cmd + Q` before the page does, so it tells the window when to show the hint that
+    // the key must be held or pressed twice. The hint names the local agents that work, which a quit
+    // stops, and is empty when the user guards every quit and no agent works. Null removes it.
+    quitShortcutHint: event<ClientAgentSummary[] | null>()("app:quit-shortcut-hint"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),
@@ -702,6 +817,11 @@ export const IPC_ENDPOINTS = {
   providers: {
     setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
+    /**
+     * Connects a provider whose descriptor has `mainlandChinaSignInSite`, with an account of that
+     * site. `connectProvider` signs in with the global site.
+     */
+    connectProviderInMainlandChina: request<AgentProviderId, AgentStatus>()("app:connect-provider-mainland-china"),
     /** Ends the sign-in that `connectProvider` started and that still waits for the browser. */
     cancelProviderSignIn: request<AgentProviderId, AgentStatus>()("app:cancel-provider-sign-in"),
     /**
@@ -734,7 +854,7 @@ export const IPC_ENDPOINTS = {
     getProviderApiKeyState: request<AgentProviderId, ProviderApiKeyState>()("app:get-provider-api-key-state"),
     /**
      * Starts a sign-in the user finishes on another device, for a provider whose backend driver has
-     * one: Codex, Grok, Cursor, Cline and Muse, and Claude on Linux. A pasted code goes to
+     * one: Codex, Grok, Cursor, Cline, Kimi and Muse, and Claude on Linux. A pasted code goes to
      * `providerAdmin.submitCodeLogin` with `LOCAL_SERVER_ID`. Cancel it with
      * `cancelProviderCodeLogin`; leaving it running holds one provider process open until the code
      * expires.
@@ -754,15 +874,23 @@ export const IPC_ENDPOINTS = {
     ),
     renameProviderAccount: request<RenameProviderAccountInput, AgentStatus>()("app:rename-provider-account"),
     removeProviderAccount: request<RemoveProviderAccountInput, AgentStatus>()("app:remove-provider-account"),
+    /** Signs the provider's own sign-in out, in the home folder that a terminal CLI shares. */
+    signOutProvider: request<AgentProviderId, AgentStatus>()("app:sign-out-provider"),
     /** The usage reset credits of each connected account of a provider. It reads the usage of each. */
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     /** Spends one usage reset credit of an account. A reset ends the usage limit that holds its agents. */
     resetProviderUsage: request<ResetProviderUsageInput, ProviderUsageResetOutcome>()("app:reset-provider-usage"),
+    /**
+     * Whether the Claude agents of this computer load the user's own Claude Code setup. This computer
+     * only: a joined server has no route for it.
+     */
+    getClaudeUserSetup: request<undefined, ClaudeUserSetupSetting>()("app:get-claude-user-setup"),
+    setClaudeUserSetup: request<boolean, ClaudeUserSetupSetting>()("app:set-claude-user-setup"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
-    download: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
-    cancel: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
+    download: request<DownloadableProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
+    cancel: request<DownloadableProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
     /** What `removeDownload` frees now: nothing while the provider is on. */
     measureDownload: request<ManagedProviderId, ProviderRuntimeDownload>()("provider-runtimes:measure-download"),
     /** Removes the downloaded CLI of a provider that is off. Rejects while it is on or downloading. */
@@ -790,7 +918,10 @@ export const IPC_ENDPOINTS = {
     getSettings: request<undefined, VoiceSettings>()("voice:get-settings"),
     setSettings: request<VoiceSettings, VoiceSettings>()("voice:set-settings"),
     transcribe: request<VoiceTranscriptionInput, VoiceTranscriptionResult>()("voice:transcribe"),
-    /** Saves or removes the ElevenLabs API key. Answers the status of the ElevenLabs model. */
+    /**
+     * Saves or removes the API key of a dictation provider. Answers the status of that provider's
+     * model in use, or of its first model.
+     */
     setApiKey: request<VoiceApiKeyInput, VoiceModelStatus>()("voice:set-api-key"),
     /**
      * Opens a streamed dictation with the cloud model in use. Answers when the provider accepted it.
@@ -807,7 +938,13 @@ export const IPC_ENDPOINTS = {
     streamTranscript: event<VoiceStreamTranscript>()("voice:stream-transcript"),
     getSpeechSettings: request<undefined, SpeechSettings>()("voice:get-speech-settings"),
     setSpeechSettings: request<SpeechSettings, SpeechSettings>()("voice:set-speech-settings"),
+    /** The status of the model in the settings. A cloud model is ready when its provider's key is saved. */
     getSpeechModelStatus: request<undefined, SpeechModelStatus>()("voice:get-speech-model-status"),
+    /**
+     * Saves or removes (null) the key of a provider that reads replies aloud. The ElevenLabs key is
+     * the same key that ElevenLabs dictation uses. Answers the status of the model in the settings.
+     */
+    setSpeechApiKey: request<SpeechApiKeyInput, SpeechModelStatus>()("voice:set-speech-api-key"),
     /** Downloads the speech model. Answers when it is ready, failed, or cancelled. */
     downloadSpeechModel: request<undefined, SpeechModelStatus>()("voice:download-speech-model"),
     cancelSpeechModelDownload: request<undefined, SpeechModelStatus>()("voice:cancel-speech-model-download"),
@@ -826,6 +963,21 @@ export const IPC_ENDPOINTS = {
      */
     keepRecording: request<VoiceTranscriptionInput, DraftAttachment>()("voice:keep-recording"),
     speechModelStatus: event<SpeechModelStatus>()("voice:speech-model-status"),
+    /** The user's own voice server, or null. While a route is on, `transcribe` or `speak` uses it. */
+    getServer: request<undefined, VoiceServerSettings | null>()("voice:get-server"),
+    /** Lists the models and voices of a server, before the user saves it. */
+    probeServer: request<VoiceServerConnection, VoiceServerProbe>()("voice:probe-server"),
+    setServer: request<VoiceServerSave, VoiceServerSettings | null>()("voice:set-server"),
+    serverSettings: event<VoiceServerSettings | null>()("voice:server-settings"),
+    /**
+     * Starts Codex live voice in the chat of an agent on this computer, or on a joined server with
+     * `live-voice-v1`. Answers the WebRTC answer when OpenAI accepted the offer. A new session ends the
+     * one before it on the same server.
+     */
+    startLive: scopedRequest<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
+    /** Ends a live voice session. It does nothing when the session ended already. */
+    stopLive: request<VoiceLiveStop, void>()("voice:stop-live"),
+    liveEvent: event<VoiceLiveEvent>()("voice:live-event"),
   },
   dynamicIsland: {
     getPreference: request<undefined, DynamicIslandPreference>()("dynamic-island:get-preference"),
@@ -859,6 +1011,27 @@ export const IPC_ENDPOINTS = {
     /** Whether the overlay shows the dock over the page. While it does, the dock in the renderer is inert. */
     shown: event<boolean>()("browser-dock:shown"),
   },
+  /**
+   * The agent dock in its own window at the right edge of the screen. The main renderer publishes it and
+   * does its actions; the dock window shows it and sends the actions back. Main sends the messages.
+   */
+  agentDock: {
+    /** Null hides the dock window. */
+    publishPresentation: request<AgentDockPresentation | null, void>()("agent-dock:publish-presentation"),
+    getPresentation: request<undefined, AgentDockPresentation | null>()("agent-dock:get-presentation"),
+    presentation: event<AgentDockPresentation | null>()("agent-dock:presentation"),
+    performAction: request<AgentDockAction, void>()("agent-dock:perform-action"),
+    action: event<AgentDockAction>()("agent-dock:action"),
+    setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
+    /** Closes the chat of a dock window, because the dock on another display opened a chat. */
+    closeChat: event<undefined>()("agent-dock:close-chat"),
+    /** The connected displays, for the display setting of the dock. */
+    listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
+    /** A drag of the dock body moves its window up or down the screen edge. */
+    drag: request<AgentDockDragPhase, void>()("agent-dock:drag"),
+    /** The position where a drag left the dock, for the main renderer to save. */
+    moved: event<AgentDockOffset>()("agent-dock:moved"),
+  },
   computerUse: {
     getState: request<undefined, ComputerUseState>()("computer-use:get-state"),
     openPermissionPane: request<MacPermissionId, ComputerUseState>()("computer-use:open-permission-pane"),
@@ -872,6 +1045,12 @@ export const IPC_ENDPOINTS = {
     /** Sends one harmless Apple Event to each app, so macOS shows its Automation prompts now. */
     request: request<readonly MacAutomationTarget[], MacAutomationResult[]>()("mac-automation:request"),
   },
+  // The programs that agents left running on this computer. `list` answers null where OpenBot cannot
+  // find them (Windows). `stop` takes the id of one, and ends it with its children.
+  backgroundProcesses: {
+    list: request<undefined, BackgroundProcess[] | null>()("background-processes:list"),
+    stop: request<string, void>()("background-processes:stop"),
+  },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),
     localGet: request<LocalSkillRevisionInput, MarketplaceSkillDetail>()("skills:local-get"),
@@ -881,6 +1060,8 @@ export const IPC_ENDPOINTS = {
 
     list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()("skills:list"),
     get: request<string, MarketplaceSkillDetail>()("skills:get"),
+    // The skill a shared link names, by its slug.
+    getBySlug: request<string, MarketplaceSkillDetail>()("skills:get-by-slug"),
     listMine: request<undefined, SkillSubmission[]>()("skills:list-mine"),
     choosePackage: request<undefined, SkillPackagePreview | null>()("skills:choose-package"),
     submit: request<SubmitSkillInput, SkillSubmission>()("skills:submit"),
@@ -958,6 +1139,12 @@ export const IPC_ENDPOINTS = {
       "provider-admin:account-sign-in-status",
     ),
     cancelAccountSignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:cancel-account-sign-in"),
+    // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
+    // This computer's own is `app.saveSetup`.
+    hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),
+    setHostDefaultProvider: scopedRequest<SaveSetupInput, HostDefaultProvider, "required">()(
+      "provider-admin:set-host-default-provider",
+    ),
     renameAccount: scopedRequest<RenameProviderAccountInput, void, "required">()("provider-admin:rename-account"),
     removeAccount: scopedRequest<RemoveProviderAccountInput, void, "required">()("provider-admin:remove-account"),
     // The usage reset credits of a joined server's host's accounts, and the reset that spends one
@@ -966,13 +1153,15 @@ export const IPC_ENDPOINTS = {
     resetUsage: scopedRequest<ResetProviderUsageInput, ProviderUsageResetOutcome, "required">()(
       "provider-admin:reset-usage",
     ),
+    // Signs a joined server's host's own sign-in of a provider out (`provider-sign-out-v1`).
+    signOut: scopedRequest<AgentProviderId, void, "required">()("provider-admin:sign-out"),
     // A sign-in that a joined server's host starts and that opens in this computer's browser
     // (`sign-in-relay-v1`). This computer takes the callback and sends its query to the host.
-    // `openRelaySignIn` opens the page when the user asks, and `pasteRelaySignIn` takes the address
+    // `openRelaySignIn` opens the page again, and `pasteRelaySignIn` takes the address
     // the browser shows when the callback cannot reach this computer.
     startRelaySignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:start-relay-sign-in"),
-    // The relayed sign-in of an account after the first (`provider-account-relay-v1`). The other relay
-    // requests run it, by its provider, as they run `startRelaySignIn`'s.
+    // The relayed sign-in of an account after the first (`provider-account-relay-v1` or `-v2`). The
+    // other relay requests run it, by its provider, as they run `startRelaySignIn`'s.
     startAccountRelaySignIn: scopedRequest<ConnectProviderAccountInput, void, "required">()(
       "provider-admin:start-account-relay-sign-in",
     ),
@@ -990,10 +1179,10 @@ export const IPC_ENDPOINTS = {
     setApiKey: scopedRequest<SetProviderApiKeyInput, AgentStatus, "required">()("provider-admin:set-api-key"),
     clearApiKey: scopedRequest<AgentProviderId, AgentStatus, "required">()("provider-admin:clear-api-key"),
     getRuntimes: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:get-runtimes"),
-    downloadRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+    downloadRuntime: scopedRequest<DownloadableProviderId, ProviderRuntimeSnapshot, "required">()(
       "provider-admin:download-runtime",
     ),
-    cancelRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+    cancelRuntime: scopedRequest<DownloadableProviderId, ProviderRuntimeSnapshot, "required">()(
       "provider-admin:cancel-runtime",
     ),
     checkRuntimeUpdates: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:check-runtime-updates"),
@@ -1041,6 +1230,24 @@ export const IPC_ENDPOINTS = {
     addTelegramOrchestrator: request<AddTelegramOrchestratorInput, AddMessagingOrchestratorResult>()(
       "messaging:add-telegram-orchestrator",
     ),
+    // The WhatsApp numbers linked as a device of this computer. A link shows a QR code or a pairing
+    // code that the phone uses; the page reads the link state while its dialog is open. No Signal and
+    // no account service: this computer holds the session.
+    getWhatsAppOverview: request<undefined, WhatsAppOverview>()("messaging:get-whatsapp-overview"),
+    startWhatsAppLink: request<StartWhatsAppLinkInput, WhatsAppLinkState>()("messaging:start-whatsapp-link"),
+    getWhatsAppLinkState: request<undefined, WhatsAppLinkState>()("messaging:get-whatsapp-link-state"),
+    cancelWhatsAppLink: request<undefined, void>()("messaging:cancel-whatsapp-link"),
+    disconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:disconnect-whatsapp-number"),
+    reconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:reconnect-whatsapp-number"),
+    setWhatsAppEnabled: request<SetMessagingEnabledInput, void>()("messaging:set-whatsapp-enabled"),
+    addWhatsAppOrchestrator: request<AddWhatsAppOrchestratorInput, AddMessagingOrchestratorResult>()(
+      "messaging:add-whatsapp-orchestrator",
+    ),
+    listWhatsAppGroups: request<MessagingWorkspaceInput, WhatsAppGroupList>()("messaging:list-whatsapp-groups"),
+    addWhatsAppSender: request<WhatsAppSenderInput, void>()("messaging:add-whatsapp-sender"),
+    removeWhatsAppSender: request<RemoveWhatsAppSenderInput, void>()("messaging:remove-whatsapp-sender"),
+    answerWhatsAppRequest: request<AnswerWhatsAppRequestInput, void>()("messaging:answer-whatsapp-request"),
+    setWhatsAppOwnNumber: request<SetWhatsAppOwnNumberInput, void>()("messaging:set-whatsapp-own-number"),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1062,6 +1269,40 @@ export const IPC_ENDPOINTS = {
     hostSetDiscordAccess: scopedRequest<HostSetDiscordAccessInput, DiscordAccess, "required">()(
       "messaging:host-set-discord-access",
     ),
+    // The WhatsApp numbers of a joined server with `whatsapp-connector-v1`. The host's session gets
+    // the QR code or the pairing code, and this computer shows it. The orchestrator starts on the
+    // host's default provider and model.
+    hostGetWhatsAppOverview: scopedQuery<WhatsAppOverview, "required">()("messaging:host-get-whatsapp-overview"),
+    hostStartWhatsAppLink: scopedRequest<StartWhatsAppLinkInput, WhatsAppLinkState, "required">()(
+      "messaging:host-start-whatsapp-link",
+    ),
+    hostGetWhatsAppLinkState: scopedQuery<WhatsAppLinkState, "required">()("messaging:host-get-whatsapp-link-state"),
+    hostCancelWhatsAppLink: scopedQuery<void, "required">()("messaging:host-cancel-whatsapp-link"),
+    hostDisconnectWhatsAppNumber: scopedRequest<MessagingWorkspaceInput, void, "required">()(
+      "messaging:host-disconnect-whatsapp-number",
+    ),
+    hostReconnectWhatsAppNumber: scopedRequest<MessagingWorkspaceInput, void, "required">()(
+      "messaging:host-reconnect-whatsapp-number",
+    ),
+    hostSetWhatsAppEnabled: scopedRequest<SetMessagingEnabledInput, void, "required">()(
+      "messaging:host-set-whatsapp-enabled",
+    ),
+    hostAddWhatsAppOrchestrator: scopedQuery<AddMessagingOrchestratorResult, "required">()(
+      "messaging:host-add-whatsapp-orchestrator",
+    ),
+    hostListWhatsAppGroups: scopedRequest<MessagingWorkspaceInput, WhatsAppGroupList, "required">()(
+      "messaging:host-list-whatsapp-groups",
+    ),
+    hostAddWhatsAppSender: scopedRequest<WhatsAppSenderInput, void, "required">()("messaging:host-add-whatsapp-sender"),
+    hostRemoveWhatsAppSender: scopedRequest<RemoveWhatsAppSenderInput, void, "required">()(
+      "messaging:host-remove-whatsapp-sender",
+    ),
+    hostAnswerWhatsAppRequest: scopedRequest<AnswerWhatsAppRequestInput, void, "required">()(
+      "messaging:host-answer-whatsapp-request",
+    ),
+    hostSetWhatsAppOwnNumber: scopedRequest<SetWhatsAppOwnNumberInput, void, "required">()(
+      "messaging:host-set-whatsapp-own-number",
+    ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`
   // reach this computer only; these take the server, so a remote admin reaches the host. The
@@ -1080,9 +1321,17 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    // The server personality: how the server's agents talk while they work. Any member can read it;
+    // only an owner or admin can set it.
+    getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
+    setPersonality: scopedRequest<HostPersonality, HostPersonality, "required">()("host-admin:set-personality"),
     // How many memories each agent of the server can keep, and the values its host permits.
     getAgentMemoryLimit: scopedQuery<HostAgentMemoryLimit, "required">()("host-admin:get-agent-memory-limit"),
     setAgentMemoryLimit: scopedRequest<number, HostAgentMemoryLimit, "required">()("host-admin:set-agent-memory-limit"),
+    // How many completed turns of one conversation pass between two background memory reviews of the
+    // server's agents (`0` is off), and the values its host permits.
+    getMemoryReview: scopedQuery<HostMemoryReview, "required">()("host-admin:get-memory-review"),
+    setMemoryReview: scopedRequest<number, HostMemoryReview, "required">()("host-admin:set-memory-review"),
     // The machine alert levels and the member who gets the alert (`machine-resources-v1`).
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(
@@ -1092,9 +1341,18 @@ export const IPC_ENDPOINTS = {
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
     ),
+    // The models that the model picker of the server shows for one provider. An owner or admin sets them.
+    getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
+      "host-admin:get-model-visibility",
+    ),
+    setModelVisibility: scopedRequest<ProviderModelVisibilityChange, ProviderModelVisibility, "required">()(
+      "host-admin:set-model-visibility",
+    ),
     // The roles of the server and the level each gives for each agent. A member reads only `mine`.
     getAgentAccess: scopedQuery<AgentAccessSnapshot, "required">()("host-admin:get-agent-access"),
     setAgentAccess: scopedRequest<AgentAccessChange, AgentAccessSnapshot, "required">()("host-admin:set-agent-access"),
+    // The changes to members, roles and agent access of the server, newest first (`server-audit-v1`).
+    getAuditLog: scopedQuery<ServerAuditLog, "required">()("host-admin:get-audit-log"),
   },
   // The built-in GitHub connection of this computer. The token stays in main; every answer is the
   // status only. The `host*` endpoints reach the connection of a joined server (`connectors-v1`): the
@@ -1130,6 +1388,37 @@ export const IPC_ENDPOINTS = {
       "bitwarden-connector:host-connect",
     ),
     hostDisconnect: scopedQuery<BitwardenConnectorStatus, "required">()("bitwarden-connector:host-disconnect"),
+  },
+  // The password managers of this computer, through one engine: each has a driver in main. Access
+  // keys and passwords go from the renderer to main once, in `connect`; every answer is the status
+  // only. `openSignIn` opens the page of a `browser` connection in the user's browser; main opens
+  // only a page of the manager's own sign-in site. The `host*` endpoints do the same for a joined
+  // server (`password-managers-v1`): the host runs the sign-in, and this computer opens its page.
+  passwordManagers: {
+    list: request<undefined, PasswordManagerStatus[]>()("password-managers:list"),
+    connect: request<PasswordManagerConnectInput, PasswordManagerStatus>()("password-managers:connect"),
+    cancel: request<PasswordManagerId, PasswordManagerStatus>()("password-managers:cancel"),
+    disconnect: request<PasswordManagerId, PasswordManagerStatus>()("password-managers:disconnect"),
+    openSignIn: request<PasswordManagerId, void>()("password-managers:open-sign-in"),
+    changed: event<PasswordManagerStatus>()("password-managers:changed"),
+    hostList: scopedQuery<PasswordManagerStatus[], "required">()("password-managers:host-list"),
+    hostConnect: scopedRequest<PasswordManagerConnectInput, PasswordManagerStatus, "required">()(
+      "password-managers:host-connect",
+    ),
+    hostCancel: scopedRequest<PasswordManagerId, PasswordManagerStatus, "required">()("password-managers:host-cancel"),
+    hostDisconnect: scopedRequest<PasswordManagerId, PasswordManagerStatus, "required">()(
+      "password-managers:host-disconnect",
+    ),
+    hostOpenSignIn: scopedRequest<PasswordManagerId, void, "required">()("password-managers:host-open-sign-in"),
+  },
+  // The Link account of this computer, for agent payments. The tokens stay in main; every answer is the
+  // status only. A joined server has no Link account: the Team API does not carry one.
+  linkAccount: {
+    status: request<undefined, LinkAccountStatus>()("link-account:status"),
+    connect: request<undefined, LinkAccountStatus>()("link-account:connect"),
+    cancel: request<undefined, LinkAccountStatus>()("link-account:cancel"),
+    disconnect: request<undefined, LinkAccountStatus>()("link-account:disconnect"),
+    changed: event<LinkAccountStatus>()("link-account:changed"),
   },
   // The Vault of this computer. Lists carry no password, card number or security code: `reveal`
   // returns one when the user asks, and `copy` writes one to the clipboard in main. The `host*`
@@ -1198,6 +1487,7 @@ export const IPC_ENDPOINTS = {
     getState: request<undefined, LicenseState>()("license:get-state"),
     openCheckout: request<LicenseCheckoutRequest, void>()("license:open-checkout"),
     setUsers: request<LicenseUsersRequest, LicenseState>()("license:set-users"),
+    changePlan: request<LicensePlanRequest, LicenseState>()("license:change-plan"),
     setRenewal: request<LicenseRenewalRequest, LicenseState>()("license:set-renewal"),
   },
   // OpenBot servers that the account server runs for this account. `wake` also works for a server
@@ -1214,9 +1504,20 @@ export const IPC_ENDPOINTS = {
     // Owner only. Stops a running server and starts it again; a server that does not run starts.
     restart: request<string, HostedServerSummary>()("hosted-servers:restart"),
   },
+  // Servers that the desktop app starts on this computer, each with its own data. Each one is in the
+  // server list as a joined server with `thisComputer`. `create` takes the name; the others take the
+  // server id. A server, in server mode or hosted, has none and refuses these.
+  localServers: {
+    create: request<string, ServerSummary>()("local-servers:create"),
+    restart: request<string, void>()("local-servers:restart"),
+    delete: request<string, void>()("local-servers:delete"),
+  },
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),
     get: request<string, MarketplaceAgentDetail>()("marketplace-agents:get"),
+    // The agent a shared link names: the approved version, else the one that waits for its first
+    // review, with `pending`. Only a link opens it; the catalog reads `get`.
+    getListing: request<string, MarketplaceAgentDetail>()("marketplace-agents:get-listing"),
     listMine: request<undefined, AgentSubmission[]>()("marketplace-agents:list-mine"),
     preview: request<string, AgentPublicationPreview>()("marketplace-agents:preview"),
     submit: request<SubmitMarketplaceAgentInput, AgentSubmission>()("marketplace-agents:submit"),
@@ -1240,6 +1541,7 @@ export const IPC_ENDPOINTS = {
     verifyEmailCode: request<VerifyEmailCodeInput, CentralAuthState>()("auth:verify-email-code"),
     updateName: request<string, CentralAuthState>()("auth:update-name"),
     updateAvatar: request<AvatarImageInput | null, CentralAuthState>()("auth:update-avatar"),
+    updateChatColor: request<AvatarColor | null, CentralAuthState>()("auth:update-chat-color"),
     createMobileConnect: request<undefined, MobileConnectTicket>()("auth:create-mobile-connect"),
     cancelMobileConnect: request<undefined, void>()("auth:cancel-mobile-connect"),
     getMobileConnectLink: request<undefined, MobileConnectLink | null>()("auth:get-mobile-connect-link"),
@@ -1250,6 +1552,18 @@ export const IPC_ENDPOINTS = {
     revokeAccountSession: request<string, void>()("auth:revoke-account-session"),
     revokeMobileConnectedDevice: request<string, void>()("auth:revoke-mobile-connected-device"),
     logout: request<undefined, CentralAuthState>()("auth:logout"),
+    // Company sign-in. `openCompanySignIn` opens the provider page again for the email in the state.
+    openCompanySignIn: request<undefined, CentralAuthState>()("auth:open-company-sign-in"),
+    // The setup of a server that the user owns, by server id. `testCompanySignIn` waits for the browser.
+    getCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:get"),
+    testCompanySignIn: request<TestCompanySignInInput, TestCompanySignInResult>()("auth:company-sign-in:test"),
+    cancelCompanySignInTest: request<undefined, void>()("auth:company-sign-in:cancel-test"),
+    setCompanySignInEnabled: request<SetCompanySignInEnabledInput, CompanySignInSettings>()(
+      "auth:company-sign-in:set-enabled",
+    ),
+    removeCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:remove"),
+    createCompanySignInScimToken: request<string, CompanySignInScimToken>()("auth:company-sign-in:create-scim-token"),
+    revokeCompanySignInScimToken: request<string, CompanySignInSettings>()("auth:company-sign-in:revoke-scim-token"),
     event: event<CentralAuthState>()("auth:event"),
   },
   update: {
@@ -1303,11 +1617,30 @@ export const IPC_ENDPOINTS = {
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // A joined server takes it through `message-delete-v1`.
+    deleteChannelMessage: scopedRequest<DeleteChannelMessageInput, void>()("agent:channels:delete-message"),
+    // Only this computer keeps a channel image. A joined server has no route for it.
+    setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
+    /** "New conversation": the members of the channel forget its earlier messages. */
+    clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
+    /** "Delete history": the messages of the channel go, and its members forget them. */
+    deleteChannelHistory: scopedRequest<string, void>()("agent:channels:delete-history"),
+    /** Compacts the channel session of each member now. */
+    compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
+    // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.
+    getSidebarPins: scopedQuery<SidebarPinsSnapshot>()("agent:sidebar-pins:get"),
+    setSidebarPins: scopedRequest<SetSidebarPinsInput, SidebarPinsSnapshot>()("agent:sidebar-pins:set"),
+    seedSidebarPins: scopedRequest<SetSidebarPinsInput, SidebarPinsSnapshot>()("agent:sidebar-pins:seed"),
     // A joined server answers through `agent-hidden-v1`. A server without it has no hidden agents.
     listHiddenAgents: scopedQuery<HiddenAgentsSnapshot>()("agent:hidden:list"),
     setAgentHidden: scopedRequest<SetAgentHiddenInput, HiddenAgentsSnapshot>()("agent:hidden:set"),
+    // The user's own level for each agent. A joined server answers through `agent-notification-levels-v1`.
+    listAgentNotificationLevels: scopedQuery<AgentNotificationLevelsSnapshot>()("agent:notification-levels:list"),
+    setAgentNotificationLevel: scopedRequest<SetAgentNotificationLevelInput, AgentNotificationLevelsSnapshot>()(
+      "agent:notification-levels:set",
+    ),
     generateProfile: scopedRequest<GenerateAgentProfileInput, AgentProfileDraft>()("agent:generate-profile"),
     saveProfile: scopedRequest<SaveAgentProfileInput, SaveAgentProfileResult>()("agent:save-profile"),
     // Only the computer that runs the agent answers. A joined server has no route for it.
@@ -1336,23 +1669,36 @@ export const IPC_ENDPOINTS = {
     markConversationRead: scopedRequest<MarkConversationReadInput, ConversationReadState>()(
       "agent:mark-conversation-read",
     ),
+    // Local only: the Team API unread route marks the whole chat, not from one message.
+    markConversationUnread: scopedRequest<MarkConversationUnreadInput, ConversationReadState>()(
+      "agent:mark-conversation-unread",
+    ),
     sendMessage: scopedRequest<SendMessageInput, QueuedMessageReceipt>()("agent:send-message"),
     setMessageReaction: scopedRequest<SetMessageReactionInput, void>()("agent:set-message-reaction"),
+    // A joined server takes it through `message-delete-v1`.
+    deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(
+      "agent:delete-conversation-message",
+    ),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
+    // A joined server takes this through `agent-thread-pages-v1`.
+    readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
+    // A joined server takes this through `agent-thread-branches-v1`.
+    branchTask: scopedRequest<BranchAgentTaskInput, AgentTask>()("agent:tasks:branch"),
     stopTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:stop"),
     closeTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:close"),
     reopenTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:reopen"),
     // A joined server takes these through `agent-threads-v1`.
     renameTask: scopedRequest<RenameAgentTaskInput, void>()("agent:tasks:rename"),
     deleteTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:delete"),
-    // A joined server takes this through `agent-thread-reads-v1`.
+    // A joined server takes these through `agent-thread-reads-v1`.
+    listTaskReads: scopedRequest<string, AgentTaskReadState[]>()("agent:tasks:reads"),
     markTaskRead: scopedRequest<MarkAgentTaskReadInput, AgentTaskReadState>()("agent:tasks:mark-read"),
     acknowledgeFailedTurn: scopedRequest<AcknowledgeFailedTurnInput, void>()("agent:acknowledge-failed-turn"),
     cancelQueuedMessage: scopedRequest<CancelQueuedMessageInput, void>()("agent:cancel-queued-message"),
@@ -1362,6 +1708,8 @@ export const IPC_ENDPOINTS = {
     reorderQueue: scopedRequest<ReorderQueueInput, void>()("agent:reorder-queue"),
     interrupt: scopedRequest<InterruptTurnInput, void>()("agent:interrupt"),
     clearContext: scopedRequest<string, void>()("agent:clear-context"),
+    /** "Delete history": the messages of the agent's own chat go, and the agent forgets them. */
+    deleteHistory: scopedRequest<string, void>()("agent:delete-history"),
     compactContext: scopedRequest<string, void>()("agent:compact-context"),
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
@@ -1456,6 +1804,17 @@ export const IPC_ENDPOINTS = {
     rotateWebhookSecret: scopedRequest<WorkflowTriggerInput, WorkflowWebhookSecret>()(
       "workflows:rotate-webhook-secret",
     ),
+    /** The repositories of the host's GitHub connection. A joined server gives them only to an owner or admin. */
+    githubCatalog: scopedQuery<WorkflowGitHubCatalog>()("workflows:github-catalog"),
+    /** The labels and people of one repository. A joined server gives them only to an owner or admin. */
+    githubOptions: scopedRequest<WorkflowGitHubRepositoryInput, WorkflowGitHubRepositoryOptions>()(
+      "workflows:github-options",
+    ),
+    githubHistory: scopedRequest<string, WorkflowGitHubHistory>()("workflows:github-history"),
+    /** Runs a GitHub trigger with the newest item that matches it, as GitHub has it now. */
+    githubRunLastEvent: scopedRequest<WorkflowGitHubLastEventInput, WorkflowRunDetail>()(
+      "workflows:github-run-last-event",
+    ),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
@@ -1478,6 +1837,9 @@ export const IPC_ENDPOINTS = {
     discardDraftAttachment: scopedRequest<string, void>()("agent:discard-draft-attachment"),
     downloadAttachments: scopedRequest<DownloadAttachmentsInput, void>()("agent:download-attachments"),
     openAttachment: scopedRequest<OpenAttachmentInput, void>()("agent:open-attachment"),
+    /** Stops the download of an attachment. Its open or save then answers without a file. */
+    stopAttachmentDownload: scopedRequest<string, void>()("agent:stop-attachment-download"),
+    attachmentDownload: event<AttachmentDownloadProgress>()("agent:attachment-download"),
     openSharedFile: scopedRequest<OpenSharedFileInput, void>()("agent:open-shared-file"),
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<PreviewSharedFileInput, FilePreview>()("agent:preview-shared-file"),
@@ -1488,10 +1850,39 @@ export const IPC_ENDPOINTS = {
       "agent:list-workspace-directory",
     ),
   },
+  // The folders an agent can change besides its workspace. On a joined server the host serves them
+  // through `agent-folders-v1`, for an owner or admin. The native picker shows only this computer, so
+  // for a joined server the renderer lists host folders with `browseAgentFolders` and then adds one.
+  agentFolders: {
+    listAgentFolders: scopedRequest<string, AgentFolderList>()("agent:folders:list"),
+    // Opens the folder picker in main. Only for an agent on this computer.
+    chooseAgentFolder: request<ChooseAgentFolderInput, AgentFolderChange>()("agent:folders:choose"),
+    // A dropped or browsed folder, or the Undo of a removal. The host checks each path as it checks a
+    // picked one. `replace` puts the folder in the place of a folder that is gone.
+    addAgentFolder: scopedRequest<AddAgentFolderInput, AgentFolderChange>()("agent:folders:add"),
+    removeAgentFolder: scopedRequest<AgentFolderInput, AgentFolderChange>()("agent:folders:remove"),
+    // Folders in those that the agent must not change. The picker opens in main; add is the Undo.
+    chooseAgentExclusion: request<string, AgentExclusionChange>()("agent:folders:exclusions:choose"),
+    addAgentExclusion: scopedRequest<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:add"),
+    removeAgentExclusion: scopedRequest<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:remove"),
+    browseAgentFolders: scopedRequest<BrowseAgentFoldersInput, AgentFolderBrowse>()("agent:folders:browse"),
+  },
+  // The instruction file at the root of an agent's workspace. On a joined server the host reads and
+  // saves it through `agent-instructions-v1`, for an owner or admin.
+  agentInstructions: {
+    readAgentInstructions: scopedRequest<string, AgentInstructionsFile>()("agent:instructions:read"),
+    saveAgentInstructions: scopedRequest<SaveAgentInstructionsInput, AgentInstructionsFile>()(
+      "agent:instructions:save",
+    ),
+    // Main finds the file from the agent id: the page never names a path to show. Only this computer
+    // shows a file, so a joined server has no reveal.
+    revealAgentInstructions: request<string, void>()("agent:instructions:reveal"),
+  },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
   // renderer must never name a path to import. So this group is never bridged to the renderer.
   attachmentImports: {
     importAttachments: scopedRequest<ImportAttachmentsInput, DraftAttachment[]>()("agent:import-attachments"),
+    importProgress: event<AttachmentImportProgress>()("agent:attachment-import-progress"),
   },
   browser: {
     open: request<BrowserOpenInput, BrowserTab>()("browser:open"),
@@ -1581,6 +1972,27 @@ export const IPC_ENDPOINTS = {
     updateAgentTaskLimit: scopedRequest<UpdateAgentTaskLimitInput, AgentTaskLimitSettings>()(
       "agent:admin:update-task-limit",
     ),
+    // Whether the agent starts a new chat itself: `agent-new-chat-v1` on a joined server.
+    getAgentNewChat: scopedRequest<string, AgentNewChatSettings>()("agent:admin:get-new-chat"),
+    updateAgentNewChat: scopedRequest<UpdateAgentNewChatInput, AgentNewChatSettings>()("agent:admin:update-new-chat"),
+    // Publishing an agent as a link-only template. On a joined server the host publishes with its own
+    // account (`agent-publish-v1`), for an owner or admin.
+    previewAgentTemplate: scopedRequest<string, AgentTemplatePreview>()("agent:admin:preview-template"),
+    publishAgentTemplate: scopedRequest<PublishAgentTemplateInput, AgentTemplatePublication>()(
+      "agent:admin:publish-template",
+    ),
+    unpublishAgentTemplate: scopedRequest<string, void>()("agent:admin:unpublish-template"),
+    // Plan card before long tasks: `agent-plan-card-v1` on a joined server.
+    getAgentPlanCard: scopedRequest<string, AgentPlanCardSettings>()("agent:admin:get-plan-card"),
+    updateAgentPlanCard: scopedRequest<UpdateAgentPlanCardInput, AgentPlanCardSettings>()(
+      "agent:admin:update-plan-card",
+    ),
+    // Fast mode: `agent-fast-mode-v1` on a joined server. A member can change it, as the model and
+    // effort. The remote model list carries the fast tiers of the host.
+    getAgentFastMode: scopedRequest<string, AgentFastModeSettings>()("agent:admin:get-fast-mode"),
+    updateAgentFastMode: scopedRequest<UpdateAgentFastModeInput, AgentFastModeSettings>()(
+      "agent:admin:update-fast-mode",
+    ),
     // Browser profiles of the computer that runs the agents, and the profile of one agent.
     listBrowserProfiles: scopedQuery<BrowserProfileList>()("agent:admin:list-browser-profiles"),
     createBrowserProfile: scopedRequest<string, BrowserProfileSummary>()("agent:admin:create-browser-profile"),
@@ -1592,6 +2004,18 @@ export const IPC_ENDPOINTS = {
     getAgentBrowserProfile: scopedRequest<string, AgentBrowserProfile>()("agent:admin:get-browser-profile"),
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
+    ),
+    // Saved proxies of the named browser profiles: `browser-proxies-v1` on a joined server.
+    listBrowserProxies: scopedQuery<BrowserProxyList | null>()("agent:admin:list-browser-proxies"),
+    saveBrowserProxy: scopedRequest<SaveBrowserProxyInput, BrowserProxySummary>()("agent:admin:save-browser-proxy"),
+    deleteBrowserProxy: scopedRequest<DeleteBrowserProxyInput, void>()("agent:admin:delete-browser-proxy"),
+    setBrowserProfileProxy: scopedRequest<SetBrowserProfileProxyInput, void>()("agent:admin:set-browser-profile-proxy"),
+    // Whether this app shares its connection with a joined server (`browser-egress-v1`). Null for
+    // this computer's own server and for a host without the capability. Turning it on also adds this
+    // member's computer to the proxies of the host.
+    getBrowserComputerSharing: scopedQuery<BrowserComputerSharing | null>()("agent:admin:get-browser-computer-sharing"),
+    setBrowserComputerSharing: scopedRequest<BrowserComputerSharing, void>()(
+      "agent:admin:set-browser-computer-sharing",
     ),
     listBrowserTabProfiles: scopedQuery<BrowserTabProfile[]>()("agent:admin:list-browser-tab-profiles"),
     getAgentAdminSettings: scopedRequest<string, AgentAdminSettings>()("agent:admin:get-settings"),
@@ -1635,7 +2059,7 @@ export const IPC_ENDPOINTS = {
     mcpSignInPage: scopedRequest<CancelMcpSignInInput, string | null, "required">()("servers:mcp:sign-in-page"),
     // A host with `sign-in-relay-v1` opens no tab: the page opens in this computer's browser, and the
     // callback comes back here. `mcpSignInRelay` names the page while it waits, `openMcpSignInRelay`
-    // opens it when the user asks, and `completeMcpSignInRelay` takes the address the user pastes when
+    // opens it again, and `completeMcpSignInRelay` takes the address the user pastes when
     // no listener took the callback.
     mcpSignInRelay: scopedRequest<CancelMcpSignInInput, McpSignInRelayPage | null, "required">()(
       "servers:mcp:sign-in-relay",
@@ -1669,9 +2093,9 @@ export const IPC_ENDPOINTS = {
     openFile: scopedRequest<OpenStoredFileInput, void, "required">()("storage:open-file"),
     openLocation: request<OpenStorageLocationInput, void>()("storage:open-location"),
     // Local only, like `openLocation`: a server removes its own old provider CLI versions.
-    getOldRuntimeVersions: request<undefined, OldRuntimeVersions>()("storage:get-old-runtime-versions"),
-    /** Removes the old versions no instance uses now, and answers what is left. */
-    removeOldRuntimeVersions: request<undefined, OldRuntimeVersions>()("storage:remove-old-runtime-versions"),
+    getRemovableRuntimes: request<undefined, RemovableRuntimes>()("storage:get-removable-runtimes"),
+    /** Removes the old versions no instance uses now and the downloads it named, and answers what is left. */
+    removeRemovableRuntimes: request<undefined, RemovableRuntimes>()("storage:remove-removable-runtimes"),
   },
   // Bound against the agent import service, which holds the staged archives. A remote server is
   // reached with `agent-import-v1`; main still opens the file dialog and sends the file.
@@ -1708,6 +2132,12 @@ export const IPC_ENDPOINTS = {
     takePendingListing: request<undefined, string | null>()("plugins:take-pending-listing"),
     openListing: event<string>()("plugins:open-listing"),
   },
+  // The Marketplace agent and skill deep link, as `plugins`: the registrar holds the pending link.
+  // There is no endpoint that adds from a link; adding is still a press of Add on the listing page.
+  marketplace: {
+    takePendingListing: request<undefined, MarketplaceListingLink | null>()("marketplace:take-pending-listing"),
+    openListing: event<MarketplaceListingLink>()("marketplace:open-listing"),
+  },
   host: {
     getStatus: request<undefined, HostStatus>()("host:get-status"),
     configure: request<ConfigureHostInput, HostStatus>()("host:configure"),
@@ -1734,6 +2164,11 @@ export const IPC_ENDPOINTS = {
     removeMember: request<string, void>()("host:remove-member"),
     listSessions: request<undefined, TeamSessionSummary[]>()("host:list-sessions"),
     revokeSession: request<string, void>()("host:revoke-session"),
+    /** Who may control this computer through remote desktop, and whether its user must allow each session. */
+    getRemoteControlPolicy: request<undefined, RemoteControlPolicy>()("host:get-remote-control-policy"),
+    setRemoteControlPolicy: request<RemoteControlPolicy, RemoteControlPolicy>()("host:set-remote-control-policy"),
+    /** Ends every remote desktop session on this computer, and refuses the requests that wait for an answer. */
+    stopRemoteControl: request<undefined, HostStatus>()("host:stop-remote-control"),
     event: event<HostStatus>()("host:event"),
   },
   events: {
@@ -1743,6 +2178,7 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:delete-routine"),
     testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
     rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
+    setSecret: scopedRequest<SetWebhookSecretInput, void, "required">()("events:set-secret"),
     sendTestEvent: scopedRequest<EventRoutineRef, WebhookTestResult, "required">()("events:send-test-event"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
     listRoutineRuns: scopedRequest<ListEventRoutineRunsInput, EventRoutineRun[], "required">()(
@@ -1779,8 +2215,10 @@ export const IPC_GROUP_PATHS = {
   voice: "voice",
   dynamicIsland: "dynamicIsland",
   browserDock: "browserDock",
+  agentDock: "agentDock",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
+  backgroundProcesses: "backgroundProcesses",
   skills: "skills",
   customProviders: "customProviders",
   providerDetection: "providerDetection",
@@ -1792,6 +2230,8 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
+  passwordManagers: "passwordManagers",
+  linkAccount: "linkAccount",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
@@ -1801,6 +2241,7 @@ export const IPC_GROUP_PATHS = {
   billing: "billing",
   license: "license",
   hostedServers: "hostedServers",
+  localServers: "localServers",
   marketplaceAgents: "marketplaceAgents",
   agentTemplates: "agentTemplates",
   auth: "auth",
@@ -1813,6 +2254,8 @@ export const IPC_GROUP_PATHS = {
   channelMemories: "agent",
   channelRoutines: "agent",
   agentAttachments: "agent",
+  agentFolders: "agent",
+  agentInstructions: "agent",
   // The preload calls it from its own drop, paste, and file input handlers.
   attachmentImports: null,
   browser: "browser",
@@ -1824,6 +2267,7 @@ export const IPC_GROUP_PATHS = {
   agentImport: "agentImport",
   instanceTransfer: "instanceTransfer",
   plugins: "plugins",
+  marketplace: "marketplace",
   host: "host",
   events: "events",
   remoteDesktop: "remoteDesktop",

@@ -28,10 +28,21 @@ export const messages = {
   "marketplace.agents.loadingDetail": "Cargando detalles del agente…",
   "marketplace.agents.skills": "Habilidades",
   "marketplace.agents.routines": "Rutinas",
-  "marketplace.agents.routineActive": "Activa",
   "marketplace.agents.routineInactive": "Inactiva",
+  "marketplace.agents.by": "de {name}",
+  "marketplace.agents.routineCount": { one: "{count} rutina", other: "{count} rutinas" },
+  "marketplace.agents.yours": "Tus agentes",
+  "marketplace.agents.all": "Todos los agentes",
+  "marketplace.agents.missing": "Este agente no está en el Marketplace.",
+  "marketplace.agents.trust.reviewed":
+    "Creado por otra persona usuaria de OpenBot. OpenBot lo revisó antes de publicarlo.",
+  "marketplace.agents.trust.reviewedBeforeAdd":
+    "Creado por otra persona usuaria de OpenBot. OpenBot lo revisó antes de publicarlo. Una vez añadido, puede actuar en tu nombre.",
+  "marketplace.agents.trust.pending": "Compartido por su creador antes de que OpenBot lo revisara.",
+  "marketplace.agents.trust.pendingBeforeAdd":
+    "Compartido por su creador antes de que OpenBot lo revisara. Una vez añadido, puede actuar en tu nombre.",
+  "marketplace.agents.source.pending": "Aún sin revisar",
   "marketplace.skill.loading": "Cargando habilidad",
-  "marketplace.skill.update": "Actualizar habilidad",
   "marketplace.try.readFailed": "OpenBot no pudo leer las habilidades de este agente. Inténtalo de nuevo.",
   "marketplace.try.enable": "Activa esta habilidad en los ajustes del agente para probarla.",
   "marketplace.try.repair": "Repara esta habilidad en los ajustes del agente para probarla.",
@@ -46,15 +57,6 @@ export const messages = {
     one: "{installs} instalación",
     other: "{installs} instalaciones",
   },
-  "marketplace.filter": "Filtrar",
-  "marketplace.filter.on": "Filtro: {filters}",
-  "marketplace.filter.all": "Todos",
-  "marketplace.filter.status": "Estado",
-  "marketplace.filter.category": "Categoría",
-  "marketplace.filter.added": "Añadidos",
-  "marketplace.filter.notAdded": "Sin añadir",
-  "marketplace.filter.installed": "Instalados",
-  "marketplace.filter.notInstalled": "Sin instalar",
   "marketplace.filter.clear": "Borrar filtros",
   "marketplace.noMatch.apps": "Ninguna app coincide con esta búsqueda.",
   "marketplace.noMatch.filters": "Ningún resultado coincide con los filtros.",
@@ -73,8 +75,6 @@ export const messages = {
   "marketplace.empty.agents": "Todavía no hay agentes en el marketplace.",
   "marketplace.empty.apps": "Todavía no hay apps en el marketplace.",
   "marketplace.empty.skills": "Todavía no hay habilidades en el marketplace.",
-  "marketplace.properties.agent": "Acerca de este agente",
-  "marketplace.properties.skill": "Acerca de esta habilidad",
   "marketplace.properties.creator": "Creador",
   "marketplace.properties.category": "Categoría",
   "marketplace.properties.version": "Versión",
@@ -103,7 +103,9 @@ export const messages = {
   "marketplace.app.slackTagline": "Menciones y mensajes directos en Slack",
   "marketplace.app.discordTagline": "Menciones y mensajes directos en Discord",
   "marketplace.app.telegramTagline": "Grupos y chats directos en Telegram",
+  "marketplace.app.whatsappTagline": "Tu propio chat y las personas que permitas en WhatsApp",
   "marketplace.app.bitwardenTagline": "Inicia sesión en sitios con credenciales de una carpeta compartida",
+  "marketplace.app.protonPassTagline": "Inicia sesión en sitios con credenciales de una bóveda compartida",
   "marketplace.app.onePasswordCategory": "Gestión de inicios de sesión y credenciales",
   "marketplace.app.yourApps": "Tus apps",
   "marketplace.app.addCustom": "Añadir personalizada",
@@ -123,6 +125,7 @@ export const messages = {
   "marketplace.app.setup.account": "Inicia sesión con tu cuenta de {name} en el navegador.",
   "marketplace.app.setup.key": "Necesita una clave de API de tu cuenta de {name}.",
   "marketplace.app.setup.keySaved": "{field} se guarda en {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot elimina el inicio de sesión de esta cuenta en {host}.",
   "marketplace.app.setup.desktop": "Se ejecuta en la app de escritorio de {name} en {address}.",
   "marketplace.app.setup.desktopConnected": "Conectada a {address}.",
   "marketplace.app.setup.open": "No necesita inicio de sesión ni clave.",
@@ -215,6 +218,25 @@ export const messages = {
     "Usa los estilos de este repositorio y diseña una página de ajustes en Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Lista los tokens de diseño del archivo abierto de Paper y compáralos con nuestro tema.",
+  "marketplace.plugin.higgsfield.tagline": "Imágenes, vídeos y audio con IA",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield permite a los agentes generar imágenes, vídeos, personajes y audio con modelos de Higgsfield como Seedance, Kling, Veo y MiniMax Hailuo, consultar el saldo de créditos y explorar la Asset Library. Los resultados se guardan en los Assets de Higgsfield del usuario. Cada usuario inicia sesión en su propia cuenta de Higgsfield en el navegador. Cada generación usa créditos de esa cuenta a la tarifa estándar, también con un plan ilimitado.",
+  "marketplace.plugin.higgsfield.app":
+    "Generación de imágenes, vídeos y audio, personajes, créditos y assets, mediante el servidor MCP de Higgsfield con inicio de sesión en el navegador.",
+  "marketplace.plugin.higgsfield.prompt.credits": "¿Cuántos créditos de Higgsfield tengo?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Haz con Higgsfield una foto de producto de una taza de cerámica sobre una mesa de madera.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Haz con Higgsfield un vídeo de 5 segundos de olas al atardecer.",
+  "marketplace.plugin.elevenlabs.tagline": "Voz, voces y agentes de voz",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs permite a los agentes convertir texto en voz, trabajar con voces y crear, probar y revisar agentes de voz de ElevenLabs y sus conversaciones. El audio generado vuelve como un enlace de descarga de corta duración. Cada usuario inicia sesión en su propia cuenta de ElevenLabs en el navegador, y cada generación usa créditos de esa cuenta.",
+  "marketplace.plugin.elevenlabs.app":
+    "Texto a voz, voces y gestión de agentes de voz, mediante el servidor MCP de ElevenLabs con inicio de sesión en el navegador.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Lee este párrafo en voz alta con una voz tranquila de ElevenLabs y dame el audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Muestra mis agentes de voz de ElevenLabs y la voz que usa cada uno.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Resume las últimas diez conversaciones de mi agente de voz de soporte.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendario y más en tu Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permite a los agentes usar Mail, Calendario, Contactos, Recordatorios, Notas, Mensajes y Safari en este Mac. Solo funciona en macOS. OpenBot inicia mcp-icloud, un servidor de la comunidad que no es de Apple ni de OpenBot. El servidor controla las apps con AppleScript, en este equipo, y no necesita cuenta ni clave. Al instalarla, OpenBot puede pedir a macOS acceso a todas estas apps a la vez, con un aviso por app. Si no lo haces, macOS pregunta la primera vez que un agente usa una app. Para cambiarlo después, abre Ajustes del Sistema › Privacidad y seguridad › Automatización. Los agentes pueden enviar correos e iMessages, y cambiar o eliminar eventos, contactos y recordatorios, así que revisa cada escritura antes de aprobarla. Lo que leen las herramientas, como el texto de los correos, va al proveedor del modelo del agente.",
@@ -233,6 +255,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash": "Explica el fallo más frecuente del proyecto móvil y su causa probable.",
   "marketplace.plugin.sentry.prompt.releaseHealth":
     "¿Cómo es la estabilidad de la versión actual en comparación con la anterior?",
+  "marketplace.plugin.gitlab.tagline": "Incidencias, merge requests y pipelines",
+  "marketplace.plugin.gitlab.description":
+    "GitLab permite a los agentes buscar proyectos, leer y crear incidencias, revisar y actualizar merge requests, leer archivos y commits del repositorio, y comprobar pipelines y jobs de CI en GitLab.com. Cada usuario inicia sesión en su propia cuenta de GitLab desde el navegador. Los agentes tienen los mismos permisos que el usuario: pueden subir commits, cambiar incidencias y merge requests, y fusionarlas. Para un GitLab autoalojado, añade un servidor MCP con tu dirección de GitLab seguida de /api/v4/mcp en los ajustes de servidores MCP e inicia sesión allí.",
+  "marketplace.plugin.gitlab.app":
+    "Proyectos, incidencias, merge requests, repositorios y pipelines de CI, mediante el servidor MCP de GitLab con inicio de sesión en el navegador.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "¿Qué merge requests esperan mi revisión?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "¿Por qué falló el último pipeline en la rama predeterminada?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Crea una incidencia para el fallo en la cola de sincronización con los pasos para reproducirlo.",
   "marketplace.plugin.vercel.tagline": "Despliegues, registros de compilación y proyectos",
   "marketplace.plugin.vercel.description":
     "Vercel permite a los agentes listar proyectos y despliegues recientes, leer registros de compilación y de ejecución, y averiguar por qué falló una compilación. Cada usuario inicia sesión en su propia cuenta de Vercel desde el navegador y elige los equipos que pueden usar los agentes. En esos equipos, los agentes tienen los mismos permisos que la cuenta del usuario. También pueden cambiar variables de entorno, dominios, registros DNS y despliegues, y comprar dominios.",
@@ -273,6 +304,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Busca este pago y explica por qué falló.",
   "marketplace.plugin.stripe.prompt.customer": "Resume las facturas de este cliente y su saldo pendiente.",
   "marketplace.plugin.stripe.prompt.link": "Redacta un enlace de pago para el plan Pro a 49 al mes.",
+  "marketplace.plugin.revenuecat.tagline": "Suscripciones, productos y paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat permite a los agentes leer y cambiar la configuración de tus suscripciones dentro de la app: apps, productos, entitlements, offerings, paquetes, paywalls y experimentos. Los agentes también pueden consultar clientes y sus compras, y leer gráficos y métricas. Una clave de API secreta de RevenueCat va en una cabecera Authorization. La clave da acceso a un proyecto. Con una clave de solo lectura, los agentes solo pueden leer. Con una clave de escritura, los agentes pueden enviar productos a revisión en la App Store, conceder entitlements a clientes y eliminar paquetes, reglas de segmentación y webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Productos, entitlements, offerings, paywalls y métricas, a través del servidor MCP de RevenueCat con una clave de API secreta.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "¿Qué offerings y paquetes tiene mi proyecto de RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "¿Cómo cambiaron este mes mis ingresos y mis suscripciones activas en RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "¿Qué entitlements tiene este cliente de RevenueCat y cuándo caducan?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "En el panel de RevenueCat, abre API keys en tu proyecto y crea una clave de API secreta. Una clave de solo lectura basta para ver datos.",
   "marketplace.plugin.posthog.tagline": "Analítica de producto y flags",
   "marketplace.plugin.posthog.description":
     "PostHog permite a los agentes consultar eventos y embudos, inspeccionar feature flags y resumir qué cambió tras una versión. Una clave de API personal de los ajustes del proyecto va en un único encabezado Authorization.",
@@ -326,6 +369,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "¿Llegó al cliente el correo de la factura?",
   "marketplace.plugin.resend.prompt.template":
     "Redacta un correo de restablecimiento de contraseña para el nuevo flujo.",
+  "marketplace.plugin.omnisend.tagline": "Marketing por email y SMS",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend permite a los agentes leer informes de campañas y formularios, buscar contactos y segmentos, y crear y editar campañas, automatizaciones, plantillas de email, formularios y productos. Cada usuario inicia sesión en su propia cuenta de Omnisend en el navegador y elige el nivel de acceso en la pantalla de consentimiento. Con acceso de escritura, los agentes también pueden enviar campañas y eliminar datos. Elige acceso de solo lectura cuando los agentes solo necesiten informes.",
+  "marketplace.plugin.omnisend.app":
+    "Campañas, automatizaciones, contactos, segmentos, formularios e informes, a través del servidor MCP de Omnisend con inicio de sesión en el navegador.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "¿Qué tal funcionaron las campañas de la semana pasada en comparación con la anterior?",
+  "marketplace.plugin.omnisend.prompt.segment": "¿Cuántos contactos hay en el segmento VIP y cómo cambió este mes?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Prepara un borrador de campaña para la nueva colección, pero no lo envíes.",
   "marketplace.plugin.composio.tagline": "Muchas aplicaciones con tu propio enlace de Composio",
   "marketplace.plugin.composio.description":
     "Composio conecta los agentes con Gmail, Slack, GitHub y cientos de aplicaciones más mediante un único servidor MCP. Conecta las aplicaciones que quieras en tu cuenta de Composio y pega aquí su URL de MCP y su clave de API.",
@@ -400,6 +453,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "¿Qué tareas de Todoist vencen hoy?",
   "marketplace.plugin.todoist.prompt.capture": "Añade estas tareas pendientes a mi bandeja de entrada de Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Pasa mis tareas vencidas de Todoist a mañana.",
+  "marketplace.plugin.ticktick.tagline": "Tareas, listas, hábitos y concentración",
+  "marketplace.plugin.ticktick.description":
+    "TickTick permite a los agentes buscar y filtrar tareas, añadir y cambiar tareas, y gestionar listas, secciones, carpetas, etiquetas y comentarios. Los agentes también pueden leer y cambiar hábitos y registros de concentración, y leer eventos de los calendarios conectados a TickTick. Cada usuario inicia sesión en su propia cuenta de TickTick en el navegador. Los agentes obtienen acceso de lectura y escritura: pueden completar, mover y eliminar tareas, y eliminar etiquetas y registros de concentración.",
+  "marketplace.plugin.ticktick.app":
+    "Tareas, listas, hábitos y registros de concentración, a través del servidor MCP de TickTick con inicio de sesión en el navegador.",
+  "marketplace.plugin.ticktick.prompt.today": "¿Qué tareas de TickTick vencen hoy?",
+  "marketplace.plugin.ticktick.prompt.capture": "Añade estos puntos de acción a mi bandeja de entrada de TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "¿Qué tareas de TickTick completé la semana pasada?",
   "marketplace.plugin.trello.tagline": "Tableros, listas y tarjetas",
   "marketplace.plugin.trello.description":
     "Trello permite a los agentes buscar y leer tableros, listas, tarjetas, listas de comprobación y comentarios, crear tableros y tarjetas, mover listas y tarjetas, marcar tarjetas como completadas y añadir listas de comprobación, comentarios y etiquetas. Los agentes también pueden leer y añadir tarjetas en la Bandeja de entrada de Trello del usuario y leer los eventos del Planner, que pueden venir de un calendario de Google u Outlook conectado. Cada usuario inicia sesión en su propia cuenta de Trello desde el navegador y elige los espacios de trabajo en una pantalla de consentimiento. Los agentes tienen los mismos permisos que el usuario en esos espacios de trabajo. Pueden archivar tarjetas y listas, pero el servidor no puede eliminar nada de forma permanente.",
@@ -408,6 +469,33 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "¿Qué tarjetas de Trello tengo asignadas?",
   "marketplace.plugin.trello.prompt.board": "Resume lo que está en curso en mi tablero de Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Añade estas tareas pendientes como tarjetas a mi tablero de Trello.",
+  "marketplace.plugin.clickup.tagline": "Tareas, documentos y novedades del equipo",
+  "marketplace.plugin.clickup.description":
+    "ClickUp permite a los agentes buscar tareas, documentos, comentarios y chats, crear y actualizar tareas, listas y documentos, publicar comentarios, enviar mensajes de chat y registrar tiempo. Cada usuario inicia sesión en su propia cuenta de ClickUp desde el navegador. Los agentes tienen los mismos permisos que el usuario. Pueden mover tareas a la papelera y eliminar comentarios.",
+  "marketplace.plugin.clickup.app":
+    "Tareas, documentos, comentarios, chat y registro de tiempo, a través del servidor MCP de ClickUp con inicio de sesión en el navegador.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Busca mis tareas abiertas de ClickUp que vencen esta semana.",
+  "marketplace.plugin.clickup.prompt.createTask": "Crea una tarea de ClickUp con estas tareas pendientes y asígnamela.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Busca la última actualización del proyecto en ClickUp y resume las preguntas abiertas.",
+  "marketplace.plugin.coinbase.tagline": "Precios cripto, carteras y trading",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase permite a los agentes leer precios, saldos, carteras, órdenes y comisiones en Coinbase Advanced Trade, previsualizar y colocar órdenes, convertir entre activos y mover fondos entre carteras. Cada usuario inicia sesión en su propia cuenta de Coinbase desde el navegador. Los agentes tienen los mismos permisos que el usuario. Las órdenes y conversiones usan fondos reales, y los agentes pueden pagar solicitudes x402 con el saldo en USDC.",
+  "marketplace.plugin.coinbase.app":
+    "Precios, saldos, carteras, órdenes y conversiones, a través del servidor MCP de Coinbase con inicio de sesión en el navegador.",
+  "marketplace.plugin.coinbase.prompt.balances": "¿Cuáles son mis saldos de Coinbase en cada cartera?",
+  "marketplace.plugin.coinbase.prompt.price": "Muestra el precio de BTC-USD en Coinbase y cómo se movió esta semana.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Previsualiza una compra a mercado de ETH por 50 USD en Coinbase. No coloques la orden.",
+  "marketplace.plugin.robinhood.tagline": "Cuentas de bolsa y trading con agentes",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood permite a los agentes leer las cuentas, posiciones, saldos, historial de transacciones y listas de seguimiento de un cliente de Robinhood, leer datos de mercado y colocar órdenes de acciones, opciones y cripto. Cada usuario inicia sesión en su propia cuenta de Robinhood desde el navegador. En el primer inicio de sesión, Robinhood pide al usuario que abra una cuenta Agentic aparte. Los agentes solo pueden operar en esa cuenta y, por defecto, colocan órdenes sin pedir al usuario que apruebe cada una.",
+  "marketplace.plugin.robinhood.app":
+    "Cuentas, posiciones, datos de mercado y operaciones, a través del servidor MCP de Robinhood con inicio de sesión en el navegador.",
+  "marketplace.plugin.robinhood.prompt.positions": "Resume mis posiciones en Robinhood y cómo se movieron hoy.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "¿Cómo se movió esta semana cada acción de mi lista de seguimiento de Robinhood?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "¿Cuánto efectivo hay en mi cuenta Agentic de Robinhood?",
   "marketplace.plugin.huggingface.tagline": "Modelos, datasets y artículos en el Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permite a los agentes buscar modelos, datasets, Spaces, colecciones y artículos en el Hugging Face Hub, leer model cards y archivos de repositorios, ver una vista previa de datasets y buscar en la documentación de Hugging Face. Usa datos públicos del Hub y no necesita cuenta ni clave. Las herramientas solo leen: los agentes no pueden crear repositorios ni ejecutar jobs.",
@@ -422,20 +510,71 @@ export const messages = {
   "marketplace.auth.personalApiKey": "Clave de API personal",
   "marketplace.auth.mcpUrl": "URL de MCP",
   "marketplace.auth.createKey": "Crear una clave",
-  "marketplace.skill.installMenu.install": "Instalar",
-  "marketplace.skill.installMenu.installNamed": "Instalar {name}",
-  "marketplace.skill.installMenu.allAgents": "Todos los agentes",
-  "marketplace.skill.installMenu.agents": {
-    one: "{count} agente",
-    other: "{count} agentes",
-  },
-  "marketplace.skill.installMenu.here": "Estás aquí",
-  "marketplace.skill.installMenu.change": {
-    one: "{label} tiene {name}. Cambiar",
-    other: "{label} tienen {name}. Cambiar",
-  },
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Probar en {name}",
+  "marketplace.skills.yours": "Tus habilidades",
+  "marketplace.skills.seeAll": "Ver todo",
+  "marketplace.skills.seeAllName": "Ver todo: {name}",
+  "marketplace.skills.none": "Ningún agente tiene una habilidad todavía.",
+  "marketplace.skills.noneHint": "Una habilidad enseña una tarea a un agente. Añade una abajo o crea la tuya.",
+  "marketplace.skills.sourceLabel": "Origen",
+  "marketplace.skills.source.all": "Todas",
+  "marketplace.skills.source.verified": "Verificadas",
+  "marketplace.skills.source.public": "Públicas",
+  "marketplace.skills.source.verifiedLong": "Verificada por OpenBot",
+  "marketplace.skills.source.publicLong": "Revisada por OpenBot",
+  "marketplace.skills.sortLabel": "Ordenar",
+  "marketplace.skills.sortName": "Ordenar: {name}",
+  "marketplace.skills.sort.installs": "Más usadas",
+  "marketplace.skills.sort.updated": "Actualizadas recientemente",
+  "marketplace.skills.sort.name": "Nombre",
+  "marketplace.skills.featured": "Destacadas",
+  "marketplace.skills.all": "Todas las habilidades",
+  "marketplace.skills.count": { one: "{count} habilidad", other: "{count} habilidades" },
+  "marketplace.skills.searchIn": "Buscar en {name}",
+  "marketplace.skills.missing": "Esta habilidad no está en el Marketplace.",
+  "marketplace.skills.state.off": "Desactivada",
+  "marketplace.skills.state.repair": "Necesita reparación",
+  "marketplace.skills.state.update": "Actualización disponible",
+  "marketplace.skills.state.modified": "Cambiada por ti",
+  "marketplace.skills.stateOn": "{state} en {agents}",
+  "marketplace.skills.version": "Versión {version}",
+  "marketplace.skills.origin.local": "Creada en este equipo",
+  "marketplace.skills.origin.workspace": "En la carpeta de este agente",
+  "marketplace.skills.origin.marketplace": "Del Marketplace · versión {version}",
+  "marketplace.skills.status.notAdded": "Sin añadir",
+  "marketplace.skills.status.on": "Activada en {agents}",
+  "marketplace.skills.agentCount": { one: "{count} agente", other: "{count} agentes" },
+  "marketplace.skills.allAgents": "todos los agentes",
+  "marketplace.skills.agentsTitle": "Agentes · {total}",
+  "marketplace.skills.agents.search": "Buscar agentes",
+  "marketplace.skills.agents.searchName": "Buscar los agentes con {name}",
+  "marketplace.skills.agents.noMatch": "Ningún agente coincide con «{query}».",
+  "marketplace.skills.agents.removeAll": "Quitar todo",
+  "marketplace.skills.agents.removeAllName": {
+    one: "Quitar {name} de {count} agente",
+    other: "Quitar {name} de los {count} agentes",
+  },
+  "marketplace.skills.agent.toggle": "{name} para {agent}",
+  "marketplace.skills.agent.remove": "Quitar",
+  "marketplace.skills.agent.removeName": "Quitar {name} de {agent}",
+  "marketplace.skills.add": "Añadir",
+  "marketplace.skills.addName": "Añadir {name} a agentes",
+  "marketplace.skills.addToAgents": "Añadir a agentes",
+  "marketplace.skills.onOf": "Activada en {have} de {total}",
+  "marketplace.skills.chooseAgents": "{name} está en {agents}. Elegir agentes",
+  "marketplace.skills.dialog.list": "Agentes con {name}",
+  "marketplace.skills.dialog.search": { one: "Buscar en {count} agente", other: "Buscar en {count} agentes" },
+  "marketplace.skills.dialog.all": { one: "{count} agente", other: "Los {count} agentes" },
+  "marketplace.skills.dialog.allMatches": { one: "{count} coincidencia", other: "Las {count} coincidencias" },
+  "marketplace.skills.dialog.checked": "{checked} de {total}",
+  "marketplace.skills.dialog.save": "Guardar",
+  "marketplace.skills.dialog.saveBoth": "Guardar: añadir {added}, quitar {removed}",
+  "marketplace.skills.dialog.addTo": "Añadir a {agents}",
+  "marketplace.skills.dialog.removeFrom": "Quitar de {agents}",
+  "marketplace.skills.dialog.full": "Límite de habilidades alcanzado",
+  "marketplace.skills.dialog.unread": "Habilidades no leídas",
+  "marketplace.skills.local.gone": "Ningún agente tiene esta habilidad ahora.",
   "marketplace.notice.agentAdded": "{name} añadido.",
   "marketplace.notice.agentUpdated": "{name} actualizado.",
   "marketplace.notice.appConnected": "{name} conectada.",

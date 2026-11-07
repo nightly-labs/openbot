@@ -1,6 +1,7 @@
 import type { FirstTouch } from "@openbot/contracts/first-touch";
+import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
-import { isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   isUuidV4,
   normalizeEmailAddress,
@@ -55,6 +56,8 @@ interface AuthServiceOptions {
   analytics?: AccountAnalytics;
   /** Saves the first website visit that a sign-in on the web sends. */
   attribution?: AccountAttribution;
+  /** True when the email's domain signs in at its company provider, which then replaces email codes. */
+  usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
 }
 
 export interface EmailSignInStart {
@@ -82,8 +85,32 @@ class AuthDependencies extends Context.Service<
     profileChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
     analytics: AccountAnalytics;
     attribution: AccountAttribution | null;
+    usesCompanySignIn: (email: string) => Effect.Effect<boolean, AuthOperationError>;
   }
 >()("@openbot/auth-api/AuthDependencies") {}
+
+export interface AnalyticsAnswer {
+  enabled: boolean;
+  ageMs: number;
+}
+
+/** The body of an analytics answer, or null when it is not valid. A missing age is an answer of now. */
+export function readAnalyticsAnswer(body: DynamicRecord): AnalyticsAnswer | null {
+  if (!isBoolean(body.enabled)) return null;
+  if (body.ageMs === undefined) return { enabled: body.enabled, ageMs: 0 };
+  return isNumber(body.ageMs) && Number.isSafeInteger(body.ageMs) && body.ageMs >= 0
+    ? { enabled: body.enabled, ageMs: body.ageMs }
+    : null;
+}
+
+/**
+ * The chat color in a `PUT /v1/me/chat-color` body: a lower-case `#rrggbb`, or null for no color.
+ * Returns undefined when the body has no valid value.
+ */
+export function readChatColor(body: DynamicRecord): AvatarColor | null | undefined {
+  if (body.chatColor === null) return null;
+  return isAvatarColor(body.chatColor) ? body.chatColor : undefined;
+}
 
 export class AuthService {
   readonly #layer: Layer.Layer<AuthDependencies>;
@@ -100,6 +127,7 @@ export class AuthService {
       profileChanged: options.profileChanged ?? (() => Effect.void),
       analytics: options.analytics ?? NO_ACCOUNT_ANALYTICS,
       attribution: options.attribution ?? null,
+      usesCompanySignIn: options.usesCompanySignIn ?? (() => Effect.succeed(false)),
     });
   }
 
@@ -123,6 +151,13 @@ export class AuthService {
         );
       }
       const email = yield* authValidate(() => normalizeEmail(emailInput));
+      if (yield* dependencies.usesCompanySignIn(email)) {
+        return yield* new AuthServiceError(
+          409,
+          "company_sign_in_required",
+          "This email signs in with your company account.",
+        );
+      }
       const now = dependencies.now();
       if (idempotencyKey !== undefined && !isUuidV4(idempotencyKey)) {
         return yield* new AuthServiceError(
@@ -382,6 +417,57 @@ export class AuthService {
       yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
       const updated = yield* dependencies.repository.updateUserName(user.id, validation.name, now);
       if (user.name !== updated.name) yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      return updated;
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * Saves the latest product analytics answer of the account, so each device of the user follows it.
+   * `ageMs` is how long the answer waited on the device. The server clock dates it, so a wrong device
+   * clock cannot make an old answer replace a newer one.
+   */
+  readonly updateAnalytics = Effect.fn("AuthService.updateAnalytics")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+      answer: AnalyticsAnswer,
+    ): Effect.fn.Return<AuthUser, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const user = yield* this.authenticate(sessionToken);
+      if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
+      const updated = yield* dependencies.repository.updateUserAnalytics(
+        user.id,
+        answer.enabled,
+        now - answer.ageMs,
+        now,
+      );
+      if (user.analyticsEnabled !== updated.analyticsEnabled) {
+        yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      }
+      return updated;
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** Saves the tint of the user's own chat bubbles. Each server of the user shows it to its members. */
+  readonly updateChatColor = Effect.fn("AuthService.updateChatColor")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+      chatColor: AvatarColor | null,
+    ): Effect.fn.Return<AuthUser, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const user = yield* this.authenticate(sessionToken);
+      if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
+      const updated = yield* dependencies.repository.updateUserChatColor(user.id, chatColor, now);
+      if (user.chatColor !== updated.chatColor) {
+        yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      }
       return updated;
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),

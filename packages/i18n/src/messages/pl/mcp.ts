@@ -45,7 +45,8 @@ export const messages = {
   "mcp.status.noAnswer": "Brak odpowiedzi",
   "mcp.status.didNotStart": "Nie uruchomił się",
   "mcp.status.unreachable": "Nieosiągalny",
-  "mcp.server.providerLimitNote": "Tylko Claude: serwer z katalogiem roboczym nie jest przekazywany innym dostawcom.",
+  "mcp.server.providerLimitNote":
+    "Tylko Claude i Codex: serwer z katalogiem roboczym nie jest przekazywany innym dostawcom.",
   "mcp.server.runtimeDownloading":
     "Pobieranie środowiska uruchomieniowego dla serwerów STDIO. Serwer może się nie uruchomić, dopóki pobieranie się nie zakończy.",
   "mcp.server.runtimeDownloadingProgress":
@@ -87,7 +88,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Usuń przekazywaną zmienną {position}",
   "mcp.panel.workingDirectory": "Katalog roboczy",
   "mcp.panel.workingDirectoryDescription":
-    "Agenci Claude i test połączenia uruchamiają serwer tutaj. Zostaw puste, aby przekazać ten serwer każdemu dostawcy: żaden inny dostawca nie może ustawić katalogu, więc pomija serwer, który go wskazuje.",
+    "Agenci Claude i Codex oraz test połączenia uruchamiają serwer tutaj. Zostaw puste, aby przekazać ten serwer każdemu dostawcy: inni dostawcy nie mogą ustawić katalogu, więc pomijają serwer, który go wskazuje.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Każdy dostawca może używać serwera MCP przez HTTP.",
   "mcp.panel.serverUrl": "URL serwera",
@@ -152,11 +153,11 @@ export const messages = {
   "mcp.panel.appSaved": "Aplikacja zapisana. Zaloguj się, aby jej użyć.",
   "mcp.panel.appRemoved": "Aplikacja usunięta.",
   "mcp.signIn.relayDescription":
-    "Sprawdź, czy strona logowania jest na {page}, a potem otwórz ją w przeglądarce. Gdy skończysz, OpenBot wyśle logowanie do {host}.",
+    "Zaloguj się na {page} w przeglądarce. Gdy skończysz, OpenBot wyśle logowanie do {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Otwórz stronę logowania {page} w swojej przeglądarce. Gdy skończysz, wklej tutaj wyświetlany adres. OpenBot wyśle wtedy logowanie do {host}.",
+    "Zaloguj się na {page} w przeglądarce. Gdy skończysz, wklej tutaj wyświetlany adres. OpenBot wyśle wtedy logowanie do {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Sprawdź, czy strona logowania jest na {page}, a potem otwórz ją w przeglądarce i zakończ tam logowanie. {host} sam wykryje logowanie.",
+    "Zaloguj się na {page} w przeglądarce i zakończ tam logowanie. {host} sam wykryje logowanie.",
   "mcp.signIn.relayOpen": "Otwórz stronę logowania",
   "mcp.signIn.relayPasteHint": "Jeśli przeglądarka nie wróci do OpenBot, skopiuj wyświetlany adres i wklej go tutaj.",
   "mcp.signIn.relayPasteRequired":

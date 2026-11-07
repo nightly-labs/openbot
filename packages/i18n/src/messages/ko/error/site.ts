@@ -26,4 +26,16 @@ export const messages = {
   "error.site.fileType": "허용되지 않는 파일 형식이에요: {path}",
   "error.site.fileOutsideRoot": "사이트 파일은 소스 루트 안에 있어야 해요: {path}",
   "error.site.fileTooLarge": "파일이 1 MB 제한을 초과했어요: {path}",
+  "error.site.serverLimit": {
+    other:
+      "이 서버는 활성 사이트 한도({count}개)에 도달했어요. 다른 사이트를 게시하려면 사이트를 삭제하거나 사이트가 더 많은 요금제의 클라우드 서버를 사용하세요.",
+  },
+  "error.site.sharedLimit":
+    "플랜이 없는 계정의 서버들은 활성 사이트를 공유하며, 모두 사용 중입니다. 여기에 사이트를 게시하려면 이 서버 중 하나에서 사이트를 삭제하거나, 라이선스에 사용자를 추가하거나, 더 많은 사이트가 포함된 플랜의 클라우드 서버를 사용하세요.",
+  "error.site.accountLimit":
+    "계정의 모든 서버에 있는 활성 사이트가 최대 수에 도달했습니다: {count}. 다른 사이트를 게시하려면 사이트를 삭제하세요.",
+  "error.site.unlinkedLimit": {
+    other:
+      "이 컴퓨터는 서버가 아니고, 계정이 활성 사이트 한도({count}개)에 도달했어요. 다른 사이트를 게시하려면 사이트를 삭제하거나 사이트가 더 많은 요금제의 클라우드 서버를 사용하세요.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

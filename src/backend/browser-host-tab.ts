@@ -41,6 +41,18 @@ export interface BrowserHostTab {
    */
   filledCard?: boolean;
   /**
+   * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
+   * or a scripted page of a connected tab could reach it. While it is set, no page of the origin in
+   * the session fills. A main-frame navigation replaces the document and clears this.
+   */
+  scriptedOrigins?: Set<string>;
+  /**
+   * The origins whose service worker could have served code from a script to the current document:
+   * it was open while agent code ran on the origin in its session. Only this document waits for a
+   * navigation; it does not block the other pages of the origin.
+   */
+  workerExposedOrigins?: Set<string>;
+  /**
    * A session of this tab and its popups only, kept in memory: a sign-in page that the host opened
    * for someone else. Such a tab is not saved, and its cookies go when it closes.
    */
@@ -55,13 +67,23 @@ export interface BrowserHostTab {
   closing?: boolean;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
+  /** Other threads of the owner agent that can use the tab: a person tagged it in their message. */
+  sharedThreadIds?: Set<string>;
   revision: number;
+  /** The number of the queued operation that runs now or ran last. */
+  operations?: number;
+  /** The last full-page image that the agent got, and the operation that last passed it on. */
+  image?: { operation: number; url: string; taken: number };
   queue: Deferred.Deferred<void>;
   scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
+  /** How often the page renderer crashed. A `run_script` stops when this changes. */
+  crashes?: number;
   /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
   documents: number;
+  /** How long reads of one document waited for its bot check. All reads of a document share one wait. */
+  challengeWait?: { document: number; waitedMs: number };
   /**
    * The last preview frame, with the page, document and capture generation it shows. A preview waits
    * behind the agent's actions, so the preview card shows this frame instead while the tab is busy.
@@ -77,13 +99,15 @@ export interface BrowserHostTab {
    */
   pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
   /**
-   * An idle agent tab whose page was unloaded to free its renderer's memory. The title and the last
+   * An idle agent tab whose page and renderer process were closed to free memory. The title and the last
    * preview frame stand in for the page until `pendingRestore` loads it again.
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
+  /** The next document keeps the focus that it takes when it commits: a person opened the tab or entered its address. */
+  focusOnCommit?: boolean | undefined;
   /** Whether the tab had focus when its page closed itself, so its opener can take focus over. */
   focusedAtPageClose?: boolean | undefined;
   environment: BrowserEnvironment;

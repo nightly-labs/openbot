@@ -22,6 +22,7 @@ import type {
   FilePreview,
   ProviderRuntimeStatus,
   QueueSnapshot,
+  ResponseStyle,
   RoutineFields,
   ServerSummary,
   TeamPresenceSnapshot,
@@ -37,7 +38,9 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
-import type { ThreadHeaderProps } from "@openbot/ui/features/conversation/threads/thread-types";
+import type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
+import type { AgentThreadOlderMessages } from "@openbot/ui/features/conversation/threads/AgentThreadView";
+import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
@@ -69,6 +72,8 @@ export interface ConversationTarget {
 /** What was said so far in a recording, and the conversation it is dictated into. */
 export interface VoiceLiveTranscript extends ConversationTarget {
   text: string;
+  /** The side thread draft that the recording is dictated into. Undefined for the agent's own chat. */
+  threadKey?: string | undefined;
 }
 
 /** A browser takeover that an agent's turn waits for. */
@@ -111,6 +116,8 @@ export interface ConversationChannelSource {
   interactionAgentName: () => string | undefined;
   /** The agents that a lead asked and that did not reply yet. */
   awaitingReplies: () => readonly AwaitingReplyItem[];
+  /** Stops the sub-task of an awaiting row, with the run below it. It does nothing while the channel is read-only. */
+  stopAwaitingReply?: ((taskId: string) => void) | undefined;
   HeaderTitle: (props: { onOpenSettings: () => void }) => JSX.Element;
   SettingsPane: (props: ConversationChannelSettingsPaneProps) => JSX.Element;
   /** Shows above the composer: the stopped tasks, and why the channel cannot work. */
@@ -160,8 +167,8 @@ export interface ConversationProps {
   accountUsage?: AccountUsage | null | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /**
-   * The endpoints the user named, so both model pickers can tell a custom model from an OpenCode
-   * one. It travels as a prop rather than through `useCustomProviders()`, the same
+   * The endpoints of the active server, so both model pickers can tell a custom model from an
+   * OpenCode one. It travels as a prop rather than through `useCustomProviders()`, the same
    * path `providerRuntimeStatuses` above already takes.
    */
   customProviders?: readonly CustomProviderSummary[] | undefined;
@@ -186,6 +193,8 @@ export interface ConversationProps {
    * a member, and for a host without `browser-profiles-v1`.
    */
   onManageBrowserProfiles?: ((trigger: HTMLElement) => void) | undefined;
+  /** Opens the notification settings at a server, where the user changes the level of its agents. */
+  onOpenNotificationSettings?: ((serverId: string, trigger: HTMLElement) => void) | undefined;
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
   /**
@@ -212,6 +221,10 @@ export interface ConversationProps {
   olderError?: string | null | undefined;
   activeTurnId: string | null | undefined;
   activityDetail?: string | undefined;
+  /** A tool step of the running turn still runs, so a long silence is work, not a wait for the provider. */
+  activityRunning?: boolean | undefined;
+  /** What the running tool step does, as the host's `turn-progress` names it, for the agent's avatar. */
+  activityKind?: string | undefined;
   /** The host's progress lines of the newest turns, by turn, for the steps of each turn. */
   turnStepLines?: TurnStepLines | undefined;
   skillsMarketplaceOpen?: boolean | undefined;
@@ -243,6 +256,11 @@ export interface ConversationProps {
   /** Optional browser stream adapter for a non-Electron client. */
   browserRuntime?: BrowserViewRuntime | undefined;
   server: ServerSummary | undefined;
+  /**
+   * The response style of the server (Server settings → Personality). A "natural" server shows what
+   * the agent says between its steps as messages of their own. Undefined until the host answers.
+   */
+  responseStyle?: ResponseStyle | undefined;
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;
   /**
@@ -269,7 +287,8 @@ export interface ConversationProps {
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The takeover of the open thread: of a side thread while one is open, else of the agent's own chat. */
   browserTakeover: BrowserTakeoverRequest | undefined;
-  onSelectAgent: (agentId: string) => void;
+  /** Opens an agent. With `tabId`, the agent opens at that thread tab, not at the tab it showed last. */
+  onSelectAgent: (agentId: string, tabId?: string) => void;
   /**
    * What stops each agent in its own chat: a question, an approval, a browser takeover or a usage
    * limit. The waiting block names it for each agent that this agent asked.
@@ -291,6 +310,22 @@ export interface ConversationProps {
     voiceRecordingDraftId?: string,
   ) => Promise<SendMessageResult>;
   onMarkRead: () => Promise<void>;
+  /** Marks an agent message and the messages after it unread. Without it, the message menu has no such item. */
+  onMarkUnread?: ((messageId: string) => Promise<void>) | undefined;
+  /**
+   * Deletes a message after the reader confirms. A failure throws, and the dialog shows it. Without it,
+   * the message menu has no Delete item.
+   */
+  onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
+  /** Whether the reader can delete a message. Without it, every finished message can. */
+  canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
+  /**
+   * The open channels that a message of this agent chat can go to. Each one opens with the text in its
+   * composer. Without it, the message menu has no such item.
+   */
+  sendToChannel?:
+    | { channels: { id: string; name: string }[]; onSend: (channelId: string, text: string) => void }
+    | undefined;
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
@@ -313,7 +348,18 @@ export interface ConversationProps {
   remoteBackupModelsLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
   remoteTaskLimitLoaded?: boolean | undefined;
-  /** The app default an agent without its own busy-message setting follows. Local agents only. */
+  /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
+  remotePlanCardLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's Computer Use setting: owners and admins only. */
+  remoteComputerUseLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's new chat setting: owners and admins only. */
+  remoteNewChatLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's busy-message mode: owners and admins only. */
+  remoteBusyMessageModeLoaded?: boolean | undefined;
+  /**
+   * The default an agent without its own busy-message setting follows: this computer's for a local
+   * agent, the host's for an agent of a joined server.
+   */
   defaultBusyMessageMode?: BusyMessageMode | undefined;
   /** The account defaults an agent without its own value follows. Local agents only. */
   agentDefaults?: AgentDefaults | undefined;
@@ -323,6 +369,8 @@ export interface ConversationProps {
   onUpdateAgentPermissions?: ((input: UpdateAgentAdminSettingsInput) => Promise<void>) | undefined;
   /** Starts a new chat with the agent. Absent when its host does not serve `context-reset-v1`. */
   onClearAgentContext?: (() => Promise<void>) | undefined;
+  /** "Delete history" of the agent's own chat. Only this computer has it. */
+  onDeleteAgentHistory?: (() => Promise<void>) | undefined;
   /** Compacts the agent's context now. The context ring offers it only where OpenBot compacts. */
   onCompactAgentContext?: (() => Promise<void>) | undefined;
   /** Answers `browserTakeover`. */
@@ -377,21 +425,24 @@ export type SidebarFilePreview =
       directory: WorkspaceDirectory;
     };
 
+/**
+ * What the right side of a chat shows. Each side panel pane is a mode with the same name, so a new
+ * pane in `SIDE_PANEL_PANES` is a mode too.
+ */
 export type RightPanelMode =
   | "none"
   /** The side panel with no open pane. It lists the panes it can open. */
   | "side-panel"
-  | "browser"
+  | SidePanelPane
+  /** The browser over the window, outside the side panel. */
   | "browser-expanded"
+  /** The browser in picture in picture, outside the side panel. */
   | "browser-pip"
-  | "settings"
   | "file-preview"
-  | "files"
-  | "question"
-  | "voice"
-  | "subagent";
+  /** A side thread in the side panel, beside the agent's own chat. */
+  | "thread";
 
-export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
+export type { SidePanelPane };
 
 /**
  * The threads of the active agent. A side thread is a task of the host; the agent's own chat is the
@@ -399,20 +450,31 @@ export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel"
  */
 export interface ConversationThreads {
   header: ThreadHeaderProps;
+  /** The side threads with a tab in the side panel. */
+  side: SideThreads;
   /** The open side thread, or null for a new thread. Undefined while the agent's own chat is open. */
   open: AgentTask | null | undefined;
+  /** All side threads of the agent that the host lists, also the closed ones. */
+  tasks: readonly AgentTask[];
   /** How many side threads of the agent can run at the same time. */
   limit: number;
   /** The side threads that run a turn now. */
   running: number;
   /** The conversation of the open side thread, when it loaded. */
   conversation: ConversationSnapshot | undefined;
+  /** The open side thread has messages before the loaded ones. */
+  olderMessages: AgentThreadOlderMessages | undefined;
   /** The approval that the open side thread's turn waits for. */
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
   acceptsFiles: boolean;
-  /** `attachmentDraftIds` are the files that the text names. */
-  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  /** A message of a side thread can reply to another message of it: this computer, or `agent-thread-replies-v1`. */
+  acceptsReplies: boolean;
+  /**
+   * `attachmentDraftIds` are the files that the text names. `replyToMessageId` is the message of the open
+   * thread that the message replies to; a new thread has no message to reply to.
+   */
+  onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;
   /** The person sees the open side thread through this message. */
   onRead: (messageId: string) => void;
@@ -423,4 +485,82 @@ export interface ConversationThreads {
   onCompactContext?: (() => Promise<void>) | undefined;
   /** Missing when the host cannot move a queued message to a new thread. */
   onRunQueuedMessage?: ((deliveryId: string) => void) | undefined;
+  /** The actions of the queue of a side thread. Missing when the host sends no queue of a thread. */
+  queueActions?: ThreadQueueActions | undefined;
+  /**
+   * Copies a conversation through an agent answer into a new thread, and opens it: the agent's own
+   * chat when `sourceTaskId` is null, or a side thread. Resolves true when the branch opened. Missing
+   * when the host cannot branch.
+   */
+  onBranch?: ((sourceTaskId: string | null, messageId: string) => Promise<boolean>) | undefined;
+  /** Deletes a message of the side thread `taskId`. Missing when the host cannot delete messages. */
+  onDeleteMessage?: ((taskId: string, messageId: string) => Promise<void>) | undefined;
+  /** Where a side thread came from, when it is a branch. Undefined for a thread that is no branch. */
+  branchSource: (task: AgentTask) => ConversationBranchSource | undefined;
+  /**
+   * The action that opens the side thread where a routine runs, by routine id. Undefined when the
+   * list has no open thread of the routine: a host that does not send the routine of a thread, or a
+   * routine that did not run since it got its thread.
+   */
+  routineThread: (routineId: string) => (() => void) | undefined;
+  /**
+   * Opens the side thread where a routine runs, for example after a test run. It reads the list again
+   * when the thread is not in it. Resolves false when the routine has no open thread.
+   */
+  onOpenRoutineThread: (routineId: string) => Promise<boolean>;
+  /**
+   * Opens the routine's side thread at the message of a run. Resolves false when the run is not in
+   * that thread: the run was in the agent's chat.
+   */
+  onOpenRoutineRun: (routineId: string, messageId: string) => Promise<boolean>;
+  /** The message that a side thread scrolls to once, after a click on "Branched from". */
+  focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+}
+
+/** The actions of the queue of a side thread, as in the agent's own chat. An edit goes through the message box. */
+interface ThreadQueueActions {
+  cancel: (deliveryId: string) => void;
+  /** Gives a queued message to the running turn of `task`. */
+  steer: (task: AgentTask, deliveryId: string) => void;
+  /** Orders the queued messages of the thread `taskId`. */
+  reorder: (taskId: string, deliveryIds: string[]) => void;
+}
+
+/** The source of a branch: the agent's own chat, a side thread, or a side thread that was deleted. */
+export interface ConversationBranchSource {
+  throughMessageId: string;
+  /** The title of the source thread. Null for the agent's own chat, which shows the agent's name. */
+  title: string | null;
+  deleted: boolean;
+  /** Opens the source at the message that the branch came from. */
+  onOpen: () => void;
+}
+
+/** The side threads in the side panel. Each shows beside the agent's own chat. */
+interface SideThreads {
+  /** In tab order. */
+  tabs: readonly ThreadItem[];
+  /** A thread of a tab, with the actions of its own message box. Undefined when the thread is gone. */
+  thread: (id: string) => SideThread | undefined;
+  /** Moves a chat tab to the side panel. */
+  onToSide: (id: string) => void;
+  /** Moves a side panel tab back to the chat tabs, and opens it there. */
+  onToChat: (id: string) => void;
+  onClose: (id: string) => void;
+  onMove: (id: string, index: number) => void;
+}
+
+/** A side thread in the side panel. Each action applies to this thread. */
+export interface SideThread {
+  task: AgentTask;
+  conversation: ConversationSnapshot | undefined;
+  /** The thread has messages before the loaded ones. */
+  olderMessages: AgentThreadOlderMessages | undefined;
+  approval: AgentApproval | undefined;
+  onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
+  onStop: () => void;
+  onRead: (messageId: string) => void;
+  onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;
+  contextState: AgentContextState | undefined;
+  onCompactContext?: (() => Promise<void>) | undefined;
 }

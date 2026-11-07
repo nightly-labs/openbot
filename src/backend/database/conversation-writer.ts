@@ -5,7 +5,7 @@ import type { ConversationMessage, ConversationSnapshot } from "@openbot/contrac
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
-import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
+import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -13,6 +13,13 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
+import {
+  deletedThreadMessageIds,
+  isDeletedThreadMessage,
+  recordDeletedThreadHistory,
+  recordDeletedThreadMessage,
+  withoutDeletedMessages,
+} from "./deleted-thread-messages";
 import { currentConversationMessage } from "./legacy-conversation-message";
 import { readOrderInputs, refreshChangedOrder, refreshThreadOrder } from "./thread-message-order";
 
@@ -46,13 +53,18 @@ export class ConversationWriter {
   }
 
   persistConversation(
-    snapshot: ConversationSnapshot,
+    written: ConversationSnapshot,
     eventType: string,
     payload: unknown = {},
     commandId = `conversation:${eventType}:${randomUUID()}`,
   ): ConversationSnapshot {
-    if (!snapshot.threadId) return structuredClone(snapshot);
-    const threadId = snapshot.threadId;
+    if (!written.threadId) return structuredClone(written);
+    const threadId = written.threadId;
+    // A message that a person deleted stays deleted, also when a held snapshot still has it.
+    const snapshot = {
+      ...written,
+      messages: withoutDeletedMessages(this.#core.connection, threadId, written.messages),
+    };
     const recovery = conversationRecoveryState(this.#core.connection, threadId, snapshot.activeTurnId);
     const result = this.#core.dispatch(
       commandId,
@@ -222,6 +234,10 @@ export class ConversationWriter {
     // A thread is required to address a projection row, and the message has to be in the snapshot
     // for its ordinal to be known. Neither holds for a flush that races a thread reset, so fall
     // back to the whole-snapshot write rather than drop the text.
+    // A late flush of a message that a person deleted writes nothing.
+    if (threadId && isDeletedThreadMessage(this.#core.connection, threadId, messageId)) {
+      return this.#threadRevision(threadId);
+    }
     const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
     if (!threadId || ordinal < 0) {
       return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
@@ -297,6 +313,9 @@ export class ConversationWriter {
     detail?: unknown;
     commandId?: string;
   }): number {
+    if (isDeletedThreadMessage(this.#core.connection, input.threadId, input.message.id)) {
+      return this.#threadRevision(input.threadId);
+    }
     const result = this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -389,7 +408,9 @@ export class ConversationWriter {
    * or one whose merge into its row changes the stored value. Key order does not count, because
    * the merge keeps the key order of the row.
    */
-  changedConversationMessages(threadId: string, messages: readonly ConversationMessage[]): ConversationMessage[] {
+  changedConversationMessages(threadId: string, written: readonly ConversationMessage[]): ConversationMessage[] {
+    // A message that a person deleted is never a change: the writer skips it.
+    const messages = withoutDeletedMessages(this.#core.connection, threadId, written);
     if (messages.length === 0) return [];
     const stored = new Map(
       databaseRows(
@@ -428,8 +449,17 @@ export class ConversationWriter {
     eventType: string;
     detail?: unknown;
     commandId?: string;
+    /**
+     * The shown messages that a person deletes. Each one is recorded, so no later write brings it
+     * back, and is removed with its attachments like a removed id.
+     */
+    deletedMessageIds?: readonly string[];
   }): number {
-    const removedMessageIds = input.removedMessageIds ?? [];
+    const deletedMessageIds = input.deletedMessageIds ?? [];
+    const removedMessageIds = [...new Set([...(input.removedMessageIds ?? []), ...deletedMessageIds])];
+    const deleted = deletedThreadMessageIds(this.#core.connection, input.threadId);
+    for (const messageId of deletedMessageIds) deleted.add(messageId);
+    const changedMessages = input.changedMessages.filter((message) => !deleted.has(message.id));
     const result = this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -439,7 +469,7 @@ export class ConversationWriter {
           eventType: input.eventType,
           payload: {
             detail: input.detail ?? {},
-            changedMessages: input.changedMessages,
+            changedMessages,
             removedMessageIds,
             activeTurnId: input.activeTurnId,
           },
@@ -458,7 +488,7 @@ export class ConversationWriter {
           throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
         }
         if (!threadOwner) this.#roster.ensureThreadProjection(db, agent, sequence);
-        const writtenMessageIds = [...input.changedMessages.map((message) => message.id), ...removedMessageIds];
+        const writtenMessageIds = [...changedMessages.map((message) => message.id), ...removedMessageIds];
         const orderBefore = readOrderInputs(db, input.threadId, writtenMessageIds);
         const findOrdinal = db.prepare(
           "SELECT ordinal, message_json FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
@@ -489,7 +519,7 @@ export class ConversationWriter {
             (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
           VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
         `);
-        for (const imported of input.changedMessages) {
+        for (const imported of changedMessages) {
           const existingRow = databaseRow(findOrdinal.get(input.threadId, imported.id));
           const existing = existingRow
             ? currentConversationMessage(JSON.parse(requiredStringColumn(existingRow, "message_json")))
@@ -529,6 +559,9 @@ export class ConversationWriter {
         const deleteMessage = db.prepare(
           "DELETE FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
         );
+        // Before the rows go: a read cursor on a deleted message moves to the message shown before it.
+        const deletedAt = new Date().toISOString();
+        for (const messageId of deletedMessageIds) recordDeletedThreadMessage(db, input.threadId, messageId, deletedAt);
         for (const messageId of removedMessageIds) {
           deleteAttachments.run(`${input.threadId}:${messageId}`);
           deleteMessage.run(input.threadId, messageId);
@@ -600,6 +633,58 @@ export class ConversationWriter {
   }
 
   /**
+   * Deletes every shown message of a thread, for "Delete history": each one is recorded as deleted,
+   * so no later write, import or replay brings it back, and goes with its attachments. The earlier
+   * events of the thread lose their messages, and the compaction summaries of the thread go, because
+   * they hold the text of the deleted messages. Returns the stored revision. Only a chat with no
+   * active turn can lose its history.
+   */
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
+    const eventType = "conversation.history-deleted";
+    return this.#core.dispatch(
+      `conversation:${eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType,
+          payload: { detail: {}, changedMessages: [], removedMessageIds: [], activeTurnId: null },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        const threadOwner = databaseRow(
+          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+        );
+        if (!threadOwner || requiredStringColumn(threadOwner, "agent_id") !== input.agentId)
+          throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
+        recordDeletedThreadHistory(db, input.threadId, new Date().toISOString());
+        deleteThreadAttachments(db, input.threadId);
+        db.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(input.threadId);
+        db.prepare("DELETE FROM projection_thread_summaries WHERE thread_id = ?").run(input.threadId);
+        // The receipt of a summary command holds the summary text too.
+        const summaryEvents =
+          "FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.summary-created'";
+        const summaryCommands = databaseRows(
+          db.prepare(`SELECT DISTINCT command_id ${summaryEvents}`).all(input.threadId),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        // After a replay, the activity row of a summary event holds the whole payload, summary text included.
+        db.prepare(
+          `DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence IN (SELECT sequence ${summaryEvents})`,
+        ).run(input.threadId, input.threadId);
+        db.prepare(`DELETE ${summaryEvents}`).run(input.threadId);
+        deleteReceiptsOf(db, summaryCommands);
+        db.prepare("UPDATE projection_threads SET updated_at = ?, last_event_sequence = ? WHERE thread_id = ?").run(
+          new Date().toISOString(),
+          sequence,
+          input.threadId,
+        );
+        return sequence;
+      },
+    );
+  }
+
+  /**
    * Upserts one message learned from a paged provider history read.
    *
    * This operation never removes rows that are absent from the provider page. Existing local
@@ -617,6 +702,10 @@ export class ConversationWriter {
     commandId?: string;
   }): number {
     const eventType = input.eventType ?? "provider-history.message-imported";
+    // A provider keeps its own history, so an import can meet a message that a person deleted here.
+    if (isDeletedThreadMessage(this.#core.connection, input.threadId, input.message.id)) {
+      return this.#threadRevision(input.threadId);
+    }
     const existingBeforeWrite = databaseRow(
       this.#core.connection
         .prepare(
@@ -633,12 +722,7 @@ export class ConversationWriter {
         existingMessage &&
         JSON.stringify(mergeImportedMessage(existingMessage, input.message)) === JSON.stringify(existingMessage)
       ) {
-        const revision = databaseRow(
-          this.#core.connection
-            .prepare("SELECT last_event_sequence FROM projection_threads WHERE thread_id = ?")
-            .get(input.threadId),
-        );
-        return revision ? requiredNumberColumn(revision, "last_event_sequence") : 0;
+        return this.#threadRevision(input.threadId);
       }
     }
     const result = this.#core.dispatch(
@@ -771,6 +855,16 @@ export class ConversationWriter {
       },
     );
     return result.revision;
+  }
+
+  /** The thread's revision, for a write that changes nothing. */
+  #threadRevision(threadId: string): number {
+    const revision = databaseRow(
+      this.#core.connection
+        .prepare("SELECT last_event_sequence FROM projection_threads WHERE thread_id = ?")
+        .get(threadId),
+    );
+    return revision ? requiredNumberColumn(revision, "last_event_sequence") : 0;
   }
 }
 

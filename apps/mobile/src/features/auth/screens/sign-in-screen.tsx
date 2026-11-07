@@ -212,8 +212,10 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   const [optionsHeight, setOptionsHeight] = useState(0);
   const [helpHeight, setHelpHeight] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
-  const columnWidth = Math.max(0, Math.min(COLUMN_MAX_WIDTH, viewport.width - 2 * SIDE_MARGIN));
-  const columnLeft = (viewport.width - columnWidth) / 2;
+  // The column stays in the middle of the space between the side insets (the iPhone Duo rail).
+  const safeWidth = viewport.width - insets.left - insets.right;
+  const columnWidth = Math.max(0, Math.min(COLUMN_MAX_WIDTH, safeWidth - 2 * SIDE_MARGIN));
+  const columnLeft = insets.left + (safeWidth - columnWidth) / 2;
   const closedHeight = optionsHeight - helpHeight;
   const bottomPad = Math.max(insets.bottom + 8, 24);
   const minOptionsTop = insets.top + MIN_OPTIONS_HEADER + PANE_GAP;
@@ -470,8 +472,8 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
                 <Animated.View
                   entering={FadeIn.duration(200).delay(reduced ? 0 : 650)}
                   pointerEvents="none"
-                  className="absolute inset-x-16 items-center"
-                  style={{ top: insets.top + 15 }}
+                  className="absolute items-center"
+                  style={{ top: insets.top + 15, left: insets.left + 64, right: insets.right + 64 }}
                 >
                   <Typography.Paragraph align="center" className="font-semibold text-white">
                     {t("mobile.auth.scanner.scanDesktop")}

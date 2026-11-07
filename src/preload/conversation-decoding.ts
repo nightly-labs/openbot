@@ -6,9 +6,12 @@
 
 import {
   type AgentTask,
+  type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
   type AgentWaitsSnapshot,
+  type AttachmentDownloadProgress,
+  type AttachmentImportProgress,
   type ConversationFileSearchPage,
   type ConversationMessage,
   type ConversationPage,
@@ -19,6 +22,7 @@ import {
   type DraftAttachment,
   type FilePreview,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAgentWaitsSnapshot,
@@ -44,6 +48,26 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+
+export function decodeAttachmentDownloadProgress(value: unknown): AttachmentDownloadProgress {
+  const progress = decodeRecord(value, "attachment download progress");
+  return {
+    serverId: requiredString(progress, "serverId"),
+    attachmentId: requiredString(progress, "attachmentId"),
+    received: requiredNumber(progress, "received"),
+    total: requiredNumber(progress, "total"),
+  };
+}
+
+export function decodeAttachmentImportProgress(value: unknown): AttachmentImportProgress {
+  const progress = decodeRecord(value, "attachment import progress");
+  return {
+    serverId: requiredString(progress, "serverId"),
+    requestId: requiredString(progress, "requestId"),
+    sent: requiredNumber(progress, "sent"),
+    total: requiredNumber(progress, "total"),
+  };
+}
 
 export function decodeFilePreview(value: unknown): FilePreview {
   const preview = decodeRecord(value, "file preview");
@@ -184,6 +208,13 @@ export function decodeAgentTaskReadState(value: unknown): AgentTaskReadState {
   return value;
 }
 
+export function decodeAgentTaskReadStates(value: unknown): AgentTaskReadState[] {
+  if (!Array.isArray(value) || !value.every(isAgentTaskReadState)) {
+    throw new Error("Invalid thread read states.");
+  }
+  return value;
+}
+
 export function decodeAgentTasks(value: unknown): AgentTasksSnapshot {
   if (!isAgentTasksSnapshot(value)) {
     throw new Error("Invalid task list response.");
@@ -201,6 +232,13 @@ export function decodeAgentTask(value: unknown): AgentTask {
 export function decodeTaskConversation(value: unknown): ConversationSnapshot {
   if (!isConversationSnapshot(value)) {
     throw new Error("Invalid task conversation response.");
+  }
+  return value;
+}
+
+export function decodeTaskPage(value: unknown): AgentTaskPage {
+  if (!isAgentTaskPage(value)) {
+    throw new Error("Invalid task page response.");
   }
   return value;
 }

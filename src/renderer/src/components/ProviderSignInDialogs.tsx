@@ -1,6 +1,7 @@
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { ProviderUseAppDialog } from "@openbot/ui/components/ProviderUseAppDialog";
+import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import type { ProviderCodeLoginOpener, ProviderConnectionApi } from "./provider-connection-api";
 
@@ -12,6 +13,7 @@ export function ProviderSignInDialogs(props: {
   api: ProviderConnectionApi | undefined;
   opener?: ProviderCodeLoginOpener | undefined;
 }) {
+  const { t } = useText();
   const shown = (opener: ProviderCodeLoginOpener | null) => props.opener === undefined || opener === props.opener;
   const provider = () => {
     const api = props.api;
@@ -31,6 +33,7 @@ export function ProviderSignInDialogs(props: {
             state={api().state()}
             onOpenVerificationUrl={api().openVerificationUrl}
             onCancel={api().cancel}
+            setupStep={provider() === "codex" ? t("provider.codeLogin.chatgptDeviceSetting") : undefined}
             onSubmitCode={api().submit}
             onOpenRelayPage={api().openRelayPage}
             onPasteRelayAddress={api().pasteRelayAddress}

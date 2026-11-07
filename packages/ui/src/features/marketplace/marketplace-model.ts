@@ -8,6 +8,7 @@ import type {
   McpServerConfig,
   SkillCategory,
 } from "@openbot/contracts/ipc";
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
 import type { ConnectorDetail } from "../connectors/ConnectorDetailPanel";
 import type { ConnectorId } from "../connectors/connectors";
@@ -19,7 +20,19 @@ import type {
 import type { CatalogList, MarketplaceHomeCache } from "./marketplace-listing";
 
 /** An agent of the user's that a skill can go to. */
-export type MarketplaceAgent = Pick<ClientAgentSummary, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
+export type MarketplaceAgent = Pick<
+  ClientAgentSummary,
+  "id" | "name" | "title" | "avatarSeed" | "avatarHue" | "avatarUrl"
+>;
+
+/** A skill that can go to more agents: a catalog listing, or a skill made on this computer. */
+export type MarketplaceSkillRef = Pick<MarketplaceSkillSummary, "id" | "name">;
+
+/** One save of the agents dialog. Each list holds agent ids. */
+export interface MarketplaceSkillChange {
+  add: readonly string[];
+  remove: readonly string[];
+}
 
 /** What an agent listing offers the user. */
 export type AgentListingState = "add" | "added" | "update";
@@ -38,12 +51,36 @@ interface AppBase {
   status: MarketplaceAppStatus;
 }
 
+/** One account of a catalog app: one row that the host holds for it. */
+export interface MarketplaceAppAccount {
+  /** The id of the MCP row. */
+  id: string;
+  /** The row name: the account's label, and its `@` tag in a message. */
+  name: string;
+  /** The server refused the stored sign-in of this account. */
+  signInNeeded: boolean;
+  /** The host holds a sign-in for this account. True when the host did not say. */
+  signedIn: boolean;
+  /**
+   * The row has its own account address, so a new name keeps it with the app. A row from before
+   * accounts is found by its catalog name, and its sign-in by its plain address.
+   */
+  renamable: boolean;
+}
+
 /** What the host holds for one app of a catalog plugin. */
 export interface MarketplaceAppConnection {
   /** The host holds a row for the app. */
   held: boolean;
-  /** The server refused the row's stored sign-in, so the user must sign in again. */
+  /** The server refused the stored sign-in of a row, so the user must sign in again. */
   signInNeeded: boolean;
+  /** The rows of the app, the first one first. Empty when the host holds none. */
+  accounts: readonly MarketplaceAppAccount[];
+  /**
+   * The user can add another account: the app signs in with a browser, and the host keeps a
+   * separate sign-in for each account (`mcp-accounts-v1`).
+   */
+  multipleAccounts: boolean;
 }
 
 /**
@@ -73,8 +110,10 @@ const CONNECTOR_SETUP = {
   slack: "channel",
   discord: "channel",
   telegram: "channel",
+  whatsapp: "channel",
   onepassword: "vault",
   bitwarden: "vault",
+  protonpass: "vault",
   github: "account",
 } as const satisfies Record<ConnectorId, AppSetup>;
 
@@ -140,6 +179,11 @@ export interface MarketplaceModel {
   listSkills: CatalogList<MarketplaceSkillSummary>;
   skillHomeCache?: MarketplaceHomeCache<MarketplaceSkillSummary> | undefined;
   loadSkill: (id: string) => Promise<MarketplaceSkillDetail | undefined>;
+  /**
+   * The listing of a skill that the user has and no loaded page holds, for its source and its sort.
+   * No view event and no error: without it, the row stays as it is.
+   */
+  skillListing: (id: string) => Promise<MarketplaceSkillSummary | undefined>;
   /** The agents a skill can go to. Empty when this user cannot install skills. */
   agents: () => readonly MarketplaceAgent[];
   /** The agent whose conversation is open. */
@@ -147,10 +191,28 @@ export interface MarketplaceModel {
   /** Reads the installed skills of each agent that has no fresh answer. */
   readSkills: () => void;
   skillRead: (agentId: string) => SkillRead;
+  /** Undefined also while a remove waits for its Undo toast. */
   installedSkill: (agentId: string, skillId: string) => InstalledSkill | undefined;
+  /**
+   * The installed skills of one agent, also those made on this computer, without a remove that
+   * waits for its Undo. Empty until `skillRead` is loaded. Absent: "Your skills" lists only the
+   * loaded catalog skills that an agent has.
+   */
+  installedSkills?: ((agentId: string) => readonly InstalledSkill[]) | undefined;
   skillBusy: (skillId: string) => boolean;
-  /** Installs the skill on each agent, or removes it, one agent at a time. */
-  setSkill: (skill: MarketplaceSkillSummary, agentIds: readonly string[], on: boolean) => Promise<void>;
+  /**
+   * Adds the skill to some agents and removes it from others as one change, with one notice and one
+   * Undo. A remove waits until the Undo toast closes, so Undo never reinstalls and never loses a
+   * changed copy. A changed copy asks for a confirmation before its remove. Agents that refuse, such
+   * as an agent at its skill limit, are named in one partial error.
+   */
+  changeSkill: (skill: MarketplaceSkillRef, change: MarketplaceSkillChange) => Promise<void>;
+  /** Turns the skill on or off for one agent. */
+  setSkillEnabled: (agentId: string, skillId: string, on: boolean) => Promise<void>;
+  /** Installs the newest version on each agent that has an older one. A changed copy asks first. */
+  updateSkill: (skill: MarketplaceSkillRef, agentIds: readonly string[]) => Promise<void>;
+  /** Absent while no composer can take the request. Starts a chat that makes a new skill. */
+  createSkill?: ((agentId: string) => void) | undefined;
   /** Absent while no composer can take the example. */
   trySkill?: ((agentId: string, skill: MarketplaceSkillDetail) => void) | undefined;
 
@@ -164,7 +226,21 @@ export interface MarketplaceModel {
    * Runs the connect step of one app that the host holds, and saves the answer over the held row:
    * a new key, a new sign-in, or a desktop app that is on again. False when the user closed it.
    */
-  reconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>, appId: string) => Promise<boolean>;
+  reconnectApp: (
+    app: Extract<MarketplaceApp, { kind: "plugin" }>,
+    appId: string,
+    accountId?: string | undefined,
+  ) => Promise<boolean>;
+  /** Signs in to one more account of a held app, as a new row. False when the user closed the step. */
+  addAccount: (app: Extract<MarketplaceApp, { kind: "plugin" }>, appId: string) => Promise<boolean>;
+  /** Gives an account another name. The name is also its `@` tag in a message. */
+  renameAccount: (
+    app: Extract<MarketplaceApp, { kind: "plugin" }>,
+    accountId: string,
+    name: string,
+  ) => Promise<boolean>;
+  /** Removes one account of an app that has more than one, with its sign-in. */
+  removeAccount: (app: Extract<MarketplaceApp, { kind: "plugin" }>, accountId: string) => Promise<boolean>;
   /** The joined server that keeps an app's credential. Absent when this computer keeps it. */
   appHostName?: string | undefined;
   /** Absent when this client cannot ask macOS, or when a joined server runs the apps. */
@@ -177,6 +253,8 @@ export interface MarketplaceModel {
   addServer?: (() => void) | undefined;
   runPrompt?: ((prompt: MarketplacePluginPrompt) => void) | undefined;
   copyLink: (slug: string) => void;
+  /** Copies the shared link of an agent or a skill. */
+  copyListingLink: (link: MarketplaceListingLink) => void;
   openUrl: (url: string) => void;
   /** The connector of a `connector` app. */
   connector: (id: ConnectorId) => MarketplaceConnector | undefined;

@@ -1,3 +1,5 @@
+import { isSkillCategory, type MarketplaceSkillQuery } from "@openbot/contracts/ipc";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { STORY_AGENT_TEMPLATE_DETAIL } from "./agent-template-fixtures";
 import {
   STORY_MARKETPLACE_AGENT_DETAILS,
@@ -5,35 +7,45 @@ import {
   STORY_MARKETPLACE_SKILL_DETAILS,
   STORY_MARKETPLACE_SKILLS,
 } from "./fixtures";
+import { mockSkillPage } from "./mock-skills";
 import { matchesQuery } from "./mock-support";
 
 /** One page of `items`, with the search, filter and cursor of the account service's list routes. */
-function page<T extends { category?: string | undefined; featured?: boolean | undefined }>(
-  items: readonly T[],
-  params: URLSearchParams,
-  text: (item: T) => string,
-) {
+function page<
+  T extends { category?: string | undefined; featured?: boolean | undefined; verified?: boolean | undefined },
+>(items: readonly T[], params: URLSearchParams, text: (item: T) => string) {
   const matches = items.filter(
     (item) =>
       matchesQuery(text(item), params.get("query") ?? undefined) &&
       (!params.has("category") || (item.category ?? "other") === params.get("category")) &&
-      (params.get("featured") !== "true" || item.featured),
+      (params.get("featured") !== "true" || item.featured) &&
+      (!params.has("verified") || (item.verified === true) === (params.get("verified") === "true")),
   );
   const start = Number(params.get("cursor") ?? 0);
   const end = start + Number(params.get("limit") ?? 50);
   return { items: matches.slice(start, end), nextCursor: end < matches.length ? String(end) : null };
 }
 
+/** The skill list query that `marketplaceQueryParams` sent. A value the route does not know is left out. */
+function skillQuery(params: URLSearchParams): MarketplaceSkillQuery {
+  const category = params.get("category");
+  const verified = params.get("verified");
+  const sort = params.get("sort");
+  const limit = Number(params.get("limit"));
+  return {
+    query: params.get("query") ?? undefined,
+    ...(isSkillCategory(category) ? { category } : {}),
+    ...(params.get("featured") === "true" ? { featured: true } : {}),
+    verified: verified === "true" ? true : verified === "false" ? false : undefined,
+    sort: isOneOf(["installs", "updated", "name"] as const, sort) ? sort : undefined,
+    cursor: params.get("cursor") ?? undefined,
+    ...(limit > 0 ? { limit } : {}),
+  };
+}
+
 /** The answer of a catalog route, or a 404 for a listing that the fixtures do not have. */
 function catalogResponse(path: string, params: URLSearchParams): Response {
-  if (path === "/v1/skills/") {
-    const { items, nextCursor } = page(
-      STORY_MARKETPLACE_SKILLS,
-      params,
-      (skill) => `${skill.name} ${skill.description} ${skill.creatorName}`,
-    );
-    return Response.json({ skills: items, nextCursor });
-  }
+  if (path === "/v1/skills/") return Response.json(mockSkillPage(STORY_MARKETPLACE_SKILLS, skillQuery(params)));
   if (path === "/v1/marketplace/agents/") {
     const { items, nextCursor } = page(
       STORY_MARKETPLACE_AGENTS,
@@ -42,6 +54,9 @@ function catalogResponse(path: string, params: URLSearchParams): Response {
     );
     return Response.json({ agents: items, nextCursor });
   }
+  const listing = linkedListing(path);
+  if (listing !== null)
+    return listing ? Response.json(listing) : Response.json({ error: "not_found" }, { status: 404 });
   const [, collection, id] = /^\/v1\/(skills|marketplace\/agents|agent-templates)\/([^/]+)$/.exec(path) ?? [];
   const key = id ? decodeURIComponent(id) : "";
   const body =
@@ -53,6 +68,19 @@ function catalogResponse(path: string, params: URLSearchParams): Response {
           ? STORY_AGENT_TEMPLATE_DETAIL
           : undefined;
   return body ? Response.json(body) : Response.json({ error: "not_found" }, { status: 404 });
+}
+
+/**
+ * The read a shared Marketplace link makes: an agent by id at `/listing`, or a skill by slug. Null for
+ * another path; undefined for a listing that the fixtures do not have.
+ */
+function linkedListing(path: string) {
+  const agentId = /^\/v1\/marketplace\/agents\/([^/]+)\/listing$/.exec(path)?.[1];
+  if (agentId) return STORY_MARKETPLACE_AGENT_DETAILS[decodeURIComponent(agentId)];
+  const slug = /^\/v1\/skills\/slug\/([^/]+)$/.exec(path)?.[1];
+  if (slug)
+    return Object.values(STORY_MARKETPLACE_SKILL_DETAILS).find((skill) => skill.slug === decodeURIComponent(slug));
+  return null;
 }
 
 /**

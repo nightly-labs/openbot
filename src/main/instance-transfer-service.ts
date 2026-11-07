@@ -31,6 +31,7 @@ import {
   type CreateRoutineInput,
   type CustomAgentSummary,
   type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   type ExportInstanceInput,
   INSTANCE_TRANSFER_LIMITS,
   type InstanceExportResult,
@@ -39,6 +40,12 @@ import {
   type InstanceTransferResult,
   type InstanceTransferSummary,
   isAgentImportKey,
+  isAvatarColor,
+  isCustomProviderContextWindow,
+  isCustomProviderHarness,
+  isCustomProviderInputs,
+  isCustomProviderMaxOutput,
+  isCustomProviderReasoningEfforts,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -82,6 +89,7 @@ import {
   type TransferSettings,
 } from "./instance-transfer-manifest";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
+import { readPackFolders } from "./skill-marketplace-service";
 import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
 
 const ARCHIVE: ArchiveLimits = {
@@ -305,6 +313,7 @@ export class InstanceTransferService {
           schedule: routine.trigger.schedule,
           ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
           ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+          ...(routine.runIn ? { runIn: routine.runIn } : {}),
         }));
       const oneTimeRoutines = routines.filter((routine) => routine.schedule.kind === "once");
 
@@ -321,6 +330,8 @@ export class InstanceTransferService {
         description: agent.description,
         avatarSeed: agent.avatarSeed,
         avatarHue: agent.avatarHue,
+        ...(agent.avatarColor ? { avatarColor: agent.avatarColor } : {}),
+        ...(agent.chatColor ? { chatColor: agent.chatColor } : {}),
         avatar,
         provider: agent.provider,
         model: agent.model,
@@ -424,6 +435,9 @@ export class InstanceTransferService {
         baseUrl: redact.url(provider.name, provider.baseUrl),
         models: provider.models,
         needsApiKey: provider.hasApiKey,
+        ...(provider.harness && provider.harness !== DEFAULT_CUSTOM_PROVIDER_HARNESS
+          ? { harness: provider.harness }
+          : {}),
       })),
       customAgents: (yield* settings.customAgents().pipe(Effect.mapError(failure))).map((agent) => ({
         id: agent.id,
@@ -684,8 +698,16 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: [...provider.models],
+          models: provider.models.map(({ id, name, contextWindow, maxOutput, reasoningEfforts, inputs }) => ({
+            id,
+            name,
+            ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
+            ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
+            ...(isCustomProviderReasoningEfforts(reasoningEfforts) ? { reasoningEfforts: [...reasoningEfforts] } : {}),
+            ...(isCustomProviderInputs(inputs) ? { inputs: [...inputs] } : {}),
+          })),
           headers: [],
+          ...(isCustomProviderHarness(provider.harness) ? { harness: provider.harness } : {}),
         }),
       );
       if (saved && provider.needsApiKey)
@@ -835,6 +857,7 @@ export class InstanceTransferService {
           description: source.description,
           avatarSeed: AVATAR_SEED_PATTERN.test(source.avatarSeed) ? source.avatarSeed : `${source.key}-${randomUUID()}`,
           avatarHue: source.avatarHue,
+          ...(isAvatarColor(source.avatarColor) ? { avatarColor: source.avatarColor } : {}),
           ...(useModel
             ? { provider: source.provider, model: source.model, reasoningEffort: source.reasoningEffort }
             : {}),
@@ -892,6 +915,7 @@ export class InstanceTransferService {
                   schedule: routine.schedule,
                   ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
                   ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+                  ...(routine.runIn ? { runIn: routine.runIn } : {}),
                 },
                 { recordConversationEvent: false },
               ),
@@ -940,6 +964,7 @@ export class InstanceTransferService {
               notifications: source.notifications,
               ...(source.busyMessageMode ? { busyMessageMode: source.busyMessageMode } : {}),
               ...(source.taskLimit === undefined ? {} : { taskLimit: source.taskLimit }),
+              ...(isAvatarColor(source.chatColor) ? { chatColor: source.chatColor } : {}),
             })
             .pipe(Effect.mapError(failure));
           completed = true;
@@ -1007,7 +1032,10 @@ const walk = Effect.fn("InstanceTransfer.walk")(function* (
   return files.sort((a, b) => a.name.localeCompare(b.name));
 });
 
-/** The skills a user or a marketplace installed. OpenBot's own skills are installed again on import. */
+/**
+ * The skills a user or a marketplace installed, with a pack as one skill. OpenBot's own skills are
+ * installed again on import.
+ */
 const skillFolders = Effect.fn("InstanceTransfer.skillFolders")(function* (
   workspace: string,
 ): Effect.fn.Return<Array<{ slug: string; files: FileEntry[] }>, ArchiveOperationError> {
@@ -1031,6 +1059,18 @@ const skillFolders = Effect.fn("InstanceTransfer.skillFolders")(function* (
       if (files.some((file) => file.name === OWNERSHIP_MARKER) || !files.some((file) => file.name === "SKILL.md"))
         continue;
       skills.set(slug, files);
+    }
+  }
+  // A pack is one skill, as in its marketplace bundle: its skills go back to `skills/<folder>/` of the
+  // pack, and the install on import writes each one as a folder of its own again. When the lock
+  // cannot be read, each folder stays a skill of its own.
+  const packs = yield* readPackFolders(workspace).pipe(Effect.orElseSucceed(() => new Map<string, string[]>()));
+  for (const [slug, children] of packs) {
+    const pack = skills.get(slug);
+    if (!pack) continue;
+    for (const child of children) {
+      for (const file of skills.get(child) ?? []) pack.push({ ...file, name: `skills/${child}/${file.name}` });
+      skills.delete(child);
     }
   }
   return [...skills].sort(([a], [b]) => a.localeCompare(b)).map(([slug, files]) => ({ slug, files }));

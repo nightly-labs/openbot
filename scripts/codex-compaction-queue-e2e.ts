@@ -4,15 +4,21 @@
 // `turn/start` with `ActiveTurnNotSteerable { turn_kind: Compact }` while a compaction turn runs.
 // Four cases: a compaction that ends by itself, one that runs past the start deadline and ends by
 // itself (#3466), one that the run deadline stops, and one that does not stop, so that OpenBot sends
-// a turn that Codex refuses. Then a side thread: the runtime snapshot carries its context, and
-// `compactTaskContext` compacts its session and not the agent's own chat (#3503).
+// a turn that Codex refuses. Then a turn end that fails after it reserved a compaction does not hold
+// the next message (#4960). Then a side thread: the runtime snapshot carries its context, and
+// `compactTaskContext` compacts its session and not the agent's own chat (#3503), and a side thread
+// deleted while it compacts does not hold the agent's own chat. Then a chat whose compactions fail
+// and whose turns grow it each time: OpenBot stops after 2 failures in a row and says so, and the
+// messages still run. One such chat compacted every 19 seconds for 7 hours and used up the plan
+// limit. Last, a usage
+// report that Codex sends while the stop ends it does not reach the closed database (#3808).
 // `bun scripts/codex-compaction-queue-e2e.ts`. Writes .openbot-build/codex-compaction-queue-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { getString, isRecord } from "../src/backend/protocol";
@@ -36,10 +42,12 @@ process.env.OPENBOT_FAKE_CODEX_CONTROL = controlPath;
 mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
+const { USAGE_CHANGE_DELAY_MS } = await import("../src/backend/agent/context-compaction");
 const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { StoredStateFailure } = await import("../src/backend/stored-state-effects");
 
 /**
  * A Codex app-server with the methods that the service calls. Each normal turn reports 90% of the
@@ -58,6 +66,8 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
+/** threadId -> turns started, for \`growUsage\`. */
+const threadTurns = new Map();
 /** threadId -> { turnId, finish } of the compaction turn that runs. */
 const compacting = new Map();
 process.stdout.on("error", (error) => {
@@ -65,6 +75,16 @@ process.stdout.on("error", (error) => {
   throw error;
 });
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+// Like a Codex in the middle of a turn, it can report usage while OpenBot stops it (#3808).
+process.on("SIGTERM", () => {
+  if (!control().usageOnStop) process.exit(0);
+  for (let thread = 1; thread <= threads; thread++) {
+    const tokenUsage = { total: { totalTokens: 95000 }, last: { totalTokens: 95000 }, modelContextWindow: 100000 };
+    write({ method: "thread/tokenUsage/updated", params: { threadId: "thread-" + thread, turnId: "turn-stop", tokenUsage } });
+  }
+  log({ usageOnStop: threads });
+  process.stdout.write("", () => process.exit(0));
+});
 const answer = (message) => {
   const params = message.params || {};
   switch (message.method) {
@@ -90,7 +110,11 @@ const answer = (message) => {
       const turnId = "turn-" + (++turns);
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
-      write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage: { total: { totalTokens: 90000 }, last: { totalTokens: 90000 }, modelContextWindow: 100000 } } });
+      // \`growUsage\`: each turn adds 6% of the window, more than the growth that allows a new compaction.
+      const count = (threadTurns.get(params.threadId) ?? 0) + 1;
+      threadTurns.set(params.threadId, count);
+      const used = control().growUsage ? 84000 + 6000 * (count - 1) : 90000;
+      write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage: { total: { totalTokens: used }, last: { totalTokens: used }, modelContextWindow: 100000 } } });
       setTimeout(() => {
         const item = { type: "agentMessage", id: "message-" + turnId, text: "Done.", phase: "final_answer" };
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
@@ -99,7 +123,7 @@ const answer = (message) => {
       return;
     }
     case "thread/compact/start": {
-      const { compactionMs, ignoreInterrupt } = control();
+      const { compactionMs, ignoreInterrupt, compactionStatus } = control();
       const turnId = "compact-turn-" + (++turns);
       const item = { type: "contextCompaction", id: "compact-item-" + turnId };
       write({ id: message.id, result: {} });
@@ -113,7 +137,7 @@ const answer = (message) => {
         if (status === "completed") write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status } } });
       };
-      const timer = setTimeout(() => finish("completed"), compactionMs);
+      const timer = setTimeout(() => finish(compactionStatus ?? "completed"), compactionMs);
       compacting.set(params.threadId, { turnId, finish, ignoreInterrupt });
       return;
     }
@@ -155,6 +179,7 @@ interface ProtocolEntry {
   refused: string | null;
   compactionEnded: string | null;
   status: string | null;
+  usageOnStop: number | null;
 }
 
 interface CaseReport {
@@ -171,6 +196,7 @@ interface CaseReport {
   passed: boolean;
 }
 
+const errors: { code: string; agentId?: string }[] = [];
 const report: { compactionTimeoutMs: number; cases: CaseReport[]; passed: boolean; error?: string } = {
   compactionTimeoutMs: COMPACTION_TIMEOUT_MS,
   cases: [],
@@ -193,6 +219,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 function protocol(): ProtocolEntry[] {
@@ -216,6 +245,7 @@ function protocolEntry(value: unknown): ProtocolEntry {
     refused: getString(entry, "refused"),
     compactionEnded: getString(entry, "compactionEnded"),
     status: getString(entry, "status"),
+    usageOnStop: typeof entry.usageOnStop === "number" ? entry.usageOnStop : null,
   };
 }
 
@@ -241,6 +271,10 @@ const agents = new AgentService({
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   contextCompactionTimeoutMs: COMPACTION_TIMEOUT_MS,
+});
+let stopped = false;
+agents.on("event", (event: AgentEvent) => {
+  if (event.type === "error") errors.push({ code: event.code, ...(event.agentId ? { agentId: event.agentId } : {}) });
 });
 
 try {
@@ -338,6 +372,48 @@ try {
     result.passed = true;
   }
 
+  // The end of a turn reserves the compaction, then saves the turn, and only then asks Codex. A save
+  // that failed between the two kept the hold until a restart, and each next message waited (#4960).
+  await writeFile(controlPath, JSON.stringify({ compactionMs: 200, ignoreInterrupt: false }));
+  const updatePreview = store.updatePreview;
+  let previewFailures = 0;
+  store.updatePreview = (id, preview) => {
+    // Each turn of the fake Codex answers "Done."; the message itself is the preview of a send.
+    if (preview !== "Done." || previewFailures > 0) return updatePreview(id, preview);
+    previewFailures += 1;
+    return Effect.fail(new StoredStateFailure({ cause: new Error("disk I/O error") }));
+  };
+  const held = await runCauseEffect(
+    agents.createAgent({
+      name: "Failed turn end",
+      description: "Checks the queue after a turn end that failed.",
+      avatarSeed: "compaction-failed-end",
+      avatarHue: null,
+      initialMessage: "First message.",
+    }),
+  );
+  await waitFor("the failed turn end", () => {
+    const busy = agents
+      .listQueue(held.id)
+      .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+    return previewFailures === 1 && !busy;
+  });
+  store.updatePreview = updatePreview;
+  const heldReceipt = await runCauseEffect(agents.sendMessage({ agentId: held.id, text: "Second message." }));
+  const heldDeliveryId = heldReceipt.deliveries[0]?.id;
+  assert.ok(heldDeliveryId, "failed turn end: no delivery");
+  const heldStatus = () => mailbox.getDelivery(heldDeliveryId)?.delivery.status ?? "missing";
+  const failedTurnEnd = {
+    previewFailures,
+    nextMessageStatus: await waitFor(
+      "the next message after the failed turn end",
+      () => (["completed", "failed", "interrupted"].includes(heldStatus()) ? heldStatus() : null),
+      30_000,
+    ).catch(() => heldStatus()),
+  };
+  Object.assign(report, { failedTurnEnd });
+  assert.equal(failedTurnEnd.nextMessageStatus, "completed", "failed turn end: the compaction hold stayed");
+
   // A side thread shows its own context, and Compact compacts only its session (#3503).
   await writeFile(controlPath, JSON.stringify({ compactionMs: 200, ignoreInterrupt: false }));
   const owner = await runCauseEffect(
@@ -398,13 +474,117 @@ try {
   assert.deepEqual(sideThread.threadCompactions, ["completed", "completed"], "side thread: compactions");
   assert.equal(sideThread.mainCompactStarts, 0, "side thread: the agent's own chat compacted");
   assert.ok(sideThread.mainContextUnchanged, "side thread: the agent's own context changed");
+
+  // A side thread deleted while Codex compacts its session. No turn of the deleted session ends the
+  // compaction for OpenBot, so its hold stayed, and the agent's own chat waited until a restart.
+  await writeFile(controlPath, JSON.stringify({ compactionMs: 5_000, ignoreInterrupt: false }));
+  const deleted = await runCauseEffect(agents.startTask({ agentId: owner.id, text: "Thread message." }));
+  const deletedSession = await waitFor(
+    "the deleted thread's session",
+    () => store.database.activeProviderSession(deleted.threadId, "codex")?.externalSessionId,
+  );
+  await waitFor("the deleted thread's compaction", () =>
+    protocol().some((line) => line.method === "thread/compact/start" && line.threadId === deletedSession),
+  );
+  await runCauseEffect(agents.deleteTask({ agentId: owner.id, taskId: deleted.id }));
+  const ownReceipt = await runCauseEffect(agents.sendMessage({ agentId: owner.id, text: "Own chat message." }));
+  const ownDeliveryId = ownReceipt.deliveries[0]?.id;
+  assert.ok(ownDeliveryId, "deleted thread: no delivery");
+  const ownStatus = () => mailbox.getDelivery(ownDeliveryId)?.delivery.status ?? "missing";
+  const deletedThread = {
+    ownChatStatus: await waitFor(
+      "the own chat message after the delete",
+      () => (["completed", "failed", "interrupted"].includes(ownStatus()) ? ownStatus() : null),
+      30_000,
+    ).catch(() => ownStatus()),
+  };
+  Object.assign(report, { deletedThread });
+  assert.equal(deletedThread.ownChatStatus, "completed", "deleted thread: the agent's own chat stayed held");
+
+  // Each compaction of this chat fails, and each turn grows the chat by 6% of its window, so the
+  // growth rule allows a new compaction after each turn. Without a limit, each turn compacted again.
+  await writeFile(
+    controlPath,
+    JSON.stringify({ compactionMs: 200, ignoreInterrupt: false, compactionStatus: "failed", growUsage: true }),
+  );
+  const failing = await runCauseEffect(
+    agents.createAgent({
+      name: "Failed compactions",
+      description: "Checks that failed compactions stop.",
+      avatarSeed: "compaction-failing",
+      avatarHue: null,
+      initialMessage: "First message.",
+    }),
+  );
+  const failingIdle = () =>
+    !agents
+      .listQueue(failing.id)
+      .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+  const failingSession = await waitFor("the first turn of the failing chat", () => {
+    const session = store.activeProviderSession(failing.id)?.externalSessionId;
+    return session && failingIdle() ? session : null;
+  });
+  const failedEnds = () =>
+    protocol().filter((line) => line.compactionEnded && line.threadId === failingSession && line.status === "failed");
+  // Each message waits for the compaction that the turn before it started.
+  for (const text of ["Second message.", "Third message.", "Fourth message."]) {
+    await waitFor(
+      "the failing chat to settle",
+      () =>
+        failingIdle() &&
+        !agents
+          .getRuntimeSnapshot()
+          .contextStates?.some((state) => state.agentId === failing.id && state.compaction?.status === "running"),
+    );
+    await runCauseEffect(agents.sendMessage({ agentId: failing.id, text }));
+    await waitFor("the message to end", failingIdle);
+  }
+  const failedCompactions = {
+    compactStarts: protocol().filter(
+      (line) => line.method === "thread/compact/start" && line.threadId === failingSession,
+    ).length,
+    failedEnds: failedEnds().length,
+    turns: protocol().filter((line) => line.method === "turn/start" && line.threadId === failingSession).length,
+    stoppedNotices: errors.filter(
+      (error) => error.code === "context_compaction_stopped" && error.agentId === failing.id,
+    ).length,
+    deliveries: agents.listQueue(failing.id).deliveries.map((delivery) => delivery.status),
+  };
+  Object.assign(report, { failedCompactions });
+  assert.equal(failedCompactions.turns, 4, "failed compactions: not every message ran");
+  assert.equal(failedCompactions.compactStarts, 2, "failed compactions: OpenBot did not stop after 2 failures");
+  assert.equal(failedCompactions.failedEnds, 2, "failed compactions: the compactions did not fail");
+  assert.equal(failedCompactions.stoppedNotices, 1, "failed compactions: one notice");
+
+  // Codex reports usage while the stop ends it. The quit closes the database next, and a late
+  // usage snapshot then failed with "OpenBot database is not initialized." (#3808).
+  await writeFile(controlPath, JSON.stringify({ compactionMs: 200, ignoreInterrupt: false, usageOnStop: true }));
+  const lateErrors: string[] = [];
+  const collect = (error: unknown) => lateErrors.push(error instanceof Error ? error.message : String(error));
+  process.on("uncaughtException", collect);
+  await runCauseEffect(agents.stop());
+  database.close();
+  stopped = true;
+  // Not a guessed delay: timers of the same delay fire in creation order, so a usage timer that the
+  // stop started fires before this one.
+  await new Promise((done) => setTimeout(done, USAGE_CHANGE_DELAY_MS));
+  process.off("uncaughtException", collect);
+  const usageOnStop = {
+    reportedThreads: protocol().find((line) => line.usageOnStop !== null)?.usageOnStop ?? 0,
+    lateErrors,
+  };
+  Object.assign(report, { usageOnStop });
+  assert.ok(usageOnStop.reportedThreads > 0, "stop: Codex reported no usage");
+  assert.deepEqual(usageOnStop.lateErrors, [], "stop: a late usage report used the closed database");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.exitCode = 1;
 } finally {
-  await runCauseEffect(agents.stop()).catch(() => {});
-  database.close();
+  if (!stopped) {
+    await runCauseEffect(agents.stop()).catch(() => {});
+    database.close();
+  }
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });

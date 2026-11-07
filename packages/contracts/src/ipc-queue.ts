@@ -230,6 +230,8 @@ export interface UpdateQueuedMessageInput {
 export interface ReorderQueueInput {
   agentId: string;
   deliveryIds: string[];
+  /** The side thread whose queued messages `deliveryIds` orders. Absent for the agent's own chat. */
+  taskId?: string;
 }
 
 export interface InterruptTurnInput {

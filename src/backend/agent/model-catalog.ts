@@ -3,9 +3,14 @@ import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { AgentClient, AgentProvider } from "./../agent-client";
+import { providerCheckTimeoutMs } from "../disk-restore";
 import { decodeModelListResponse, type ModelListResponse } from "./../protocol";
 import { providerFailure } from "../provider-client-effects";
-import { BUILT_IN_PROVIDER_DRIVERS, type ProviderClientContext } from "./../provider-drivers";
+import {
+  BUILT_IN_PROVIDER_DRIVERS,
+  type BuiltInProviderDriver,
+  type ProviderClientContext,
+} from "./../provider-drivers";
 import {
   compareModelVersions,
   FALLBACK_MODELS,
@@ -15,6 +20,8 @@ import {
 } from "./provider-models";
 import { isProviderTimeout } from "./provider-status";
 import { providerLabel } from "./thread-items";
+
+type ProviderModelCatalog = NonNullable<BuiltInProviderDriver["catalog"]>;
 
 const logger = createOpenBotLogger("provider-runtime");
 const MODEL_METADATA_FALLBACKS = [...FALLBACK_MODELS, ...OPENCODE_FREE_MODEL_FALLBACKS];
@@ -47,6 +54,96 @@ export class ModelCatalog {
   }
 
   /**
+   * Reads the models that one client serves, in the catalogue's order, and how many the CLI listed.
+   * A provider account after the first reads its own list with it. Fails as `model/list` fails.
+   */
+  readonly read = Effect.fn("ModelCatalog.read")(function* (
+    this: ModelCatalog,
+    client: AgentClient,
+    catalog: ProviderModelCatalog = {},
+    hasStoredKey = false,
+  ) {
+    const serverModels = new Map<string, ModelListResponse["data"][number]>();
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const response = yield* client.request(
+        "model/list",
+        { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
+        decodeModelListResponse,
+        // A slow list answers inside the normal request timeout, and a list that timed out
+        // kept that agent out of the catalogue.
+        providerCheckTimeoutMs(catalog.slowList ? this.#options.requestTimeoutMs : 5_000),
+      );
+      // Every model the CLI reports is offered, the ones it marks hidden included; only the
+      // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such
+      // as `gpt-6-astra` is hidden until its own launch -- and this app has no way to tell
+      // that apart from a model the account cannot use, so a hidden flag was the only
+      // reason a working model was missing from the picker while the same CLI ran it
+      // happily from a terminal.
+      for (const item of response.data) {
+        // The trimmed id is what is kept: `isAgentModel` allows no whitespace, so a padded
+        // id would fail the contract guard downstream and take the whole list with it.
+        const id = item.model?.trim();
+        if (!id) continue;
+        // An id the contract refuses is dropped alone, for the same reason: the Cursor CLI
+        // once added `=` and `,`, and that emptied the picker for every provider.
+        if (!isAgentModel(id)) {
+          logger.warn("A provider reported a model id that is not valid.", { provider: client.provider, id });
+          continue;
+        }
+        serverModels.set(id, { ...item, model: id });
+      }
+      cursor = catalog.paged ? response.nextCursor : undefined;
+      if (cursor && cursors.has(cursor))
+        return yield* providerFailure(new Error("Model discovery repeated a pagination cursor."));
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    const models: AgentModelOption[] = [];
+    for (const server of serverModels.values()) {
+      if (!server.model) continue;
+      const fallback = MODEL_METADATA_FALLBACKS.find(
+        (candidate) => candidate.provider === client.provider && candidate.id === server.model,
+      );
+      const efforts = (server?.supportedReasoningEfforts ?? [])
+        .map((item) => item.reasoningEffort)
+        .filter(isReasoningEffort);
+      // The name the provider CLI gives, whole: a model is easier to recognise as
+      // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
+      // A provider can name its models itself, such as Claude Code.
+      // Clamped, because a name over the limit is not a long name downstream: it fails
+      // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
+      // whole array, so one over-long name empties the picker. OpenCode is the CLI that
+      // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
+      // 160 characters passes 160 - but the clamp protects every CLI.
+      const name = modelDisplayName(
+        catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
+      );
+      // Decided here, on the resolved name, so the catalog and the picker's Free badge cannot
+      // disagree about what costs money. With no key stored the same models can only come
+      // from the user's own sign-in, which does buy them.
+      if (hasStoredKey && catalog.usableWithStoredKey?.(server.model, name) === false) continue;
+      models.push({
+        provider: client.provider,
+        id: server.model,
+        name,
+        description: fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
+        defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)
+          ? server.defaultReasoningEffort
+          : (fallback?.defaultReasoningEffort ?? "medium"),
+        supportedReasoningEfforts: efforts.length ? efforts : (fallback?.supportedReasoningEfforts ?? ["medium"]),
+        ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
+        ...catalog.modelFields?.(server),
+      });
+    }
+    const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
+    // Tier first, then newest first. Sort is stable, so the CLI's own order still decides
+    // between models of one version.
+    const sorted = [...models].sort((left, right) => rank(left) - rank(right) || compareModelVersions(left, right));
+    return { models: sorted, listed: serverModels.size };
+  });
+
+  /**
    * Reads the catalogue of every connected CLI, and answers which providers replied with a fresh one.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
@@ -71,88 +168,7 @@ export class ModelCatalog {
           const hasStoredKey = Boolean(this.#options.credentials.apiKey(provider));
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
-            const serverModels = new Map<string, ModelListResponse["data"][number]>();
-            const cursors = new Set<string>();
-            let cursor: string | undefined;
-            do {
-              const response = yield* client.request(
-                "model/list",
-                { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
-                decodeModelListResponse,
-                // A slow list answers inside the normal request timeout, and a list that timed out
-                // kept that agent out of the catalogue.
-                catalog.slowList ? this.#options.requestTimeoutMs : 5_000,
-              );
-              // Every model the CLI reports is offered, the ones it marks hidden included; only the
-              // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such
-              // as `gpt-6-astra` is hidden until its own launch -- and this app has no way to tell
-              // that apart from a model the account cannot use, so a hidden flag was the only
-              // reason a working model was missing from the picker while the same CLI ran it
-              // happily from a terminal.
-              for (const item of response.data) {
-                // The trimmed id is what is kept: `isAgentModel` allows no whitespace, so a padded
-                // id would fail the contract guard downstream and take the whole list with it.
-                const id = item.model?.trim();
-                if (!id) continue;
-                // An id the contract refuses is dropped alone, for the same reason: the Cursor CLI
-                // once added `=` and `,`, and that emptied the picker for every provider.
-                if (!isAgentModel(id)) {
-                  logger.warn("A provider reported a model id that is not valid.", { provider: client.provider, id });
-                  continue;
-                }
-                serverModels.set(id, { ...item, model: id });
-              }
-              cursor = catalog.paged ? response.nextCursor : undefined;
-              if (cursor && cursors.has(cursor))
-                return yield* providerFailure(new Error("Model discovery repeated a pagination cursor."));
-              if (cursor) cursors.add(cursor);
-            } while (cursor);
-            const models: AgentModelOption[] = [];
-            for (const server of serverModels.values()) {
-              if (!server.model) continue;
-              const fallback = MODEL_METADATA_FALLBACKS.find(
-                (candidate) => candidate.provider === client.provider && candidate.id === server.model,
-              );
-              const efforts = (server?.supportedReasoningEfforts ?? [])
-                .map((item) => item.reasoningEffort)
-                .filter(isReasoningEffort);
-              // The name the provider CLI gives, whole: a model is easier to recognise as
-              // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
-              // A provider can name its models itself, such as Claude Code.
-              // Clamped, because a name over the limit is not a long name downstream: it fails
-              // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
-              // whole array, so one over-long name empties the picker. OpenCode is the CLI that
-              // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
-              // 160 characters passes 160 - but the clamp protects every CLI.
-              const name = modelDisplayName(
-                catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
-              );
-              // Decided here, on the resolved name, so the catalog and the picker's Free badge cannot
-              // disagree about what costs money. With no key stored the same models can only come
-              // from the user's own sign-in, which does buy them.
-              if (hasStoredKey && catalog.usableWithStoredKey?.(server.model, name) === false) continue;
-              models.push({
-                provider: client.provider,
-                id: server.model,
-                name,
-                description:
-                  fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
-                defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)
-                  ? server.defaultReasoningEffort
-                  : (fallback?.defaultReasoningEffort ?? "medium"),
-                supportedReasoningEfforts: efforts.length
-                  ? efforts
-                  : (fallback?.supportedReasoningEfforts ?? ["medium"]),
-                ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
-                ...catalog.modelFields?.(server),
-              });
-            }
-            const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
-            // Tier first, then newest first. Sort is stable, so the CLI's own order still decides
-            // between models of one version.
-            const sorted = [...models].sort(
-              (left, right) => rank(left) - rank(right) || compareModelVersions(left, right),
-            );
+            const { models: sorted, listed } = yield* this.read(client, catalog, hasStoredKey);
             // For a provider with a fallback, a successful but empty response is no more useful to
             // the picker than a timeout: it must not erase the built-in free tier on first
             // discovery. It is not a fresh catalog, so callers must not treat it as proof that
@@ -164,7 +180,7 @@ export class ModelCatalog {
               count: sorted.length,
               durationMs: Math.round(performance.now() - startedAt),
             });
-            if (catalog.fallback && serverModels.size === 0) {
+            if (catalog.fallback && listed === 0) {
               return { provider, models: catalog.fallback(previous), fresh: false };
             }
             return { provider, models: sorted, fresh: true };

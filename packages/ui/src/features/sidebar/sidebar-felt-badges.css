@@ -1,0 +1,254 @@
+/* The felt badges of a sidebar avatar: the unread count, cream yarn digits on a plum felt pill, the
+   failed routine mark, a raspberry felt ball with a cream felt X, and the badge of an agent that waits
+   for the user, an amber felt ball with a cream yarn icon. No badge has a drop shadow.
+
+   The badges share one anchor and one felt height, so a one-digit count is the same round ball as
+   the failed mark, and a longer count grows to the left from the same right end. The waiting ball is
+   2px larger, so it is the first badge the eye finds in a busy list. The felt box is the
+   16px of the badge before it. The ring around it is in the colour of the row under the avatar, the
+   same colour as the outline of the faces, and is 3.5px wide. Chrome rounds a border width down to
+   whole pixels, so the border takes the 3 whole pixels and a solid ring shadow adds the half pixel.
+   The ring grows outwards, so the felt stays where the shipped badge was. The badge fills its padding
+   box with the felt colour, which snaps to the device pixels with the ring, so the ring is the same
+   width on all four sides. The felt texture is a separate box at a fractional offset, so it lands up
+   to one device pixel off; it stays 0.25px inside the fill and never covers the ring. The base badge
+   rules are in `app-shell.css`; the doubled class wins over its active row border. */
+
+.agent-row-agent-status:is(
+  .agent-row-agent-status-unread,
+  .agent-row-agent-status-routine-failed,
+  .agent-row-agent-status-waiting
+) {
+  --sidebar-felt-ring: var(--agent-avatar-outline, var(--openbot-bg-sidebar));
+  --sidebar-felt-ring-width: 3.5px;
+  --sidebar-felt-ring-border: 3px;
+  --sidebar-felt-box: 16px;
+
+  /* The shipped badge sat 3px past the avatar, plus its ring. */
+  inset-inline-end: calc(-3px - var(--sidebar-felt-ring-border));
+  bottom: calc(-1px - var(--sidebar-felt-ring-border));
+  box-sizing: border-box;
+  min-width: calc(var(--sidebar-felt-box) + 2 * var(--sidebar-felt-ring-border));
+  height: calc(var(--sidebar-felt-box) + 2 * var(--sidebar-felt-ring-border));
+  isolation: isolate;
+  border: var(--sidebar-felt-ring-border) solid var(--sidebar-felt-ring);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--sidebar-felt-under) padding-box;
+  box-shadow: 0 0 0 calc(var(--sidebar-felt-ring-width) - var(--sidebar-felt-ring-border)) var(--sidebar-felt-ring);
+}
+
+.agent-row-agent-status-unread {
+  --sidebar-felt-under: linear-gradient(to bottom, var(--openbot-felt-plum-top), var(--openbot-felt-plum-bottom));
+  --felt-box: var(--sidebar-felt-box);
+
+  /* The digits roll in and out inside the felt, as on a counter. The clip is the rounded padding box,
+     so it cuts no part of the ring or the felt. */
+  overflow: clip;
+  padding: 0 3px;
+  color: var(--openbot-felt-cream);
+  font-size: var(--openbot-text-lg);
+  line-height: 16px;
+}
+
+/* The felt pill and the cream digit stroke are the same as on the "+N" count of a channel cluster,
+   so `channel-avatar.css` holds them for both badges. */
+
+/* The letter spacing also adds space after the last digit. The negative end margin removes it, so
+   the digits are on the centre of the pill. The yarn look is CSS only, so Chrome and Firefox draw
+   the same digits: an SVG filter is not safe at this size, because Firefox rounds a 0.35px dilate up
+   to 1px and the digits fuse. */
+.agent-row-unread-count {
+  position: relative;
+  margin-inline-end: -0.06em;
+  letter-spacing: 0.06em;
+}
+
+/* The failed mark: a raspberry felt ball with two cream felt pills crossed on it. The ball is opaque
+   to a radius of 0.45 of the art, so the ball is opaque past the clip 0.25px inside the felt box, on
+   a raspberry fill, as on the pill. The mark sits 2px further in than the count, closer to the face. */
+.agent-row-agent-status.agent-row-agent-status-routine-failed {
+  --sidebar-felt-under: linear-gradient(
+    to bottom,
+    var(--openbot-felt-raspberry-top),
+    var(--openbot-felt-raspberry-bottom)
+  );
+
+  inset-inline-end: calc(-1px - var(--sidebar-felt-ring-border));
+  bottom: calc(1px - var(--sidebar-felt-ring-border));
+  width: calc(var(--sidebar-felt-box) + 2 * var(--sidebar-felt-ring-border));
+}
+
+.agent-row-agent-status-routine-failed::before {
+  position: absolute;
+  z-index: -1;
+  inset: -0.75px;
+  background: url("../../assets/plush/felt-x-ball.webp") center / 100% 100% no-repeat;
+  clip-path: circle(calc(50% - 1px));
+  content: "";
+}
+
+.agent-row-agent-status-routine-failed svg {
+  display: none;
+}
+
+/* The waiting badge: an amber felt ball with the icon of the wait reason in cream yarn. The fill and
+   the felt art are in `channel-avatar.css` with the unread pill. The thick round stroke makes the icon
+   read as yarn at this size. */
+.agent-row-agent-status.agent-row-agent-status-waiting {
+  --sidebar-felt-box: 18px;
+  --sidebar-felt-under: linear-gradient(to bottom, var(--openbot-felt-amber-top), var(--openbot-felt-amber-bottom));
+  --felt-box: var(--sidebar-felt-box);
+
+  width: calc(var(--sidebar-felt-box) + 2 * var(--sidebar-felt-ring-border));
+  color: var(--openbot-felt-cream);
+}
+
+.agent-row-agent-status-waiting svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.75;
+}
+
+/* Transitions. A felt badge lands with a squash, bounces and rolls its digits when the count changes,
+   and shrinks away when it closes; the pill also animates to its new width (`SidebarAgentIndicator`).
+   The X lands, then shakes "no" once. The badge squashes on the avatar, so it scales from its bottom
+   edge. With reduced motion, the component sets none of these classes and the badge changes at once. */
+.agent-row-agent-status:is(
+  .agent-row-agent-status-unread,
+  .agent-row-agent-status-routine-failed,
+  .agent-row-agent-status-waiting
+) {
+  transform-origin: 50% 100%;
+}
+
+/* The old count lies on top of the new one while it rolls away. */
+.agent-row-unread-count.agent-row-unread-count-old {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  margin: 0;
+  place-items: center;
+}
+
+.agent-row-unread-count.agent-row-unread-count-roll-gone {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .agent-row-agent-status:is(
+    .agent-row-agent-status-unread,
+    .agent-row-agent-status-routine-failed,
+    .agent-row-agent-status-waiting
+  ).agent-row-agent-status-entering {
+    animation: sidebar-felt-in var(--openbot-duration-slow) cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  .agent-row-agent-status-unread.agent-row-agent-status-bumping {
+    animation: sidebar-felt-bump 360ms ease-out;
+  }
+
+  .agent-row-agent-status-unread.agent-row-agent-status-bumping-b {
+    animation: sidebar-felt-bump-b 360ms ease-out;
+  }
+
+  .agent-row-agent-status:is(
+    .agent-row-agent-status-unread,
+    .agent-row-agent-status-routine-failed
+  ).agent-row-agent-status-leaving {
+    animation: sidebar-felt-out var(--openbot-duration-overlay) cubic-bezier(0.5, 0, 0.75, 0) both;
+  }
+
+  .agent-row-unread-count.agent-row-unread-count-roll-in {
+    animation: sidebar-felt-roll-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .agent-row-unread-count.agent-row-unread-count-roll-in-b {
+    animation: sidebar-felt-roll-in-b 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .agent-row-unread-count.agent-row-unread-count-roll-out {
+    animation: sidebar-felt-roll-out 200ms ease-in both;
+  }
+
+  .agent-row-unread-count.agent-row-unread-count-roll-out-b {
+    animation: sidebar-felt-roll-out-b 200ms ease-in both;
+  }
+}
+
+/* A felt badge fades in and grows a little, with no bounce: the sidebar changes often. */
+@keyframes sidebar-felt-in {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+}
+
+/* Two names for one bounce: a change during a bounce changes the name, which starts it again. */
+@keyframes sidebar-felt-bump {
+  35% {
+    scale: 1.12 0.88;
+  }
+
+  65% {
+    scale: 0.97 1.04;
+  }
+}
+
+@keyframes sidebar-felt-bump-b {
+  35% {
+    scale: 1.12 0.88;
+  }
+
+  65% {
+    scale: 0.97 1.04;
+  }
+}
+
+@keyframes sidebar-felt-out {
+  30% {
+    scale: 1.1 0.9;
+  }
+
+  100% {
+    opacity: 0;
+    scale: 0.2;
+  }
+}
+
+@keyframes sidebar-felt-roll-in {
+  from {
+    opacity: 0;
+    translate: 0 65%;
+  }
+}
+
+@keyframes sidebar-felt-roll-in-b {
+  from {
+    opacity: 0;
+    translate: 0 65%;
+  }
+}
+
+@keyframes sidebar-felt-roll-out {
+  to {
+    opacity: 0;
+    translate: 0 -65%;
+  }
+}
+
+@keyframes sidebar-felt-roll-out-b {
+  to {
+    opacity: 0;
+    translate: 0 -65%;
+  }
+}
+
+/* The filter definitions of the channel faces take no space. They stay rendered: Firefox does not
+   apply a filter from an SVG that is not displayed. */
+.sidebar-plush-ring-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}

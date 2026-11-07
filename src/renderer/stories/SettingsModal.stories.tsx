@@ -1,4 +1,10 @@
-import type { AvatarImageInput, CentralAuthUser, MobileConnectedDevice, UpdateStatus } from "@openbot/contracts/ipc";
+import type {
+  AvatarImageInput,
+  CentralAuthUser,
+  MobileConnectedDevice,
+  ServerSummary,
+  UpdateStatus,
+} from "@openbot/contracts/ipc";
 import { Button, Toaster, toast } from "@openbot/ui";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
@@ -6,6 +12,7 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import type { SettingsTab } from "../src/features/settings/settings-tabs";
+import type { CodexLiveAccess } from "../src/features/speech/codex-live-access";
 import { STORY_SERVERS } from "../src/preview/fixtures";
 import { createMockBilling } from "../src/preview/mock-billing";
 import type { MockVoiceOptions } from "../src/preview/mock-voice";
@@ -20,6 +27,7 @@ const storyGeneralSettings: GeneralSettingsValue = {
   keepRunningInBackground: false,
   keepAwake: false,
   keepAwakeOnBattery: false,
+  quitGuard: "working",
 };
 
 const storyAppInfo = { name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" } as const;
@@ -51,6 +59,8 @@ function SettingsModalStory(props: {
   scheduledRestart?: UpdateStatus["scheduledRestart"];
   /** The downloaded dictation models and the saved voice setting. */
   voice?: MockVoiceOptions;
+  /** Whether Codex can open live voice. */
+  codexLiveAccess?: CodexLiveAccess;
 }) {
   const previousApi = window.openbot;
   const billingApi = createMockBilling();
@@ -59,7 +69,8 @@ function SettingsModalStory(props: {
   onCleanup(() => {
     mock.dispose();
     toast.dismiss();
-    window.openbot = previousApi;
+    // Storybook can render the story again before it cleans up the first render. That render's API stays.
+    if (window.openbot === mock.api) window.openbot = previousApi;
   });
   const hostedServersApi = {
     ...mock.api.hostedServers,
@@ -76,6 +87,11 @@ function SettingsModalStory(props: {
       : storyUpdateStatus,
   );
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
+  // The notification level and the mute of each server, as the server list of the app keeps them.
+  const [servers, setServers] = createSignal<readonly ServerSummary[]>(STORY_SERVERS);
+  const updateServer = (serverId: string, change: Partial<ServerSummary>): void => {
+    setServers((list) => list.map((server) => (server.id === serverId ? { ...server, ...change } : server)));
+  };
   const [mobileDevices, setMobileDevices] = createSignal<MobileConnectedDevice[]>([
     {
       sessionId: "11111111-1111-4111-8111-111111111111",
@@ -151,6 +167,8 @@ function SettingsModalStory(props: {
             page={page()}
             initialTab={props.initialTab}
             openTab={props.openTab}
+            codexLiveAccess={props.codexLiveAccess}
+            onConnectCodex={() => setOpen(false)}
             open={open()}
             value={value()}
             onValueChange={(next) => {
@@ -158,7 +176,16 @@ function SettingsModalStory(props: {
               setValue(next);
             }}
             appInfo={storyAppInfo}
-            servers={STORY_SERVERS}
+            servers={servers()}
+            onSetServerNotificationLevel={async (serverId, level) =>
+              updateServer(serverId, { notificationLevel: level })
+            }
+            onSetServerMuted={async (serverId, muted, durationMs) =>
+              updateServer(serverId, {
+                notificationsMuted: muted,
+                notificationsMutedUntil: muted && durationMs !== undefined ? Date.now() + durationMs : null,
+              })
+            }
             updateStatus={updateStatus()}
             onCancelScheduledRestart={async () => {
               const { scheduledRestart: _cancelled, ...rest } = updateStatus();
@@ -167,6 +194,9 @@ function SettingsModalStory(props: {
             account={account()}
             onUpdateAccountName={updateAccountName}
             onUpdateAccountAvatar={updateAccountAvatar}
+            onSetChatColor={async (chatColor) => {
+              setAccount((current) => ({ ...current, chatColor }));
+            }}
             onCreateMobileConnect={createMobileConnect}
             onCancelMobileConnect={async () => {
               window.clearTimeout(scanTimer);
@@ -208,6 +238,7 @@ const meta = {
     account: storyAccount,
     onUpdateAccountName: fn(async () => undefined),
     onUpdateAccountAvatar: fn(async () => undefined),
+    onSetChatColor: fn(async () => undefined),
     onCreateMobileConnect: fn(async () => ({
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=storybook-mobile-ticket_1234567890abcdef",
@@ -273,15 +304,48 @@ export const VoiceWhisperHungarian: Story = {
   ),
 };
 
+/** Cohere Transcribe offers only its own languages, so the saved Hungarian shows as English. */
+export const VoiceCohereLanguages: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      initialTab="voice"
+      voice={{
+        voiceModelsReady: ["parakeet-tdt-0.6b-v3", "cohere-transcribe-03-2026"],
+        voiceSettings: { modelId: "cohere-transcribe-03-2026", language: "hu" },
+      }}
+    />
+  ),
+};
+
+/** Bark is retired, but it stays in the list while it is downloaded and in use. */
+export const VoiceRetiredBarkInUse: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      initialTab="voice"
+      voice={{
+        voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"],
+        voiceSettings: { modelId: "bark-3.0-plus", language: "automatic" },
+      }}
+    />
+  ),
+};
+
 /** Downloaded models, and the speech model, each with Remove. */
 export const VoiceModelsDownloaded: Story = {
   render: () => (
     <SettingsModalStory
       initialOpen
       initialTab="voice"
-      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"], speechModelReady: true }}
+      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "parakeet-unified-en-0.6b"], speechModelReady: true }}
     />
   ),
+};
+
+/** Codex signs in with an API key or not at all: live voice says why it is off, and Connect opens Providers. */
+export const VoiceCodexSignIn: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="voice" codexLiveAccess="signIn" />,
 };
 
 /** The install guide for each phone, the sign-in code and the connected phones. */

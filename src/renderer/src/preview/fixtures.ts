@@ -24,6 +24,7 @@ import type {
   MarketplaceSkillSummary,
   QueueDelivery,
   RemoteDesktopSession,
+  ServerAuditEntry,
   ServerSummary,
   SharedTable,
   SkillPackagePreview,
@@ -222,6 +223,14 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
     name: "Claude Sonnet 5",
     description: "Balanced Claude model for general agent work.",
     defaultReasoningEffort: "high",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "grok",
+    id: "grok-4.7",
+    name: "Grok 4.7",
+    description: "Discovered from Grok CLI over ACP.",
+    defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high"],
   },
   {
@@ -745,6 +754,106 @@ export const STORY_TEAM_MEMBERS: TeamMemberSummary[] = STORY_PRESENCE.members.ma
   disabled: member.disabled,
 }));
 
+const ALICE = { id: "member-alice", name: "Alice Chen" };
+const NORBERT = { id: "member-self", name: "Norbert" };
+const JON = { id: "member-jon", name: "Jon Bell" };
+const MAYA = { id: "member-maya", name: "Maya Singh" };
+const LEGAL = { id: "role-legal", name: "Legal team" };
+const FINANCE = { id: "role-finance", name: "Finance" };
+const RESEARCH = { id: "research", name: "Research" };
+const SALES = { id: "sales", name: "Sales Outbound" };
+
+/**
+ * The access changes of the story server, newest first: Legal chats with Research, Finance manages
+ * Sales Outbound, and every member no longer manages Research or Sales Outbound.
+ */
+export const STORY_SERVER_AUDIT_ENTRIES: ServerAuditEntry[] = [
+  {
+    id: "audit-14",
+    at: "2026-11-02T14:05:00.000Z",
+    actor: NORBERT,
+    change: { kind: "role-renamed", roleId: LEGAL.id, from: "Legal team", to: "Legal" },
+  },
+  {
+    id: "audit-13",
+    at: "2026-11-02T10:16:00.000Z",
+    actor: ALICE,
+    change: { kind: "agent-level", role: null, agent: SALES, from: "manage", to: "view" },
+  },
+  {
+    id: "audit-12",
+    at: "2026-11-02T10:15:00.000Z",
+    actor: ALICE,
+    change: { kind: "agent-level", role: null, agent: RESEARCH, from: "manage", to: "none" },
+  },
+  {
+    id: "audit-11",
+    at: "2026-11-02T10:02:00.000Z",
+    actor: NORBERT,
+    change: { kind: "member-role", member: ALICE, from: "member", to: "admin" },
+  },
+  {
+    id: "audit-10",
+    at: "2026-10-31T16:40:00.000Z",
+    actor: NORBERT,
+    change: { kind: "role-deleted", role: { id: "role-contractors", name: "Contractors" } },
+  },
+  {
+    id: "audit-09",
+    at: "2026-10-31T16:20:00.000Z",
+    actor: NORBERT,
+    change: { kind: "member-removed", member: { id: "member-sam", name: "Sam Ortiz" } },
+  },
+  {
+    id: "audit-08",
+    at: "2026-10-31T11:07:00.000Z",
+    actor: ALICE,
+    change: { kind: "role-member", role: FINANCE, member: MAYA, added: true },
+  },
+  {
+    id: "audit-07",
+    at: "2026-10-31T11:07:00.000Z",
+    actor: ALICE,
+    change: { kind: "role-member", role: FINANCE, member: JON, added: true },
+  },
+  {
+    id: "audit-06",
+    at: "2026-10-31T11:06:00.000Z",
+    actor: ALICE,
+    change: { kind: "agent-level", role: FINANCE, agent: SALES, from: "none", to: "manage" },
+  },
+  {
+    id: "audit-05",
+    at: "2026-10-31T11:05:00.000Z",
+    actor: ALICE,
+    change: { kind: "role-created", role: FINANCE },
+  },
+  {
+    id: "audit-04",
+    at: "2026-10-30T09:42:00.000Z",
+    actor: NORBERT,
+    change: { kind: "role-member", role: LEGAL, member: JON, added: true },
+  },
+  {
+    id: "audit-03",
+    at: "2026-10-30T09:41:00.000Z",
+    actor: NORBERT,
+    change: { kind: "agent-level", role: LEGAL, agent: RESEARCH, from: "none", to: "chat" },
+  },
+  {
+    id: "audit-02",
+    at: "2026-10-30T09:40:00.000Z",
+    actor: NORBERT,
+    change: { kind: "role-created", role: LEGAL },
+  },
+  {
+    id: "audit-01",
+    at: "2026-10-30T09:12:00.000Z",
+    actor: null,
+    change: { kind: "member-joined", member: MAYA, role: "member" },
+  },
+];
+
 export const STORY_INVITES: TeamInviteSummary[] = [
   {
     id: "invite-1",
@@ -822,6 +931,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 4,
     installs: 1_284,
     featured: true,
+    verified: true,
     iconUrl: skillPreviewIcon("📝", "#7255ce"),
     updatedAt: "2026-08-17T09:12:00.000Z",
   },
@@ -835,6 +945,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 2,
     installs: 862,
     featured: true,
+    verified: false,
     iconUrl: skillPreviewIcon("🗄️", "#2463a6"),
     updatedAt: "2026-08-15T14:40:00.000Z",
   },
@@ -848,6 +959,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 7,
     installs: 517,
     featured: false,
+    verified: false,
     iconUrl: skillPreviewIcon("🎨", "#be4d86"),
     updatedAt: "2026-08-11T11:05:00.000Z",
   },
@@ -861,6 +973,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 1,
     installs: 344,
     featured: false,
+    verified: false,
     iconUrl: skillPreviewIcon("📬", "#e88124"),
     updatedAt: "2026-08-09T07:30:00.000Z",
   },
@@ -874,8 +987,9 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 3,
     installs: 209,
     featured: false,
+    verified: true,
     iconUrl: skillPreviewIcon("🔎", "#268477"),
-    updatedAt: "2026-08-04T16:20:00.000Z",
+    updatedAt: "2026-08-19T16:20:00.000Z",
   },
   {
     id: "skill-nightly-backup",
@@ -887,6 +1001,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 5,
     installs: 156,
     featured: false,
+    verified: false,
     iconUrl: skillPreviewIcon("💾", "#526178"),
     updatedAt: "2026-07-28T22:00:00.000Z",
   },

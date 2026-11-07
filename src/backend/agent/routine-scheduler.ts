@@ -48,6 +48,7 @@ import {
   routineToolAgentId,
   routineToolArguments,
   routineToolPolicies,
+  routineToolRunPlace,
   routineToolSchedule,
   routineToolString,
 } from "./routine-tools";
@@ -101,6 +102,13 @@ export interface RoutineHooks {
   isRunning(): boolean;
   /** Whether a spent provider plan holds this agent's queue. */
   usageLimited(agentId: string): boolean;
+  /**
+   * The open side thread that takes the runs of this routine, created or restored here. Null when the
+   * agent has no room for one more thread: its runs then go to the agent's own chat.
+   */
+  routineThread(agentId: string, routineId: string, routineName: string): { taskId: string; threadId: string } | null;
+  /** Archives the side thread of a deleted routine. Its history stays, and the user can open it again. */
+  routineDeleted(agentId: string, routineId: string): Effect.Effect<void>;
 }
 
 /** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
@@ -473,6 +481,7 @@ export class RoutineScheduler implements RoutineDueSource {
           if (this.#mailbox.nextQueued(input.agentId)) this.#hooks.scheduleDrain(input.agentId);
         }),
     );
+    yield* this.#hooks.routineDeleted(input.agentId, input.routineId);
   }, Effect.uninterruptible);
 
   readonly test = Effect.fn("RoutineScheduler.test")(function* (
@@ -603,6 +612,7 @@ export class RoutineScheduler implements RoutineDueSource {
         "timezone",
         "limitPolicy",
         "missedPolicy",
+        "runIn",
       ]);
       const agentId = this.#toolAgentId(args, senderAgentId);
       const active = args.active === undefined ? true : args.active;
@@ -633,6 +643,7 @@ export class RoutineScheduler implements RoutineDueSource {
           timezone,
           schedule: routineToolSchedule(args.schedule),
           ...routineToolPolicies(args),
+          ...routineToolRunPlace(args),
         },
         this.#toolMutationOptions(agentId, senderAgentId, params),
       );
@@ -664,6 +675,7 @@ export class RoutineScheduler implements RoutineDueSource {
         timezone,
         ...webhookToolTrigger(args),
         ...(limitPolicy === undefined ? {} : { limitPolicy }),
+        ...routineToolRunPlace(args),
       });
       // Only the caller's own chat shows the card with the secret: the card needs the turn.
       const turnId = agentId === senderAgentId ? params.turnId : undefined;
@@ -713,6 +725,7 @@ export class RoutineScheduler implements RoutineDueSource {
         timezone: current.timezone,
         ...webhookToolTrigger(args, current.trigger),
         ...(limitPolicy === undefined ? {} : { limitPolicy }),
+        ...routineToolRunPlace(args),
       });
       const turnId = agentId === senderAgentId ? params.turnId : undefined;
       const recorded = this.#recordWebhookEvent(agentId, "updated", routine, turnId);
@@ -729,8 +742,9 @@ export class RoutineScheduler implements RoutineDueSource {
         "active",
         "limitPolicy",
         "missedPolicy",
+        "runIn",
       ]);
-      const policies = routineToolPolicies(args);
+      const policies = { ...routineToolPolicies(args), ...routineToolRunPlace(args) };
       const input: UpdateRoutineInput = {
         agentId: this.#toolAgentId(args, senderAgentId),
         routineId: routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
@@ -772,7 +786,11 @@ export class RoutineScheduler implements RoutineDueSource {
         INPUT_LIMITS.identifier,
         "routineId is required.",
       );
-      yield* this.delete({ agentId, routineId }, agentId === senderAgentId ? { turnId: params.turnId } : {});
+      if (this.#routines.getRecord(agentId, routineId)?.trigger.kind === "webhook") {
+        yield* this.#webhookTool(senderAgentId, params.threadId, params.turnId).delete({ agentId, routineId });
+      } else {
+        yield* this.delete({ agentId, routineId }, agentId === senderAgentId ? { turnId: params.turnId } : {});
+      }
       return openBotToolResult({ deleted: true, agentId, routineId });
     }
 
@@ -785,6 +803,7 @@ export class RoutineScheduler implements RoutineDueSource {
         INPUT_LIMITS.identifier,
         "routineId is required.",
       );
+      this.#refuseWebhookTest(agentId, routineId);
       return openBotToolResult(yield* this.test({ agentId, routineId }));
     }
 
@@ -993,12 +1012,9 @@ export class RoutineScheduler implements RoutineDueSource {
   ) {
     // A test or a script run that arrives while a spent plan holds the agent would wait for the
     // reset, and a routine set to skip has no use for a late result.
+    const record = yield* routineStep(() => this.#routines.getRecord(run.agentId, run.routineId));
     const skipped = yield* routineStep(() => {
-      if (
-        this.#routines.getRecord(run.agentId, run.routineId)?.limitPolicy !== "skip" ||
-        !this.#hooks.usageLimited(run.agentId)
-      )
-        return null;
+      if (record?.limitPolicy !== "skip" || !this.#hooks.usageLimited(run.agentId)) return null;
       const cancelled = this.#transitionRunWithConversation(run, "cancelled");
       this.stateChanged(run.agentId);
       return cancelled;
@@ -1009,8 +1025,14 @@ export class RoutineScheduler implements RoutineDueSource {
     const agent = yield* this.#store.getOrCreate(run.agentId).pipe(toRoutineOperationFailed);
     return yield* Effect.gen({ self: this }, function* () {
       yield* routineStep(validateRecipient);
+      // A routine runs in the agent's chat unless the user chose its own side thread. That thread is a
+      // lane beside the chat and the other routines, so a run does not wait for them.
+      const thread = yield* routineStep(() =>
+        record?.runIn === "thread" ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName) : null,
+      );
       const receipt = yield* this.#mailbox
         .enqueue({
+          ...(thread ? { taskId: thread.taskId } : {}),
           sender: {
             kind: "routine",
             routineId: run.routineId,
@@ -1041,6 +1063,14 @@ export class RoutineScheduler implements RoutineDueSource {
         }
       });
       yield* routineStep(() => this.#waits.wakeForRun(run, deliveryId, waitId));
+      // A run in the routine's thread shows in that thread's queue, and the chat keeps its preview.
+      if (thread) {
+        yield* routineStep(() => {
+          this.#hooks.emitQueue(agent.id);
+          this.#hooks.scheduleDrain(agent.id);
+        });
+        return queued;
+      }
       const snapshot = yield* routineStep(() => {
         const current = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
         this.#hooks.syncMailboxMessages(current);
@@ -1144,7 +1174,7 @@ export class RoutineScheduler implements RoutineDueSource {
       activeTurnIds.add(delivery.turnId);
     }
     if (activeTurnIds.size === 0) return cancellableRuns;
-    if (!this.#store.activeProviderSession(agentId) && !this.#conversation.routineSession(agentId)) {
+    if (!this.#store.activeProviderSession(agentId) && !this.#conversation.hasRoutineSession(agentId)) {
       return yield* new RoutineOperationFailed({ cause: new Error(sourceText("error.backend.routineRunNoSession")) });
     }
     for (const turnId of activeTurnIds) yield* this.#hooks.interrupt(agentId, turnId);
@@ -1215,6 +1245,14 @@ export class RoutineScheduler implements RoutineDueSource {
     return { run: updated, message };
   }
 
+  /** `test_routine` does not test a webhook routine; the user does it in Routines settings. */
+  #refuseWebhookTest(agentId: string, routineId: string): void {
+    if (this.#routines.getRecord(agentId, routineId)?.trigger.kind !== "webhook") return;
+    throw new RoutineInputError(
+      `Routine ${routineId} is a webhook routine. Only the user tests it, in Routines settings. Tell the user to do it there.`,
+    );
+  }
+
   /**
    * The writer of the webhook routine tools. A public route changes only on a person's request: a
    * routine run or an agent message can carry text from outside, such as a webhook body.
@@ -1231,7 +1269,7 @@ export class RoutineScheduler implements RoutineDueSource {
       !this.#conversation.isExecutionThread(this.#conversation.publicThreadId(senderAgentId, threadId));
     if (!requested) {
       throw new RoutineInputError(
-        "Only a person's message can create or change a webhook routine. Ask the user to request it in the chat.",
+        "Only a person's message can create, change or delete a webhook routine. Ask the user to request it in the chat.",
       );
     }
     return webhooks;

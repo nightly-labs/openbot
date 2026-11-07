@@ -10,7 +10,10 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { hasVisibleToasts } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
 import {
   type BackupModelSource,
   rememberedBackupModels,
@@ -26,6 +29,7 @@ import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { turnsPort } from "../../turns-port";
@@ -40,11 +44,12 @@ import { agentsPort } from "../agents/agents-port";
 import { withHostAccountUsage } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { useBrowserTabs } from "../browser/browser-context";
+import { useChannels } from "../channels/channels-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
-import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { loadServerPersonality, serverResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -55,8 +60,14 @@ import { useUsage } from "../usage/usage-context";
 import { useWindowPage } from "../window/window-page-context";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
+import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
+import {
+  createAgentMessageDeleteAccess,
+  desktopAgentMessageDeleteAccess,
+  readerCanDeleteMessage,
+} from "./message-delete-access";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -87,6 +98,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     setPendingPluginConnect,
     agentAutoApproves,
     generalSettings,
+    openNotificationLevels,
   } = useSettings();
   const {
     providerRuntimeStatuses,
@@ -95,6 +107,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     cancelProviderRuntimeDownload,
     providerAdminServerId,
     connection,
+    activeCustomProviders,
   } = useProviders();
   /**
    * The composer's sign-ins: Connect, and the code from the ⋯ menu. The dialog shows here only while
@@ -108,9 +121,22 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
-  // Not gated on the server: the picker needs these IDs to label a model it is already showing, and
-  // a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
-  const { customProviders } = useCustomProviders();
+  // The server's response style decides whether progress updates show as messages. Main answers
+  // "classic" for a joined server until the server says what it supports, so the read waits for a
+  // negotiated protocol.
+  const personalityServerId = () => {
+    const server = activeServer();
+    return server && (server.kind === "local" || server.compatibility?.negotiatedProtocol != null)
+      ? server.id
+      : undefined;
+  };
+  createEffect(personalityServerId, (serverId) => {
+    if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
+  });
+  const responseStyle = () => {
+    const serverId = activeServer()?.id;
+    return serverId ? serverResponseStyle(serverId) : undefined;
+  };
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -158,6 +184,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     conversations,
     sendMessage,
     markAgentMessagesRead,
+    markAgentMessagesUnread,
+    deleteAgentMessage,
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
@@ -173,6 +201,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     closeBrowserTab,
   } = useBrowserTabs();
   const { activeRemoteDesktopSession, remoteDesktopWorkspaceVisible, openRemoteDesktopWorkspace } = useRemoteDesktop();
+  /** A joined host's workspace or open conversation is still loading, so the composer says "Connecting…". */
+  const remoteLoading = () =>
+    activeServer()?.kind === "remote" && (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded);
+  /**
+   * A named function, not a ternary in the prop: a ternary prop makes a memo on each read, and the Effort select
+   * of a model picker reads this status in an effect callback, where a new memo halts the renderer.
+   */
+  const panelAgentStatus = () => (remoteLoading() ? { ...agentStatus(), phase: "starting" as const } : agentStatus());
   const usage = useUsage();
   const windowPage = useWindowPage();
   // The composer never asks for usage itself. It reads the dock's reading, which is scoped to the
@@ -181,6 +217,21 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const auth = useAuth();
   const { teamPresence, currentTeamMember } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
+  const channels = useChannels();
+  const conversationController = useConversationController();
+  /** The open channels, for "Send to channel" on a message. The text waits in the channel's composer. */
+  const sendToChannel = () => {
+    if (!channels.supported()) return;
+    const open = channels.state.channels.filter((channel) => !channel.archived);
+    if (open.length === 0) return;
+    return {
+      channels: open.map((channel) => ({ id: channel.id, name: channel.name })),
+      onSend: (channelId: string, text: string) => {
+        conversationController.appendChannelText({ serverId: activeServer()?.id ?? "local", channelId }, text);
+        void channels.open(channelId);
+      },
+    };
+  };
 
   // The waits of the agents that this agent asked, by the same rules as the sidebar's "Needs you".
   const agentWaits = createMemo(() =>
@@ -215,11 +266,24 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
-  /** Local only: the Team API has no route to compact a joined server's agent. */
-  const compactActiveAgentContext = createMemo(() => {
+  /** "Delete history" of the active agent's own chat. The Team API has no route for it. */
+  const deleteActiveAgentHistory = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
     if (!agent || server?.kind !== "local") return undefined;
+    return async () => {
+      await turnsPort().agent.deleteHistory(agent.id, server.id);
+      // A window around a search result keeps the messages that an empty snapshot does not name, so
+      // the chat reads its latest page again.
+      await loadLatestAgentMessages(agent.id);
+    };
+  });
+
+  /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */
+  const compactActiveAgentContext = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || !server || !serverSupportsCapability(server, "context-compact-v1")) return undefined;
     return () => turnsPort().agent.compactContext(agent.id, server.id);
   });
 
@@ -227,7 +291,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const compactTaskContext = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "context-compact-v1")) return undefined;
     return (taskId: string) => turnsPort().agent.compactTaskContext({ agentId: agent.id, taskId }, server.id);
   });
 
@@ -236,17 +300,27 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const agent = activeAgent();
     const settings = remoteAgentSettings();
     const automation = remoteAgentAdmin.automation();
+    const busyMessageMode = remoteAgentAdmin.busyMessageMode();
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
+    const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const fastMode = remoteAgentAdmin.fastMode();
+    const computerUse = remoteAgentAdmin.computerUse();
+    const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
       ? {
           ...agent,
           ...(settings ? { access: settings.access } : {}),
           ...(activeServer()?.kind === "remote" && automation !== undefined ? { allowAutomation: automation } : {}),
+          ...(activeServer()?.kind === "remote" && busyMessageMode ? { busyMessageMode } : {}),
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
+          ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
+          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
+          ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
         }
       : agent;
   });
@@ -339,6 +413,30 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const usageLimited = (choice: AgentModelChoice) =>
     usageLimitedModels().some((limited) => sameAgentModelChoice(limited, choice));
 
+  /** Whether the reader is the sender `senderId`: a member on a joined server, or anyone on this computer. */
+  const isOwnSender = (senderId: string) => {
+    const state = auth.centralAuth();
+    return isReaderAuthor(senderId, {
+      memberId: currentTeamMember()?.id ?? null,
+      accountUserId: state.status === "signed_in" ? state.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
+  };
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
+  /** The host deletes messages only with `message-delete-v1`. This computer always can. */
+  const messageDeleteSupported = () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY);
+  /** Whether the reader may delete `message` in the active agent's chat or side threads. */
+  const canDeleteAgentMessage = (message: AgentMessage) =>
+    readerCanDeleteMessage(message, {
+      deleteAny: deletesAnyAgentMessage(activeAgent()?.id),
+      isOwnSender,
+    });
+  const deleteActiveAgentMessage = (messageId: string) => {
+    const agentId = activeAgent()?.id;
+    return agentId ? deleteAgentMessage(agentId, messageId) : Promise.resolve();
+  };
+  /** The Delete action of the active agent's chat. A host without `message-delete-v1` has none. */
+  const deleteMessageAction = () => (messageDeleteSupported() ? deleteActiveAgentMessage : undefined);
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
@@ -360,6 +458,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
       contextStates: threadContextStates,
       onCompactContext: compactTaskContext(),
+      onOpenMainMessage: (messageId) => void openAgentMessage(agent.id, messageId),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */
@@ -463,13 +562,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   createEffect(
     () => {
       const ask = usageLimitAsk();
-      return ask ? `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}` : null;
+      return ask ? { key: `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}`, provider: ask.provider } : null;
     },
-    (key) => {
-      const ask = usageLimitAsk();
-      if (!key || !ask || shownUsageLimits.has(key)) return;
-      shownUsageLimits.add(key);
-      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: ask.provider });
+    (shown) => {
+      if (!shown || shownUsageLimits.has(shown.key)) return;
+      shownUsageLimits.add(shown.key);
+      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: shown.provider });
     },
   );
 
@@ -496,16 +594,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
         }
         onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
-        agentStatus={
-          activeServer()?.kind === "remote" &&
-          (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded)
-            ? { ...agentStatus(), phase: "starting" }
-            : agentStatus()
-        }
-        agentsConnecting={agentListConnecting()}
+        agentStatus={panelAgentStatus()}
+        agentsConnecting={agentListConnecting() || (remoteLoading() && activeServer()?.state === "online")}
         accountUsage={withHostAccountUsage(auth.accountUsage(), hostAccountLimits())}
         providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
-        customProviders={customProviders()}
+        customProviders={activeCustomProviders()}
         // The custom agents are this computer's. A joined host's picker counts its own from its models.
         customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
         onDownloadProvider={providerDownloads() ? downloadProviderRuntime : undefined}
@@ -516,6 +609,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onSignInWithCodeProvider={composerCodeSignIn() ? signInWithCode : undefined}
         onManageProviders={manageProviders() ? openProviderSettings : undefined}
         onManageBrowserProfiles={manageBrowserProfiles() ? openBrowserProfileSettings : undefined}
+        onOpenNotificationSettings={openNotificationLevels}
         agent={conversationAgent()}
         agents={agentList()}
         mentionAgents={agentList().filter((agent) => !userHiddenAgentIds().has(agent.id))}
@@ -546,16 +640,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         workspaceCovered={windowPage.conversationCovered()}
         browserControlState={browserControlState()}
         server={activeServer()}
+        responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
-        isOwnSender={(senderId) => {
-          const state = auth.centralAuth();
-          return isReaderAuthor(senderId, {
-            memberId: currentTeamMember()?.id ?? null,
-            accountUserId: state.status === "signed_in" ? state.user.id : null,
-            onOwnComputer: activeServer()?.kind === "local",
-          });
-        }}
+        isOwnSender={isOwnSender}
         // The browser and the remote desktop show in the main window only.
         browserEnabled={
           !platform.landingPreview && !platform.chatWindow && activeServerSupportsCapability("browser-control")
@@ -574,6 +662,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
+        activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
+        activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
         mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
@@ -583,7 +673,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsOpen() ||
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
-          hasVisibleToasts()
+          hasVisibleToasts() ||
+          quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}
         messageFocusRequest={messageFocusRequest()}
@@ -593,6 +684,18 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onSetAgentAvatar={setAgentAvatar}
         onSendMessage={sendMessage}
         onMarkRead={() => markAgentMessagesRead()}
+        // A joined server marks one message unread only through `conversation-unread-from-v1`.
+        onMarkUnread={
+          activeServerSupportsCapability(CONVERSATION_UNREAD_FROM_CAPABILITY)
+            ? (messageId) => {
+                const agentId = activeAgent()?.id;
+                return agentId ? markAgentMessagesUnread(agentId, messageId) : Promise.resolve();
+              }
+            : undefined
+        }
+        onDeleteMessage={deleteMessageAction()}
+        canDeleteMessage={canDeleteAgentMessage}
+        sendToChannel={sendToChannel()}
         onLoadOlder={() => void loadOlderAgentMessages()}
         onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
         onSearchMessages={(query) =>
@@ -611,11 +714,20 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
+        remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+        remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
+        remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
+        remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
         onUpdateAgentPermissions={permissionsEditable() ? writeAgentPermissions : undefined}
-        defaultBusyMessageMode={generalSettings().busyMessageMode}
+        defaultBusyMessageMode={
+          activeServer()?.kind === "remote"
+            ? remoteAgentAdmin.defaultBusyMessageMode()
+            : generalSettings().busyMessageMode
+        }
         agentDefaults={generalSettings().agentDefaults}
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
+        onDeleteAgentHistory={deleteActiveAgentHistory()}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}

@@ -17,12 +17,21 @@ one `query` string, because models often send one string. Up to three strong res
 queries that contain each word of the tool name without its namespace, include the original schema and guidance, so the agent can call them
 without a describe step. Each model step sends the full context again, so one step less saves more
 input than the added schema costs. A query word that is only in the namespace, or one shared verb
-such as "read", does not make a result strong. The other results have a short description only. `tool_describe`
-returns the original schemas for up to ten qualified names, plus guidance from
+such as "read", does not make a result strong. The other results have a short description only. When a
+strong result is an `openbot_browser` tool, the results also include `openbot_browser.run_script` with its
+schema. Agents search for the single actions that they know, such as click, and otherwise do not find the
+multi-step tool (see [Browser](browser.md)). The instructions
+tell the agent to describe a tool only when no search result gave its schema. A search with ready schemas, and each
+`tool_describe` result, starts with a `call` note: the tools are not direct tools, so run them with `tool_call`.
+Claude loads its own deferred tools with a search and then calls them directly, and it called a found
+`openbot.list_workflows` as `mcp__openbot__list_workflows`. A search that names a workflow does not get the
+browser note. `tool_describe` accepts `names`, or
+one `name` string, and returns the original schemas for up to ten qualified names, plus guidance from
 `agent/tool-guidance.ts`. Identical guidance appears once per response. The initial catalog lists
 names without schemas.
 
-`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`. The router resolves only
+`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`, and `tool` as an alias of `name`, because
+a refused call costs a model step. The router resolves only
 original built-in names. It preserves the request, thread, turn, and call identifiers and the abort
 signal, then enters the same dispatch as a direct call. Existing decoders, secure browser input,
 approval cards, image results, cancellation, and message idempotency remain at their existing owners.
@@ -87,6 +96,51 @@ Memory refresh behavior remains unchanged. The Codex fake-provider test proves t
 instructions are sent on resume; it does not prove native model adoption. Claude prompt snapshots
 stay off so they cannot freeze changed profile or memory text.
 
+## Background memory review
+
+`agent/memory-review.ts` reviews an agent's memories in the background. Each conversation has its
+own count: the agent's own chat and each side thread. A review starts after 20 completed turns of a
+conversation, after 15 minutes with no turn in a conversation that has 3 or more new turns, when
+the user clears the chat, and when a side thread with new turns closes. Turns of channels,
+messaging threads and routine runs do not count. A turn in which the agent changes its memories
+itself starts the count again. A deleted side thread is not reviewed, and its running review ends.
+The counts and the last reviewed message are in memory only; after a restart, a review reads the
+latest messages.
+
+The number of turns is a setting of the server that runs the agents: Server settings > General >
+Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
+it through `memory-review-v1` (see [servers.md](servers.md)). Main owns
+`openbot-memory-review-v1.json` (`MemoryReviewPreferenceStore`) and passes
+`memoryReviewInterval()` to the agent service, which reads it at each use, so a change applies from
+the next turn. Off starts no review of any kind: not after turns, a pause, a clear or a closed side
+thread. The counts continue while it is off, so the first turn after it is on again can start a
+review.
+
+The review is one profile-client generation without tools, on the agent's own provider. It uses
+the provider's default model (`defaultProviderModel`) when that model is listed and its standard
+input price in `usage-pricing.ts` is lower than the price of the agent's model, with that model's
+default reasoning effort. Otherwise, also when a price is not known, it uses the agent's own model
+and reasoning effort. Benchmark v2 measured the review quality on `claude-haiku-5-5`. The review
+does not reuse the main chat's prompt cache: its prompt and tools are not the chat's, so its input
+is billed at the full rate. It reads the agent's profile, its memories, and the conversation since the last review and after
+the latest context reset, with the side-question transcript budget. The prompt holds every
+essential memory and as many searchable memories as fit 12,000 characters: first those that share
+the most words with the reviewed conversation, then the newest. It states how many are not shown,
+so a review stays the same size at any memory limit. Chat and memory text pass through
+the secret redaction before the prompt is made. The model answers `add`, `update` and `forget`
+operations as JSON. `AgentMemories.applyReview` commits them as one turn through the checks of the
+memory tools: the memory limit, the essential budget, duplicates and the user's selections. A
+review does not change a memory that the user wrote or whose inclusion the user chose, a memory
+whose text changed after the review read it, or a memory whose text the redaction changed. A memory
+clear during the review drops all of its changes.
+
+Only one review runs at a time, and only when a profile-client slot stays free for the user. A
+review that cannot start waits, and starts when the running review ends or at the next turn. A
+clear's review that waits for longer reads the new chat, not the chat that the clear ended. A failed generation or an answer that is not JSON is logged
+and shows nothing. A usage limit is skipped silently and does not mark the model. The changes show as a
+memory-changes line with its own `memory-review-` turn id, in the conversation that was reviewed.
+While a turn of that conversation runs, the line waits for the turn to end. Agent deletion and service stop end a running review.
+
 ## Compaction ownership
 
 Codex and Muse complete explicit compaction through turn events. Pi completes it through the request
@@ -121,12 +175,12 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex and Pi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
-for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
+`releases/latest` for Codex, Pi, Kimi, GitHub Copilot and Mistral, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex and Pi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi, Kimi, GitHub Copilot and Mistral, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -156,7 +210,11 @@ artifact and preserves the old runtime, so a release that does not start leaves 
 in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
-automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
+automatically discovered system CLI. When the managed copy wins, `resolveInstalledFirst` in
+`src/backend/cli.ts` also resolves with no managed copy, at the same time, and a system CLI of the same or a newer
+version runs instead: the user's CLI on `PATH` replaces a copy that is not newer. A version that
+cannot be compared, such as two Cursor builds of one date, keeps the managed copy. Antigravity has
+no `PATH` discovery, so it always runs the managed copy. Updates never run the system CLI's updater. An explicit path
 suppresses managed update offers. Startup uses the same selection and reads the executable's version.
 On macOS and Linux, discovery looks in the folders of the login-shell `PATH` (`loginSearchPath` in
 `src/backend/cli.ts`, shared with ACP and custom agents and cached for 60 s), then in fixed user
@@ -219,15 +277,20 @@ agent service has to be given the executable either way. Staging directories car
 random suffix and are swept by age, never by name, so a sibling's install is not collected while it
 runs. The manager stamps each version it takes into use -- the pinned one it verified, and the older
 one it falls back to until the pinned one arrives -- and collection keeps anything stamped within two
-days. When the computer has been awake for one check interval (one hour), the update check keeps
+days. Once the version it runs is `ready`, the manager keeps no older version to fall back on and stops
+stamping the one it replaced, so that version goes when its last stamp leaves the window. Before
+this, the store kept the last working older version of each CLI for good, and every update left two
+copies on disk. When the computer has been awake for one check interval (one hour), the update check keeps
 only what was stamped within three hours. So a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
 
 A provider that is off in this profile runs no CLI, so the manager does not stamp its versions. Pi
 counts as in use while a key-only provider that runs on it is on. Its
-provider page in Settings offers Remove download (#3321), which removes every version of that CLI and
-this profile's partial downloads of it, and leaves accounts and sign-ins alone. It is refused while
+provider page in Settings offers Delete (#3321), which removes every version of that CLI and
+this profile's partial downloads of it, and leaves accounts and sign-ins alone. On a provider that
+is on and runs the CLI that OpenBot downloaded, Delete first turns the provider off. An agent that
+uses the provider stops it, as it stops the switch. It is refused while
 the provider is on, while its download runs, and for a provider with an explicit CLI path. The same
 age rule keeps a version another instance stamped, with one change: the manager remembers its own
 last stamp of each directory, and a directory whose mtime is not later than that stamp counts as
@@ -239,6 +302,15 @@ stamps the version it activates, so an install it made in the same session is it
 provider that is off is not stamped, a sibling can collect its version; turning the provider on
 reads the store again when that version is gone. Turning the provider on later downloads the CLI as
 on first use.
+
+Server settings > Storage shows the same downloads in its "Provider runtimes" cleanup row, for this
+computer only. `removableRuntimes` answers the old versions and the download of each provider that is
+off, counts a directory that is both once, and names those providers; a provider whose download runs
+is left out. A provider that is on keeps its copy unless main reported a system version for it
+(`setSystemVersion`): it then runs the user's CLI, so its copy runs nothing and counts as removable.
+The row never moves a running provider to another CLI. `removeRemovableRuntimes` collects the old versions, then calls `removeDownload`
+for each named provider at once, so each follows the rules above. A failure does not stop the
+others; the error names the providers that failed, and the page measures again.
 
 ### Managed provider updates
 
@@ -274,14 +346,32 @@ Each provider status row reports `cliSource`, and main passes the version of a `
 it compares a managed installation. The row and the notification therefore use the one update offer,
 the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
 runs behind it, whoever owns the CLI: the download installs the managed copy and
-`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
-which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+`updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
+Later resolutions keep that copy while it is newer than the system install, which is left where it
+is; when the user's CLI catches up, the user's CLI runs again. When the user's CLI goes away, main calls
+`providerUseChanged`, which stamps the copy again, or reads the store when a sibling collected it. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
 the binary, not from the client that runs it, so a provider that is signed out still reports its own
 install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
 in one error that goes to the provider row and to the caller - and on, through the Team API, to the
 team's connected clients.
+
+A hosted server (`OPENBOT_HOSTED_SERVER=1`, packaged Linux) has system Claude and Codex CLIs from its image, and the
+image updates them at boot. That update can fail with no error, and the user cannot install a CLI
+there. When a row is `outdated`, main calls `download` for the provider once per start, so the
+managed copy replaces the old CLI with no offer (#4995). The row has no `cliSource`, because the
+resolution failed. An off provider is left alone.
+
+Codex keeps a lease on its state database backfill for 15 minutes, and a process that stops during
+the backfill keeps it. Each Codex start in that time exits with "timed out waiting for state db
+backfill", for any version. `ProviderRuntime` replaces that exit text with
+`error.provider.codexStateBusy`, and an update whose new copy fails this way keeps the copy. Codex
+gets `LONG_START_TIMEOUT_MS` on each start that has no wait of its own: at launch, also when the
+launch starts all providers, and for an agent's own process. A stop in the request timeout during a
+slow backfill (the first start after a hosted server's restore) starts the lease. At launch this
+default is not a learned wait: a timeout after it gives the next start `LONG_START_TIMEOUT_MS` again,
+not twice that time.
 
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore
@@ -355,6 +445,17 @@ drops the paid Zen models from `ModelCatalog.refresh` (through the OpenCode driv
 with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
+
+The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
+sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
+applies config `options.apiKey` last. With no saved key, it reads the CLI's own keys in the order
+T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
+self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
+(or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
+Console key tries the Go key. The
+database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
+SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 
 `PREFERRED_MODEL_ORDER` (in the same file) reorders that catalog, because a provider with no
 `defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
@@ -455,7 +556,7 @@ callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session 
 VM. A browser on another computer cannot complete this loopback callback. A server with no
 desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
 
-The local Settings > Providers screen offers Connect for both a managed runtime and an
+The local Server settings > Providers screen offers Connect for both a managed runtime and an
 external runtime. Gemini has no device-code flow, so a remote host signs it in on a page in its
 own browser. A Linux host advertises `provider-host-sign-in-v1` (Team API v7 only). Connect sends
 `start` to the host. The host runs the same sign-in as its own Connect, and opens the Google link
@@ -516,12 +617,19 @@ own folder (`antigravityReadsGeminiHome` gates the rows, the sign-in, the checks
 the agent start), and `antigravityStatePaths` confines its process to that folder. Each new session
 leaves a conversation database in that folder, so a usage read of an account with no agent process
 starts no process: the account shows its reading from the sign-in check. The sandbox cannot create folders in a new account's home, so OpenBot makes them.
+A plan can serve models that the first account's does not, so the account check also reads the account's own
+`model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as
+`models` only the ones that the provider's catalogue does not list: the picker shows the catalogue on the
+account's entry, with the models an admin turned off left out, and then these. `updateAgent` accepts a model
+of the agent's account. A failed list keeps the last one. `provider-accounts-v1` does not carry it, so a joined server
+still shows the provider's catalogue for each account.
 The account sign-in is the same ACP `authenticate` call as the first account's; a Reconnect calls
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
 first account: an account process never gets `GEMINI_API_KEY`. The server reports no email and the token file holds none, so OpenBot cannot see
-that two accounts are the same Google account. A joined server signs the account in through the
-live view, because `provider-account-relay-v1` names Codex and Claude only.
+that two accounts are the same Google account. A joined server relays the account's sign-in to the
+client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
+names Codex and Claude only, signs the account in through the live view.
 
 From 1.4.1 the server answers a prompt that starts with `/usage` itself, without a model turn: it
 reads the Google account's quota summary and sends one Markdown answer. The driver's
@@ -652,6 +760,167 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Devin
+
+The Devin provider (id `devin`) starts Cognition's Devin CLI with `devin acp`. The runtime manager
+reads `static.devin.ai/cli/current/manifest.json` and downloads
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `static.devin.ai/cli/<version>/`. The
+archives hold only `bin/` and `share/`. Staging keeps both, because Devin CLI 3000.11.234 has a
+skill that reads its documentation in `share/devin/docs`, and refuses links and other special files.
+The manifest gives a SHA-256 for each target and no size, so a `GET` with `Range: bytes=0-0` gives
+the download size. `OPENBOT_DEVIN_PATH` selects another executable.
+
+Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
+browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
+(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
+the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
+empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+
+`devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
+`devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
+`devin/cli/plugins` stay read-only, because every other Devin process loads them. `.devin` and
+`.windsurf` in a workspace are project settings, so a confined process cannot write them. A model
+change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
+and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
+session.
+
+No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
+### GitHub Copilot
+
+The GitHub Copilot provider (id `copilot`, issue #4637) starts GitHub's Copilot CLI with
+`copilot --acp --no-auto-update`. The runtime manager reads `releases/latest` of
+`github/copilot-cli` and downloads `copilot-<target>.tar.gz` (`.zip` on Windows). Each archive holds
+only `copilot` (`copilot.exe`). The licence lets an app include the CLI only unchanged, so OpenBot
+downloads it and does not ship it. `OPENBOT_COPILOT_PATH` selects another executable. Every Copilot
+process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`.
+
+The executable unpacks its JavaScript package into `pkg/<platform>/<version>` of its cache folder
+when that folder is missing. A confined process gets `COPILOT_CACHE_HOME` and
+`COPILOT_PKG_CACHE_HOME` in its own temporary folder (`COPILOT_CONFINED_ENV`), so it never writes a
+package that an unconfined process runs.
+
+Sign in runs `copilot login`, which opens GitHub's page in the system browser and takes the result
+on a `127.0.0.1` callback. A joined computer signs in the host with `copilot login --device-code`,
+which prints "visit PAGE and enter code CODE". Copilot CLI 1.0.105 keeps the token in the system
+keychain. It prefers `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` and `GITHUB_TOKEN`, in that order, to the
+keychain sign-in, so one of them in OpenBot's environment selects the account. The CLI has no
+sign-out command: Sign out starts its ACP server and calls the ACP `logout` method
+(`acpLogout`). It cannot sign out a token from the environment. A signed-out process answers
+`session/new` with `-32000`. Not confirmed: a Linux server with no keychain service, and the form
+of Copilot's error for a lost session, which `DEFAULT_ACP_FLAVOR` reads with the `-32002` rule.
+
+`copilotStatePaths` lets a confined process write `~/.copilot` (or `$COPILOT_HOME`), with its
+settings, instructions, hooks, skills, agents, plugins, MCP configuration and `pkg` read-only,
+because every other Copilot process loads them. In a workspace, `.mcp.json`, `.github/mcp.json`,
+`.github/copilot`, `.github/hooks`, `.github/skills` and `.github/agents` are project settings, so a
+confined process cannot write them. Their parent folders, `.github` and the workspace, cannot be
+renamed or removed, so the rules stay on those paths. The CLI reads `.github/instructions` and
+`.github/copilot-instructions.md` as well; a confined process can write them, as it can write
+`AGENTS.md`.
+
+No frozen Team API protocol knows `copilot`. The host hides Copilot agents, models, status, and
+sign-in state from peers below protocol 8, as for Devin.
+
+### Mistral
+
+The Mistral provider (id `mistral`) starts `vibe-acp`, the ACP server of Mistral Vibe. The runtime
+manager reads `releases/latest` of `mistralai/mistral-vibe` and downloads
+`vibe-acp-<triple>-<version>.tar.gz` (`.zip` on Windows). Each archive is a PyInstaller onedir build:
+`vibe-acp` and its `_internal` folder both go to `bin/`, and the macOS and Linux links stay links, as
+for Kimi. The licence is Apache-2.0. The archive holds it in
+`_internal/mistral_vibe-<version>.dist-info/licenses/LICENSE`, so the lock pins its hash in `files`.
+`OPENBOT_MISTRAL_PATH` selects another executable. The `vibe` command is the terminal app, not the
+ACP server, so the system search looks for `vibe-acp`.
+
+Every Mistral process gets `VIBE_ENABLE_TELEMETRY=false` (`MISTRAL_ENV` in `provider-drivers.ts`).
+In Vibe 3.1.0 this stops its usage events, its OpenTelemetry traces and its experiment fetch. An
+organization's managed configuration from Mistral is a higher layer, so it can turn telemetry on
+again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
+not confirmed in a run).
+
+Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
+has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
+`$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
+`config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers
+`session/new` with `-32000` and "Missing API key for mistral provider.". Sign out starts the ACP
+server and calls `_auth/signOut` (`acpLogout`). It cannot sign out a key from the environment:
+Vibe refuses with `-32602`. The keychain item is global, so Mistral has no added accounts.
+
+`mistralStatePaths` lets a confined process write `$VIBE_HOME` (`~/.vibe`) for its logs, locks,
+history and caches. Its settings stay read-only, because every other Vibe process loads them:
+`config.toml`, `.env`, `trusted_folders.toml`, `hooks.toml`, `AGENTS.md`, `tools`, `skills`,
+`skills.toml`, `skills-registry-cache`, `agents`, `prompts`, `plugins`, `projects.toml`,
+`local_projects.toml`, `managed_config_cache.json` and `connector_bootstrap_cache.json`. Vibe writes
+`trusted_folders.toml` at startup when it is missing, and stops when it cannot. So OpenBot makes an
+empty file first (`makeMistralTrustedFolders`), and never changes one that exists. `.vibe` in a
+workspace is project settings, so a confined process cannot write it.
+
+Vibe 3.1.0 reads `AGENTS.md`, `.vibe` and `.agents/skills` only in a trusted folder. Its ACP trust
+decision writes `trusted_folders.toml`, so OpenBot sends the workspace in the session's
+`additionalDirectories` instead (`workspaceAsAdditionalDirectory` in `MISTRAL_ACP_FLAVOR`). A folder
+there is trusted for that session only.
+
+A model or thinking change with `session/set_config_option` applies to the session, and then Vibe
+saves it as the default in `config.toml`. A confined process cannot write that file, and the save
+fails with `-32602` and "Layer 'user-toml': cannot write config file". `AcpFlavor.configSetUnsaved`
+reads that failure as a change that applied. A Full access Mistral agent saves the value, so it
+becomes the default of each new Vibe session, also in a terminal. Vibe answers a lost session with
+`-32602` and `{ session_id: <id> }`, which `MISTRAL_ACP_FLAVOR` reads as a missing session.
+
+No frozen Team API protocol knows `mistral`. The host hides Mistral agents, models, status, and
+sign-in state from peers below protocol 8, and `providers-v8` carries it.
+
+### Kimi
+
+The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
+downloads the PyInstaller onedir archive `kimi-<version>-<triple>-onedir.tar.gz` (`.zip` on Windows)
+from the GitHub release and renames its `kimi` folder to `bin`. The macOS and Linux archives hold
+relative symbolic links in `kimi/_internal`, and a copy of a link breaks the signature of the macOS
+Python framework. So `assertSafeArchive` and `rejectNonRegularFiles` accept a link when
+`isSafeLinkTarget` accepts its target: relative, with no `..` part, no backslash, no NUL and no drive.
+The install record keeps each link as `link:<target>`, and every start compares it. The archives
+have no license file, so staging downloads `LICENSE` from the version tag and checks the pinned
+hash. `resolveKimiCli` refuses a CLI older than 1.52.0.
+
+Every Kimi process gets `KIMI_CLI_NO_AUTO_UPDATE=1` (`KIMI_ENV` in `provider-drivers.ts`). The ACP
+`authenticate` call of Kimi only checks the stored token, so Sign in runs `kimi login` and the code
+sign-in runs `kimi login --json`, which prints the device code as JSON lines (`deviceCodeEvent` in
+`cli-code-login.ts`). On macOS and Linux the code sign-in gets `BROWSER=true`, so the CLI does not
+open a browser on the host. On Windows the page can open on the host. Sign out runs `kimi logout`. `kimiStatePaths` lets a confined process write
+`KIMI_SHARE_DIR` (`~/.kimi`) and protects `config.toml`, `config.json`, `mcp.json`, `plugins`,
+`skills` and `bin` there, because every other Kimi process loads them. Kimi answers a lost session
+with `-32602` and `{ session_id: "Session not found" }`, which `KIMI_ACP_FLAVOR` reads as a missing
+session.
+
+Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model with
+`session/set_model`. Kimi moves the session to the model, and then saves the model as its default in
+`config.toml`. A Workspace only Kimi process cannot write that file, and the save fails with `-32603`
+and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
+that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
+Kimi session, also in a terminal.
+
+The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/kimi-usage.ts`)
+sends the request of the CLI's `/usage` command, `GET <base_url>/usages`, with the CLI's access
+token. The CLI's version selects the folder: `KIMI_SHARE_DIR` or `~/.kimi` for the Python CLI 1.x,
+`KIMI_CODE_HOME` or `~/.kimi-code` for Kimi Code 2.x. Both write `base_url` and the token key into
+`[providers."managed:kimi-code"]` of `config.toml`, and the token into `credentials/<key without
+"oauth/">.json`. `KIMI_CODE_BASE_URL` comes first, then `base_url`, then `https://api.kimi.com/coding/v1`.
+The reader accepts only an `https` address. The rolling 5-hour window (the shortest window of
+`limits[]`, else `usages.limit_5h`) fills the primary window, and the weekly quota (`usage`, else
+`usages.limit_7d`) the secondary one. No sign-in, a 401, 403 or 404, or an answer with no quota
+gives no reading. The token lasts 15 minutes, and the CLI refreshes it only during a turn, so an
+expired token fails the read and the dock keeps the last reading. An account with no Kimi Code plan
+has no reading, so a Kimi limit failure stays a turn error. The dock poll calls `readKimiUsage`
+directly, with the CLI that the last Kimi client ran on, so it does not start or wake the CLI for a
+reading. Before a Kimi client runs, the poll has no reading.
+
+No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -696,6 +965,49 @@ provider and model pickers show the agent disabled, with "Update OpenBot to use 
 neutral `unknown` logo. They do not reset the agent. The model picker and the backup models leave
 out the models of that provider. Host types (`AgentProviderId`, the database, the drivers) stay
 closed.
+
+### Hermes
+
+The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
+no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
+and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
+`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+
+A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
+Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the
+OpenBot user. The script is pinned to the commit of one release (`HERMES_INSTALLER`), and OpenBot
+checks its SHA-256 before it runs. It runs one `--stage <name> --json` at a time, with no browser,
+computer-use or setup stage, so each stage moves the progress bar and Cancel stops its process
+group. Hermes goes to `~/.hermes` and `~/.local/bin/hermes`, as a terminal install puts it, and
+OpenBot does not update or remove it. The installer status is an optional `providers.hermes` in the
+runtime snapshot: `not-downloaded`, `downloading`, `finishing`, `download-error`, and `ready` when
+Hermes is installed, so that a server's row offers its Connect. Team API protocols below 8 never
+carry it; `providers-v8` adds the row, and an older client drops it. On Windows and with
+`OPENBOT_HERMES_PATH`, the row opens the `hermes-install` guide. The process keeps
+the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
+skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
+and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
+profiles in it. On a server, that is the Hermes of the service user (`/var/lib/openbot`, or `/data` in
+Docker); the server packages include `libatomic1`, which the Node.js of the Hermes installer needs.
+`scripts/hermes-server-e2e.ts` installs Hermes in the release image with `HermesInstaller` and runs a
+turn on a mock model.
+
+Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
+question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
+input (`closeInput`). `parseCliCodePrompt` takes the `Open:` URL, not the `Portal:` URL that Hermes
+prints first. `signInFile` watches the change time of `auth.json`, so a `hermes setup` or `hermes
+auth` in a terminal ends a `sign-in-required` state. Models are `provider:model` ids with the name
+`<Provider> · <model>`; the picker groups them by provider. A `nous:` model counts as a
+subscription in analytics.
+
+Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session makes a new session
+and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
+`HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
+session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
+Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
+reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
+with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
+protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
 
 ### Custom agents
 
@@ -797,6 +1109,34 @@ a refused `turn/start`, and a provider that fails to start do not fail over. A m
 most once for each model that failed it, so a move that cannot happen shows the error on the next
 failure; the check for a ready backup runs again when the turn ends.
 
+### Usage read pacing
+
+Each desktop window, web tab and phone polls the plan usage every five minutes, and each poll reaches
+the host. A usage endpoint allows few requests an hour for each login: Claude's is shared with Claude
+Code and answers HTTP 429 for an hour or more when a client asks too often. So `UsageReadGate`
+(`src/backend/agent/usage-read-gate.ts`) paces the reads of each provider's own sign-in in
+`ProviderRuntime.usage`, and of each account after the first in `ProviderAccounts.usage`. One read runs
+at a time; a request that comes during it waits and takes its reading. A reading answers for four
+minutes, a little less than the poll, so one view still gets a new reading at each poll. After a failed
+read, the next one waits 5 minutes, then 10, 20 and 40, up to an hour. Between reads and during the wait,
+the last reading stays on the rail, also when one of its windows has reset.
+A window that resets after the last read starts a read before the four minutes end, but not during the
+wait after a failure; a window that had already reset when the provider sent the reading does not.
+
+A read outside the poll of the provider's own sign-in, with the dock's model, also counts: when Codex
+starts, its reading replaces the kept one and the next poll does not read again. The read after a usage
+limit has no model, so for a provider whose limits depend on the model it resets the gate, and the next
+poll reads. These reads, and the reads of a usage reset, are not paced. A credential change, another
+login, a sign-out, turning the provider off or a new key resets the gate and forgets the kept reading and
+reset credits, so the next poll reads at once and no view shows the old login's reading; a read that
+started before the reset does not set the next read time. An account check or a usage reset of an
+account after the first also counts as a read.
+
+The values follow t3code (one refresh in five minutes for each host, one at a time) and openusage (5
+minutes, doubling up to an hour). CodexBar and openusage first wait for `Retry-After`; the Claude Agent
+SDK and the Codex app-server do not give OpenBot that header, so the gate uses only the doubling.
+`scripts/usage-read-pacing-e2e.ts` checks the gate with a fake Codex.
+
 ### Usage reset credits
 
 Codex can give an account usage reset credits: one restores the spent usage limits of the account at
@@ -804,8 +1144,8 @@ once (issue #2859). `account/rateLimits/read` counts them in `rateLimitResetCred
 and `account/rateLimitResetCredit/consume` spends one; both are stable Codex app-server methods since
 0.156.0. `ProviderRuntime.#refreshUsage` keeps the count of each client with its usage reading.
 `usageResets` reads the provider's own sign-in again while its process runs, and keeps the last count
-while it is released; an account after the first uses the reading that the dock keeps for five
-minutes. An account whose reading has no count is left out. `resetUsage` sends the consume with a new
+while it is released; an account after the first uses the reading that the dock keeps (see
+[Usage read pacing](#usage-read-pacing)). An account whose reading has no count is left out. `resetUsage` sends the consume with a new
 `idempotencyKey` for each reset the user asks for, through the running client, an agent's process or a
 short one in the account's folder. Then it reads the account's usage again and sends `usage-changed`.
 After the answer `reset`, or `nothingToReset` (no limit of the account is spent), `AgentService` calls
@@ -814,6 +1154,25 @@ After the answer `reset`, or `nothingToReset` (no limit of the account is spent)
 Settings > Providers shows **Reset usage** in the ⋯ menu of a connected account that has a credit.
 The confirmation names the credits left, and the answer shows under the accounts. A joined server
 uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](servers.md#admin-capabilities)).
+
+### Disconnect the own sign-in
+
+Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
+Codex, Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral (issue #3487). Claude and Codex have an `accounts.signOut` command
+(`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
+Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`, the ACP `logout` method of `copilot --acp`, and the
+`_auth/signOut` extension method of `vibe-acp`)
+for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+`ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
+sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
+On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
+the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
+Gemini Reconnect does. A failed sign-out keeps the client and shows its reason. Agents keep the own
+sign-in and wait for a Reconnect. The accounts after the first and their folders stay, but they
+need the connected CLI, so they wait too. A joined server uses the optional `provider-sign-out-v1`
+route.
 
 ## Provider settings and the ACP registry
 
@@ -929,8 +1288,10 @@ remain valid; the names are reserved only for new custom-agent creation.
 
 Optional `providers-v5` routes include the new runtimes and write-only provider keys.
 `agent-session-settings-v1` adds read, set, reset, and an agent-ID-only invalidation event.
-`acp-registry-v1` adds registry administration. Each administrative route checks the host role;
-clients hide unsupported controls. MCP-over-ACP transport is outside this change.
+`acp-registry-v1` adds registry administration. `custom-agents-v1` lists, adds, replaces and removes
+the host's custom agents with the parsers and change service of the local Settings; the trial start
+and the usage answers stay local. Each administrative route checks the host role; clients hide
+unsupported controls. MCP-over-ACP transport is outside this change.
 
 ## Local context indication
 

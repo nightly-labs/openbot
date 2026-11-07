@@ -7,6 +7,12 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.language.system": "System default",
   "mobile.settings.language.footer":
     "System default follows the first language in your phone settings. Text that is not translated yet shows in English.",
+  "mobile.settings.language.restartTitle": "Restart OpenBot?",
+  "mobile.settings.language.restartBody":
+    "This language reads in the other direction. The screens change direction when OpenBot starts again. If the screens still look wrong after the restart, close OpenBot in the app switcher and open it again.",
+  "mobile.settings.language.restartNow": "Restart now",
+  "mobile.settings.language.restartFailed":
+    "OpenBot could not restart. The screens change direction the next time you open OpenBot.",
   "mobile.settings.dictation.language": "Dictation language",
   "mobile.settings.about.development": "Development",
   "mobile.settings.about.openFailed": "Could not open the link. Try again.",
@@ -19,11 +25,14 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.home.support": "Support",
   "mobile.settings.home.supportHint": "Get help and save a support log",
   "mobile.settings.support.help": "Get help",
+  "mobile.settings.support.discord": "Open a ticket on Discord",
+  "mobile.settings.support.discordHint": "The fastest way to get help",
   "mobile.settings.support.message": "Message us on X",
   "mobile.settings.support.issues": "Report a problem on GitHub",
   "mobile.settings.support.helpFooter":
-    "Tell us what happened and when. Attach the support log file to your GitHub issue.",
+    "Tell us what happened and when. Attach the support log file to your Discord ticket or GitHub issue.",
   "mobile.settings.support.log": "Support log",
+  "mobile.settings.support.show": "Show log",
   "mobile.settings.support.save": "Save log file",
   "mobile.settings.support.events": { one: "{count} event", other: "{count} events" },
   "mobile.settings.support.clear": "Clear log",
@@ -33,8 +42,8 @@ export const messages = defineMessages("mobile.settings", {
     "The log stays on this phone, and OpenBot does not send it. It records connection steps, requests and errors. It does not record messages or files, and it masks passwords and tokens. Read the file before you share it.",
   "mobile.settings.support.saveFailed": "Could not save the log file. Try again.",
   "mobile.settings.support.sharingUnavailable": "Sharing is not available on this phone.",
-  "mobile.settings.support.recent": "Recent events",
-  "mobile.settings.support.recentFooter": "Newest first. The saved file has all events.",
+  "mobile.settings.support.newestFirst": "Newest first.",
+  "mobile.settings.support.showOlder": "Show older events",
   "mobile.settings.support.empty": "No events yet.",
   "mobile.settings.sessions.kindDesktop": "desktop",
   "mobile.settings.sessions.kindMobile": "mobile",
@@ -68,12 +77,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.animations.footer":
     "Turn off Animations to reduce motion in the whole app. When Reduce Motion is on in your phone settings, the app also reduces motion. The animations below then stay off.",
   "mobile.settings.animations.all": "Animations",
-  "mobile.settings.animations.chatZoom": "Zoom into chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "A chat opens out of its avatar in the list and closes back into it. When this is off, a chat slides in from the side.",
   "mobile.settings.animations.agentFaces": "Animated agent faces",
   "mobile.settings.animations.agentFacesFooter":
-    "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still.",
+    "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still, and the characters on the welcome and empty home screens stop floating.",
   "mobile.settings.animations.composerResize": "Compact message field",
   "mobile.settings.animations.composerResizeFooter":
     "The message field becomes a small bar while the keyboard is closed. When this is off, the field stays full size.",
@@ -119,7 +125,6 @@ export const messages = defineMessages("mobile.settings", {
     "Notifications and the Live Activity play this sound. The Live Activity also lights up the screen. The OpenBot sound is the sound that the desktop app plays when a task finishes. The four sounds after it are the sounds of the desktop sound themes.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Notifications play this sound. The OpenBot sound is the sound that the desktop app plays when a task finishes. The four sounds after it are the sounds of the desktop sound themes.",
-  "mobile.settings.notifications.notifyAbout": "Notify me about",
   "mobile.settings.notifications.level.all": "All activity",
   "mobile.settings.notifications.level.needsMe": "Only when it needs me",
   "mobile.settings.notifications.level.nothing": "Nothing",
@@ -136,12 +141,29 @@ export const messages = defineMessages("mobile.settings", {
     "The events of this server that notify this phone. The desktop app has its own settings.",
   "mobile.settings.notifications.serverUnsupported":
     "This server cannot send notifications. Update OpenBot on the computer that runs it.",
+  "mobile.settings.notifications.thisPhone": "This phone",
+  "mobile.settings.notifications.whatYouHear": "What you hear about",
+  "mobile.settings.notifications.wholeServer": "Whole server",
+  "mobile.settings.notifications.levelShort.all": "All",
+  "mobile.settings.notifications.levelShort.needsMe": "Needs me",
+  "mobile.settings.notifications.levelShort.nothing": "Off",
+  "mobile.settings.notifications.thisPhoneOnly": "This phone only",
+  "mobile.settings.notifications.offForEveryone": "Off for everyone on this server",
+  "mobile.settings.notifications.turnOn": "Turn on",
+  "mobile.settings.notifications.turnOnFor": "Turn on notifications of {name} for everyone on this server",
+  "mobile.settings.notifications.chooseAgent": "Choose for one agent",
+  "mobile.settings.notifications.chooseAnotherAgent": "Choose another agent",
+  "mobile.settings.notifications.levelsFooter": "Tap an agent’s level again to follow the server.",
+  "mobile.settings.notifications.agentsUnsupported": "Update OpenBot on this server to choose agents.",
+  "mobile.settings.notifications.agentsOffline": "Agents show when this server is online.",
+  "mobile.settings.notifications.scopeFooter":
+    "Your choices apply on all your devices. Mute applies to this phone only.",
   "mobile.settings.notifications.channel": "Agent notifications ({sound})",
   "mobile.settings.notifications.channelSilent": "Agent notifications (no sound)",
   "mobile.settings.privacy.title": "Privacy",
   "mobile.settings.privacy.footer":
-    "Share feature use and connection results from this phone. Message contents and files are not sent.",
-  "mobile.settings.privacy.analytics": "Share product analytics",
+    "Feature use and connection results from this phone always go to OpenBot’s analytics. On: with your account ID and email. Off: with a random install ID only. Message contents and files are not sent.",
+  "mobile.settings.privacy.analytics": "Link analytics to my account",
   "mobile.settings.privacy.retry": "Retry saving privacy setting",
   "mobile.settings.conversations.title": "Conversations",
   "mobile.settings.conversations.hiddenChats": "Hidden chats",
@@ -244,6 +266,14 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Listening",
   "mobile.settings.voice.tab.speaking": "Speaking",
+  "mobile.settings.voice.pause.title": "Pause before sending",
+  "mobile.settings.voice.pause.label": "Wait for new words",
+  "mobile.settings.voice.pause.footer":
+    "In a voice conversation, OpenBot sends your words when it recognizes no new words for this long. Noise without words does not keep it listening. Choose a longer pause if you speak slowly or stop to think.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Reply speed",
+  "mobile.settings.voice.speed.footer": "The speed of replies that OpenBot reads aloud, also in a voice conversation.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streams your speech to ElevenLabs with a single-use token, and ElevenLabs bills your account. The key stays on this phone.",
 });

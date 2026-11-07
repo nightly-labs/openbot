@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "Impossible de supprimer ce canal. Réessayez.",
   "mobile.channel.list.open": "Ouvrir le canal {name}",
   "mobile.channel.list.openWithTitle": "Ouvrir le canal {name}, {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": { one: "{count} message non lu", other: "{count} messages non lus" },
   "mobile.channel.list.noMessages": "Aucun message pour l’instant",
   "mobile.channel.task.task": "Tâche",
@@ -21,6 +22,7 @@ export const messages = {
   "mobile.channel.task.paused": "En pause",
   "mobile.channel.task.resume": "Reprendre",
   "mobile.channel.task.reassign": "Réattribuer",
+  "mobile.channel.task.cancel": "Annuler la tâche",
   "mobile.channel.loadFailed": "Impossible de charger les canaux. Réessayez.",
   "mobile.channel.actions.historyStale":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",

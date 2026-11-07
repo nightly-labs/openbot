@@ -33,20 +33,24 @@ export function OpenBotHostedServers() {
         server runs—not in the number of agents you can create.
       </p>
       <p>
-        Starter supports up to three team members, with 12 GB of storage and base speed. It could suit a small,
-        founder-led company where two or three people share an OpenBot workspace for research, routine admin, or client
-        work.
+        Starter is for one person, with 12 GB of storage and base speed. It could suit a founder or a freelancer who
+        wants agents to keep working on research, routine admin, or client work while the laptop is closed.
       </p>
       <p>
-        Standard supports up to 10 members, with 50 GB of storage and twice the speed of Starter. Think of a small
+        Standard supports up to 5 members, with 50 GB of storage and twice the speed of Starter. Think of a small
         software consultancy working across several client projects: its team might use agents for code review,
         research, and preparing project notes.
       </p>
       <p>
-        Pro supports up to 25 members, with 100 GB of storage and four times the base speed. It’s aimed at larger teams
+        Pro supports up to 10 members, with 100 GB of storage and four times the base speed. It’s aimed at larger teams
         or heavier workloads, especially those involving more browser-based work.
       </p>
       <p>You can pay monthly or yearly. The yearly option saves 20%.</p>
+      <p>
+        Work at a company also needs a commercial license. A Starter license for one user costs €10 a month, and a Team
+        license costs €25 a month for two users and €15 for each extra user, up to 10 users. With a hosted server, the
+        license costs 10% less, and you can buy both with one payment. Yearly billing also takes 20% off the license.
+      </p>
       <ArticleImage
         src={pricing}
         alt="OpenBot hosted server pricing with Starter, Standard, and Pro plans. The yearly billing option is selected, showing member limits, storage, and speed for each plan."

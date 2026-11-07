@@ -2,18 +2,21 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
 /**
  * What spoken replies reach in main: the speech model and settings, the synthesis, the finished
- * answer, and the recording a voice turn keeps with its message.
+ * answer, the recording a voice turn keeps with its message, and the user's own voice server.
  */
 export interface SpeechPort {
   voice: Pick<
     OpenBotDesktopApi["voice"],
     | "getSpeechSettings"
+    | "setSpeechSettings"
     | "getSpeechModelStatus"
     | "downloadSpeechModel"
     | "onSpeechModelStatus"
     | "speak"
     | "warmSpeech"
     | "keepRecording"
+    | "getServer"
+    | "onServerSettings"
   >;
   agent: Pick<OpenBotDesktopApi["agent"], "readConversationPage" | "discardDraftAttachment">;
 }

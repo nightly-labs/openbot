@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
   IdleRestart,
@@ -75,6 +76,33 @@ export function createDisabledUpdateAdapter(): UpdateAdapter {
   };
 }
 
+/** electron-updater's updater, or `null` when the module does not load. */
+export async function loadElectronUpdater(): Promise<UpdateAdapter | null> {
+  try {
+    const updaterModule = await import("electron-updater");
+    const adapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+    if (adapter) return adapter;
+    logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
+  } catch {
+    logger.warn("OpenBot updates are disabled: electron-updater failed to load");
+  }
+  return null;
+}
+
+/**
+ * electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. The base is
+ * the cache path of electron-updater 6.8.9 (`getAppCacheDir`), which differs from Electron's.
+ */
+export function electronUpdaterCacheDirectory(): string {
+  const root =
+    process.platform === "win32"
+      ? process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local")
+      : process.platform === "darwin"
+        ? join(homedir(), "Library", "Caches")
+        : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
+  return join(root, "openbot-updater");
+}
+
 export function isValidSemver(version: string): boolean {
   return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(
     version,
@@ -123,6 +151,13 @@ const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_DIAGNOSTIC_EVENTS = 20;
 
 /**
+ * Shutdown preparation plus the handover to the installer. Generous because on macOS quitAndInstall
+ * asks Squirrel to stage the ZIP and only quits when that finishes, which is disk bound on an artifact
+ * of a few hundred megabytes. Firing early here would report a failure over a working install.
+ */
+export const UPDATE_INSTALL_TIMEOUT_MS = 300_000;
+
+/**
  * Every busy phase needs a deadline, and typing this as a total record over `UpdateBusyPhase` is what
  * enforces it: adding a phase to `UPDATE_BUSY_PHASES` without a timeout here fails to compile. A busy
  * phase with no bound is exactly how "Preparing update..." became a state the UI could never leave.
@@ -140,13 +175,7 @@ const DEFAULT_PHASE_TIMEOUTS: Record<UpdateBusyPhase, number> = {
    * hundreds of megabytes, so a slow link must stay supported while a dead socket must not.
    */
   downloading: 120_000,
-  /**
-   * Shutdown preparation plus the handover to the installer. Generous because on macOS
-   * quitAndInstall asks Squirrel to stage the ZIP and only quits when that finishes, which is disk
-   * bound on an artifact of a few hundred megabytes. Firing early here would report a failure over a
-   * working install.
-   */
-  installing: 300_000,
+  installing: UPDATE_INSTALL_TIMEOUT_MS,
 };
 
 /**
@@ -196,6 +225,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkTimer: ReturnType<typeof setTimeout> | null = null;
   #phaseTimer: ReturnType<typeof setTimeout> | null = null;
   #started = false;
+  /** False for a start that checks only on request, such as the newer-database recovery. */
+  #checksScheduled = false;
   #installStarted = false;
   #pendingInstallRequests = 0;
   #installHandedOver = false;
@@ -302,9 +333,19 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#fork(pruneInstalledUpdate(this.#options.updaterCacheDirectory, this.#options.currentVersion));
     }
 
+    this.#checksScheduled = scheduleChecks;
     if (scheduleChecks && this.#options.enabled) {
       this.#scheduleCheck(this.#options.initialCheckDelayMs);
     }
+  }
+
+  /** Schedules the checks that `stop` cleared, for an app that keeps running after it, such as after a Windows session end that another app cancels. */
+  resume(): void {
+    if (!this.#started) return;
+    // `stop` cleared the deadline of a busy phase, and a download keeps running after it.
+    if (!this.#phaseTimer) this.#armPhaseTimer();
+    if (!this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
+    this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   getStatus(): UpdateStatus {

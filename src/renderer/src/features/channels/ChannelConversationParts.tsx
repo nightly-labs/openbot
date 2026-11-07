@@ -11,7 +11,7 @@ import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppe
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
-import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
+import { AgentMemoriesSettings } from "../conversation/AgentMemoriesSettings";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import type { ConversationChannelSettingsPaneProps } from "../conversation/conversation-types";
 import { channelMemoriesPort } from "../conversation/memories-port";
@@ -31,6 +31,7 @@ export interface ChannelRoutineHost {
   routineRecovery: () => boolean;
   /** Whether the `eventsServerId` host sends a test event to a webhook routine. */
   webhookTests: () => boolean;
+  webhookSenderSecret: () => boolean;
 }
 
 function useOpenChannel(channelId: string) {
@@ -75,7 +76,12 @@ export function ChannelHeaderTitle(props: { channelId: string; onOpenSettings: (
           onClick={props.onOpenSettings}
           disabled={current().channel.archived}
         >
-          <ChannelAvatar members={current().channel.members} agents={channels.agents()} />
+          <ChannelAvatar
+            members={current().channel.members}
+            agents={channels.agents()}
+            icon={current().channel.icon}
+            imageUrl={current().channel.imageUrl}
+          />
           <span class="channel-header-copy">
             <h1>{current().channel.name}</h1>
             <Show when={current().channel.title.trim()}>
@@ -95,7 +101,12 @@ export function ChannelEmptyState(props: { channelId: string }) {
     <Show when={page()}>
       {(current) => (
         <div class="channel-empty">
-          <ChannelAvatar members={current().channel.members} agents={channels.agents()} />
+          <ChannelAvatar
+            members={current().channel.members}
+            agents={channels.agents()}
+            icon={current().channel.icon}
+            imageUrl={current().channel.imageUrl}
+          />
           <h2>{current().channel.name}</h2>
           <Show when={current().channel.title}>
             <p class="channel-empty-title">{current().channel.title}</p>
@@ -123,6 +134,15 @@ export function ChannelAboveComposer(props: { channelId: string }) {
       taskId,
       recipientAgentId,
     });
+  const cancelTask = (taskId: string) =>
+    channels.command({
+      type: "cancel",
+      operationId: crypto.randomUUID(),
+      channelId: props.channelId,
+      taskId,
+      recipientAgentId: null,
+    });
+  const onCancel = () => (channels.taskCancelSupported() ? cancelTask : undefined);
   return (
     <Show when={page()}>
       {(current) => (
@@ -132,6 +152,7 @@ export function ChannelAboveComposer(props: { channelId: string }) {
             members={current().channel.members}
             name={name}
             onResume={resumeTask}
+            onCancel={onCancel()}
           />
           <Show when={!current().channel.archived && !current().channel.members.length}>
             <p>{t("channel.conversation.noMembers")}</p>
@@ -144,7 +165,7 @@ export function ChannelAboveComposer(props: { channelId: string }) {
 
 /**
  * The channel settings in the settings pane of the view. Memories and routines live here rather than
- * in `ChannelEditor`, because the routines view covers the whole pane: its own header replaces the
+ * in `ChannelEditor`, because each of their pages covers the whole pane: its own header replaces the
  * pane header, as in the agent settings.
  */
 export function ChannelSettingsPane(
@@ -179,7 +200,12 @@ export function ChannelSettingsPane(
     const eventApi =
       runtime().eventRoutines ??
       (serverId
-        ? desktopEventRoutinesApi(serverId, props.routines.routineRecovery(), props.routines.webhookTests())
+        ? desktopEventRoutinesApi(
+            serverId,
+            props.routines.routineRecovery(),
+            props.routines.webhookTests(),
+            props.routines.webhookSenderSecret(),
+          )
         : undefined);
     return eventApi ? eventRoutinesPort({ kind: "channel", id: props.channelId }, eventApi, legacy) : legacy;
   });
@@ -216,48 +242,45 @@ export function ChannelSettingsPane(
       maxWidth={props.maxWidth}
       onResize={setPanelWidth}
     >
-      <Show
-        when={panel.routines.open}
-        fallback={
-          <>
-            <SettingsPanelHeader
-              title={t("channel.settings.title")}
-              onClose={props.onClose}
-              closeLabel={t("channel.panel.close")}
-            />
-            <SettingsPanelContent>
-              <ChannelEditor
-                memoryCount={panel.memories.count}
-                routineCount={panel.routines.count}
-                onOpenMemories={() =>
-                  setPanel((state) => {
-                    state.memories.open = true;
-                  })
-                }
-                onOpenRoutines={() =>
-                  setPanel((state) => {
-                    state.routines.open = true;
-                  })
-                }
-              />
-            </SettingsPanelContent>
-            <AgentMemoriesModal
-              port={memoriesPort()}
-              open={panel.memories.open}
-              onOpenChange={(open) =>
-                setPanel((state) => {
-                  state.memories.open = open;
-                })
-              }
-              onCountChange={(count) =>
-                setPanel((state) => {
-                  state.memories.count = count;
-                })
-              }
-            />
-          </>
+      <Show when={!panel.routines.open && !panel.memories.open}>
+        <SettingsPanelHeader
+          title={t("channel.settings.title")}
+          onClose={props.onClose}
+          closeLabel={t("channel.panel.close")}
+        />
+        <SettingsPanelContent>
+          <ChannelEditor
+            memoryCount={panel.memories.count}
+            routineCount={panel.routines.count}
+            onOpenMemories={() =>
+              setPanel((state) => {
+                state.memories.open = true;
+              })
+            }
+            onOpenRoutines={() =>
+              setPanel((state) => {
+                state.routines.open = true;
+              })
+            }
+          />
+        </SettingsPanelContent>
+      </Show>
+      <AgentMemoriesSettings
+        port={memoriesPort()}
+        open={panel.memories.open}
+        onBack={() =>
+          setPanel((state) => {
+            state.memories.open = false;
+          })
         }
-      >
+        onClose={props.onClose}
+        onCountChange={(count) =>
+          setPanel((state) => {
+            state.memories.count = count;
+          })
+        }
+      />
+      <Show when={panel.routines.open}>
         <AgentRoutinesSettings
           port={routinesPort()}
           onCountChange={(count) =>

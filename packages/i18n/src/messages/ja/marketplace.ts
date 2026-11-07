@@ -31,11 +31,21 @@ export const messages = {
   "marketplace.agents.loadingDetail": "エージェントの詳細を読み込んでいます…",
   "marketplace.agents.skills": "スキル",
   "marketplace.agents.routines": "ルーティン",
-  "marketplace.agents.routineActive": "有効",
   "marketplace.agents.routineInactive": "無効",
+  "marketplace.agents.by": "作成者: {name}",
+  "marketplace.agents.routineCount": { other: "{count} 件のルーティン" },
+  "marketplace.agents.yours": "自分のエージェント",
+  "marketplace.agents.all": "すべてのエージェント",
+  "marketplace.agents.missing": "このエージェントはマーケットプレイスにありません。",
+  "marketplace.agents.trust.reviewed": "別の OpenBot ユーザーが作成しました。公開前に OpenBot が確認しています。",
+  "marketplace.agents.trust.reviewedBeforeAdd":
+    "別の OpenBot ユーザーが作成しました。公開前に OpenBot が確認しています。追加すると、あなたに代わって操作できます。",
+  "marketplace.agents.trust.pending": "OpenBot の確認前に作成者が共有しました。",
+  "marketplace.agents.trust.pendingBeforeAdd":
+    "OpenBot の確認前に作成者が共有しました。追加すると、あなたに代わって操作できます。",
+  "marketplace.agents.source.pending": "未確認",
 
   "marketplace.skill.loading": "スキルを読み込んでいます",
-  "marketplace.skill.update": "スキルをアップデート",
   "marketplace.try.readFailed": "OpenBot はこのエージェントのスキルを読み取れませんでした。もう一度お試しください。",
   "marketplace.try.enable": "試すには、エージェントの設定でこのスキルを有効にしてください。",
   "marketplace.try.repair": "試すには、エージェントの設定でこのスキルを修復してください。",
@@ -48,15 +58,6 @@ export const messages = {
   "marketplace.search.label": "マーケットプレイスを検索",
   "marketplace.search.placeholder": "検索",
   "marketplace.installs": { other: "{installs} 回インストール" },
-  "marketplace.filter": "フィルター",
-  "marketplace.filter.on": "フィルター: {filters}",
-  "marketplace.filter.all": "すべて",
-  "marketplace.filter.status": "状態",
-  "marketplace.filter.category": "カテゴリー",
-  "marketplace.filter.added": "追加済み",
-  "marketplace.filter.notAdded": "未追加",
-  "marketplace.filter.installed": "インストール済み",
-  "marketplace.filter.notInstalled": "未インストール",
   "marketplace.filter.clear": "フィルターをクリア",
   "marketplace.noMatch.apps": "この検索に一致するアプリはありません。",
   "marketplace.noMatch.filters": "フィルターに一致する項目はありません。",
@@ -66,8 +67,6 @@ export const messages = {
   "marketplace.empty.agents": "マーケットプレイスにはまだエージェントがありません。",
   "marketplace.empty.apps": "マーケットプレイスにはまだアプリがありません。",
   "marketplace.empty.skills": "マーケットプレイスにはまだスキルがありません。",
-  "marketplace.properties.agent": "このエージェントについて",
-  "marketplace.properties.skill": "このスキルについて",
   "marketplace.properties.creator": "作成者",
   "marketplace.properties.category": "カテゴリー",
   "marketplace.properties.version": "バージョン",
@@ -98,7 +97,9 @@ export const messages = {
   "marketplace.app.slackTagline": "Slack のメンションとダイレクトメッセージ",
   "marketplace.app.discordTagline": "Discord のメンションとダイレクトメッセージ",
   "marketplace.app.telegramTagline": "Telegram のグループとダイレクトチャット",
+  "marketplace.app.whatsappTagline": "WhatsApp の自分のチャットと、許可した人",
   "marketplace.app.bitwardenTagline": "共有フォルダーのログイン情報でサイトにサインイン",
+  "marketplace.app.protonPassTagline": "共有保管庫のログイン情報でサイトにサインイン",
   "marketplace.app.onePasswordCategory": "ログインと認証情報の管理",
   "marketplace.app.yourApps": "あなたのアプリ",
   "marketplace.app.addCustom": "カスタムを追加",
@@ -118,6 +119,7 @@ export const messages = {
   "marketplace.app.setup.account": "ブラウザーで {name} アカウントにサインインします。",
   "marketplace.app.setup.key": "{name} アカウントの API キーが必要です。",
   "marketplace.app.setup.keySaved": "{field} は {host} に保存されています。",
+  "marketplace.app.account.removeDescription": "OpenBot は {host} にあるこのアカウントのサインイン情報を削除します。",
   "marketplace.app.setup.desktop": "{name} デスクトップアプリの {address} で動作します。",
   "marketplace.app.setup.desktopConnected": "{address} に接続済みです。",
   "marketplace.app.setup.open": "サインインもキーも不要です。",
@@ -210,6 +212,26 @@ export const messages = {
     "このリポジトリのスタイルを使って、Paper で設定ページをデザインしてください。",
   "marketplace.plugin.paper.prompt.tokens":
     "開いている Paper のファイルにあるデザイントークンを一覧にして、私たちのテーマと比較してください。",
+  "marketplace.plugin.higgsfield.tagline": "AI による画像、動画、音声",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield を使うと、エージェントは Seedance、Kling、Veo、MiniMax Hailuo などの Higgsfield モデルで画像、動画、キャラクター、音声を生成し、クレジット残高を確認し、Asset Library を閲覧できます。結果はユーザーの Higgsfield Assets に保存されます。各ユーザーはブラウザで自分の Higgsfield アカウントにサインインします。生成のたびに、そのアカウントのクレジットが標準料金で使われます。無制限プランでも同じです。",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield の MCP サーバー経由で、画像・動画・音声の生成、キャラクター、クレジット、アセットを扱います。ブラウザでサインインします。",
+  "marketplace.plugin.higgsfield.prompt.credits": "Higgsfield のクレジットは何残っていますか？",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
+  "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",
+  "marketplace.plugin.elevenlabs.app":
+    "テキスト読み上げ、ボイス、音声エージェントの管理。ブラウザーでサインインする ElevenLabs の MCP サーバー経由です。",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "この段落を落ち着いた ElevenLabs のボイスで読み上げて、音声をください。",
+  "marketplace.plugin.elevenlabs.prompt.agents":
+    "私の ElevenLabs 音声エージェントと、それぞれが使うボイスを一覧にしてください。",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "サポート用音声エージェントの直近 10 件の会話を要約してください。",
   "marketplace.plugin.appleApps.tagline": "Mac のメール、カレンダーなど",
   "marketplace.plugin.appleApps.description":
     "Apple apps を使うと、エージェントはこの Mac のメール、カレンダー、連絡先、リマインダー、メモ、メッセージ、Safari を使えます。macOS でのみ動作します。OpenBot は mcp-icloud を起動します。これは Apple や OpenBot が作ったものではない、コミュニティのサーバーです。サーバーはこのコンピューター上で AppleScript を使ってアプリを操作し、アカウントもキーも不要です。インストール時に、OpenBot はこれらすべてのアプリへのアクセスを macOS にまとめて求めることができます。確認はアプリごとに 1 回表示されます。求めない場合は、エージェントが初めてアプリを使うときに macOS が確認します。後で変更するには、システム設定 › プライバシーとセキュリティ › オートメーション を開いてください。エージェントはメールや iMessage を送信し、イベント、連絡先、リマインダーを変更・削除できるので、承認する前に各書き込みを確認してください。ツールが読んだ内容（メールの本文など）は、エージェントのモデルプロバイダーに送られます。",
@@ -228,6 +250,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "モバイルプロジェクトで最も多いクラッシュと、その原因として考えられるものを説明してください。",
   "marketplace.plugin.sentry.prompt.releaseHealth": "現在のリリースは前回と比べてどのくらい健全ですか？",
+  "marketplace.plugin.gitlab.tagline": "Issue、マージリクエスト、パイプライン",
+  "marketplace.plugin.gitlab.description":
+    "GitLab を使うと、エージェントは GitLab.com でプロジェクトを検索し、Issue を読んで作成し、マージリクエストをレビューして更新し、リポジトリーのファイルとコミットを読み、CI パイプラインとジョブを確認できます。各ユーザーはブラウザーで自分の GitLab アカウントにサインインします。エージェントにはユーザーと同じ権限があり、コミットのプッシュ、Issue とマージリクエストの変更、マージができます。セルフホストの GitLab では、MCP サーバーの設定で GitLab のアドレスの後に /api/v4/mcp を付けたサーバーを追加し、そこでサインインしてください。",
+  "marketplace.plugin.gitlab.app":
+    "プロジェクト、Issue、マージリクエスト、リポジトリー、CI パイプラインを、ブラウザーでサインインする GitLab の MCP サーバーで提供します。",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "自分のレビューを待っているマージリクエストはどれですか？",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "デフォルトブランチの最新のパイプラインはなぜ失敗したのですか？",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "同期キューのクラッシュについて、再現手順を付けて Issue を作成してください。",
   "marketplace.plugin.vercel.tagline": "デプロイ、ビルドログ、プロジェクト",
   "marketplace.plugin.vercel.description":
     "Vercel を使うと、エージェントはプロジェクトと最近のデプロイを一覧表示し、ビルドログとランタイムログを読み、ビルドが失敗した理由を調べられます。各ユーザーはブラウザーで自分の Vercel アカウントにサインインし、エージェントが使えるチームを選びます。それらのチームでは、エージェントはユーザーのアカウントと同じ権限を持ちます。環境変数、ドメイン、DNS レコード、デプロイの変更や、ドメインの購入もできます。",
@@ -270,6 +301,19 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "この決済を調べて、失敗した理由を説明してください。",
   "marketplace.plugin.stripe.prompt.customer": "この顧客の請求書と未払い残高をまとめてください。",
   "marketplace.plugin.stripe.prompt.link": "Pro プランの月額 49 の支払いリンクの下書きを作成してください。",
+  "marketplace.plugin.revenuecat.tagline": "サブスクリプション、プロダクト、ペイウォール",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat を使うと、エージェントはアプリ内サブスクリプションの設定を読み取り、変更できます。対象はアプリ、プロダクト、エンタイトルメント、オファリング、パッケージ、ペイウォール、実験です。エージェントは顧客とその購入を調べ、チャートと指標を読むこともできます。RevenueCat のシークレット API キーは 1 つの Authorization ヘッダーに入ります。キーが使えるのは 1 つのプロジェクトです。読み取り専用キーでは、エージェントは読み取りだけができます。書き込みキーでは、エージェントはプロダクトを App Store の審査に提出し、顧客にエンタイトルメントを付与し、パッケージ、ターゲティングルール、Webhook を削除できます。",
+  "marketplace.plugin.revenuecat.app":
+    "RevenueCat の MCP サーバーとシークレット API キーで使う、プロダクト、エンタイトルメント、オファリング、ペイウォール、指標。",
+  "marketplace.plugin.revenuecat.prompt.offerings":
+    "私の RevenueCat プロジェクトにはどのオファリングとパッケージがありますか？",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "今月、RevenueCat の収益とアクティブなサブスクリプションはどう変わりましたか？",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "この RevenueCat の顧客にはどのエンタイトルメントがあり、いつ期限が切れますか？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat のダッシュボードでプロジェクトの API keys を開き、シークレット API キーを作成します。データを見るだけなら読み取り専用キーで十分です。",
   "marketplace.plugin.posthog.tagline": "プロダクト分析とフラグ",
   "marketplace.plugin.posthog.description":
     "PostHog を使うと、エージェントはイベントとファネルを照会し、フィーチャーフラグを調べ、リリース後に何が変わったかをまとめられます。プロジェクト設定の個人用 API キーを 1 つの Authorization ヘッダーに入れます。",
@@ -322,6 +366,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "ローンチのお知らせの下書きをベータリストに送信してください。",
   "marketplace.plugin.resend.prompt.status": "請求書のメールは顧客に届きましたか？",
   "marketplace.plugin.resend.prompt.template": "新しいフロー用のパスワードリセットメールの下書きを作成してください。",
+  "marketplace.plugin.omnisend.tagline": "メールとSMSのマーケティング",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーはブラウザで自分の Omnisend アカウントにサインインし、同意画面でアクセスレベルを選びます。書き込みアクセスがあると、エージェントはキャンペーンの送信やデータの削除もできます。レポートだけが必要な場合は読み取り専用アクセスを選んでください。",
+  "marketplace.plugin.omnisend.app":
+    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。ブラウザでサインインし、Omnisend の MCP サーバー経由で使います。",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "先週のキャンペーンの成果は、その前の週と比べてどうでしたか?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
   "marketplace.plugin.composio.tagline": "自分の Composio リンクで多数のアプリを利用",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など数百のアプリに接続します。Composio アカウントで使いたいアプリを接続し、その MCP URL と API キーをここに貼り付けてください。",
@@ -395,6 +448,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今日が期限の Todoist タスクはどれですか？",
   "marketplace.plugin.todoist.prompt.capture": "これらのアクション項目を Todoist のインボックスに追加してください。",
   "marketplace.plugin.todoist.prompt.overdue": "期限切れの Todoist タスクを明日に移してください。",
+  "marketplace.plugin.ticktick.tagline": "タスク、リスト、習慣、集中",
+  "marketplace.plugin.ticktick.description":
+    "TickTick を使うと、エージェントはタスクを検索・絞り込み、タスクを追加・変更し、リスト、セクション、フォルダー、タグ、コメントを管理できます。習慣と集中記録の読み取りと変更、TickTick に接続したカレンダーの予定の読み取りもできます。各ユーザーはブラウザーで自分の TickTick アカウントにサインインします。エージェントには読み取りと書き込みのアクセス権があり、タスクの完了、移動、削除、タグと集中記録の削除ができます。",
+  "marketplace.plugin.ticktick.app":
+    "タスク、リスト、習慣、集中記録を、ブラウザーでのサインインで TickTick の MCP サーバー経由で扱います。",
+  "marketplace.plugin.ticktick.prompt.today": "今日が期限の TickTick タスクはどれですか？",
+  "marketplace.plugin.ticktick.prompt.capture": "これらのアクション項目を TickTick の受信箱に追加してください。",
+  "marketplace.plugin.ticktick.prompt.week": "先週完了した TickTick タスクはどれですか？",
   "marketplace.plugin.trello.tagline": "ボード、リスト、カード",
   "marketplace.plugin.trello.description":
     "Trello を使うと、エージェントはボード、リスト、カード、チェックリスト、コメントを検索して読み、ボードとカードを作成し、リストとカードを移動し、カードを完了にし、チェックリスト、コメント、ラベルを追加できます。また、ユーザーの Trello インボックスのカードを読んで追加し、Planner の予定を読むこともできます。予定は、接続された Google または Outlook のカレンダーから来ることがあります。各ユーザーはブラウザーで自分の Trello アカウントにサインインし、同意画面でワークスペースを選びます。エージェントには、それらのワークスペースでユーザーと同じ権限があります。カードとリストをアーカイブできますが、サーバーは何も完全には削除できません。",
@@ -403,6 +464,33 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "自分に割り当てられた Trello カードはどれですか？",
   "marketplace.plugin.trello.prompt.board": "Trello ボードで進行中の作業をまとめてください。",
   "marketplace.plugin.trello.prompt.newCards": "これらのアクション項目をカードとして Trello ボードに追加してください。",
+  "marketplace.plugin.clickup.tagline": "タスク、ドキュメント、チームの更新",
+  "marketplace.plugin.clickup.description":
+    "ClickUp を使うと、エージェントはタスク、ドキュメント、コメント、チャットを検索し、タスク、リスト、ドキュメントを作成・更新し、コメントの投稿、チャットメッセージの送信、時間の記録ができます。各ユーザーはブラウザーで自分の ClickUp アカウントにサインインします。エージェントにはユーザーと同じ権限があります。タスクをゴミ箱に移動したり、コメントを削除したりできます。",
+  "marketplace.plugin.clickup.app":
+    "タスク、ドキュメント、コメント、チャット、時間記録。ClickUp の MCP サーバーをブラウザーでのサインインで使います。",
+  "marketplace.plugin.clickup.prompt.findTasks": "今週が期限の未完了の ClickUp タスクを探してください。",
+  "marketplace.plugin.clickup.prompt.createTask":
+    "これらのアクション項目で ClickUp タスクを作成し、私に割り当ててください。",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "ClickUp で最新のプロジェクト更新を探し、未解決の質問を要約してください。",
+  "marketplace.plugin.coinbase.tagline": "暗号資産の価格、ポートフォリオ、取引",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase を使うと、エージェントは Coinbase Advanced Trade の価格、残高、ポートフォリオ、注文、手数料を読み取り、注文のプレビューと発注、資産間の交換、ポートフォリオ間の資金移動ができます。各ユーザーはブラウザで自分の Coinbase アカウントにサインインします。エージェントにはユーザーと同じ権限があります。注文と交換には実際の資金が使われ、エージェントは USDC 残高から x402 リクエストの支払いもできます。",
+  "marketplace.plugin.coinbase.app":
+    "価格、残高、ポートフォリオ、注文、交換。Coinbase の MCP サーバーとブラウザでのサインインを使います。",
+  "marketplace.plugin.coinbase.prompt.balances": "各ポートフォリオの Coinbase 残高を教えてください。",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase の BTC-USD 価格と今週の値動きを見せてください。",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase で ETH を 50 USD 分成行買いする注文をプレビューしてください。発注はしないでください。",
+  "marketplace.plugin.robinhood.tagline": "証券口座とエージェントによる取引",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood を使うと、エージェントは Robinhood 顧客の口座、ポジション、残高、取引履歴、ウォッチリストと市場データを読み取り、株式、オプション、暗号資産の注文を出せます。各ユーザーはブラウザで自分の Robinhood アカウントにサインインします。最初のサインイン時に、Robinhood は別の Agentic 口座を開くようユーザーに求めます。エージェントが取引できるのはその口座だけで、初期設定では注文ごとにユーザーの承認を求めずに発注します。",
+  "marketplace.plugin.robinhood.app":
+    "口座、ポジション、市場データ、取引。Robinhood の MCP サーバーとブラウザでのサインインを使います。",
+  "marketplace.plugin.robinhood.prompt.positions": "Robinhood のポジションと今日の値動きをまとめてください。",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Robinhood のウォッチリストの各銘柄は今週どう動きましたか？",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Robinhood の Agentic 口座には現金がいくらありますか？",
   "marketplace.plugin.huggingface.tagline": "Hub のモデル、データセット、論文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face を使うと、エージェントは Hugging Face Hub のモデル、データセット、Spaces、コレクション、論文を検索し、モデルカードやリポジトリのファイルを読み、データセットをプレビューし、Hugging Face のドキュメントを検索できます。公開されている Hub のデータを使うので、アカウントもキーも不要です。ツールは読み取り専用で、エージェントはリポジトリの作成やジョブの実行はできません。",
@@ -416,14 +504,69 @@ export const messages = {
   "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "キーを作成",
 
-  "marketplace.skill.installMenu.install": "インストール",
-  "marketplace.skill.installMenu.installNamed": "{name} をインストール",
-  "marketplace.skill.installMenu.allAgents": "すべてのエージェント",
-  "marketplace.skill.installMenu.agents": { other: "エージェント {count} 件" },
-  "marketplace.skill.installMenu.here": "現在地",
-  "marketplace.skill.installMenu.change": { other: "{label} には {name} があります。変更" },
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "{name} で試す",
+  "marketplace.skills.yours": "あなたのスキル",
+  "marketplace.skills.seeAll": "すべて表示",
+  "marketplace.skills.seeAllName": "すべて表示: {name}",
+  "marketplace.skills.none": "スキルを持つエージェントはまだいません。",
+  "marketplace.skills.noneHint":
+    "スキルはエージェントに 1 つのタスクを教えます。下から追加するか、自分で作成してください。",
+  "marketplace.skills.sourceLabel": "提供元",
+  "marketplace.skills.source.all": "すべて",
+  "marketplace.skills.source.verified": "検証済み",
+  "marketplace.skills.source.public": "公開",
+  "marketplace.skills.source.verifiedLong": "OpenBot が検証済み",
+  "marketplace.skills.source.publicLong": "OpenBot が審査済み",
+  "marketplace.skills.sortLabel": "並べ替え",
+  "marketplace.skills.sortName": "並べ替え: {name}",
+  "marketplace.skills.sort.installs": "利用数順",
+  "marketplace.skills.sort.updated": "最近の更新",
+  "marketplace.skills.sort.name": "名前",
+  "marketplace.skills.featured": "おすすめ",
+  "marketplace.skills.all": "すべてのスキル",
+  "marketplace.skills.count": { other: "{count} 件のスキル" },
+  "marketplace.skills.searchIn": "{name} を検索",
+  "marketplace.skills.missing": "このスキルはマーケットプレイスにありません。",
+  "marketplace.skills.state.off": "オフ",
+  "marketplace.skills.state.repair": "修復が必要",
+  "marketplace.skills.state.update": "アップデートあり",
+  "marketplace.skills.state.modified": "自分で変更済み",
+  "marketplace.skills.stateOn": "{agents}: {state}",
+  "marketplace.skills.version": "バージョン {version}",
+  "marketplace.skills.origin.local": "このコンピューターで作成",
+  "marketplace.skills.origin.workspace": "このエージェントのフォルダー内",
+  "marketplace.skills.origin.marketplace": "マーケットプレイスから · バージョン {version}",
+  "marketplace.skills.status.notAdded": "未追加",
+  "marketplace.skills.status.on": "{agents} でオン",
+  "marketplace.skills.agentCount": { other: "エージェント {count} 件" },
+  "marketplace.skills.allAgents": "すべてのエージェント",
+  "marketplace.skills.agentsTitle": "エージェント · {total}",
+  "marketplace.skills.agents.search": "エージェントを検索",
+  "marketplace.skills.agents.searchName": "{name} を持つエージェントを検索",
+  "marketplace.skills.agents.noMatch": "「{query}」に一致するエージェントはありません。",
+  "marketplace.skills.agents.removeAll": "すべて削除",
+  "marketplace.skills.agents.removeAllName": { other: "エージェント {count} 件から {name} を削除" },
+  "marketplace.skills.agent.toggle": "{agent} の {name}",
+  "marketplace.skills.agent.remove": "削除",
+  "marketplace.skills.agent.removeName": "{agent} から {name} を削除",
+  "marketplace.skills.add": "追加",
+  "marketplace.skills.addName": "{name} をエージェントに追加",
+  "marketplace.skills.addToAgents": "エージェントに追加",
+  "marketplace.skills.onOf": "{total} 件中 {have} 件でオン",
+  "marketplace.skills.chooseAgents": "{name} は {agents} にあります。エージェントを選択",
+  "marketplace.skills.dialog.list": "{name} を持つエージェント",
+  "marketplace.skills.dialog.search": { other: "エージェント {count} 件を検索" },
+  "marketplace.skills.dialog.all": { other: "すべてのエージェント ({count} 件)" },
+  "marketplace.skills.dialog.allMatches": { other: "一致した {count} 件すべて" },
+  "marketplace.skills.dialog.checked": "{checked} / {total}",
+  "marketplace.skills.dialog.save": "保存",
+  "marketplace.skills.dialog.saveBoth": "保存: {added} 件追加、{removed} 件削除",
+  "marketplace.skills.dialog.addTo": "{agents} に追加",
+  "marketplace.skills.dialog.removeFrom": "{agents} から削除",
+  "marketplace.skills.dialog.full": "スキルの上限に達しました",
+  "marketplace.skills.dialog.unread": "スキルを読み込めていません",
+  "marketplace.skills.local.gone": "このスキルを持つエージェントは現在いません。",
 
   "marketplace.notice.agentAdded": "{name} を追加しました。",
   "marketplace.notice.agentUpdated": "{name} をアップデートしました。",

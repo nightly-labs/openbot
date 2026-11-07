@@ -1,10 +1,13 @@
+import type { ExpressionId } from "@norbert_bodziony/bloub";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AccountUsage,
   AgentModelId,
   AgentProviderId,
   AgentReasoningEffort,
   AgentStatus,
+  AvatarColor,
   AvatarHue,
   ClientAgentModelOption,
   CustomAgentSummary,
@@ -14,12 +17,18 @@ import type {
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Field, Input, Textarea } from "@openbot/ui";
 import { createSignal, For, onSettled, Show } from "solid-js";
-import { AVATAR_HUE_CHOICES, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
+import {
+  AVATAR_COLOR_CHOICES,
+  avatarHeadColor,
+  avatarSeedForFace,
+  isAvatarColorChoice,
+  type SupportedAvatarSilhouetteId,
+} from "../../bloub-avatar";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { currentText, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "./AgentAvatar";
-import { AVATAR_HUE_LABEL } from "./avatar-hue-label";
+import { avatarColorChoiceLabel } from "./avatar-hue-label";
 import { InstructionsLimit, instructionsTooLong } from "./InstructionsLimit";
 
 export interface FirstAgentDraft {
@@ -27,11 +36,15 @@ export interface FirstAgentDraft {
   purpose: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour, which wins over `avatarHue`. Absent or null: `avatarHue` is the colour. */
+  avatarColor?: AvatarColor | null | undefined;
   suggestionId: string | null;
   provider: AgentProviderId;
   model: AgentModelId;
   /** The reasoning level the user chose. Absent, the agent starts on the model's default level. */
   reasoningEffort?: AgentReasoningEffort | undefined;
+  /** The account of `provider` the agent starts on. Absent, the provider's own sign-in. */
+  providerAccountId?: string | undefined;
 }
 
 /**
@@ -45,7 +58,6 @@ export interface FirstAgentSuggestion {
   purposeKey: AppTextKey;
   avatarSeed: string;
   avatarHue: AvatarHue;
-  animationCycleOffset: number;
   animationOffset: number;
 }
 
@@ -58,6 +70,10 @@ export interface FirstAgentSetupProps {
   /** The live catalog behind the model picker. Absent, the form keeps no model choice. */
   modelOptions?: ClientAgentModelOption[] | undefined;
   agentStatus?: AgentStatus | undefined;
+  /** Lets the model picker choose an account of a provider with more than one. */
+  accountChoice?: boolean | undefined;
+  /** The plan readings that mark the spent models of each account in the picker. */
+  accountUsage?: AccountUsage | null | undefined;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
@@ -73,13 +89,35 @@ export interface FirstAgentSetupProps {
   onCancel?: (() => void) | undefined;
 }
 
-export const FIRST_AGENT_AVATAR_SEEDS = avatarCandidateSeeds("first-bot", "first-bot", 0);
+/**
+ * The faces a new agent can start with. Each has open eyes, and only a few are wide. The eyes set
+ * the automatic color, so the order puts a different color next to each face. The suggestions take
+ * faces 2-7 and set their own color.
+ */
+const FIRST_AGENT_FACES: ReadonlyArray<{ shape: SupportedAvatarSilhouetteId; expression: ExpressionId }> = [
+  { shape: "cercle", expression: "attentif" },
+  { shape: "squircle", expression: "curieux" },
+  { shape: "triangle", expression: "neutre" },
+  { shape: "hexagone", expression: "surpris" },
+  { shape: "carre", expression: "attentif" },
+  { shape: "galet", expression: "curieux" },
+  { shape: "pentagone", expression: "neutre" },
+  { shape: "capsule", expression: "attentif" },
+  { shape: "losange", expression: "curieux" },
+  { shape: "nuage", expression: "surpris" },
+  { shape: "squircle", expression: "neutre" },
+  { shape: "cercle", expression: "curieux" },
+];
+
+export const FIRST_AGENT_AVATAR_SEEDS = FIRST_AGENT_FACES.map((face) => avatarSeedForFace("first-bot", face));
 
 const SUGGESTION_MOMENTUM_FRICTION = 0.88;
 const SUGGESTION_MOMENTUM_MINIMUM = 0.01;
 const SUGGESTION_MOMENTUM_MAXIMUM = 1.75;
 const SUGGESTION_DRAG_THRESHOLD = 8;
 const MOTION_FRAME_DURATION = 1000 / 60;
+/** The face choices are 24px. At the default eye size their eyes are too small to compare. */
+const FACE_CHOICE_EYE_SCALE = 1.25;
 
 /**
  * A new draft. Its name is the default name in the interface language when the draft is made: the
@@ -106,7 +144,6 @@ export const FIRST_AGENT_SUGGESTIONS: FirstAgentSuggestion[] = [
     purposeKey: "agent.setup.suggestion.inboxHelper.purpose",
     avatarSeed: FIRST_AGENT_AVATAR_SEEDS[1] ?? "first-bot:inbox",
     avatarHue: 320,
-    animationCycleOffset: 0,
     animationOffset: 0.15,
   },
   {
@@ -116,7 +153,6 @@ export const FIRST_AGENT_SUGGESTIONS: FirstAgentSuggestion[] = [
     purposeKey: "agent.setup.suggestion.tripPlanner.purpose",
     avatarSeed: FIRST_AGENT_AVATAR_SEEDS[2] ?? "first-bot:travel",
     avatarHue: 215,
-    animationCycleOffset: 2,
     animationOffset: 0.65,
   },
   {
@@ -126,7 +162,6 @@ export const FIRST_AGENT_SUGGESTIONS: FirstAgentSuggestion[] = [
     purposeKey: "agent.setup.suggestion.personalOrganizer.purpose",
     avatarSeed: FIRST_AGENT_AVATAR_SEEDS[3] ?? "first-bot:organizer",
     avatarHue: 55,
-    animationCycleOffset: 4,
     animationOffset: 1.2,
   },
   {
@@ -136,7 +171,6 @@ export const FIRST_AGENT_SUGGESTIONS: FirstAgentSuggestion[] = [
     purposeKey: "agent.setup.suggestion.shoppingScout.purpose",
     avatarSeed: FIRST_AGENT_AVATAR_SEEDS[4] ?? "first-bot:shopping",
     avatarHue: 150,
-    animationCycleOffset: 6,
     animationOffset: 1.8,
   },
   {
@@ -146,7 +180,6 @@ export const FIRST_AGENT_SUGGESTIONS: FirstAgentSuggestion[] = [
     purposeKey: "agent.setup.suggestion.writingPartner.purpose",
     avatarSeed: FIRST_AGENT_AVATAR_SEEDS[5] ?? "first-bot:writing",
     avatarHue: 30,
-    animationCycleOffset: 8,
     animationOffset: 2.45,
   },
   {
@@ -156,7 +189,6 @@ export const FIRST_AGENT_SUGGESTIONS: FirstAgentSuggestion[] = [
     purposeKey: "agent.setup.suggestion.learningCoach.purpose",
     avatarSeed: FIRST_AGENT_AVATAR_SEEDS[6] ?? "first-bot:learning",
     avatarHue: 245,
-    animationCycleOffset: 10,
     animationOffset: 3.15,
   },
 ];
@@ -166,7 +198,8 @@ function matchesSuggestion(draft: FirstAgentDraft, suggestion: FirstAgentSuggest
     draft.name === t(suggestion.nameKey) &&
     draft.purpose === t(suggestion.purposeKey) &&
     draft.avatarSeed === suggestion.avatarSeed &&
-    draft.avatarHue === suggestion.avatarHue
+    draft.avatarHue === suggestion.avatarHue &&
+    (draft.avatarColor ?? null) === null
   );
 }
 
@@ -294,6 +327,10 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
     }, 0);
   }
 
+  function automaticColor(): boolean {
+    return props.value.avatarHue === null && (props.value.avatarColor ?? null) === null;
+  }
+
   function updateDraft(updates: Partial<FirstAgentDraft>): void {
     if (props.submitting) return;
     const next = { ...props.value, ...updates };
@@ -311,10 +348,12 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       purpose: t(suggestion.purposeKey),
       avatarSeed: suggestion.avatarSeed,
       avatarHue: suggestion.avatarHue,
+      avatarColor: null,
       suggestionId: suggestion.id,
       provider: props.value.provider,
       model: props.value.model,
       reasoningEffort: props.value.reasoningEffort,
+      providerAccountId: props.value.providerAccountId,
     });
   }
 
@@ -324,12 +363,21 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   const reasoningEffort = () =>
     props.value.reasoningEffort ?? modelOption(props.value.provider, props.value.model)?.defaultReasoningEffort;
 
-  /** A new model keeps the chosen level when it supports it, and else starts on its own default. */
-  function selectModel(model: AgentModelId, provider: AgentProviderId): void {
-    const kept = props.value.reasoningEffort;
+  /**
+   * A new model keeps the chosen level when it supports it, and else starts on its own default. The
+   * picker sends an account only for a provider with more than one; any other choice is the own sign-in.
+   */
+  function selectModel(
+    model: AgentModelId,
+    provider: AgentProviderId,
+    accountId?: string | null,
+    effort?: AgentReasoningEffort,
+  ): void {
+    const kept = effort ?? props.value.reasoningEffort;
     updateDraft({
       model,
       provider,
+      providerAccountId: props.accountChoice ? (accountId ?? undefined) : undefined,
       reasoningEffort:
         kept && modelOption(provider, model)?.supportedReasoningEfforts.includes(kept) ? kept : undefined,
     });
@@ -343,7 +391,12 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           data-avatar-seed={props.value.avatarSeed}
           data-avatar-hue={props.value.avatarHue ?? "automatic"}
         >
-          <AgentAvatar seed={props.value.avatarSeed} hue={props.value.avatarHue} motion="idle" />
+          <AgentAvatar
+            seed={props.value.avatarSeed}
+            hue={props.value.avatarHue}
+            color={props.value.avatarColor ?? null}
+            motion="idle"
+          />
           <h1 aria-live="polite">{displayName()}</h1>
         </div>
         <Show when={props.mode === "additional" && props.onCancel}>
@@ -380,6 +433,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
             <AgentAvatar
               seed={props.value.avatarSeed}
               hue={props.value.avatarHue}
+              color={props.value.avatarColor ?? null}
               motion="idle"
               animationOffset={0.4}
             />
@@ -394,28 +448,30 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                 size="sm"
                 class="first-agent-color-choice"
                 aria-label={t("agent.setup.colorAutomatic")}
-                aria-pressed={props.value.avatarHue === null ? "true" : "false"}
+                aria-pressed={automaticColor() ? "true" : "false"}
                 data-cuelume-tap="select"
-                onClick={() => updateDraft({ avatarHue: null })}
+                onClick={() => updateDraft({ avatarHue: null, avatarColor: null })}
               >
                 <span
                   class="first-agent-color-swatch"
                   style={{ background: avatarHeadColor(props.value.avatarSeed, null) }}
                 />
               </Button>
-              <For each={AVATAR_HUE_CHOICES}>
+              <For each={AVATAR_COLOR_CHOICES}>
                 {(option) => (
                   <Button
                     variant="ghost"
                     type="button"
                     size="sm"
                     class="first-agent-color-choice"
-                    aria-label={t("agent.setup.colorOption", { color: t(AVATAR_HUE_LABEL[option.hue]) })}
-                    aria-pressed={props.value.avatarHue === option.hue ? "true" : "false"}
+                    aria-label={t("agent.setup.colorOption", { color: t(avatarColorChoiceLabel(option)) })}
+                    aria-pressed={
+                      isAvatarColorChoice(option, props.value.avatarHue, props.value.avatarColor) ? "true" : "false"
+                    }
                     data-cuelume-tap="select"
-                    onClick={() => updateDraft({ avatarHue: option.hue })}
+                    onClick={() => updateDraft({ avatarHue: option.hue, avatarColor: option.color })}
                   >
-                    <span class="first-agent-color-swatch" style={{ background: avatarHueSwatch(option.hue) }} />
+                    <span class="first-agent-color-swatch" style={{ background: option.swatch }} />
                   </Button>
                 )}
               </For>
@@ -440,8 +496,10 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                     <AgentAvatar
                       seed={seed}
                       hue={props.value.avatarHue}
+                      color={props.value.avatarColor ?? null}
                       motion="idle"
                       animationOffset={index() * 0.16}
+                      eyeScale={FACE_CHOICE_EYE_SCALE}
                     />
                   </Button>
                 )}
@@ -481,6 +539,9 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       value={props.value.model}
                       modelOptions={options()}
                       agentStatus={status()}
+                      accountChoice={props.accountChoice === true}
+                      providerAccountId={props.value.providerAccountId}
+                      accountUsage={props.accountUsage}
                       runtimeStatuses={props.runtimeStatuses}
                       customProviders={props.customProviders}
                       customAgents={props.customAgents}
@@ -544,7 +605,6 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       variant="ghost"
                       type="button"
                       class="first-agent-suggestion-card"
-                      data-animation-cycle-offset={suggestion.animationCycleOffset}
                       data-animation-offset={suggestion.animationOffset}
                       aria-label={t("agent.setup.suggestion.label", {
                         name: t(suggestion.nameKey),
@@ -561,7 +621,6 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                         seed={suggestion.avatarSeed}
                         hue={suggestion.avatarHue}
                         motion="always"
-                        cycleOffset={suggestion.animationCycleOffset}
                         animationOffset={suggestion.animationOffset}
                       />
                       <span>

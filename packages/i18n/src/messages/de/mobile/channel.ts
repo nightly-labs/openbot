@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "Dieser Kanal konnte nicht gelöscht werden. Versuche es erneut.",
   "mobile.channel.list.open": "Kanal {name} öffnen",
   "mobile.channel.list.openWithTitle": "Kanal {name} öffnen, {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": { one: "{count} ungelesene Nachricht", other: "{count} ungelesene Nachrichten" },
   "mobile.channel.list.noMessages": "Noch keine Nachrichten",
   "mobile.channel.task.task": "Aufgabe",
@@ -21,6 +22,7 @@ export const messages = {
   "mobile.channel.task.paused": "Pausiert",
   "mobile.channel.task.resume": "Fortsetzen",
   "mobile.channel.task.reassign": "Neu zuweisen",
+  "mobile.channel.task.cancel": "Aufgabe abbrechen",
   "mobile.channel.loadFailed": "Die Kanäle konnten nicht geladen werden. Versuche es erneut.",
   "mobile.channel.actions.historyStale":
     "Die Aufgabe wurde geändert, aber der Chatverlauf konnte nicht aktualisiert werden.",

@@ -7,6 +7,12 @@ export class RemoteWorkflowError extends Schema.TaggedError<RemoteWorkflowError>
   cause: Schema.Defect(),
 }) {}
 
+/** A file download that reports its bytes. `size` is the size that the message names for the file. */
+export interface RemoteFileProgress {
+  size: number;
+  onProgress: (received: number, total: number) => void;
+}
+
 export const { io: remoteCall, sync: remoteDecode, rewrap: toRemoteWorkflowError } = causeHelpers(RemoteWorkflowError);
 
 export class RemoteRequest extends Context.Service<

@@ -226,3 +226,6 @@ export const AgentsAndMessagesOnly: Story = {
 };
 
 export const NoAgents: Story = { args: { agents: [] } };
+
+/** No agents and no channels, so the search finds nothing. Type any text: the plush watches the caret, then looks for a result. */
+export const NothingFound: Story = { args: { agents: [], channels: [] } };

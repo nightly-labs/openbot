@@ -69,4 +69,11 @@ export const messages = {
   "skill.preview.examplePrompt": "이 스킬을 사용할 수 있게 도와줘.",
   "skill.preview.try": "스킬 사용해 보기",
   "skill.preview.linkFailed": "링크를 열 수 없어요.",
+
+  "skill.marketplace.changed": { other: "에이전트 {count}개에서 {name}을(를) 변경했어요." },
+  "skill.marketplace.updated": { other: "에이전트 {count}개에서 {name}을(를) 업데이트했어요." },
+  "skill.marketplace.undone": "{name} 변경을 되돌렸어요.",
+  "skill.marketplace.confirmAgents": "에이전트: {agents}.",
+  "skill.marketplace.limitReason": "에이전트 하나에 스킬을 {limit}개까지 추가할 수 있어요.",
+  "skill.marketplace.cannotRemove": "OpenBot은 기본 제공 스킬과 직접 설치하지 않은 스킬을 제거할 수 없어요.",
 } as const satisfies PartialTranslation<typeof source>;

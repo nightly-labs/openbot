@@ -20,6 +20,8 @@ export interface OpenBotSiblingInstance {
 interface SiblingScanInput {
   executablePath: string;
   currentPid: number;
+  /** The local servers that this process started. They stop with it before the install. */
+  excludedPids?: () => ReadonlySet<number>;
   platform?: NodeJS.Platform;
   listProcesses?: () => Effect.Effect<string, SiblingScanFailed>;
 }
@@ -49,9 +51,10 @@ export function listSiblingOpenBotInstances(
 
 function parseSiblingInstances(
   output: string,
-  input: Pick<SiblingScanInput, "executablePath" | "currentPid">,
+  input: Pick<SiblingScanInput, "executablePath" | "currentPid" | "excludedPids">,
 ): OpenBotSiblingInstance[] {
   const siblings: OpenBotSiblingInstance[] = [];
+  const excluded = input.excludedPids?.() ?? new Set<number>();
   if (!input.executablePath.trim()) return siblings;
   for (const line of output.split("\n")) {
     const match = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line);
@@ -59,7 +62,7 @@ function parseSiblingInstances(
     const pid = Number(match[1]);
     const uid = Number(match[2]);
     const command = match[3] ?? "";
-    if (pid === input.currentPid) continue;
+    if (pid === input.currentPid || excluded.has(pid)) continue;
     if (command !== input.executablePath && !command.startsWith(`${input.executablePath} `)) continue;
     siblings.push({ pid, uid });
   }

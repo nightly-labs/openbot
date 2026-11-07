@@ -1,0 +1,75 @@
+name: Windows installer E2E
+
+# PR CI does not build the NSIS installer. This job builds the installer of the pull request from the
+# app of a released installer, then updates the real installers on a Windows runner with
+# `scripts/windows-home-install-update-e2e.ts`. It runs only when the installer script or this test
+# changes.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - build/installer.nsh
+      - scripts/windows-home-install-update-e2e.ts
+      - .github/workflows/windows-installer-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  home-install-update:
+    name: Windows home install update
+    runs-on: windows-2025
+    timeout-minutes: 40
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      # The earlier version is the one that the reporters updated from. The app of the second
+      # version goes into the installer of this pull request.
+      EARLIER_VERSION: 0.52.1
+      APP_VERSION: 0.53.0
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # electron-builder packs a prepackaged app; it needs no native build.
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Download released installers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .openbot-build/installers
+          gh release download "v$EARLIER_VERSION" -R "$GITHUB_REPOSITORY" -p "OpenBot-$EARLIER_VERSION-x64.exe" -D .openbot-build/installers
+          gh release download "v$APP_VERSION" -R "$GITHUB_REPOSITORY" -p "OpenBot-$APP_VERSION-x64.exe" -D .openbot-build/installers
+
+      - name: Build the installer of this pull request
+        shell: bash
+        run: |
+          7z x -y -o.openbot-build/released ".openbot-build/installers/OpenBot-$APP_VERSION-x64.exe" '$PLUGINSDIR/app-64.7z'
+          7z x -y -o.openbot-build/app '.openbot-build/released/$PLUGINSDIR/app-64.7z'
+          bunx electron-builder --win nsis --x64 --publish never --prepackaged .openbot-build/app \
+            -c.directories.output=.openbot-build/installer
+
+      - name: Update the installers
+        shell: bash
+        run: |
+          installer=$(ls .openbot-build/installer/OpenBot-*-x64.exe)
+          bun scripts/windows-home-install-update-e2e.ts ".openbot-build/installers/OpenBot-$EARLIER_VERSION-x64.exe" "$installer"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-home-install-update-e2e
+          path: .openbot-build/windows-home-install-update-e2e.json
+          if-no-files-found: warn

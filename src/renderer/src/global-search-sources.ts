@@ -1,4 +1,4 @@
-import { BookMarked, Bot, CalendarClock, Hash, Server, Store, UsersRound } from "@openbot/ui";
+import { BookMarked, Bot, CalendarClock, Hash, Server, Sparkles, Store, UsersRound } from "@openbot/ui";
 import type {
   GlobalSearchAction,
   GlobalSearchFile,
@@ -12,11 +12,11 @@ import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
 import { globalSearchChannels } from "./features/channels/global-search-channels";
-import { serverCanAdminister } from "./features/servers/server-capabilities";
+import { activeServerHasProviderSettings, serverCanAdminister } from "./features/servers/server-capabilities";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
-import { dynamicIslandSettingsShown, navItems } from "./features/settings/settings-tabs";
+import { navItems, settingsTabShown } from "./features/settings/settings-tabs";
 import { useUsage } from "./features/usage/usage-context";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
@@ -110,7 +110,7 @@ export function useGlobalSearchSources(open: () => boolean) {
   const actions = createMemo<GlobalSearchAction[]>(
     () => {
       const server = activeServer();
-      const dynamicIslandShown = dynamicIslandSettingsShown(platform.appInfo()?.platform, platform.chatWindow !== null);
+      const settingsWindow = { platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null };
       const list: GlobalSearchAction[] = [
         {
           id: "new-agent",
@@ -150,7 +150,7 @@ export function useGlobalSearchSources(open: () => boolean) {
       }
       for (const item of navItems) {
         // Hosted servers shows only for an account with hosting, which the dialog checks when it opens.
-        if (item.value === "hosted-servers" || (item.value === "dynamic-island" && !dynamicIslandShown)) continue;
+        if (!settingsTabShown(item.value, settingsWindow)) continue;
         list.push({
           id: `settings:${item.value}`,
           label: t(item.titleKey),
@@ -191,6 +191,26 @@ export function useGlobalSearchSources(open: () => boolean) {
             group: "settings",
             icon: BookMarked,
             run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+          });
+        }
+        if (serverCanAdminister(server, "memory-review-v1") && (server.kind === "local" || server.state === "online")) {
+          list.push({
+            id: "server:memory-review",
+            label: t("server.settings.memoryReview"),
+            detail: server.name,
+            group: "settings",
+            icon: BookMarked,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+          });
+        }
+        if (activeServerHasProviderSettings(server)) {
+          list.push({
+            id: "server:providers",
+            label: t("server.settings.providersTitle"),
+            detail: server.name,
+            group: "settings",
+            icon: Sparkles,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "providers"),
           });
         }
       }

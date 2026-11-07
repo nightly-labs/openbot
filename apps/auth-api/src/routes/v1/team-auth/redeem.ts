@@ -21,7 +21,16 @@ export const Route = createFileRoute("/v1/team-auth/redeem")({
               body.serverId,
               requestSourceIp(request),
             );
-            return user ? json(user) : apiError(401, "invalid_team_ticket", "The team ticket is invalid or expired.");
+            if (!user) return apiError(401, "invalid_team_ticket", "The team ticket is invalid or expired.");
+            // The host that redeems the ticket can belong to another user; it gets the member's identity only.
+            return json({
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              avatarUrl: user.avatarUrl,
+              // Members of the server see the chat color, so the host gets it too.
+              chatColor: user.chatColor,
+            });
           }),
           (error) => {
             if (error instanceof SyntaxError) {

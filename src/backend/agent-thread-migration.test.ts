@@ -47,6 +47,14 @@ function seedTasks(db: DatabaseSync): void {
         '2026-10-01T09:00:00.000Z', '2026-10-02T09:00:00.000Z', '2026-10-03T09:00:00.000Z', 7)`);
 }
 
+// Migration 49 adds the GitHub workflow tables, empty.
+const EMPTY_GITHUB_TABLES = {
+  workflow_github_actions: [],
+  workflow_github_deliveries: [],
+  workflow_github_runs: [],
+};
+
+// Migration 48 adds the branch link, null for every moved task.
 const THREADS = [
   {
     thread_id: "openbot-thread-closed",
@@ -61,6 +69,10 @@ const THREADS = [
     updated_at: "2026-10-02T09:00:00.000Z",
     archived_at: "2026-10-03T09:00:00.000Z",
     last_event_sequence: 7,
+    branch_source_thread_id: null,
+    branch_source_message_id: null,
+    branch_through_message_id: null,
+    routine_id: null,
   },
   {
     thread_id: "openbot-thread-open",
@@ -75,6 +87,10 @@ const THREADS = [
     updated_at: "2026-10-02T08:00:00.000Z",
     archived_at: null,
     last_event_sequence: 4,
+    branch_source_thread_id: null,
+    branch_source_message_id: null,
+    branch_through_message_id: null,
+    routine_id: null,
   },
 ];
 
@@ -102,14 +118,26 @@ function agentTables(db: DatabaseSync): unknown[] {
     .all();
 }
 
-/** The rows that migration 47 must keep: every table except the task table, which becomes the thread table. */
+/**
+ * The rows that migration 47 must keep: every table except the task table, which becomes the thread table.
+ * Migration 51 adds an empty sender table after it.
+ */
 function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]> {
-  const { projection_agent_tasks: _tasks, projection_agent_threads: _threads, ...kept } = rows;
+  const {
+    projection_agent_tasks: _tasks,
+    projection_agent_threads: _threads,
+    projection_messaging_allowed_senders: _senders,
+    projection_deleted_thread_messages: _deleted,
+    browser_proxies: _proxies,
+    browser_profile_proxies: _profileProxies,
+    agent_usage_skill_loads: _skillLoads,
+    ...kept
+  } = rows;
   return kept;
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 47 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 58 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -142,11 +170,12 @@ describe("agent thread migration", () => {
       if (version < 46) migrateUpTo(db, 46);
       const before = contents(db);
       migrateOpenBotDatabase(db);
-      expect(withoutTasks(contents(db))).toEqual(withoutTasks(before));
+      expect(withoutTasks(contents(db))).toEqual({ ...withoutTasks(before), ...EMPTY_GITHUB_TABLES });
       expect(threads(db)).toEqual(THREADS);
       expect(agentTables(db)).toEqual([
         { type: "index", name: "agent_threads_agent" },
         { type: "index", name: "agent_threads_open" },
+        { type: "index", name: "agent_threads_routine" },
         { type: "table", name: "projection_agent_threads" },
       ]);
       expectHealthy(db);
@@ -215,9 +244,9 @@ describe("agent thread migration", () => {
     seedThreads(db);
     seedTasks(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(48,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(59,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=48; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=59; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
   });

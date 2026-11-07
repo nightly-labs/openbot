@@ -1,0 +1,59 @@
+/*
+ * The name of a new server on this computer. The same small dialog as the OpenCode key dialog:
+ * a left-aligned title, one description line, one field.
+ */
+
+.create-local-server-dialog {
+  width: min(400px, 100%);
+  max-height: calc(100dvh - var(--openbot-space-6) * 2);
+  overflow-y: auto;
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-6);
+  color: var(--openbot-text-primary);
+  animation: create-local-server-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+.create-local-server-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--openbot-space-1);
+}
+
+.create-local-server-title {
+  margin: 0;
+  font-size: var(--openbot-text-xl);
+  line-height: var(--openbot-leading-xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-tight);
+}
+
+.create-local-server-description {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.create-local-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  margin: var(--openbot-space-4) 0 0;
+}
+
+.create-local-server-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+}
+
+@keyframes create-local-server-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

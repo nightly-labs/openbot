@@ -64,6 +64,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot は現在アカウントサービスに接続できません。",
   "account.login.signInDescription":
     "メールアドレスでサインイン、またはアカウントを作成できます。ワンタイムコードをお送りします。",
+  "account.login.keyringChangedDescription":
+    "システムのキーリングが前回のサインインを失いました。OpenBot は今後、このコンピューター上の専用ファイルにサインインを保存します。もう一度サインインしてください。",
   "account.login.codeAccepted": "コードが承認されました。",
   "account.login.codeSent": "{email} にコードを送信しました。",
   "account.login.connectingSecurely": "安全に接続しています…",
@@ -101,4 +103,5 @@ export const messages = {
   "account.language.previous": "前の言語",
   "account.language.next": "次の言語",
   "account.language.continue": "続ける",
+  "account.language.change": "言語を変更",
 } as const satisfies PartialTranslation<typeof source>;

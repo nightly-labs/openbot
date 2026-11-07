@@ -32,21 +32,23 @@ import { type OwnedProcess, stopOwnedProcesses } from "./dev-services";
 
 const logger = createOpenBotLogger("dev-stack", (line) => process.stderr.write(`${line}\n`));
 
-const USAGE = "Usage: bun scripts/dev-stack.ts <status|stop|forget> [--all] [--pid=<supervisor pid>]";
+const USAGE = "Usage: bun scripts/dev-stack.ts <status|stop|forget|restart-client> [--all] [--pid=<supervisor pid>]";
 
 export interface DevStackInvocation {
   // `forget` drops a record without signalling anything. It is the way out of
   // the one state `stop` refuses to resolve on its own: a recorded pid that is
   // alive but that this machine cannot date, which `stop` will not signal
   // because the pid may since have been recycled by an unrelated program.
-  command: "status" | "stop" | "forget";
+  // `restart-client` asks this worktree's runner to stop and start only its test client.
+  command: "status" | "stop" | "forget" | "restart-client";
   all: boolean;
   pid: number | null;
 }
 
 export function parseDevStackInvocation(args: string[]): DevStackInvocation {
   const command = args.find((argument) => !argument.startsWith("--"));
-  if (command !== "status" && command !== "stop" && command !== "forget") throw new Error(USAGE);
+  if (command !== "status" && command !== "stop" && command !== "forget" && command !== "restart-client")
+    throw new Error(USAGE);
   const raw = args.find((argument) => argument.startsWith("--pid="))?.slice("--pid=".length);
   const pid = raw === undefined ? null : Number(raw);
   if (pid !== null && (!Number.isInteger(pid) || pid <= 0)) throw new Error("--pid must be a positive integer.");
@@ -90,6 +92,34 @@ function ownedProcess(pid: number): OwnedProcess {
 
 // Verify process identity before signalling. A live supervisor stops its own
 // children; otherwise stop only child groups whose leaders are verified.
+// The runner restarts the child itself: it owns the pid, the published records, and the exit handler
+// that would otherwise stop the whole stack. This only asks, and only a runner it can confirm.
+function restartTestClient(selected: DevStackRecord[]): void {
+  const withClient = selected.filter((record) => record.services.includes("test-client"));
+  const [record] = withClient;
+  if (!record || withClient.length > 1) {
+    logger.error(
+      withClient.length > 1
+        ? "More than one stack runs a test client. Name one with --pid=<supervisor pid>."
+        : "No dev stack of this worktree runs a test client. Start one with `bun run dev:test-client`.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (process.platform === "win32") {
+    logger.error("Restarting only the test client needs SIGUSR2, which Windows does not have.");
+    process.exitCode = 1;
+    return;
+  }
+  if (verifyRecordedProcess({ pid: record.supervisorPid, startedAt: record.startedAt }) !== "live") {
+    logger.error(`Cannot confirm pid ${record.supervisorPid} is the runner of this stack, so it was not signalled.`);
+    process.exitCode = 1;
+    return;
+  }
+  process.kill(record.supervisorPid, "SIGUSR2");
+  logger.info(`Asked ${describeDevStack(record)} to restart its test client.`);
+}
+
 async function stopDevStack(record: DevStackRecord): Promise<boolean> {
   let unresolved = false;
   const refuse = (pid: number, what: string): void => {
@@ -253,6 +283,10 @@ async function main(): Promise<void> {
 
   const scope = devStackScope(invocation, projectRoot);
   const selected = selectDevStacks(records, scope);
+  if (invocation.command === "restart-client") {
+    restartTestClient(selected);
+    return;
+  }
   if (selected.length === 0) {
     if (scope.kind === "worktree" && records.length > 0) {
       const elsewhere = invocation.command === "forget" ? "Recorded elsewhere" : "Live elsewhere";

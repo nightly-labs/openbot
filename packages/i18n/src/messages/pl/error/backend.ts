@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
   "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
   "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Wklej pełny sekret podpisu od nadawcy. Ma od 16 do 1024 znaków i nie zawiera spacji.",
   "error.backend.webhookRouteUnavailable":
     "Publiczna trasa webhooka nie jest gotowa. Sprawdź połączenie z hostem i spróbuj ponownie.",
   "error.backend.browserViewRemoteOnly": "Podgląd przeglądarki na żywo jest tylko dla zdalnego hosta.",
@@ -57,21 +59,39 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine nie osiągnął gotowości.",
   "error.backend.sunshineNotReadyReason": "Sunshine nie osiągnął gotowości. {reason}",
   "error.backend.channelLeadModelUnavailable": "Model lidera kanału jest niedostępny.",
+  "error.backend.contextCompactionIneffective":
+    "Kompaktowanie nie zmniejsza tego czatu: po dwóch kompaktowaniach nadal zajmuje {percent}% okna kontekstu modelu, więc OpenBot przestaje go kompaktować. Narzędzia i instrukcje zajmują większość okna. Wyłącz serwery MCP lub sterowanie komputerem, których ten agent nie potrzebuje, albo wybierz model z większym oknem. Potem zacznij nowy czat.",
+  "error.backend.contextCompactionStopped":
+    "Dwa kompaktowania tego czatu z rzędu się nie udały, więc OpenBot przestaje go kompaktować automatycznie. Każda próba wysyła cały czat do modelu i zużywa limit planu. Wybierz „Kompaktuj”, aby spróbować ponownie, albo zacznij nowy czat.",
+  "error.backend.providerRetrying":
+    "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Jeśli agent nie będzie kontynuować, zatrzymaj turę.",
+  "error.backend.providerRetryingLargeContext":
+    "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Ten czat zajmuje {percent}% okna kontekstu modelu. Jeśli agent nie będzie kontynuować, zatrzymaj turę: OpenBot skompaktuje czat przed następną wiadomością.",
   "error.backend.sharedDataUnavailable": "Dane współdzielone są niedostępne.",
   "error.backend.shuttingDown": "OpenBot się zamyka.",
   "error.backend.channelUnconfirmedStart":
     "Kanał ma niepotwierdzone rozpoczęcie przydziału. Sprawdź jego wynik przed usunięciem.",
   "error.backend.channelNotFound": "Nie znaleziono kanału.",
   "error.backend.channelMemberUnavailable": "Członek kanału jest niedostępny.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Poczekaj, aż praca w tym kanale się zakończy, a potem rozpocznij nową rozmowę.",
+  "error.backend.channelWaitBeforeCompact": "Poczekaj, aż praca w tym kanale się zakończy, a potem go skompaktuj.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Poczekaj, aż praca w tym kanale się zakończy, a potem usuń jego historię.",
+  "error.backend.channelCompactUnavailable":
+    "Żaden członek tego kanału nie może teraz skompaktować kontekstu. Członek musi najpierw odpowiedzieć w kanale, a jego dostawca musi obsługiwać kompaktowanie.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
   "error.backend.channelTaskComplete": "To zadanie jest już ukończone.",
+  "error.backend.channelTaskNotStopped": "Anulować można tylko zatrzymane lub nieudane zadanie.",
   "error.backend.channelSelectAgent": "Wybierz agenta.",
   "error.backend.channelLeadRequired": "Wybierz dostępnego lidera kanału lub przydziel to zadanie członkowi.",
   "error.backend.channelRoutingTooLong":
     "To żądanie przekracza limit kontekstu kierowania. Wybierz członka lub wyślij krótsze żądanie.",
   "error.backend.channelTaskMemberRequired": "Wybierz członka do tego zadania.",
+  "error.backend.channelTaskStopped": "Zatrzymano. Kontynuuj lub przydziel ponownie to zadanie.",
+  "error.backend.channelRoutingUnreadable": "Lider nie mógł przydzielić tej wiadomości. Przydziel ją członkowi.",
   "error.backend.channelRoutingFailed": "Kierowanie nie powiodło się. Wybierz członka lub spróbuj ponownie.",
   "error.backend.channelLeadTimedOut": "Lider kanału nie odpowiedział na czas. Wybierz członka lub spróbuj ponownie.",
   "error.backend.channelLeadFailed":
@@ -80,6 +100,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "Nie utworzono dostarczenia kanału.",
   "error.backend.channelAssignmentStopped": "Ten przydział kanału został zatrzymany lub zastąpiony.",
   "error.backend.channelAssigneeUnavailable": "Przydzielony agent jest niedostępny.",
+  "error.backend.channelAssigneeRemoved": "Przydzielony członek został usunięty.",
+  "error.backend.channelAssigneeReassign": "Przydzielony członek jest niedostępny. Przydziel to zadanie ponownie.",
   "error.backend.channelAssignmentChanged": "Ten przydział kanału się zmienił.",
   "error.backend.channelMemberRequired": "Wybierz dostępnego członka tego kanału.",
   "error.backend.memoryEssentialBudget":
@@ -103,8 +125,8 @@ export const messages = {
     "Masz {saved} z {limit} wspomnień. Aby zrobić miejsce, zaktualizuj jedno wspomnienie przez memoryId, łącząc tekst dwóch powiązanych wspomnień, a następnie zapomnij drugie lub zapomnij wspomnienie, które nie jest już prawdziwe. Potem spróbuj ponownie.",
   "error.backend.agentMemoryLimitExceeded":
     "Liczba zapisanych wspomnień: {saved}. Limit: {limit}. Użytkownik ustawił limit poniżej liczby zapisanych wspomnień. Nie zapominaj wspomnień, aby zrobić miejsce. Powiedz użytkownikowi, że to wspomnienie nie zostało zapisane.",
-  "error.backend.channelHistoryLeadRequired": "Wybierz lidera kanału, aby przygotować wspólną historię.",
   "error.backend.channelHistoryArriving": "Wspólna wiadomość wciąż napływa. Wznów, gdy będzie kompletna.",
+  "error.backend.channelHistoryLeadRequired": "Wybierz lidera kanału, aby przygotować wspólną historię.",
   "error.backend.channelHistoryInvalid": "Podsumowanie historii jest nieprawidłowe. Wznów, aby spróbować ponownie.",
   "error.backend.channelContextTooLong":
     "Ten przydział przekracza limit wspólnego kontekstu. Wyślij krótsze żądanie lub przydziel je ponownie.",
@@ -188,6 +210,12 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Oczekiwanie budzi tylko uruchomienie jednej z twoich rutyn, a nie masz żadnej rutyny. Utwórz ją za pomocą openbot.create_routine, a potem otwórz oczekiwanie.",
   "error.backend.agentWaitRemoteUnsupported": "Otwarte oczekiwania są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.messageDeleteUnsupported": "Ten serwer nie obsługuje usuwania wiadomości.",
+  "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
+  "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
+  "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
@@ -216,6 +244,11 @@ export const messages = {
     "OpenBot nie mógł odczytać informacji o logowaniu tego serwera. Sprawdź adres serwera i spróbuj ponownie.",
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
+  "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz ustawienia MCP i wybierz Zaloguj się.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} nie może uruchomić serwera MCP {name}. Otwórz ustawienia MCP i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -242,6 +275,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Serwer może mieć maksymalnie {limit} sekcji paska bocznego.",
   "error.backend.sectionNameRequired": "Nazwa sekcji jest wymagana.",
   "error.backend.sectionNameTooLong": "Nazwa sekcji jest za długa.",
+  "error.backend.sidebarFolderTooDeep": "Foldery mogą mieć tylko trzy poziomy.",
+  "error.backend.sidebarFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",
@@ -286,6 +321,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Profil przeglądarki o tej nazwie już istnieje.",
   "error.backend.browserSessionInUse": "Karta nadal używa tej sesji przeglądarki. Spróbuj ponownie.",
   "error.backend.browserProfileLimit": "Możesz mieć maksymalnie {limit} profili przeglądarki.",
+  "error.backend.browserProxyNotFound": "Ten serwer proxy już nie istnieje.",
+  "error.backend.browserProxyAddressInvalid":
+    "Wpisz adres serwera proxy, np. socks5://host:1080 lub http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Możesz mieć maksymalnie {limit} serwerów proxy.",
+  "error.backend.browserProxyTaken": "Serwer proxy z tym adresem już istnieje.",
+  "error.backend.browserProxyChanged":
+    "Ten serwer proxy zmienił się po jego otwarciu. Sprawdź go ponownie i spróbuj jeszcze raz.",
+  "error.backend.browserProxyUnreachable": "Proxy {name} nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":
     "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
   "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",
@@ -327,14 +373,17 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Liczba otwartych wątków tego agenta: {count}. Zarchiwizuj wątek, a potem rozpocznij lub przywróć inny.",
   "error.backend.threadRemoteUnsupported": "Wątki są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.branchSourceBusy": "Zatrzymaj bieżącą turę, zanim utworzysz odgałęzienie tego czatu.",
+  "error.backend.branchMessageNotFound": "Odgałęzienie możesz utworzyć tylko od ukończonej odpowiedzi agenta.",
+  "error.backend.branchRemoteUnsupported": "Odgałęzienia są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.threadMoveRefused": "W nowym wątku można uruchomić tylko wiadomość wysłaną wyłącznie do tego agenta.",
   "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
   "error.backend.taskToolInvalid":
     "Nadaj zadaniu tytuł o długości maksymalnie 120 znaków i opis, który mówi, co zrobić.",
   "error.backend.taskOwnChatOnly":
     "Zadanie możesz rozpocząć tylko z własnego czatu. Kanał, rozmowa w komunikatorze ani inne zadanie nie mogą go rozpocząć.",
-  "error.backend.taskOpenLimit":
-    "Liczba otwartych zadań tego agenta: {count}. Zanim rozpoczniesz kolejne zadanie, poczekaj, aż użytkownik zamknie jedno z nich.",
+  "error.backend.taskUnfinishedLimit":
+    "Liczba niezakończonych zadań tego agenta: {count}. Rozpocznij kolejne zadanie, gdy jedno z nich się zakończy.",
   "error.backend.taskOpenLimitReached":
     "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",

@@ -12,6 +12,12 @@ HeroUI Native is a component source, not a requirement to decorate every screen.
 
 Render product text through HeroUI Native `Typography`, including `Typography.Heading` and `Typography.Paragraph` for semantic roles. Screens and product components must not import React Native `Text` directly unless a third-party integration boundary requires the native primitive and the exception is documented.
 
+Chat message text is a documented exception. A long reply draws hundreds of text views, so the chat
+Markdown renderer draws React Native `Text` with the plain styles in
+`src/features/chat/components/chat-text-styles.ts`, not `Typography` and its class names. Every way
+of drawing a message, and the selection field over it, uses that one table. Body text is 16 points
+on a 22-point line, as in the composer.
+
 Native system chrome is the intentional exception. Navigation and operating-system-owned controls must remain native even when HeroUI can produce a visually similar element. This lets iOS apply Liquid Glass automatically on supported versions and lets Android retain its native Material behavior.
 
 All text uses Inter, the desktop and web font, with the system font as fallback. Native chrome stays native but takes the font: header titles, back titles and toolbar labels read the React Navigation theme fonts (`navigationFonts` in `src/shared/lib/app-font.ts`), and an iOS `@expo/ui` label takes `nativeLabelFont`. System menus, date pickers and Live Activities keep the system font.
@@ -39,7 +45,7 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 - Do not replace native headers, tab bars, toolbars, or search bars with `GlassView`. `expo-glass-effect` is for deliberate custom content surfaces, not for rebuilding system chrome.
 - Preserve platform safe-area and scroll-edge behavior. Ordinary screens normally use automatic content inset adjustment. Native sheets use the shared `SheetScrollView` header handling described below; do not add a second automatic inset or screen-local spacer.
 - The home list is the fallback exception for a full screen: iOS 27 shows no native scroll edge effect under its header. Its native header is transparent on iOS and Android, the native top edge is hidden, and the screen draws the canvas `SheetScrollEdgeEffect` of the chat header under the native buttons
-(on iOS; Android draws the solid Material bar of the big header). Android pads the list by the header height, because it has no content inset.
+(on iOS; Android draws the bar header blur of the big header, and the solid Material bar before Android 12). Android pads the list by the header height, because it has no content inset.
 - Avoid forcing opaque colors or bespoke backgrounds onto native chrome unless the product requirement explicitly calls for it. Let the operating system adapt materials to the platform version, appearance, accessibility settings, and scroll state.
 - Treat older iOS versions and Android as first-class fallbacks. The interface must remain complete and readable when Liquid Glass is unavailable or reduced transparency is enabled.
 - Use platform-native icons in native navigation (`sf` on iOS and the corresponding Material icon on Android). Use the existing application icon convention for HeroUI content.
@@ -55,18 +61,21 @@ large title does not work under the custom scroll edge effect on iOS 27, and And
   34 pt bold title. On iOS a pull past the top grows it a little, as the native title does.
 - `LargeTitleBar` draws the scroll edge effect and the 17 pt small title. The small title fades in,
   4 pt up, in 200 ms when the text of the big title reaches the bottom of the bar.
-- Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the surface
-  solid under the bar and a 32 dp fade below it, as the top fade of the design,
+- Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the bar header
+  blur described below (the surface solid under the bar and a 32 dp fade below it before Android 12),
   a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp glass circle on full screens, the plain icon in sheets.
-- Android has no Liquid Glass, and its blur does not work over a scroll view. The search field and the
-  bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
+- Android has no Liquid Glass. The search field and the bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
   opaque), a hairline edge, a soft shadow and the top light of `ChromeGlassSheen`. The home search
   field has a real blur on Android 12 and later: the home content is in a `BlurTargetView`, and the
   field draws a `BlurView` of it (radius 24) under the lighter `--openbot-bg-chrome-blur` fill. While
   the results are open, the field shows the solid glass over the blur, because the results are not in
   the target. iOS without Liquid Glass keeps the solid capsule.
-  Stacks set `androidBackOptions` in `screenOptions`, so the back button of every inner page, in
-  sheets too, is the same round button and not the native arrow.
+- Android 12 and later blur the content under the bar with `AndroidHeaderBlur`
+  (`src/shared/components/android-header-blur.tsx`): the scroll content is in an `AndroidBlurTarget`
+  on the surface color. The bar draws the usual Expo progressive blur: a `BlurView` of the target
+  (intensity 40) with the surface color at 80% over it, in a `MaskedView` whose eased gradient fades it out below the bar. A sheet bar reaches 28 dp
+  below the bar and is full over its top 45%; a full screen bar reaches 32 dp below and is full over
+  its top 68%, because its title sits lower. It needs no native change. `LargeTitleBar` takes the target as `blurTarget`.
 - `LargeTitleScrollView` puts grouped content under a big header on the sheet surface.
 
 The native header stays, transparent, with an empty title. It keeps the native Liquid Glass buttons on
@@ -109,6 +118,56 @@ installs. A skill opens the agent choice as the next page, and an app that asks 
 sign-in opens its connect page; each page has its own `SheetSaveAction`. The arrow on an example request is the desktop Try: it puts the request
 (a skill keeps its `@[name](skill:id)` marker) in an agent's message field and the chat replaces the
 sheet, as Agent info > Skills does for a new skill. Several agents that can use it are a native menu.
+
+## Wide windows and iPhone Duo
+
+The app supports iPad and iPhone Duo. Apple and Expo ask for one design that widens, not a design
+for each device or pose: a folded iPhone Duo is a compact window, and an open one is a wide window.
+
+- `AdaptiveSplit` (`src/shared/components/adaptive-split.tsx`) decides the layout from the window.
+  A window 700 pt or wider (iPad in both orientations, the open iPhone Duo, an open Android foldable)
+  shows the chat list as a pane beside the stack. Narrower windows (phones, the folded iPhone Duo, a
+  half of Split View) show the stack alone, as before.
+- A vertical fold, from `react-native-reserved-regions`, ends the pane, so neither column lies across
+  it. Without a fold the pane takes about a third of the window, from 320 to 400 pt.
+- The pane has two modes, kept across starts (`split-pane-preference.ts`): the full list, or a rail
+  of avatars (`ChatListRail`, 76 pt and the side inset). Only a drag on the divider changes it, with
+  no button: it resizes the list (320 pt to 520 pt, and the detail keeps 380 pt), and a drag or
+  flick past the middle collapses it to the rail, or opens the rail again. The pane width follows
+  the finger on the UI thread. The list never lays out narrower than 320 pt: the pane clips it,
+  and below that the list fades out as the rail fades in (`SplitPaneLayers`), so nothing snaps. With a fold, the
+  list keeps the fold width; the rail gives the detail the rest of the window. The divider is an
+  `adjustable` element for screen readers.
+- The bar of the pane fits 320 pt: the connection state takes the room that the buttons leave. On
+  iOS its 48 pt buttons, and the chat header's beside it, are centred in the native bar height
+  (`NATIVE_BAR_HEIGHT`: 50 pt on iPad, 44 pt on iPhone), so they line up with the native bar buttons
+  of the other screens (Threads, Marketplace and others). A phone keeps the chat header 8 pt down.
+- On a wide window, bottom search fields (home, Marketplace) take the resting height and bottom gap
+  of the chat composer (`useBottomFieldMetrics`, from `shared/lib/composer-metrics.ts`), so they line
+  up with the composer beside them. The phone keeps the large field. Use the hook for a new one.
+- The stack stays mounted when the layout changes. A chat that is open when the device folds stays
+  open, with its state. Home then shows the list again under it.
+- On a wide window, `connected` shows the empty detail, the pane draws its own bar (the native bar
+  belongs to the stack), a chat opens in place of the chat before it, and a chat beside the pane has
+  no Back and no edge swipe (`useSplitDetailRoot`).
+- Each column has its own `SafeAreaProvider`. Use `useSafeAreaInsets()` for the column insets, and
+  `useColumnWidth()` in place of the window width for a view that sizes itself.
+- Pad content by `insets.left` and `insets.right`, not only top and bottom. The iPhone Duo rail
+  takes 84 pt on the left or the right, and landscape has side insets too. Keep backgrounds edge to
+  edge, pad the content, and give absolute buttons `left: insets.left + N`. Put the insets outside a
+  scroll view with `contentInsetAdjustmentBehavior="always"` (a margin on the scroll view), because
+  iOS would also inset its content by them.
+- Native headers, toolbars and sheets place themselves, rail included. Do not move them by hand.
+- While iOS shows the vertical bar (`useVerticalBarShown`), it moves native bar buttons (Back, icon
+  buttons, menus) into it; custom views (`Stack.Toolbar.View`) stay at the top. A JS header cannot
+  move, so `ChatHeader` then shows the native bar with its Back, browser and actions as toolbar items
+  and its title pill as a custom view. Give a new screen native bar items, not JS buttons.
+- With the vertical bar, the top inset has no status bar and iOS makes the top bar shorter than the
+  stack reports. The bars start at `useBarTop()` (at least 20 pt from the top edge), and the
+  large-title screens pad their content themselves (`scroll.ownsInset`, as on Android), so the
+  caption stays below the scroll edge effect. Without the vertical bar nothing changes.
+- Check folded, open, partially open, Split View and rotation on iPhone Duo, iPad in both
+  orientations, and a standard iPhone, which must not change.
 
 ## Sheets
 
@@ -239,10 +298,18 @@ covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
-Android sheets draw no edge blur. Below the opaque native header, or at the top of a sheet with no
-header, the content fades into a 32 dp masked `bg-sheet` layer. The fade follows the same rule as the
-iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat, home list
-and drawer edges keep their canvas effect.
+On Android 12 and later, a `SheetScrollView` under a native header replaces that header with
+`AndroidBlurHeader`, a custom Material 3 small top app bar (64 dp) over `AndroidHeaderBlur`. It sets
+the `header` option in a layout effect, and puts the native header back when it unmounts. The custom
+header draws the page's `headerLeft`, title and `headerRight`, so `androidBackOptions`,
+`AndroidHeaderButton` and `SheetSaveAction` keep working. The stack measures it, and the content
+clears exactly that height. A sheet header (`sheetHeaderInsetOptions`, see `isSheetHeader`) does not
+reach the status bar; a full screen adds it. A page without `SheetScrollView`, such as a scanner or a
+PIN page, keeps the opaque native header. A page that puts a `Stack.SearchBar` in the header (the
+audit log) sets `androidNativeHeader`, because the custom header cannot draw it. Before Android 12, and at the top of a sheet with no header, the
+content fades into a 32 dp masked `bg-sheet` layer below the opaque header.
+The fade follows the same rule as the iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat and drawer
+edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.

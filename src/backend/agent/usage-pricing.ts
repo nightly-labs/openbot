@@ -139,6 +139,21 @@ const PRICES: Readonly<Record<string, Price>> = {
   "antigravity:claude-sonnet-5-5": antigravityClaude(2, 0.1, 10),
 };
 
+function priceOf(provider: string, model: string): Price | undefined {
+  // Claude Code names the 1M context window `[1m]`. It is priced at the model's standard rates.
+  const price = PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+  if (price || provider !== "antigravity") return price;
+  // An Antigravity agent can keep its effort in the model ID, such as `gemini-3.8-flash-high`. The
+  // effort changes the tokens, not the rates.
+  const effort = /-(minimal|low|medium|high)$/.exec(model);
+  return effort ? PRICES[`${provider}:${model.slice(0, effort.index)}`] : undefined;
+}
+
+/** The standard input rate per million tokens, or null for a model with no known price. */
+export function inputPrice(provider: string, model: string): number | null {
+  return priceOf(provider, model)?.short.input ?? null;
+}
+
 /**
  * Prices the tokens of one update. `lastRequestInputTokens` is the prompt of the last request in it,
  * when the provider reports one. An update under the long-context threshold cannot hold a request
@@ -155,8 +170,7 @@ export function estimateUsageCost(
   smallestRequestInputTokens: number | null = null,
   occurredAt: string = new Date().toISOString(),
 ): { cost: number | null; basis: string | null } {
-  // Claude Code names the 1M context window `[1m]`. It is priced at the model's standard rates.
-  const price = PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+  const price = priceOf(provider, model);
   if (
     !price ||
     tokens.uncachedInput === null ||

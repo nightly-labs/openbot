@@ -18,6 +18,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -192,6 +193,11 @@ export function QrScanner({
 }) {
   const embedded = inSheet || immersive;
   const { t, errorMessage } = useText();
+  // A full screen keeps its content clear of the side insets (the iPhone Duo rail). In a sheet, the
+  // padding stays as it was.
+  const insets = useSafeAreaInsets();
+  const sideLeft = inSheet ? 0 : insets.left;
+  const sideRight = inSheet ? 0 : insets.right;
   const scanLocked = useRef(false);
   const completed = useRef(false);
   const scanPending = useRef(false);
@@ -316,7 +322,11 @@ export function QrScanner({
           contentContainerClassName={
             embedded ? "min-h-full grow px-4 pb-4 pt-20" : "min-h-full grow px-5 pb-safe-offset-8 pt-8"
           }
-          contentContainerStyle={contentInsetTop === undefined ? undefined : { paddingTop: contentInsetTop }}
+          contentContainerStyle={{
+            ...(contentInsetTop === undefined ? null : { paddingTop: contentInsetTop }),
+            paddingLeft: sideLeft + (embedded ? 16 : 20),
+            paddingRight: sideRight + (embedded ? 16 : 20),
+          }}
           contentInsetAdjustmentBehavior={embedded ? "never" : "automatic"}
         >
           <View className="mx-auto w-full max-w-md flex-1 justify-center">
@@ -430,7 +440,7 @@ export function QrScanner({
         )}
 
         {immersive ? (
-          <View className="absolute inset-x-6 items-center" style={{ bottom: "19%" }}>
+          <View className="absolute items-center" style={{ bottom: "19%", left: sideLeft + 24, right: sideRight + 24 }}>
             {previewReady ? (
               // The pill comes in once the block over the camera has faded.
               <Animated.View entering={FadeIn.duration(200).delay(reducedMotion ? 0 : 650)}>
@@ -440,8 +450,8 @@ export function QrScanner({
           </View>
         ) : (
           <Animated.View
-            style={statusStyle}
-            className={embedded ? "absolute inset-x-4 bottom-4" : "absolute inset-x-5 bottom-safe-offset-5"}
+            style={[statusStyle, { left: sideLeft + (embedded ? 16 : 20), right: sideRight + (embedded ? 16 : 20) }]}
+            className={embedded ? "absolute bottom-4" : "absolute bottom-safe-offset-5"}
           >
             <ScannerStatus pairing={pairing} scanState={scanState} onRetry={retry} />
           </Animated.View>

@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
+  "error.backend.webhookSenderSecretInvalid":
+    "보낸 쪽의 서명 시크릿 전체를 붙여 넣으세요. 16~1024자이며 공백이 없습니다.",
   "error.backend.webhookRouteUnavailable":
     "공개 웹훅 경로가 아직 준비되지 않았어요. 호스트 연결을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookTestUnavailable":
@@ -55,21 +57,37 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine이 준비되지 않았어요.",
   "error.backend.sunshineNotReadyReason": "Sunshine이 준비되지 않았어요. {reason}",
   "error.backend.channelLeadModelUnavailable": "채널 리더 모델을 사용할 수 없어요.",
+  "error.backend.contextCompactionIneffective":
+    "압축해도 이 채팅이 작아지지 않아요. 두 번 압축한 뒤에도 모델 컨텍스트 창의 {percent}%를 사용해서 OpenBot이 압축을 멈춰요. 창의 대부분은 도구와 지침이 사용해요. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끄거나, 창이 더 큰 모델을 선택하세요. 그런 다음 새 채팅을 시작하세요.",
+  "error.backend.contextCompactionStopped":
+    '이 채팅의 압축이 두 번 연속 실패하여 OpenBot이 자동 압축을 중지합니다. 시도할 때마다 채팅 전체가 모델로 전송되어 요금제 한도를 사용합니다. 다시 시도하려면 "지금 압축"을 선택하거나 새 채팅을 시작하세요.',
+  "error.backend.providerRetrying":
+    "제공자가 이 요청에 {attempts}번 실패해서 다시 시도하고 있어요. 에이전트가 계속하지 않으면 턴을 중지하세요.",
+  "error.backend.providerRetryingLargeContext":
+    "제공자가 이 요청에 {attempts}번 실패해서 다시 시도하고 있어요. 이 채팅은 모델 컨텍스트 창의 {percent}%를 사용해요. 에이전트가 계속하지 않으면 턴을 중지하세요. 그러면 OpenBot이 다음 메시지 전에 채팅을 압축해요.",
   "error.backend.sharedDataUnavailable": "공유 데이터를 사용할 수 없어요.",
   "error.backend.shuttingDown": "OpenBot이 종료되는 중이에요.",
   "error.backend.channelUnconfirmedStart":
     "채널에 시작을 확인하지 못한 배정이 있어요. 삭제하기 전에 결과를 확인하세요.",
   "error.backend.channelNotFound": "채널을 찾을 수 없어요.",
   "error.backend.channelMemberUnavailable": "채널 멤버를 사용할 수 없어요.",
+  "error.backend.channelWaitBeforeNewConversation": "이 채널의 작업이 끝날 때까지 기다린 다음 새 대화를 시작하세요.",
+  "error.backend.channelWaitBeforeCompact": "이 채널의 작업이 끝날 때까지 기다린 다음 압축하세요.",
+  "error.backend.channelWaitBeforeDeleteHistory": "이 채널의 작업이 끝날 때까지 기다린 다음 기록을 삭제하세요.",
+  "error.backend.channelCompactUnavailable":
+    "지금은 이 채널의 어떤 멤버도 컨텍스트를 압축할 수 없습니다. 먼저 멤버가 채널에서 답해야 하고, 그 제공자가 압축을 지원해야 합니다.",
   "error.backend.channelArchived": "메시지를 보내거나 작업을 변경하려면 먼저 이 채널을 복원하세요.",
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
   "error.backend.channelTaskNotFound": "채널 작업을 찾을 수 없어요.",
   "error.backend.channelTaskComplete": "이 작업은 이미 완료되었어요.",
+  "error.backend.channelTaskNotStopped": "중지되었거나 실패한 작업만 취소할 수 있어요.",
   "error.backend.channelSelectAgent": "에이전트를 선택하세요.",
   "error.backend.channelLeadRequired": "사용 가능한 채널 리더를 선택하거나 이 작업을 멤버에게 배정하세요.",
   "error.backend.channelRoutingTooLong":
     "이 요청이 라우팅 컨텍스트 한도를 넘었어요. 멤버를 선택하거나 더 짧은 요청을 보내세요.",
   "error.backend.channelTaskMemberRequired": "이 작업을 맡을 멤버를 선택하세요.",
+  "error.backend.channelTaskStopped": "중지됨. 이 작업을 계속하거나 다시 배정하세요.",
+  "error.backend.channelRoutingUnreadable": "리더가 이 메시지를 배정하지 못했어요. 멤버에게 다시 배정하세요.",
   "error.backend.channelRoutingFailed": "라우팅에 실패했어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadTimedOut": "채널 리더가 제시간에 답하지 않았어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadFailed": "채널 리더가 이 메시지를 전달하지 못했어요. 멤버를 선택하거나 다시 시도해 주세요.",
@@ -77,6 +95,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "채널 전달이 만들어지지 않았어요.",
   "error.backend.channelAssignmentStopped": "이 채널 배정은 중지되었거나 다른 배정으로 바뀌었어요.",
   "error.backend.channelAssigneeUnavailable": "배정된 에이전트를 사용할 수 없어요.",
+  "error.backend.channelAssigneeRemoved": "배정된 멤버가 제거되었어요.",
+  "error.backend.channelAssigneeReassign": "배정된 멤버를 사용할 수 없어요. 이 작업을 다시 배정하세요.",
   "error.backend.channelAssignmentChanged": "이 채널 배정이 변경되었어요.",
   "error.backend.channelMemberRequired": "이 채널에서 사용 가능한 멤버를 선택하세요.",
   "error.backend.memoryEssentialBudget":
@@ -98,8 +118,8 @@ export const messages = {
     "메모리가 {limit}개 중 {saved}개예요. 공간을 만들려면 관련된 메모리 두 개의 내용을 합쳐 memoryId로 메모리 하나를 업데이트한 후 나머지 하나를 삭제하거나, 더 이상 사실이 아닌 메모리를 삭제하세요. 그런 다음 다시 시도해 주세요.",
   "error.backend.agentMemoryLimitExceeded":
     "메모리가 {saved}개인데 한도는 {limit}개예요. 사용자가 한도를 저장된 메모리 수보다 낮게 설정했어요. 공간을 만들려고 메모리를 삭제하지 마세요. 사용자에게 이 메모리가 저장되지 않았다고 알리세요.",
-  "error.backend.channelHistoryLeadRequired": "공유 기록을 준비하려면 채널 리더를 선택하세요.",
   "error.backend.channelHistoryArriving": "공유 메시지가 아직 도착하는 중이에요. 완료되면 재개하세요.",
+  "error.backend.channelHistoryLeadRequired": "공유 기록을 준비하려면 채널 리더를 선택하세요.",
   "error.backend.channelHistoryInvalid": "기록 요약이 올바르지 않아요. 재개해서 다시 시도해 주세요.",
   "error.backend.channelContextTooLong":
     "이 배정이 공유 컨텍스트 한도를 넘었어요. 더 짧은 요청을 보내거나 다시 배정하세요.",
@@ -180,6 +200,12 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "대기를 깨우는 것은 내 루틴의 실행뿐인데, 루틴이 없어요. openbot.create_routine으로 루틴을 만든 후 대기를 여세요.",
   "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.messageDeleteUnsupported": "이 서버는 메시지 삭제를 지원하지 않아요.",
+  "error.backend.messageDeleteNotFound": "이 메시지는 채팅에 없어요.",
+  "error.backend.messageDeleteBusy": "이 메시지는 실행 중인 턴의 일부예요. 턴이 끝나면 삭제하세요.",
+  "error.backend.messageDeleteForbidden": "내가 보낸 메시지만 삭제할 수 있어요.",
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
@@ -206,6 +232,11 @@ export const messages = {
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot이 이 서버의 로그인 정보를 읽을 수 없었어요. 서버 주소를 확인한 후 다시 시도해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
+  "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 로그인을 요청해요. MCP 설정을 열고 로그인을 선택해 주세요.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. MCP 설정을 열고 연결 테스트를 선택하면 원인을 확인할 수 있어요.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -230,6 +261,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "서버 하나에는 사이드바 섹션을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.sectionNameRequired": "섹션 이름이 필요해요.",
   "error.backend.sectionNameTooLong": "섹션 이름이 너무 길어요.",
+  "error.backend.sidebarFolderTooDeep": "폴더는 3단계까지만 만들 수 있습니다.",
+  "error.backend.sidebarFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없습니다.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
@@ -275,6 +308,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "같은 이름의 브라우저 프로필이 이미 있어요.",
   "error.backend.browserSessionInUse": "탭 하나가 아직 이 브라우저 세션을 사용 중이에요. 다시 시도해 주세요.",
   "error.backend.browserProfileLimit": "브라우저 프로필은 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyNotFound": "이 프록시는 더 이상 없어요.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 또는 http://user:password@host:3128 같은 프록시 주소를 입력하세요.",
+  "error.backend.browserProxyLimit": "프록시는 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyTaken": "이 주소를 사용하는 프록시가 이미 있어요.",
+  "error.backend.browserProxyChanged": "이 프록시를 연 뒤에 변경되었어요. 다시 확인한 다음 다시 시도해 주세요.",
+  "error.backend.browserProxyUnreachable": "프록시 {name}이(가) 응답하지 않아 페이지를 열지 못했어요.",
+  "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
+  "error.backend.browserProxyComputerUnreachable":
+    "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",
@@ -315,13 +358,16 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "이 에이전트에는 열린 스레드가 {count}개 있어요. 스레드 하나를 보관한 후 다른 스레드를 시작하거나 복원하세요.",
   "error.backend.threadRemoteUnsupported": "스레드는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.branchSourceBusy": "이 채팅을 분기하기 전에 현재 턴을 중지하세요.",
+  "error.backend.branchMessageNotFound": "에이전트의 완료된 답변에서만 분기할 수 있어요.",
+  "error.backend.branchRemoteUnsupported": "분기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
-  "error.backend.taskOpenLimit":
-    "이 에이전트에는 이미 열린 작업이 {count}개 있어요. 다른 작업을 시작하기 전에 사용자가 작업 하나를 닫을 때까지 기다리세요.",
+  "error.backend.taskUnfinishedLimit":
+    "이 에이전트에는 이미 끝나지 않은 작업이 {count}개 있어요. 그중 하나가 끝나면 다른 작업을 시작하세요.",
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",

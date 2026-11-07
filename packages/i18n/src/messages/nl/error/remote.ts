@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Testen van extern bureaublad is niet beschikbaar.",
   "error.remote.controlUnavailable": "Bediening op afstand is niet beschikbaar.",
   "error.remote.controlSessionNotFound": "Sessie voor bediening op afstand niet gevonden.",
+  "error.remote.controlNotAllowed": "De eigenaar van deze computer staat je rol niet toe om hem te bedienen.",
+  "error.remote.controlDeclined": "De persoon bij deze computer heeft bediening op afstand niet toegestaan.",
   "error.remote.testRuntimeUpdate": "Werk de macOS-runtime voor extern bureaublad bij om deze test uit te voeren.",
   "error.remote.testOtherSessions": "Beëindig andere sessies van extern bureaublad voordat je een test start.",
   "error.remote.testPermissions": "Controleer de toestemmingen en de GUI-sessie op de host voordat je de test start.",
@@ -93,6 +95,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "De WebRTC-bestandsoverdracht is mislukt.",
   "error.remote.fileResumeFailed": "De WebRTC-bestandsoverdracht kon niet op tijd worden hervat.",
   "error.remote.fileTransportStopped": "Het WebRTC-bestandstransport is gestopt.",
+  "error.remote.downloadStopped": "De download is gestopt.",
   "error.remote.fileResumeExpired": "De termijn om de WebRTC-bestandsoverdracht te hervatten is verlopen.",
   "error.remote.hostRequestFailed": "De host kon het verzoek niet voltooien.",
   "error.remote.responseTooLarge": "Het antwoord van de host is te groot om naar dit apparaat te sturen.",
@@ -126,8 +129,6 @@ export const messages = {
   "error.remote.serverDisconnected": "De verbinding met de server is verbroken.",
   "error.remote.preferencesUnreadable": "De opgeslagen chatvoorkeuren konden niet worden gelezen.",
   "error.remote.accountAuthRequired": "Verificatie van het account is verplicht.",
-  "error.remote.serverIdentityChanged":
-    "De identiteit van de server is gewijzigd. De vertrouwde hostsleutel wordt niet vervangen.",
   "error.remote.pairedIdentityChanged":
     "De identiteit van de gekoppelde desktop ontbreekt of is gewijzigd. Scan een nieuwe code van die desktop.",
   "error.remote.permanentInviteNoEmail": "Permanente uitnodigingen kunnen niet per e-mail worden verstuurd.",
@@ -191,14 +192,19 @@ export const messages = {
     "Deze host heeft het maximumaantal leden bereikt. Vraag de eigenaar om ruimte te maken.",
   "error.remote.hostNotRegistered": "Deze host is niet meer geregistreerd bij de OpenBot-service.",
   "error.remote.membershipEnded": "Je bent geen lid meer van deze host. Vraag de eigenaar om een nieuwe uitnodiging.",
+  "error.remote.membershipChanged":
+    "Iemand anders heeft dit lid tegelijk gewijzigd. Laad de leden opnieuw en probeer het nog eens.",
   "error.remote.accountSessionInactive": "Je inlog is niet meer actief. Log opnieuw in.",
   "error.remote.hostOtherAccount": "Deze host hoort bij een ander account.",
   "error.remote.remoteNotConfigured": "Externe verbindingen zijn niet ingesteld op deze OpenBot-service.",
   "error.remote.hostRefused": "De host heeft het verzoek geweigerd ({status}).",
   "error.remote.formUnavailable": "Dit formulier is niet meer beschikbaar.",
   "error.remote.hostedServerRemoval": "Gebruik Facturering om een gehoste server te verwijderen.",
+  "error.remote.hostRemoved": "De eigenaar heeft deze server uit het account verwijderd.",
   "error.remote.channelsUnsupported": "Werk deze desktopserver bij om kanalen te gebruiken.",
   "error.remote.channelDeleteUnsupported": "Werk deze desktopserver bij om kanalen te verwijderen.",
   "error.remote.historyRefreshFailed": "Het bericht is verstuurd, maar de chatgeschiedenis kon niet worden vernieuwd.",
   "error.remote.taskHistoryRefreshFailed": "De taak is gewijzigd, maar de chatgeschiedenis kon niet worden vernieuwd.",
+  "error.remote.localServerAccountRemovalFailed":
+    "De server is op zijn computer verwijderd, maar het account toont hem nog. Verwijder hem opnieuw om hem uit het account te halen.",
 } as const satisfies PartialTranslation<typeof source>;

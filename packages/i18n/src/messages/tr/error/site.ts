@@ -27,4 +27,18 @@ export const messages = {
   "error.site.fileType": "Bu dosya türüne izin verilmez: {path}",
   "error.site.fileOutsideRoot": "Site dosyaları kaynak kökünün içinde kalmalıdır: {path}",
   "error.site.fileTooLarge": "Bir dosya 1 MB sınırını aşıyor: {path}",
+  "error.site.serverLimit": {
+    one: "Bu sunucu {count} etkin site sınırına ulaştı. Başka bir site yayımlamak için bir siteyi silin veya daha fazla site içeren bir plana sahip bulut sunucusu kullanın.",
+    other:
+      "Bu sunucu {count} etkin site sınırına ulaştı. Başka bir site yayımlamak için bir siteyi silin veya daha fazla site içeren bir plana sahip bulut sunucusu kullanın.",
+  },
+  "error.site.sharedLimit":
+    "Hesabınızın planı olmayan sunucuları etkin sitelerini paylaşır ve hepsi kullanımda. Burada bir site yayımlamak için bu sunuculardan birindeki bir siteyi silin, lisansınıza kullanıcı ekleyin veya daha fazla site içeren bir plana sahip bir bulut sunucusu kullanın.",
+  "error.site.accountLimit":
+    "Hesabınız tüm sunucularında en fazla sayıda etkin siteye sahip: {count}. Başka bir site yayımlamak için bir siteyi silin.",
+  "error.site.unlinkedLimit": {
+    one: "Bu bilgisayar bir sunucu değil ve hesabı {count} etkin site sınırına ulaştı. Başka bir site yayımlamak için bir siteyi silin veya daha fazla site içeren bir plana sahip bulut sunucusu kullanın.",
+    other:
+      "Bu bilgisayar bir sunucu değil ve hesabı {count} etkin site sınırına ulaştı. Başka bir site yayımlamak için bir siteyi silin veya daha fazla site içeren bir plana sahip bulut sunucusu kullanın.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

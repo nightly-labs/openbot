@@ -40,13 +40,14 @@ export function SidebarNav() {
       ref={setAgentListElement}
       aria-label={t("sidebar.nav.label")}
       class={["agent-list", scrollFades.classes()]}
+      style={{ "--agent-list-stuck-height": `${scrollFades.stuckHeight()}px` }}
       data-sidebar-dragging={draggingKind()}
       onDragOver={updateSidebarNativeDrag}
       onDragLeave={handleListDragLeave}
       onDrop={dropSidebarNativeDrag}
       onScroll={scrollFades.measure}
     >
-      <div class="agent-list-content">
+      <div ref={scrollFades.watch} class="agent-list-content">
         <Show
           when={
             resolvedPinnedItems().length === 0 &&

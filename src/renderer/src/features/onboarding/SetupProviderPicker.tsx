@@ -123,9 +123,14 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
   "Cursor plan or API key": "onboarding.provider.cursorPlan",
   "Free models with a Cline account": "onboarding.provider.clineAccount",
+  "Kimi models with a Kimi Code account": "onboarding.provider.kimiAccount",
+  "Many models with a Devin account": "onboarding.provider.devinAccount",
+  "Many models with a Copilot plan": "onboarding.provider.copilotAccount",
+  "Mistral models with a Mistral account": "onboarding.provider.mistralAccount",
   "Mercury models with an Inception API key": "onboarding.provider.inceptionKey",
   "DeepSeek models with a DeepSeek API key": "onboarding.provider.deepseekKey",
   "Many models with an OpenRouter API key": "onboarding.provider.openrouterKey",
+  "Nous Portal plan or your Hermes setup": "onboarding.provider.hermesNous",
 };
 
 /**
@@ -216,6 +221,7 @@ export function createSetupProviders(
         message: status?.message,
         email: status?.email,
         connectionState: status?.connectionState,
+        signInPending: status?.signInPending,
         checkError: status?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider.id] ?? null,
         freeModels: provider.id === "opencode",
@@ -476,10 +482,11 @@ export function createSetupProviders(
 
   /**
    * OpenCode, Muse and Gemini sign in with a pasted key, so their rows open the key dialog; the rest
-   * open a guide. Claude's key is an option on its Providers page, so its Sign in stays the guide.
+   * open a guide. Claude's and Codex's keys are an option on their Providers page, so their Sign in
+   * stays the guide.
    */
   function signInProvider(provider: AgentProviderId): void {
-    if (isKeyDialogProvider(provider) && provider !== "claude" && props.providerKeys) {
+    if (isKeyDialogProvider(provider) && provider !== "claude" && provider !== "codex" && props.providerKeys) {
       setKeyProvider(provider);
       return;
     }
@@ -487,13 +494,25 @@ export function createSetupProviders(
   }
 
   /** Resolves `false` when the request failed; the error then says why. */
-  async function connectProvider(provider: AgentProviderId): Promise<boolean> {
+  function connectProvider(provider: AgentProviderId): Promise<boolean> {
+    return followSignIn(provider, (connection) => connection.connect(provider));
+  }
+
+  /** Signs in on the provider's mainland China site, as `connectProvider` does on its default site. */
+  function connectProviderInMainlandChina(provider: AgentProviderId): Promise<boolean> {
+    return followSignIn(provider, (connection) => connection.connectInMainlandChina?.(provider) ?? Promise.resolve());
+  }
+
+  async function followSignIn(
+    provider: AgentProviderId,
+    start: (connection: ProviderConnectionApi) => Promise<void>,
+  ): Promise<boolean> {
     const connection = props.connection;
     const kind = connection?.connectKind(provider);
     if (!connection || !kind || props.refreshingProviders) return true;
     // A dialog sign-in reports itself in its dialog. The browser sign-in reports in the row.
     if (kind === "dialog") {
-      await connection.connect(provider);
+      await start(connection);
       return true;
     }
     keepProviderRows();
@@ -506,7 +525,7 @@ export function createSetupProviders(
       props.agentStatus.providers?.find((candidate) => candidate.id === provider)?.message ?? null,
     );
     try {
-      await connection.connect(provider);
+      await start(connection);
       return true;
     } catch (cause) {
       providersAwaitingFocusRefresh.delete(provider);
@@ -589,6 +608,7 @@ export function createSetupProviders(
     selectCustomProvider,
     signInProvider,
     connectProvider,
+    connectProviderInMainlandChina,
     downloadProvider,
     /** Forgets the user's choice, so the step chooses again from the rows it shows. */
     clearChoice: () => {
@@ -633,6 +653,14 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           connect: async (provider) => {
             await props.providers.connectProvider(provider);
           },
+          ...(api.mainlandChinaSite && api.connectInMainlandChina
+            ? {
+                mainlandChinaSite: api.mainlandChinaSite,
+                connectInMainlandChina: async (provider) => {
+                  await props.providers.connectProviderInMainlandChina(provider);
+                },
+              }
+            : {}),
         }
       : undefined;
   });
@@ -720,6 +748,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
       <Show when={source().onAddCustomProvider}>
         <CustomProviderDialog
           open={props.providers.host.state.open}
+          contextWindows={!source().hostProviders}
           busy={props.providers.host.state.saving}
           submitError={props.providers.host.state.submitError}
           takenProviderIds={(source().customProviders ?? []).map((provider) => provider.id)}

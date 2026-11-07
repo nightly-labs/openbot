@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Padrão do sistema",
   "mobile.settings.language.footer":
     "Padrão do sistema segue o primeiro idioma nas configurações do celular. O texto ainda não traduzido aparece em inglês.",
+  "mobile.settings.language.restartTitle": "Reiniciar o OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Este idioma é lido na direção oposta. As telas mudam de direção quando o OpenBot iniciar de novo. Se as telas ainda parecerem erradas depois de reiniciar, feche o OpenBot no alternador de apps e abra-o de novo.",
+  "mobile.settings.language.restartNow": "Reiniciar agora",
+  "mobile.settings.language.restartFailed":
+    "Não foi possível reiniciar o OpenBot. As telas mudam de direção na próxima vez que você abrir o OpenBot.",
   "mobile.settings.dictation.language": "Idioma do ditado",
   "mobile.settings.about.development": "Desenvolvimento",
   "mobile.settings.about.openFailed": "Não foi possível abrir o link. Tente novamente.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Suporte",
   "mobile.settings.home.supportHint": "Obter ajuda e salvar um registro de suporte",
   "mobile.settings.support.help": "Obter ajuda",
+  "mobile.settings.support.discord": "Abrir um ticket no Discord",
+  "mobile.settings.support.discordHint": "O jeito mais rápido de conseguir ajuda",
   "mobile.settings.support.message": "Fale conosco no X",
   "mobile.settings.support.issues": "Relatar um problema no GitHub",
   "mobile.settings.support.helpFooter":
-    "Conte o que aconteceu e quando. Anexe o arquivo de registro de suporte à sua issue no GitHub.",
+    "Conte o que aconteceu e quando. Anexe o arquivo de registro de suporte ao seu ticket no Discord ou à sua issue no GitHub.",
   "mobile.settings.support.log": "Registro de suporte",
+  "mobile.settings.support.show": "Mostrar registro",
   "mobile.settings.support.save": "Salvar arquivo de registro",
   "mobile.settings.support.events": { one: "{count} evento", other: "{count} eventos" },
   "mobile.settings.support.clear": "Limpar registro",
@@ -34,8 +43,8 @@ export const messages = {
     "O registro fica neste celular e o OpenBot não o envia. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
   "mobile.settings.support.saveFailed": "Não foi possível salvar o arquivo de registro. Tente novamente.",
   "mobile.settings.support.sharingUnavailable": "O compartilhamento não está disponível neste celular.",
-  "mobile.settings.support.recent": "Eventos recentes",
-  "mobile.settings.support.recentFooter": "Mais recentes primeiro. O arquivo salvo tem todos os eventos.",
+  "mobile.settings.support.newestFirst": "Mais recentes primeiro.",
+  "mobile.settings.support.showOlder": "Mostrar eventos anteriores",
   "mobile.settings.support.empty": "Nenhum evento ainda.",
   "mobile.settings.sessions.kindDesktop": "computador",
   "mobile.settings.sessions.kindMobile": "celular",
@@ -70,12 +79,9 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nas configurações do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
   "mobile.settings.animations.all": "Animações",
-  "mobile.settings.animations.chatZoom": "Zoom ao abrir chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "Um chat abre a partir do avatar na lista e fecha de volta nele. Quando desativado, o chat desliza pela lateral.",
   "mobile.settings.animations.agentFaces": "Rostos animados dos agentes",
   "mobile.settings.animations.agentFacesFooter":
-    "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados.",
+    "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados e os personagens da tela de boas-vindas e da tela inicial vazia param de flutuar.",
   "mobile.settings.animations.composerResize": "Campo de mensagem compacto",
   "mobile.settings.animations.composerResizeFooter":
     "O campo de mensagem vira uma barra pequena enquanto o teclado está fechado. Quando desativado, o campo fica no tamanho completo.",
@@ -122,7 +128,6 @@ export const messages = {
     "As notificações e a Atividade ao Vivo tocam este som. A Atividade ao Vivo também acende a tela. O som do OpenBot é o som que o app para computador toca quando uma tarefa termina. Os quatro sons seguintes são os dos temas de som do app para computador.",
   "mobile.settings.notifications.soundFooterAndroid":
     "As notificações tocam este som. O som do OpenBot é o som que o app para computador toca quando uma tarefa termina. Os quatro sons seguintes são os dos temas de som do app para computador.",
-  "mobile.settings.notifications.notifyAbout": "Notificar sobre",
   "mobile.settings.notifications.level.all": "Toda atividade",
   "mobile.settings.notifications.level.needsMe": "Só quando precisar de mim",
   "mobile.settings.notifications.level.nothing": "Nada",
@@ -139,12 +144,29 @@ export const messages = {
     "Os eventos deste servidor que notificam este celular. O app para computador tem as próprias configurações.",
   "mobile.settings.notifications.serverUnsupported":
     "Este servidor não pode enviar notificações. Atualize o OpenBot no computador que o executa.",
+  "mobile.settings.notifications.thisPhone": "Este celular",
+  "mobile.settings.notifications.whatYouHear": "O que chega para você",
+  "mobile.settings.notifications.wholeServer": "Servidor inteiro",
+  "mobile.settings.notifications.levelShort.all": "Tudo",
+  "mobile.settings.notifications.levelShort.needsMe": "Me chama",
+  "mobile.settings.notifications.levelShort.nothing": "Nada",
+  "mobile.settings.notifications.thisPhoneOnly": "Só este celular",
+  "mobile.settings.notifications.offForEveryone": "Desativado para todos neste servidor",
+  "mobile.settings.notifications.turnOn": "Ativar",
+  "mobile.settings.notifications.turnOnFor": "Ativar as notificações de {name} para todos neste servidor",
+  "mobile.settings.notifications.chooseAgent": "Escolher para um agente",
+  "mobile.settings.notifications.chooseAnotherAgent": "Escolher outro agente",
+  "mobile.settings.notifications.levelsFooter": "Toque de novo no nível de um agente para seguir o servidor.",
+  "mobile.settings.notifications.agentsUnsupported": "Atualize o OpenBot neste servidor para escolher agentes.",
+  "mobile.settings.notifications.agentsOffline": "Os agentes aparecem quando este servidor está online.",
+  "mobile.settings.notifications.scopeFooter":
+    "Suas escolhas valem em todos os seus dispositivos. Silenciar vale só para este celular.",
   "mobile.settings.notifications.channel": "Notificações dos agentes ({sound})",
   "mobile.settings.notifications.channelSilent": "Notificações dos agentes (sem som)",
   "mobile.settings.privacy.title": "Privacidade",
   "mobile.settings.privacy.footer":
-    "Compartilhe o uso de recursos e os resultados de conexão deste celular. O conteúdo das mensagens e os arquivos não são enviados.",
-  "mobile.settings.privacy.analytics": "Compartilhar análises do produto",
+    "O uso de recursos e os resultados de conexão deste celular sempre vão para a análise do OpenBot. Ativado: com o ID e o e-mail da sua conta. Desativado: só com um ID de instalação aleatório. O conteúdo das mensagens e os arquivos não são enviados.",
+  "mobile.settings.privacy.analytics": "Vincular a análise à minha conta",
   "mobile.settings.privacy.retry": "Tentar salvar a privacidade de novo",
   "mobile.settings.conversations.title": "Conversas",
   "mobile.settings.conversations.hiddenChats": "Chats ocultos",
@@ -247,6 +269,15 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Ouvir",
   "mobile.settings.voice.tab.speaking": "Falar",
+  "mobile.settings.voice.pause.title": "Pausa antes de enviar",
+  "mobile.settings.voice.pause.label": "Esperar novas palavras",
+  "mobile.settings.voice.pause.footer":
+    "Em uma conversa por voz, o OpenBot envia suas palavras quando não reconhece novas palavras por esse tempo. Ruído sem palavras não o mantém ouvindo. Escolha uma pausa maior se você fala devagar ou para para pensar.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Velocidade das respostas",
+  "mobile.settings.voice.speed.footer":
+    "A velocidade das respostas que o OpenBot lê em voz alta, também em uma conversa por voz.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "O OpenBot transmite sua fala para a ElevenLabs com um token de uso único, e a ElevenLabs cobra na sua conta. A chave fica neste celular.",
 } as const satisfies PartialTranslation<typeof source>;

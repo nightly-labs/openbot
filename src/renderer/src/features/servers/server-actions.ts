@@ -1,6 +1,7 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
+import type { HiddenLocalServer } from "@openbot/ui/features/servers/ServerRail";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
@@ -19,24 +20,37 @@ export function useServerActions() {
   const {
     servers,
     setServerMuted,
-    setServerNotificationLevel,
     setJoinServerOpen,
     setAddServerOpen,
+    setCreateLocalServerOpen,
     hostedServersAvailable,
     hostedServerIds,
     hostedServersLoaded,
     refreshHostedServersAvailable,
+    localServerHidden,
+    setLocalServerHidden,
   } = useServers();
   const { selectServer } = useServerSelection();
   const { openServerSettings, requestLeaveServer, requestRestartServer } = useServerSettings();
-  const { openHostedServerDelete } = useSettings();
+  const { openHostedServerDelete, openNotificationLevels } = useSettings();
 
-  /** Local servers above the saved remote-server order, as the rail draws them. */
+  function remoteServers(): ServerSummary[] {
+    return servers().filter((server) => server.kind === "remote");
+  }
+
+  /**
+   * The server on this computer while the user hides it. An open server always shows, and without
+   * another server it is the only one.
+   */
+  function hiddenLocalServer(): ServerSummary | undefined {
+    if (!localServerHidden() || remoteServers().length === 0) return undefined;
+    return servers().find((server) => server.kind === "local" && !server.active);
+  }
+
+  /** Local servers above the saved remote-server order, as the rail draws them. A hidden server is left out. */
   function orderedServers(): ServerSummary[] {
-    return [
-      ...servers().filter((server) => server.kind === "local"),
-      ...servers().filter((server) => server.kind === "remote"),
-    ];
+    const hidden = hiddenLocalServer();
+    return [...servers().filter((server) => server.kind === "local" && server !== hidden), ...remoteServers()];
   }
 
   function selectFailed(error: unknown): void {
@@ -64,19 +78,74 @@ export function useServerActions() {
     void refreshHostedServersAvailable();
   }
 
+  /** Opens the dialog that names a new server on this computer. The landing preview has no main process. */
+  const createLocal = platform.landingPreview ? undefined : () => setCreateLocalServerOpen(true);
+
+  /**
+   * The item for a server on this computer in the add menus of the rail and the server menu. The hosted
+   * server plans show it in their "Other options" menu, so the add menus show it only when the add
+   * button opens the invite dialog in place of the plans.
+   */
+  function addMenuCreateLocal(): (() => void) | undefined {
+    return hostedServersAvailable() ? undefined : createLocal;
+  }
+
+  /**
+   * Hides the server on this computer. When it is open, another server opens in its place: the first
+   * online one, so that the hide does not wait for or fail on an offline server.
+   */
+  async function hideLocal(serverId: string): Promise<void> {
+    const other = remoteServers().find((server) => server.state === "online") ?? remoteServers()[0];
+    if (!other) return;
+    if (servers().some((server) => server.id === serverId && server.active)) {
+      try {
+        if (!(await selectServer(other.id))) return;
+      } catch (error) {
+        selectFailed(error);
+        return;
+      }
+    }
+    setLocalServerHidden(true);
+  }
+
+  /** The item that shows the hidden server on this computer again, in the add menus. */
+  function hiddenLocal(): HiddenLocalServer | undefined {
+    const server = hiddenLocalServer();
+    return server ? { name: server.name, show: () => setLocalServerHidden(false) } : undefined;
+  }
+
+  /** A server that runs on this computer as a child process. Delete and restart go to its supervisor. */
+  function onThisComputer(serverId: string): boolean {
+    return servers().some((server) => server.id === serverId && server.thisComputer === true);
+  }
+
   const callbacks = {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
-    onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
+    onOpenNotificationSettings: openNotificationLevels,
     onOpenSettings: openServerSettings,
     onLeave: requestLeaveServer,
     // The same confirmation: main removes an owned server from the account instead of leaving it.
     onRemove: requestLeaveServer,
-    canRemove: (serverId) => hostedServersLoaded() && !hostedServerIds().has(serverId),
-    onDelete: openHostedServerDelete,
-    canDelete: (serverId) => hostedServerIds().has(serverId),
+    canRemove: (serverId) => hostedServersLoaded() && !hostedServerIds().has(serverId) && !onThisComputer(serverId),
+    // A server on this computer uses the leave confirmation, which deletes it in that case.
+    onDelete: (serverId, trigger) =>
+      onThisComputer(serverId) ? requestLeaveServer(serverId, trigger) : openHostedServerDelete(serverId, trigger),
+    canDelete: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
     onRestart: requestRestartServer,
-    canRestart: (serverId) => hostedServerIds().has(serverId),
+    canRestart: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
+    onHide: (serverId) => void hideLocal(serverId),
+    // Only beside another server: the list is never empty.
+    canHide: () => remoteServers().length > 0,
   } satisfies ServerActionCallbacks;
 
-  return { orderedServers, select, add, addCreatesServer: hostedServersAvailable, callbacks };
+  return {
+    orderedServers,
+    select,
+    add,
+    createLocal,
+    addMenuCreateLocal,
+    addCreatesServer: hostedServersAvailable,
+    hiddenLocal,
+    callbacks,
+  };
 }

@@ -3,7 +3,6 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
 import { memo, type PropsWithChildren, useEffect, useId, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
@@ -22,18 +21,19 @@ import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/compon
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
+import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnreadCount, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
-import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { END_X, lineDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -56,7 +56,11 @@ function AgentRowTextReveal({ active, children }: PropsWithChildren<{ active: bo
   const blurStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 0.35, 0.8, 1], [0.72, 0.58, 0.1, 0]),
   }));
-  const maskProps = useAnimatedProps(() => ({ width: width.get() * progress.get() }));
+  // The text shows from its start: from the right in a right-to-left layout. The mask counts from the left.
+  const maskProps = useAnimatedProps(() => ({
+    x: END_X === 1 ? 0 : width.get() * (1 - progress.get()),
+    width: width.get() * progress.get(),
+  }));
 
   if (!active) return children;
 
@@ -71,13 +75,13 @@ function AgentRowTextReveal({ active, children }: PropsWithChildren<{ active: bo
         maskElement={
           <Svg height="100%" width="100%">
             <Defs>
-              <LinearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
+              <LinearGradient id={gradientId} x1={END_X === 1 ? "0" : "1"} x2={END_X === 1 ? "1" : "0"} y1="0" y2="0">
                 <Stop offset="0" stopColor="#000" stopOpacity="1" />
                 <Stop offset="0.82" stopColor="#000" stopOpacity="1" />
                 <Stop offset="1" stopColor="#000" stopOpacity="0" />
               </LinearGradient>
             </Defs>
-            <AnimatedRect animatedProps={maskProps} fill={`url(#${gradientId})`} height="100%" x="0" y="0" />
+            <AnimatedRect animatedProps={maskProps} fill={`url(#${gradientId})`} height="100%" y="0" />
           </Svg>
         }
       >
@@ -102,13 +106,20 @@ interface AgentListRowProps {
  */
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
-  const [background] = useThemeColor(["background"]);
+  const background = useChatRowBackground(agent.id);
   const pinBlocked = useMobileWorkspaceSelector(
     ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
   );
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
+  const drag = useChatDrag("row", () => ({
+    chat: { kind: "agent", id: agent.id },
+    pinned: false,
+    name: agent.name,
+    preview: <AgentDragPreview agent={agent} />,
+  }));
+  const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const agentChatPreview = useAgentChatPreview(agent);
   // An agent that waits in a channel says so, as its last message in its own chat is not the wait.
   const waitingChannel = useWaitingChannel(agent.id, agent.serverId);
@@ -116,28 +127,33 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
-  const isUnread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const unreadCount = useAgentListUnreadCount(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
     <BloubAvatar
       agentId={agent.id}
       serverId={agent.serverId}
       hue={agent.avatarHue}
+      color={agent.avatarColor}
       seed={agent.avatarSeed}
       size={54}
       animateIdle={false}
       rings
+      withThreads
     />
   );
-  const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;
+  // As on the desktop, a wait outranks the unread count in the corner of the avatar.
+  const waitBadge = waitReason ? (
+    <AgentWaitBadge reason={waitReason} />
+  ) : unreadCount > 0 ? (
+    <AgentUnreadBadge count={unreadCount} avatarSize={54} ringColor={background} />
+  ) : null;
   const avatar = (
-    <ChatZoomSource>
-      <AgentPinAvatar agentId={agent.id} location="row" size={54}>
-        {bloub}
-        {waitBadge}
-      </AgentPinAvatar>
-    </ChatZoomSource>
+    <AgentPinAvatar agentId={agent.id} location="row" size={54}>
+      {bloub}
+      {waitBadge}
+    </AgentPinAvatar>
   );
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -149,7 +165,12 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       accessibilityLabel={
         waitReason
           ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : openLabel
+          : unreadCount > 0
+            ? t("mobile.agent.list.withState", {
+                label: openLabel,
+                state: t("mobile.agent.list.unread", { count: unreadCount }),
+              })
+            : openLabel
       }
       accessibilityRole="button"
       accessibilityActions={[{ name: "pin", label: t("mobile.agent.pin.pinNamed", { name: agent.name }) }]}
@@ -159,10 +180,8 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       className="w-full"
       onPressIn={agentChatPreview.onPressIn}
       delayLongPress={longPressDelay}
-      onLongPress={() => {
-        void haptics.longPress();
-        if (isAndroid) setMenuKey((key) => key + 1);
-      }}
+      onLongPress={holdMenu.onLongPress}
+      onPressOut={holdMenu.onPressOut}
     >
       {({ pressed }) => (
         <View
@@ -178,7 +197,6 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
           <AgentRowTextReveal active={isUnpinTarget}>
             <View className="min-w-0 flex-1 gap-0.5">
               <View className="flex-row items-center gap-2">
-                {isUnread ? <View className="size-2 rounded-full bg-accent" /> : null}
                 <Typography.Paragraph
                   className="font-semibold min-w-0 flex-1"
                   numberOfLines={1}
@@ -199,7 +217,11 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
                   {agent.title.trim()}
                 </Typography.Paragraph>
               ) : null}
-              <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.preview}>
+              <Typography.Paragraph
+                className="text-text-secondary"
+                numberOfLines={1}
+                style={[typeScale.preview, lineDirectionStyle(previewLine)]}
+              >
                 {previewLine}
               </Typography.Paragraph>
             </View>
@@ -214,6 +236,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       agentName={agent.name}
       pinBlocked={pinBlocked}
       onPin={(withHaptic) => toggleAgentPinAnimated(agent.id, { haptic: withHaptic })}
+      drag={drag}
     >
       {isAndroid ? (
         <View>

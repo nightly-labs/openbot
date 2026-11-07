@@ -15,10 +15,14 @@ export interface AcpParams {
   prompt?: { type: string; text?: string }[];
   configId?: string;
   value?: string;
+  /** `session/set_model`. */
+  modelId?: string;
   /** `_x.ai/interject` of Grok. */
   text?: string;
   interjectionId?: string;
   content?: { type: string; text?: string; mimeType?: string }[];
+  /** `initialize`. OpenCode reads the `_meta` key that asks for its subagents' sessions. */
+  clientCapabilities?: { _meta?: { "opencode/child-session-updates"?: boolean } };
 }
 
 export interface AcpRequest {

@@ -19,7 +19,7 @@ const WAIT_ICON = {
 } as const satisfies Record<MobileAgentWaitReason, LucideIcon>;
 
 /** The chip in the time slot: what the user does next. */
-const WAIT_ACTION = {
+export const AGENT_WAIT_ACTION = {
   question: "mobile.agent.list.waiting.action.question",
   approval: "mobile.agent.list.waiting.action.approval",
   takeover: "mobile.agent.list.waiting.action.takeover",
@@ -76,7 +76,7 @@ export function AgentWaitChip({ reason }: { reason: MobileAgentWaitReason }) {
         style={[typeScale.small, { color: String(warning) }]}
         numberOfLines={1}
       >
-        {t(WAIT_ACTION[reason])}
+        {t(AGENT_WAIT_ACTION[reason])}
       </Typography.Paragraph>
     </View>
   );

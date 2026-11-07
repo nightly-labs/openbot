@@ -12,6 +12,15 @@ export const messages = defineMessages("error.connector", {
   "error.connector.githubExpired": "The GitHub connection expired. Connect GitHub again.",
   "error.connector.githubFileUnreadable": "The GitHub connection file is unreadable.",
   "error.connector.githubFileTooLarge": "The GitHub connection file is too large.",
+  "error.connector.linkDenied": "The Link sign-in was refused.",
+  "error.connector.linkCodeExpired": "The Link sign-in expired. Connect Link again.",
+  "error.connector.linkUnexpected": "Link sent an unexpected answer: {detail}",
+  "error.connector.linkUnreachable": "OpenBot cannot reach Link: {detail}",
+  "error.connector.linkExpired": "The Link connection expired. Connect Link again.",
+  "error.connector.linkNotConnected": "Link is not connected. Connect it in Server settings > Vault > Cards.",
+  "error.connector.linkNoCard": "The Link account has no card. Add a card in Link.",
+  "error.connector.linkFileUnreadable": "The Link connection file is unreadable.",
+  "error.connector.linkFileTooLarge": "The Link connection file is too large.",
   // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",
@@ -35,4 +44,20 @@ export const messages = defineMessages("error.connector", {
   "error.connector.bitwardenCliInstallFailed":
     "Could not install the Bitwarden CLI on this server. Check its network connection, then connect again.",
   "error.connector.bitwardenFileUnreadable": "The Bitwarden connection file is unreadable.",
+  "error.connector.passwordManagerUnknown": "OpenBot does not know this password manager.",
+  "error.connector.passwordManagerMethod": "This password manager cannot connect this way.",
+  "error.connector.passwordManagerNoSignIn": "No sign-in page is open. Connect again.",
+  "error.connector.protonPassFailed": "Could not connect Proton Pass. Connect again.",
+  "error.connector.protonPassCliInstallFailed":
+    "Could not install the Proton Pass CLI. Check the network connection, then connect again.",
+  "error.connector.protonPassPlan":
+    "Your Proton plan does not allow the Proton Pass CLI. Change the plan, then connect again.",
+  "error.connector.protonPassExpired": "The Proton Pass access ended. Connect again.",
+  "error.connector.protonPassKeyInvalid": "Enter a Proton Pass access key that starts with pst_.",
+  "error.connector.protonPassExtraPassword": "The extra password is not correct. Enter it again.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass did not ask for an extra password.",
+  "error.connector.protonPassFileUnreadable": "The Proton Pass connection file is unreadable.",
+  "error.connector.protonPassSignInTimeout": "The Proton sign-in took too long. Connect again.",
+  "error.connector.protonPassSetupFailed":
+    "Could not make the vault Shared with OpenBot or its access key in Proton Pass. Connect again.",
 });

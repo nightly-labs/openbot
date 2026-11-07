@@ -1,6 +1,7 @@
 import emojiRegex from "emoji-regex";
 
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentInstructionsChange, isAgentInstructionsChange } from "./ipc-agent-instructions";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier, isRequestId } from "./ipc-bounded-values";
 import { type ConversationMemoryChange, isConversationMemoryChanges } from "./ipc-conversation-memory-changes";
@@ -41,10 +42,18 @@ export function isImageGenerationInfo(value: unknown): value is ImageGenerationI
   );
 }
 
+/**
+ * The id of the question that asks the user to allow or block an MCP plugin request. The plugin
+ * takes only one of its options; a typed answer cancels the request.
+ */
+export const MCP_ELICITATION_DECISION_QUESTION_ID = "mcp-elicitation-decision";
+
 export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
+  /** A short line under the question. The Team API does not carry it. */
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
   /** The user can pick more than one option. Set only when true. */
@@ -57,6 +66,7 @@ export function isAgentPromptQuestion(value: unknown): value is AgentPromptQuest
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.header, INPUT_LIMITS.promptHeader) &&
     isBoundedString(value.question, INPUT_LIMITS.promptQuestion) &&
+    (value.detail === undefined || isBoundedString(value.detail, INPUT_LIMITS.promptQuestion)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
@@ -144,6 +154,11 @@ export interface AgentExchangeSummary {
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
   /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
   expectsReply?: boolean;
+  /**
+   * The sender's side thread that sent an incoming message. The sender link opens it. The Team API
+   * does not carry it, so a joined client opens the sender's own chat.
+   */
+  senderTaskId?: string;
 }
 
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
@@ -168,7 +183,8 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
           (isNumber(delivery.position) && Number.isInteger(delivery.position) && delivery.position >= 1)) &&
         (delivery.error === null || isBoundedString(delivery.error, INPUT_LIMITS.messageText)),
     ) &&
-    (value.expectsReply === undefined || isBoolean(value.expectsReply))
+    (value.expectsReply === undefined || isBoolean(value.expectsReply)) &&
+    (value.senderTaskId === undefined || isIdentifier(value.senderTaskId))
   );
 }
 
@@ -226,6 +242,8 @@ export interface ConversationMessage {
   subagents?: ConversationSubagent[] | undefined;
   /** Set on the one `memory-changes` message of a turn. The text counts the same changes. */
   memoryChanges?: ConversationMemoryChange[] | undefined;
+  /** Set on an `instructions-change` message. */
+  instructionsChange?: AgentInstructionsChange | undefined;
   /**
    * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
    * beside `questionPrompt`. Absent on a message from an older host.
@@ -282,6 +300,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
     (value.plan === undefined || isConversationPlan(value.plan)) &&
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
+    (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );

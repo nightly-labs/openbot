@@ -7,7 +7,9 @@
 // request timeout connects on the retry and after a key change (#2311), that a key change that
 // ends after the runtime is disposed does not keep its new process or the previous one, and that a
 // first install that unpacks for longer than the long start timeout stays installed and connects on
-// a retry that waits longer (#3532).
+// a retry that waits longer (#3532), and that a saved key whose `authenticate` never answers ends the
+// key change with a timeout, not a row that stays connecting. The row of that check says that no
+// sign-in waits, and the row of a Connect whose Google page is open says that one does, until Cancel.
 // `bun scripts/antigravity-start-e2e.ts`. Writes .openbot-build/antigravity-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -37,11 +39,16 @@ const SLOW_UNPACK_MS = 7_000;
 /** The long start timeout of the first-install case, and an unpack between it and twice it. */
 const FIRST_INSTALL_START_TIMEOUT_MS = 4_000;
 const FIRST_INSTALL_UNPACK_MS = 6_000;
+/** The long start timeout of the saved-key case, whose server never answers `authenticate`. */
+const KEY_AUTH_START_TIMEOUT_MS = 2_000;
 
 // `FAKE_AGY_MODE`: `hang` never answers, `crash` exits at its first request, and `slow` unpacks for
 // `FAKE_AGY_UNPACK_MS` before it reads a request, then answers as an ACP server with one model.
 // While the file `FAKE_AGY_HOLD` exists, a `session/new` after the first one, as the catalogue
 // refresh of a started process sends, waits for that file to go and writes its pid to `<file>.held`.
+// With `FAKE_AGY_KEY_AUTH=hang`, `initialize` offers the Gemini API key sign-in and `authenticate` never answers.
+// With `FAKE_AGY_SIGN_IN=wait`, `initialize` offers the Google sign-in, and `authenticate` prints Google's page, as
+// the real server does, and never answers.
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -58,7 +65,17 @@ const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0",
 function handle(message) {
   if (message.id === undefined) return;
   if (message.method === "initialize") {
-    write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: {}, authMethods: [] } });
+    const authMethods = process.env.FAKE_AGY_KEY_AUTH
+      ? [{ id: "gemini-api-key", name: "Gemini API key" }]
+      : process.env.FAKE_AGY_SIGN_IN
+        ? [{ id: "oauth-personal", name: "Google" }]
+        : [];
+    write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: {}, authMethods } });
+    return;
+  }
+  if (message.method === "authenticate" && process.env.FAKE_AGY_KEY_AUTH === "hang") return;
+  if (message.method === "authenticate" && process.env.FAKE_AGY_SIGN_IN === "wait") {
+    process.stderr.write("Open the following link to authenticate the ACP server: https://accounts.google.com/o/oauth2/v2/auth?state=fake" + NL);
     return;
   }
   if (message.method === "session/new") {
@@ -140,6 +157,17 @@ interface Report {
     timedOut: { state: string | undefined; message: string | null | undefined };
     retry: { spawns: number; state: string | undefined };
   };
+  keyAuthenticateHang?: {
+    whileWaiting: { connectionState: string | undefined; signInPending: boolean | undefined };
+    keyChange: "succeeded" | "failed" | "still waiting";
+    connectionState: string | undefined;
+    state: string | undefined;
+    lastError: string | null;
+  };
+  browserSignIn?: {
+    whileWaiting: { connectionState: string | undefined; signInPending: boolean | undefined };
+    afterCancel: { connectionState: string | undefined; signInPending: boolean | undefined };
+  };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-start-e2e-"));
@@ -180,6 +208,7 @@ function runtime(
   freeBytes: () => number,
   isStopping: () => boolean = () => false,
   firstInstall = false,
+  savedKey: string | null = null,
 ): { providers: ProviderRuntime; store: AgentStore } {
   const store = new AgentStore(join(root, "profile"), join(root, "home"), new OpenBotDatabase(join(root, "profile")));
   const providers = new ProviderRuntime({
@@ -208,11 +237,17 @@ function runtime(
     emitError: () => undefined,
     requestTimeoutMs: 5_000,
     ...(firstInstall ? { longStartTimeoutMs: FIRST_INSTALL_START_TIMEOUT_MS } : {}),
+    ...(savedKey ? { longStartTimeoutMs: KEY_AUTH_START_TIMEOUT_MS } : {}),
     preferredProvider: "antigravity",
     clientFactory: null,
     // As main does, a first install names the path before the file is there.
     bundledExecutables: { antigravity: firstInstall ? firstInstallExecutable : executable },
-    credentials: { ...NO_PROVIDER_CREDENTIALS, providerTempDirectory: tempRoot, availableDiskBytes: freeBytes },
+    credentials: {
+      ...NO_PROVIDER_CREDENTIALS,
+      apiKey: (provider) => (provider === "antigravity" ? savedKey : null),
+      providerTempDirectory: tempRoot,
+      availableDiskBytes: freeBytes,
+    },
     redactMcp: (text) => text,
   });
   return { providers, store };
@@ -495,6 +530,84 @@ try {
   report.firstInstallTimeout.retry = { spawns: (await starts()).length, state: antigravityRow(firstInstall)?.state };
   await stopAll(firstInstall);
   assert.equal(report.firstInstallTimeout.retry.spawns, 2, "one start that timed out, then one retry that connected");
+
+  // 11. A saved Gemini key whose `authenticate` never answers. The key change starts a new process
+  // and must end at the start timeout; before, the row stayed connecting and Cancel waited forever.
+  process.env.FAKE_AGY_UNPACK_MS = "0";
+  process.env.FAKE_AGY_KEY_AUTH = "hang";
+  await rm(log, { force: true });
+  const keyed = runtime(
+    join(root, "temp-key-hang"),
+    () => Number.MAX_SAFE_INTEGER,
+    () => false,
+    false,
+    "fake-gemini-key",
+  ).providers;
+  const keyHangEnd = runCauseEffect(keyed.changeProviderCredential("antigravity", () => Effect.void)).then(
+    () => "succeeded" as const,
+    () => "failed" as const,
+  );
+  await waitFor("the key change to start its process", async () => (await starts()).length === 1);
+  const waitingRow = antigravityRow(keyed);
+  const whileWaiting = { connectionState: waitingRow?.connectionState, signInPending: waitingRow?.signInPending };
+  const keyHang = await Promise.race([
+    keyHangEnd,
+    new Promise<"still waiting">((done) =>
+      setTimeout(() => done("still waiting"), 2 * KEY_AUTH_START_TIMEOUT_MS + WAIT_MS),
+    ),
+  ]);
+  const keyHangRow = antigravityRow(keyed);
+  report.keyAuthenticateHang = {
+    whileWaiting,
+    keyChange: keyHang,
+    connectionState: keyHangRow?.connectionState,
+    state: keyHangRow?.state,
+    lastError: keyed.lastError("antigravity"),
+  };
+  delete process.env.FAKE_AGY_KEY_AUTH;
+  await stopAll(keyed);
+  assert.equal(whileWaiting.connectionState, "connecting");
+  assert.equal(
+    whileWaiting.signInPending,
+    false,
+    "a check again opens no page, so the row offers no sign-in to finish",
+  );
+  assert.equal(keyHang, "failed", "the key change fails when `authenticate` does not answer");
+  assert.equal(keyHangRow?.connectionState, undefined, "the row does not stay connecting");
+  assert.equal(
+    report.keyAuthenticateHang.lastError,
+    sourceText("error.provider.acpStartTimedOut", {
+      provider: "Gemini",
+      seconds: String(KEY_AUTH_START_TIMEOUT_MS / 1_000),
+    }),
+  );
+
+  // 12. A Connect whose Google page is open and never finishes. The row says that a sign-in waits,
+  // and Cancel ends it.
+  await rm(log, { force: true });
+  const signingIn = runtime(join(root, "temp-sign-in"), () => Number.MAX_SAFE_INTEGER).providers;
+  await runCauseEffect(signingIn.ensureProvider("antigravity").pipe(Effect.ignore));
+  process.env.FAKE_AGY_SIGN_IN = "wait";
+  let pageOpened = false;
+  await runCauseEffect(
+    signingIn.connectProvider("antigravity", async () => {
+      pageOpened = true;
+    }),
+  );
+  await waitFor("the Google page to open", async () => pageOpened);
+  const signInRow = antigravityRow(signingIn);
+  const signInWaiting = { connectionState: signInRow?.connectionState, signInPending: signInRow?.signInPending };
+  await runCauseEffect(signingIn.cancelProviderSignIn("antigravity"));
+  const cancelledRow = antigravityRow(signingIn);
+  report.browserSignIn = {
+    whileWaiting: signInWaiting,
+    afterCancel: { connectionState: cancelledRow?.connectionState, signInPending: cancelledRow?.signInPending },
+  };
+  delete process.env.FAKE_AGY_SIGN_IN;
+  await stopAll(signingIn);
+  assert.equal(signInWaiting.connectionState, "connecting");
+  assert.equal(signInWaiting.signInPending, true, "a Connect that waits for the Google page offers its sign-in");
+  assert.equal(report.browserSignIn.afterCancel.connectionState, undefined, "Cancel ends the sign-in");
 
   report.passed = true;
 } finally {

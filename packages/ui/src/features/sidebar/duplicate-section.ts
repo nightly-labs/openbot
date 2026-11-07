@@ -3,6 +3,9 @@
  * agent, move each copy in, and move the section behind the original. No host has a single action
  * for it, so the chain runs here for every consumer. Each call answers the layout it produced, and
  * the next step reads that layout rather than a signal that has not flushed yet.
+ *
+ * A folder in a folder gets its copy in the same folder. The copy holds the agents of the folder,
+ * not the folders in it.
  */
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -64,7 +67,11 @@ export async function duplicateSection(deps: SectionDuplicateDeps, sectionId: st
     source.name,
     deps.layout.sections.map((section) => section.name),
   );
-  let layout = await deps.mutateLayout({ type: "create", name });
+  // A layout has a parent only from a host with `sidebar-folders-v1`, so only that host gets one.
+  const parentId = source.parentId;
+  let layout = await deps.mutateLayout(
+    parentId === undefined ? { type: "create", name } : { type: "create", name, parentId },
+  );
   if (!layout) return null;
   // The new section is the one this create added. Another client can add a section at the same time,
   // so the name picks between new sections; the host may store the name in another form.
@@ -86,6 +93,16 @@ export async function duplicateSection(deps: SectionDuplicateDeps, sectionId: st
     if (!layout) return null;
   }
   // A source that another client deleted meanwhile has no place to follow, so the copy stays last.
+  if (parentId !== undefined) {
+    const parents = new Map(layout.sections.map((section) => [section.id, section.parentId]));
+    const siblings = layout.order.filter((id) => id === sectionId || parents.get(id) === parentId);
+    const sourceSibling = siblings.indexOf(sectionId);
+    if (sourceSibling >= 0) {
+      const next = siblings.slice(sourceSibling + 1).find((id) => id !== created.id) ?? null;
+      await deps.mutateLayout({ type: "nest", sectionId: created.id, parentId, beforeSectionId: next });
+    }
+    return created.id;
+  }
   const sourceIndex = layout.order.indexOf(sectionId);
   const from = layout.order.indexOf(created.id);
   const to = sourceIndex + 1;

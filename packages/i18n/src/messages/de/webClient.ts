@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "Gehosteten Server erstellen",
   "webClient.notice.join": "Mit Einladung beitreten",
   "webClient.notice.refreshHosts": "Server aktualisieren",
+  "webClient.otherTab.title": "{name} ist in einem anderen Tab geöffnet",
+  "webClient.otherTab.description": "OpenBot kann einen Server jeweils nur in einem Tab verwenden.",
+  "webClient.otherTab.useHere": "Hier verwenden",
   "webClient.agent.modelsFailed": "Die Modelle des Servers konnten nicht geladen werden.",
   "webClient.agent.refreshFailed":
     "Der Agent wurde erstellt, aber der Arbeitsbereich konnte nicht aktualisiert werden. Lade ihn neu, bevor du es erneut versuchst.",

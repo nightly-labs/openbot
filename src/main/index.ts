@@ -1,13 +1,17 @@
+import { uptime } from "node:os";
 import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import {
   type AgentEvent,
+  type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
+  DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
-import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -27,9 +31,18 @@ import {
   screen,
   shell,
 } from "electron";
+import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath } from "./app-icon";
-import { type ApplicationServices, createApplicationServices } from "./application-services";
+import { NewerDatabaseError } from "../backend/openbot-database-schema";
+import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
+import { watchAppArchive } from "./app-archive-watch";
+import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
+import { readSavedTransparentWindow } from "./appearance-service";
+import {
+  APPEARANCE_PREFERENCE_FILE,
+  type ApplicationServices,
+  createApplicationServices,
+} from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
@@ -46,16 +59,20 @@ import {
 import { stopStuckExitAfterLimit } from "./exit-watchdog";
 import { filePreviewPages } from "./file-preview-pages";
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
-import { takeHostedServerEnvironment } from "./hosted-server-bootstrap";
+import { hostedDiskRestoreProbe, takeHostedServerEnvironment } from "./hosted-server-bootstrap";
 import { takeHostingDeveloperKey } from "./hosted-server-service";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { acpRegistryIpcHandlers } from "./ipc/acp-registry-handlers";
 import { agentAdminIpcHandlers } from "./ipc/agent-admin-handlers";
+import { agentDockIpcHandlers } from "./ipc/agent-dock-handlers";
+import { agentFolderIpcHandlers } from "./ipc/agent-folder-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
+import { agentInstructionsIpcHandlers } from "./ipc/agent-instructions-handlers";
 import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
+import { backgroundProcessIpcHandlers } from "./ipc/background-process-handlers";
 import { billingIpcHandlers } from "./ipc/billing-handlers";
 import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserDockIpcHandlers } from "./ipc/browser-dock-handlers";
@@ -74,13 +91,17 @@ import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { instanceTransferIpcHandlers } from "./ipc/instance-transfer-handlers";
 import { licenseIpcHandlers } from "./ipc/license-handlers";
+import { linkAccountIpcHandlers } from "./ipc/link-account-handlers";
+import { localServerIpcHandlers } from "./ipc/local-server-handlers";
 import { macAutomationIpcHandlers } from "./ipc/mac-automation-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
+import { marketplaceLinkIpcHandlers } from "./ipc/marketplace-link-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
+import { passwordManagersIpcHandlers } from "./ipc/password-managers-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
@@ -102,53 +123,95 @@ import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
+import { restartOnXWaylandWithoutMonitor, takeXWaylandRestartMarker } from "./linux-wayland-output";
+import { openLocalServerControl, takeLocalServerChildEnvironment } from "./local-server-child";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
   createMainWindowController,
   createMainWindowHolder,
   hideWindowsForQuit,
+  keepWindowsHidden,
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
+import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { startMainLog } from "./provider-log";
+import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
+import { RunMarker, type UncleanExitProperties } from "./run-marker";
+import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
+import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
-import { setWindowAppearance } from "./window-appearance";
+import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
+import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
+import { placeWindowButtons } from "./window-buttons";
 
 const logger = createOpenBotLogger("main");
 
 // Electron keeps running after both events: an unhandled rejection only prints a warning, and a
-// monitor leaves the default exception handling in place. These add a redacted log line and a
-// trace span, so a diagnostics export shows that the main process failed and how often.
+// monitor leaves the default exception handling in place, except after `hideExceptionErrorBox`. These
+// add a redacted log line and a trace span, so a diagnostics export shows that the main process failed
+// and how often.
 let crashTrace: TraceFile | null = null;
+/** How this run ends, for the next start (`run-marker.ts`). Only the process with the lock has one. */
+let runMarker: RunMarker | null = null;
+/** How the previous run ended when it did not quit cleanly. Host analytics sends it once. */
+let previousUncleanExit: UncleanExitProperties | null = null;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
-type ExitReason = "main_window_closed" | "signal" | "session_end" | "quit";
+let exceptionErrorBoxHidden = false;
+
+/**
+ * Electron shows its error box for an uncaught exception only while no other listener handles it.
+ * The box blocks the main thread: on a server nobody can close it, and during a quit it also holds
+ * back the shutdown deadline (#3808). The monitor above still logs the exception.
+ */
+function hideExceptionErrorBox(): void {
+  if (exceptionErrorBoxHidden) return;
+  exceptionErrorBoxHidden = true;
+  process.on("uncaughtException", () => {
+    // Electron's own listener keeps the process running too.
+  });
+}
+
+/**
+ * `menu` and `shortcut` are the macOS Quit item by click and by `Cmd + Q`, `tray` is the tray item on
+ * Windows and Linux, and `update` is an update install. `quit` is any other request: the Dock, another
+ * app, or a system logout on macOS.
+ */
+type ExitReason = "main_window_closed" | "signal" | "session_end" | "menu" | "shortcut" | "tray" | "update" | "quit";
 let exitRecorded = false;
 
 /**
  * Records once why OpenBot quits, in the main log and in the trace, before the teardown closes the
  * trace. The first reason wins: closing the window then also quits. A process that ends with no such
- * line and no crash dump stopped from outside, such as Task Manager.
+ * line and no crash dump stopped from outside with a signal that cannot be caught, such as SIGKILL or
+ * Task Manager.
  */
 function recordExit(reason: ExitReason): void {
   if (exitRecorded) return;
   exitRecorded = true;
   logger.info(`Quitting: ${reason}.`);
+  runMarker?.quitting(reason);
   if (!crashTrace) return;
   crashTrace.record({ kind: "exit", name: reason, durationMs: 0, outcome: "requested" });
   Effect.runFork(crashTrace.flush());
+}
+
+function quitFor(reason: ExitReason): void {
+  recordExit(reason);
+  app.quit();
 }
 
 function reportMainProcessFailure(origin: "uncaughtException" | "unhandledRejection", error: unknown): void {
@@ -177,8 +240,24 @@ const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_
 removeClaudeCodeSessionEnvironment(process.env);
 // Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
+// Before the first provider check: a restored disk gives the provider CLIs a longer limit.
+if (hostedServer) setDiskRestoreProbe(hostedDiskRestoreProbe());
 const hostingDeveloperKey = takeHostingDeveloperKey(process.env, app.isPackaged);
 const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, process.platform);
+// Always taken, so the owner password leaves the environment also when the flag is refused.
+const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
+const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
+const localServerControl = localServerChild
+  ? openLocalServerControl(process.platform, (cause) =>
+      logger.error("The local server has no control pipe from the desktop app:", toLogValue(cause)),
+    )
+  : null;
+if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
+// A local server keeps a main window that never loads. A second launch on its profile, a deep link or
+// an MCP sign-in showed it as an empty window next to the desktop app.
+if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
+// A local server has no window, so it has no Dock tile either.
+if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
   selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL),
@@ -214,6 +293,16 @@ if (commandLineUserDataDirectory) {
 app.setName("OpenBot");
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+// Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
+// XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
+// systemd watches the process, the output and the input of a headless server, so it does not restart.
+const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
+if (
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env)))
+)
+  app.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
@@ -221,10 +310,27 @@ if (hasSingleInstanceLock) {
   // Crash dumps stay in `crashDumps` on this computer. Crashpad removes old reports itself. Without
   // them, a window that disappeared on Windows left nothing to tell a crash from a quit (#2675).
   crashReporter.start({ uploadToServer: false });
+  // After the crash reporter: the next start counts the dumps written after this run's last sign of life.
+  // The desktop stops a local server child with SIGKILL after a grace period, so the child has no marker.
+  if (!localServerChild)
+    ({ marker: runMarker, previous: previousUncleanExit } = RunMarker.start({
+      userDataPath: app.getPath("userData"),
+      crashDumpsPath: app.getPath("crashDumps"),
+      appVersion: app.getVersion(),
+      server: hostedServer !== null || serverMode !== null,
+      now: Date.now(),
+      bootedAt: Date.now() - uptime() * 1_000,
+    }));
+  if (previousUncleanExit)
+    logger.warn(
+      `The previous run did not quit cleanly (${previousUncleanExit.phase}, ${previousUncleanExit.uptime_class}, ${previousUncleanExit.crash_dump_count} crash dumps).`,
+    );
   // Linux AppImage: the handler must stop before the AppImage unmounts (#3066).
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
   stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
+  if (startedOnXWayland)
+    logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
@@ -293,6 +399,8 @@ let activeRemotePrincipalId: string | null = null;
 /** Counts account transitions, so queued work for a superseded one is dropped rather than applied. */
 let centralAuthGeneration = 0;
 let activeAnalyticsPrincipalId: string | null = null;
+/** The last account state that `forwardCentralAuth` saw. It tells a sign-in by the user from a restored session. */
+let previousCentralAuthStatus: CentralAuthState["status"] | null = null;
 const remoteAccountGate = Semaphore.makeUnsafe(1);
 const macHapticFeedback = new MacHapticFeedback();
 let isQuitting = false;
@@ -322,20 +430,30 @@ let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
+const WM_ENDSESSION = 0x0016;
 
 // A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
 // services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
-// (`scripts/hosting/openbot-boat-pre-stop`).
-if (!app.isPackaged || hostedServer || serverMode) {
+// (`scripts/hosting/openbot-boat-pre-stop`). The desktop app quits the same way, so a `kill` from a
+// terminal or another app also stops its services and leaves a "Quitting: signal." line (#4149).
+{
   const quitAfterSignal = () => {
-    recordExit("signal");
     // Before `app.quit()`: the same signal can stop the Computer Use driver first.
     quitStarted = true;
-    app.quit();
+    quitFor("signal");
   };
   process.once("SIGINT", quitAfterSignal);
   process.once("SIGTERM", quitAfterSignal);
   process.once("SIGHUP", quitAfterSignal);
+  // The desktop app holds the other end of the control pipe. Its end means that the app stopped, also
+  // by a crash. A process with no pipe cannot know that, so it quits at once.
+  if (localServerChild) {
+    if (localServerControl) {
+      localServerControl.once("end", quitAfterSignal);
+      localServerControl.once("error", quitAfterSignal);
+      localServerControl.resume();
+    } else quitAfterSignal();
+  }
 }
 
 /**
@@ -359,11 +477,15 @@ const {
   forwardUpdatePreference,
   forwardVoiceModelStatus,
   forwardVoiceStreamTranscript,
+  forwardVoiceLiveEvent,
   forwardSpeechModelStatus,
+  forwardVoiceServerSettings,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardLinkAccountStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
+  forwardPasswordManagerStatus,
   forwardVaultState,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
@@ -371,6 +493,8 @@ const {
   forwardTeamPresence,
   forwardDirectMessage,
   forwardDirectTyping,
+  forwardAttachmentDownload,
+  forwardAttachmentImportProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
@@ -384,11 +508,28 @@ const {
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
   getFormat: () => createFormat(services?.language.locale ?? "en"),
-  desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
+  // The desktop app shows the notifications of a local server, as it does for every joined server.
+  desktopNotificationsEnabled: () =>
+    !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),
   notificationPreviewEnabled: () => services?.notificationPreference.get().messagePreview ?? true,
+  ownAgentNotificationLevels: () => services?.agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY) ?? new Map(),
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
+/**
+ * The agents that a quit stops: the local agents, and the agents on the servers on this computer,
+ * whose processes end with this one. Before the services start, no agent can work.
+ */
+function workingAgents(): AgentSummary[] {
+  if (!services) return [];
+  return [...services.service.workingAgents(), ...(services.localServers?.workingAgents() ?? [])];
+}
+
+/** The user's `Cmd + Q` guard. Before the services exist, the default. */
+function quitGuard(): QuitGuard {
+  return services?.appBehavior.quitGuard ?? DEFAULT_QUIT_GUARD;
+}
+
 const windows = createMainWindowController({
   holder: windowHolder,
   statePath: join(app.getPath("userData"), MAIN_WINDOW_STATE_FILE),
@@ -400,6 +541,7 @@ const windows = createMainWindowController({
   keepRunningInBackground: () => services?.appBehavior.keepRunningInBackground ?? false,
   getServices: () => services,
   getTranslate: () => services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale())),
+  getLayoutDirection: () => localeDirection(services?.language.locale ?? resolveLocale("system", app.getLocale())),
   onRendererLoadStarted: () => {
     deepLinkReceiverReady = false;
     filePreviewPages.clear();
@@ -414,6 +556,9 @@ const windows = createMainWindowController({
     attachQuitOnMainWindowClose(window);
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
+  quitFromShortcut: () => quitFor("shortcut"),
+  workingAgents,
+  quitGuard,
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -496,12 +641,25 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
         logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
       );
   });
+  // Windows sends WM_ENDSESSION with a zero wParam when another app cancels the session end. Electron
+  // has no event for it. Without this reset, closing the window later quits instead of hiding, and the
+  // next quit skips `prepareForShutdown`.
+  window.hookWindowMessage(WM_ENDSESSION, (wParam) => {
+    if (quitStarted || !systemSessionEnding || wParam.some((byte) => byte !== 0)) return;
+    systemSessionEnding = false;
+    systemSessionEndFlushStarted = false;
+    isQuitting = false;
+    // The query stopped the update checks.
+    services?.updater.resume();
+  });
   window.on("session-end", () => {
     recordExit("session_end");
     systemSessionEnding = true;
     isQuitting = true;
     // Windows can stop the Computer Use driver first, and sends no `before-quit` for a session end.
     quitStarted = true;
+    // An error box would hold back the flushes below until Windows ends the process.
+    hideExceptionErrorBox();
     void runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
       logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
     );
@@ -531,13 +689,16 @@ function registerIpcHandlers({
   browserView,
   updater,
   setupFile,
-  analyticsPreferenceFile,
+  analyticsPreferences,
+  analyticsInstallId,
   updatePreferenceFile,
   requestedUpdate,
   idleRestart,
   approvalAutomation,
   agentAdminSettings,
   agentHostSettings,
+  agentFolders,
+  agentInstructions,
   browserProfiles,
   language,
   logoColor,
@@ -547,10 +708,15 @@ function registerIpcHandlers({
   busyMessageMode,
   agentDefaults,
   agentMemoryLimit,
+  memoryReview,
   agentAccess,
+  serverAudit,
   teamStore,
   serverTimezone,
+  serverPersonality,
   promptCacheTtl,
+  claudeUserSetup,
+  modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
   externalLinks,
@@ -560,6 +726,7 @@ function registerIpcHandlers({
   appBehavior,
   agentInitialization,
   sidebarLayout,
+  sidebarPins,
   host,
   remoteDesktop,
   remoteServers,
@@ -567,12 +734,15 @@ function registerIpcHandlers({
   skills,
   hostedSites,
   githubConnector,
+  linkAccount,
   onePasswordConnector,
   bitwardenConnector,
+  passwordManagers,
   vault,
   billing,
   license,
   hostedServers,
+  localServers,
   routineFeed,
   events,
   customProviderChanges,
@@ -587,16 +757,19 @@ function registerIpcHandlers({
   instanceTransfer,
   voice,
   speech,
+  voiceServer,
   dynamicIsland,
+  agentDock,
   cuaDriver,
   computerUsePermissionHelp,
-  analytics,
   storageUsage,
   machineAlerts,
   trace,
   resourceMonitor,
+  startup,
   routineFlows,
   workflows,
+  workflowGitHub,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -615,7 +788,7 @@ function registerIpcHandlers({
       browser,
       updater,
       setupFile,
-      analyticsPreferenceFile,
+      analyticsPreferences,
       approvalAutomation,
       busyMessageMode,
       agentDefaults,
@@ -635,14 +808,20 @@ function registerIpcHandlers({
       initializeAgent: () => runCauseEffect(agentInitialization.start()),
       appVariant,
       analyticsCaptureUrl,
+      analyticsInstallId,
       getMainWindow: getDialogParent,
+      isMainWindow: (sender) => {
+        const window = windowHolder.current;
+        return window !== null && !window.isDestroyed() && window.webContents === sender;
+      },
       openChatWindow: windows.openChatWindow,
       chatWindowTargets: windows.chatWindowTargets,
-      setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
       trace,
       resources: resourceMonitor,
+      startup,
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
+    ...agentDockIpcHandlers({ agentDock }),
     ...browserDockIpcHandlers({ browserDock }),
     ...computerUseIpcHandlers({
       cuaDriver,
@@ -650,10 +829,31 @@ function registerIpcHandlers({
       permissionHelp: computerUsePermissionHelp,
     }),
     ...macAutomationIpcHandlers({ platform: process.platform }),
-    ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials, openLink }),
-    ...voiceIpcHandlers({ voice, speech, service }),
+    ...backgroundProcessIpcHandlers({ platform: process.platform, agents: () => service.listAgents() }),
+    ...providerIpcHandlers({
+      service,
+      providerRuntimes,
+      credentials: providerCredentials,
+      claudeUserSetup,
+      openLink,
+    }),
+    ...voiceIpcHandlers({
+      voice,
+      speech,
+      server: voiceServer,
+      service,
+      remoteServers,
+      forwardLiveEvent: forwardVoiceLiveEvent,
+    }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
+    ...agentFolderIpcHandlers({
+      folders: agentFolders,
+      remoteServers,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
+    }),
+    ...agentInstructionsIpcHandlers({ files: agentInstructions, remoteServers }),
     ...hostedSiteIpcHandlers({
       hostedSites,
       remoteServers,
@@ -661,14 +861,17 @@ function registerIpcHandlers({
       translate: language.translate,
     }),
     ...githubConnectorIpcHandlers({ githubConnector, remoteServers, openExternal: openLink }),
+    ...linkAccountIpcHandlers({ linkAccount }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
+    ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
     ...vaultIpcHandlers({ vault, getMainWindow: getDialogParent, translate: language.translate, remoteServers }),
     ...billingIpcHandlers({ billing }),
     ...licenseIpcHandlers({ license }),
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
+    ...localServerIpcHandlers({ localServers }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...customAgentIpcHandlers(customAgentChanges),
     ...acpRegistryIpcHandlers(acpRegistry, remoteServers),
@@ -676,7 +879,7 @@ function registerIpcHandlers({
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,
-      takePendingLink: () => takePendingDeepLink("agent-template"),
+      takePendingLink: () => takePendingDeepLink("agent-template")?.id ?? null,
     }),
     ...agentImportIpcHandlers({
       agentImport,
@@ -705,16 +908,19 @@ function registerIpcHandlers({
       host,
       remoteDesktop,
       remoteServers,
-      takePendingInvite: () => takePendingDeepLink("invite"),
+      takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
     }),
     ...pluginIpcHandlers({
-      takePendingPluginSlug: () => takePendingDeepLink("plugin"),
+      takePendingPluginSlug: () => takePendingDeepLink("plugin")?.slug ?? null,
+    }),
+    ...marketplaceLinkIpcHandlers({
+      takePendingListing: () => takePendingDeepLink("marketplace")?.link ?? null,
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
-    ...workflowIpcHandlers({ workflows, events, remoteServers }),
+    ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
     ...routineResultIpcHandlers({ routineResults }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
@@ -731,12 +937,22 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      serverPersonality,
       agentMemoryLimit,
+      memoryReview,
       machineAlerts,
       promptCacheTtl,
+      modelVisibility,
       agentAccess,
+      serverAudit,
       localServerId: () => teamStore.getIdentity()?.serverId,
       localAgentIds: () => service.listAgents().map((agent) => agent.id),
+      localOwner: () => {
+        const owner = teamStore.configured
+          ? teamStore.listMembers().find((member) => member.role === "owner")
+          : undefined;
+        return owner ? memberAuditName(owner) : null;
+      },
     }),
     ...providerAdminIpcHandlers({
       service,
@@ -783,6 +999,7 @@ function registerIpcHandlers({
     ...agentIpcHandlers({
       service,
       sidebarLayout,
+      sidebarPins,
       host,
       remoteServers,
       skills,
@@ -792,6 +1009,7 @@ function registerIpcHandlers({
         openUrl: (url) => openHttpLink(url, openLink),
       }),
       openExternal: openLink,
+      modelVisibility,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });
@@ -814,14 +1032,53 @@ function requestDesktopNotificationPermission(
 }
 
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
+/** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
+async function presentApplication(): Promise<void> {
+  await ensureMacApplicationPresence(
+    process.platform,
+    (policy) => app.setActivationPolicy(policy),
+    () => app.dock?.show() ?? Promise.resolve(),
+  );
+  // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
+  // exists, so an AppImage writes its own first. On Windows the NSIS installer writes the scheme
+  // (`build/installer.nsh`), and each start writes it again for installs from before that script.
+  // A Windows development build does not register: the handler would be bare `electron.exe`.
+  // A macOS development build does not register either: macOS ignores the path and arguments and
+  // names the `com.github.Electron` bundle, so the link took `openbot://` from an installed
+  // OpenBot and opened some worktree's bare Electron.app. `bun run dev:slack` has a loopback return.
+  await Effect.runPromise(
+    installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
+  );
+  if (
+    process.platform === "linux" ||
+    ((process.platform === "darwin" || process.platform === "win32") && app.isPackaged)
+  ) {
+    if (!app.setAsDefaultProtocolClient("openbot")) {
+      logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
+    }
+  }
+}
+
 function centralAuthPrincipalId(state: CentralAuthState): string | null {
   return state.status === "signed_in" ? state.user.id : null;
 }
 
 function forwardCentralAuth(state: CentralAuthState): void {
+  // A local server has no account: its owner is a password member that a sign-out must not unbind.
+  if (localServerChild) return;
+  // A session that loads, recovers after an error, or refreshes is not a sign-in by the user. Its
+  // publish is automatic, so the account service can refuse a server that its owner removed (#5273).
+  const automaticSignIn =
+    previousCentralAuthStatus === null ||
+    previousCentralAuthStatus === "loading" ||
+    previousCentralAuthStatus === "error" ||
+    previousCentralAuthStatus === "signed_in";
+  previousCentralAuthStatus = state.status;
   if (state.status === "signed_in") {
     if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
     activeAnalyticsPrincipalId = state.user.id;
+    // Started before the renderer is told, so its next read of the answer waits for this one.
+    services?.analyticsPreferences.followAccount(state.user);
   } else if (state.status === "signed_out") {
     if (activeAnalyticsPrincipalId) services?.analytics.clear();
     activeAnalyticsPrincipalId = null;
@@ -896,9 +1153,9 @@ function forwardCentralAuth(state: CentralAuthState): void {
               ),
             );
         // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
-        if (host && services?.serverMode) yield* services.serverMode.publish();
+        if (host && services?.serverMode) yield* services.serverMode.publish(automaticSignIn);
         else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
-          yield* host.start();
+          yield* host.start(true);
       }),
     ),
   ).catch((error) => {
@@ -930,25 +1187,41 @@ function acceptDeepLink(link: DeepLink): void {
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
   showMainWindow(window);
-  const delivered =
-    link.kind === "invite"
-      ? sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url)
-      : link.kind === "plugin"
-        ? sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug)
-        : sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
-  if (delivered) pendingDeepLink = null;
+  if (sendDeepLink(window, link)) pendingDeepLink = null;
+}
+
+function sendDeepLink(window: BrowserWindow, link: RendererDeepLink): boolean {
+  switch (link.kind) {
+    case "invite":
+      return sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url);
+    case "plugin":
+      return sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug);
+    case "agent-template":
+      return sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
+    case "marketplace":
+      return sendToRenderer(window, IPC_ENDPOINTS.marketplace.openListing, link.link);
+  }
 }
 
 /**
  * The pending link, if it is the kind that asked. Any request marks the receiver ready, because
  * the renderer subscribes to every kind before it asks for any.
  */
-function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
+function takePendingDeepLink<Kind extends RendererDeepLink["kind"]>(
+  kind: Kind,
+): Extract<RendererDeepLink, { kind: Kind }> | null {
   deepLinkReceiverReady = true;
   const link = pendingDeepLink;
-  if (link?.kind !== kind) return null;
+  if (!link || !isDeepLinkKind(link, kind)) return null;
   pendingDeepLink = null;
-  return link.kind === "invite" ? link.url : link.kind === "plugin" ? link.slug : link.id;
+  return link;
+}
+
+function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
+  link: RendererDeepLink,
+  kind: Kind,
+): link is Extract<RendererDeepLink, { kind: Kind }> {
+  return link.kind === kind;
 }
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
@@ -979,11 +1252,18 @@ function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspac
     ),
   )
     .then((accepted) => {
+      if (!accepted) {
+        logger.warn(
+          `A ${platform} install link was not accepted: no install of this run waits for it, or the joined server refused it.`,
+        );
+        return;
+      }
       const window = windowHolder.current;
-      if (accepted && window && !window.isDestroyed()) showMainWindow(window);
+      if (window && !window.isDestroyed()) showMainWindow(window);
     })
-    .catch(() => {
-      // The connector settings show the connection's state. The error can quote Slack or Discord.
+    .catch((error: unknown) => {
+      // The connector settings show the connection's state. The log keeps the cause.
+      logger.error(`Unable to finish the ${platform} install:`, toLogValue(error));
     });
 }
 
@@ -1056,39 +1336,27 @@ if (!hasSingleInstanceLock) {
     .then(async () => {
       // Startup marks for `dev:bench`, which reads them over the inspector. They change nothing.
       performance.mark("openbot:when-ready");
+      // A run that ends in sleep, or in an OS shutdown that Electron reports, is told apart at the next start.
+      powerMonitor.on("suspend", () => runMarker?.suspend());
+      powerMonitor.on("resume", () => runMarker?.resume());
+      powerMonitor.on("shutdown", () => runMarker?.osShutdown());
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
-      if (!(await Effect.runPromise(hostAllowsTenantLaunch()))) {
+      if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
+      if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
       }
-      await ensureMacApplicationPresence(
-        process.platform,
-        (policy) => app.setActivationPolicy(policy),
-        () => app.dock?.show() ?? Promise.resolve(),
-      );
-      // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
-      // exists, so an AppImage writes its own first. On Windows the NSIS installer writes the scheme
-      // (`build/installer.nsh`), and each start writes it again for installs from before that script.
-      // A Windows development build does not register: the handler would be bare `electron.exe`.
-      // A macOS development build does not register either: macOS ignores the path and arguments and
-      // names the `com.github.Electron` bundle, so the link took `openbot://` from an installed
-      // OpenBot and opened some worktree's bare Electron.app. `bun run dev:slack` has a loopback return.
-      await Effect.runPromise(
-        installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
-      );
-      if (
-        process.platform === "linux" ||
-        ((process.platform === "darwin" || process.platform === "win32") && app.isPackaged)
-      ) {
-        if (!app.setAsDefaultProtocolClient("openbot")) {
-          logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
-        }
-      }
+      if (!localServerChild) await presentApplication();
       configureContentSecurityPolicy();
       configureRendererPermissions();
-      await Effect.runPromise(windows.restoreMainWindowBounds());
+      // A local server keeps a window that never loads: the agent browser and the services attach to it.
+      if (!localServerChild) await Effect.runPromise(windows.restoreMainWindowBounds());
+      // The window takes its blur when it is built: see `glassWindowOptions`.
+      if (process.platform === "darwin" && !localServerChild)
+        setInitialWindowGlass(
+          await runCauseEffect(readSavedTransparentWindow(join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE))),
+        );
       const mainWindow = windows.openMainWindow();
 
       const built = await createApplicationServices({
@@ -1102,6 +1370,9 @@ if (!hasSingleInstanceLock) {
         hostedServer,
         serverMode,
         hostingDeveloperKey,
+        localServerChild,
+        localServerControl,
+        previousUncleanExit,
         macHapticFeedback,
         teardown,
         forwardCentralAuth,
@@ -1110,12 +1381,19 @@ if (!hasSingleInstanceLock) {
         forwardVoiceModelStatus,
         forwardVoiceStreamTranscript,
         forwardSpeechModelStatus,
+        forwardVoiceServerSettings,
         forwardWorkflowNotice,
         prepareForUpdateInstall,
         quitting: () => quitStarted,
       });
       services = built;
       performance.mark("openbot:services-built");
+      // The first window opens before the saved language is read, with the system's direction.
+      placeWindowButtons(BrowserWindow.getAllWindows());
+      // A server has nobody to read the warning; a development build runs no `app.asar`.
+      if (app.isPackaged && !serverMode && !hostedServer && !localServerChild) {
+        teardown.push(0, "app archive watch", watchAppArchive(process.resourcesPath, built.language.translate));
+      }
       // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
       // `services`, so every account change announced during construction was dropped.
       // `createApplicationServices` bound the local host to the one state it read and attributed the
@@ -1131,6 +1409,8 @@ if (!hasSingleInstanceLock) {
         centralAuthPrincipalId(currentAccount) !== centralAuthPrincipalId(appliedAccount)
       ) {
         forwardCentralAuth(currentAccount);
+      } else if (currentAccount.status === "signed_in") {
+        built.analyticsPreferences.followAccount(currentAccount.user);
       }
       const {
         service,
@@ -1140,6 +1420,7 @@ if (!hasSingleInstanceLock) {
         remoteServers,
         updater,
         dynamicIsland,
+        agentDock,
         teamStore,
         language,
         logoColor,
@@ -1206,8 +1487,15 @@ if (!hasSingleInstanceLock) {
       // Team API clients never receive them.
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
+      // Codex live voice goes to this computer's windows only, never to Team API clients.
+      service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
+      // A pin from the owner's phone shows at once in the sidebar of this computer.
+      built.sidebarPins.subscribe((key) => {
+        if (key === OWNER_PIN_KEY)
+          forwardAgentEvent("local", { type: "sidebar-pins-changed", ...built.sidebarPins.snapshot(OWNER_PIN_KEY) });
+      });
       built.approvalAutomation.subscribe((preference) => {
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.approvalAutomation, preference);
@@ -1224,8 +1512,10 @@ if (!hasSingleInstanceLock) {
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.linkAccount.onChanged(forwardLinkAccountStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
+      built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
@@ -1234,6 +1524,8 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      remoteServers.on("attachmentDownload", forwardAttachmentDownload);
+      remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
       // Machine alerts are hidden for now: the check does not start, and no alert notification shows.
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
       // the first screen waits for it. The other servers start after the load, below. The connection
@@ -1250,43 +1542,124 @@ if (!hasSingleInstanceLock) {
         ),
       ).catch((error) => logger.warn("Unable to start the selected server's connection:", toLogValue(error)));
       updater.on("status", forwardUpdateStatus);
+      // An install that fails after shutdown preparation has no window left to show the failure, and
+      // the process still holds the single-instance lock. Exit now, not at the install deadline.
+      updater.on("status", (status) => {
+        if (!shutdownStarted || status.errorCode !== "install_failed") return;
+        logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
+        app.exit(0);
+      });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
-        await prepareForUpdateInstall();
+        await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
         app.quit();
       });
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      // A Signal socket of the host can be dead after sleep without knowing it; devices then cannot connect.
+      const renewHostSignal = () =>
+        void runCauseEffect(built.teamWebRtcBridge.renewHostSignal()).catch((error) =>
+          logger.warn("Unable to renew the host Signal connection after sleep:", toLogValue(error)),
+        );
+      if (localServerChild) {
+        // No window, menu, tray, Dynamic Island or renderer: the desktop app is the interface.
+        const childRoutineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
+        powerMonitor.on("suspend", () => childRoutineWake.suspend());
+        powerMonitor.on("resume", () => childRoutineWake.resume());
+        powerMonitor.on("resume", () => built.messaging.resume());
+        powerMonitor.on("resume", renewHostSignal);
+        teardown.push(0, "routine wake", () => childRoutineWake.dispose());
+        void runCauseEffect(built.agentInitialization.start()).catch((error) => {
+          logger.error("Unable to initialize the local agent backend:", toLogValue(error));
+        });
+        return;
+      }
+      const publishOnLaunch = () => {
+        const teamIdentity = teamStore.getIdentity();
+        if (built.serverMode) {
+          const serverModeControl = built.serverMode;
+          void runCauseEffect(
+            built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish(true))),
+          ).catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
+        } else if (
+          shouldAutoStartHost({
+            configured: Boolean(teamIdentity),
+            enabledOnLaunch: teamIdentity?.enabledOnLaunch ?? false,
+            remoteRole: developmentRemoteRole,
+          })
+        ) {
+          void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start(true)))).catch(
+            (error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)),
+          );
+        }
+      };
+      // Nobody looks at the window of a server, and a device that woke it waits for the publish. So a
+      // server publishes now, before the window loads. A desktop publishes after its window loads, so
+      // the bridge window does not compete with the first window for the CPU.
+      const publishesBeforeRenderer = Boolean(built.serverMode || hostedServer);
+      if (publishesBeforeRenderer) publishOnLaunch();
       void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
         logger.warn("Unable to ask for notification permission:", toLogValue(error)),
       );
-      configureApplicationMenu(service, updater, interfaceSize, language.translate);
-      // The way back to a window hidden in the background on Windows and Linux.
+      configureApplicationMenu(
+        service,
+        updater,
+        interfaceSize,
+        language.translate,
+        () => windowHolder.current,
+        workingAgents,
+        quitGuard,
+        quitFor,
+      );
+      // The way back to a window hidden in the background, and the sign that a member controls
+      // this computer.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
+        menuBarIcon: loadMenuBarIcon(),
         translate: language.translate,
         open: reopenMainWindow,
-        quit: () => app.quit(),
+        quit: () => quitFor("tray"),
+        stopRemoteControl: () => {
+          void runCauseEffect(host.stopRemoteControl()).catch((error) =>
+            logger.warn("Unable to stop remote control:", toLogValue(error)),
+          );
+        },
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
       const unsubscribeBackgroundTray = appBehavior.subscribe(() => tray.sync(appBehavior.keepRunningInBackground));
+      const showRemoteControl = (memberNames: string[]) => tray.setRemoteControl(memberNames);
+      const announceRemoteControl = (memberName: string) => notifyRemoteControlStarted(language.translate, memberName);
+      host.on("remoteControlChanged", showRemoteControl);
+      host.on("remoteControlStarted", announceRemoteControl);
       teardown.push(0, "background tray", () => {
         unsubscribeBackgroundTray();
+        host.off("remoteControlChanged", showRemoteControl);
+        host.off("remoteControlStarted", announceRemoteControl);
         tray.destroy();
       });
       // One place turns a language change into every visible consequence: the menu is built again
       // because a native label cannot be changed in place, and every window is told, including the
       // Dynamic Island, which has no Settings of its own to read the new value from.
       language.subscribe((preference) => {
-        configureApplicationMenu(service, updater, interfaceSize, language.translate);
+        configureApplicationMenu(
+          service,
+          updater,
+          interfaceSize,
+          language.translate,
+          () => windowHolder.current,
+          workingAgents,
+          quitGuard,
+          quitFor,
+        );
         tray.relabel();
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLanguagePreference, preference);
         }
+        placeWindowButtons(BrowserWindow.getAllWindows());
       });
       applyAppIconColor(logoColor.preference.color);
       logoColor.subscribe((preference) => {
@@ -1313,24 +1686,36 @@ if (!hasSingleInstanceLock) {
       await runCauseEffect(dynamicIsland.initialize()).catch((error) =>
         logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
       );
-      await windows.loadRenderer(mainWindow);
-      performance.mark("openbot:renderer-loaded");
-      // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
-      // the connection of the selected server. The renderer can have read the list before them.
-      forwardServers(remoteServers.list());
-      // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
-      await Effect.runPromise(remoteServers.startEventConnections());
       const reconcileDynamicIsland = () =>
         void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
           logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
         );
+      // The island pages load beside the main window, not before it.
+      reconcileDynamicIsland();
+      await windows.loadRenderer(mainWindow);
+      performance.mark("openbot:renderer-loaded");
+      built.startup?.rendererLoaded();
+      // After the first window, so the new process does not compete with the start for the CPU.
+      Effect.runFork(built.prewarmAgentDatabase);
+      // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
+      await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
+      // The agent dock window opens when the main renderer publishes the dock; this only moves it.
+      const reconcileAgentDock = () =>
+        void Effect.runPromise(agentDock.reconcileWindow()).catch((error) =>
+          logger.error("Unable to place the agent dock:", toLogValue(error)),
+        );
+      screen.on("display-added", reconcileAgentDock);
+      screen.on("display-removed", reconcileAgentDock);
+      screen.on("display-metrics-changed", reconcileAgentDock);
+      powerMonitor.on("resume", reconcileAgentDock);
       powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
+      powerMonitor.on("resume", renewHostSignal);
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
       powerMonitor.on("suspend", () => routineWake.suspend());
       powerMonitor.on("resume", () => routineWake.resume());
@@ -1354,23 +1739,7 @@ if (!hasSingleInstanceLock) {
         powerMonitor.off("on-battery", syncKeepAwake);
         keepAwake.dispose();
       });
-      const teamIdentity = teamStore.getIdentity();
-      if (built.serverMode) {
-        const serverModeControl = built.serverMode;
-        void runCauseEffect(
-          built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish())),
-        ).catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
-      } else if (
-        shouldAutoStartHost({
-          configured: Boolean(teamIdentity),
-          enabledOnLaunch: teamIdentity?.enabledOnLaunch ?? false,
-          remoteRole: developmentRemoteRole,
-        })
-      ) {
-        void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start()))).catch((error) =>
-          logger.error("Unable to republish this OpenBot:", toLogValue(error)),
-        );
-      }
+      if (!publishesBeforeRenderer) publishOnLaunch();
       void runCauseEffect(built.agentInitialization.start()).catch((error) => {
         logger.error("Unable to initialize the local agent backend:", toLogValue(error));
       });
@@ -1442,11 +1811,24 @@ if (!hasSingleInstanceLock) {
       // The Windows error box ends the text at a NUL character, so control characters are replaced.
       const message = (error instanceof Error ? error.message : String(error)).replace(/[^\P{Cc}\n\t]/gu, "�");
       logger.error("OpenBot failed to start:", toLogValue(error));
-      // A server has nobody at its virtual display to close the box, and the box blocks the quit.
-      if (!serverMode && !hostedServer) {
+      // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
+      // server on this computer has no window: the app that started it reports the failed start.
+      if (!serverMode && !hostedServer && !localServerChild) {
         // The services, and with them the saved language, may not exist yet. Then the system language applies.
         const locale = services?.language.locale ?? resolveLocale("system", app.getLocale());
         const translate = services?.language.translate ?? translateFor(locale);
+        // A newer OpenBot migrated the data: install that release instead of a dead-end error (#4969).
+        if (error instanceof NewerDatabaseError) {
+          recoverFromNewerDatabase({
+            window: windowHolder.current,
+            translate,
+            beforeInstall: prepareForUpdateInstall,
+          }).catch((recoveryError) => {
+            logger.error("The update over newer data failed:", toLogValue(recoveryError));
+            app.quit();
+          });
+          return;
+        }
         dialog.showErrorBox(
           translate("startup.failedTitle"),
           translate("startup.failedBody", { message: localizeSourceText(message, locale) }),
@@ -1463,6 +1845,8 @@ app.on("window-all-closed", () => {
 app.on("before-quit", (event) => {
   // Any other quit is recorded by `prepareForShutdown`.
   if (systemSessionEnding) recordExit("session_end");
+  // A quit after a Windows session-end query does not run `prepareForShutdown`.
+  hideExceptionErrorBox();
   isQuitting = true;
   quitStarted = true;
   if (systemSessionEnding) {
@@ -1478,6 +1862,21 @@ app.on("before-quit", (event) => {
   void prepareForShutdown().finally(() => app.quit());
 });
 
+/** Null outside macOS, or when the file is missing: the tray then shows the app icon. */
+function loadMenuBarIcon(): NativeImage | null {
+  if (process.platform !== "darwin") return null;
+  const icon = nativeImage.createFromPath(
+    resolveMenuBarIconPath({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      sourceRoot: resolve(__dirname, "../.."),
+    }),
+  );
+  if (!icon.isEmpty()) return icon;
+  logger.warn("The menu bar icon is missing.");
+  return null;
+}
+
 function reopenMainWindow(): void {
   void windows
     .ensureMainWindow()
@@ -1492,16 +1891,25 @@ function reopenMainWindow(): void {
  */
 const SHUTDOWN_DEADLINE_MS = 30_000;
 
-function forceExitAfterShutdownDeadline(): void {
+function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
-    logger.error(`OpenBot did not quit within ${SHUTDOWN_DEADLINE_MS} ms and will exit now.`);
+    logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
+    runMarker?.quitTimedOut();
     app.exit(0);
-  }, SHUTDOWN_DEADLINE_MS);
+  }, deadlineMs);
 }
 
-async function prepareForUpdateInstall(): Promise<void> {
+/**
+ * An in-app update keeps the process alive after the teardown: on macOS Squirrel only now copies,
+ * unpacks and verifies the downloaded ZIP, and quits when that is done. On a slow Mac this takes
+ * longer than a quit may, and an exit before it ends leaves the old version installed (#4244). The
+ * update uses the install timeout of the update service. It counts from the start of the teardown,
+ * so Squirrel gets that time less the teardown.
+ */
+async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
+  recordExit("update");
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
-  await prepareForShutdown();
+  await prepareForShutdown(deadlineMs);
 }
 
 /**
@@ -1511,13 +1919,14 @@ async function prepareForUpdateInstall(): Promise<void> {
  * registered as well, for the case where the quit arrives before those services exist; both are
  * idempotent, so running twice costs nothing.
  */
-async function prepareForShutdown(): Promise<void> {
+async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<void> {
   if (shutdownStarted) return;
   // An update install runs this before its `app.quit()`, and the teardown closes the trace.
   recordExit("quit");
   shutdownStarted = true;
   isQuitting = true;
-  forceExitAfterShutdownDeadline();
+  hideExceptionErrorBox();
+  forceExitAfterShutdownDeadline(deadlineMs);
   if (services) Effect.runFork(services.updater.stop());
   await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
     logger.error("Unable to save the main window position:", toLogValue(error)),
@@ -1525,6 +1934,8 @@ async function prepareForShutdown(): Promise<void> {
   // After the bounds are saved.
   hideWindowsForQuit();
   services?.dynamicIsland.destroy();
+  services?.agentDock.destroy();
   macHapticFeedback.destroy();
   await teardown.runAll();
+  runMarker?.clean();
 }

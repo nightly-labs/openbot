@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "시스템 기본값",
   "mobile.settings.language.footer":
     "시스템 기본값은 휴대전화 설정의 첫 번째 언어를 따라요. 아직 번역되지 않은 텍스트는 영어로 표시돼요.",
+  "mobile.settings.language.restartTitle": "OpenBot을 다시 시작할까요?",
+  "mobile.settings.language.restartBody":
+    "이 언어는 반대 방향으로 읽어요. OpenBot을 다시 시작하면 화면 방향이 바뀌어요. 다시 시작한 뒤에도 화면이 이상하면 앱 전환기에서 OpenBot을 닫고 다시 열어 주세요.",
+  "mobile.settings.language.restartNow": "지금 다시 시작",
+  "mobile.settings.language.restartFailed":
+    "OpenBot을 다시 시작하지 못했어요. 다음에 OpenBot을 열 때 화면 방향이 바뀌어요.",
   "mobile.settings.dictation.language": "받아쓰기 언어",
   "mobile.settings.about.development": "개발",
   "mobile.settings.about.openFailed": "링크를 열 수 없었어요. 다시 시도해 주세요.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "지원",
   "mobile.settings.home.supportHint": "도움을 받고 지원 로그를 저장해요",
   "mobile.settings.support.help": "도움 받기",
+  "mobile.settings.support.discord": "Discord에서 티켓 열기",
+  "mobile.settings.support.discordHint": "가장 빠르게 도움을 받는 방법이에요",
   "mobile.settings.support.message": "X로 메시지 보내기",
   "mobile.settings.support.issues": "GitHub에서 문제 신고",
   "mobile.settings.support.helpFooter":
-    "무슨 일이 언제 일어났는지 알려 주세요. GitHub 이슈에 지원 로그 파일을 첨부해 주세요.",
+    "무슨 일이 언제 일어났는지 알려 주세요. Discord 티켓이나 GitHub 이슈에 지원 로그 파일을 첨부해 주세요.",
   "mobile.settings.support.log": "지원 로그",
+  "mobile.settings.support.show": "로그 보기",
   "mobile.settings.support.save": "로그 파일 저장",
   "mobile.settings.support.events": { other: "이벤트 {count}건" },
   "mobile.settings.support.clear": "로그 지우기",
@@ -34,8 +43,8 @@ export const messages = {
     "로그는 이 휴대전화에만 남고 OpenBot이 전송하지 않아요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
   "mobile.settings.support.saveFailed": "로그 파일을 저장할 수 없었어요. 다시 시도해 주세요.",
   "mobile.settings.support.sharingUnavailable": "이 휴대전화에서는 공유를 사용할 수 없어요.",
-  "mobile.settings.support.recent": "최근 이벤트",
-  "mobile.settings.support.recentFooter": "최신순이에요. 저장한 파일에는 모든 이벤트가 있어요.",
+  "mobile.settings.support.newestFirst": "최신순이에요.",
+  "mobile.settings.support.showOlder": "이전 이벤트 보기",
   "mobile.settings.support.empty": "아직 이벤트가 없어요.",
   "mobile.settings.sessions.kindDesktop": "데스크톱",
   "mobile.settings.sessions.kindMobile": "모바일",
@@ -69,12 +78,9 @@ export const messages = {
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",
   "mobile.settings.animations.all": "애니메이션",
-  "mobile.settings.animations.chatZoom": "채팅 확대 전환",
-  "mobile.settings.animations.chatZoomFooter":
-    "채팅이 목록의 아바타에서 펼쳐지고 다시 그 안으로 닫혀요. 끄면 채팅이 옆에서 밀려 들어와요.",
   "mobile.settings.animations.agentFaces": "에이전트 얼굴 애니메이션",
   "mobile.settings.animations.agentFacesFooter":
-    "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있어요.",
+    "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있고, 환영 화면과 빈 홈 화면의 캐릭터도 더 이상 떠다니지 않아요.",
   "mobile.settings.animations.composerResize": "작은 메시지 입력란",
   "mobile.settings.animations.composerResizeFooter":
     "키보드가 닫혀 있으면 메시지 입력란이 작은 바로 바뀌어요. 끄면 입력란이 원래 크기로 유지돼요.",
@@ -120,7 +126,6 @@ export const messages = {
     "알림과 실시간 현황이 이 소리를 재생해요. 실시간 현황은 화면도 켜요. OpenBot 소리는 작업이 끝났을 때 데스크톱 앱이 재생하는 소리예요. 그 뒤의 네 가지 소리는 데스크톱 소리 테마의 소리예요.",
   "mobile.settings.notifications.soundFooterAndroid":
     "알림이 이 소리를 재생해요. OpenBot 소리는 작업이 끝났을 때 데스크톱 앱이 재생하는 소리예요. 그 뒤의 네 가지 소리는 데스크톱 소리 테마의 소리예요.",
-  "mobile.settings.notifications.notifyAbout": "알림 받을 항목",
   "mobile.settings.notifications.level.all": "모든 활동",
   "mobile.settings.notifications.level.needsMe": "내 입력이 필요할 때만",
   "mobile.settings.notifications.level.nothing": "없음",
@@ -137,12 +142,29 @@ export const messages = {
     "이 휴대전화로 알림을 보내는 이 서버의 이벤트예요. 데스크톱 앱에는 별도의 설정이 있어요.",
   "mobile.settings.notifications.serverUnsupported":
     "이 서버는 알림을 보낼 수 없어요. 서버가 실행되는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
+  "mobile.settings.notifications.thisPhone": "이 휴대전화",
+  "mobile.settings.notifications.whatYouHear": "알림 받을 내용",
+  "mobile.settings.notifications.wholeServer": "서버 전체",
+  "mobile.settings.notifications.levelShort.all": "모두",
+  "mobile.settings.notifications.levelShort.needsMe": "필요할 때",
+  "mobile.settings.notifications.levelShort.nothing": "끔",
+  "mobile.settings.notifications.thisPhoneOnly": "이 휴대전화만",
+  "mobile.settings.notifications.offForEveryone": "이 서버의 모든 사람에게 꺼짐",
+  "mobile.settings.notifications.turnOn": "켜기",
+  "mobile.settings.notifications.turnOnFor": "이 서버의 모든 사람에게 {name}의 알림 켜기",
+  "mobile.settings.notifications.chooseAgent": "에이전트별로 선택",
+  "mobile.settings.notifications.chooseAnotherAgent": "다른 에이전트 선택",
+  "mobile.settings.notifications.levelsFooter": "에이전트의 수준을 다시 탭하면 서버 설정을 따라요.",
+  "mobile.settings.notifications.agentsUnsupported": "에이전트별로 선택하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.settings.notifications.agentsOffline": "이 서버가 온라인이면 에이전트가 표시돼요.",
+  "mobile.settings.notifications.scopeFooter":
+    "선택한 내용은 내 모든 기기에 적용돼요. 음소거는 이 휴대전화에만 적용돼요.",
   "mobile.settings.notifications.channel": "에이전트 알림 ({sound})",
   "mobile.settings.notifications.channelSilent": "에이전트 알림 (소리 없음)",
   "mobile.settings.privacy.title": "개인정보 보호",
   "mobile.settings.privacy.footer":
-    "이 휴대전화의 기능 사용 현황과 연결 결과를 공유해요. 메시지 내용과 파일은 전송하지 않아요.",
-  "mobile.settings.privacy.analytics": "제품 분석 공유",
+    "이 휴대전화의 기능 사용 현황과 연결 결과는 항상 OpenBot 분석 서비스로 전송돼요. 켜짐: 계정 ID 및 이메일과 함께. 꺼짐: 임의의 설치 ID만 함께. 메시지 내용과 파일은 전송하지 않아요.",
+  "mobile.settings.privacy.analytics": "분석 데이터를 내 계정에 연결",
   "mobile.settings.privacy.retry": "개인정보 설정 다시 저장",
   "mobile.settings.conversations.title": "대화",
   "mobile.settings.conversations.hiddenChats": "숨긴 채팅",
@@ -242,6 +264,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "듣기",
   "mobile.settings.voice.tab.speaking": "말하기",
+  "mobile.settings.voice.pause.title": "보내기 전 멈춤",
+  "mobile.settings.voice.pause.label": "새 단어 대기",
+  "mobile.settings.voice.pause.footer":
+    "음성 대화에서 이 시간 동안 새 단어가 인식되지 않으면 OpenBot이 말을 보냅니다. 단어 없는 소음은 듣기를 유지하지 않습니다. 천천히 말하거나 생각하려고 멈춘다면 더 긴 멈춤을 선택하세요.",
+  "mobile.settings.voice.pause.seconds": "{seconds}초",
+  "mobile.settings.voice.speed.title": "답장 속도",
+  "mobile.settings.voice.speed.footer": "OpenBot이 소리 내어 읽는 답장의 속도입니다. 음성 대화에도 적용됩니다.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot은 일회용 토큰으로 음성을 ElevenLabs에 스트리밍하고, ElevenLabs가 계정에 요금을 청구해요. 키는 이 휴대폰에 남아 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

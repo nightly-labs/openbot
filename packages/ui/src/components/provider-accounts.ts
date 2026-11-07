@@ -1,5 +1,6 @@
 import {
   type AgentProviderId,
+  type ClientAgentModelOption,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
@@ -33,6 +34,13 @@ export interface ProviderAccountActions {
   usageResets?: ((provider: AgentProviderId) => Promise<readonly ProviderUsageResets[]>) | undefined;
   /** Spends one usage reset credit of an account, and answers what the provider did. */
   resetUsage?: ((provider: AgentProviderId, accountId: string) => Promise<ProviderUsageResetOutcome>) | undefined;
+  /**
+   * Signs the provider's own sign-in out. Its agents wait until it connects again. Absent where the
+   * computer that runs the providers cannot.
+   */
+  signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
+  /** True for this computer's providers, whose own sign-in a terminal CLI shares. */
+  local?: boolean | undefined;
 }
 
 /** The name an account shows: the user's name for it, its email, "API key", or its place in the list. */
@@ -62,4 +70,23 @@ export function isAgentAccount(agentAccountId: string | undefined | null, accoun
 /** Whether the account is the one of the saved Claude key: it has no sign-in and no plan usage. */
 export function isApiKeyAccount(accountId: string): boolean {
   return accountId === CLAUDE_API_KEY_ACCOUNT_ID;
+}
+
+/**
+ * A model of a provider: from the list of models, or one that only an account after the first
+ * serves. A plan can serve models that the provider's own sign-in does not (#5217).
+ */
+export function findModelOption(
+  options: readonly ClientAgentModelOption[],
+  providers: readonly { id: string; accounts?: readonly ProviderAccountStatus[] | undefined }[] | undefined,
+  provider: string,
+  model: string,
+): ClientAgentModelOption | undefined {
+  return (
+    options.find((option) => option.provider === provider && option.id === model) ??
+    providers
+      ?.find((status) => status.id === provider)
+      ?.accounts?.flatMap((account) => account.models ?? [])
+      .find((option) => option.id === model)
+  );
 }

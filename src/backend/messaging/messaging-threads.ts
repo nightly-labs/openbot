@@ -1,6 +1,9 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import type {
   AgentEvent,
   ConversationMessage,
+  ConversationSnapshot,
   MessagingPlatform,
   RoutineResultConnectionOption,
 } from "@openbot/contracts/ipc";
@@ -12,6 +15,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
+import type { AttachmentOperationError } from "../attachment-effects";
 import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -20,7 +24,7 @@ import { type MessagingContextMessage, messagingPromptText } from "./messaging-p
 import type { MessagingOperationFailed } from "./messaging-service";
 import { type MessagingLink, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
-import type { ContextEntry, MessageTarget, MessagingPlace } from "./messaging-types";
+import type { ContextEntry, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
 
 /** A file the agent attached to its answer, ready to upload. */
 export interface MessagingAnswerFile {
@@ -48,7 +52,9 @@ export type MessagingActivity =
       answer: string | null;
       files: MessagingAnswerFile[];
     }
-  | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin };
+  | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin }
+  /** A new progress line that the agent wrote between its steps, with the Natural style. */
+  | { type: "progress"; link: MessagingLink; turnId: string; origin: MessagingOrigin; text: string };
 
 export interface MessagingReceiveInput {
   connectionId: string;
@@ -105,8 +111,112 @@ export interface MessagingOutbound {
     connectionId: string,
     target: MessageTarget,
     markdown: string,
-  ): Effect.Effect<{ posted: true } | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }>;
+    files: MessagingAnswerFile[],
+  ): Effect.Effect<
+    | { posted: true; messageId: string; url?: string; skippedFiles?: string[] }
+    | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
+  >;
+  /** A Discord output of a workflow: a reply, a post or a reaction. */
+  discord(
+    connectionId: string,
+    send: MessagingDiscordSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+  /** A Telegram output of a workflow: a reply, a post or a reaction, in the connection's chat. */
+  telegram(
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+  /** A Slack output of a workflow: a reply in a thread, a post or a reaction. */
+  slack(
+    connectionId: string,
+    send: MessagingSlackSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
 }
+
+/**
+ * A post or a reaction of a workflow's Telegram output. One connection is one chat, so a post needs no
+ * place. `threadKey` keeps a reply in the forum topic of the message.
+ */
+export type MessagingTelegramSend =
+  | { action: "reply"; threadKey: string; messageId: string; text: string }
+  | { action: "post"; text: string }
+  | { action: "react"; messageId: string; emoji: string };
+
+/** A message in a Telegram group that starts a conversation with OpenBot, for the Telegram triggers of workflows. */
+export interface MessagingTelegramMention {
+  connectionId: string;
+  chatName: string;
+  chatId: string;
+  /** The topic or reply chain of the message, which a reply keeps. */
+  threadKey: string;
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  /** The text without OpenBot's own mention. */
+  text: string;
+  /** ISO time. */
+  receivedAt: string;
+}
+
+/**
+ * A post or a reaction of a workflow's Slack output, in one channel of the connection's workspace.
+ * `threadId` is the timestamp of the thread's first message; `emoji` is a Slack reaction name.
+ */
+export type MessagingSlackSend =
+  | { action: "reply"; channelId: string; threadId: string; text: string }
+  | { action: "post"; channelId: string; text: string }
+  | { action: "react"; channelId: string; messageId: string; emoji: string };
+
+/** A message in a Slack channel that mentions OpenBot, for the Slack triggers of workflows. */
+export interface MessagingSlackMention {
+  connectionId: string;
+  workspaceName: string;
+  channelId: string;
+  channelName: string;
+  /** The timestamp of the message. */
+  messageId: string;
+  /** The thread a reply goes to: the mention's thread, or the mention itself at the top level. */
+  threadId: string;
+  authorId: string;
+  authorName: string;
+  /** The text with each mention as `@name`. */
+  text: string;
+  /** The files of the message. Their addresses need the bot's token, so a workflow sees only their names. */
+  files: readonly InboundFile[];
+  /** ISO time. */
+  receivedAt: string;
+}
+
+/** A post or a reaction of a workflow's Discord output, in one channel of the connection's server. */
+export type MessagingDiscordSend =
+  | { action: "reply"; channelId: string; messageId: string; text: string }
+  | { action: "post"; channelId: string; text: string }
+  | { action: "react"; channelId: string; messageId: string; emoji: string };
+
+/** A message in a Discord server that mentions OpenBot, for the Discord triggers of workflows. */
+export interface MessagingDiscordMention {
+  connectionId: string;
+  serverName: string;
+  channelId: string;
+  channelName: string;
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  authorRoleIds: readonly string[];
+  /** The text with each mention as `@name`. */
+  text: string;
+  /** The files of the message and of the message it replies to, as signed addresses on Discord's CDN. */
+  files: readonly InboundFile[];
+  /** ISO time. */
+  receivedAt: string;
+}
+
+/**
+ * What the workflows did with a mention: none of their triggers takes it (`none`), so an agent answers
+ * it; a trigger started a run (`started`); or a trigger takes it but its workflow did not start
+ * (`skipped`), such as while a run of it is open.
+ */
+export type MessagingMentionResult = "none" | "started" | "skipped";
 
 export interface MessagingThreadsHooks {
   schedule(agentId: string): void;
@@ -125,6 +235,11 @@ export interface MessagingThreadsHooks {
    * Null when a compaction could drop the guidance with no signal, so each prompt repeats it.
    */
   contextSession(agentId: string, threadId: string): string | null;
+  /**
+   * The provider of the agent when the server uses the Natural style, so the conversation sees the
+   * agent's progress lines. Null with the Classic style: the conversation sees only "Working".
+   */
+  progressUpdates(agentId: string): AgentProviderRef | null;
 }
 
 /**
@@ -138,7 +253,12 @@ const HISTORY_TIMEOUT_MS = 15_000;
 const FINISHED_TURN_LIMIT = 256;
 /** What a messaging tool answers when its connection does not run. */
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
-const PLATFORM_NAMES: Record<MessagingPlatform, string> = { slack: "Slack", discord: "Discord", telegram: "Telegram" };
+const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
+  slack: "Slack",
+  discord: "Discord",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
+};
 
 /**
  * Owns the execution threads of external conversations: it enqueues their messages, frames their
@@ -157,12 +277,19 @@ export class MessagingThreads {
   readonly #listeners = new Set<(activity: MessagingActivity) => void>();
   readonly #admissions = new Map<string, Deferred.Deferred<void>>();
   /** The external message each running turn answers, by turn id. */
-  readonly #turnOrigins = new Map<string, { origin: MessagingOrigin | null; followUp: boolean }>();
+  readonly #turnOrigins = new Map<
+    string,
+    { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean }
+  >();
+  /** The deliveries whose requester stopped them while they were starting, so their turn stops when it starts. */
+  readonly #stopsBeforeStart = new Set<string>();
   /**
    * The newest turns whose end the conversation was told of, so `deliverySettled` does not tell it a
    * second time. Past the cap, the oldest goes.
    */
   readonly #finishedTurns = new Set<string>();
+  /** The id of the last progress line that each running turn reported, by turn id. */
+  readonly #progress = new Map<string, string>();
   /**
    * The provider session that read the guidance and the saved facts of each conversation, by link
    * id. Kept in memory only: after a restart, the first prompt of each conversation repeats them.
@@ -190,6 +317,9 @@ export class MessagingThreads {
       ) => Effect.Effect<MessagingHistory | null, MessagingOperationFailed>)
     | null = null;
   #outbound: MessagingOutbound | null = null;
+  #mentionHandler: ((mention: MessagingDiscordMention) => Effect.Effect<MessagingMentionResult>) | null = null;
+  #telegramMentionHandler: ((mention: MessagingTelegramMention) => Effect.Effect<MessagingMentionResult>) | null = null;
+  #slackMentionHandler: ((mention: MessagingSlackMention) => Effect.Effect<MessagingMentionResult>) | null = null;
 
   constructor(database: OpenBotDatabase, mailbox: MailboxStore, hooks: MessagingThreadsHooks) {
     this.store = new MessagingStore(database);
@@ -232,15 +362,101 @@ export class MessagingThreads {
     this.#outbound = outbound;
   }
 
+  /** The workflows' side of a Discord mention. Without it, every mention goes to an agent. */
+  setMentionHandler(
+    handler: ((mention: MessagingDiscordMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#mentionHandler = handler;
+  }
+
+  /** Gives a Discord mention to the workflows first. */
+  workflowMention(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult> {
+    return this.#mentionHandler ? this.#mentionHandler(mention) : Effect.succeed("none");
+  }
+
+  /** The workflows' side of a Slack mention. Without it, every mention goes to an agent. */
+  setSlackMentionHandler(
+    handler: ((mention: MessagingSlackMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#slackMentionHandler = handler;
+  }
+
+  /** Gives a Slack mention to the workflows first. */
+  slackWorkflowMention(mention: MessagingSlackMention): Effect.Effect<MessagingMentionResult> {
+    return this.#slackMentionHandler ? this.#slackMentionHandler(mention) : Effect.succeed("none");
+  }
+
+  /**
+   * A Discord output of a workflow. Only an enabled connection of this host can take it. The server is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly discordSend = Effect.fn("MessagingThreads.discordSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingDiscordSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "discord") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.discord(connectionId, send);
+  });
+
+  /** The workflows' side of a Telegram group message. Without it, every message goes to an agent. */
+  setTelegramMentionHandler(
+    handler: ((mention: MessagingTelegramMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#telegramMentionHandler = handler;
+  }
+
+  /** Gives a new Telegram group conversation to the workflows first. */
+  workflowTelegramMention(mention: MessagingTelegramMention): Effect.Effect<MessagingMentionResult> {
+    return this.#telegramMentionHandler ? this.#telegramMentionHandler(mention) : Effect.succeed("none");
+  }
+
+  /**
+   * A Telegram output of a workflow. Only an enabled connection of this host can take it. The chat is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly telegramSend = Effect.fn("MessagingThreads.telegramSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "telegram") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.telegram(connectionId, send);
+  });
+
+  /**
+   * A Slack output of a workflow. Only an enabled connection of this host can take it. The workspace is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly slackSend = Effect.fn("MessagingThreads.slackSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingSlackSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "slack") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.slack(connectionId, send);
+  });
+
   /**
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
-   * place; only an enabled connection of this host can take a post.
+   * place; only an enabled connection of this host can take a post. `openFiles` checks the files of a
+   * post under the calling agent's path rules, before the text is sent.
    */
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
     tool: string,
     args: unknown,
-  ): Effect.fn.Return<OpenBotToolResponse> {
+    openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
+  ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
     const call = parseMessagingOutboundTool(tool, args);
     if ("error" in call) return openBotToolFailure(call.error);
     const enabled = this.store.connections().filter((record) => record.enabled);
@@ -268,6 +484,7 @@ export class MessagingThreads {
             record.connectionId,
             { platformChannelId: call.place, replyThreadId: call.replyTo },
             call.text,
+            call.files.length ? yield* openFiles(call.files) : [],
           );
     return "error" in answer ? openBotToolFailure(answer.error) : openBotToolResult(answer);
   });
@@ -285,7 +502,12 @@ export class MessagingThreads {
     if (!this.store.connection(connectionId)?.enabled) return { failure: "gone" };
     const outbound = this.#outbound;
     if (!outbound) return { failure: "not-running" };
-    const answer = yield* outbound.post(connectionId, { platformChannelId: placeId, replyThreadId: null }, markdown);
+    const answer = yield* outbound.post(
+      connectionId,
+      { platformChannelId: placeId, replyThreadId: null },
+      markdown,
+      [],
+    );
     return "error" in answer ? { failure: answer.failure } : answer;
   });
 
@@ -488,6 +710,9 @@ export class MessagingThreads {
       platform: connection?.platform ?? "slack",
       workspaceName: prompt.workspaceName ?? connection?.workspaceName ?? null,
       isDirect: link.isDirect,
+      // Only the "Message yourself" chat has the linked number as the author of a direct message:
+      // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
+      fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,
@@ -570,20 +795,32 @@ export class MessagingThreads {
   event(event: AgentEvent, scope: Scope.Scope): boolean {
     switch (event.type) {
       case "conversation":
-        return event.snapshot.threadId !== null && this.#takes(event.snapshot.threadId);
+        if (event.snapshot.threadId === null) return false;
+        this.#reportProgress(event.snapshot);
+        return this.#takes(event.snapshot.threadId);
       case "conversation-delta":
       case "turn-progress":
         return this.#takes(event.threadId);
       case "turn-started": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
-        const running = this.#mailbox
+        const active = this.#mailbox
           .unresolvedMessagingDeliveries(link.linkId)
-          .find((context) => context.delivery.status !== "queued");
+          .filter((context) => context.delivery.status !== "queued");
+        const running = active[0];
         const origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
         const followUp = running?.delivery.sender.kind === "agent";
-        this.#turnOrigins.set(event.turnId, { origin, followUp });
+        const deliveryIds = active.map((context) => context.delivery.id);
+        this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
+        let stopped = false;
+        for (const deliveryId of deliveryIds) if (this.#stopsBeforeStart.delete(deliveryId)) stopped = true;
+        if (stopped)
+          Effect.runFork(
+            this.#hooks
+              .interrupt(link.agentId, event.turnId, link.threadId)
+              .pipe(Effect.uninterruptible, Effect.forkIn(scope, { startImmediately: true })),
+          );
         return !this.#hooks.ownChat(event.threadId);
       }
       case "turn-completed": {
@@ -591,6 +828,7 @@ export class MessagingThreads {
         if (!link) return false;
         const started = this.#turnOrigins.get(event.turnId) ?? { origin: null, followUp: false };
         this.#turnOrigins.delete(event.turnId);
+        this.#progress.delete(event.turnId);
         // A turn with no known requester tells no conversation, so `deliverySettled` still must.
         if (started.origin) {
           this.#finishedTurns.add(event.turnId);
@@ -618,6 +856,35 @@ export class MessagingThreads {
     return this.store.linkForThread(threadId) !== null && !this.#hooks.ownChat(threadId);
   }
 
+  /**
+   * Reports the newest completed progress line of the running turn once. Only narration counts: the
+   * agent's thinking never goes to the conversation.
+   */
+  #reportProgress(snapshot: ConversationSnapshot): void {
+    const turnId = snapshot.activeTurnId;
+    const origin = turnId ? this.#turnOrigins.get(turnId)?.origin : null;
+    if (!turnId || !origin || snapshot.threadId === null) return;
+    const link = this.store.linkForThread(snapshot.threadId);
+    const provider = link ? this.#hooks.progressUpdates(link.agentId) : null;
+    if (!link || !provider) return;
+    // From the end, without a copy: this runs on each snapshot of the turn.
+    let update: (typeof snapshot.messages)[number] | undefined;
+    for (let index = snapshot.messages.length - 1; index >= 0 && !update; index -= 1) {
+      const message = snapshot.messages[index];
+      if (
+        message?.turnId === turnId &&
+        message.itemType === "commentary" &&
+        message.status === "completed" &&
+        message.text.trim() &&
+        isNarrationItemId(message.id, provider)
+      )
+        update = message;
+    }
+    if (!update || this.#progress.get(turnId) === update.id) return;
+    this.#progress.set(turnId, update.id);
+    this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });
+  }
+
   /** A messaging delivery that failed before its turn started ends like a failed turn. */
   deliveryFailed(deliveryId: string): void {
     this.deliverySettled(deliveryId, "failed");
@@ -631,13 +898,17 @@ export class MessagingThreads {
    */
   deliverySettled(deliveryId: string, status: "completed" | "failed" | "interrupted"): void {
     this.#prepared.delete(deliveryId);
+    this.#stopsBeforeStart.delete(deliveryId);
     const origin = this.#mailbox.messagingOrigin(deliveryId);
     const link = origin ? this.store.link(origin.linkId) : null;
     if (!origin || !link) return;
     const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
     const turnId = delivery?.turnId ?? null;
     if (turnId && this.#finishedTurns.has(turnId)) return;
-    if (turnId) this.#turnOrigins.delete(turnId);
+    if (turnId) {
+      this.#turnOrigins.delete(turnId);
+      this.#progress.delete(turnId);
+    }
     const answer =
       status === "completed" && turnId
         ? ([...this.#turnMessages(link, turnId)].reverse().find(isAnswer)?.text ?? null)
@@ -689,6 +960,13 @@ export class MessagingThreads {
       } else if (context.delivery.status === "running" && context.delivery.turnId) {
         const turnId = context.delivery.turnId;
         yield* this.#hooks.interrupt(link.agentId, turnId, link.threadId).pipe(toMessagingThreadFailed);
+        stopped = true;
+      } else if (context.delivery.status === "starting") {
+        // The turn has no id yet. When it already started, stop it now; else stop it when it starts (#5516).
+        const deliveryId = context.delivery.id;
+        const started = [...this.#turnOrigins].find(([, turn]) => turn.deliveryIds.includes(deliveryId))?.[0];
+        if (started) yield* this.#hooks.interrupt(link.agentId, started, link.threadId).pipe(toMessagingThreadFailed);
+        else this.#stopsBeforeStart.add(deliveryId);
         stopped = true;
       }
     }
@@ -752,7 +1030,7 @@ export class MessagingThreads {
 }
 
 /** The same test the turn lifecycle uses for the answer of a turn. */
-function isAnswer(message: ConversationMessage): boolean {
+export function isAnswer(message: ConversationMessage): boolean {
   return (
     message.author === "assistant" &&
     message.itemType !== "commentary" &&

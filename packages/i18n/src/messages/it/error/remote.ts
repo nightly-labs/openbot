@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Il test del desktop remoto non è disponibile.",
   "error.remote.controlUnavailable": "Il controllo remoto non è disponibile.",
   "error.remote.controlSessionNotFound": "Sessione di controllo remoto non trovata.",
+  "error.remote.controlNotAllowed": "Il proprietario di questo computer non consente al tuo ruolo di controllarlo.",
+  "error.remote.controlDeclined": "La persona a questo computer non ha consentito il controllo remoto.",
   "error.remote.testRuntimeUpdate": "Aggiorna il runtime del desktop remoto per macOS per eseguire questo test.",
   "error.remote.testOtherSessions": "Termina le altre sessioni di desktop remoto prima di avviare un test.",
   "error.remote.testPermissions": "Controlla i permessi e la sessione grafica sull'host prima di avviare il test.",
@@ -90,6 +92,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "Il trasferimento file WebRTC non è riuscito.",
   "error.remote.fileResumeFailed": "Il trasferimento file WebRTC non ha potuto riprendere entro la scadenza.",
   "error.remote.fileTransportStopped": "Il trasporto file WebRTC si è fermato.",
+  "error.remote.downloadStopped": "Il download è stato interrotto.",
   "error.remote.fileResumeExpired": "La scadenza per riprendere il trasferimento file WebRTC è trascorsa.",
   "error.remote.hostRequestFailed": "L'host non ha potuto completare la richiesta.",
   "error.remote.responseTooLarge": "La risposta dell'host è troppo grande per essere inviata a questo dispositivo.",
@@ -123,8 +126,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Il server si è disconnesso.",
   "error.remote.preferencesUnreadable": "Non è stato possibile leggere le preferenze della chat salvate.",
   "error.remote.accountAuthRequired": "Serve l'autenticazione dell'account.",
-  "error.remote.serverIdentityChanged":
-    "L'identità del server è cambiata. La chiave host attendibile non viene sostituita.",
   "error.remote.pairedIdentityChanged":
     "L'identità del desktop associato manca o è cambiata. Scansiona un nuovo codice da quel desktop.",
   "error.remote.permanentInviteNoEmail": "Gli inviti permanenti non si possono inviare per email.",
@@ -188,16 +189,21 @@ export const messages = {
     "Questo host ha raggiunto il limite di membri. Chiedi al proprietario di fare spazio.",
   "error.remote.hostNotRegistered": "Questo host non è più registrato presso il servizio OpenBot.",
   "error.remote.membershipEnded": "Non sei più membro di questo host. Chiedi un nuovo invito al proprietario.",
+  "error.remote.membershipChanged":
+    "Qualcun altro ha modificato questo membro nello stesso momento. Ricarica i membri e riprova.",
   "error.remote.accountSessionInactive": "Il tuo accesso non è più attivo. Accedi di nuovo.",
   "error.remote.hostOtherAccount": "Questo host appartiene a un altro account.",
   "error.remote.remoteNotConfigured": "Le connessioni remote non sono configurate su questo servizio OpenBot.",
   "error.remote.hostRefused": "L'host ha rifiutato la richiesta ({status}).",
   "error.remote.formUnavailable": "Questo modulo non è più disponibile.",
   "error.remote.hostedServerRemoval": "Usa Fatturazione per eliminare un server ospitato.",
+  "error.remote.hostRemoved": "Il proprietario ha rimosso questo server dall'account.",
   "error.remote.channelsUnsupported": "Aggiorna questo server desktop per usare i canali.",
   "error.remote.channelDeleteUnsupported": "Aggiorna questo server desktop per eliminare i canali.",
   "error.remote.historyRefreshFailed":
     "Il messaggio è stato inviato, ma non è stato possibile aggiornare la cronologia della chat.",
   "error.remote.taskHistoryRefreshFailed":
     "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Il server è eliminato sul suo computer, ma l’account lo elenca ancora. Eliminalo di nuovo per rimuoverlo dall’account.",
 } as const satisfies PartialTranslation<typeof source>;

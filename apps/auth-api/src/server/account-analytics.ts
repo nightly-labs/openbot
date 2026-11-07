@@ -17,6 +17,7 @@ import {
   type HostedServerSize,
 } from "@openbot/contracts/hosted-servers";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
 
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
@@ -26,9 +27,11 @@ const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
  * `reactivated` and `end_reason` on plan events. Generation 11 adds the license to the billing events
  * (`product`, `users`, `direction`), `entry_point` on `checkout_started`, and the license totals of
  * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
- * property changes. Generation 12 adds `email_sent`.
+ * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
+ * Generation 14 adds `email_fallback_sent`. Generation 15 adds the `ready` hosted server action, with
+ * `duration_ms` and the `create` reason.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 12;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 15;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -45,9 +48,22 @@ const BILLING_ACTIONS = [
   "portal_opened",
 ] as const;
 export type BillingAction = (typeof BILLING_ACTIONS)[number];
+/**
+ * The billing actions of an account that pays for a plan or a license. Each one also sets the
+ * account email on the OpenPanel profile, so that a paying account is never anonymous, also when
+ * its apps have product analytics off.
+ */
+const PAID_BILLING_ACTIONS = [
+  "plan_started",
+  "payment_succeeded",
+  "plan_changed",
+  "cancel_scheduled",
+  "cancel_withdrawn",
+] as const satisfies readonly BillingAction[];
 
 const HOSTED_SERVER_ACTIONS = [
   "provisioned",
+  "ready",
   "setup_failed",
   "idle_stopped",
   "woken",
@@ -66,7 +82,7 @@ export type BillingProduct = (typeof BILLING_PRODUCTS)[number];
 export const PLAN_CHANGE_DIRECTIONS = ["up", "down"] as const;
 export type PlanChangeDirection = (typeof PLAN_CHANGE_DIRECTIONS)[number];
 /**
- * The largest license user count that analytics accepts. The app sells up to 25 users; a license
+ * The largest license user count that analytics accepts. The app sells up to 10 users; a license
  * from the Stripe Dashboard can have more, so the bound only stops a value that is not a count.
  */
 const ANALYTICS_MAX_LICENSE_USERS = 10_000;
@@ -75,7 +91,13 @@ const ANALYTICS_MAX_LICENSE_USERS = 10_000;
 export function isAnalyticsLicenseUsers(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= ANALYTICS_MAX_LICENSE_USERS;
 }
-const WAKE_REASONS = ["message", "restart", "schedule", "retention"] as const;
+/** `create`: only on `ready`, for the first start of a new server. */
+const WAKE_REASONS = ["create", "message", "restart", "schedule", "retention"] as const;
+/**
+ * The longest start that `ready` reports. A longer one is a start time that a Worker without the column
+ * left behind, not a start.
+ */
+export const MAX_HOSTED_START_MS = 2 * 60 * 60 * 1000;
 /** Why a plan ended: the account cancelled it, or Stripe ended it after unpaid invoices. */
 const PLAN_END_REASONS = ["canceled", "unpaid"] as const;
 export type PlanEndReason = (typeof PLAN_END_REASONS)[number];
@@ -86,8 +108,8 @@ export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
-/** The kinds of email that the Worker sends from the shared SMTP mailbox. */
-const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome"] as const;
+/** The kinds of email that the Worker sends through the shared SMTP mailbox, and through Cloudflare when it cannot. */
+const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 /** `unknown`: the server got the message but did not confirm it, so it can count against the quota. */
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
@@ -127,8 +149,10 @@ export type AccountAnalyticsEvent =
       size?: HostedServerSize;
       reason?: (typeof WAKE_REASONS)[number];
       error?: HostedServerError | null;
+      /** On `ready`: from the request to boat until boat reported the sandbox as usable. */
+      durationMs?: number;
     }
-  | { name: "email_sent"; kind: EmailKind; result: EmailResult };
+  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult };
 
 /** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
 export interface AccountAnalytics {
@@ -151,19 +175,34 @@ export interface AccountAnalyticsOptions {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
   /** Keeps the Worker alive until the send ends (`waitUntil`). */
   schedule: (send: Effect.Effect<void>) => void;
+  /** Reads the account email for the profile of a paying account. */
+  database: D1Database;
 }
 
 class AnalyticsDeliveryError extends Schema.TaggedError<AnalyticsDeliveryError>()("AnalyticsDeliveryError", {}) {}
+
+/** The two OpenPanel requests of the account service. An event body never has an email. */
+type OpenPanelBody =
+  | { type: "track"; payload: { name: string; profileId?: string; properties: AnalyticsProperties } }
+  | { type: "identify"; payload: { profileId: string; email: string } };
+
+/**
+ * The normalized email of an account, for the OpenPanel profile of a paying account. `null` when the
+ * account is gone or its email is not valid.
+ */
+export async function readAccountEmail(database: D1Database, accountId: string): Promise<string | null> {
+  const row = await database
+    .prepare("SELECT email FROM users WHERE id = ?")
+    .bind(accountId)
+    .first<{ email: unknown }>();
+  return typeof row?.email === "string" ? normalizeEmailAddress(row.email) : null;
+}
 
 export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
   const clientId = options.clientId?.trim();
   const clientSecret = options.clientSecret?.trim();
   if (!clientId || !clientSecret) return NO_ACCOUNT_ANALYTICS;
-  const send = Effect.fn("AccountAnalytics.send")(function* (
-    accountId: string | null,
-    event: AccountAnalyticsEvent,
-    properties: AnalyticsProperties,
-  ) {
+  const post = Effect.fn("AccountAnalytics.post")(function* (body: OpenPanelBody) {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         options.fetch(`${OPENPANEL_API_URL}/track`, {
@@ -173,24 +212,46 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
             "openpanel-client-id": clientId,
             "openpanel-client-secret": clientSecret,
           },
-          body: JSON.stringify({
-            type: "track",
-            payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
-          }),
+          body: JSON.stringify(body),
           signal: AbortSignal.any([signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]),
         }),
       catch: () => new AnalyticsDeliveryError({}),
     });
-    if (!response.ok) console.warn("Account analytics send failed.", { status: response.status });
+    if (!response.ok) {
+      console.warn(body.type === "track" ? "Account analytics send failed." : "Account analytics identify failed.", {
+        status: response.status,
+      });
+    }
+  });
+  /** Sets the account email on the profile, as the apps do at sign-in. */
+  const identify = Effect.fn("AccountAnalytics.identify")(function* (accountId: string) {
+    const email = yield* Effect.tryPromise({
+      try: () => readAccountEmail(options.database, accountId),
+      catch: () => new AnalyticsDeliveryError({}),
+    });
+    if (email) yield* post({ type: "identify", payload: { profileId: accountId, email } });
   });
   return {
     track(accountId, event) {
       const properties = accountEventProperties(event);
       if (!properties || (accountId !== null && !ACCOUNT_ID_PATTERN.test(accountId))) return;
+      const send = post({
+        type: "track",
+        payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
+      }).pipe(Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))));
+      const paid = accountId !== null && event.name === "billing_action" && isOneOf(PAID_BILLING_ACTIONS, event.action);
       options.schedule(
-        send(accountId, event, properties).pipe(
-          Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))),
-        ),
+        paid
+          ? Effect.all(
+              [
+                send,
+                identify(accountId).pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Account analytics identify failed."))),
+                ),
+              ],
+              { concurrency: 2, discard: true },
+            )
+          : send,
       );
     },
   };
@@ -238,7 +299,7 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     if (!isOneOf(ATTRIBUTION_SOURCES, event.via) || !touch.first_touch_source) return null;
     return { ...properties, recorded_via: event.via, ...touch };
   }
-  if (event.name === "email_sent") {
+  if (event.name === "email_sent" || event.name === "email_fallback_sent") {
     if (!isOneOf(EMAIL_KINDS, event.kind) || !isOneOf(EMAIL_RESULTS, event.result)) return null;
     return { ...properties, kind: event.kind, result: event.result };
   }
@@ -248,6 +309,15 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   if (isOneOf(HOSTED_SERVER_SIZE_NAMES, event.size)) properties.size = event.size;
   if (isOneOf(WAKE_REASONS, event.reason)) properties.reason = event.reason;
   if (isOneOf(HOSTED_SERVER_ERRORS, event.error)) properties.error = event.error;
+  const duration = event.durationMs;
+  if (
+    event.action === "ready" &&
+    typeof duration === "number" &&
+    Number.isInteger(duration) &&
+    duration >= 0 &&
+    duration <= MAX_HOSTED_START_MS
+  )
+    properties.duration_ms = duration;
   return properties;
 }
 

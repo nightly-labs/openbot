@@ -6,6 +6,7 @@ import {
   type VaultContactSummary,
   type VaultItemKind,
   type VaultItemSummary,
+  type VaultSaveInput,
   type VaultState,
 } from "@openbot/contracts/ipc";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -17,6 +18,7 @@ import { useUniwind } from "uniwind";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
 import {
   type VaultDraft,
+  vaultAddressExample,
   vaultCardTitle,
   vaultContactTitle,
   vaultCountryOptions,
@@ -39,8 +41,14 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 const KINDS: readonly VaultItemKind[] = ["login", "card", "contact", "apiKey"];
-// An address, the same in each language.
+// Examples that are the same in each language.
 const WEBSITE_PLACEHOLDER = "https://example.com";
+const PERSON_PLACEHOLDER = "Ada Lovelace";
+const EMAIL_PLACEHOLDER = "ada@example.com";
+const PASSWORD_PLACEHOLDER = "••••••••••••";
+const CARD_NUMBER_PLACEHOLDER = "4242 4242 4242 4242";
+const SECURITY_CODE_PLACEHOLDER = "123";
+const API_KEY_PLACEHOLDER = "sk-proj-4f9a…";
 const VARIABLE_NAME_LIMIT = 64;
 
 /** Short fields side by side, each with an equal share of the width. */
@@ -101,13 +109,24 @@ export function ServerVaultItemScreen() {
   );
 }
 
-function VaultItemForm({
+/**
+ * An agent's request for a new item (`request_vault_item`). The form shows only the fields of the
+ * request, starts with the values that the agent filled in, and `save` answers the request.
+ */
+export interface VaultItemRequest {
+  title: string;
+  prefill: Partial<VaultDraft>;
+  save: (input: VaultSaveInput) => Promise<void>;
+}
+
+export function VaultItemForm({
   serverId,
   host,
   kind,
   saved,
   contacts,
   vault,
+  request,
 }: {
   serverId: string;
   host: string;
@@ -115,12 +134,15 @@ function VaultItemForm({
   saved: VaultItemSummary | undefined;
   contacts: VaultContactSummary[];
   vault: ReturnType<typeof useServerVault>;
+  request?: VaultItemRequest | undefined;
 }) {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
   const { saveVaultItem, deleteVaultItem } = useMobileWorkspaceActions();
   const { action, perform, setState } = vault;
-  const [initial] = useState(() => vaultDraft(saved));
+  // The agent's label is only a suggestion: the field starts empty and shows it as its placeholder.
+  const { label: suggestedLabel, ...prefill } = request?.prefill ?? {};
+  const [initial] = useState(() => ({ ...vaultDraft(saved), ...prefill }));
   const [draft, setDraft] = useState<VaultDraft>(initial);
   // Navigation runs a render later, once the guard below reads `leaving`.
   const [leaving, setLeaving] = useState(false);
@@ -137,6 +159,7 @@ function VaultItemForm({
     if (state) void showState.current(state);
   }, [leaving]);
   const input = vaultSaveInput(kind, saved?.id ?? null, draft);
+  const example = vaultAddressExample(draft.country);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const locked = action.isPending;
 
@@ -163,7 +186,8 @@ function VaultItemForm({
   const save = () => {
     if (!input) return;
     void perform(async () => {
-      await setState(await saveVaultItem(input, serverId));
+      if (request) await request.save(input);
+      else await setState(await saveVaultItem(input, serverId));
     }).then((done) => {
       if (done) setLeaving(true);
     });
@@ -211,27 +235,36 @@ function VaultItemForm({
     field(key, label, {
       autoCapitalize: "none",
       isRequired: !saved && key !== "securityCode",
-      placeholder: saved ? t("mobile.server.vault.secretSaved") : undefined,
       ...props,
+      // A saved secret keeps its value until a new one is typed, and the placeholder says so.
+      ...(saved
+        ? {
+            placeholder: t(
+              key === "securityCode" ? "mobile.server.vault.secretSavedShort" : "mobile.server.vault.secretSaved",
+            ),
+          }
+        : {}),
     });
 
-  const title = saved
-    ? saved.kind === "login"
-      ? vaultLoginTitle(saved)
-      : saved.kind === "card"
-        ? vaultCardTitle(saved, t)
-        : saved.kind === "apiKey"
-          ? saved.name
-          : vaultContactTitle(saved, t)
-    : t(
-        kind === "login"
-          ? "mobile.server.vault.newLogin"
-          : kind === "card"
-            ? "mobile.server.vault.newCard"
-            : kind === "apiKey"
-              ? "mobile.server.vault.newApiKey"
-              : "mobile.server.vault.newContact",
-      );
+  const title = request?.title
+    ? request.title
+    : saved
+      ? saved.kind === "login"
+        ? vaultLoginTitle(saved)
+        : saved.kind === "card"
+          ? vaultCardTitle(saved, t)
+          : saved.kind === "apiKey"
+            ? saved.name
+            : vaultContactTitle(saved, t)
+      : t(
+          kind === "login"
+            ? "mobile.server.vault.newLogin"
+            : kind === "card"
+              ? "mobile.server.vault.newCard"
+              : kind === "apiKey"
+                ? "mobile.server.vault.newApiKey"
+                : "mobile.server.vault.newContact",
+        );
   const failure = action.error
     ? errorMessage(action.error, t(saved ? "mobile.server.vault.saveFailed" : "mobile.server.vault.addFailed"))
     : null;
@@ -240,9 +273,10 @@ function VaultItemForm({
     <SettingsContent>
       <Stack.Screen options={{ title }} />
       <SheetSaveAction
-        dirty={dirty}
+        // The agent can fill in a whole address, which the user may save as it is.
+        dirty={dirty || Boolean(request)}
         canSave={input !== null && !locked}
-        pending={locked && dirty}
+        pending={locked && (dirty || Boolean(request))}
         label={saved ? undefined : t("mobile.server.vault.addConfirm")}
         onSave={save}
       />
@@ -261,20 +295,35 @@ function VaultItemForm({
               placeholder: WEBSITE_PLACEHOLDER,
               hint: t("mobile.server.vault.websiteHint"),
             })}
-            {field("username", t("mobile.server.vault.username"), { autoCapitalize: "none" })}
+            {field("username", t("mobile.server.vault.username"), {
+              autoCapitalize: "none",
+              placeholder: EMAIL_PLACEHOLDER,
+            })}
             {secret("password", t("mobile.server.vault.password"), {
               secureTextEntry: true,
+              placeholder: PASSWORD_PLACEHOLDER,
               maxLength: VAULT_PASSWORD_LIMIT,
               hint: t("mobile.server.vault.secretHint", { host }),
             })}
-            {field("notes", t("mobile.server.vault.notes"), { multiline: true, maxLength: VAULT_NOTES_LIMIT })}
+            {request
+              ? null
+              : field("notes", t("mobile.server.vault.notes"), {
+                  multiline: true,
+                  maxLength: VAULT_NOTES_LIMIT,
+                  placeholder: t("mobile.server.vault.notesPlaceholder"),
+                })}
           </>
         ) : kind === "card" ? (
           <>
-            {field("label", t("mobile.server.vault.label"))}
-            {field("nameOnCard", t("mobile.server.vault.nameOnCard"))}
+            {field("label", t("mobile.server.vault.label"), {
+              placeholder: suggestedLabel || t("mobile.server.vault.cardLabelPlaceholder"),
+            })}
+            {field("nameOnCard", t("mobile.server.vault.nameOnCard"), {
+              placeholder: PERSON_PLACEHOLDER,
+            })}
             {secret("number", t("mobile.server.vault.cardNumber"), {
               inputMode: "numeric",
+              placeholder: CARD_NUMBER_PLACEHOLDER,
               maxLength: 23,
             })}
             <View className="gap-1">
@@ -295,7 +344,7 @@ function VaultItemForm({
                   inputMode: "numeric",
                   secureTextEntry: true,
                   maxLength: 4,
-                  placeholder: saved ? t("mobile.server.vault.secretSavedShort") : undefined,
+                  placeholder: SECURITY_CODE_PLACEHOLDER,
                 })}
               </FieldRow>
               <View className="px-1">
@@ -316,22 +365,25 @@ function VaultItemForm({
             })}
             {secret("key", t("mobile.server.vault.apiKey"), {
               secureTextEntry: true,
+              placeholder: API_KEY_PLACEHOLDER,
               maxLength: VAULT_API_KEY_LIMIT,
               hint: t("mobile.server.vault.secretHint", { host }),
             })}
-            {field("notes", t("mobile.server.vault.notes"), { multiline: true, maxLength: VAULT_NOTES_LIMIT })}
+            {field("notes", t("mobile.server.vault.notes"), {
+              multiline: true,
+              maxLength: VAULT_NOTES_LIMIT,
+              placeholder: t("mobile.server.vault.notesPlaceholder"),
+            })}
           </>
         ) : (
           <>
-            {field("label", t("mobile.server.vault.label"))}
-            {field("fullName", t("mobile.server.vault.fullName"))}
-            {field("address", t("mobile.server.vault.address"))}
-            {field("address2", t("mobile.server.vault.address2"))}
-            <FieldRow>
-              {field("postalCode", t("mobile.server.vault.postalCode"))}
-              {field("city", t("mobile.server.vault.city"))}
-            </FieldRow>
-            {field("region", t("mobile.server.vault.region"))}
+            {field("label", t("mobile.server.vault.label"), {
+              placeholder: suggestedLabel || t("mobile.server.vault.contactLabelPlaceholder"),
+            })}
+            {field("fullName", t("mobile.server.vault.fullName"), {
+              placeholder: PERSON_PLACEHOLDER,
+            })}
+            {/* The country comes first: the address placeholders follow its format. */}
             <SettingsSection>
               <SettingsRow
                 disclosure={false}
@@ -349,12 +401,36 @@ function VaultItemForm({
                 <Typography.Paragraph>{t("mobile.server.vault.country")}</Typography.Paragraph>
               </SettingsRow>
             </SettingsSection>
-            {field("phone", t("mobile.server.vault.phone"), { inputMode: "tel" })}
-            {field("email", t("mobile.server.vault.email"), { autoCapitalize: "none", inputMode: "email" })}
+            {field("address", t("mobile.server.vault.address"), {
+              placeholder: example.address,
+            })}
+            {field("address2", t("mobile.server.vault.address2"), {
+              placeholder: t("mobile.server.vault.address2Placeholder"),
+            })}
+            <FieldRow>
+              {field("postalCode", t("mobile.server.vault.postalCode"), {
+                placeholder: example.postalCode,
+              })}
+              {field("city", t("mobile.server.vault.city"), { placeholder: example.city })}
+            </FieldRow>
+            {field("region", t("mobile.server.vault.region"), {
+              placeholder: example.region,
+            })}
+            {field("phone", t("mobile.server.vault.phone"), { inputMode: "tel", placeholder: example.phone })}
+            {field("email", t("mobile.server.vault.email"), {
+              autoCapitalize: "none",
+              inputMode: "email",
+              placeholder: EMAIL_PLACEHOLDER,
+            })}
           </>
         )}
+        <View className="px-1">
+          <Typography.Paragraph type="body-xs" className="text-text-secondary">
+            {t(kind === "contact" ? "mobile.server.vault.contactRequiredNote" : "mobile.server.vault.requiredNote")}
+          </Typography.Paragraph>
+        </View>
       </View>
-      {kind === "card" ? (
+      {kind === "card" && !request ? (
         <SettingsSection title={t("mobile.server.vault.billingContact")}>
           <SettingsRow
             disclosure={false}

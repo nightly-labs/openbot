@@ -19,7 +19,13 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "메시지 또는 첨부 파일이 필요해요.",
   "error.agent.promptAnswersTooLong": "프롬프트 답변이 너무 길어요.",
   "error.agent.gone": "이 에이전트는 더 이상 없어요.",
+  "error.agent.instructionsTooLarge": "지침 파일이 너무 커서 여기서 열 수 없어요. 텍스트 편집기에서 줄여 주세요.",
+  "error.agent.instructionsOutside": "지침 파일이 에이전트 작업 공간 밖을 가리켜서 OpenBot에서 열지 않아요.",
+  "error.agent.instructionsReadFailed": "지침 파일을 읽지 못했어요.",
+  "error.agent.instructionsSaveFailed": "지침 파일을 저장하지 못했어요.",
   "error.agent.profileGenerationBusy": "프로필 생성이 바빠요. 잠시 후 다시 시도해 주세요.",
+  "error.agent.instructionsChanged":
+    "에이전트가 지침 파일을 변경했습니다. 마지막 변경 사항이 저장되지 않았습니다. 다시 변경하세요.",
   "error.agent.initialMessageRequired": "첫 메시지가 필요해요.",
   "error.agent.initialMessageTooLong": "첫 메시지가 너무 길어요.",
   "error.agent.setupCleanupFailed": "에이전트 설정에 실패했고 불완전한 에이전트를 제거할 수 없었어요.",
@@ -32,6 +38,8 @@ export const messages = {
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에서 모델 목록이 비어 있어요.',
   "error.agent.modelNotInProviderList":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}의 목록에 없어요.',
+  "error.agent.modelVariantNotListed":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}의 목록에 없어요. {provider}가 이 모델에 제공하는 값 중 하나를 사용하세요: {models}',
   "error.agent.modelProviderMismatch": "선택한 모델이 해당 제공자의 모델이 아니에요.",
   "error.agent.modelNotListed": '모델 "{model}"을(를) 사용할 수 없어요. 사용 가능한 모델: {models}.',
   "error.agent.providerNotListed":
@@ -47,6 +55,7 @@ export const messages = {
     "이 에이전트의 작업이 실행 중이에요. 제공자를 변경하기 전에 작업이 끝날 때까지 기다리거나 작업을 중지해 주세요.",
   "error.agent.waitBeforeClearContext": "새 채팅을 시작하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.waitBeforeCompactContext": "컨텍스트를 압축하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
+  "error.agent.waitBeforeDeleteHistory": "기록을 삭제하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.compactContextUnavailable": "이 에이전트는 지금 컨텍스트를 압축할 수 없어요.",
   "error.agent.unknown": "알 수 없는 에이전트: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -112,6 +121,8 @@ export const messages = {
     "이 서버의 메모리가 부족해요. 메시지는 대기열에서 기다리다가 메모리가 확보되면 시작돼요.",
   "error.agent.workspaceOnlyToolMissing":
     "워크스페이스 전용 모드에는 {tool}이(가) 필요한데 OpenBot이 찾지 못했어요. 설치하거나 에이전트 설정에서 전체 접근 권한을 선택하세요.",
+  "error.agent.claudeSandboxUnavailable":
+    "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어요: {reason}. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
   "error.agent.screenCaptureOff":
     "이 에이전트는 화면 캡처가 꺼져 있어요. 사용자가 에이전트 설정에서 컴퓨터 제어를 켤 수 있어요.",
   "error.agent.screenCaptureUnavailable": "이 컴퓨터에서는 화면 캡처를 사용할 수 없어요.",

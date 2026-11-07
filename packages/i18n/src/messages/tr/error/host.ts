@@ -31,4 +31,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "Kiracı kapatması zaman aşımına uğradı. Hiçbir uygulama değişimi başlatılmadı.",
   "error.host.tenantHealthMissing":
     "Yeniden başlatmanın ardından kiracı sağlık raporları eksik veya sağlıksız. Başka bir güncellemeden önce kiracı oturumlarını inceleyin.",
+  "error.host.personalityInvalid": "Bu yanıt stili bilinmiyor.",
 } as const satisfies PartialTranslation<typeof source>;

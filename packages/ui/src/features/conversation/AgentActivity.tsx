@@ -1,3 +1,4 @@
+import type { AgentStepActivity } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, Show } from "solid-js";
@@ -88,13 +89,33 @@ export function AgentActivityIndicator(props: {
    * network. The line then says that it waits, with no shine, because a silent provider is not visible work.
    */
   waitingFor?: string | null | undefined;
+  /**
+   * The line shows only what the agent does now, as the step names it, and nothing more: no label
+   * while no step is named, no time and no steps. The avatar shows what the step does, and each new
+   * label rises into place.
+   */
+  plain?: boolean | undefined;
+  /** What the running step does, as the host names it. A plain line shows it on the avatar. */
+  activity?: AgentStepActivity | null | undefined;
 }) {
   const { t, format } = useText();
+  // While the model reads the result of a step, a plain line keeps the name of that step: the host's
+  // "Reviewing the latest tool result…" would replace each step name a moment after it shows. The
+  // review text stays as the detail when the answer starts and the step kind goes, so it is kept out
+  // until a new step names itself.
+  let reviewDetail: string | null | undefined;
+  const detail = createMemo<string | null | undefined>((previous) => {
+    if (!props.plain) return props.detail;
+    if (props.activity === "reviewing") reviewDetail = props.detail;
+    return previous && props.detail && props.detail === reviewDetail ? previous : props.detail;
+  });
   const label = () => {
     const provider = props.waitingFor;
     if (provider) return t("chat.activity.waitingFor", { provider });
-    return props.detail ?? t(agentActivityLabelKey(props.label));
+    return detail() ?? t(agentActivityLabelKey(props.label));
   };
+  /** The text on the line. A plain line shows no general label: the moving avatar says that the agent works. */
+  const shownLabel = () => (props.plain && !props.waitingFor && !detail() ? null : label());
   const statusLabel = () => {
     const name = props.agent?.name ?? t("chat.activity.agentFallback");
     const provider = props.waitingFor;
@@ -106,7 +127,10 @@ export function AgentActivityIndicator(props: {
   // the avatar reads its mood in a tracked effect, where a new memo halts the reactive system.
   const mood = () => (props.waitingFor ? "connecting" : "working");
   const waiting = () => (props.waitingFor ? "true" : undefined);
-  const elapsedMs = createElapsed(() => (props.phase === "exiting" ? undefined : props.since));
+  const plain = () => (props.plain ? "true" : undefined);
+  const avatarActivity = () => (props.plain && !props.waitingFor ? (props.activity ?? null) : undefined);
+  const shownSteps = () => (props.plain ? undefined : props.steps);
+  const elapsedMs = createElapsed(() => (props.phase === "exiting" || props.plain ? undefined : props.since));
   const elapsed = createMemo(() => {
     const ms = elapsedMs();
     if (ms < ELAPSED_VISIBLE_AFTER_MS) return null;
@@ -117,15 +141,28 @@ export function AgentActivityIndicator(props: {
     return `${minutes} ${seconds}`;
   });
   return (
-    <div class="agent-activity-entry" data-state={props.phase ?? "active"} data-waiting={waiting()}>
+    <div
+      class="agent-activity-entry"
+      data-state={props.phase ?? "active"}
+      data-waiting={waiting()}
+      data-plain={plain()}
+    >
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true" aria-label={statusLabel()} />
       <AgentActivityBody
-        steps={props.steps}
+        steps={shownSteps()}
         stepsOpenByDefault={props.stepsOpenByDefault}
         live={props.phase !== "exiting"}
       >
-        <AgentAvatar agent={props.agent} mood={mood()} class="agent-activity-avatar" />
-        <span class="agent-activity-label">{label()}</span>
+        <AgentAvatar agent={props.agent} mood={mood()} activity={avatarActivity()} class="agent-activity-avatar" />
+        <Show
+          when={plain()}
+          fallback={<Show when={shownLabel()}>{(text) => <span class="agent-activity-label">{text()}</span>}</Show>}
+        >
+          {/* Keyed, so that each new label is a new element and plays its entrance. */}
+          <Show when={shownLabel()} keyed>
+            {(text) => <span class="agent-activity-label">{text}</span>}
+          </Show>
+        </Show>
         <Show when={elapsed()}>{(time) => <span class="agent-activity-elapsed">{time()}</span>}</Show>
       </AgentActivityBody>
     </div>

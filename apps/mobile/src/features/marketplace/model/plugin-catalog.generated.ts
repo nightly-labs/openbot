@@ -315,6 +315,38 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "ticktick",
+    name: "TickTick",
+    tagline: "Tasks, lists, habits and focus",
+    description:
+      "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+    category: "productivity",
+    creatorName: "TickTick",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-today", text: "Which TickTick tasks are due today?" },
+      { id: "prompt-capture", text: "Add these action items to my TickTick Inbox." },
+      { id: "prompt-week", text: "Which TickTick tasks did I complete last week?" },
+    ],
+    websiteUrl: "https://ticktick.com",
+    privacyPolicyUrl: "https://ticktick.com/privacy",
+    termsUrl: "https://ticktick.com/tos",
+    featured: false,
+    apps: [
+      {
+        id: "app-ticktick-mcp",
+        name: "TickTick",
+        description: "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+        server: {
+          name: "ticktick",
+          transport: "http",
+          url: "https://mcp.ticktick.com",
+          auth: [{ id: "ticktick-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "trello",
     name: "Trello",
     tagline: "Boards, lists and cards",
@@ -457,6 +489,72 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "higgsfield",
+    name: "Higgsfield",
+    tagline: "AI images, videos and audio",
+    description:
+      "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+    category: "design",
+    creatorName: "Higgsfield",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-credits", text: "How many Higgsfield credits do I have?" },
+      { id: "prompt-product-shot", text: "Make a Higgsfield product photo of a ceramic mug on a wooden table." },
+      { id: "prompt-clip", text: "Make a 5-second Higgsfield video of waves at sunset." },
+    ],
+    websiteUrl: "https://higgsfield.ai",
+    privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
+    termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
+    featured: false,
+    apps: [
+      {
+        id: "app-higgsfield-mcp",
+        name: "Higgsfield",
+        description:
+          "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+        server: {
+          name: "higgsfield",
+          transport: "http",
+          url: "https://mcp.higgsfield.ai/mcp",
+          auth: [{ id: "higgsfield-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "elevenlabs",
+    name: "ElevenLabs",
+    tagline: "Speech, voices and voice agents",
+    description:
+      "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+    category: "design",
+    creatorName: "ElevenLabs",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+      { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+      { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+    ],
+    websiteUrl: "https://elevenlabs.io",
+    privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+    termsUrl: "https://elevenlabs.io/terms-of-use",
+    featured: false,
+    apps: [
+      {
+        id: "app-elevenlabs-mcp",
+        name: "ElevenLabs",
+        description:
+          "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+        server: {
+          name: "elevenlabs",
+          transport: "http",
+          url: "https://api.elevenlabs.io/v1/mcp",
+          auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "apple-apps",
     name: "Apple apps",
     tagline: "Mail, Calendar and more on your Mac",
@@ -516,6 +614,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           transport: "http",
           url: "https://mcp.sentry.dev/mcp",
           auth: [{ id: "sentry-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "gitlab",
+    name: "GitLab",
+    tagline: "Issues, merge requests and pipelines",
+    description:
+      "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+    category: "coding",
+    creatorName: "GitLab",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-review-queue", text: "Which merge requests wait for my review?" },
+      { id: "prompt-failed-pipeline", text: "Why did the last pipeline on the default branch fail?" },
+      { id: "prompt-new-issue", text: "File an issue for the crash in the sync queue with reproduction steps." },
+    ],
+    websiteUrl: "https://about.gitlab.com",
+    privacyPolicyUrl: "https://about.gitlab.com/privacy/",
+    termsUrl: "https://about.gitlab.com/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-gitlab-mcp",
+        name: "GitLab",
+        description:
+          "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+        server: {
+          name: "gitlab",
+          transport: "http",
+          url: "https://gitlab.com/api/v4/mcp",
+          auth: [{ id: "gitlab-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],
@@ -886,6 +1017,60 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "revenuecat",
+    name: "RevenueCat",
+    tagline: "Subscriptions, products and paywalls",
+    description:
+      "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+    category: "other",
+    creatorName: "RevenueCat",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-offerings", text: "Which offerings and packages does my RevenueCat project have?" },
+      { id: "prompt-revenue", text: "How did my RevenueCat revenue and active subscriptions change this month?" },
+      {
+        id: "prompt-customer",
+        text: "Which entitlements does this RevenueCat customer have, and when do they expire?",
+      },
+    ],
+    websiteUrl: "https://www.revenuecat.com",
+    privacyPolicyUrl: "https://www.revenuecat.com/privacy",
+    termsUrl: "https://www.revenuecat.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-revenuecat-mcp",
+        name: "RevenueCat",
+        description:
+          "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+        server: {
+          name: "revenuecat",
+          transport: "http",
+          url: "https://mcp.revenuecat.ai/mcp",
+          auth: [
+            {
+              id: "revenuecat-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "sk_…",
+                  hint: "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
+                },
+              ],
+              docsUrl: "https://www.revenuecat.com/docs/projects/authentication#finding-api-keys",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "posthog",
     name: "PostHog",
     tagline: "Product analytics and flags",
@@ -1122,6 +1307,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "omnisend",
+    name: "Omnisend",
+    tagline: "Email and SMS marketing",
+    description:
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    category: "automation",
+    creatorName: "Omnisend",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+      { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+      { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+    ],
+    websiteUrl: "https://www.omnisend.com",
+    privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+    termsUrl: "https://www.omnisend.com/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-omnisend-mcp",
+        name: "Omnisend",
+        description:
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+        server: {
+          name: "omnisend",
+          transport: "http",
+          url: "https://mcp.omnisend.com/mcp",
+          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Many apps through your own Composio link",
@@ -1173,6 +1391,106 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
               docsLabel: "Get a key",
             },
           ],
+        },
+      },
+    ],
+  },
+  {
+    slug: "clickup",
+    name: "ClickUp",
+    tagline: "Tasks, docs and team updates",
+    description:
+      "ClickUp lets agents search tasks, docs, comments and chat, create and update tasks, lists and docs, post comments, send chat messages and track time. Each user signs in to their own ClickUp account through the browser. Agents get the same permissions as the user. They can move tasks to the trash and delete comments.",
+    category: "productivity",
+    creatorName: "ClickUp",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-find-tasks", text: "Find my open ClickUp tasks due this week." },
+      { id: "prompt-create-task", text: "Create a ClickUp task for these action items and assign it to me." },
+      {
+        id: "prompt-summarize-doc",
+        text: "Find the latest project update in ClickUp and summarize the open questions.",
+      },
+    ],
+    websiteUrl: "https://clickup.com",
+    privacyPolicyUrl: "https://clickup.com/terms/privacy",
+    termsUrl: "https://clickup.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-clickup-mcp",
+        name: "ClickUp",
+        description: "Tasks, docs, comments, chat and time tracking, over ClickUp's MCP server with browser sign-in.",
+        server: {
+          name: "clickup",
+          transport: "http",
+          url: "https://mcp.clickup.com/mcp",
+          auth: [{ id: "clickup-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "coinbase",
+    name: "Coinbase",
+    tagline: "Crypto prices, portfolios and trading",
+    description:
+      "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+    category: "data-analytics",
+    creatorName: "Coinbase",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-balances", text: "What are my Coinbase balances in each portfolio?" },
+      { id: "prompt-price", text: "Show the BTC-USD price on Coinbase and how it moved this week." },
+      { id: "prompt-preview-order", text: "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order." },
+    ],
+    websiteUrl: "https://www.coinbase.com",
+    privacyPolicyUrl: "https://www.coinbase.com/legal/privacy",
+    termsUrl: "https://www.coinbase.com/legal/user_agreement",
+    featured: false,
+    apps: [
+      {
+        id: "app-coinbase-mcp",
+        name: "Coinbase",
+        description:
+          "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+        server: {
+          name: "coinbase",
+          transport: "http",
+          url: "https://agents.coinbase.com/mcp",
+          auth: [{ id: "coinbase-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "robinhood",
+    name: "Robinhood",
+    tagline: "Brokerage accounts and agentic trading",
+    description:
+      "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+    category: "data-analytics",
+    creatorName: "Robinhood",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-positions", text: "Summarize my Robinhood positions and how they moved today." },
+      { id: "prompt-watchlist", text: "How did each stock on my Robinhood watchlist move this week?" },
+      { id: "prompt-agentic-cash", text: "How much cash is in my Robinhood Agentic account?" },
+    ],
+    websiteUrl: "https://robinhood.com",
+    privacyPolicyUrl: "https://robinhood.com/us/en/support/articles/privacy-policy/",
+    termsUrl: "https://robinhood.com/us/en/about/legal/",
+    featured: false,
+    apps: [
+      {
+        id: "app-robinhood-mcp",
+        name: "Robinhood",
+        description: "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+        server: {
+          name: "robinhood",
+          transport: "http",
+          url: "https://agent.robinhood.com/mcp/trading",
+          auth: [{ id: "robinhood-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],

@@ -4,13 +4,24 @@ import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/val
 import { Effect, Fiber, Option, Result, Schema } from "effect";
 import {
   type ContactMessageEmailInput,
+  type LicenseEmailInput,
   type RenderedEmail,
   renderContactMessageEmail,
+  renderLicenseEmail,
   renderSignInCodeEmail,
   renderTeamInviteEmail,
   renderWelcomeEmail,
   type WelcomeEmailInput,
 } from "./email-templates";
+
+/**
+ * The `EMAIL_RELAY` service binding: the `openbot-email-relay` Worker in `src/email-relay-entry.ts`.
+ * Cloudflare runs that Worker near the mail host, because some Cloudflare locations cannot open a
+ * socket to it (#4578).
+ */
+interface EmailRelay {
+  fetch(request: Request): Promise<Response>;
+}
 
 export interface SmtpEmailConfig {
   host: string;
@@ -18,6 +29,8 @@ export interface SmtpEmailConfig {
   username: string;
   password: string;
   from: string;
+  /** Sends through the relay Worker instead of a socket from this Worker. */
+  relay?: EmailRelay;
 }
 
 export interface SmtpEmailMessage {
@@ -40,7 +53,10 @@ export interface SmtpWelcomeMessage extends WelcomeEmailInput {
   email: string;
 }
 
-interface PreparedEmailMessage {
+/** A license email and its address. */
+export type SmtpLicenseMessage = LicenseEmailInput & { email: string };
+
+export interface PreparedEmailMessage {
   email: string;
   /** The address a reply goes to, when it is not the sender. */
   replyTo?: string;
@@ -109,38 +125,35 @@ const SENDER_LIMIT_REPLY = /too many (?:messages|emails|recipients)|(?:sending|s
 const SMTP_TIMEOUT_MS = 7_500;
 const SMTP_CLOSE_TIMEOUT_MS = 250;
 const SMTP_MAX_ATTEMPTS = 3;
+// A service binding needs an absolute URL. The relay reads only the body.
+const RELAY_URL = "https://openbot-email-relay.internal/send";
+// The relay ends its own attempts inside the delivery budget, so its result must arrive before this
+// limit. The margin covers the binding hop and a cold start. Only a relay that hangs reaches it.
+const RELAY_TIMEOUT_MS = EMAIL_CODE_DELIVERY_BUDGET_MS + 5_000;
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/iu;
 
-export const sendPrivateEmailCode = Effect.fn("Smtp.sendPrivateEmailCode ")(function* (
-  config: SmtpEmailConfig,
+/** Checks a sign-in code message and renders it. */
+export const prepareEmailCode = Effect.fn("Email.prepareCode")(function* (
   message: SmtpEmailMessage,
-  connector?: SmtpConnector,
-) {
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
-    validateConfig(config);
     validateEmail(message.email, "recipient");
     if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/u.test(message.code)) {
       throw new Error("smtp_invalid_code");
     }
   });
-  return yield* sendPrivateEmail(
-    config,
-    {
-      email: message.email,
-      content: renderSignInCodeEmail({
-        code: message.code,
-        expiresInMinutes: Math.max(1, Math.ceil((message.expiresAt - Date.now()) / 60_000)),
-      }),
-    },
-    connector,
-  );
+  return {
+    email: message.email,
+    content: renderSignInCodeEmail({
+      code: message.code,
+      expiresInMinutes: Math.max(1, Math.ceil((message.expiresAt - Date.now()) / 60_000)),
+    }),
+  };
 });
 
-export const sendPrivateTeamInvite = Effect.fn("Smtp.sendPrivateTeamInvite ")(function* (
-  config: SmtpEmailConfig,
+export const prepareTeamInvite = Effect.fn("Email.prepareTeamInvite")(function* (
   message: SmtpTeamInviteMessage,
-  connector?: SmtpConnector,
-) {
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
     validateEmail(message.email, "recipient");
     validateEmail(message.inviterEmail, "inviter");
@@ -155,27 +168,21 @@ export const sendPrivateTeamInvite = Effect.fn("Smtp.sendPrivateTeamInvite ")(fu
       throw new Error("smtp_invalid_invite_url");
     }
   });
-  return yield* sendPrivateEmail(
-    config,
-    {
-      email: message.email,
-      content: renderTeamInviteEmail({
-        inviterEmail: message.inviterEmail,
-        serverName: message.serverName,
-        inviteUrl: message.inviteUrl,
-        role: message.role,
-      }),
-    },
-    connector,
-  );
+  return {
+    email: message.email,
+    content: renderTeamInviteEmail({
+      inviterEmail: message.inviterEmail,
+      serverName: message.serverName,
+      inviteUrl: message.inviteUrl,
+      role: message.role,
+    }),
+  };
 });
 
-/** Sends the welcome email of an account's first plan. A reply goes to the sending mailbox. */
-export const sendPrivateWelcomeEmail = Effect.fn("Smtp.sendPrivateWelcomeEmail")(function* (
-  config: SmtpEmailConfig,
+/** The welcome email of an account's first plan. A reply goes to the sending mailbox. */
+export const prepareWelcomeEmail = Effect.fn("Email.prepareWelcome")(function* (
   message: SmtpWelcomeMessage,
-  connector?: SmtpConnector,
-) {
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
     if (
       !message.serverName.trim() ||
@@ -185,27 +192,31 @@ export const sendPrivateWelcomeEmail = Effect.fn("Smtp.sendPrivateWelcomeEmail")
       throw new Error("smtp_invalid_server_name");
     }
   });
-  return yield* sendPrivateEmail(
-    config,
-    { email: message.email, content: renderWelcomeEmail({ plan: message.plan, serverName: message.serverName }) },
-    connector,
-  );
+  return { email: message.email, content: renderWelcomeEmail({ plan: message.plan, serverName: message.serverName }) };
 });
 
-/** Sends a message from the site's contact form to the sending mailbox. A reply goes to the visitor. */
-export const sendPrivateContactMessage = Effect.fn("Smtp.sendPrivateContactMessage")(function* (
-  config: SmtpEmailConfig,
+export function prepareLicenseEmail(message: SmtpLicenseMessage): Effect.Effect<PreparedEmailMessage> {
+  return Effect.sync(() => ({ email: message.email, content: renderLicenseEmail(message) }));
+}
+
+/** A message from the site's contact form to `recipient`, the sending mailbox. A reply goes to the visitor. */
+export function prepareContactMessage(
+  recipient: string,
   message: SmtpContactMessage,
-  connector?: SmtpConnector,
-) {
-  return yield* sendPrivateEmail(
-    config,
-    { email: config.from, replyTo: message.email, content: renderContactMessageEmail(message) },
-    connector,
-  );
-});
+): Effect.Effect<PreparedEmailMessage> {
+  return Effect.sync(() => ({ email: recipient, replyTo: message.email, content: renderContactMessageEmail(message) }));
+}
 
-const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
+/**
+ * The SMTP headers that both senders add: `Auto-Submitted` (RFC 3834) and `X-Auto-Response-Suppress`
+ * (Exchange and Outlook) stop vacation and out-of-office replies to the sending mailbox.
+ */
+export const AUTOMATED_EMAIL_HEADERS = {
+  "Auto-Submitted": "auto-generated",
+  "X-Auto-Response-Suppress": "All",
+} as const;
+
+export const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   config: SmtpEmailConfig,
   message: PreparedEmailMessage,
   connector?: SmtpConnector,
@@ -216,6 +227,7 @@ const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   if (replyTo !== undefined) yield* smtpValidate(() => validateEmail(replyTo, "reply_to"));
   const { subject } = message.content;
   if (!subject || subject.length > 160 || hasHeaderBreak(subject)) return yield* new SmtpError("smtp_invalid_subject");
+  if (config.relay) return yield* sendThroughRelay(config.relay, config, message);
   const connect = connector ?? (yield* smtpCall(loadCloudflareConnector));
   for (let attempt = 1; attempt <= SMTP_MAX_ATTEMPTS; attempt += 1) {
     const result = yield* Effect.result(sendPrivateEmailAttempt(config, message, connect));
@@ -233,6 +245,73 @@ const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   }
 });
 
+// The relay request. The password crosses only the service binding, inside Cloudflare, and neither
+// Worker logs a request body.
+const RelayedEmail = Schema.Struct({
+  config: Schema.Struct({
+    host: Schema.String,
+    port: Schema.Number,
+    username: Schema.String,
+    password: Schema.String,
+    from: Schema.String,
+  }),
+  message: Schema.Struct({
+    email: Schema.String,
+    replyTo: Schema.optionalKey(Schema.String),
+    content: Schema.Struct({
+      subject: Schema.String,
+      preheader: Schema.String,
+      text: Schema.String,
+      html: Schema.String,
+    }),
+  }),
+});
+// The relay answers 204 when the mail host took the message, and 502 with the message of the failure.
+const RelayFailure = Schema.Struct({ error: Schema.String });
+const DELIVERY_ERROR_PATTERN = /^(?:smtp|email_delivery)_[a-z_]+$/u;
+
+// The relay runs the same send, with its retries and sender-limit check, so its failure message keeps
+// its meaning here. When the relay does not answer, it can have sent the message.
+const sendThroughRelay = Effect.fn("SmtpEmail.relay")(function* (
+  relay: EmailRelay,
+  config: SmtpEmailConfig,
+  message: PreparedEmailMessage,
+): Effect.fn.Return<void, SmtpFailure> {
+  const { relay: _relay, ...smtp } = config;
+  const unknown = () => new SmtpError("smtp_delivery_unknown");
+  const failure = yield* Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        relay.fetch(
+          new Request(RELAY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ config: smtp, message }),
+            signal,
+          }),
+        ),
+      catch: unknown,
+    });
+    if (response.status === 204) return null;
+    const body = yield* Effect.tryPromise({ try: () => response.json(), catch: unknown });
+    const decoded = Schema.decodeUnknownOption(RelayFailure)(body);
+    if (Option.isNone(decoded) || !DELIVERY_ERROR_PATTERN.test(decoded.value.error)) return unknown();
+    return new SmtpError(decoded.value.error);
+  }).pipe(Effect.timeoutOrElse({ duration: RELAY_TIMEOUT_MS, orElse: () => Effect.fail(unknown()) }));
+  if (failure) return yield* failure;
+});
+
+/** Sends one relay request in the relay Worker. A request that does not decode fails permanently. */
+export const sendRelayedEmail = Effect.fn("SmtpEmail.sendRelayed")(function* (
+  request: Request,
+  connector?: SmtpConnector,
+): Effect.fn.Return<void, SmtpFailure> {
+  const invalid = () => new SmtpError("smtp_invalid_relay_request");
+  const body = yield* Effect.tryPromise({ try: () => request.json(), catch: invalid });
+  const { config, message } = yield* Schema.decodeUnknownEffect(RelayedEmail)(body).pipe(Effect.mapError(invalid));
+  return yield* sendPrivateEmail(config, message, connector);
+});
+
 const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
   config: SmtpEmailConfig,
   message: PreparedEmailMessage,
@@ -240,7 +319,7 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
 ): Effect.fn.Return<void, SmtpFailure> {
   const startedAt = Date.now();
   const state: SmtpAttemptState = { submissionStarted: false, accepted: false, replyAt: {} };
-  const outcome: { error: SmtpFailure | null; closeConfirmed: boolean } = { error: null, closeConfirmed: false };
+  const outcome: { error: SmtpFailure | null } = { error: null };
   yield* Effect.acquireUseRelease(
     Effect.gen(function* () {
       const socket = yield* smtpValidate(() =>
@@ -257,7 +336,8 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
     }),
     ({ session }) =>
       Effect.gen(function* () {
-        // Observe the deadline without stopping the session before socket closure confirms its final state.
+        // Observe the deadline only. The release step stops the session, so `state` is final when the
+        // result is decided after it.
         const result = yield* Fiber.join(session).pipe(
           Effect.timeoutOrElse({
             duration: SMTP_TIMEOUT_MS,
@@ -271,10 +351,13 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
               : result.failure;
         }
       }),
+    // Stop the session before the close, so it cannot write again and `state` is final. A session that
+    // did not start the submission did not send the message, whether or not the close is confirmed, so
+    // a relay that stalls before `DATA` gets a new attempt instead of an unknown result.
     ({ socket, session }) =>
       Effect.gen(function* () {
-        outcome.closeConfirmed = yield* closeSmtpSocket(socket);
         yield* Fiber.interrupt(session);
+        yield* closeSmtpSocket(socket);
       }),
   );
   console.info("SMTP session timing:", {
@@ -284,18 +367,14 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
   });
   if (state.accepted) return;
   if (outcome.error && !isRetryableSmtpError(outcome.error)) return yield* outcome.error;
-  if (state.submissionStarted || !outcome.closeConfirmed) return yield* new SmtpError("smtp_delivery_unknown");
+  if (state.submissionStarted) return yield* new SmtpError("smtp_delivery_unknown");
   if (outcome.error) return yield* outcome.error;
   return yield* new SmtpError("smtp_delivery_unknown");
 });
 
-/** True when the socket confirms its close before the deadline. */
-function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<boolean> {
-  return Effect.tryPromise(async () => socket.close()).pipe(
-    Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS),
-    Effect.map(Option.isSome),
-    Effect.orElseSucceed(() => false),
-  );
+/** Waits for the socket close until the deadline. */
+function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<void> {
+  return Effect.tryPromise(async () => socket.close()).pipe(Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS), Effect.ignore);
 }
 
 function normalizeSmtpError(error: unknown): SmtpFailure {
@@ -427,8 +506,7 @@ class SmtpResponseReader {
 
 // Plain text first and HTML last: a client shows the last part it can render. Both parts are
 // quoted-printable, so the message is 7-bit clean and no line passes the 998-octet limit, whatever
-// the relay supports. `Auto-Submitted` (RFC 3834) and `X-Auto-Response-Suppress` (Exchange and
-// Outlook) stop vacation and out-of-office replies to the sending mailbox.
+// the relay supports.
 function createMimeMessage(from: string, message: PreparedEmailMessage): string {
   const boundary = `openbot-${crypto.randomUUID()}`;
   return dotStuff(
@@ -439,8 +517,7 @@ function createMimeMessage(from: string, message: PreparedEmailMessage): string 
       `Subject: ${encodeHeaderValue(message.content.subject)}`,
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: <${crypto.randomUUID()}@openbot.run>`,
-      "Auto-Submitted: auto-generated",
-      "X-Auto-Response-Suppress: All",
+      ...Object.entries(AUTOMATED_EMAIL_HEADERS).map(([name, value]) => `${name}: ${value}`),
       "MIME-Version: 1.0",
       "Content-Type: multipart/alternative;",
       ` boundary="${boundary}"`,

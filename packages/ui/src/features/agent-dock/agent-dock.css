@@ -1,0 +1,707 @@
+/* The liquid agent dock on the right edge of the window. See `AgentDock.tsx`. */
+
+/* The stage sits on the right edge, centred in the window. It lets clicks through where it is empty. */
+.agent-dock {
+  /* The liquid has the window frame colour, so the dock reads as part of the frame. The glass window
+     has a clear frame; overlapping clear shapes would show their seams, so the dock stays solid. */
+  --agent-dock-fill: var(--window-solid-frame, var(--openbot-bg-frame));
+  /* The seat badges are cut out of the dock, as the sidebar badges are cut out of the sidebar. */
+  --agent-avatar-outline: var(--agent-dock-fill);
+  --agent-row-avatar-size: 40px;
+
+  position: fixed;
+  z-index: var(--openbot-layer-dropdown);
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  /* The motion loop springs `--agent-dock-tuck` when the dock slides into the edge. */
+  translate: var(--agent-dock-tuck, 0px) 0;
+  pointer-events: none;
+}
+
+/* On the left edge the stage is mirrored. */
+.agent-dock[data-side="left"] {
+  right: auto;
+  left: 0;
+  transform: translateY(-50%) scaleX(-1);
+  translate: calc(-1 * var(--agent-dock-tuck, 0px)) 0;
+}
+
+/* The dock body between the seats. It takes the pointer; only the handle below moves the dock. */
+.agent-dock-hit {
+  position: absolute;
+  pointer-events: auto;
+}
+
+/* The handle below the dock: an arc in the dock colour beside the bottom tail. It shows only on a dock
+   that the user can move. */
+.agent-dock-handle {
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  overflow: visible;
+  fill: none;
+}
+
+.agent-dock:not([data-draggable]) .agent-dock-handle {
+  display: none;
+}
+
+.agent-dock-handle-arc {
+  stroke: var(--agent-dock-fill);
+  stroke-linecap: round;
+  transition:
+    stroke-width var(--openbot-duration-normal) var(--openbot-ease-out),
+    translate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* The handle answers the pointer: it gets thicker and comes nearer to the dock, more while it drags. */
+.agent-dock-handle:has(.agent-dock-handle-hit:hover) .agent-dock-handle-arc {
+  stroke-width: 5.5px;
+  translate: 0 -2px;
+}
+
+.agent-dock[data-dragging] .agent-dock-handle .agent-dock-handle-arc {
+  stroke-width: 6px;
+  translate: 0 -3px;
+}
+
+.agent-dock-handle-hit {
+  stroke: var(--openbot-transparent);
+  stroke-linecap: round;
+  pointer-events: stroke;
+  cursor: grab;
+}
+
+.agent-dock-handle-hit:active {
+  cursor: grabbing;
+}
+
+.agent-dock-filter {
+  position: absolute;
+}
+
+/* The liquid. It runs past the window edge, so the filter does not round the edge off. */
+.agent-dock-liquid {
+  position: absolute;
+  inset: -40px -60px -40px -40px;
+}
+
+.agent-dock-liquid > * {
+  position: absolute;
+  background: var(--agent-dock-fill);
+}
+
+.agent-dock-liquid > .agent-dock-shapes {
+  top: 0;
+  left: 0;
+  overflow: visible;
+  background: var(--openbot-transparent);
+  fill: var(--agent-dock-fill);
+}
+
+.agent-dock-edge {
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  overflow: visible;
+  fill: var(--agent-dock-fill);
+}
+
+.agent-dock-panel-body {
+  margin-left: 40px;
+  margin-top: 40px;
+  opacity: 0;
+}
+
+.agent-dock-drop {
+  top: 40px;
+  left: 40px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--openbot-radius-pill);
+  transform: scale(0);
+}
+
+/* Seats and the add button. */
+.agent-dock-seats {
+  position: absolute;
+  inset: 0;
+}
+
+.agent-dock-seat {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  pointer-events: auto;
+  transform-origin: 50% 50%;
+}
+
+/* The seats scroll when the dock is full. The motion loop sets the top and the height. */
+.agent-dock-seat-scroll {
+  position: absolute;
+  top: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: none;
+  --agent-dock-seat-fade-top: 0px;
+  --agent-dock-seat-fade-bottom: 0px;
+}
+
+.agent-dock-seat-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* The motion loop sets the height, which springs down when a seat goes. */
+.agent-dock-seat-list {
+  position: relative;
+  overflow: clip;
+}
+
+/* An edge with more seats behind it fades out. The selectors outrank the global .scroll-fade-* masks. */
+.agent-dock-seats .agent-dock-seat-scroll:is(.scroll-fade-top, .scroll-fade-bottom) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--agent-dock-seat-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--agent-dock-seat-fade-bottom)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--agent-dock-seat-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--agent-dock-seat-fade-bottom)),
+    transparent
+  );
+}
+
+.agent-dock-seat-scroll.scroll-fade-top {
+  --agent-dock-seat-fade-top: var(--agent-dock-seat-fade);
+}
+
+.agent-dock-seat-scroll.scroll-fade-bottom {
+  --agent-dock-seat-fade-bottom: var(--agent-dock-seat-fade);
+}
+
+.agent-dock-seat-button {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  padding: 0;
+  background: var(--openbot-transparent);
+  color: var(--openbot-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--openbot-duration-normal) var(--openbot-ease-out),
+    transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* The avatar drawing runs past the seat. Only the seat takes the pointer, so a press between the
+   seats lands on the dock body and drags it. */
+.agent-dock-seat-button * {
+  pointer-events: none;
+}
+
+.agent-dock-seat-button:hover {
+  color: var(--openbot-text-primary);
+  transform: scale(1.06);
+}
+
+.agent-dock-seat-button:active {
+  transform: scale(0.92);
+}
+
+.agent-dock-seat-button:focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+/* The open agent is a little larger; the liquid neck marks it too. */
+.agent-dock-seat-button[data-open] {
+  transform: scale(1.12);
+}
+
+.agent-dock-seat-button .agent-avatar {
+  /* The plush art sits low in its box. Every app surface lifts it by 14% of the face size. */
+  --agent-avatar-optical-offset: calc(40px * -0.14);
+
+  width: 40px;
+  height: 40px;
+}
+
+/* The sidebar badge, with the dock colour for its cut-out border. */
+.agent-dock-seat-button .agent-row-agent-status {
+  border-color: var(--agent-dock-fill);
+}
+
+.agent-dock-add svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.agent-dock-menu-avatar.agent-avatar {
+  width: 20px;
+  height: 20px;
+}
+
+/* The chat, over the liquid panel. */
+.agent-dock-panel {
+  position: absolute;
+  top: 0;
+  color: var(--openbot-text-primary);
+  opacity: 0;
+  transform-origin: 100% 50%;
+}
+
+.agent-dock-panel[data-open] {
+  pointer-events: auto;
+}
+
+.agent-dock-chat {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  animation: agent-dock-swap var(--openbot-duration-island-content) var(--openbot-ease-out);
+}
+
+@keyframes agent-dock-swap {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(8px);
+  }
+}
+
+.agent-dock-chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-2) var(--openbot-space-4);
+}
+
+.agent-dock-chat-avatar.agent-avatar {
+  --agent-avatar-optical-offset: calc(34px * -0.14);
+
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+}
+
+.agent-dock-chat-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  line-height: var(--openbot-leading-sm);
+}
+
+.agent-dock-chat-title strong {
+  overflow: hidden;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-chat-title span {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  padding: 0;
+  background: var(--openbot-transparent);
+  color: var(--openbot-text-muted);
+  cursor: pointer;
+}
+
+.agent-dock-icon:hover {
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.agent-dock-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+/* The log and its scroll thumb. The thumb stays outside the faded edges of the log. */
+.agent-dock-log {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* The system scrollbar stays hidden: the faded edges and the thumb show where the reader is. */
+.agent-dock-messages {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--openbot-space-2) var(--openbot-space-4) var(--openbot-space-3);
+  scrollbar-width: none;
+  --agent-dock-fade-top: 0px;
+  --agent-dock-fade-bottom: 0px;
+}
+
+.agent-dock-messages::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-dock-messages-content {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.agent-dock-scroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: 3px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.agent-dock-scroll-thumb[data-scrollable][data-shown] {
+  opacity: 0.5;
+}
+
+/* An edge with more messages behind it fades out. The selectors outrank the global .scroll-fade-* masks. */
+.agent-dock-chat .agent-dock-messages:is(.scroll-fade-top, .scroll-fade-bottom) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--agent-dock-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--agent-dock-fade-bottom)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--agent-dock-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--agent-dock-fade-bottom)),
+    transparent
+  );
+}
+
+.agent-dock-messages.scroll-fade-top {
+  --agent-dock-fade-top: 32px;
+}
+
+.agent-dock-messages.scroll-fade-bottom {
+  --agent-dock-fade-bottom: 32px;
+}
+
+.agent-dock-empty {
+  margin: auto 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  text-align: center;
+}
+
+.agent-dock-bubble {
+  max-width: 85%;
+  flex: none;
+  font-size: var(--openbot-text-md);
+  overflow-wrap: anywhere;
+}
+
+.agent-dock-bubble[data-pending] {
+  opacity: 0.6;
+}
+
+.agent-dock-bubble[data-error] {
+  color: var(--openbot-danger-text);
+}
+
+.agent-dock-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* The chat's Markdown, a size down to fit the panel. */
+.agent-dock-markdown {
+  min-width: 0;
+  font-size: var(--openbot-text-md);
+}
+
+.agent-dock-typing {
+  display: flex;
+  padding-block: var(--openbot-space-1);
+}
+
+.agent-dock-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-dock-typing-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+  animation: agent-dock-dot 1s var(--openbot-ease-in-out) infinite;
+}
+
+.agent-dock-typing-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.agent-dock-typing-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes agent-dock-dot {
+  50% {
+    opacity: 0.3;
+    transform: translateY(-3px);
+  }
+}
+
+.agent-dock-sr {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The agent waits for the user. The answer controls are in the main window. */
+.agent-dock-wait {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0 var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  background: var(--openbot-bg-surface);
+  font-size: var(--openbot-text-sm);
+}
+
+.agent-dock-wait-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--openbot-text-muted);
+}
+
+.agent-dock-wait-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.agent-dock-wait-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.agent-dock-error {
+  margin: var(--openbot-space-2) var(--openbot-space-4) 0;
+  color: var(--openbot-danger-text);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The app's compact composer, as the side-question and diagram chat panels use it. */
+.agent-dock-composer.composer[data-compact] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
+}
+
+/* Panel radius 24 = composer radius 12 + gap 12, so the corners are concentric. A focus halo would
+   make the gap 9 px at the corner; the border alone shows focus. */
+.agent-dock-composer.composer[data-compact]:focus-within {
+  box-shadow: none;
+}
+
+.agent-dock-composer.composer[data-compact] > .composer-input-label {
+  grid-column: 1;
+}
+
+/* The finished-work shelf beside the dock. See `AgentDockShelf.tsx`. The results drip out of the dock
+   and stand on the line between the last agent and the add button. */
+.agent-dock-shelf {
+  /* The side the results come from and go back to: the dock. */
+  --agent-dock-shelf-toward: 1;
+
+  position: absolute;
+  display: grid;
+  justify-items: end;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-dock-shelf[hidden] {
+  display: none;
+}
+
+.agent-dock-shelf-item {
+  animation: agent-dock-shelf-drip 560ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  transition:
+    opacity var(--openbot-duration-normal) ease-out,
+    translate var(--openbot-duration-normal) ease-out;
+}
+
+.agent-dock-shelf-item[data-leaving] {
+  opacity: 0;
+  translate: calc(var(--agent-dock-shelf-toward) * 24px) 0;
+}
+
+@keyframes agent-dock-shelf-drip {
+  from {
+    opacity: 0;
+    scale: 0.6;
+    translate: calc(var(--agent-dock-shelf-toward) * 32px) 0;
+  }
+}
+
+/* Over the shared button: its font, gap, hover fill and focus ring are not the shelf look. */
+.agent-dock-shelf :is(.agent-dock-result, .agent-dock-shelf-more) {
+  gap: 0;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--agent-dock-fill);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.agent-dock-shelf :is(.agent-dock-result, .agent-dock-shelf-more):focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.agent-dock-shelf :is(.agent-dock-result, .agent-dock-shelf-more):hover:not(:disabled) {
+  background: var(--agent-dock-fill);
+}
+
+.agent-dock-result {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 var(--openbot-space-4) 0 var(--openbot-space-1);
+  color: var(--openbot-text-primary);
+  transition: translate var(--openbot-duration-normal) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.agent-dock-result:hover {
+  translate: calc(var(--agent-dock-shelf-toward) * -4px) 0;
+}
+
+.agent-dock-result .agent-avatar {
+  --agent-avatar-optical-offset: calc(32px * -0.14);
+
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+
+.agent-dock-result > svg {
+  flex: none;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-left: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+}
+
+.agent-dock-result-label {
+  max-width: 240px;
+  overflow: hidden;
+  margin-left: var(--openbot-space-2);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+}
+
+.agent-dock-shelf-more {
+  height: 28px;
+  padding: 0 var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-dock-shelf-more:hover {
+  color: var(--openbot-text-primary);
+}
+
+/* On the left edge the seats and the chat are mirrored back, so they read as usual. */
+.agent-dock[data-side="left"] .agent-dock-seat,
+.agent-dock[data-side="left"] .agent-dock-panel {
+  scale: -1 1;
+}
+
+.agent-dock[data-side="left"] .agent-dock-panel {
+  transform-origin: 50% 50%;
+}
+
+/* The shelf is mirrored back too. Its results then come from the left, where the dock is. */
+.agent-dock[data-side="left"] .agent-dock-shelf {
+  --agent-dock-shelf-toward: -1;
+
+  justify-items: start;
+  scale: -1 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-dock-handle-arc,
+  .agent-dock-scroll-thumb {
+    transition: none;
+  }
+
+  .agent-dock-chat,
+  .agent-dock-typing-dots i {
+    animation: none;
+  }
+
+  .agent-dock-seat-button,
+  .agent-dock-result {
+    transition: none;
+  }
+
+  .agent-dock-shelf-item {
+    animation: none;
+  }
+}
+
+/* The dock window at the right edge of the screen: the apps under it show through all of it but the dock. */
+:root[data-surface="agent-dock"],
+:root[data-surface="agent-dock"] body,
+:root[data-surface="agent-dock"] #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* The screen edge is the frame there, so the strip of frame on the right of the dock is past the window. */
+:root[data-surface="agent-dock"] .agent-dock {
+  right: -5px;
+}

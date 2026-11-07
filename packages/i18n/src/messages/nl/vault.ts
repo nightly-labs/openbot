@@ -81,7 +81,7 @@ export const messages = {
   "vault.importMenu": "Importeren uit CSV",
   "vault.importTitle": "Importeren uit een CSV-bestand",
   "vault.importDescription":
-    "Importeer logins uit een CSV-bestand dat 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Wachtwoorden of LastPass exporteert. OpenBot leest het bestand op deze computer en uploadt het niet.",
+    "Importeer logins uit een CSV-bestand dat 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Wachtwoorden, LastPass of Proton Pass exporteert. OpenBot leest het bestand op deze computer en uploadt het niet.",
   "vault.importChoose": "CSV-bestand kiezen",
   "vault.importDone": "Geïmporteerd: {imported}. Overgeslagen: {skipped}.",
   "vault.unavailableTitle": "Deze computer kan geen geheimen bewaren",
@@ -93,4 +93,11 @@ export const messages = {
   "vault.reset": "Kluis resetten",
   "vault.resetTitle": "De kluis resetten?",
   "vault.resetDescription": "OpenBot verwijdert het kluisbestand en alle items erin. Je kunt dit niet ongedaan maken.",
+  "vault.request.private": "Gaat naar je Kluis. {agent} ziet het nooit.",
+  "vault.request.privateUnnamed": "Gaat naar je Kluis. De agent ziet het nooit.",
+  "vault.request.addLogin": "Login toevoegen",
+  "vault.request.addCard": "Kaart toevoegen",
+  "vault.request.addContact": "Adres toevoegen",
+  "vault.request.notNow": "Niet nu",
+  "vault.request.saved": "Opgeslagen in de Kluis",
 } as const satisfies PartialTranslation<typeof source>;

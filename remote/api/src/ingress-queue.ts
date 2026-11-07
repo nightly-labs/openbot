@@ -51,7 +51,7 @@ const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
   routeCheckMilliseconds: 60_000,
   otherRouteCheckMilliseconds: 10 * 60_000,
   maximumPerHost: 64,
-  // A flush sends them all at once, and the socket closes at 256 KB of backpressure. One largest
+  // A flush sends them all at once, and the socket closes at 1 MiB of backpressure. One largest
   // delivery, sealed, is about 160 KB.
   maximumBytesPerHost: 192 * 1024,
   maximumBytes: 256 * 1024 * 1024,

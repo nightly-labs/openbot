@@ -32,7 +32,10 @@ const config = {
         chunkSizeWarningLimit: 1_200,
       },
       optimizeDeps: {
-        include: ["@norbert_bodziony/bloub", "solid-recharts"],
+        include: ["solid-recharts"],
+        // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
+        // code away from the images, so Vite serves the package as it is.
+        exclude: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
       },
       resolve: {
         alias: [{ find: "solid-js/web", replacement: "@solidjs/web" }],
@@ -42,7 +45,9 @@ const config = {
     const plugins = (mergedConfig.plugins ?? []).filter((plugin: PluginOption) => !isLegacySolidPlugin(plugin));
     return {
       ...mergedConfig,
-      plugins: [...plugins, solidPlugin()],
+      // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
+      // in a chat drop frames that the built app does not drop. Set this to true for a trace.
+      plugins: [...plugins, solidPlugin({ performanceTracks: false })],
     };
   },
 } satisfies StorybookConfig;

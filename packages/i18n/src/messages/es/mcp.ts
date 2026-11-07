@@ -44,7 +44,7 @@ export const messages = {
   "mcp.status.didNotStart": "No se inició",
   "mcp.status.unreachable": "Inaccesible",
   "mcp.server.providerLimitNote":
-    "Solo Claude: un servidor con un directorio de trabajo no se proporciona a los otros proveedores.",
+    "Solo Claude y Codex: un servidor con un directorio de trabajo no se proporciona a los otros proveedores.",
   "mcp.server.runtimeDownloading":
     "Descargando el entorno de ejecución usado para iniciar servidores STDIO. Es posible que no puedan iniciarse hasta que termine.",
   "mcp.server.runtimeDownloadingProgress":
@@ -86,7 +86,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Eliminar variable transferida {position}",
   "mcp.panel.workingDirectory": "Directorio de trabajo",
   "mcp.panel.workingDirectoryDescription":
-    "Los agentes de Claude y la prueba de conexión inician el servidor aquí. Déjalo vacío para proporcionar este servidor a todos los proveedores: ningún otro proveedor puede establecer un directorio, por lo que omite los servidores que indican uno.",
+    "Los agentes de Claude y Codex y la prueba de conexión inician el servidor aquí. Déjalo vacío para proporcionar este servidor a todos los proveedores: los demás proveedores no pueden establecer un directorio, por lo que omiten los servidores que indican uno.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Todos los proveedores pueden usar un servidor MCP HTTP.",
   "mcp.panel.serverUrl": "URL del servidor",
@@ -147,11 +147,11 @@ export const messages = {
   "mcp.panel.appSaved": "App guardada. Inicia sesión para usarla.",
   "mcp.panel.appRemoved": "App eliminada.",
   "mcp.signIn.relayDescription":
-    "Comprueba que la página de inicio de sesión está en {page} y ábrela en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Abre la página de inicio de sesión de {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Comprueba que la página de inicio de sesión está en {page}, ábrela en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
+    "Inicia sesión en {page} en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
   "mcp.signIn.relayOpen": "Abrir inicio de sesión",
   "mcp.signIn.relayPasteHint": "Si el navegador no vuelve a OpenBot, copia la dirección que muestra y pégala aquí.",
   "mcp.signIn.relayPasteRequired":

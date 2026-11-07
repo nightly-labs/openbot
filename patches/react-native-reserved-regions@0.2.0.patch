@@ -1,0 +1,73 @@
+diff --git a/android/src/main/java/com/appandflow/reservedregions/ReservedRegionsView.kt b/android/src/main/java/com/appandflow/reservedregions/ReservedRegionsView.kt
+index 4e7f17b448d3196f547ac39daadd67fe936c5d2a..3a2eed28d386cae032b988d86e4ff4d778a06b28 100644
+--- a/android/src/main/java/com/appandflow/reservedregions/ReservedRegionsView.kt
++++ b/android/src/main/java/com/appandflow/reservedregions/ReservedRegionsView.kt
+@@ -39,6 +39,17 @@ class ReservedRegionsView(context: Context) : ReactViewGroup(context), UIManager
+   private var hasDispatchedRegions = false
+   private var onRegionsChange: RegionsChangeHandler? = null
+ 
++  // Reanimated handles an event on the UI thread at once and can mount pending React changes
++  // synchronously. Inside a view tree pass (attach, window insets, layout) that removes a view while
++  // Android walks the children, and ViewGroup.dispatchApplyWindowInsets reads a null child. Send
++  // the event after the pass.
++  private val updateRegionsAfterPass = Runnable { if (!awaitingFirstMount) updateRegions() }
++
++  private fun scheduleUpdateRegions() {
++    removeCallbacks(updateRegionsAfterPass)
++    post(updateRegionsAfterPass)
++  }
++
+   override fun willDispatchViewUpdates(uiManager: UIManager) {}
+ 
+   override fun willMountItems(uiManager: UIManager) {}
+@@ -78,10 +89,11 @@ class ReservedRegionsView(context: Context) : ReactViewGroup(context), UIManager
+     } else {
+       foldingFeaturesReady = true
+     }
+-    if (hasDispatchedRegions) updateRegionsIfInputsChanged()
++    if (hasDispatchedRegions) scheduleUpdateRegions()
+   }
+ 
+   override fun onDetachedFromWindow() {
++    removeCallbacks(updateRegionsAfterPass)
+     uiManager?.removeUIManagerEventListener(this)
+     uiManager = null
+     tracker?.removeWindowLayoutInfoListener(layoutInfoConsumer)
+@@ -91,12 +103,12 @@ class ReservedRegionsView(context: Context) : ReactViewGroup(context), UIManager
+ 
+   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+     super.onLayout(changed, left, top, right, bottom)
+-    if (!awaitingFirstMount) updateRegions()
++    if (!awaitingFirstMount) scheduleUpdateRegions()
+   }
+ 
+   override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+     val result = super.onApplyWindowInsets(insets)
+-    if (!awaitingFirstMount) updateRegions()
++    if (!awaitingFirstMount) scheduleUpdateRegions()
+     return result
+   }
+ 
+diff --git a/ios/ReservedRegionsView.mm b/ios/ReservedRegionsView.mm
+index 04b38972d2cf73c56a128c977e121b1b8533d5e9..e268fe04d7c11d5f719c4af3aac1169a941409f5 100644
+--- a/ios/ReservedRegionsView.mm
++++ b/ios/ReservedRegionsView.mm
+@@ -116,12 +116,12 @@ using namespace facebook::react;
+     return;
+   }
+   _hasDispatchedRegions = YES;
+-  eventEmitter->experimental_flushSync([eventEmitter, regions = std::move(regionPayloads)]() mutable {
+-    eventEmitter->dispatchEvent(
+-        "regionsChange",
+-        folly::dynamic::object("regions", std::move(regions)),
+-        RawEvent::Category::Discrete);
+-  });
++  // Do not flush synchronously: the main thread then waits for the JS thread, and deadlocks when
++  // JS waits for the main thread (an Expo view function that looks up its view at start).
++  eventEmitter->dispatchEvent(
++      "regionsChange",
++      folly::dynamic::object("regions", std::move(regionPayloads)),
++      RawEvent::Category::Discrete);
+ }
+ 
+ - (void)prepareForRecycle

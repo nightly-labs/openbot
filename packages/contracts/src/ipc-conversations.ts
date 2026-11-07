@@ -161,6 +161,12 @@ export interface MarkConversationReadInput {
   throughMessageId: string | null;
 }
 
+/** Marks `fromMessageId` and the messages after it unread, for this computer's reader. */
+export interface MarkConversationUnreadInput {
+  agentId: string;
+  fromMessageId: string;
+}
+
 export interface SendMessageInput {
   agentId: string;
   text: string;
@@ -178,6 +184,17 @@ export interface SendMessageInput {
    * the message for replay and never gives it to the agent.
    */
   voiceRecordingDraftId?: string;
+}
+
+/**
+ * Deletes one message from the chat of an agent, or of one open side task of the agent. The host
+ * removes it from its history and view; the provider session of the agent can still remember it.
+ */
+export interface DeleteConversationMessageInput {
+  agentId: string;
+  messageId: string;
+  /** The open task of this agent whose chat holds the message. Without it, the agent's own chat. */
+  taskId?: string;
 }
 
 export interface SetMessageReactionInput {

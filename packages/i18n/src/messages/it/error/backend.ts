@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "Il database di OpenBot non ha superato il controllo di integrità.",
   "error.backend.webhookRouteLimit": "Un host può avere al massimo {limit} routine webhook.",
   "error.backend.webhookSettingsInvalid": "Controlla le impostazioni del webhook e riprova.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Incolla il segreto di firma completo del mittente. Ha da 16 a 1024 caratteri e nessuno spazio.",
   "error.backend.webhookRouteUnavailable":
     "Il percorso pubblico del webhook non è pronto. Controlla la connessione all'host e riprova.",
   "error.backend.browserViewRemoteOnly": "La vista in diretta del browser è disponibile solo per un host remoto.",
@@ -56,22 +58,41 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine non è diventato pronto.",
   "error.backend.sunshineNotReadyReason": "Sunshine non è diventato pronto. {reason}",
   "error.backend.channelLeadModelUnavailable": "Il modello del responsabile del canale non è disponibile.",
+  "error.backend.contextCompactionIneffective":
+    "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
+  "error.backend.contextCompactionStopped":
+    "Due compattazioni di fila di questa chat non sono riuscite, quindi OpenBot smette di compattarla automaticamente. Ogni tentativo invia l'intera chat al modello e consuma il limite del tuo piano. Seleziona «Compatta ora» per riprovare, oppure avvia una nuova chat.",
+  "error.backend.providerRetrying":
+    "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Se l'agente non continua, interrompi il turno.",
+  "error.backend.providerRetryingLargeContext":
+    "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Questa chat usa il {percent}% della finestra di contesto del modello. Se l'agente non continua, interrompi il turno: OpenBot compatterà la chat prima del prossimo messaggio.",
   "error.backend.sharedDataUnavailable": "I dati condivisi non sono disponibili.",
   "error.backend.shuttingDown": "OpenBot si sta chiudendo.",
   "error.backend.channelUnconfirmedStart":
     "Il canale ha un avvio di assegnazione non confermato. Controlla il risultato prima di eliminarlo.",
   "error.backend.channelNotFound": "Canale non trovato.",
   "error.backend.channelMemberUnavailable": "Un membro del canale non è disponibile.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Attendi che il lavoro in questo canale finisca, poi avvia una nuova conversazione.",
+  "error.backend.channelWaitBeforeCompact": "Attendi che il lavoro in questo canale finisca, poi compattalo.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Attendi che il lavoro in questo canale finisca, poi elimina la sua cronologia.",
+  "error.backend.channelCompactUnavailable":
+    "Nessun membro di questo canale può compattare il contesto ora. Un membro deve prima rispondere nel canale e il suo provider deve supportare la compattazione.",
   "error.backend.channelArchived": "Ripristina questo canale prima di inviare messaggi o modificare le attività.",
   "error.backend.channelReferenceUnavailable": "Il messaggio del canale a cui si fa riferimento non è disponibile.",
   "error.backend.channelTaskNotFound": "Attività del canale non trovata.",
   "error.backend.channelTaskComplete": "Questa attività è già completata.",
+  "error.backend.channelTaskNotStopped": "Si può annullare solo un'attività interrotta o non riuscita.",
   "error.backend.channelSelectAgent": "Seleziona un agente.",
   "error.backend.channelLeadRequired":
     "Scegli un responsabile del canale disponibile o assegna questa attività a un membro.",
   "error.backend.channelRoutingTooLong":
     "Questa richiesta supera il limite del contesto di instradamento. Seleziona un membro o invia una richiesta più breve.",
   "error.backend.channelTaskMemberRequired": "Scegli un membro per questa attività.",
+  "error.backend.channelTaskStopped": "Interrotta. Continua o riassegna questa attività.",
+  "error.backend.channelRoutingUnreadable":
+    "Il responsabile non ha potuto instradare questo messaggio. Riassegnalo a un membro.",
   "error.backend.channelRoutingFailed": "L'instradamento non è riuscito. Scegli un membro o riprova.",
   "error.backend.channelLeadTimedOut":
     "Il responsabile del canale non ha risposto in tempo. Scegli un membro o riprova.",
@@ -81,6 +102,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "La consegna del canale non è stata creata.",
   "error.backend.channelAssignmentStopped": "Questa assegnazione del canale è stata interrotta o sostituita.",
   "error.backend.channelAssigneeUnavailable": "L'agente assegnato non è disponibile.",
+  "error.backend.channelAssigneeRemoved": "Il membro assegnato è stato rimosso.",
+  "error.backend.channelAssigneeReassign": "Il membro assegnato non è disponibile. Riassegna questa attività.",
   "error.backend.channelAssignmentChanged": "Questa assegnazione del canale è cambiata.",
   "error.backend.channelMemberRequired": "Seleziona un membro disponibile di questo canale.",
   "error.backend.memoryEssentialBudget":
@@ -104,9 +127,9 @@ export const messages = {
     "Hai {saved} memorie su {limit}. Per fare spazio, aggiorna una memoria tramite memoryId con il testo combinato di due memorie correlate e poi dimentica l'altra, oppure dimentica una memoria che non è più vera. Poi riprova.",
   "error.backend.agentMemoryLimitExceeded":
     "Hai {saved} memorie e il limite è {limit}. L'utente ha impostato il limite al di sotto del numero di memorie salvate. Non dimenticare memorie per fare spazio. Di' all'utente che questa memoria non è stata salvata.",
+  "error.backend.channelHistoryArriving": "Un messaggio condiviso sta ancora arrivando. Riprendi quando è completo.",
   "error.backend.channelHistoryLeadRequired":
     "Scegli un responsabile del canale per preparare la cronologia condivisa.",
-  "error.backend.channelHistoryArriving": "Un messaggio condiviso sta ancora arrivando. Riprendi quando è completo.",
   "error.backend.channelHistoryInvalid": "Il riepilogo della cronologia non è valido. Riprendi per riprovare.",
   "error.backend.channelContextTooLong":
     "Questa assegnazione supera il limite del contesto condiviso. Invia una richiesta più breve o riassegnala.",
@@ -195,6 +218,13 @@ export const messages = {
     "Solo un'esecuzione di una delle tue routine risveglia un'attesa, e non hai routine. Creane una con openbot.create_routine, poi apri l'attesa.",
   "error.backend.agentWaitRemoteUnsupported":
     "Le attese aperte sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Segnare un messaggio come non letto è disponibile solo per gli agenti su questo computer.",
+  "error.backend.messageDeleteUnsupported": "Questo server non supporta l’eliminazione dei messaggi.",
+  "error.backend.messageDeleteNotFound": "Questo messaggio non è nella chat.",
+  "error.backend.messageDeleteBusy":
+    "Questo messaggio fa parte di un turno in corso. Eliminalo quando il turno finisce.",
+  "error.backend.messageDeleteForbidden": "Puoi eliminare solo i messaggi che hai inviato.",
   "error.backend.routineFlowHandoffFailed": "La routine non è riuscita a passare il lavoro a questo agente.",
   "error.backend.mcpServerLimit": "OpenBot conserva fino a {limit} server MCP.",
   "error.backend.mcpServerNameTaken": "Esiste già un server MCP chiamato {name}.",
@@ -223,6 +253,11 @@ export const messages = {
     "OpenBot non ha potuto leggere le informazioni di accesso di questo server. Controlla l’indirizzo del server e riprova.",
   "error.backend.mcpServerExited":
     "Il server si è fermato prima di rispondere. Esegui il comando in un terminale per vedere l'errore.",
+  "error.backend.mcpServerFailedToStart": "Il server non si è avviato: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} non è riuscito a usare il server MCP {name} perché il server chiede l’accesso. Apri le impostazioni MCP e scegli Accedi.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} non è riuscito ad avviare il server MCP {name}. Apri le impostazioni MCP e scegli Prova la connessione per vedere la causa.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot non è riuscito ad avviare la connessione di accesso locale per questo server. Riavvia OpenBot e riprova.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -249,6 +284,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Un server può avere fino a {limit} sezioni nella barra laterale.",
   "error.backend.sectionNameRequired": "Il nome della sezione è obbligatorio.",
   "error.backend.sectionNameTooLong": "Il nome della sezione è troppo lungo.",
+  "error.backend.sidebarFolderTooDeep": "Le cartelle possono avere solo tre livelli.",
+  "error.backend.sidebarFolderMoveInvalid": "Questa cartella non può essere spostata lì.",
   "error.backend.sectionNameDuplicate": "I nomi delle sezioni devono essere univoci.",
   "error.backend.directMessageRequired": "Scrivi prima un messaggio.",
   "error.backend.directMessageTooLong": "Un messaggio diretto può avere fino a {limit} caratteri.",
@@ -293,6 +330,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Esiste già un profilo browser con questo nome.",
   "error.backend.browserSessionInUse": "Una scheda usa ancora questa sessione del browser. Riprova.",
   "error.backend.browserProfileLimit": "Puoi avere fino a {limit} profili browser.",
+  "error.backend.browserProxyNotFound": "Questo proxy non esiste più.",
+  "error.backend.browserProxyAddressInvalid":
+    "Inserisci un indirizzo proxy come socks5://host:1080 o http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Puoi avere fino a {limit} proxy.",
+  "error.backend.browserProxyTaken": "Esiste già un proxy con questo indirizzo.",
+  "error.backend.browserProxyChanged":
+    "Questo proxy è cambiato dopo che l'hai aperto. Controllalo di nuovo, poi riprova.",
+  "error.backend.browserProxyUnreachable": "Il proxy {name} non risponde, quindi la pagina non si è aperta.",
+  "error.backend.browserProxySignInRefused":
+    "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
   "error.backend.browserLowMemory":
     "Su questo server la memoria è quasi esaurita, quindi il browser non può aprire un'altra scheda. Chiudi una scheda o attendi che gli altri agenti finiscano.",
   "error.backend.browserOpenFailed": "Impossibile aprire {url}: {reason}",
@@ -337,6 +386,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Questo agente ha {count} thread aperti. Archivia un thread, poi avviane o ripristinane un altro.",
   "error.backend.threadRemoteUnsupported": "I thread sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.branchSourceBusy": "Interrompi il turno in corso prima di creare un ramo di questa chat.",
+  "error.backend.branchMessageNotFound": "Puoi creare un ramo solo da una risposta completata dell'agente.",
+  "error.backend.branchRemoteUnsupported": "I rami sono disponibili solo per gli agenti su questo computer.",
   "error.backend.threadMoveRefused":
     "Solo un messaggio che hai inviato soltanto a questo agente può essere eseguito in un nuovo thread.",
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",
@@ -344,8 +396,8 @@ export const messages = {
     "Dai all'attività un titolo di al massimo 120 caratteri e una descrizione che dica cosa fare.",
   "error.backend.taskOwnChatOnly":
     "Avvia un'attività solo dalla tua chat. Un canale, una conversazione di messaggistica o un'altra attività non possono avviarne una.",
-  "error.backend.taskOpenLimit":
-    "Questo agente ha già {count} attività aperte. Attendi che l'utente ne chiuda una prima di avviare un'altra attività.",
+  "error.backend.taskUnfinishedLimit":
+    "Questo agente ha già {count} attività non finite. Avvia un'altra attività quando una di esse finisce.",
   "error.backend.taskOpenLimitReached":
     "Questo agente ha {count} attività aperte. Chiudi un'attività, poi avviane o aprine un'altra.",
   "error.backend.taskRemoteUnsupported": "Le attività sono disponibili solo per gli agenti su questo computer.",
