@@ -301,6 +301,7 @@ import { ProviderHostSignIns } from "./provider-host-sign-ins";
 import { startAccountLog, startAgentLog, startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
+import { providerRuntimeFetch } from "./provider-runtime-network";
 import { ProviderUseSettingsStore } from "./provider-use-settings-store";
 import { RelayedMessagingInstalls } from "./relayed-messaging-installs";
 import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
@@ -1433,6 +1434,8 @@ export async function createApplicationServices({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
     downloadRoot: providerDownloads,
+    // Tests and Node-only callers keep injecting their own fetch.
+    fetchImpl: providerRuntimeFetch,
     hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
