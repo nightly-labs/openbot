@@ -32,4 +32,5 @@ export const messages = {
     "L'arresto dei tenant è scaduto. Non è stata avviata nessuna sostituzione dell'applicazione.",
   "error.host.tenantHealthMissing":
     "I report di salute dei tenant mancano o non sono in buono stato dopo il riavvio. Controlla le sessioni dei tenant prima di un altro aggiornamento.",
+  "error.host.personalityInvalid": "Questo stile di risposta non è noto.",
 } as const satisfies PartialTranslation<typeof source>;

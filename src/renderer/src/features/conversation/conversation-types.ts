@@ -22,6 +22,7 @@ import type {
   FilePreview,
   ProviderRuntimeStatus,
   QueueSnapshot,
+  ResponseStyle,
   RoutineFields,
   ServerSummary,
   TeamPresenceSnapshot,
@@ -219,6 +220,10 @@ export interface ConversationProps {
   olderError?: string | null | undefined;
   activeTurnId: string | null | undefined;
   activityDetail?: string | undefined;
+  /** A tool step of the running turn still runs, so a long silence is work, not a wait for the provider. */
+  activityRunning?: boolean | undefined;
+  /** What the running tool step does, as the host's `turn-progress` names it, for the agent's avatar. */
+  activityKind?: string | undefined;
   /** The host's progress lines of the newest turns, by turn, for the steps of each turn. */
   turnStepLines?: TurnStepLines | undefined;
   skillsMarketplaceOpen?: boolean | undefined;
@@ -250,6 +255,11 @@ export interface ConversationProps {
   /** Optional browser stream adapter for a non-Electron client. */
   browserRuntime?: BrowserViewRuntime | undefined;
   server: ServerSummary | undefined;
+  /**
+   * The response style of the server (Server settings → Personality). A "natural" server shows what
+   * the agent says between its steps as messages of their own. Undefined until the host answers.
+   */
+  responseStyle?: ResponseStyle | undefined;
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;
   /**

@@ -668,4 +668,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "업데이트를 설치하기 위해 {name}이(가) 다시 시작되고 있어요",
   "server.restartNotice.restartingDescription": "{name}이(가) 돌아오면 OpenBot이 자동으로 다시 연결해요.",
   "server.restartNotice.backTitle": "{name}이(가) 다시 온라인이 되었어요",
+  "server.settings.personalityTitle": "성격",
+  "server.settings.personalityDescription": "이 서버의 에이전트가 말하는 방식을 선택해요.",
+  "server.settings.responseStyle": "응답 스타일",
+  "server.settings.responseStyleDescription":
+    "자연형: 에이전트가 작업 중에 짧은 업데이트를 보내고 채팅에 표시돼요. 클래식: 에이전트가 끝나면 한 번만 답해요.",
+  "server.settings.responseStyleNatural": "자연형",
+  "server.settings.responseStyleClassic": "클래식",
+  "server.settings.personalityLoadFailed": "서버 성격을 불러올 수 없었어요.",
 } as const satisfies PartialTranslation<typeof source>;

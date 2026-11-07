@@ -156,4 +156,5 @@ export const messages = {
   "error.team.signInRelayUsed": "أُرسل تسجيل الدخول هذا بالفعل.",
   "error.team.signInRelayMismatch": "هذا العنوان ليس من تسجيل الدخول هذا.",
   "error.team.signInRelayLinkUnknown": "لم يعرض أي وكيل على هذا الخادم رابط تسجيل الدخول هذا.",
+  "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
 } as const satisfies PartialTranslation<typeof source>;

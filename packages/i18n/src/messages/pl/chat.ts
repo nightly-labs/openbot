@@ -441,6 +441,7 @@ export const messages = {
   "chat.actions.branch": "Odgałęź w nowym wątku",
   "chat.actions.readAloud": "Przeczytaj na głos",
   "chat.actions.stopReading": "Zatrzymaj czytanie",
+  "chat.actions.more": "Więcej akcji",
   "chat.menu.reply": "Odpowiedz",
   "chat.menu.copy": "Kopiuj wiadomość",
   "chat.menu.react": "Zareaguj",

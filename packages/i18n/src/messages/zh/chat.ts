@@ -333,6 +333,7 @@ export const messages = {
   "chat.actions.branch": "在新话题中分支",
   "chat.actions.readAloud": "朗读",
   "chat.actions.stopReading": "停止朗读",
+  "chat.actions.more": "更多操作",
   "chat.menu.reply": "回复",
   "chat.menu.copy": "复制消息",
   "chat.menu.react": "回应",

@@ -84,6 +84,9 @@ export const messages = {
   "settings.showAgentSteps.title": "Ajan adımlarını göster",
   "settings.showAgentSteps.description":
     "Bu cihazda ve tarayıcıda her turun düşünme sürecini, araç adımlarını ve bellek değişikliklerini varsayılan olarak açar.",
+  "settings.compactMessageActions.title": "Kompakt mesaj işlemleri",
+  "settings.compactMessageActions.description":
+    "Bir mesajın yanında Tepki ver, Yanıtla ve Daha fazla seçeneklerini, mesajların arasında da saati gösterir. Kapalıyken tüm işlemler ve saat her mesajın altında görünür.",
   "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
   "settings.busyMessage.description":
     "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. ChatGPT ve Claude ile çalışır.",

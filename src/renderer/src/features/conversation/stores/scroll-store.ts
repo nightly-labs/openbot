@@ -25,6 +25,7 @@ import { formatMessageTime } from "../../../app-message-projection";
 import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
+import { narrationRows } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -94,18 +95,18 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       ]),
   );
   const shownMessages = createMemo(() => {
-    const shown = deps.props.messages.filter(
-      (message) =>
-        !(
-          message.kind === "thinking" &&
-          (!message.turnId ||
-            thinkingRowHiddenTurns().has(message.turnId) ||
-            !message.items?.some((item) => item.trim()))
-        ) &&
-        !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
-        !silentAgentAnswer(message),
-    );
     // A channel row has the id of its channel entry and an author of its own, so this is for an agent's chat.
+    const progressUpdates = !deps.props.channel && deps.props.responseStyle === "natural";
+    const shown = deps.props.messages.flatMap((message) => {
+      if (message.kind === "thinking") {
+        const rows = progressUpdates ? narrationRows(message, deps.props.agent?.provider) : [];
+        const showsSteps =
+          message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
+        return showsSteps ? [...rows, message] : rows;
+      }
+      if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
+      return silentAgentAnswer(message) ? [] : [message];
+    });
     const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
     return summarizeHostedSiteMessages(withQuestionContext(shown, deps.props.messages, questionTurnId));
   });
@@ -403,7 +404,8 @@ function withQuestionContext(
   if (!turnId) return shown;
   const thinking = messages.find((message) => message.kind === "thinking" && message.turnId === turnId);
   const context = thinking ? lastNarration(thinking) : null;
-  if (!context) return shown;
+  // With progress updates on, the narration is already a row of its own.
+  if (!context || shown.some((message) => message.id === context.id)) return shown;
   const turnEnd = shown.findLastIndex((message) => message.turnId === turnId) + 1;
   const at = turnEnd > 0 ? turnEnd : shown.length;
   return [...shown.slice(0, at), context, ...shown.slice(at)];

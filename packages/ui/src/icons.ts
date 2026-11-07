@@ -148,6 +148,7 @@ export { default as ShieldCheck } from "lucide-solid/icons/shield-check";
 export { default as Shuffle } from "lucide-solid/icons/shuffle";
 export { default as SlidersHorizontal } from "lucide-solid/icons/sliders-horizontal";
 export { default as Smartphone } from "lucide-solid/icons/smartphone";
+export { default as Smile } from "lucide-solid/icons/smile";
 export { default as Sparkles } from "lucide-solid/icons/sparkles";
 export { default as Split } from "lucide-solid/icons/split";
 export { default as Square } from "lucide-solid/icons/square";

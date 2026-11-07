@@ -600,4 +600,12 @@ export const messages = {
   "server.restartNotice.restartingDescription":
     "OpenBot si riconnette automaticamente quando {name} torna disponibile.",
   "server.restartNotice.backTitle": "{name} è di nuovo online",
+  "server.settings.personalityTitle": "Personalità",
+  "server.settings.personalityDescription": "Scegli come ti parlano gli agenti di questo server.",
+  "server.settings.responseStyle": "Stile di risposta",
+  "server.settings.responseStyleDescription":
+    "Naturale: gli agenti inviano brevi aggiornamenti mentre lavorano e la chat li mostra. Classico: gli agenti rispondono una sola volta, alla fine.",
+  "server.settings.responseStyleNatural": "Naturale",
+  "server.settings.responseStyleClassic": "Classico",
+  "server.settings.personalityLoadFailed": "Impossibile caricare la personalità del server.",
 } as const satisfies PartialTranslation<typeof source>;

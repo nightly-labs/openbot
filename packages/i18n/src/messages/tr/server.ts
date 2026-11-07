@@ -621,4 +621,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name}, güncellemeyi yüklemek için yeniden başlatılıyor",
   "server.restartNotice.restartingDescription": "{name} geri geldiğinde OpenBot otomatik olarak tekrar bağlanır.",
   "server.restartNotice.backTitle": "{name} tekrar çevrim içi",
+  "server.settings.personalityTitle": "Kişilik",
+  "server.settings.personalityDescription": "Bu sunucudaki ajanların sizinle nasıl konuşacağını seçin.",
+  "server.settings.responseStyle": "Yanıt stili",
+  "server.settings.responseStyleDescription":
+    "Doğal: ajanlar çalışırken kısa güncellemeler gönderir ve sohbet bunları gösterir. Klasik: ajanlar bitirdiklerinde bir kez yanıt verir.",
+  "server.settings.responseStyleNatural": "Doğal",
+  "server.settings.responseStyleClassic": "Klasik",
+  "server.settings.personalityLoadFailed": "Sunucu kişiliği yüklenemedi.",
 } as const satisfies PartialTranslation<typeof source>;

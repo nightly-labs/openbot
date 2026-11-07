@@ -11,6 +11,7 @@ import { createEffect, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
@@ -72,6 +73,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     activeTurnId: () => thread()?.task.activeTurnId,
   });
   const showAgentSteps = useShowAgentSteps();
+  const compactMessageActions = useCompactMessageActions();
   const { appFocused } = usePlatform();
   // The person reads the thread in the side panel while the window has focus.
   createEffect(
@@ -207,6 +209,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
+            compactMessageActions={compactMessageActions()}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
             canDeleteMessage={view.canDeleteMessage}

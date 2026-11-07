@@ -70,6 +70,7 @@ import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
@@ -469,6 +470,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_THREAD_PAGES_CAPABILITY,
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
+  HOST_PERSONALITY_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -641,7 +643,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHANNEL_ISOLATION_CAPABILITY &&
     capability !== AGENT_THREAD_PAGES_CAPABILITY &&
     capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
-    capability !== ROUTINE_RUN_PLACE_CAPABILITY,
+    capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
+    capability !== HOST_PERSONALITY_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -690,6 +693,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_THREAD_PAGES_CAPABILITY,
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
+  HOST_PERSONALITY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -821,6 +825,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHANNEL_ISOLATION_CAPABILITY &&
       capability !== AGENT_THREAD_PAGES_CAPABILITY &&
       capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
-      capability !== ROUTINE_RUN_PLACE_CAPABILITY,
+      capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
+      capability !== HOST_PERSONALITY_CAPABILITY,
   );
 }

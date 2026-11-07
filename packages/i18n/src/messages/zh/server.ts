@@ -649,4 +649,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} 正在重启以安装更新",
   "server.restartNotice.restartingDescription": "{name} 恢复后 OpenBot 会自动重新连接。",
   "server.restartNotice.backTitle": "{name} 已恢复在线",
+  "server.settings.personalityTitle": "个性",
+  "server.settings.personalityDescription": "选择此服务器上的助手如何与你交流。",
+  "server.settings.responseStyle": "回复风格",
+  "server.settings.responseStyleDescription":
+    "自然：助手在工作时发送简短进度，并显示在聊天中。经典：助手完成后只回复一次。",
+  "server.settings.responseStyleNatural": "自然",
+  "server.settings.responseStyleClassic": "经典",
+  "server.settings.personalityLoadFailed": "无法加载服务器个性。",
 } as const satisfies PartialTranslation<typeof source>;

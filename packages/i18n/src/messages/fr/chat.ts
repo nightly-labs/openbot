@@ -341,6 +341,7 @@ export const messages = {
   "chat.actions.branch": "Dériver dans un nouveau fil",
   "chat.actions.readAloud": "Lire à voix haute",
   "chat.actions.stopReading": "Arrêter la lecture",
+  "chat.actions.more": "Plus d’actions",
   "chat.menu.reply": "Répondre",
   "chat.menu.copy": "Copier le message",
   "chat.menu.react": "Réagir",

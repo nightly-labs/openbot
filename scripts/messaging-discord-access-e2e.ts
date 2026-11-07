@@ -306,6 +306,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     forgetThread: () => Effect.void,
     ownChat: () => false,
     contextSession: () => null,
+    progressUpdates: () => null,
   });
   const messaging = new MessagingService({
     threads,

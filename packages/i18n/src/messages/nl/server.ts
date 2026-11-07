@@ -667,4 +667,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} herstart om een update te installeren",
   "server.restartNotice.restartingDescription": "OpenBot verbindt automatisch opnieuw als {name} terug is.",
   "server.restartNotice.backTitle": "{name} is weer online",
+  "server.settings.personalityTitle": "Persoonlijkheid",
+  "server.settings.personalityDescription": "Kies hoe de agents op deze server met je praten.",
+  "server.settings.responseStyle": "Antwoordstijl",
+  "server.settings.responseStyleDescription":
+    "Natuurlijk: agents sturen korte updates terwijl ze werken, en de chat toont ze. Klassiek: agents antwoorden één keer, als ze klaar zijn.",
+  "server.settings.responseStyleNatural": "Natuurlijk",
+  "server.settings.responseStyleClassic": "Klassiek",
+  "server.settings.personalityLoadFailed": "Kan de persoonlijkheid van de server niet laden.",
 } as const satisfies PartialTranslation<typeof source>;

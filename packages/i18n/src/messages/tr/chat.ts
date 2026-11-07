@@ -349,6 +349,7 @@ export const messages = {
   "chat.actions.branch": "Yeni mesaj dizisine dallandır",
   "chat.actions.readAloud": "Sesli oku",
   "chat.actions.stopReading": "Okumayı durdur",
+  "chat.actions.more": "Daha fazla işlem",
   "chat.menu.reply": "Yanıtla",
   "chat.menu.copy": "Mesajı kopyala",
   "chat.menu.react": "Tepki ver",

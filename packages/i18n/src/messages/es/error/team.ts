@@ -154,4 +154,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Este inicio de sesión ya se envió.",
   "error.team.signInRelayMismatch": "Esta dirección no es de este inicio de sesión.",
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
+  "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
 } as const satisfies PartialTranslation<typeof source>;

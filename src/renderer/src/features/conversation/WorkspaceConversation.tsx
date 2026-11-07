@@ -49,6 +49,7 @@ import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { loadServerPersonality, serverResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -120,6 +121,22 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
+  // The server's response style decides whether progress updates show as messages. Main answers
+  // "classic" for a joined server until the server says what it supports, so the read waits for a
+  // negotiated protocol.
+  const personalityServerId = () => {
+    const server = activeServer();
+    return server && (server.kind === "local" || server.compatibility?.negotiatedProtocol != null)
+      ? server.id
+      : undefined;
+  };
+  createEffect(personalityServerId, (serverId) => {
+    if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
+  });
+  const responseStyle = () => {
+    const serverId = activeServer()?.id;
+    return serverId ? serverResponseStyle(serverId) : undefined;
+  };
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -610,6 +627,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         workspaceCovered={windowPage.conversationCovered()}
         browserControlState={browserControlState()}
         server={activeServer()}
+        responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
         isOwnSender={isOwnSender}
@@ -631,6 +649,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
+        activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
+        activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
         mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
