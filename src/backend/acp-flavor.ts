@@ -84,6 +84,8 @@ export interface AcpFlavor {
     failedSession(stderrLine: string): string | undefined;
     /** The start of an answer that is the failure text, when no stderr line came. */
     answerIsFailure: RegExp;
+    /** The failure text of a model step that ended with neither text nor tool calls. */
+    emptyOutputFailure?: RegExp;
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
     /** The message of an answer chunk that reports an exhausted quota, or `null`. */
