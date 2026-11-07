@@ -8,32 +8,19 @@
   fill: var(--openbot-provider-current);
 }
 
-/* The action sits beside the words it acts on, centred on the title and the version line, rather than
-   in a row of its own under them. The words stop at the button while it is there; a state with no
-   button gives them the full width, so the running update's bar reaches the right edge. */
-.provider-update-toast[data-sonner-toast][data-styled="true"] [data-action] {
-  grid-row: 1;
-  align-self: center;
-}
-
-.provider-update-toast[data-sonner-toast][data-styled="true"]:has(.provider-update-toast-action:not([data-idle="true"]))
-  [data-content] {
-  grid-column: 2;
-}
-
-/* In the first row the button is under the close control, which floats over the top right corner,
-   so it keeps the same room clear that the words keep. */
-.ui-toaster.ui-toaster-closeable .provider-update-toast[data-sonner-toast][data-styled="true"] [data-action],
-.ui-toaster .provider-update-toast[data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-action] {
-  margin-inline-end: var(--openbot-space-6);
-}
-
 /* A state with nothing to offer marks its label instead of losing it, and the button goes out of the
    layout. Sonner renders its action button for as long as an action exists on the toast, and taking
    the action away means replacing the notification, which is the one thing this flow will not do.
    Hiding the button also keeps a control with no accessible name out of the tree. */
 .ui-toaster [data-sonner-toast] [data-action]:has(.provider-update-toast-action[data-idle="true"]) {
   display: none;
+}
+
+/* With the button out of the layout there is no button row, so the card keeps its full bottom
+   padding. */
+.ui-toaster
+.provider-update-toast[data-sonner-toast][data-styled="true"]:has(.provider-update-toast-action[data-idle="true"]) {
+  padding-bottom: var(--openbot-space-3);
 }
 
 /* The running update puts its bar under the version line. Sonner builds the toast's children itself,
@@ -87,14 +74,6 @@
   align-items: center;
   gap: var(--openbot-space-3);
   margin-top: var(--openbot-space-2);
-}
-
-/* The content column keeps its words clear of the close control, which floats over the top right
-   corner. The progress row is below that corner, so it takes the room back and ends at the card's
-   right padding. */
-.ui-toaster.ui-toaster-closeable .provider-update-toast .provider-update-toast-progress,
-.ui-toaster .provider-update-toast:has([data-close-button]) .provider-update-toast-progress {
-  margin-inline-end: calc(-1 * var(--openbot-space-6));
 }
 
 .provider-update-toast-bar {

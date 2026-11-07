@@ -154,7 +154,8 @@
   gap: var(--openbot-space-2);
   -webkit-app-region: no-drag;
 }
-/* The toast of a long first load, like the GitHub star toast: a raised card with the 1px ring only. */
+/* The toast of a long first load, like the GitHub star toast: a raised card with the 1px ring only.
+   The buttons sit 8px from the bottom edge. */
 .server-connection-toast-host {
   width: var(--width);
 }
@@ -162,8 +163,8 @@
   position: relative;
   display: grid;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-4);
-  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-4) var(--openbot-space-4) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
@@ -171,16 +172,11 @@
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
 }
-.server-connection-toast-close {
-  position: absolute;
-  top: var(--openbot-space-2);
-  right: var(--openbot-space-2);
-  color: var(--openbot-text-muted);
-}
-/* The end padding keeps the title clear of the close button. */
+/* The close control sits on the corner, mostly outside the card, so the title keeps a small space. */
 .server-connection-toast-title {
-  padding-right: var(--openbot-space-6);
+  padding-right: var(--openbot-space-1);
   font-weight: var(--openbot-weight-semibold);
+  text-wrap: balance;
 }
 .server-connection-toast-body {
   margin: 0;
@@ -190,12 +186,8 @@
   font-variant-numeric: tabular-nums;
   text-wrap: pretty;
 }
-/* Retry is last, in the corner. A long label in a translation moves the buttons to a new line. */
+/* Retry is last, in the corner. With the grid gap, the button row is 12px below the words. */
 .server-connection-toast-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--openbot-space-1-5);
   margin-top: var(--openbot-space-1);
 }
 .server-connection-content {
