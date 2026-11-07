@@ -23,6 +23,7 @@ import type {
   SidePanelPane,
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
+import { SHARED_FOLDER_PATH } from "../message-image-files";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -693,7 +694,15 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agent = conversationRuntime(deps.props).agent;
     let request: Promise<void>;
     if (file.kind === "shared") request = agent.openSharedFile({ path: file.path, action: "download" });
-    else if (agentId) request = agent.openWorkspaceFile({ agentId, path: file.path, action: "download" });
+    else if (agentId)
+      request = agent
+        .openWorkspaceFile({ agentId, path: file.path, action: "download" })
+        // The image showed from the shared folder when the workspace has no such file (#5657).
+        .catch((error: unknown) =>
+          SHARED_FOLDER_PATH.test(file.path)
+            ? agent.openSharedFile({ path: file.path, action: "download" })
+            : Promise.reject(error),
+        );
     else return;
     void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.download")), target));
   }
@@ -759,9 +768,6 @@ function filePreviewKey(source: SidebarFilePreview["source"]): string {
   if (source.kind === "shared") return `shared\u0000${source.path}`;
   return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
 }
-
-/** A path that the host reads as one in the shared folder, such as `Shared/report.md`. */
-const SHARED_FOLDER_PATH = /^Shared[/\\]/u;
 
 function filePreviewError(error: unknown, path: string): string {
   let decodedPath = path;

@@ -2,6 +2,9 @@ import type { MessageImageFile } from "@openbot/ui/features/conversation/Markdow
 import { releaseFilePreviewPage } from "./conversation-port";
 import type { ConversationRuntime } from "./conversation-runtime";
 
+/** A path that the host reads as one in the shared folder, such as `Shared/report.md`. */
+export const SHARED_FOLDER_PATH = /^Shared[/\\]/u;
+
 /** A larger named image keeps only its chip. The host does not read or send a larger file. */
 const INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
 /** The cached `data:` URLs together take at most this many characters. */
@@ -54,7 +57,7 @@ export function createMessageImageFiles(
               exactPath: true,
             })
             // The host reads `Shared/…` as a shared file, as the chip does when the workspace has none (#5657).
-            .catch((error: unknown) => (/^Shared[/\\]/u.test(file.path) ? shared() : Promise.reject(error)));
+            .catch((error: unknown) => (SHARED_FOLDER_PATH.test(file.path) ? shared() : Promise.reject(error)));
     releaseFilePreviewPage(preview.pageUrl);
     const type = preview.mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
     if (preview.previewKind !== "image" || !preview.bytes || !INLINE_IMAGE_TYPES.has(type)) return null;
