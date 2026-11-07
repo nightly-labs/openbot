@@ -654,6 +654,7 @@ export class BrowserCdpEngine {
   });
   #retainDebugger = false;
   #ownsDebugger = false;
+  #idleDetachScheduled = false;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -1969,8 +1970,19 @@ export class BrowserCdpEngine {
 
   /** The engine sees a dialog only while it stays attached: for each lease, watch, and open dialog. */
   #releaseIdleDebugger(): void {
-    if (this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog && this.#dialogWatches.size === 0)
-      this.#detachOwnedDebugger();
+    if (!this.#debuggerIdle() || this.#idleDetachScheduled) return;
+    // A lease can end inside a CDP message: a command fails while Chromium detaches the frame sessions
+    // of a committing navigation. A detach there frees the sessions that Chromium still uses, and the
+    // main process crashes (#5520). Detach on a later task, if the debugger is still idle then.
+    this.#idleDetachScheduled = true;
+    setImmediate(() => {
+      this.#idleDetachScheduled = false;
+      if (this.#debuggerIdle()) this.#detachOwnedDebugger();
+    });
+  }
+
+  #debuggerIdle(): boolean {
+    return this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog && this.#dialogWatches.size === 0;
   }
 
   #signalDialogChange(): void {
