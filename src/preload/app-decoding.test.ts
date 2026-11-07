@@ -435,6 +435,7 @@ const AGENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 describe("pending Marketplace listing", () => {
   it.each([
     ["an agent", { kind: "agent", id: AGENT_ID }],
+    ["a curated agent", { kind: "agent", id: "openbot-curated-agent-copy-editor" }],
     ["a skill", { kind: "skill", id: "release-notes" }],
   ])("keeps %s", (_name, value) => {
     expect(decodePendingMarketplaceListing(value)).toEqual(value);
@@ -451,8 +452,10 @@ describe("pending Marketplace listing", () => {
     ["no link", null],
     ["a bare slug", "release-notes"],
     ["an unknown kind", { kind: "plugin", id: "release-notes" }],
-    ["an agent with a slug", { kind: "agent", id: "release-notes" }],
     ["an agent id in upper case", { kind: "agent", id: AGENT_ID.toUpperCase() }],
+    ["an agent with a path", { kind: "agent", id: "../account" }],
+    ["an agent with a dot", { kind: "agent", id: "agent.md" }],
+    ["an agent id over 128 characters", { kind: "agent", id: "a".repeat(129) }],
     ["a skill with a path", { kind: "skill", id: "../account" }],
     ["a skill with a dot", { kind: "skill", id: "notes.md" }],
     ["a skill slug over 64 characters", { kind: "skill", id: "a".repeat(65) }],
