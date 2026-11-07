@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "プロセス {pid} とその子プロセスを停止します。",
   "chat.backgroundTasks.stopping": "停止中…",
   "chat.backgroundTasks.stopFailed": "バックグラウンドタスクを停止できませんでした。",
+  "chat.backgroundTasks.unverified": "未確認",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot がこのプロセスを起動した記録はありません。ユーザーが起動したプロセスの可能性があるため、停止は無効です。",
   "chat.trace.title": "トレース",
   "chat.trace.search": "ステップを検索",
   "chat.trace.steps": "ステップ",

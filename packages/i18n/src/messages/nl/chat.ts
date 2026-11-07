@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Dit stopt proces {pid} en de onderliggende processen.",
   "chat.backgroundTasks.stopping": "Stoppen…",
   "chat.backgroundTasks.stopFailed": "De achtergrondtaak kon niet worden gestopt.",
+  "chat.backgroundTasks.unverified": "Niet geverifieerd",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot heeft dit proces niet gestart. Het kan een proces zijn dat je zelf hebt gestart, dus Stoppen is uitgeschakeld.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Stappen zoeken",
   "chat.trace.steps": "Stappen",

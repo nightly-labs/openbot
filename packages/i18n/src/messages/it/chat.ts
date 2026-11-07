@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Questa azione interrompe il processo {pid} e i relativi processi figli.",
   "chat.backgroundTasks.stopping": "Interruzione…",
   "chat.backgroundTasks.stopFailed": "Impossibile interrompere l’attività in background.",
+  "chat.backgroundTasks.unverified": "Non verificato",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot non ha avviato questo processo. Potrebbe essere un processo avviato da te, quindi Arresta è disattivato.",
   "chat.trace.title": "Traccia",
   "chat.trace.search": "Cerca passaggi",
   "chat.trace.steps": "Passaggi",

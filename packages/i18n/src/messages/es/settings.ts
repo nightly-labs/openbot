@@ -137,6 +137,9 @@ export const messages = {
   "settings.backgroundProcesses.stop": "Detener",
   "settings.backgroundProcesses.stopLabel": "Detener el proceso {pid}",
   "settings.backgroundProcesses.stopFailed": "No se pudo detener el proceso.",
+  "settings.backgroundProcesses.unverified": "Sin verificar",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot no inició este proceso. Puede ser un proceso que iniciaste tú, así que Detener está desactivado.",
   "settings.keepRemoteSessions.title": "Conexión rápida a servidores",
   "settings.keepRemoteSessions.description":
     "Mantener la conexión con los servidores entre inicios. OpenBot se abre aproximadamente un segundo más rápido. Al cerrar OpenBot, el servicio de OpenBot no cierra la conexión.",

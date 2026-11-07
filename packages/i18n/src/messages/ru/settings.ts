@@ -142,6 +142,9 @@ export const messages = {
   "settings.backgroundProcesses.stop": "Остановить",
   "settings.backgroundProcesses.stopLabel": "Остановить процесс {pid}",
   "settings.backgroundProcesses.stopFailed": "Не удалось остановить процесс.",
+  "settings.backgroundProcesses.unverified": "Не подтверждён",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot не запускал этот процесс. Возможно, его запустили вы, поэтому остановка отключена.",
   "settings.keepRemoteSessions.title": "Быстрое подключение к серверам",
   "settings.keepRemoteSessions.description":
     "Сохранять подключение к серверам между запусками. OpenBot запускается примерно на секунду быстрее. При выходе из OpenBot сервис OpenBot не закрывает подключение.",

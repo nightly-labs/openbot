@@ -4,8 +4,8 @@ import { type BackgroundProcess, isBackgroundProcess } from "@openbot/contracts/
 
 function decodeBackgroundProcess(value: unknown): BackgroundProcess {
   if (!isBackgroundProcess(value)) throw new Error("Invalid background process.");
-  const { id, pid, command, startedAt, ports, agentId } = value;
-  return { id, pid, command, startedAt, ports: [...ports], agentId };
+  const { id, pid, command, startedAt, ports, agentId, verified } = value;
+  return { id, pid, command, startedAt, ports: [...ports], agentId, verified };
 }
 
 export function decodeBackgroundProcesses(value: unknown): BackgroundProcess[] | null {

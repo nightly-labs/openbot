@@ -1,5 +1,5 @@
 import type { BackgroundProcess } from "@openbot/contracts/ipc";
-import { Button, Command, ConfirmDialog, Square } from "@openbot/ui";
+import { Badge, Button, Command, ConfirmDialog, Square } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { useDuration } from "./Subagents";
@@ -7,8 +7,8 @@ import { useDuration } from "./Subagents";
 export interface BackgroundTasksCardProps {
   /** The processes of the agent of this conversation, oldest first. */
   processes: readonly BackgroundProcess[];
-  /** Stops one process. A rejection keeps the confirmation open and shows the error. */
-  onStop: (id: string) => Promise<void>;
+  /** Stops one verified process. A rejection keeps the confirmation open and shows the error. */
+  onStop: (process: BackgroundProcess) => Promise<void>;
 }
 
 /** Ages one row from its start time, on a one-second clock that ends with the row. */
@@ -46,7 +46,7 @@ export function BackgroundTasksCard(props: BackgroundTasksCardProps) {
     setStopping(process.id);
     setError(undefined);
     try {
-      await props.onStop(process.id);
+      await props.onStop(process);
       setTarget(undefined);
     } catch (cause) {
       setError(errorMessage(cause, t("chat.backgroundTasks.stopFailed")));
@@ -82,6 +82,15 @@ export function BackgroundTasksCard(props: BackgroundTasksCardProps) {
                         {process().command}
                       </code>
                       <span class="background-tasks-meta">
+                        <Show when={!process().verified}>
+                          <Badge
+                            variant="warning-light"
+                            class="background-tasks-unverified"
+                            title={t("chat.backgroundTasks.unverifiedHint")}
+                          >
+                            {t("chat.backgroundTasks.unverified")}
+                          </Badge>
+                        </Show>
                         <span>{t("chat.backgroundTasks.running")}</span>
                         <span aria-hidden="true">·</span>
                         <span>{t("chat.backgroundTasks.elapsed", { duration: duration(elapsed()) })}</span>
@@ -98,22 +107,24 @@ export function BackgroundTasksCard(props: BackgroundTasksCardProps) {
                         </Show>
                       </span>
                     </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      class="background-tasks-stop"
-                      disabled={stopping() === process().id}
-                      loading={stopping() === process().id}
-                      aria-label={t("chat.backgroundTasks.stopLabel", { pid: String(process().pid) })}
-                      onClick={() => {
-                        setError(undefined);
-                        setTarget(process());
-                      }}
-                    >
-                      <Square aria-hidden="true" />
-                      {t("chat.backgroundTasks.stop")}
-                    </Button>
+                    <Show when={process().verified}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        class="background-tasks-stop"
+                        disabled={stopping() === process().id}
+                        loading={stopping() === process().id}
+                        aria-label={t("chat.backgroundTasks.stopLabel", { pid: String(process().pid) })}
+                        onClick={() => {
+                          setError(undefined);
+                          setTarget(process());
+                        }}
+                      >
+                        <Square aria-hidden="true" />
+                        {t("chat.backgroundTasks.stop")}
+                      </Button>
+                    </Show>
                   </li>
                 );
               }}

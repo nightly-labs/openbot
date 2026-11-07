@@ -79,6 +79,10 @@
   line-height: var(--openbot-leading-sm);
 }
 
+.background-tasks-unverified {
+  flex: 0 0 auto;
+}
+
 .background-tasks-stop {
   flex: 0 0 auto;
 }

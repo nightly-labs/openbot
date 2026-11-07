@@ -120,6 +120,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Это остановит процесс {pid} и его дочерние процессы.",
   "chat.backgroundTasks.stopping": "Остановка…",
   "chat.backgroundTasks.stopFailed": "Не удалось остановить фоновую задачу.",
+  "chat.backgroundTasks.unverified": "Не подтверждён",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot не запускал этот процесс. Возможно, его запустили вы, поэтому остановка отключена.",
   "chat.trace.title": "Трассировка",
   "chat.trace.search": "Искать шаги",
   "chat.trace.steps": "Шаги",

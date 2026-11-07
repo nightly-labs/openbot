@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Isto para o processo {pid} e os respetivos processos filhos.",
   "chat.backgroundTasks.stopping": "A parar…",
   "chat.backgroundTasks.stopFailed": "Não foi possível parar a tarefa em segundo plano.",
+  "chat.backgroundTasks.unverified": "Não verificado",
+  "chat.backgroundTasks.unverifiedHint":
+    "O OpenBot não iniciou este processo. Pode ser um processo que você iniciou, por isso Parar está desativado.",
   "chat.trace.title": "Rastreamento",
   "chat.trace.search": "Pesquisar passos",
   "chat.trace.steps": "Passos",

@@ -7,13 +7,14 @@
 // again. A provider process that OpenBot runs has OpenBot as its parent, so it is never one.
 //
 // macOS shows the environment of a program, but not of an Apple system program such as `/bin/sleep`.
-// There a program is a left program too when its working directory is an agent workspace. The
-// environment stays in memory: it can hold secrets, so this fallback reads only the directory.
+// There a program is shown too when its working directory is an agent workspace, but that is display
+// only: anyone can start a program in a workspace. Stop needs the marker, which records that an agent
+// started the program.
 
 import { execFile } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
-import { sep } from "node:path";
-import type { BackgroundProcess } from "@openbot/contracts/ipc";
+import { basename, sep } from "node:path";
+import type { BackgroundProcess, BackgroundProcessStopInput } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { Effect, Schema } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -51,6 +52,8 @@ interface LeftProcess {
   root: ProcessRow;
   /** The root first, then its descendants. */
   tree: ProcessRow[];
+  /** True when the environment of the root has the marker, so an agent started it. */
+  verified: boolean;
 }
 
 /**
@@ -176,13 +179,16 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (
       : new Map<number, string[]>();
   const left: LeftProcess[] = [];
   for (const root of candidates) {
+    const verified = marked.has(root.pid);
+    // A working folder only says where a program runs, not who started it: keep such a program for
+    // display, but never treat it as one that this app may stop.
     const inWorkspace = ownerOf(cwds.get(root.pid)?.[0], workspaces) !== null;
-    if (!marked.has(root.pid) && !inWorkspace) continue;
+    if (!verified && !inWorkspace) continue;
     const tree = [root];
     for (let index = 0; index < tree.length; index++) tree.push(...(children.get(tree[index]?.pid ?? -1) ?? []));
     // An OpenBot that an agent started is never stopped from this one.
     if (tree.some((row) => row.pid === process.pid)) continue;
-    left.push({ root, tree });
+    left.push({ root, tree, verified });
   }
   return left;
 });
@@ -222,10 +228,20 @@ function ownerOf(cwd: string | undefined, agents: readonly BackgroundProcessAgen
   return owner?.id ?? null;
 }
 
+/**
+ * The name of the program alone. A process that OpenBot did not start can have secrets in its
+ * arguments, such as `--token`, and its command line is not for display.
+ */
+function executableOf(command: string): string {
+  const match = /^(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(command.trim());
+  return basename(match?.[1] ?? match?.[2] ?? match?.[3] ?? "");
+}
+
 /** Null on Windows, where OpenBot cannot find these programs. */
 export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(function* (
   platform: NodeJS.Platform,
   agents: readonly BackgroundProcessAgent[],
+  agentId?: string,
 ) {
   if (platform === "win32") return null;
   const left = yield* findLeftProcesses(platform, agents);
@@ -239,7 +255,7 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
   // lsof gives the real path of a folder, such as `/private/tmp` for `/tmp` on macOS.
   const workspaces = yield* resolveWorkspaces(agents);
   return left
-    .map(({ root, tree }): BackgroundProcess => {
+    .map(({ root, tree, verified }): BackgroundProcess => {
       const ports = new Set<number>();
       for (const row of tree) {
         for (const address of listening.get(row.pid) ?? []) {
@@ -250,12 +266,14 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
       return {
         id: processId(root),
         pid: root.pid,
-        command: redactText(root.command).slice(0, MAX_COMMAND_LENGTH),
+        command: verified ? redactText(root.command).slice(0, MAX_COMMAND_LENGTH) : executableOf(root.command),
         startedAt: root.startedAt,
         ports: [...ports].sort((left, right) => left - right),
         agentId: ownerOf(cwds.get(root.pid)?.[0], workspaces),
+        verified,
       };
     })
+    .filter((process) => agentId === undefined || process.agentId === agentId)
     .sort((left, right) => right.startedAt - left.startedAt);
 });
 
@@ -270,17 +288,27 @@ function signal(pid: number, name: NodeJS.Signals | 0): boolean {
 
 /**
  * Ends one left program and its children: SIGTERM, then SIGKILL to each process that still runs
- * after `STOP_GRACE_MS`. The id must name a left program now, so a page cannot signal another process.
+ * after `STOP_GRACE_MS`. The caller must name a verified process of the agent that its card shows,
+ * so a page cannot signal a program that a person started.
  */
 export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(function* (
   platform: NodeJS.Platform,
-  id: string,
+  input: BackgroundProcessStopInput,
   agents: readonly BackgroundProcessAgent[],
 ) {
   if (platform === "win32") return;
-  const found = (yield* findLeftProcesses(platform, agents)).find(({ root }) => processId(root) === id);
-  if (!found) return;
-  const pids = found.tree.map((row) => row.pid);
+  const found = (yield* findLeftProcesses(platform, agents)).find(({ root }) => processId(root) === input.id);
+  // A program without the marker may be one that a person started in the workspace: show it only.
+  if (!found?.verified) return;
+  const workspaces = yield* resolveWorkspaces(agents);
+  const cwds = yield* lsof(["-a", "-d", "cwd", "-p", String(found.root.pid)]);
+  if (ownerOf(cwds.get(found.root.pid)?.[0], workspaces) !== input.agentId) return;
+  // The start time comes from a new read: macOS gives it to 1 second, so a pid can be in use again
+  // under the same start time. Only a program that is the same as the one that the card showed ends.
+  const before = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
+  const tree = found.tree.filter((row) => before.get(row.pid) === row.startedAt);
+  if (tree.every((row) => row.pid !== found.root.pid)) return;
+  const pids = tree.map((row) => row.pid);
   for (const pid of pids) signal(pid, "SIGTERM");
   for (let waited = 0; waited < STOP_GRACE_MS; waited += STOP_CHECK_INTERVAL_MS) {
     if (!pids.some((pid) => signal(pid, 0))) return;
@@ -288,5 +316,5 @@ export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(funct
   }
   // A pid that ended in the grace period can name a new program now: only the same start is killed.
   const current = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
-  for (const row of found.tree) if (current.get(row.pid) === row.startedAt) signal(row.pid, "SIGKILL");
+  for (const row of tree) if (current.get(row.pid) === row.startedAt) signal(row.pid, "SIGKILL");
 });

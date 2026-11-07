@@ -125,6 +125,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Spowoduje to zatrzymanie procesu {pid} i jego procesów podrzędnych.",
   "chat.backgroundTasks.stopping": "Zatrzymywanie…",
   "chat.backgroundTasks.stopFailed": "Nie udało się zatrzymać zadania w tle.",
+  "chat.backgroundTasks.unverified": "Niezweryfikowany",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot nie uruchomił tego procesu. To może być proces uruchomiony przez Ciebie, dlatego zatrzymywanie jest wyłączone.",
   "chat.trace.title": "Ślad",
   "chat.trace.search": "Szukaj kroków",
   "chat.trace.steps": "Kroki",

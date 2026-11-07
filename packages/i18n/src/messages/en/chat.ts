@@ -69,6 +69,9 @@ export const messages = defineMessages("chat", {
   "chat.backgroundTasks.confirmDescription": "This stops process {pid} and its child processes.",
   "chat.backgroundTasks.stopping": "Stopping…",
   "chat.backgroundTasks.stopFailed": "Could not stop the background task.",
+  "chat.backgroundTasks.unverified": "Unverified",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot did not start this process. It may be a process that you started, so Stop is disabled.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Search steps",
   "chat.trace.steps": "Steps",

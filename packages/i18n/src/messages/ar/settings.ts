@@ -141,6 +141,9 @@ export const messages = {
   "settings.backgroundProcesses.stop": "إيقاف",
   "settings.backgroundProcesses.stopLabel": "إيقاف العملية {pid}",
   "settings.backgroundProcesses.stopFailed": "تعذّر إيقاف العملية.",
+  "settings.backgroundProcesses.unverified": "غير مؤكد",
+  "settings.backgroundProcesses.unverifiedHint":
+    "لم يبدأ OpenBot هذه العملية. قد تكون عملية بدأتها أنت، لذا الإيقاف معطّل.",
   "settings.keepRemoteSessions.title": "اتصال سريع بالخوادم",
   "settings.keepRemoteSessions.description":
     "الإبقاء على الاتصال بالخوادم المنضم إليها بين مرات التشغيل. يبدأ OpenBot أسرع بنحو ثانية. عند إنهاء OpenBot، لا تغلق خدمة OpenBot الاتصال.",

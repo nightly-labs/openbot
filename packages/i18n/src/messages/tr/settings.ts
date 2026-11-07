@@ -135,6 +135,9 @@ export const messages = {
   "settings.backgroundProcesses.stop": "Durdur",
   "settings.backgroundProcesses.stopLabel": "{pid} işlemini durdur",
   "settings.backgroundProcesses.stopFailed": "İşlem durdurulamadı.",
+  "settings.backgroundProcesses.unverified": "Doğrulanmadı",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot bu işlemi başlatmadı. Bu, sizin başlattığınız bir işlem olabilir; bu nedenle Durdur devre dışı.",
   "settings.keepRemoteSessions.title": "Sunuculara hızlı bağlantı",
   "settings.keepRemoteSessions.description":
     "Katıldığınız sunuculara olan bağlantıyı açılışlar arasında koruyun. OpenBot yaklaşık bir saniye daha hızlı başlar. OpenBot'tan çıktığınızda OpenBot hizmeti bağlantıyı kapatmaz.",

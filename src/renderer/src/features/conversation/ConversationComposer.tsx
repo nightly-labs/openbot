@@ -3,6 +3,7 @@ import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-fil
 import {
   type AccountUsageLimit,
   type AgentWait,
+  type BackgroundProcess,
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
@@ -48,7 +49,12 @@ import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
-import { backgroundProcesses, stopBackgroundProcess, subscribeBackgroundProcesses } from "./background-processes";
+import {
+  backgroundProcesses,
+  setBackgroundProcessAgent,
+  stopBackgroundProcess,
+  subscribeBackgroundProcesses,
+} from "./background-processes";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { useConversationViewScope } from "./conversation-scope";
 import { currentConversationTarget } from "./stores/composer-store";
@@ -202,11 +208,15 @@ export function ConversationComposer() {
   });
   const backgroundTasksVisible = () => backgroundTasks().length > 0 && !pickerOpen();
   const slotOpen = () => queueVisible() || awaitingVisible() || waitsVisible() || backgroundTasksVisible();
+  createEffect(
+    () => props.agent?.id,
+    (agentId) => setBackgroundProcessAgent(agentId),
+  );
   const unsubscribeBackgroundProcesses = subscribeBackgroundProcesses();
   onCleanup(unsubscribeBackgroundProcesses);
-  async function stopBackgroundTask(id: string): Promise<void> {
+  async function stopBackgroundTask(process: BackgroundProcess): Promise<void> {
     try {
-      await stopBackgroundProcess(id);
+      await stopBackgroundProcess(process);
     } catch (error) {
       actionToast.error(errorMessage(error, t("chat.backgroundTasks.stopFailed")), {
         id: "conversation-background-task-stop-failed",

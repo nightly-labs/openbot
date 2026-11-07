@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Esto detiene el proceso {pid} y sus procesos secundarios.",
   "chat.backgroundTasks.stopping": "Deteniendo…",
   "chat.backgroundTasks.stopFailed": "No se pudo detener la tarea en segundo plano.",
+  "chat.backgroundTasks.unverified": "Sin verificar",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot no inició este proceso. Puede ser un proceso que iniciaste tú, así que Detener está desactivado.",
   "chat.trace.title": "Traza",
   "chat.trace.search": "Buscar pasos",
   "chat.trace.steps": "Pasos",

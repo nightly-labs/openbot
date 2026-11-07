@@ -137,6 +137,9 @@ export const messages = {
   "settings.backgroundProcesses.stop": "Arresta",
   "settings.backgroundProcesses.stopLabel": "Arresta il processo {pid}",
   "settings.backgroundProcesses.stopFailed": "Impossibile arrestare il processo.",
+  "settings.backgroundProcesses.unverified": "Non verificato",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot non ha avviato questo processo. Potrebbe essere un processo avviato da te, quindi Arresta è disattivato.",
   "settings.keepRemoteSessions.title": "Connessione rapida ai server",
   "settings.keepRemoteSessions.description":
     "Mantieni la connessione ai server a cui ti sei unito tra un avvio e l'altro. OpenBot si avvia circa un secondo prima. Quando esci da OpenBot, il servizio OpenBot non chiude la connessione.",

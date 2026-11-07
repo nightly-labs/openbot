@@ -1,5 +1,6 @@
 import type { BackgroundProcess } from "@openbot/contracts/ipc";
 import {
+  Badge,
   Button,
   Item,
   ItemActions,
@@ -24,7 +25,7 @@ export interface BackgroundProcessesSectionProps {
   agents: readonly AgentDefaultsAgent[];
   /** The ids of the processes that are stopping now. */
   stopping: readonly string[];
-  onStop: (id: string) => void;
+  onStop: (process: BackgroundProcess) => void;
 }
 
 /**
@@ -83,16 +84,28 @@ export function BackgroundProcessesSection(props: BackgroundProcessesSectionProp
                 </ItemMedia>
                 <ItemContent>
                   <ItemTitle title={process.command}>{process.command}</ItemTitle>
-                  <ItemDescription>{details(process)}</ItemDescription>
+                  <ItemDescription>
+                    <Show when={!process.verified}>
+                      <Badge
+                        variant="warning-light"
+                        class="settings-background-process-unverified"
+                        title={t("settings.backgroundProcesses.unverifiedHint")}
+                      >
+                        {t("settings.backgroundProcesses.unverified")}
+                      </Badge>
+                    </Show>
+                    {details(process)}
+                  </ItemDescription>
                 </ItemContent>
                 <ItemActions>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={props.stopping.includes(process.id)}
+                    disabled={!process.verified || props.stopping.includes(process.id)}
+                    title={process.verified ? undefined : t("settings.backgroundProcesses.unverifiedHint")}
                     aria-label={t("settings.backgroundProcesses.stopLabel", { pid: String(process.pid) })}
-                    onClick={() => props.onStop(process.id)}
+                    onClick={() => props.onStop(process)}
                   >
                     {t("settings.backgroundProcesses.stop")}
                   </Button>

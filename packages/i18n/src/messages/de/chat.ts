@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Dadurch werden Prozess {pid} und seine Kindprozesse beendet.",
   "chat.backgroundTasks.stopping": "Wird gestoppt…",
   "chat.backgroundTasks.stopFailed": "Die Hintergrundaufgabe konnte nicht gestoppt werden.",
+  "chat.backgroundTasks.unverified": "Nicht bestätigt",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot hat diesen Prozess nicht gestartet. Er kann von Ihnen gestartet worden sein, daher Stoppen ist deaktiviert.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Schritte suchen",
   "chat.trace.steps": "Schritte",

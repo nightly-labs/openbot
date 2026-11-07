@@ -120,12 +120,13 @@ export function createSettingsAgentsSection(options: {
       });
   }
 
-  function stopProcess(id: string): void {
+  function stopProcess(process: BackgroundProcess): void {
+    const id = process.id;
     setState((draft) => {
       draft.stopping.push(id);
     });
     settingsPort()
-      .backgroundProcesses.stop(id)
+      .backgroundProcesses.stop({ id, agentId: process.agentId })
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(errorMessage(error, t("settings.backgroundProcesses.stopFailed")), {

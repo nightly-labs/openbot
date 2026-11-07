@@ -70,6 +70,9 @@ export const messages = {
   "chat.backgroundTasks.confirmDescription": "Bu işlem {pid} ve alt süreçlerini durdurur.",
   "chat.backgroundTasks.stopping": "Durduruluyor…",
   "chat.backgroundTasks.stopFailed": "Arka plan görevi durdurulamadı.",
+  "chat.backgroundTasks.unverified": "Doğrulanmadı",
+  "chat.backgroundTasks.unverifiedHint":
+    "OpenBot bu işlemi başlatmadı. Bu, sizin başlattığınız bir işlem olabilir; bu nedenle Durdur devre dışı.",
   "chat.trace.title": "İz",
   "chat.trace.search": "Adımlarda ara",
   "chat.trace.steps": "Adımlar",

@@ -310,6 +310,10 @@
   gap: var(--openbot-space-4);
 }
 
+.settings-background-process-unverified {
+  margin-inline-end: var(--openbot-space-2);
+}
+
 .settings-modal-row-title {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);

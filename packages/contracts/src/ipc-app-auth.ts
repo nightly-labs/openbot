@@ -3,7 +3,7 @@ import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { decodeRecord, nullableNumber, requiredBoolean, requiredNumber, requiredString } from "./ipc-decoding";
-import { isDynamicRecord, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
@@ -425,13 +425,37 @@ export interface BackgroundProcess {
   /** The pid and the start time: a pid is reused. Stop takes it. */
   id: string;
   pid: number;
-  /** The command line with secrets redacted. */
+  /**
+   * The command line with secrets redacted. For a process that OpenBot did not start, only the
+   * executable name, because its arguments may hold secrets.
+   */
   command: string;
   /** Milliseconds since the epoch. */
   startedAt: number;
   /** The TCP ports that the process or its children listen on. */
   ports: number[];
-  /** The agent whose workspace holds the working folder of the process, or null when none does. */
+  /**
+   * The agent whose workspace holds the working folder of the process, or null when none does. This
+   * is for display only: a working folder does not prove which agent, or person, started it.
+   */
+  agentId: string | null;
+  /**
+   * True when the environment of the process has the agent-process marker, so OpenBot started it.
+   * Only a verified process has Stop; a process that a person started can have the same working
+   * folder, and must not be stopped from here.
+   */
+  verified: boolean;
+}
+
+/** The processes of one agent, for the card of its conversation. */
+export interface BackgroundProcessListInput {
+  agentId: string;
+}
+
+/** Stop one process, as the card that shows it asks. Main checks the owner again. */
+export interface BackgroundProcessStopInput {
+  id: string;
+  /** The agent whose card asks, or null for a process with no agent. */
   agentId: string | null;
 }
 
@@ -444,7 +468,8 @@ export function isBackgroundProcess(value: unknown): value is BackgroundProcess 
     isFiniteNumber(value.startedAt) &&
     Array.isArray(value.ports) &&
     value.ports.every((port) => integerInRange(port, 1, 65_535)) &&
-    (value.agentId === null || isIdentifier(value.agentId))
+    (value.agentId === null || isIdentifier(value.agentId)) &&
+    isBoolean(value.verified)
   );
 }
 
