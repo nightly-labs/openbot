@@ -448,6 +448,50 @@ export function isBackgroundProcess(value: unknown): value is BackgroundProcess 
   );
 }
 
+export const BACKGROUND_TASK_STATUSES = ["running", "finished", "stopped", "unknown"] as const;
+
+/**
+ * A program that OpenBot started for an agent, kept after it ends. `lastLine` is the last line that
+ * it wrote, so a conversation can show progress without reading the log itself.
+ */
+export interface BackgroundTask {
+  id: string;
+  agentId: string;
+  /** The command line with secrets redacted. */
+  command: string;
+  title: string;
+  pid: number;
+  /** Milliseconds since the epoch. */
+  startedAt: number;
+  endedAt: number | null;
+  /** Null while it runs, and when OpenBot did not see how it ended. */
+  exitCode: number | null;
+  status: (typeof BACKGROUND_TASK_STATUSES)[number];
+  lastLine: string;
+  /** Where the program writes its output, so a caller can read more than the last line. */
+  logPath: string;
+}
+
+export function isBackgroundTask(value: unknown): value is BackgroundTask {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isIdentifier(value.agentId) &&
+    isString(value.command) &&
+    isString(value.title) &&
+    integerInRange(value.pid, 0, Number.MAX_SAFE_INTEGER) &&
+    isFiniteNumber(value.startedAt) &&
+    (value.endedAt === null || isFiniteNumber(value.endedAt)) &&
+    (value.exitCode === null || Number.isInteger(value.exitCode)) &&
+    (value.status === "running" ||
+      value.status === "finished" ||
+      value.status === "stopped" ||
+      value.status === "unknown") &&
+    isString(value.lastLine) &&
+    isString(value.logPath)
+  );
+}
+
 /**
  * How far Computer Use is from working, as one value the panel switches on.
  *

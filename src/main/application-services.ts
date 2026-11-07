@@ -30,6 +30,7 @@ import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-displa
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
+import { BackgroundTasks } from "./background-tasks";
 import {
   type BrowserProfileService,
   browserProxyConnection,
@@ -599,6 +600,8 @@ export interface ApplicationServiceContext {
 /** Everything the entry point wires up, registers IPC handlers against, and shuts down. */
 export interface ApplicationServices {
   service: AgentService;
+  /** The programs OpenBot starts for an agent, kept for the conversation card after they end. */
+  backgroundTasks: BackgroundTasks;
   routineFlows: RoutineFlowsHandle;
   workflows: WorkflowsHandle;
   /** The repositories, labels and people that the workflow editor offers from the GitHub connection. */
@@ -1160,6 +1163,8 @@ export async function createApplicationServices({
   await Effect.runPromise(skillCreator.syncAll(store.list()));
   await Effect.runPromise(dataSkill.syncAll(store.list()));
   performance.mark("openbot:services.skills");
+  // The programs OpenBot starts for an agent, with their logs: the conversation card reads them.
+  const backgroundTasks = new BackgroundTasks(join(app.getPath("userData"), "background-tasks"));
   const hostedSites = new HostedSiteDesktopService(centralAuth, () => {
     // Read at request time: the team store is created later, and the server can register after launch.
     const hostId = teamStore.getIdentity()?.serverId;
@@ -1913,6 +1918,7 @@ export async function createApplicationServices({
         yield* skillCreator.syncAgent(agent);
         yield* dataSkill.syncAgent(agent);
       }),
+    backgroundTasks,
     hostedSites: {
       list: () => hostedSites.list().pipe(toHostedSiteOperationFailed),
       publish: (input, roots) => hostedSites.publish(input, roots).pipe(toHostedSiteOperationFailed),
@@ -3769,6 +3775,7 @@ export async function createApplicationServices({
 
   return {
     service,
+    backgroundTasks,
     routineFlows: routineFlowRuntime,
     workflows: workflowRuntime,
     workflowGitHub,

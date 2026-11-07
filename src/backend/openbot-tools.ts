@@ -193,6 +193,31 @@ export const acknowledgeRequestToolSchema = z.object({
     .describe("A smaller option that the user may prefer, such as Only find the cause."),
 });
 
+export const runBackgroundToolSchema = z.strictObject({
+  command: z
+    .string()
+    .trim()
+    .min(1)
+    .max(2_000)
+    .describe(
+      "The shell command to run, such as `curl -L -o file.zip https://…`. It runs from the workspace and keeps running after this turn.",
+    ),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .optional()
+    .describe("A short name for the conversation card, such as Download the dataset. Defaults to the command."),
+  cwd: z
+    .string()
+    .trim()
+    .min(1)
+    .max(INPUT_LIMITS.path)
+    .optional()
+    .describe("A folder inside your workspace to run in. The default is the workspace root."),
+});
+
 export const askUiToolSchema = z.object({
   blockId: uiBlockIdSchema.optional().describe("Your id for this block. OpenBot makes one when you omit it."),
   block: z.discriminatedUnion("type", [
@@ -351,6 +376,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "delete_site",
     description: "Delete an owned static site after the user explicitly asks to delete it.",
     shape: { siteId: z.string().min(1).max(INPUT_LIMITS.identifier) },
+  },
+  {
+    name: "run_background",
+    description:
+      "Start a long command in the background and get its id, pid, start time, and log path. Use it for a download, a build, a server, or anything that may outlive this turn or take more than about 30 seconds. OpenBot keeps stdout and stderr in the log, shows the last line in the conversation, and records the exit code next to the log, so the user sees progress instead of a silent wait. Reply with the id and what it does; do not wait in this turn for a download that the user can watch.",
+    shape: runBackgroundToolSchema.shape,
   },
   {
     name: "attach_files_to_response",

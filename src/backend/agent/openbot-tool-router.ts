@@ -9,6 +9,7 @@ import type {
   AgentModelOption,
   AgentSummary,
   AvatarImageInput,
+  BackgroundTask,
   ConversationMessage,
   CreateAgentInput,
   McpServerConfig,
@@ -57,6 +58,7 @@ import {
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
   routineReportFailureToolSchema,
+  runBackgroundToolSchema,
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
 } from "../openbot-tools";
@@ -76,6 +78,7 @@ import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approva
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
+import { resolveBackgroundTaskCwd } from "./background-task-cwd";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
@@ -176,6 +179,19 @@ function captureFailure(failure: ScreenCaptureFailed) {
   return openBotToolFailure(failure.reason);
 }
 
+/** The programs that OpenBot starts for an agent, outside the provider turn. */
+export interface BackgroundTaskHost {
+  start(input: {
+    agentId: string;
+    workspace: string;
+    command: string;
+    title?: string | undefined;
+  }): Promise<BackgroundTask>;
+  list(agentId: string): Promise<BackgroundTask[]>;
+  tail(id: string, maxBytes: number): Promise<string | null>;
+  stop(id: string): Promise<void>;
+}
+
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
   listModels(): AgentModelOption[];
@@ -249,6 +265,8 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
   vaultItems?: VaultItems | null | undefined;
+  /** The programs OpenBot starts in the background; null where nothing can start one. */
+  backgroundTasks?: BackgroundTaskHost | null | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -289,6 +307,7 @@ export class OpenBotToolRouter {
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
+  readonly #backgroundTasks: BackgroundTaskHost | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
 
@@ -326,6 +345,7 @@ export class OpenBotToolRouter {
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
+    this.#backgroundTasks = options.backgroundTasks ?? null;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -1067,6 +1087,34 @@ export class OpenBotToolRouter {
 
     if (params.tool === "html_render") {
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
+    }
+
+    if (params.tool === "run_background") {
+      const backgroundTasks = this.#backgroundTasks;
+      if (!backgroundTasks) return openBotToolFailure("This server cannot start background tasks.");
+      const args = runBackgroundToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const sender = this.#requireAgent(senderAgentId);
+      const workspace = resolveBackgroundTaskCwd(sender.workspacePath, args.cwd);
+      if (workspace === null) return openBotToolFailure("cwd must stay inside your workspace.");
+      const task = yield* Effect.tryPromise({
+        try: () =>
+          backgroundTasks.start({
+            agentId: senderAgentId,
+            workspace,
+            command: args.command,
+            title: args.title,
+          }),
+        catch: (cause) => new ToolOperationFailed({ cause }),
+      });
+      return openBotToolResult({
+        id: task.id,
+        pid: task.pid,
+        startedAt: task.startedAt,
+        logPath: task.logPath,
+        title: task.title,
+        status: task.status,
+        next: "The program runs outside this turn. OpenBot shows it above the input with its last output line and exit code. Tell the user what it does and that they can watch it there; do not poll it in this turn.",
+      });
     }
 
     if (params.tool === "list_sites") {

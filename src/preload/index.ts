@@ -207,6 +207,7 @@ import {
   decodeVoid,
 } from "./app-decoding";
 import { decodeBackgroundProcesses } from "./background-process-decoding";
+import { decodeBackgroundTasks, decodeBackgroundTaskTail } from "./background-task-decoding";
 import {
   decodeBrowserBounds,
   decodeBrowserControlState,
@@ -826,6 +827,11 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   backgroundProcesses: bridgeGroup(IPC_ENDPOINTS.backgroundProcesses, {
     list: decodeBackgroundProcesses,
+    stop: decodeVoid,
+  }),
+  backgroundTasks: bridgeGroup(IPC_ENDPOINTS.backgroundTasks, {
+    list: decodeBackgroundTasks,
+    tail: decodeBackgroundTaskTail,
     stop: decodeVoid,
   }),
   providerRuntimes: bridgeGroup(IPC_ENDPOINTS.providerRuntimes, {

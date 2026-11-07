@@ -1,0 +1,130 @@
+/* The programs that the agent of this conversation runs outside its turns. */
+
+.managed-tasks {
+  width: auto;
+  margin: -1px 0 0;
+  border-top: 1px solid var(--openbot-queue-border);
+  background: var(--openbot-queue-surface);
+}
+
+.managed-tasks-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.managed-tasks-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.managed-tasks-running {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.managed-tasks-items {
+  display: grid;
+  margin: 0;
+  padding: 0 0 var(--openbot-space-3);
+  list-style: none;
+}
+
+.managed-tasks-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.managed-tasks-dot {
+  width: var(--openbot-space-2);
+  height: var(--openbot-space-2);
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+}
+
+.managed-tasks-row[data-status="running"] .managed-tasks-dot {
+  background: var(--openbot-success);
+}
+
+.managed-tasks-row[data-status="finished"] .managed-tasks-dot {
+  background: var(--openbot-text-muted);
+}
+
+.managed-tasks-row[data-status="stopped"] .managed-tasks-dot,
+.managed-tasks-row[data-status="unknown"] .managed-tasks-dot {
+  background: var(--openbot-danger, var(--openbot-text-muted));
+}
+
+.managed-tasks-body {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--openbot-space-0-5);
+}
+
+.managed-tasks-command {
+  display: block;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.managed-tasks-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.managed-tasks-status {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.managed-tasks-last-line {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--openbot-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.managed-tasks-stop {
+  flex: 0 0 auto;
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  cursor: pointer;
+}
+
+.managed-tasks-stop:hover:not(:disabled) {
+  background: var(--openbot-hover, var(--openbot-queue-surface));
+}
+
+.managed-tasks-stop:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
