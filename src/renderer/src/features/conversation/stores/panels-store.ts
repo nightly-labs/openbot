@@ -83,11 +83,6 @@ const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
 
-/** The pane that shows a panel mode, or null for a mode outside the side panel. */
-function paneOfMode(mode: RightPanelMode): SidePanelPane | null {
-  return isSidePanelPane(mode) ? mode : null;
-}
-
 export interface PanelsStoreDeps {
   props: ConversationProps;
   rightPanels: () => Record<string, RightPanelMode>;
@@ -144,7 +139,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     activeRightPanel() === "side-panel" ||
     activeRightPanel() === "thread" ||
     activeRightPanel() === "file-preview" ||
-    paneOfMode(activeRightPanel()) !== null;
+    isSidePanelPane(activeRightPanel());
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -225,12 +220,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
-    const pane = paneOfMode(mode);
-    if (pane)
+    if (isSidePanelPane(mode))
       updateSidePanel(agentId, (state) => ({
         ...state,
-        panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
-        selected: pane,
+        panes: state.panes.includes(mode) ? state.panes : [...state.panes, mode],
+        selected: mode,
         file: null,
       }));
     else if (mode === "side-panel" || mode === "thread")

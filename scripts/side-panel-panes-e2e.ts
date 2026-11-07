@@ -36,12 +36,17 @@ const report: { passed: boolean; checks: typeof checks; errors: string[]; error?
   errors: [],
 };
 
+/** The tab names of the panes. The Browser pane adds the tabs of its pages to the same tab list. */
+const PANE_NAMES = ["Browser", "Files", "Agent settings", "Voice", "Side question"];
+
 /** The pane tabs of the side panel, as "Name" or "Name*" for the selected tab. */
 function paneTabs(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll(".side-panel-tab-select")].map(
-      (tab) => `${tab.textContent ?? ""}${tab.getAttribute("aria-selected") === "true" ? "*" : ""}`,
-    ),
+  return page.evaluate(
+    (names) =>
+      [...document.querySelectorAll(".side-panel-tabs .side-panel-tab-select")]
+        .filter((tab) => names.includes(tab.textContent ?? ""))
+        .map((tab) => `${tab.textContent ?? ""}${tab.getAttribute("aria-selected") === "true" ? "*" : ""}`),
+    PANE_NAMES,
   );
 }
 
@@ -49,13 +54,13 @@ function paneTabs(page: Page): Promise<string[]> {
 async function tabsBecome(page: Page, expected: string[]): Promise<string[]> {
   await page
     .waitForFunction(
-      (want) =>
+      ([names, want]) =>
         JSON.stringify(
-          [...document.querySelectorAll(".side-panel-tab-select")].map(
-            (tab) => `${tab.textContent ?? ""}${tab.getAttribute("aria-selected") === "true" ? "*" : ""}`,
-          ),
+          [...document.querySelectorAll(".side-panel-tabs .side-panel-tab-select")]
+            .filter((tab) => names.includes(tab.textContent ?? ""))
+            .map((tab) => `${tab.textContent ?? ""}${tab.getAttribute("aria-selected") === "true" ? "*" : ""}`),
         ) === JSON.stringify(want),
-      expected,
+      [PANE_NAMES, expected] as const,
       { timeout: WAIT_MS },
     )
     .catch(() => undefined);
@@ -94,7 +99,7 @@ const browser = await chromium.launch(
 );
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  page.on("pageerror", (error) => report.errors.push(String(error)));
+  page.on("pageerror", (error) => report.errors.push(error.stack ?? String(error)));
   await page.goto(`${storybook}/iframe.html?id=${STORY}&viewMode=story`, { timeout: 120_000 });
   const toggle = page.locator(".conversation-header .side-panel-toggle");
   await toggle.waitFor({ timeout: 60_000 });
@@ -178,13 +183,20 @@ try {
   await page.getByRole("tab", { name: "Voice" }).click();
   await tabsBecome(page, ["Agent settings", "Voice*"]);
   await selectAgent(page, "Research");
-  const research = await paneTabs(page);
+  const researchBefore = await tabsBecome(page, []);
+  await toggle.click();
+  await page.getByRole("button", { name: "Open Browser" }).click();
+  await tabsBecome(page, ["Browser*"]);
   await selectAgent(page, "Chief");
   const chief = await tabsBecome(page, ["Agent settings", "Voice*"]);
+  await selectAgent(page, "Research");
+  const research = await tabsBecome(page, ["Browser*"]);
+  await selectAgent(page, "Chief");
+  await tabsBecome(page, ["Agent settings", "Voice*"]);
   check(
-    "agents: another agent does not show these tabs, and they come back",
-    research.length === 0 && same(chief, ["Agent settings", "Voice*"]),
-    { research, chief },
+    "agents: each agent keeps its own tabs",
+    researchBefore.length === 0 && same(chief, ["Agent settings", "Voice*"]) && same(research, ["Browser*"]),
+    { researchBefore, chief, research },
   );
 
   // The side question opens from the composer. Closing its tab deletes the question.

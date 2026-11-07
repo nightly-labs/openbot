@@ -71,6 +71,13 @@ export function isSidePanelPane(value: string): value is SidePanelPane {
   return Object.hasOwn(SIDE_PANEL_PANES, value);
 }
 
+/** The panes in `available`, in the order of `SIDE_PANEL_PANES`. */
+function inPaneOrder(available: readonly SidePanelPane[]): SidePanelPane[] {
+  return Object.keys(SIDE_PANEL_PANES)
+    .filter(isSidePanelPane)
+    .filter((pane) => available.includes(pane));
+}
+
 function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
   return SIDE_PANEL_PANES[props.pane].icon();
 }
@@ -222,7 +229,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   const { t } = useText();
   let root: HTMLDivElement | undefined;
   let tabList: HTMLDivElement | undefined;
-  const closedPanes = () => props.available.filter((pane) => !props.panes.includes(pane));
+  const closedPanes = () => inPaneOrder(props.available).filter((pane) => !props.panes.includes(pane));
   const threads = () => props.threads?.items ?? [];
   const files = () => props.files?.items ?? [];
   const hasTabs = () => props.panes.length + threads().length + files().length > 0;
@@ -658,7 +665,7 @@ export function SidePanelLauncher(props: {
   });
   return (
     <nav ref={launcher} class="side-panel-launcher" aria-label={t("conversation.sidePanel.launcher")}>
-      <For each={props.available}>
+      <For each={inPaneOrder(props.available)}>
         {(pane) => (
           <Button variant="secondary" class="side-panel-launch" onClick={() => props.onOpen(pane)}>
             <PaneIcon pane={pane} />
