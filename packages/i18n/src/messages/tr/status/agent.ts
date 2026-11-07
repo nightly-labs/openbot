@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.changesReviewing": "Yapılan değişiklikler inceleniyor…",
   "status.agent.agentCoordinating": "Başka bir ajanla koordinasyon sağlanıyor…",
   "status.agent.agentResponseReviewing": "Diğer ajanın yanıtı inceleniyor…",
+  "status.agent.commandRunning": "Bir komut çalıştırılıyor…",
   "status.agent.toolStepWorking": "Bir sonraki araç destekli adım işleniyor…",
   "status.agent.memoryChanges": "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu.",
   "status.agent.memoryChangesWithConflicts":

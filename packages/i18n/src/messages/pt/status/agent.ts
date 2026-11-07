@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.changesReviewing": "Revisando as alterações que fiz…",
   "status.agent.agentCoordinating": "Coordenando com outro agente…",
   "status.agent.agentResponseReviewing": "Revisando a resposta do outro agente…",
+  "status.agent.commandRunning": "Executando um comando…",
   "status.agent.toolStepWorking": "Processando a próxima etapa assistida por ferramentas…",
   "status.agent.memoryChanges": "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas.",
   "status.agent.memoryChangesWithConflicts":

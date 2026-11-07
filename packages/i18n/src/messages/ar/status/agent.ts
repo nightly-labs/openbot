@@ -62,6 +62,7 @@ export const messages = {
   "status.agent.changesReviewing": "جارٍ مراجعة التغييرات التي أجريتها…",
   "status.agent.agentCoordinating": "جارٍ التنسيق مع وكيل آخر…",
   "status.agent.agentResponseReviewing": "جارٍ مراجعة رد الوكيل الآخر…",
+  "status.agent.commandRunning": "جارٍ تشغيل أمر…",
   "status.agent.toolStepWorking": "جارٍ العمل على الخطوة التالية بمساعدة الأدوات…",
   "status.agent.memoryChanges": "الذاكرة: حُفظ {saved}، وحُدّث {updated}، ونُسي {forgotten}.",
   "status.agent.memoryChangesWithConflicts":

@@ -458,6 +458,15 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (/(agent|delegate|message|send)/u.test(descriptor)) {
     return completed ? sourceText("status.agent.agentResponseReviewing") : sourceText("status.agent.agentCoordinating");
   }
+  // Last, so that a command with a title such as "Run the tests" keeps the text above. A command that
+  // never returns then reads as a command, not as an unknown step (#5485). Pi names its shell tool `bash`.
+  if (
+    !completed &&
+    (toolUsage(item)?.kind === "command" ||
+      (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash"))
+  ) {
+    return sourceText("status.agent.commandRunning");
+  }
   return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.toolStepWorking");
 }
 

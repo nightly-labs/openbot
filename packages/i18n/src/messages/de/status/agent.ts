@@ -58,6 +58,7 @@ export const messages = {
   "status.agent.changesReviewing": "Die vorgenommenen Änderungen werden geprüft…",
   "status.agent.agentCoordinating": "Es wird mit einem anderen Agenten abgestimmt…",
   "status.agent.agentResponseReviewing": "Die Antwort des anderen Agenten wird geprüft…",
+  "status.agent.commandRunning": "Befehl wird ausgeführt…",
   "status.agent.toolStepWorking": "Der nächste toolgestützte Schritt wird abgearbeitet…",
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
   "status.agent.memoryChangesWithConflicts":
