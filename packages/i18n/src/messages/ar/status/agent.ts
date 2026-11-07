@@ -62,6 +62,7 @@ export const messages = {
   "status.agent.changesReviewing": "جارٍ مراجعة التغييرات التي أجريتها…",
   "status.agent.agentCoordinating": "جارٍ التنسيق مع وكيل آخر…",
   "status.agent.agentResponseReviewing": "جارٍ مراجعة رد الوكيل الآخر…",
+  "status.agent.commandRunningUnnamed": "جارٍ تشغيل أمر…",
   "status.agent.toolStepWorking": "جارٍ العمل على الخطوة التالية بمساعدة الأدوات…",
   "status.agent.webSearching": "جارٍ البحث في الويب عن «{query}»…",
   "status.agent.urlFetching": "جارٍ فتح {host}…",

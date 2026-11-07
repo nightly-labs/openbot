@@ -51,6 +51,7 @@ export const messages = {
   "status.agent.changesReviewing": "正在查看所做的更改…",
   "status.agent.agentCoordinating": "正在与另一个助手协作…",
   "status.agent.agentResponseReviewing": "正在查看另一个助手的回复…",
+  "status.agent.commandRunningUnnamed": "正在运行命令…",
   "status.agent.toolStepWorking": "正在处理下一个工具步骤…",
   "status.agent.webSearching": "正在网上搜索“{query}”…",
   "status.agent.urlFetching": "正在打开 {host}…",
