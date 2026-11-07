@@ -1,3 +1,4 @@
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { onCleanup } from "solid-js";
 
 /**
@@ -10,8 +11,7 @@ export function createWebFileSaver(): (file: { name: string; base64: string }) =
     for (const url of urls) URL.revokeObjectURL(url);
   });
   return (file) => {
-    const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    const url = URL.createObjectURL(new Blob([base64ToBytes(file.base64)], { type: "application/octet-stream" }));
     urls.add(url);
     const link = document.createElement("a");
     link.href = url;
