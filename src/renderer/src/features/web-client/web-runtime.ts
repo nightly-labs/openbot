@@ -1467,7 +1467,15 @@ export function createWebWorkspaceRuntime(
             Effect.mapError((error) => error.cause),
           ),
         );
-      await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
+      // The released route refuses a body with no profile field, so a change of only the account or
+      // the colours skips it. A change with nothing to send still goes there, which refuses it.
+      const profileChange = Object.entries(profile).some(([key, value]) => key !== "agentId" && value !== undefined);
+      const otherChange =
+        providerAccountId !== undefined ||
+        (chatColors && chatColor !== undefined) ||
+        (colors && avatarColor !== undefined);
+      if (profileChange || !otherChange)
+        await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
       if (providerAccountId === undefined) return;
       await runTeamEffect(
         setAgentProviderAccount(teamApi, { agentId: input.agentId, accountId: providerAccountId }).pipe(

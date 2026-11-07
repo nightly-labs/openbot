@@ -349,6 +349,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:server-mute
 
+      - name: Run the remote agent account update E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-agent-account-update
+
       - name: Run the desktop and phone notification E2E test
         if: ${{ !cancelled() }}
         run: bun run test:desktop-notifications
