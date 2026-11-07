@@ -92,7 +92,7 @@ function quotaGroups(answer: string): QuotaGroup[] {
       usedPercent: Math.max(0, Math.min(100, 100 - Number(bucket[2]))),
       windowDurationMins: /week/iu.test(bucketName)
         ? WEEKLY_WINDOW_MINS
-        : /\b5\s*-?\s*h/iu.test(bucketName)
+        : /\b(?:5|five)\s*-?\s*h/iu.test(bucketName)
           ? FIVE_HOUR_WINDOW_MINS
           : null,
       resetsAt: resetSeconds(bucket[3]),
