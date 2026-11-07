@@ -190,7 +190,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Wissen",
   "agentSettings.deleteHistory.confirmTitle": "Chatgeschiedenis met {name} wissen?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Alle berichten en bestanden van deze chat worden van deze computer gewist en de agent vergeet ze. Dit kun je niet ongedaan maken. Zijthreads, instructies, model, tools, herinneringen, werkruimte en browser veranderen niet.",
+    "Alle berichten en bestanden van deze chat worden uit OpenBot gewist en de agent vergeet ze. Dit kun je niet ongedaan maken. Zijthreads, instructies, model, tools, herinneringen, werkruimte en browser veranderen niet.",
   "agentSettings.deleteHistory.confirm": "Geschiedenis wissen",
   "agentSettings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
   "agentSettings.fullAccess.title": "Deze agent volledige toegang geven?",

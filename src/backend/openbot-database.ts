@@ -325,10 +325,7 @@ export class OpenBotDatabase {
   }
 
   /** Deletes every shown message of a thread, for "Delete history". No later write or replay brings one back. */
-  deleteThreadHistory(input: { agentId: string; threadId: string; activeTurnId: string | null; eventType: string }): {
-    revision: number;
-    messageIds: string[];
-  } {
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
     return this.#conversationWrites.deleteThreadHistory(input);
   }
 

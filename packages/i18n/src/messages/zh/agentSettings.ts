@@ -181,7 +181,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "删除",
   "agentSettings.deleteHistory.confirmTitle": "删除与 {name} 的对话历史记录？",
   "agentSettings.deleteHistory.confirmDescription":
-    "此对话的所有消息和文件都会从这台电脑上删除，智能体也会忘记它们。此操作无法撤销。侧边线程、指令、模型、工具、记忆、工作区和浏览器不会改变。",
+    "此对话的所有消息和文件都会从 OpenBot 中删除，智能体也会忘记它们。此操作无法撤销。侧边线程、指令、模型、工具、记忆、工作区和浏览器不会改变。",
   "agentSettings.deleteHistory.confirm": "删除历史记录",
   "agentSettings.deleteHistory.failed": "无法删除历史记录。",
 

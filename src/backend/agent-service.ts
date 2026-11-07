@@ -3686,12 +3686,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // A turn or a move to another chat can start while the mailbox step waits.
         const agent = this.#conversation.requireKnownAgent(agentId);
         if (threadId !== target.threadId || snapshot.activeTurnId || mainChatBusy(agent)) throw busy();
-        const { revision } = this.#store.database.deleteThreadHistory({
-          agentId,
-          threadId,
-          activeTurnId: null,
-          eventType: "conversation.history-deleted",
-        });
+        const revision = this.#store.database.deleteThreadHistory({ agentId, threadId });
         this.#conversation.forgetDeletedHistory(threadId);
         snapshot.messages = [];
         snapshot.revision = revision;

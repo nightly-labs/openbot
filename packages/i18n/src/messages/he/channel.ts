@@ -41,7 +41,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "מחיקה",
   "channel.settings.deleteHistory.confirmTitle": "למחוק את ההיסטוריה של {name}?",
   "channel.settings.deleteHistory.confirmDescription":
-    "כל ההודעות והקבצים של הערוץ הזה יימחקו מהמחשב הזה, והחברים ישכחו אותם. אי אפשר לבטל את הפעולה. חברים, הוראות, זיכרונות, שגרות ומשימות לא משתנים.",
+    "כל ההודעות והקבצים של הערוץ הזה יימחקו מ-OpenBot, והחברים ישכחו אותם. אי אפשר לבטל את הפעולה. חברים, הוראות, זיכרונות, שגרות ומשימות לא משתנים.",
   "channel.settings.deleteHistory.confirm": "מחיקת היסטוריה",
   "channel.settings.deleteHistory.failed": "לא ניתן למחוק את ההיסטוריה.",
   "channel.settings.routines": "שגרות",

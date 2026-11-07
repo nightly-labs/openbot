@@ -209,7 +209,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Usuń",
   "agentSettings.deleteHistory.confirmTitle": "Usunąć historię czatu z {name}?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Wszystkie wiadomości i pliki tego czatu znikną z tego komputera, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
+    "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
   "agentSettings.deleteHistory.confirm": "Usuń historię",
   "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",

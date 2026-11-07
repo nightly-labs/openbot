@@ -192,7 +192,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.deleteHistory.button": "Delete",
   "agentSettings.deleteHistory.confirmTitle": "Delete the chat history with {name}?",
   "agentSettings.deleteHistory.confirmDescription":
-    "All messages and files of this chat go from this computer, and the agent forgets them. You cannot undo this. Side threads, instructions, model, tools, memories, workspace, and browser do not change.",
+    "All messages and files of this chat go from OpenBot, and the agent forgets them. You cannot undo this. Side threads, instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.deleteHistory.confirm": "Delete history",
   "agentSettings.deleteHistory.failed": "Could not delete the history.",
 

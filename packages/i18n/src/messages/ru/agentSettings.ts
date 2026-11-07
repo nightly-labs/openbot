@@ -216,7 +216,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Удалить",
   "agentSettings.deleteHistory.confirmTitle": "Удалить историю чата с {name}?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Все сообщения и файлы этого чата будут удалены с этого компьютера, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
+    "Все сообщения и файлы этого чата будут удалены из OpenBot, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
   "agentSettings.deleteHistory.confirm": "Удалить историю",
   "agentSettings.deleteHistory.failed": "Не удалось удалить историю.",
 

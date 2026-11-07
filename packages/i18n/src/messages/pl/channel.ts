@@ -45,7 +45,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "Usuń",
   "channel.settings.deleteHistory.confirmTitle": "Usunąć historię kanału {name}?",
   "channel.settings.deleteHistory.confirmDescription":
-    "Wszystkie wiadomości i pliki tego kanału znikną z tego komputera, a członkowie o nich zapomną. Nie można tego cofnąć. Członkowie, instrukcje, wspomnienia, rutyny i zadania się nie zmienią.",
+    "Wszystkie wiadomości i pliki tego kanału znikną z OpenBot, a członkowie o nich zapomną. Nie można tego cofnąć. Członkowie, instrukcje, wspomnienia, rutyny i zadania się nie zmienią.",
   "channel.settings.deleteHistory.confirm": "Usuń historię",
   "channel.settings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "channel.settings.routines": "Rutyny",

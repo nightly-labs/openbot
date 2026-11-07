@@ -194,7 +194,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Elimina",
   "agentSettings.deleteHistory.confirmTitle": "Eliminare la cronologia della chat con {name}?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Tutti i messaggi e i file di questa chat vengono eliminati da questo computer e l'agente li dimentica. Non puoi annullare. Thread secondari, istruzioni, modello, strumenti, memorie, spazio di lavoro e browser non cambiano.",
+    "Tutti i messaggi e i file di questa chat vengono eliminati da OpenBot e l'agente li dimentica. Non puoi annullare. Thread secondari, istruzioni, modello, strumenti, memorie, spazio di lavoro e browser non cambiano.",
   "agentSettings.deleteHistory.confirm": "Elimina cronologia",
   "agentSettings.deleteHistory.failed": "Impossibile eliminare la cronologia.",
 

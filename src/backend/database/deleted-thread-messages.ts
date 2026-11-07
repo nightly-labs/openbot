@@ -113,35 +113,51 @@ function scrubDeletedMessageEvents(db: DatabaseSync, threadId: string, messageId
 }
 
 /**
- * Records the delete of every shown message of a thread, for "Delete history", and returns their
- * ids. As `recordDeletedThreadMessage` for each one, in a fixed number of statements: the read
+ * Records the delete of every shown message of a thread, for "Delete history". As
+ * `recordDeletedThreadMessage` for each one, in a fixed number of statements: the read
  * cursors and baselines of the thread go back to "nothing read", and every earlier event of the
- * thread loses all its messages. Call it before the projection rows are removed.
+ * thread loses all its messages. An activity row that a replay filled with a whole event payload
+ * loses them too. Call it before the projection rows are removed.
  */
-export function recordDeletedThreadHistory(db: DatabaseSync, threadId: string, deletedAt: string): string[] {
-  const ids = threadMessageIds(db, threadId);
+export function recordDeletedThreadHistory(db: DatabaseSync, threadId: string, deletedAt: string): void {
   db.prepare(
     `INSERT OR IGNORE INTO projection_deleted_thread_messages (thread_id, message_id, deleted_at)
      SELECT thread_id, message_id, ? FROM projection_thread_messages WHERE thread_id = ?`,
   ).run(deletedAt, threadId);
   db.prepare("UPDATE projection_thread_reads SET through_message_id = NULL WHERE thread_id = ?").run(threadId);
   db.prepare("UPDATE projection_thread_read_baselines SET through_message_id = NULL WHERE thread_id = ?").run(threadId);
-  // One event at a time: a long thread's events hold full snapshots, too large to read all at once.
-  const sequences = databaseRows(
+  scrubAllMessages(db, "orchestration_events", "aggregate_type = 'thread' AND aggregate_id = ?", threadId);
+  scrubAllMessages(db, "projection_thread_activities", "thread_id = ?", threadId);
+}
+
+/**
+ * Removes every message from the payloads of one thread's rows in `table`, one row at a time: a long
+ * thread's events hold full snapshots, too large to read all at once. Only a payload with a snapshot
+ * or a message key ("…Message" or "…Messages") can carry one.
+ */
+function scrubAllMessages(
+  db: DatabaseSync,
+  table: "orchestration_events" | "projection_thread_activities",
+  where: string,
+  threadId: string,
+): void {
+  const rowIds = databaseRows(
     db
-      .prepare("SELECT sequence FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ?")
+      .prepare(
+        `SELECT rowid FROM ${table}
+         WHERE ${where} AND (instr(payload_json, 'Message') > 0 OR instr(payload_json, '"snapshot"') > 0)`,
+      )
       .all(threadId),
-  ).map((row) => requiredNumberColumn(row, "sequence"));
-  const read = db.prepare("SELECT payload_json FROM orchestration_events WHERE sequence = ?");
-  const update = db.prepare("UPDATE orchestration_events SET payload_json = ? WHERE sequence = ?");
+  ).map((row) => requiredNumberColumn(row, "rowid"));
+  const read = db.prepare(`SELECT payload_json FROM ${table} WHERE rowid = ?`);
+  const update = db.prepare(`UPDATE ${table} SET payload_json = ? WHERE rowid = ?`);
   const isMessage = (value: unknown) => isDynamicRecord(value) && isString(value.id);
-  for (const sequence of sequences) {
-    const row = databaseRow(read.get(sequence));
+  for (const rowKey of rowIds) {
+    const row = databaseRow(read.get(rowKey));
     const payload = row ? databaseRow(JSON.parse(requiredStringColumn(row, "payload_json"))) : null;
     const scrubbed = payload ? scrubbedPayload(payload, isMessage) : null;
-    if (scrubbed) update.run(JSON.stringify(scrubbed), sequence);
+    if (scrubbed) update.run(JSON.stringify(scrubbed), rowKey);
   }
-  return ids;
 }
 
 /** The payload without the messages that `isDeleted` names, or null when the payload carries none. */

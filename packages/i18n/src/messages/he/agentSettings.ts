@@ -197,7 +197,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "מחיקה",
   "agentSettings.deleteHistory.confirmTitle": "למחוק את היסטוריית הצ'אט עם {name}?",
   "agentSettings.deleteHistory.confirmDescription":
-    "כל ההודעות והקבצים של הצ'אט הזה יימחקו מהמחשב הזה, והסוכן ישכח אותם. אי אפשר לבטל את הפעולה. שרשורים צדדיים, הוראות, מודל, כלים, זיכרונות, סביבת עבודה ודפדפן לא משתנים.",
+    "כל ההודעות והקבצים של הצ'אט הזה יימחקו מ-OpenBot, והסוכן ישכח אותם. אי אפשר לבטל את הפעולה. שרשורים צדדיים, הוראות, מודל, כלים, זיכרונות, סביבת עבודה ודפדפן לא משתנים.",
   "agentSettings.deleteHistory.confirm": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.failed": "לא ניתן למחוק את ההיסטוריה.",
 

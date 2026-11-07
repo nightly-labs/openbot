@@ -221,7 +221,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "حذف",
   "agentSettings.deleteHistory.confirmTitle": "هل تريد حذف سجل الدردشة مع {name}؟",
   "agentSettings.deleteHistory.confirmDescription":
-    "تُحذف كل رسائل هذه الدردشة وملفاتها من هذا الكمبيوتر وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+    "تُحذف كل رسائل هذه الدردشة وملفاتها من OpenBot وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.deleteHistory.confirm": "حذف السجل",
   "agentSettings.deleteHistory.failed": "تعذّر حذف السجل.",
 

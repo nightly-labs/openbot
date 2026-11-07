@@ -38,7 +38,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "Sil",
   "channel.settings.deleteHistory.confirmTitle": "{name} geçmişi silinsin mi?",
   "channel.settings.deleteHistory.confirmDescription":
-    "Bu kanalın tüm mesajları ve dosyaları bu bilgisayardan silinir ve üyeler onları unutur. Bu işlem geri alınamaz. Üyeler, talimatlar, anılar, rutinler ve görevler değişmez.",
+    "Bu kanalın tüm mesajları ve dosyaları OpenBot'tan silinir ve üyeler onları unutur. Bu işlem geri alınamaz. Üyeler, talimatlar, anılar, rutinler ve görevler değişmez.",
   "channel.settings.deleteHistory.confirm": "Geçmişi sil",
   "channel.settings.deleteHistory.failed": "Geçmiş silinemedi.",
   "channel.settings.routines": "Rutinler",

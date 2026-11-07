@@ -38,7 +38,7 @@ export const messages = defineMessages("channel", {
   "channel.settings.deleteHistory.button": "Delete",
   "channel.settings.deleteHistory.confirmTitle": "Delete the history of {name}?",
   "channel.settings.deleteHistory.confirmDescription":
-    "All messages and files of this channel go from this computer, and the members forget them. You cannot undo this. The members, instructions, memories, routines, and tasks do not change.",
+    "All messages and files of this channel go from OpenBot, and the members forget them. You cannot undo this. The members, instructions, memories, routines, and tasks do not change.",
   "channel.settings.deleteHistory.confirm": "Delete history",
   "channel.settings.deleteHistory.failed": "Could not delete the history.",
   "channel.settings.routines": "Routines",

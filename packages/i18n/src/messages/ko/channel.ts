@@ -37,7 +37,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "삭제",
   "channel.settings.deleteHistory.confirmTitle": "{name}의 기록을 삭제할까요?",
   "channel.settings.deleteHistory.confirmDescription":
-    "이 채널의 모든 메시지와 파일이 이 컴퓨터에서 삭제되고 멤버도 잊어요. 되돌릴 수 없어요. 멤버, 지침, 메모리, 루틴, 작업은 바뀌지 않아요.",
+    "이 채널의 모든 메시지와 파일이 OpenBot에서 삭제되고 멤버도 잊어요. 되돌릴 수 없어요. 멤버, 지침, 메모리, 루틴, 작업은 바뀌지 않아요.",
   "channel.settings.deleteHistory.confirm": "기록 삭제",
   "channel.settings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
   "channel.settings.routines": "루틴",

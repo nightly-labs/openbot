@@ -271,7 +271,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const agent = activeAgent();
     const server = activeServer();
     if (!agent || server?.kind !== "local") return undefined;
-    return () => turnsPort().agent.deleteHistory(agent.id, server.id);
+    return async () => {
+      await turnsPort().agent.deleteHistory(agent.id, server.id);
+      // A window around a search result keeps the messages that an empty snapshot does not name, so
+      // the chat reads its latest page again.
+      await loadLatestAgentMessages(agent.id);
+    };
   });
 
   /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */

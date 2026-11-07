@@ -189,7 +189,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Eliminar",
   "agentSettings.deleteHistory.confirmTitle": "¿Eliminar el historial del chat con {name}?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Todos los mensajes y archivos de este chat se eliminan de este equipo y el agente los olvida. No se puede deshacer. Los hilos secundarios, las instrucciones, el modelo, las herramientas, las memorias, el espacio de trabajo y el navegador no cambian.",
+    "Todos los mensajes y archivos de este chat se eliminan de OpenBot y el agente los olvida. No se puede deshacer. Los hilos secundarios, las instrucciones, el modelo, las herramientas, las memorias, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.deleteHistory.confirm": "Eliminar historial",
   "agentSettings.deleteHistory.failed": "No se pudo eliminar el historial.",
   "agentSettings.fullAccess.title": "¿Dar acceso completo a este agente?",

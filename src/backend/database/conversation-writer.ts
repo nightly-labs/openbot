@@ -636,20 +636,19 @@ export class ConversationWriter {
    * Deletes every shown message of a thread, for "Delete history": each one is recorded as deleted,
    * so no later write, import or replay brings it back, and goes with its attachments. The earlier
    * events of the thread lose their messages, and the compaction summaries of the thread go, because
-   * they hold the text of the deleted messages. Returns the stored revision and the deleted ids.
+   * they hold the text of the deleted messages. Returns the stored revision. Only a chat with no
+   * active turn can lose its history.
    */
-  deleteThreadHistory(input: { agentId: string; threadId: string; activeTurnId: string | null; eventType: string }): {
-    revision: number;
-    messageIds: string[];
-  } {
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
+    const eventType = "conversation.history-deleted";
     return this.#core.dispatch(
-      `conversation:${input.eventType}:${randomUUID()}`,
+      `conversation:${eventType}:${randomUUID()}`,
       [
         {
           aggregateType: "thread",
           aggregateId: input.threadId,
-          eventType: input.eventType,
-          payload: { detail: {}, changedMessages: [], removedMessageIds: [], activeTurnId: input.activeTurnId },
+          eventType,
+          payload: { detail: {}, changedMessages: [], removedMessageIds: [], activeTurnId: null },
         },
       ],
       (db, sequences) => {
@@ -659,7 +658,7 @@ export class ConversationWriter {
         );
         if (!threadOwner || requiredStringColumn(threadOwner, "agent_id") !== input.agentId)
           throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
-        const messageIds = recordDeletedThreadHistory(db, input.threadId, new Date().toISOString());
+        recordDeletedThreadHistory(db, input.threadId, new Date().toISOString());
         deleteThreadAttachments(db, input.threadId);
         db.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(input.threadId);
         db.prepare("DELETE FROM projection_thread_summaries WHERE thread_id = ?").run(input.threadId);
@@ -669,6 +668,10 @@ export class ConversationWriter {
         const summaryCommands = databaseRows(
           db.prepare(`SELECT DISTINCT command_id ${summaryEvents}`).all(input.threadId),
         ).map((row) => requiredStringColumn(row, "command_id"));
+        // After a replay, the activity row of a summary event holds the whole payload, summary text included.
+        db.prepare(
+          `DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence IN (SELECT sequence ${summaryEvents})`,
+        ).run(input.threadId, input.threadId);
         db.prepare(`DELETE ${summaryEvents}`).run(input.threadId);
         deleteReceiptsOf(db, summaryCommands);
         db.prepare("UPDATE projection_threads SET updated_at = ?, last_event_sequence = ? WHERE thread_id = ?").run(
@@ -676,7 +679,7 @@ export class ConversationWriter {
           sequence,
           input.threadId,
         );
-        return { revision: sequence, messageIds };
+        return sequence;
       },
     );
   }

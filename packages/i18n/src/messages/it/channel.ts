@@ -40,7 +40,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "Elimina",
   "channel.settings.deleteHistory.confirmTitle": "Eliminare la cronologia di {name}?",
   "channel.settings.deleteHistory.confirmDescription":
-    "Tutti i messaggi e i file di questo canale vengono eliminati da questo computer e i membri li dimenticano. Non puoi annullare. Membri, istruzioni, memorie, routine e attività non cambiano.",
+    "Tutti i messaggi e i file di questo canale vengono eliminati da OpenBot e i membri li dimenticano. Non puoi annullare. Membri, istruzioni, memorie, routine e attività non cambiano.",
   "channel.settings.deleteHistory.confirm": "Elimina cronologia",
   "channel.settings.deleteHistory.failed": "Impossibile eliminare la cronologia.",
   "channel.settings.routines": "Routine",

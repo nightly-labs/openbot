@@ -40,7 +40,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "Wissen",
   "channel.settings.deleteHistory.confirmTitle": "Geschiedenis van {name} wissen?",
   "channel.settings.deleteHistory.confirmDescription":
-    "Alle berichten en bestanden van dit kanaal worden van deze computer gewist en de leden vergeten ze. Dit kun je niet ongedaan maken. Leden, instructies, herinneringen, routines en taken veranderen niet.",
+    "Alle berichten en bestanden van dit kanaal worden uit OpenBot gewist en de leden vergeten ze. Dit kun je niet ongedaan maken. Leden, instructies, herinneringen, routines en taken veranderen niet.",
   "channel.settings.deleteHistory.confirm": "Geschiedenis wissen",
   "channel.settings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
   "channel.settings.routines": "Routines",

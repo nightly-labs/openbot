@@ -196,7 +196,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Supprimer",
   "agentSettings.deleteHistory.confirmTitle": "Supprimer l’historique de la discussion avec {name} ?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Tous les messages et fichiers de cette discussion sont supprimés de cet ordinateur et l’agent les oublie. Cette action est irréversible. Les fils secondaires, les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
+    "Tous les messages et fichiers de cette discussion sont supprimés d’OpenBot et l’agent les oublie. Cette action est irréversible. Les fils secondaires, les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.deleteHistory.confirm": "Supprimer l’historique",
   "agentSettings.deleteHistory.failed": "Impossible de supprimer l’historique.",
 

@@ -190,7 +190,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Löschen",
   "agentSettings.deleteHistory.confirmTitle": "Chatverlauf mit {name} löschen?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Alle Nachrichten und Dateien dieses Chats werden von diesem Computer gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
+    "Alle Nachrichten und Dateien dieses Chats werden aus OpenBot gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
   "agentSettings.deleteHistory.confirm": "Verlauf löschen",
   "agentSettings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
   "agentSettings.fullAccess.title": "Diesem Agenten vollen Zugriff geben?",

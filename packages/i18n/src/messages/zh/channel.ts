@@ -36,7 +36,7 @@ export const messages = {
   "channel.settings.deleteHistory.button": "删除",
   "channel.settings.deleteHistory.confirmTitle": "删除 {name} 的历史记录？",
   "channel.settings.deleteHistory.confirmDescription":
-    "此频道的所有消息和文件都会从这台电脑上删除，成员也会忘记它们。此操作无法撤销。成员、指令、记忆、例行任务和任务不会改变。",
+    "此频道的所有消息和文件都会从 OpenBot 中删除，成员也会忘记它们。此操作无法撤销。成员、指令、记忆、例行任务和任务不会改变。",
   "channel.settings.deleteHistory.confirm": "删除历史记录",
   "channel.settings.deleteHistory.failed": "无法删除历史记录。",
   "channel.settings.routines": "自动化任务",

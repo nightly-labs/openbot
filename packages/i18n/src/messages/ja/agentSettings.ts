@@ -190,7 +190,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "削除",
   "agentSettings.deleteHistory.confirmTitle": "{name} とのチャット履歴を削除しますか？",
   "agentSettings.deleteHistory.confirmDescription":
-    "このチャットのすべてのメッセージとファイルをこのコンピューターから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+    "このチャットのすべてのメッセージとファイルをOpenBotから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.deleteHistory.confirm": "履歴を削除",
   "agentSettings.deleteHistory.failed": "履歴を削除できませんでした。",
 

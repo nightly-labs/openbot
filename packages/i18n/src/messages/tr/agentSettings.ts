@@ -189,7 +189,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "Sil",
   "agentSettings.deleteHistory.confirmTitle": "{name} ile sohbet geçmişi silinsin mi?",
   "agentSettings.deleteHistory.confirmDescription":
-    "Bu sohbetin tüm mesajları ve dosyaları bu bilgisayardan silinir ve ajan onları unutur. Bu işlem geri alınamaz. Yan konular, talimatlar, model, araçlar, anılar, çalışma alanı ve tarayıcı değişmez.",
+    "Bu sohbetin tüm mesajları ve dosyaları OpenBot'tan silinir ve ajan onları unutur. Bu işlem geri alınamaz. Yan konular, talimatlar, model, araçlar, anılar, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.deleteHistory.confirm": "Geçmişi sil",
   "agentSettings.deleteHistory.failed": "Geçmiş silinemedi.",
   "agentSettings.fullAccess.title": "Bu ajana tam erişim verilsin mi?",

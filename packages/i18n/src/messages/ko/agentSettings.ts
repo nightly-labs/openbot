@@ -182,7 +182,7 @@ export const messages = {
   "agentSettings.deleteHistory.button": "삭제",
   "agentSettings.deleteHistory.confirmTitle": "{name}님과의 채팅 기록을 삭제할까요?",
   "agentSettings.deleteHistory.confirmDescription":
-    "이 채팅의 모든 메시지와 파일이 이 컴퓨터에서 삭제되고 에이전트도 잊어요. 되돌릴 수 없어요. 사이드 스레드, 지침, 모델, 도구, 메모리, 작업 공간, 브라우저는 바뀌지 않아요.",
+    "이 채팅의 모든 메시지와 파일이 OpenBot에서 삭제되고 에이전트도 잊어요. 되돌릴 수 없어요. 사이드 스레드, 지침, 모델, 도구, 메모리, 작업 공간, 브라우저는 바뀌지 않아요.",
   "agentSettings.deleteHistory.confirm": "기록 삭제",
   "agentSettings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
   "agentSettings.fullAccess.title": "이 에이전트에 전체 접근 권한을 줄까요?",
