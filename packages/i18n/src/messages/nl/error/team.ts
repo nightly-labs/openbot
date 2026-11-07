@@ -86,6 +86,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Deze verbinding ondersteunt het tonen van mappen niet.",
   "error.team.conversationFileSearchUnsupported": "Deze verbinding ondersteunt het zoeken in bestanden niet.",
   "error.team.sideQuestionUnsupported": "Deze verbinding ondersteunt geen zijvragen.",
+  "error.team.liveVoiceUnsupported":
+    "Deze server ondersteunt geen Codex live spraak. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.routineFlowsUnsupported":
     "Deze server ondersteunt geen routineflows. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.routineCanvasTooLarge":

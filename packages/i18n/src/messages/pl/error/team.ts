@@ -84,6 +84,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "To połączenie nie obsługuje pokazywania folderów.",
   "error.team.conversationFileSearchUnsupported": "To połączenie nie obsługuje wyszukiwania plików.",
   "error.team.sideQuestionUnsupported": "To połączenie nie obsługuje pytań pobocznych.",
+  "error.team.liveVoiceUnsupported":
+    "Ten serwer nie obsługuje głosu na żywo Codex. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.routineFlowsUnsupported":
     "Ten serwer nie obsługuje przepływów rutyn. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.routineCanvasTooLarge":

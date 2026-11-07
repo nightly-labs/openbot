@@ -175,7 +175,7 @@ import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
-import { LiveVoice, type LiveVoiceReply } from "./agent/live-voice";
+import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -302,8 +302,11 @@ interface AgentServiceEvents {
   toolUsage: [usage: ToolUsageSignal];
   /** A workflow run ended, for the local host's product analytics. Never forwarded to a client. */
   workflowRun: [end: WorkflowRunEnd];
-  /** A Codex live voice transcript or end, for the window that runs the session. */
-  liveVoice: [event: VoiceLiveEvent];
+  /**
+   * A Codex live voice transcript or end. `memberId` is null for a session of this computer, whose
+   * windows get it; a member's session goes only to that member's Team API connections.
+   */
+  liveVoice: [event: VoiceLiveEvent, memberId: string | null];
 }
 
 export interface AgentServiceOptions {
@@ -1516,8 +1519,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return agent;
       },
       relay: (agent) => this.#liveVoiceRelay(agent),
-      send: (agentId, text) =>
-        this.sendMessage({ agentId, text }).pipe(
+      send: (agentId, text, sender) =>
+        this.sendMessage({ agentId, text }, sender).pipe(
           Effect.flatMap((receipt) => {
             const deliveryId = receipt.deliveries[0]?.id;
             return deliveryId
@@ -1526,7 +1529,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
-      emit: (event) => this.emit("liveVoice", event),
+      emit: (event, memberId) => this.emit("liveVoice", event, memberId),
       redact: (text) => this.#mcp.redact(text),
     });
     this.#browser.onControlChanged((state) => {
@@ -4662,20 +4665,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  /** Starts live voice for the agent and answers the renderer's WebRTC offer. */
+  /**
+   * Starts live voice for the agent and answers the WebRTC offer. `owner` is the member who asks over
+   * the Team API, or null for this computer.
+   */
   startLiveVoice(
     input: VoiceLiveStart,
     voice: CodexLiveVoice | null,
+    owner: LiveVoiceOwner | null = null,
   ): Effect.Effect<VoiceLiveSession, AgentLifecycleFailed> {
     return this.#liveVoice
-      .start(input, voice)
+      .start(input, voice, owner)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "startLiveVoice", cause: failure.cause })),
       );
   }
 
-  stopLiveVoice(sessionId: string): Effect.Effect<void> {
-    return this.#liveVoice.stop(sessionId);
+  /** `memberId` is the owner of the session, or null for this computer. */
+  stopLiveVoice(sessionId: string, memberId: string | null = null): Effect.Effect<void> {
+    return this.#liveVoice.stop(sessionId, memberId);
   }
 
   /**

@@ -84,6 +84,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "عرض المجلدات غير مدعوم في هذا الاتصال.",
   "error.team.conversationFileSearchUnsupported": "البحث في الملفات غير مدعوم في هذا الاتصال.",
   "error.team.sideQuestionUnsupported": "الأسئلة الجانبية غير مدعومة في هذا الاتصال.",
+  "error.team.liveVoiceUnsupported": "لا يدعم هذا الخادم صوت Codex المباشر. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.routineFlowsUnsupported": "لا يدعم هذا الخادم تدفقات المهام الدورية. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.routineCanvasTooLarge":
     "لوحة هذه المهمة الدورية كبيرة جدًا لإرسالها إلى هذا الجهاز. اختصر تعليمات المهمة الدورية على الحاسوب الذي يشغّل الخادم.",

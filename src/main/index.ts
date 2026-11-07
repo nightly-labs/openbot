@@ -837,7 +837,7 @@ function registerIpcHandlers({
       claudeUserSetup,
       openLink,
     }),
-    ...voiceIpcHandlers({ voice, speech, server: voiceServer, service }),
+    ...voiceIpcHandlers({ voice, speech, server: voiceServer, service, remoteServers }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
@@ -1519,6 +1519,14 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directTyping", forwardDirectTyping);
       remoteServers.on("attachmentDownload", forwardAttachmentDownload);
       remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
+      // The host sends a member's live voice events only to that member's connections.
+      remoteServers.on("liveVoice", (_serverId, event) =>
+        forwardVoiceLiveEvent(
+          event.kind === "transcript"
+            ? { type: "transcript", sessionId: event.sessionId, role: event.role, text: event.text, final: event.final }
+            : { type: "ended", sessionId: event.sessionId, error: event.error },
+        ),
+      );
       // Machine alerts are hidden for now: the check does not start, and no alert notification shows.
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
       // the first screen waits for it. The other servers start after the load, below. The connection

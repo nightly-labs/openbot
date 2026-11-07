@@ -49,6 +49,7 @@ import {
   type QueueSnapshot,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
+  type VoiceLiveEvent,
   type WhatsAppAccount,
   type WhatsAppLinkState,
 } from "@openbot/contracts/ipc";
@@ -128,6 +129,12 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import {
+  LIVE_VOICE_CAPABILITY,
+  LIVE_VOICE_ROUTES,
+  type LiveVoiceEvent,
+  liveVoiceEvent,
+} from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY, LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
@@ -213,6 +220,7 @@ import type {
   TeamApiAgentTasks,
   TeamApiBrowser,
   TeamApiConnectors,
+  TeamApiLiveVoice,
   TeamApiMailbox,
   TeamApiRoutineRunPlaces,
 } from "../src/main/team-api/dependencies";
@@ -1129,6 +1137,35 @@ const machineMetrics = {
   checkedAt: "2026-10-27T12:00:00.000Z",
 };
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
+// Codex live voice as the agent service runs it for a member: each start records its owner and
+// answers the offer, and the test sends the transcript and the end as the service does.
+const liveVoiceListeners = new Set<(event: VoiceLiveEvent, memberId: string | null) => void>();
+let liveVoiceStarts = 0;
+/** Wakes the test that waits for the host to stop a voice by itself. */
+let liveVoiceStopped: (() => void) | null = null;
+const liveVoice: TeamApiLiveVoice = {
+  startLiveVoice: (input, voice, owner) => {
+    record("startLiveVoice", input, voice, owner?.memberId ?? null, owner?.sender?.id ?? null);
+    if (input.sdp === "offer-without-sign-in")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "startLiveVoice",
+          cause: new Error(sourceText("error.voice.live.signIn")),
+        }),
+      );
+    liveVoiceStarts += 1;
+    return Effect.succeed({ sessionId: `voice-${liveVoiceStarts}`, sdp: `answer to ${input.sdp}` });
+  },
+  stopLiveVoice: (sessionId, memberId) =>
+    Effect.sync(() => {
+      record("stopLiveVoice", sessionId, memberId);
+      liveVoiceStopped?.();
+    }),
+  subscribe: (listener) => {
+    liveVoiceListeners.add(listener);
+    return () => liveVoiceListeners.delete(listener);
+  },
+};
 // The real memory review store on a temporary file, as the host keeps it.
 const memoryReviewFile = join(root, "memory-review.json");
 const ROTATED_HOST_KEY = "-----BEGIN PUBLIC KEY-----\nrotated-e2e\n-----END PUBLIC KEY-----\n";
@@ -1480,6 +1517,7 @@ try {
     vault,
     browserProfiles,
     machine,
+    liveVoice,
     // Only the disk of the host answers here; the storage-v1 routes are not part of this run.
     storage: {
       usage: unused("storage.usage"),
@@ -6523,6 +6561,203 @@ try {
       "side questions do not reach the chat, the queue or a turn",
       calls.slice(callsBefore).every((entry) => entry.method === "askSideQuestion"),
       calls.slice(callsBefore).map((entry) => entry.method),
+    );
+  }
+
+  // ---- Codex live voice for a member (live-voice-v1) ----
+  {
+    const capabilities = [LIVE_VOICE_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const starts = () => callsOf("startLiveVoice").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises live-voice-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(LIVE_VOICE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LIVE_VOICE_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const start = { agentId: "agent-ada", sdp: "offer-1", voice: "maple" };
+    const unsupported = await call("POST", LIVE_VOICE_ROUTES.start, { token: bobToken, json: start });
+    check(
+      "a start without live-voice-v1 gets 400 liveVoiceUnsupported and starts no voice",
+      errorIs(unsupported, 400, sourceText("error.team.liveVoiceUnsupported")) && starts() === 0,
+      summary(unsupported),
+    );
+    const unknownVoice = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { ...start, voice: "alloy" },
+    });
+    // Protocol 6 does not know Pi, so `agent-pi` is hidden from this client.
+    const hiddenAgent = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { ...start, agentId: "agent-pi" },
+    });
+    const missingAgent = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { ...start, agentId: "agent-gone" },
+    });
+    accessLevels = { revision: 12, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", LIVE_VOICE_ROUTES.start, { token: bobToken, ...v9, json: start });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    const noEvents = await call("POST", LIVE_VOICE_ROUTES.start, { token: bobToken, ...v9, json: start });
+    check(
+      "a voice outside the contract, a hidden or missing agent, a member who can only view, or a session with no event connection starts no voice",
+      unknownVoice.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        errorIs(noEvents, 409, sourceText("error.voice.live.disconnected")) &&
+        starts() === 0,
+      [summary(unknownVoice), summary(hiddenAgent), summary(missingAgent), summary(viewer), summary(noEvents)],
+    );
+
+    // Each socket also declares chat-colors-v1: the host answers that declaration with the colour list,
+    // so the list shows that the host has read the capabilities of the socket.
+    const openVoiceSocket = async (token: string) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: LiveVoiceEvent[] = [];
+      const waiters = new Set<() => void>();
+      let declared = false;
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") declared = true;
+        const event = liveVoiceEvent(value);
+        if (event) events.push(event);
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, LIVE_VOICE_CAPABILITY],
+        }),
+      );
+      const ready = await until(() => declared);
+      return { socket, events, ready, until };
+    };
+    const bobSocket = await openVoiceSocket(bobToken);
+    const adaSocket = await openVoiceSocket(adaToken);
+    const started = await call("POST", LIVE_VOICE_ROUTES.start, { token: bobToken, ...v9, json: start });
+    check(
+      "a member who can chat starts live voice and gets the answer, with the member as owner and sender",
+      bobSocket.ready &&
+        adaSocket.ready &&
+        started.status === 200 &&
+        isDeepStrictEqual(started.body, { sessionId: "voice-1", sdp: "answer to offer-1" }) &&
+        isDeepStrictEqual(callsOf("startLiveVoice"), [
+          [{ agentId: "agent-ada", sdp: "offer-1" }, "maple", bobId, bobId],
+        ]),
+      [summary(started), callsOf("startLiveVoice")],
+    );
+    const emitVoice = (event: VoiceLiveEvent, memberId: string | null) => {
+      for (const listener of liveVoiceListeners) listener(event, memberId);
+    };
+    emitVoice({ type: "transcript", sessionId: "voice-1", role: "user", text: "Hello Ada", final: true }, bobId);
+    emitVoice({ type: "transcript", sessionId: "voice-local", role: "user", text: "Mine", final: true }, null);
+    emitVoice({ type: "ended", sessionId: "voice-1", error: null }, bobId);
+    const bobHeard = await bobSocket.until(() => bobSocket.events.some((event) => event.kind === "ended"));
+    // Ada's socket gets a later event of her own, so an earlier event of bob would be there by then.
+    emitVoice({ type: "ended", sessionId: "voice-ada", error: null }, adaId);
+    const adaHeard = await adaSocket.until(() => adaSocket.events.length > 0);
+    check(
+      "the transcript and the end go only to the member who started the voice, and a session of the host computer goes to no member",
+      bobHeard &&
+        isDeepStrictEqual(bobSocket.events, [
+          {
+            type: "live-voice",
+            kind: "transcript",
+            sessionId: "voice-1",
+            role: "user",
+            text: "Hello Ada",
+            final: true,
+          },
+          { type: "live-voice", kind: "ended", sessionId: "voice-1", error: null },
+        ]) &&
+        adaHeard &&
+        isDeepStrictEqual(adaSocket.events, [
+          { type: "live-voice", kind: "ended", sessionId: "voice-ada", error: null },
+        ]),
+      [bobSocket.events, adaSocket.events],
+    );
+    const stopped = await call("POST", LIVE_VOICE_ROUTES.stop, {
+      token: bobToken,
+      ...v9,
+      json: { sessionId: "voice-1" },
+    });
+    check(
+      "a member stops a voice as its owner only",
+      stopped.status === 200 &&
+        isDeepStrictEqual(stopped.body, {}) &&
+        isDeepStrictEqual(callsOf("stopLiveVoice"), [["voice-1", bobId]]),
+      [summary(stopped), callsOf("stopLiveVoice")],
+    );
+    const noSignIn = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-without-sign-in" },
+    });
+    check(
+      "a host without a Codex sign-in answers 409 with the sentence for the member, and no voice means OpenAI chooses",
+      errorIs(noSignIn, 409, sourceText("error.voice.live.signIn")) &&
+        isDeepStrictEqual(callsOf("startLiveVoice").at(-1), [
+          { agentId: "agent-ada", sdp: "offer-without-sign-in" },
+          null,
+          bobId,
+          bobId,
+        ]),
+      [summary(noSignIn), callsOf("startLiveVoice").at(-1)],
+    );
+    // A voice that runs when the member's last event connection closes stops with it.
+    const second = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-2" },
+    });
+    const closedStop = new Promise<boolean>((resolveStop) => {
+      const timer = setTimeout(() => resolveStop(false), 5_000);
+      liveVoiceStopped = () => {
+        clearTimeout(timer);
+        resolveStop(true);
+      };
+    });
+    bobSocket.socket.close();
+    const stoppedOnClose = await closedStop;
+    liveVoiceStopped = null;
+    adaSocket.socket.close();
+    check(
+      "the host stops a member's voice when the last event connection of its logical session closes",
+      second.status === 200 &&
+        field(second.body, "sessionId") === "voice-2" &&
+        stoppedOnClose &&
+        isDeepStrictEqual(callsOf("stopLiveVoice").at(-1), ["voice-2", bobId]),
+      [summary(second), callsOf("stopLiveVoice")],
     );
   }
 

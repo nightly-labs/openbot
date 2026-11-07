@@ -92,6 +92,8 @@ export const messages = {
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
   "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
+  "error.team.liveVoiceUnsupported":
+    "Questo server non supporta la voce dal vivo di Codex. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineFlowsUnsupported":
     "Questo server non supporta i flussi di routine. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineCanvasTooLarge":
