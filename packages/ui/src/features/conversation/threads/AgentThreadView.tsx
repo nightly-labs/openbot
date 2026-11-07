@@ -565,8 +565,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const sendLabel = () =>
     t(recording() ? "composer.send.voice" : editingQueued() ? "composer.send.saveQueued" : "composer.send.message");
   /*
-   * The rows that the queue panel shows. The last row leaves with its animation before the panel
-   * closes, as in the agent's own chat. Another thread does not get the rows of the one before.
+   * The rows that the queue panel shows. When the last message goes, the slot closes at once and keeps
+   * these rows, so the whole panel goes down behind the input in one move, as in the agent's own chat.
+   * Another thread does not get the rows of the one before.
    */
   const [queueRows, setQueueRows] = createSignal<{ taskId: string | undefined; deliveries: QueueDelivery[] }>({
     taskId: undefined,
@@ -576,10 +577,10 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   createEffect(
     () => ({ taskId: props.task?.id, deliveries: props.queue?.deliveries ?? [] }),
     (next) => {
-      if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
-      queueExitTimer = undefined;
       const shown = untrack(queueRows);
       if (next.deliveries.length > 0 || next.taskId !== shown.taskId) {
+        if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
+        queueExitTimer = undefined;
         // Each change of the thread sends its queue again. A row that did not change keeps its object,
         // so the panel does not draw it again and the pointer and the focus stay on it.
         const previous = new Map(shown.deliveries.map((delivery) => [delivery.id, delivery]));
@@ -590,7 +591,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         setQueueRows({ taskId: next.taskId, deliveries });
         return;
       }
-      if (shown.deliveries.length === 0) return;
+      // Each change of the thread sends the empty queue again. The panel closes at the end of its
+      // first exit, not after the thread is quiet.
+      if (shown.deliveries.length === 0 || queueExitTimer !== undefined) return;
       queueExitTimer = window.setTimeout(() => {
         queueExitTimer = undefined;
         setQueueRows(next);
@@ -601,6 +604,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
   });
   const queuePanelOwner = () => (queueRows().deliveries.length > 0 ? queueRows().taskId : undefined);
+  const queueOpen = () => (props.queue?.deliveries.length ?? 0) > 0 && queueRows().taskId === props.task?.id;
   const hasRow = () =>
     Boolean(props.onRemoveAttachment) &&
     ((props.rowAttachments?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0);
@@ -790,9 +794,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             <div class="composer-stack">
               <div
                 class="agent-queue-slot"
-                data-open={queuePanelOwner() ? "true" : "false"}
-                aria-hidden={queuePanelOwner() ? undefined : "true"}
-                inert={queuePanelOwner() ? undefined : true}
+                data-open={queueOpen() ? "true" : "false"}
+                aria-hidden={queueOpen() ? undefined : "true"}
+                inert={queueOpen() ? undefined : true}
               >
                 <div class="agent-queue-slot-inner">
                   {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
