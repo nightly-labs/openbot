@@ -50,6 +50,8 @@ export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFaile
 export interface DynamicIslandWindowControllerOptions {
   platform: NodeJS.Platform;
   preferencePath: string;
+  /** The preference before the user saves one. Development builds start with the island off. */
+  defaultPreference?: DynamicIslandPreference;
   createWindow: (bounds: Rectangle, display: Display) => BrowserWindow;
   loadWindow: (window: BrowserWindow, display: Display) => Promise<void>;
   getDisplays: () => Display[];
@@ -63,7 +65,7 @@ export interface DynamicIslandWindowControllerOptions {
 
 export class DynamicIslandWindowController {
   readonly #options: DynamicIslandWindowControllerOptions;
-  #preference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
+  #preference: DynamicIslandPreference;
   #presentation = IDLE_DYNAMIC_ISLAND_PRESENTATION;
   readonly #windows = new Map<number, BrowserWindow>();
   readonly #interactiveDisplays = new Set<number>();
@@ -77,12 +79,16 @@ export class DynamicIslandWindowController {
 
   constructor(options: DynamicIslandWindowControllerOptions) {
     this.#options = options;
+    this.#preference = { ...(options.defaultPreference ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE) };
   }
 
   // Reads only the saved preference. The caller starts `reconcileWindow`, so the island page loads do
   // not hold back the main window.
   readonly initialize = Effect.fn("DynamicIsland.initialize")(function* (this: DynamicIslandWindowController) {
-    this.#preference = yield* readDynamicIslandPreference(this.#options.preferencePath);
+    this.#preference = yield* readDynamicIslandPreference(
+      this.#options.preferencePath,
+      this.#options.defaultPreference,
+    );
   }).bind(this);
 
   get preference(): DynamicIslandPreference {
