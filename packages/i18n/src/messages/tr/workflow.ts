@@ -164,7 +164,7 @@ export const messages = {
 
   "workflow.output.title": "Çıktı",
   "workflow.output.name": "çıktı",
-  "workflow.output.target.messagingChannel": "Slack, Discord veya Telegram kanalı",
+  "workflow.output.target.messagingChannel": "Mesajlaşma yeri",
   "workflow.output.target.chatChannel": "OpenBot kanalı",
   "workflow.output.target.file": "Dosya",
   "workflow.output.target.notify": "Bildirim",

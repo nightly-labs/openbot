@@ -169,7 +169,7 @@ export const messages = {
 
   "workflow.output.title": "Вывод",
   "workflow.output.name": "вывод",
-  "workflow.output.target.messagingChannel": "Канал Slack, Discord или Telegram",
+  "workflow.output.target.messagingChannel": "Место в мессенджере",
   "workflow.output.target.chatChannel": "Канал OpenBot",
   "workflow.output.target.file": "Файл",
   "workflow.output.target.notify": "Уведомление",

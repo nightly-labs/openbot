@@ -4,4 +4,4 @@
 
 ### Changed
 
-- In "Send to" of a workflow output, "Channel" is now "Slack, Discord or Telegram channel", so it is not mixed up with an OpenBot channel.
+- In "Send to" of a workflow output, "Channel" is now "Messaging place", so it is not mixed up with an OpenBot channel.

@@ -153,7 +153,7 @@ export const messages = {
   "workflow.condition.taken": "נבחר",
   "workflow.output.title": "פלט",
   "workflow.output.name": "פלט",
-  "workflow.output.target.messagingChannel": "ערוץ Slack, Discord או Telegram",
+  "workflow.output.target.messagingChannel": "יעד הודעות",
   "workflow.output.target.chatChannel": "ערוץ OpenBot",
   "workflow.output.target.file": "קובץ",
   "workflow.output.target.notify": "התראה",
