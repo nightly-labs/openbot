@@ -2,8 +2,9 @@
 // OpenAI-compatible server, to check the Code Mode catalog that each request carries. OpenBot denies
 // OpenCode's `session_*` and `worktree_*` tools: OpenBot names its own chats, and `session_move` would
 // move the session out of the agent's workspace. `worktree_remove` stays, because OpenCode checks it
-// with the `edit` permission. The user's own config denies `opencode_models`, so the catalog also
-// shows that OpenCode keeps the user's rules beside OpenBot's.
+// with the `edit` permission. OpenBot's MCP servers serve no resources, so `opencode-agent-defaults.ts`
+// also denies the two MCP resource tools. The user's own config denies `opencode_models`, so the
+// catalog also shows that OpenCode keeps the user's rules beside OpenBot's.
 // `OPENCODE_CLI=<opencode> bun scripts/opencode-tool-trim-e2e.ts`.
 // Writes .openbot-build/opencode-tool-trim-e2e/report.json.
 import assert from "node:assert/strict";
@@ -26,8 +27,15 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-tool-trim-e
 const NL = String.fromCharCode(10);
 const ENDPOINT = "spark";
 const MODEL = "agent-model";
-const DENIED = ["session_move", "session_rename", "worktree_create", "worktree_list"];
-const KEPT = ["list_mcp_resources", "read_mcp_resource", "worktree_remove"];
+const DENIED = [
+  "session_move",
+  "session_rename",
+  "worktree_create",
+  "worktree_list",
+  "list_mcp_resources",
+  "read_mcp_resource",
+];
+const KEPT = ["worktree_remove"];
 /** Denied by the user's own config. */
 const USER_DENIED = "models";
 

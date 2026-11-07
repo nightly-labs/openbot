@@ -407,6 +407,24 @@ streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
+OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
+agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
+`question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
+`opencode_read_mcp_resource` tools (OpenBot's MCP servers serve no resources), and the `report` and
+`opencode` skills. These rules go in an `OPENCODE_CONFIG` file in the provider state folder, not in
+`OPENCODE_CONFIG_CONTENT`, so a rule in the project's `opencode.json` comes after them and wins. The
+global config comes before that file, so the driver leaves out each rule that a global name or pattern
+matches. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
+When the user sets `OPENCODE_CONFIG`, or a global config file cannot be decoded, OpenBot adds no rule.
+The `models` tool, the `explore` agent and all OpenBot tools stay; with two tools gone, the Code Mode
+catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the others. On OpenCode 2.2.6
+a one-reply request goes from 5,987 to 5,288 o200k tokens (−11.7%), and a read-then-reply task from
+12,130 to 10,732. `bun run bench:opencode-prompt-settings` runs the real driver and CLI against a fake
+model on loopback in temporary XDG folders and reports the tokens, tools, skills and catalog of each
+variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. `bun run smoke:opencode-agent`
+runs one agent turn with the core tools, a subagent and an OpenBot tool through `execute`, then checks
+that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
 `native-runtime.lock.json` names. Every OpenCode install on the computer shares
