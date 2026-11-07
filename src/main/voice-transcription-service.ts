@@ -10,6 +10,7 @@ import {
   LOCAL_VOICE_MODEL_IDS,
   type LocalVoiceModelId,
   modelLanguage,
+  SPEECH_KEY_PROVIDER_NAMES,
   VOICE_AUDIO_LIMITS,
   VOICE_MODEL_IDS,
   VOICE_MODELS,
@@ -24,7 +25,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Scope } from "effect";
-import type { VoiceApiKeyStore } from "./voice-api-key-store";
+import { savedKeyError, type VoiceApiKeyStore } from "./voice-api-key-store";
 import {
   type OpenVoiceStreamSocket,
   ScribeRealtimeSession,
@@ -292,7 +293,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   ) {
     yield* this.#apiKeys
       .set(key)
-      .pipe(Effect.mapError(({ cause }) => new VoiceOperationError({ cause: savedKeyError(cause) })));
+      .pipe(Effect.mapError(({ cause }) => new VoiceOperationError({ cause: savedKeyError(cause, "elevenlabs") })));
     // A stream holds the key it opened with; a removed key ends it.
     if (key === null) this.#endStream();
     const status = this.#cloudStatus();
@@ -309,7 +310,11 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     const { modelId, language } = this.#preferences.get();
     const apiKey = this.#apiKeys.get();
     if (modelId !== ELEVENLABS_VOICE_MODEL_ID || !apiKey)
-      return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.cloud.keyRequired")) });
+      return yield* new VoiceOperationError({
+        cause: new Error(
+          sourceText("error.voice.cloud.keyRequired", { provider: SPEECH_KEY_PROVIDER_NAMES.elevenlabs }),
+        ),
+      });
     const id = randomUUID();
     const session = new ScribeRealtimeSession({
       url: scribeRealtimeUrl(language),
@@ -380,7 +385,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
           modelId: ELEVENLABS_VOICE_MODEL_ID,
           phase: "missing",
           progress: null,
-          message: sourceText("error.voice.cloud.keyRequired"),
+          message: sourceText("error.voice.cloud.keyRequired", { provider: SPEECH_KEY_PROVIDER_NAMES.elevenlabs }),
         };
   }
 
@@ -528,15 +533,6 @@ function streamError(cause: unknown): VoiceOperationError {
 }
 
 /** The cipher's message for a computer with no secret storage; any other failure is generic. */
-function savedKeyError(cause: unknown): Error {
-  const unavailable = sourceText("error.app.secretStorageUnavailable");
-  return new Error(
-    cause instanceof Error && cause.message === unavailable
-      ? unavailable
-      : sourceText("error.voice.cloud.keySaveFailed"),
-  );
-}
-
 function errorCategory(
   error: unknown,
 ): "unknown" | "timeout" | "runtime-unavailable" | "model-load-failed" | "inference-failed" | "host-exited" {

@@ -840,6 +840,15 @@ html.ui-textarea-resizing {
   padding: var(--openbot-space-1);
 }
 
+.ui-select-section {
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+  list-style: none;
+}
+
 .ui-select-item {
   position: relative;
   display: flex;

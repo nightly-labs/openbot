@@ -587,13 +587,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Daha yavaş. 14 dil; konuşulan dili siz belirlersiniz. Yaklaşık 4 GB bellek kullanır.",
   "settings.voice.model.size": "İndirme boyutu: {size}",
-  "settings.voice.model.downloading": "İndiriliyor · {received} / {total}",
   "settings.voice.model.failed": "İndirme durdu. Bağlantıyı kontrol edip tekrar deneyin.",
   "settings.voice.model.progressLabel": "{name} indiriliyor",
   "settings.voice.model.use": "Kullan",
-  "settings.voice.model.inUse": "Kullanımda",
   "settings.voice.model.downloadLabel": "İndir: {name}",
-  "settings.voice.model.cancelLabel": "{name} indirmesini durdur",
   "settings.voice.model.retryLabel": "Tekrar indir: {name}",
   "settings.voice.model.useLabel": "Dikte için kullan: {name}",
   "settings.voice.model.removeLabel": "{name} modelini bu bilgisayardan kaldır",
@@ -615,9 +612,6 @@ export const messages = {
   "settings.voice.removeFailed": "Model kaldırılamadı. Tekrar deneyin.",
   "settings.voice.model.elevenlabs.description":
     "Sesinizi ElevenLabs'e gönderir. Metin siz konuşurken görünür ve değişmez. Kendi API anahtarınızı kullanır ve ElevenLabs her kullanımı ücretlendirir.",
-  "settings.voice.model.keySaved": "API anahtarı kaydedildi",
-  "settings.voice.model.keyMissing": "ElevenLabs API anahtarı gerekir",
-  "settings.voice.apiKey.label": "ElevenLabs API anahtarı",
   "settings.voice.apiKey.placeholder": "Anahtarı yapıştırın",
   "settings.voice.apiKey.save": "Anahtarı kaydet",
   "settings.voice.apiKey.remove": "Anahtarı kaldır",

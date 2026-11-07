@@ -614,13 +614,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Wolniejszy. 14 języków. Język mowy ustawiasz sam. Używa około 4 GB pamięci.",
   "settings.voice.model.size": "Rozmiar pobierania: {size}",
-  "settings.voice.model.downloading": "Pobieranie · {received} z {total}",
   "settings.voice.model.failed": "Pobieranie zostało przerwane. Sprawdź połączenie i spróbuj ponownie.",
   "settings.voice.model.progressLabel": "Pobieranie: {name}",
   "settings.voice.model.use": "Użyj",
-  "settings.voice.model.inUse": "W użyciu",
   "settings.voice.model.downloadLabel": "Pobierz {name}",
-  "settings.voice.model.cancelLabel": "Zatrzymaj pobieranie modelu {name}",
   "settings.voice.model.retryLabel": "Pobierz ponownie {name}",
   "settings.voice.model.useLabel": "Użyj modelu {name} do dyktowania",
   "settings.voice.model.removeLabel": "Usuń model {name} z tego komputera",
@@ -642,9 +639,6 @@ export const messages = {
   "settings.voice.removeFailed": "Nie udało się usunąć modelu. Spróbuj ponownie.",
   "settings.voice.model.elevenlabs.description":
     "Przesyła twój głos do ElevenLabs. Tekst pojawia się w trakcie mówienia i się nie zmienia. Używa twojego klucza API, a ElevenLabs nalicza opłatę za każde użycie.",
-  "settings.voice.model.keySaved": "Klucz API zapisany",
-  "settings.voice.model.keyMissing": "Wymaga klucza API ElevenLabs",
-  "settings.voice.apiKey.label": "Klucz API ElevenLabs",
   "settings.voice.apiKey.placeholder": "Wklej klucz",
   "settings.voice.apiKey.save": "Zapisz klucz",
   "settings.voice.apiKey.remove": "Usuń klucz",

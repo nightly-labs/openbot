@@ -595,13 +595,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Más lento. 14 idiomas. Tú fijas el idioma hablado. Usa unos 4 GB de memoria.",
   "settings.voice.model.size": "Tamaño de la descarga: {size}",
-  "settings.voice.model.downloading": "Descargando · {received} de {total}",
   "settings.voice.model.failed": "La descarga se detuvo. Comprueba la conexión e inténtalo de nuevo.",
   "settings.voice.model.progressLabel": "Descargando {name}",
   "settings.voice.model.use": "Usar",
-  "settings.voice.model.inUse": "En uso",
   "settings.voice.model.downloadLabel": "Descargar {name}",
-  "settings.voice.model.cancelLabel": "Detener la descarga de {name}",
   "settings.voice.model.retryLabel": "Volver a descargar {name}",
   "settings.voice.model.useLabel": "Usar {name} para el dictado",
   "settings.voice.model.removeLabel": "Quitar {name} de este equipo",
@@ -623,9 +620,6 @@ export const messages = {
   "settings.voice.removeFailed": "No se pudo quitar el modelo. Inténtalo de nuevo.",
   "settings.voice.model.elevenlabs.description":
     "Envía tu voz a ElevenLabs. El texto aparece mientras hablas y no cambia. Usa tu propia clave de API, y ElevenLabs cobra cada uso.",
-  "settings.voice.model.keySaved": "Clave de API guardada",
-  "settings.voice.model.keyMissing": "Necesita una clave de API de ElevenLabs",
-  "settings.voice.apiKey.label": "Clave de API de ElevenLabs",
   "settings.voice.apiKey.placeholder": "Pega la clave",
   "settings.voice.apiKey.save": "Guardar clave",
   "settings.voice.apiKey.remove": "Quitar clave",

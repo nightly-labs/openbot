@@ -602,13 +602,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Langsamer. 14 Sprachen. Du legst die gesprochene Sprache fest. Braucht etwa 4 GB Arbeitsspeicher.",
   "settings.voice.model.size": "Downloadgröße: {size}",
-  "settings.voice.model.downloading": "Wird geladen · {received} von {total}",
   "settings.voice.model.failed": "Der Download wurde unterbrochen. Prüfe die Verbindung und versuche es erneut.",
   "settings.voice.model.progressLabel": "{name} wird geladen",
   "settings.voice.model.use": "Verwenden",
-  "settings.voice.model.inUse": "Aktiv",
   "settings.voice.model.downloadLabel": "{name} herunterladen",
-  "settings.voice.model.cancelLabel": "Download von {name} stoppen",
   "settings.voice.model.retryLabel": "{name} erneut herunterladen",
   "settings.voice.model.useLabel": "{name} für das Diktat verwenden",
   "settings.voice.model.removeLabel": "{name} von diesem Computer entfernen",
@@ -630,9 +627,6 @@ export const messages = {
   "settings.voice.removeFailed": "Das Modell konnte nicht entfernt werden. Versuche es erneut.",
   "settings.voice.model.elevenlabs.description":
     "Überträgt deine Stimme an ElevenLabs. Der Text erscheint beim Sprechen und bleibt stabil. Nutzt deinen eigenen API-Schlüssel, und ElevenLabs berechnet jede Nutzung.",
-  "settings.voice.model.keySaved": "API-Schlüssel gespeichert",
-  "settings.voice.model.keyMissing": "ElevenLabs-API-Schlüssel fehlt",
-  "settings.voice.apiKey.label": "ElevenLabs-API-Schlüssel",
   "settings.voice.apiKey.placeholder": "Schlüssel einfügen",
   "settings.voice.apiKey.save": "Schlüssel speichern",
   "settings.voice.apiKey.remove": "Schlüssel entfernen",

@@ -1,9 +1,11 @@
 import {
+  cloudSpeechModel,
   DEFAULT_SPEECH_SETTINGS,
   DEFAULT_VOICE_SETTINGS,
   ELEVENLABS_VOICE_MODEL_ID,
   type OpenBotDesktopApi,
   SPEECH_MODEL_ID,
+  type SpeechKeyProvider,
   type SpeechModelStatus,
   type SpeechSettings,
   VOICE_MODEL_IDS,
@@ -24,6 +26,8 @@ export interface MockVoiceOptions {
   voiceSettings?: VoiceSettings;
   /** True when the speech model is downloaded. */
   speechModelReady?: boolean;
+  /** True when the xAI key for replies is saved. The ElevenLabs key is the dictation key. */
+  xaiKeySaved?: boolean;
   speechSettings?: SpeechSettings;
   /** The user's own voice server. None when not given. */
   voiceServer?: VoiceServerSettings | null;
@@ -74,7 +78,8 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const transcriptListeners = new Set<Listener<VoiceStreamTranscript>>();
   const transfers = new Map<VoiceModelId, { settle: (status: VoiceModelStatus) => void }>();
   let speechSettings: SpeechSettings = clone(options.speechSettings ?? DEFAULT_SPEECH_SETTINGS);
-  let speechStatus: SpeechModelStatus = options.speechModelReady
+  // The status of Supertonic. The status of a cloud model follows its provider's key.
+  let supertonicStatus: SpeechModelStatus = options.speechModelReady
     ? { modelId: SPEECH_MODEL_ID, phase: "ready", progress: 100, message: null }
     : { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
   const speechListeners = new Set<Listener<SpeechModelStatus>>();
@@ -83,13 +88,29 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const serverListeners = new Set<Listener<VoiceServerSettings | null>>();
   const liveListeners = new Set<Listener<VoiceLiveEvent>>();
   const liveAnswerers = new Map<string, RTCPeerConnection>();
+  let xaiKeySaved = options.xaiKeySaved ?? false;
+  const keySaved = (provider: SpeechKeyProvider) =>
+    provider === "xai" ? xaiKeySaved : ready.has(ELEVENLABS_VOICE_MODEL_ID);
+  const speechStatus = (): SpeechModelStatus => {
+    const { modelId } = speechSettings;
+    const cloud = cloudSpeechModel(modelId);
+    if (!cloud) return clone(supertonicStatus);
+    return keySaved(cloud.provider)
+      ? { modelId, phase: "ready", progress: 100, message: null }
+      : { modelId, phase: "missing", progress: null, message: null };
+  };
+  const announceSpeech = () => {
+    emit(speechListeners, speechStatus());
+    return speechStatus();
+  };
   const setSpeechStatus = (next: SpeechModelStatus) => {
-    speechStatus = next;
-    emit(speechListeners, clone(next));
+    supertonicStatus = next;
+    if (speechSettings.modelId === SPEECH_MODEL_ID) emit(speechListeners, clone(next));
   };
   const downloadSpeech = () =>
     new Promise<SpeechModelStatus>((resolve) => {
-      if (speechStatus.phase === "ready") return resolve(clone(speechStatus));
+      if (speechSettings.modelId !== SPEECH_MODEL_ID || supertonicStatus.phase === "ready")
+        return resolve(speechStatus());
       const transfer = { settle: resolve };
       speechTransfer = transfer;
       const advance = (progress: number) => {
@@ -97,7 +118,7 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
         if (progress >= 100) {
           speechTransfer = null;
           setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "ready", progress: 100, message: null });
-          return resolve(clone(speechStatus));
+          return resolve(speechStatus());
         }
         setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "downloading", progress, message: null });
         schedule(() => advance(progress + 10), 200);
@@ -132,6 +153,17 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       schedule(() => advance(5), 200);
     });
 
+  const setElevenLabsKey = (key: string | null) => {
+    if (key === null) ready.delete(ELEVENLABS_VOICE_MODEL_ID);
+    else ready.add(ELEVENLABS_VOICE_MODEL_ID);
+    setStatus({
+      modelId: ELEVENLABS_VOICE_MODEL_ID,
+      phase: key === null ? "missing" : "ready",
+      progress: key === null ? null : 100,
+      message: null,
+    });
+  };
+
   const voice: OpenBotDesktopApi["voice"] = {
     getModelStatus: async () => status(settings.modelId),
     getModelStatuses: async () => VOICE_MODEL_IDS.map(status),
@@ -159,12 +191,8 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     },
     transcribe: async () => ({ text: "Mock voice transcript" }),
     setApiKey: async ({ key }) => {
-      setStatus({
-        modelId: ELEVENLABS_VOICE_MODEL_ID,
-        phase: key === null ? "missing" : "ready",
-        progress: key === null ? null : 100,
-        message: null,
-      });
+      setElevenLabsKey(key);
+      announceSpeech();
       return status(ELEVENLABS_VOICE_MODEL_ID);
     },
     startStream: async () => ({ streamId: crypto.randomUUID() }),
@@ -181,24 +209,38 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     },
     getSpeechSettings: async () => clone(speechSettings),
     setSpeechSettings: async (next) => {
+      const changed = next.modelId !== speechSettings.modelId;
+      if (changed && speechTransfer) {
+        // As in main, a Supertonic download stops when the user chooses another model.
+        const transfer = speechTransfer;
+        speechTransfer = null;
+        supertonicStatus = { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
+        transfer.settle(clone(supertonicStatus));
+      }
       speechSettings = clone(next);
+      if (changed) announceSpeech();
       return clone(speechSettings);
     },
-    getSpeechModelStatus: async () => clone(speechStatus),
+    getSpeechModelStatus: async () => speechStatus(),
+    setSpeechApiKey: async ({ provider, key }) => {
+      if (provider === "xai") xaiKeySaved = key !== null;
+      else setElevenLabsKey(key);
+      return announceSpeech();
+    },
     downloadSpeechModel: downloadSpeech,
     cancelSpeechModelDownload: async () => {
       const transfer = speechTransfer;
-      if (!transfer) return clone(speechStatus);
+      if (!transfer) return speechStatus();
       speechTransfer = null;
       setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
-      transfer.settle(clone(speechStatus));
-      return clone(speechStatus);
+      transfer.settle(speechStatus());
+      return speechStatus();
     },
     removeSpeechModel: async () => {
       speechTransfer?.settle({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
       speechTransfer = null;
       setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
-      return clone(speechStatus);
+      return speechStatus();
     },
     // Silence of about the length the text would take to read.
     speak: async ({ text }) => ({

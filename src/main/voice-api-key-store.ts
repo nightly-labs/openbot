@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { SPEECH_KEY_PROVIDER_NAMES, type SpeechKeyProvider } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -79,4 +80,14 @@ export class VoiceApiKeyStore {
       ),
     );
   });
+}
+
+/** The error that the user sees when a provider's key is not saved. A locked keychain keeps its own text. */
+export function savedKeyError(cause: unknown, provider: SpeechKeyProvider): Error {
+  const unavailable = sourceText("error.app.secretStorageUnavailable");
+  return new Error(
+    cause instanceof Error && cause.message === unavailable
+      ? unavailable
+      : sourceText("error.voice.cloud.keySaveFailed", { provider: SPEECH_KEY_PROVIDER_NAMES[provider] }),
+  );
 }

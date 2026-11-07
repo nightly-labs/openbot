@@ -569,13 +569,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "느려요. 14개 언어를 지원하고 말하는 언어를 직접 지정해요. 메모리를 약 4GB 사용해요.",
   "settings.voice.model.size": "다운로드 크기: {size}",
-  "settings.voice.model.downloading": "다운로드 중 · {total} 중 {received}",
   "settings.voice.model.failed": "다운로드가 중단되었어요. 연결을 확인하고 다시 시도해 주세요.",
   "settings.voice.model.progressLabel": "{name} 다운로드 중",
   "settings.voice.model.use": "사용",
-  "settings.voice.model.inUse": "사용 중",
   "settings.voice.model.downloadLabel": "{name} 다운로드",
-  "settings.voice.model.cancelLabel": "{name} 다운로드 중지",
   "settings.voice.model.retryLabel": "{name} 다시 다운로드",
   "settings.voice.model.useLabel": "받아쓰기에 {name} 사용",
   "settings.voice.model.removeLabel": "이 컴퓨터에서 {name} 삭제",
@@ -596,9 +593,6 @@ export const messages = {
   "settings.voice.removeFailed": "모델을 삭제할 수 없어요. 다시 시도해 주세요.",
   "settings.voice.model.elevenlabs.description":
     "음성을 ElevenLabs로 스트리밍해요. 말하는 동안 텍스트가 표시되고 바뀌지 않아요. 내 API 키를 사용하며, 사용할 때마다 ElevenLabs에서 요금이 청구돼요.",
-  "settings.voice.model.keySaved": "API 키 저장됨",
-  "settings.voice.model.keyMissing": "ElevenLabs API 키가 필요해요",
-  "settings.voice.apiKey.label": "ElevenLabs API 키",
   "settings.voice.apiKey.placeholder": "키를 붙여넣으세요",
   "settings.voice.apiKey.save": "키 저장",
   "settings.voice.apiKey.remove": "키 삭제",

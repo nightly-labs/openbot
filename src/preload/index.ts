@@ -919,6 +919,7 @@ const openbotApi: OpenBotDesktopApi = {
     getSpeechSettings: decodeSpeechSettings,
     setSpeechSettings: decodeSpeechSettings,
     getSpeechModelStatus: decodeSpeechModelStatus,
+    setSpeechApiKey: decodeSpeechModelStatus,
     downloadSpeechModel: decodeSpeechModelStatus,
     cancelSpeechModelDownload: decodeSpeechModelStatus,
     removeSpeechModel: decodeSpeechModelStatus,
