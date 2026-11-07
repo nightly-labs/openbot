@@ -472,7 +472,7 @@ const server = createServer((request, response) => {
 
   response.setHeader("content-type", "text/html; charset=utf-8");
   response.end(`<!doctype html>
-    <input aria-label="Task" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
+    <input aria-label="Task" onkeydown="window.smokeKeys = (window.smokeKeys ?? '') + event.key" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
     <button aria-label="Save" onclick="document.querySelector('output').textContent = document.querySelector('input').value + '|input:' + document.querySelector('input').dataset.trusted + '|click:' + event.isTrusted">Save</button>
     <a href="/child" target="_blank">Child</a>
     <a href="/download" download>Download</a>
@@ -2616,8 +2616,20 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
       const typed = await runCauseEffect(
         browser.act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" }),
       );
-      if (!typed.text.includes("typed:background|input:true"))
-        throw new Error(`Background input was not native: ${typed.text}`);
+      if (!typed.text.includes("typed:background|input:true")) {
+        const pages = await Promise.all(
+          webContents
+            .getAllWebContents()
+            .filter((contents) => !contents.isDestroyed() && contents.getURL() === `${origin}/`)
+            .map((contents) =>
+              contents.executeJavaScript(
+                "JSON.stringify({ keys: window.smokeKeys ?? '', value: document.querySelector('input')?.value, active: document.activeElement?.ariaLabel ?? document.activeElement?.localName, focus: document.hasFocus(), visibility: document.visibilityState, size: [innerWidth, innerHeight] })",
+                true,
+              ),
+            ),
+        );
+        throw new Error(`Background input was not native: ${typed.text} ${pages.join(" ")}`);
+      }
     } catch (error) {
       failures.push(`input: ${String(error)}`);
     }

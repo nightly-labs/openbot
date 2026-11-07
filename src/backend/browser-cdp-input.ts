@@ -43,7 +43,7 @@ export const dispatchPointerMove = Effect.fn("Browser.dispatchPointerMove")(func
   yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", ...target, modifiers }, sessionId);
 });
 
-export function pointerPath(from: PointerPoint | undefined, to: PointerPoint): PointerPoint[] {
+function pointerPath(from: PointerPoint | undefined, to: PointerPoint): PointerPoint[] {
   let dx = from ? from.x - to.x : 0;
   let dy = from ? from.y - to.y : 0;
   const distance = Math.hypot(dx, dy);
