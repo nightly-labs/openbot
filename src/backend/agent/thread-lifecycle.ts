@@ -248,6 +248,12 @@ export class ThreadLifecycle {
   readonly #routineThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   /**
+   * The section-mates that each loaded session got at its start or resume, for a client with
+   * `turnContext`. A section change does not change the tool fingerprint, so the next turn resumes
+   * the session to give the new list to the turn context, as a memory change does.
+   */
+  readonly #givenSections = new Map<string, string>();
+  /**
    * Routine digests and the cleanup after a turn change a handoff one at a time. A routine thread
    * runs beside the chat, so its digest can arrive while a chat turn starts with the handoff.
    */
@@ -502,7 +508,10 @@ export class ThreadLifecycle {
         });
         return replacement;
       }
-      if (this.#conversation.loadedClientFor(session.externalSessionId) !== client) {
+      if (
+        this.#conversation.loadedClientFor(session.externalSessionId) !== client ||
+        this.#sectionChanged(currentAgent, client, session.externalSessionId)
+      ) {
         const resumed = yield* Effect.result(this.resumeThread(currentAgent, client, session.externalSessionId));
         if (Result.isFailure(resumed)) {
           if (!isMissingProviderSessionError(resumed.failure.cause, client.provider)) return yield* resumed.failure;
@@ -602,6 +611,7 @@ export class ThreadLifecycle {
     yield* this.#releaseProviderSession(externalThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
+    this.#givenSections.delete(externalThreadId);
     this.#compaction.forgetThread(externalThreadId);
     this.#pendingHandoffs.delete(externalThreadId);
   }, Effect.uninterruptible).bind(this);
@@ -714,6 +724,8 @@ export class ThreadLifecycle {
     publicThreadId: string,
     reason?: "configuration-change" | "missing-session",
   ) {
+    // Read before the params: a change that lands after it then resumes the session at the next turn.
+    const givenSection = this.#sectionKey(owner);
     const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
@@ -736,6 +748,7 @@ export class ThreadLifecycle {
     this.#sessionStarts.set(key, count);
     logger.info("Started a provider session.", { provider: client.provider, reason: startReason, count });
     const externalThreadId = response.thread.id;
+    this.#rememberSection(client, externalThreadId, givenSection);
     const prepared = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         if (client.provider === "codex") {
@@ -1081,6 +1094,20 @@ export class ThreadLifecycle {
     return this.#computerUseInOwnChat(agent, publicThreadId) ? { ...agent, computerUse: false } : agent;
   }
 
+  /** The section-mates as the turn context gets them: names and titles count, the order too. */
+  #sectionKey(agent: AgentSummary): string {
+    return JSON.stringify(this.#sectionTeammates(agent.id));
+  }
+
+  #rememberSection(client: AgentClient, externalThreadId: string, section: string): void {
+    if (client.turnContext === true) this.#givenSections.set(externalThreadId, section);
+  }
+
+  #sectionChanged(agent: AgentSummary, client: AgentClient, externalThreadId: string): boolean {
+    const given = this.#givenSections.get(externalThreadId);
+    return client.turnContext === true && given !== undefined && given !== this.#sectionKey(agent);
+  }
+
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
       this.#conversation.isTaskThread(publicThreadId) &&
@@ -1329,6 +1356,7 @@ export class ThreadLifecycle {
     externalThreadId: string,
   ) {
     this.#conversation.bindThread(externalThreadId, agent.id);
+    const givenSection = this.#sectionKey(agent);
     const params = yield* this.threadParams(agent, client, externalThreadId);
     const resumed = yield* Effect.result(
       client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed),
@@ -1340,6 +1368,7 @@ export class ThreadLifecycle {
         .pipe(toThreadOperationFailed);
       yield* client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed);
     }
+    this.#rememberSection(client, externalThreadId, givenSection);
     this.#conversation.markThreadLoaded(externalThreadId, client);
   }).bind(this);
 
@@ -1410,6 +1439,7 @@ export class ThreadLifecycle {
     this.#store.database.deactivateProviderSessions(publicThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
+    this.#givenSections.delete(externalThreadId);
     this.#compaction.forgetThread(externalThreadId);
     this.#pendingHandoffs.delete(externalThreadId);
   }
