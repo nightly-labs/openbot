@@ -40,7 +40,7 @@ import type { WebhookDeliveryReport } from "./host-events-service";
 import { REMOTE_CONNECT_PHASES, type RemoteConnectPhase, type RemoteConnectSummary } from "./remote-connect-trace";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
 import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
-import { SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
+import { SERVICE_STEP_PROPERTY_NAMES, SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
@@ -103,6 +103,7 @@ const STARTUP_PROPERTY_NAMES = [
   "workspace_ready_ms",
   "slowest_service_step",
   "slowest_service_step_ms",
+  ...SERVICE_STEP_PROPERTY_NAMES,
 ] as const satisfies readonly (keyof StartupProperties)[];
 // A turn uses its agent's model and sometimes a few more, such as a Claude subagent's model.
 const MAX_TOKEN_ROWS_PER_TURN = 8;
