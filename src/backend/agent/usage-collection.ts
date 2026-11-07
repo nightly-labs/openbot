@@ -224,6 +224,25 @@ export function memoryReviewUsageObserver(
 }
 
 /**
+ * Collects the usage of one `openbot.web_search` turn under the agent that searched. The search is
+ * its own Codex session, so its counters never meet those of the agent's turns.
+ */
+export function webSearchUsageObserver(
+  usage: AgentUsage,
+  agentId: string,
+  model: AgentSummary["model"],
+): (notification: { method: string; params?: unknown }) => void {
+  const session = { id: `web-search:${randomUUID()}`, provider: "codex" as const, createdAt: new Date().toISOString() };
+  return ({ method, params }) => {
+    try {
+      collectProviderUsage(usage, { id: agentId, model }, session, method, params);
+    } catch (error) {
+      logger.warn("Could not save the usage of a web search.", { error });
+    }
+  };
+}
+
+/**
  * An ACP `Usage`, whose `inputTokens` include the cache reads and writes. The cache fields are
  * optional, and agents leave them out when they are 0 (#4181).
  */

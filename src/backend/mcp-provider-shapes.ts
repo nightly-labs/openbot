@@ -597,6 +597,8 @@ export type CodexOwnTransports = Readonly<Record<string, McpTransport>>;
 export interface CodexOwnServers {
   disabled: Record<string, CodexDisabledMcpServer>;
   transports: CodexOwnTransports;
+  /** The `config/read` answer with its layers, or null without one. */
+  read: DynamicRecord | null;
 }
 
 export function codexOwnTransports(configured: DynamicRecord | null): CodexOwnTransports {
@@ -623,6 +625,7 @@ export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(f
       }),
     ),
     transports: codexOwnTransports(configured),
+    read: config,
   };
 });
 

@@ -50,6 +50,7 @@ import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDec
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import { readCodexMcpConfig } from "./codex-mcp-config";
+import { type CodexPromptSettings, codexPromptSettings } from "./codex-prompt-settings";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById } from "./delivery-content";
@@ -70,7 +71,7 @@ import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
-import { VISIBLE_DYNAMIC_TOOLS } from "./tool-catalog";
+import { visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
   type PromptInstructionsFile,
@@ -107,7 +108,7 @@ const logger = createOpenBotLogger("thread-lifecycle");
 const CODEX_MCP_ADAPTER_VERSION = 10;
 
 /** What a provider other than Codex, or a Codex with no file to read, has in its own files. */
-const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {} };
+const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {}, read: null };
 
 /**
  * Providers whose client starts its process again with the MCP servers and skills of that moment
@@ -158,7 +159,7 @@ const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
  * direct because from `exec` a model often reads `result.content` instead of `generatedImage(result)`:
  * it then sees no image and tells the user that the image failed, although the chat shows it.
  */
-const CODEX_DIRECT_ONLY_NAMESPACES = [...VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name), "image_gen"];
+const CODEX_DIRECT_ONLY_NAMESPACES = [...visibleDynamicTools("codex").map((namespace) => namespace.name), "image_gen"];
 
 /** The provider switch waits for the capture, so its read is short. */
 const CAPTURE_READ_TIMEOUT_MS = 10_000;
@@ -703,7 +704,7 @@ export class ThreadLifecycle {
         instructionsFile,
       ),
       serviceName: "openbot",
-      dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+      dynamicTools: visibleDynamicTools(client.provider),
     };
     return { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params };
   });
@@ -889,7 +890,8 @@ export class ThreadLifecycle {
         "features.goals": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
-      } & ReturnType<typeof codexSandboxConfig>;
+      } & CodexPromptSettings &
+        ReturnType<typeof codexSandboxConfig>;
     },
     ThreadOperationFailed
   > {
@@ -905,6 +907,7 @@ export class ThreadLifecycle {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
         ...CODEX_FEATURES_CONFIG,
+        ...codexPromptSettings(own.read),
         // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
         // script can be longer, and Codex would drop its end.
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
@@ -1022,7 +1025,7 @@ export class ThreadLifecycle {
     return createHash("sha256")
       .update(
         JSON.stringify([
-          VISIBLE_DYNAMIC_TOOLS,
+          visibleDynamicTools(agent.provider),
           mcpFingerprintValues(configs),
           Object.keys(disabled).sort(),
           // A revoked approval must also replace a loaded session with the old tool policy.
@@ -1311,7 +1314,7 @@ export class ThreadLifecycle {
         configs,
         yield* this.#instructionsFile(agent, client),
       ),
-      ...(client.provider === "codex" ? {} : { dynamicTools: VISIBLE_DYNAMIC_TOOLS }),
+      ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),
       ...(yield* this.codexConfigEffect(
         agent,
         client,

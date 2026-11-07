@@ -103,6 +103,9 @@ export const messages = defineMessages("error.agent", {
   "error.agent.quickAcknowledgementLocalOnly": "Only the computer that runs the agent can change this setting.",
   "error.agent.sideQuestionBusy": "Too many side questions are running. Try again shortly.",
   "error.agent.sideQuestionFailed": "The agent could not answer the side question. Try again.",
+  "error.agent.webSearchSignIn": "Web search needs a Codex sign-in with a ChatGPT account.",
+  "error.agent.webSearchBusy": "Too many searches and side questions are running. Try again shortly.",
+  "error.agent.webSearchFailed": "The web search did not finish. Try again.",
   "error.agent.busyMessageModeLocalOnly":
     "What messages do while the agent works can only be set on the computer that runs the agent.",
   "error.agent.backupModelsLocalOnly": "Backup models can only be set on the computer that runs the agent.",

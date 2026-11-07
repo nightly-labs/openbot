@@ -17,7 +17,7 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { openBotToolFailure, openBotToolResult } from "../src/backend/agent/routine-tools";
-import { discoverTools, resolveDeferredTool, VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { discoverTools, resolveDeferredTool, visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { resolvePiCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import {
@@ -174,10 +174,10 @@ client.on("request", (request) => {
   try {
     if (params.tool === "tool_search") {
       hostTools.push("tool_search");
-      return client.respond(request.id, openBotToolResult(discoverTools(params)));
+      return client.respond(request.id, openBotToolResult(discoverTools(params, "pi")));
     }
     if (params.tool === "tool_call") {
-      const resolved = resolveDeferredTool(params);
+      const resolved = resolveDeferredTool(params, "pi");
       hostTools.push(resolved?.tool ?? "tool_call:invalid");
       if (!resolved) return client.respond(request.id, openBotToolFailure("Unknown tool."));
       return client.respond(request.id, openBotToolResult({ shown: true, tool: resolved.tool }));
@@ -250,7 +250,7 @@ try {
         cwd: workspace,
         model: MODEL,
         developerInstructions: "You are Ada, a careful assistant in an end-to-end smoke test.",
-        dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+        dynamicTools: visibleDynamicTools("pi"),
       },
       (value) => getString(getRecord(value, "thread"), "id"),
     ),

@@ -52,7 +52,7 @@ import {
   type SubagentState,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { claudeBridgedToolName, VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
+import { claudeBridgedToolName, visibleToolDefinitions } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
@@ -2465,10 +2465,12 @@ const writeClaudeFlagSettings = Effect.fn("ClaudeAgentClient.writeFlagSettings")
  * gets, without validation-only keywords. The OpenBot tool router decodes each call with the full schema.
  */
 export function claudeOpenBotTools(call: (name: string, args: unknown) => Promise<CallToolResult>) {
-  return VISIBLE_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) => {
-    const shape = advertisedZodShape(z.strictObject(definition.shape));
-    return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
-  });
+  return visibleToolDefinitions("claude")
+    .filter((definition) => definition.name !== "ask_user")
+    .map((definition) => {
+      const shape = advertisedZodShape(z.strictObject(definition.shape));
+      return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
+    });
 }
 
 /** A file that cannot be deleted must not stop the close. */

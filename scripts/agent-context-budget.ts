@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { type AgentModelOption, type AgentSummary, DEFAULT_AGENT_DEFAULTS } from "@openbot/contracts/ipc";
 import { developerInstructions } from "../src/backend/agent/developer-instructions";
 import { listModelsPayload } from "../src/backend/agent/model-tools";
-import { BUILTIN_TOOL_CATALOG, VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { BUILTIN_TOOL_CATALOG, visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { toolGuidance } from "../src/backend/agent/tool-guidance";
 import { runDebtRatchet } from "./debt-ratchet";
 
@@ -73,7 +73,8 @@ function measure(): Map<string, number> {
   return new Map([
     ["instructions.claude", bytes(instructions("claude"))],
     ["instructions.codex", bytes(instructions("codex"))],
-    ["visible-tools", bytes(VISIBLE_DYNAMIC_TOOLS)],
+    // Pi has no web search of its own, so its visible tools name the whole catalog.
+    ["visible-tools", bytes(visibleDynamicTools("pi"))],
     ["catalog.schemas", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.inputSchema))],
     ["catalog.descriptions", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.description))],
     ["guidance", sum([...guidance])],

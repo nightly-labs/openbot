@@ -83,6 +83,35 @@ variant in `.openbot-build/pi-prompt-settings-bench/report.json`. `bun run smoke
 agent session through the core tools, a commit, and a hidden tool, checks each request, and writes
 `.openbot-build/pi-agent-smoke/report.json`.
 
+Codex adds its own base prompt, tools, and skill listing to each Codex request.
+`agent/codex-prompt-settings.ts` turns off `features.tool_suggest`, whose `request_plugin_install` waits
+for a plugin install that OpenBot cannot do, and the skills about the Codex app (`CODEX_UNFIT_SKILLS`).
+The thread value of `skills.config` replaces the whole list, so the user's own entries go first and OpenBot
+adds only the skills that no entry names. A feature counts as the user's only when a file layer of
+`config/read` sets it, because the merged `features` table also holds defaults. On Codex 0.166 and GPT-6
+Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
+and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
+stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
+`.openbot-build/codex-prompt-settings-bench/report.json`. `bun run smoke:codex-agent` runs one thread
+through `update_plan`, the shell, `apply_patch`, a subagent, a skill, a deferred OpenBot tool, Codex's
+own web search, and a commit, and writes `.openbot-build/codex-agent-smoke/report.json`.
+
+Codex keeps its own inline web search (`web__run`, about 2,450 tokens in each request). Agents on a
+provider with no web search of its own (the Pi-based providers and custom ACP agents) get the deferred
+`openbot.web_search` instead (`AgentService.searchWeb`; `OWN_WEB_SEARCH_PROVIDERS` in
+`agent/tool-catalog.ts` lists the providers whose CLI searches). It
+runs one side Codex thread that can only search the web (`generateTextWithoutTools` in `webSearch` mode)
+on the Codex sign-in of this computer, and returns a short answer with source URLs. A search has two
+requests, about 13,500 input tokens on GPT-6 Luna. The side thread turns off the permissions,
+environment, collaboration and skill texts (about 2,060 tokens in each request), and all toolless
+threads set `agents.enabled = false`: the model catalog turns on the multi-agent tools for each GPT-6
+model, and only this key turns them off (about 1,560 tokens). `bun run bench:codex-web-search` (writes
+`.openbot-build/codex-web-search-bench/report.json`) compares both on a Codex agent, in a chat of seven
+turns with three searches: `openbot.web_search` used 7% fewer input tokens but 8% more uncached tokens,
+because the first request of each side thread misses the prompt cache, and each search turn took 9.5 to
+12 seconds against 4 to 6 seconds inline. Both gave the same answers. For that reason a Codex agent does
+not get `openbot.web_search`.
+
 ## History retrieval and replacement sessions
 
 A replacement provider session receives a handoff of at most 32,000 characters, including headers

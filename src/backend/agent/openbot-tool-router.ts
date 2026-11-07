@@ -59,6 +59,7 @@ import {
   routineReportFailureToolSchema,
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
+  webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
@@ -213,6 +214,8 @@ export interface OpenBotToolRouterHooks {
    * busy-message mode is "steer". Otherwise the message waits in the queue.
    */
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
+  /** The answer of one web search for the agent, from a side turn whose only tool is web search. */
+  searchWeb(agentId: string, query: string): Effect.Effect<string, ToolOperationFailed>;
 }
 
 export interface OpenBotToolRouterOptions {
@@ -395,7 +398,7 @@ export class OpenBotToolRouter {
               let result: ReturnType<typeof discoverTools>;
               try {
                 this.#requireAgent(agentId);
-                result = discoverTools(params);
+                result = discoverTools(params, client.provider);
               } catch {
                 client.respond(request.id, openBotToolFailure(invalid));
                 return;
@@ -412,7 +415,7 @@ export class OpenBotToolRouter {
               return;
             }
             if (params.tool === "tool_call") {
-              const resolved = resolveDeferredTool(params);
+              const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
                 client.respond(request.id, openBotToolFailure(invalid));
                 return;
@@ -639,7 +642,8 @@ export class OpenBotToolRouter {
               CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
-              tool === "messaging_post";
+              tool === "messaging_post" ||
+              tool === "web_search";
             // A workflow tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
               correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
@@ -1126,6 +1130,12 @@ export class OpenBotToolRouter {
 
     if (params.tool === "html_render") {
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
+    }
+
+    if (params.tool === "web_search") {
+      const args = webSearchToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const answer = yield* this.#hooks.searchWeb(senderAgentId, args.query);
+      return { success: true, contentItems: [{ type: "inputText", text: answer }] };
     }
 
     if (params.tool === "list_sites") {

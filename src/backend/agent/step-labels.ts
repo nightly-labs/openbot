@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { getArray, getRecord, getString, isRecord, type ThreadItem } from "../protocol";
+import { bridgedToolName, getArray, getRecord, getString, isRecord, type ThreadItem } from "../protocol";
 
 /** The longest path, query or name that a step label quotes. A label is one short line. */
 const QUOTE_LIMIT = 48;
@@ -36,6 +36,8 @@ export function stepLabel(item: ThreadItem): string | null {
   const query = getString(item, "query") ?? getString(item, "pattern");
   if (query && (type === "websearch" || name === "websearch"))
     return sourceText("status.agent.webSearching", { query: quote(query) });
+  const searched = webSearchQuery(item);
+  if (searched) return sourceText("status.agent.webSearching", { query: quote(searched) });
   const url = getString(item, "url");
   const host = url ? urlHost(url) : null;
   if (host) return sourceText("status.agent.urlFetching", { host });
@@ -45,6 +47,12 @@ export function stepLabel(item: ThreadItem): string | null {
     return sourceText("status.agent.textSearching", { query: quote(query) });
   const command = shellCommand(item);
   return command ? commandLabel(command) : null;
+}
+
+/** The query of an `openbot.web_search` call. Agents find the tool in the catalog and run it with `tool_call`. */
+function webSearchQuery(item: ThreadItem): string | null {
+  if (bridgedToolName(item) !== "openbot.web_search") return null;
+  return getString(getRecord(getRecord(item, "arguments"), "arguments"), "query");
 }
 
 /** Codex parses its own commands into actions: a read, a file list or a search. */

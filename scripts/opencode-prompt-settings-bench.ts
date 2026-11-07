@@ -16,7 +16,7 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { getArray, getRecord, getString } from "../src/backend/protocol";
 import {
@@ -180,7 +180,7 @@ try {
               cwd: harness.workspace,
               model: OPENCODE_MODEL,
               developerInstructions: "You are Ada, a careful assistant in an end-to-end benchmark.",
-              dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+              dynamicTools: visibleDynamicTools("opencode"),
             },
             (value) => value,
           ),
