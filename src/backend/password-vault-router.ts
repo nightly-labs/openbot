@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Effect } from "effect";
 import type { PasswordVault, VaultLogin } from "./password-vault";
 
@@ -23,7 +24,11 @@ export function passwordVaultRouter(sources: ReadonlyArray<PasswordVaultSource>)
         const list = yield* vault.loginsFor(origin);
         if (list === null) continue;
         any = true;
-        found.push(...list.map((login) => ({ ...login, id: `${prefix}${login.id}` })));
+        // An id that submit_secret cannot take is not listed: the agent then asks the user for the secret.
+        for (const login of list) {
+          const id = `${prefix}${login.id}`;
+          if (id.length <= INPUT_LIMITS.vaultLoginId) found.push({ ...login, id });
+        }
       }
       return any ? found : null;
     }),
