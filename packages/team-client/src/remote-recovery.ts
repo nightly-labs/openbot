@@ -271,6 +271,9 @@ export function createRemoteConnectionRecovery(
       if (Result.isFailure(result)) {
         const error = result.failure;
         if (error instanceof Error && error.message === sourceText("error.remote.appInBackground")) {
+          // The app went to the background, so this attempt did not fail. Do not count it: the attempt
+          // after the return uses the same number and the same wait.
+          attempt = Math.max(0, attempt - 1);
           interrupted = true;
           retryRequested = false;
           retryAt = null;
