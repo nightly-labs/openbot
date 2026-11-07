@@ -1,7 +1,7 @@
 // Reads the newest release of each provider CLI for each target, as each user's update check does.
 // Then it installs the newest release of each provider that it can run with no account, and runs the
 // conformance cases on it: model list, turn, cancel and a turn after it, resume in a new process, and a
-// missing session. OpenCode uses a fake model on loopback: the shared free OpenCode models have a
+// missing session. OpenCode uses a fake model on loopback, given as a custom endpoint: the shared free OpenCode models have a
 // usage limit that the runners of all GitHub users reach, so a turn on them fails for no CLI fault.
 // A CLI release reaches users within an hour of its publication, so a scheduled run finds a broken
 // release before many users install it. Add the version to `provider-runtime-blocklist.json` to stop
@@ -172,27 +172,20 @@ const fakeAddress = fakeModel.address();
 if (!fakeAddress || typeof fakeAddress !== "object") throw new Error("The fake model server has no port.");
 const fakePort = fakeAddress.port;
 
-/** OpenCode reads the fake model from its global config in the new home. */
-async function writeOpenCodeConfig(): Promise<void> {
-  const folder = join(home, ".config", "opencode");
-  await mkdir(folder, { recursive: true });
-  const config = {
-    $schema: "https://opencode.ai/config.json",
-    autoupdate: false,
-    share: "disabled",
-    provider: {
-      canary: {
-        npm: "@ai-sdk/openai-compatible",
-        name: "Canary",
-        options: { baseURL: `http://127.0.0.1:${fakePort}/v1`, apiKey: "canary" },
-        models: { fake: { name: "Fake", tool_call: true } },
-      },
+/** The fake model, given as a custom endpoint, as OpenBot gives a user's endpoint to OpenCode. */
+const CANARY_CREDENTIALS = {
+  ...NO_PROVIDER_CREDENTIALS,
+  customProviders: () => [
+    {
+      id: "canary",
+      name: "Canary",
+      baseUrl: `http://127.0.0.1:${fakePort}/v1`,
+      apiKey: "canary",
+      models: [{ id: "fake", name: "Fake" }],
+      headers: [],
     },
-    model: FREE_MODELS.opencode,
-    small_model: FREE_MODELS.opencode,
-  };
-  await writeFile(join(folder, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
-}
+  ],
+};
 
 /** Every provider's newest release must be readable for every target, or no user gets the update. */
 async function readReleases(): Promise<string[]> {
@@ -255,7 +248,7 @@ async function canary(manager: ProviderRuntimeManager, provider: ManagedProvider
     const client = driver.createClient(
       { executable, version, source: "managed" },
       REQUEST_TIMEOUT_MS,
-      NO_PROVIDER_CREDENTIALS,
+      CANARY_CREDENTIALS,
     );
     clients.push(client);
     client.start();
@@ -321,7 +314,6 @@ async function canary(manager: ProviderRuntimeManager, provider: ManagedProvider
 const manager = new ProviderRuntimeManager({ root: join(root, "runtimes") });
 try {
   await mkdir(home, { recursive: true });
-  await writeOpenCodeConfig();
   await runCauseEffect(manager.initialize());
   await runCauseEffect(manager.checkForUpdates());
   // Run the installs first, so that one release that cannot be read does not hide a broken CLI.
