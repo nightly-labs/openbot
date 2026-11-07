@@ -74,6 +74,9 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot n’a pas lancé ce processus. Il peut s’agir d’un processus que vous avez lancé ; l’arrêt est donc désactivé.",
   "chat.backgroundTasks.notFound": "Le processus ne s’exécute plus.",
+  "chat.backgroundTasks.stopRefused":
+    "Cette tâche d’arrière-plan appartient à un autre agent ou ne peut pas être arrêtée ici.",
+  "chat.backgroundTasks.stopStillRunning": "Le processus continue de s’exécuter après la demande d’arrêt.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Rechercher des étapes",
   "chat.trace.steps": "Étapes",

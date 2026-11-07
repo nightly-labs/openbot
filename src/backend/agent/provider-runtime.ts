@@ -84,6 +84,7 @@ import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
 import { AGENT_ID_VARIABLE } from "./agent-process";
+import { agentShellEnvironment } from "./agent-shell";
 import { captureBrowser } from "./browser-capture";
 import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
@@ -2519,7 +2520,7 @@ export class ProviderRuntime implements ProviderPort {
       ...(own.confinement ? { confinement: own.confinement } : {}),
       ...(accountEnvironment ? { accountEnvironment } : {}),
       // This process belongs to one agent, so its tools can name the agent even after a `cd`.
-      agentEnvironment: { [AGENT_ID_VARIABLE]: agentId },
+      agentEnvironment: { ...agentShellEnvironment(), [AGENT_ID_VARIABLE]: agentId },
     });
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       yield* client.stop().pipe(Effect.catch(() => Effect.void));
@@ -2987,14 +2988,15 @@ export class ProviderRuntime implements ProviderPort {
       const context = {
         ...this.#credentials,
         ...(accountEnvironment ? { accountEnvironment } : {}),
-        ...(agentEnvironment
-          ? {
-              agentEnvironment: (inherited?: NodeJS.ProcessEnv) => ({
-                ...this.#credentials.agentEnvironment?.(inherited),
-                ...agentEnvironment,
-              }),
-            }
-          : {}),
+        agentEnvironment: (inherited?: NodeJS.ProcessEnv) => {
+          const credentialsEnvironment = this.#credentials.agentEnvironment?.(inherited);
+          const merged = { ...inherited, ...credentialsEnvironment, ...agentEnvironment };
+          return {
+            ...credentialsEnvironment,
+            ...agentEnvironment,
+            ...agentShellEnvironment(merged),
+          };
+        },
       };
       return yield* Effect.acquireUseRelease(
         providerStep(() =>

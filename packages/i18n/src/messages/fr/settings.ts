@@ -147,6 +147,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Non vérifié",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot n’a pas lancé ce processus. Il peut s’agir d’un processus que vous avez lancé ; l’arrêt est donc désactivé.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot n’a pas enregistré quel agent a lancé ce processus ; Arrêter est donc désactivé.",
+  "settings.backgroundProcesses.stopRefused":
+    "Cette tâche d’arrière-plan appartient à un autre agent ou ne peut pas être arrêtée ici.",
+  "settings.backgroundProcesses.stopStillRunning": "Le processus continue de s’exécuter après la demande d’arrêt.",
   "settings.backgroundProcesses.notFound": "Le processus ne s’exécute plus.",
   "settings.keepRemoteSessions.title": "Connexion rapide aux serveurs",
   "settings.keepRemoteSessions.description":

@@ -15,6 +15,7 @@ const PROCESS: BackgroundProcess = {
   ports: [],
   agentId: "agent-1",
   verified: true,
+  stoppable: true,
 };
 
 let list: ReturnType<typeof vi.fn>;
@@ -119,10 +120,10 @@ describe("background process polling", () => {
   });
 
   it("sends the agent id with a stop and returns the result", async () => {
-    const stopped = await stopBackgroundProcess(PROCESS);
+    const result = await stopBackgroundProcess(PROCESS);
 
     expect(stop).toHaveBeenCalledWith({ id: PROCESS.id, agentId: PROCESS.agentId });
-    expect(stopped).toBe(true);
+    expect(result).toEqual({ stopped: true });
   });
 
   it("pauses while the document is hidden and reads again when it is visible", async () => {

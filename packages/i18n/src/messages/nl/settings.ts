@@ -138,6 +138,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Niet geverifieerd",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot heeft dit proces niet gestart. Het kan een proces zijn dat je zelf hebt gestart, dus Stoppen is uitgeschakeld.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot heeft niet vastgelegd welke agent dit proces heeft gestart, dus Stoppen is uitgeschakeld.",
+  "settings.backgroundProcesses.stopRefused":
+    "Deze achtergrondtaak hoort bij een andere agent of kan hier niet worden gestopt.",
+  "settings.backgroundProcesses.stopStillRunning": "Het proces draait nog nadat het is gevraagd te stoppen.",
   "settings.backgroundProcesses.notFound": "Het proces wordt niet meer uitgevoerd.",
   "settings.keepRemoteSessions.title": "Snelle verbinding met servers",
   "settings.keepRemoteSessions.description":

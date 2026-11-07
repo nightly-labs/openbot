@@ -140,6 +140,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Non verificato",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot non ha avviato questo processo. Potrebbe essere un processo avviato da te, quindi Arresta è disattivato.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot non ha registrato quale agente ha avviato questo processo, quindi Arresta è disattivato.",
+  "settings.backgroundProcesses.stopRefused":
+    "Questa attività in background appartiene a un altro agente o non può essere arrestata da qui.",
+  "settings.backgroundProcesses.stopStillRunning": "Il processo è ancora in esecuzione dopo la richiesta di arresto.",
   "settings.backgroundProcesses.notFound": "Il processo non è più in esecuzione.",
   "settings.keepRemoteSessions.title": "Connessione rapida ai server",
   "settings.keepRemoteSessions.description":

@@ -130,8 +130,14 @@ export function createSettingsAgentsSection(options: {
       .then((result) => {
         if (result.stopped) return;
         const { t } = currentText();
-        actionToast.error(t("settings.backgroundProcesses.notFound"), {
-          id: "settings-background-process-stop-not-found",
+        const key =
+          result.reason === "still-running"
+            ? "settings.backgroundProcesses.stopStillRunning"
+            : result.reason === "not-stoppable" || result.reason === "wrong-agent"
+              ? "settings.backgroundProcesses.stopRefused"
+              : "settings.backgroundProcesses.notFound";
+        actionToast.error(t(key), {
+          id: `settings-background-process-stop-${result.reason ?? "not-found"}`,
           report: { operation: "settings", source: "action", cause_code: "unknown" },
         });
       })

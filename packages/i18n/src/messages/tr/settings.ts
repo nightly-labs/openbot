@@ -138,6 +138,10 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Doğrulanmadı",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot bu işlemi başlatmadı. Bu, sizin başlattığınız bir işlem olabilir; bu nedenle Durdur devre dışı.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot bu işlemi hangi ajanın başlattığını kaydetmediği için Durdur devre dışı.",
+  "settings.backgroundProcesses.stopRefused": "Bu arka plan görevi başka bir ajana ait veya buradan durdurulamıyor.",
+  "settings.backgroundProcesses.stopStillRunning": "İşlem durdurma isteğinden sonra hâlâ çalışıyor.",
   "settings.backgroundProcesses.notFound": "Bu işlem artık çalışmıyor.",
   "settings.keepRemoteSessions.title": "Sunuculara hızlı bağlantı",
   "settings.keepRemoteSessions.description":

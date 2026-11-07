@@ -143,6 +143,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Niezweryfikowany",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot nie uruchomił tego procesu. To może być proces uruchomiony przez Ciebie, dlatego zatrzymywanie jest wyłączone.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot nie zapisał, który agent uruchomił ten proces, więc Zatrzymaj jest wyłączone.",
+  "settings.backgroundProcesses.stopRefused":
+    "To zadanie w tle należy do innego agenta lub nie można go tutaj zatrzymać.",
+  "settings.backgroundProcesses.stopStillRunning": "Proces nadal działa po żądaniu zatrzymania.",
   "settings.backgroundProcesses.notFound": "Ten proces nie jest już uruchomiony.",
   "settings.keepRemoteSessions.title": "Szybkie połączenie z serwerami",
   "settings.keepRemoteSessions.description":

@@ -435,16 +435,21 @@ export interface BackgroundProcess {
   /** The TCP ports that the process or its children listen on. */
   ports: number[];
   /**
-   * The agent whose workspace holds the working folder of the process, or null when none does. This
-   * is for display only: a working folder does not prove which agent, or person, started it.
+   * The agent that the environment or shell registry names, or the agent whose workspace holds the
+   * working folder when neither names one. This is for display: a working folder does not prove
+   * which agent, or person, started the process. Stop checks the environment or registry again.
    */
   agentId: string | null;
   /**
-   * True when the environment of the process has the agent-process marker, so OpenBot started it.
-   * Only a verified process has Stop; a process that a person started can have the same working
-   * folder, and must not be stopped from here.
+   * True when the environment of the process has the agent-process marker, or a shell wrapper
+   * recorded the agent that started it, so OpenBot started it.
    */
   verified: boolean;
+  /**
+   * True when this app may stop the process. A marker-only process, or one that only its working
+   * folder attributes, has no Stop: a person can start a program in the same folder.
+   */
+  stoppable: boolean;
 }
 
 /** The processes of one agent, for the card of its conversation. */
@@ -459,13 +464,31 @@ export interface BackgroundProcessStopInput {
   agentId: string | null;
 }
 
+/** Why a stop request did not end the process. */
+export const BACKGROUND_PROCESS_STOP_REASONS = [
+  "not-found",
+  "not-stoppable",
+  "wrong-agent",
+  "still-running",
+  "unsupported",
+] as const;
+
+export type BackgroundProcessStopReason = (typeof BACKGROUND_PROCESS_STOP_REASONS)[number];
+
 /** The result of a stop request: false when the process was not found, unverified, or owned by another agent. */
 export interface BackgroundProcessStopResult {
   stopped: boolean;
+  /** Present when `stopped` is false, so the card can say why rather than call every refusal missing. */
+  reason?: BackgroundProcessStopReason;
 }
 
 export function isBackgroundProcessStopResult(value: unknown): value is BackgroundProcessStopResult {
-  return isDynamicRecord(value) && isBoolean(value.stopped);
+  return (
+    isDynamicRecord(value) &&
+    isBoolean(value.stopped) &&
+    (value.reason === undefined ||
+      (typeof value.reason === "string" && BACKGROUND_PROCESS_STOP_REASONS.some((reason) => reason === value.reason)))
+  );
 }
 
 export function isBackgroundProcess(value: unknown): value is BackgroundProcess {
@@ -478,7 +501,8 @@ export function isBackgroundProcess(value: unknown): value is BackgroundProcess 
     Array.isArray(value.ports) &&
     value.ports.every((port) => integerInRange(port, 1, 65_535)) &&
     (value.agentId === null || isIdentifier(value.agentId)) &&
-    isBoolean(value.verified)
+    isBoolean(value.verified) &&
+    isBoolean(value.stoppable)
   );
 }
 

@@ -129,6 +129,8 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot nie uruchomił tego procesu. To może być proces uruchomiony przez Ciebie, dlatego zatrzymywanie jest wyłączone.",
   "chat.backgroundTasks.notFound": "Ten proces nie jest już uruchomiony.",
+  "chat.backgroundTasks.stopRefused": "To zadanie w tle należy do innego agenta lub nie można go tutaj zatrzymać.",
+  "chat.backgroundTasks.stopStillRunning": "Proces nadal działa po żądaniu zatrzymania.",
   "chat.trace.title": "Ślad",
   "chat.trace.search": "Szukaj kroków",
   "chat.trace.steps": "Kroki",

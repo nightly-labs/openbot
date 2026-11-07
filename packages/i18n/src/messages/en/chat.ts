@@ -73,6 +73,8 @@ export const messages = defineMessages("chat", {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot did not start this process. It may be a process that you started, so Stop is disabled.",
   "chat.backgroundTasks.notFound": "This process is no longer running.",
+  "chat.backgroundTasks.stopRefused": "This background task belongs to another agent or cannot be stopped from here.",
+  "chat.backgroundTasks.stopStillRunning": "The process is still running after it was asked to stop.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Search steps",
   "chat.trace.steps": "Steps",

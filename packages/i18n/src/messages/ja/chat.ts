@@ -74,6 +74,8 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot がこのプロセスを起動した記録はありません。ユーザーが起動したプロセスの可能性があるため、停止は無効です。",
   "chat.backgroundTasks.notFound": "このプロセスはすでに実行されていません。",
+  "chat.backgroundTasks.stopRefused": "このバックグラウンドタスクは別のエージェントのものか、ここから停止できません。",
+  "chat.backgroundTasks.stopStillRunning": "停止を要求した後もプロセスは実行中です。",
   "chat.trace.title": "トレース",
   "chat.trace.search": "ステップを検索",
   "chat.trace.steps": "ステップ",

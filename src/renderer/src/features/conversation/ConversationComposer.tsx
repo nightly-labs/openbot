@@ -4,6 +4,7 @@ import {
   type AccountUsageLimit,
   type AgentWait,
   type BackgroundProcess,
+  type BackgroundProcessStopResult,
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
@@ -213,7 +214,7 @@ export function ConversationComposer() {
   );
   const unsubscribeBackgroundProcesses = subscribeBackgroundProcesses();
   onCleanup(unsubscribeBackgroundProcesses);
-  async function stopBackgroundTask(process: BackgroundProcess): Promise<boolean> {
+  async function stopBackgroundTask(process: BackgroundProcess): Promise<BackgroundProcessStopResult> {
     // The card keeps the confirmation open and shows one error, so a failure is not also a toast.
     return stopBackgroundProcess(process);
   }

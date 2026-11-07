@@ -74,6 +74,9 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot heeft dit proces niet gestart. Het kan een proces zijn dat je zelf hebt gestart, dus Stoppen is uitgeschakeld.",
   "chat.backgroundTasks.notFound": "Het proces wordt niet meer uitgevoerd.",
+  "chat.backgroundTasks.stopRefused":
+    "Deze achtergrondtaak hoort bij een andere agent of kan hier niet worden gestopt.",
+  "chat.backgroundTasks.stopStillRunning": "Het proces draait nog nadat het is gevraagd te stoppen.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Stappen zoeken",
   "chat.trace.steps": "Stappen",

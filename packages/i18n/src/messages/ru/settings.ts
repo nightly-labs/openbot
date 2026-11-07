@@ -145,6 +145,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Не подтверждён",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot не запускал этот процесс. Возможно, его запустили вы, поэтому остановка отключена.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot не записал, какой агент запустил этот процесс, поэтому «Остановить» отключено.",
+  "settings.backgroundProcesses.stopRefused":
+    "Эта фоновая задача принадлежит другому агенту или не может быть остановлена отсюда.",
+  "settings.backgroundProcesses.stopStillRunning": "Процесс всё ещё выполняется после запроса остановки.",
   "settings.backgroundProcesses.notFound": "Этот процесс больше не выполняется.",
   "settings.keepRemoteSessions.title": "Быстрое подключение к серверам",
   "settings.keepRemoteSessions.description":

@@ -1,4 +1,9 @@
-import type { BackgroundProcess } from "@openbot/contracts/ipc";
+import type {
+  BackgroundProcess,
+  BackgroundProcessStopReason,
+  BackgroundProcessStopResult,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Badge, Button, Command, ConfirmDialog, Square } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -7,8 +12,15 @@ import { useDuration } from "./Subagents";
 export interface BackgroundTasksCardProps {
   /** The processes of the agent of this conversation, oldest first. */
   processes: readonly BackgroundProcess[];
-  /** Stops one verified process. False means that it was not found; a rejection shows the error. */
-  onStop: (process: BackgroundProcess) => Promise<boolean>;
+  /** Stops one stoppable process. A refusal says why; a rejection shows the error. */
+  onStop: (process: BackgroundProcess) => Promise<BackgroundProcessStopResult>;
+}
+
+function stopErrorKey(reason: BackgroundProcessStopReason | undefined): AppTextKey {
+  if (reason === "still-running") return "chat.backgroundTasks.stopStillRunning";
+  if (reason === "not-stoppable" || reason === "wrong-agent") return "chat.backgroundTasks.stopRefused";
+  if (reason === "unsupported") return "chat.backgroundTasks.stopFailed";
+  return "chat.backgroundTasks.notFound";
 }
 
 /** Ages one row from its start time, on a one-second clock that ends with the row. */
@@ -46,9 +58,9 @@ export function BackgroundTasksCard(props: BackgroundTasksCardProps) {
     setStopping(process.id);
     setError(undefined);
     try {
-      const stopped = await props.onStop(process);
-      if (!stopped) {
-        setError(t("chat.backgroundTasks.notFound"));
+      const result = await props.onStop(process);
+      if (!result.stopped) {
+        setError(t(stopErrorKey(result.reason)));
         return;
       }
       setTarget(undefined);
@@ -111,7 +123,7 @@ export function BackgroundTasksCard(props: BackgroundTasksCardProps) {
                         </Show>
                       </span>
                     </span>
-                    <Show when={process().verified}>
+                    <Show when={process().stoppable}>
                       <Button
                         type="button"
                         variant="ghost"

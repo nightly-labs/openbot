@@ -74,6 +74,8 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot이 이 프로세스를 시작하지 않았습니다. 직접 시작한 프로세스일 수 있으므로 중지가 비활성화됩니다.",
   "chat.backgroundTasks.notFound": "이 프로세스는 더 이상 실행 중이 아닙니다.",
+  "chat.backgroundTasks.stopRefused": "이 백그라운드 작업은 다른 에이전트의 것이거나 여기에서 중지할 수 없습니다.",
+  "chat.backgroundTasks.stopStillRunning": "중지 요청 후에도 프로세스가 계속 실행 중입니다.",
   "chat.trace.title": "트레이스",
   "chat.trace.search": "단계 검색",
   "chat.trace.steps": "단계",

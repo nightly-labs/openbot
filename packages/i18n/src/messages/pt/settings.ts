@@ -140,6 +140,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Não verificado",
   "settings.backgroundProcesses.unverifiedHint":
     "O OpenBot não iniciou este processo. Pode ser um processo que você iniciou, por isso Parar está desativado.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "O OpenBot não registrou qual agente iniciou este processo, então Parar está desativado.",
+  "settings.backgroundProcesses.stopRefused":
+    "Esta tarefa em segundo plano pertence a outro agente ou não pode ser interrompida daqui.",
+  "settings.backgroundProcesses.stopStillRunning": "O processo continua em execução após o pedido para parar.",
   "settings.backgroundProcesses.notFound": "O processo não está mais em execução.",
   "settings.keepRemoteSessions.title": "Conexão rápida a servidores",
   "settings.keepRemoteSessions.description":

@@ -1,4 +1,4 @@
-import type { BackgroundProcess } from "@openbot/contracts/ipc";
+import type { BackgroundProcess, BackgroundProcessStopResult } from "@openbot/contracts/ipc";
 import { createStore } from "solid-js";
 
 const ACTIVE_POLL_INTERVAL_MS = 5_000;
@@ -88,8 +88,8 @@ export function subscribeBackgroundProcesses(): () => void {
 }
 
 /** Stops one verified process, then refreshes at once so the row leaves before the next poll. */
-export async function stopBackgroundProcess(process: BackgroundProcess): Promise<boolean> {
+export async function stopBackgroundProcess(process: BackgroundProcess): Promise<BackgroundProcessStopResult> {
   const result = await window.openbot.backgroundProcesses.stop({ id: process.id, agentId: process.agentId });
   await refresh();
-  return result.stopped;
+  return result;
 }

@@ -28,6 +28,7 @@ import {
   screen,
   shell,
 } from "electron";
+import { configureAgentShell } from "../backend/agent/agent-shell";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { NewerDatabaseError } from "../backend/openbot-database-schema";
@@ -811,7 +812,7 @@ function registerIpcHandlers({
         service.listAgents().map((agent) => ({
           id: agent.id,
           workspacePath: agent.workspacePath,
-          folders: [agent.workspacePath, service.sharedRoot, ...(agent.additionalFolders ?? [])],
+          folders: [agent.workspacePath, ...(agent.additionalFolders ?? [])],
         })),
     }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials, openLink }),
@@ -1328,6 +1329,11 @@ if (!hasSingleInstanceLock) {
           await runCauseEffect(readSavedTransparentWindow(join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE))),
         );
       const mainWindow = windows.openMainWindow();
+
+      if (!(await configureAgentShell(join(app.getPath("userData"), "background-agents"))))
+        logger.warn(
+          "The agent shell wrappers could not be prepared, so a background task started by an Apple shell stays display only.",
+        );
 
       const built = await createApplicationServices({
         mainWindow,

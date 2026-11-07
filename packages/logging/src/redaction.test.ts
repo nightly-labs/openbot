@@ -167,6 +167,21 @@ describe("redactText", () => {
     expect(redactText('{"key":"pk_live_9f2b3c4d5e"}')).not.toContain("pk_live_9f2b3c4d5e");
   });
 
+  it("redacts command-line passwords and URL user info", () => {
+    expect(redactText("mysql -pS3cret -u root")).toBe("mysql -p[redacted] -u root");
+    expect(redactText("tool --password hunter2 --quiet")).toBe("tool --password [redacted] --quiet");
+    expect(redactText("postgres://user:hunter2@localhost:5432/db")).toBe(
+      "postgres://user:[redacted]@localhost:5432/db",
+    );
+    expect(redactText("postgres://user:p@ss@localhost/db")).toBe("postgres://user:[redacted]@localhost/db");
+    expect(redactText("curl -p 8080")).toBe("curl -p 8080");
+  });
+
+  it("leaves an already redacted argument unchanged when it passes through twice", () => {
+    const once = redactText("mysql -pS3cret --password hunter2 postgres://user:pw@localhost/db");
+    expect(redactText(once)).toBe(once);
+  });
+
   it("redacts a quoted credential whole instead of stopping at the first space", () => {
     expect(redactText('password: "my secret pass"')).toBe('password: "[redacted]"');
   });

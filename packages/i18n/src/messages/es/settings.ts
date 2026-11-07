@@ -140,6 +140,11 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Sin verificar",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot no inició este proceso. Puede ser un proceso que iniciaste tú, así que Detener está desactivado.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot no registró qué agente inició este proceso, así que Detener está desactivado.",
+  "settings.backgroundProcesses.stopRefused":
+    "Esta tarea en segundo plano pertenece a otro agente o no se puede detener desde aquí.",
+  "settings.backgroundProcesses.stopStillRunning": "El proceso sigue ejecutándose después de pedirle que se detenga.",
   "settings.backgroundProcesses.notFound": "El proceso ya no está en ejecución.",
   "settings.keepRemoteSessions.title": "Conexión rápida a servidores",
   "settings.keepRemoteSessions.description":

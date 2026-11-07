@@ -73,6 +73,8 @@ export const messages = {
   "chat.backgroundTasks.unverified": "未验证",
   "chat.backgroundTasks.unverifiedHint": "OpenBot 没有启动这个进程。它可能是你自己启动的进程，因此停止功能已禁用。",
   "chat.backgroundTasks.notFound": "这个进程已经不再运行。",
+  "chat.backgroundTasks.stopRefused": "这个后台任务属于其他 agent，或无法从这里停止。",
+  "chat.backgroundTasks.stopStillRunning": "请求停止后，进程仍在运行。",
   "chat.trace.title": "追踪",
   "chat.trace.search": "搜索步骤",
   "chat.trace.steps": "步骤",

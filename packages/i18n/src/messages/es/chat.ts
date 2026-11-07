@@ -74,6 +74,9 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot no inició este proceso. Puede ser un proceso que iniciaste tú, así que Detener está desactivado.",
   "chat.backgroundTasks.notFound": "El proceso ya no está en ejecución.",
+  "chat.backgroundTasks.stopRefused":
+    "Esta tarea en segundo plano pertenece a otro agente o no se puede detener desde aquí.",
+  "chat.backgroundTasks.stopStillRunning": "El proceso sigue ejecutándose después de pedirle que se detenga.",
   "chat.trace.title": "Traza",
   "chat.trace.search": "Buscar pasos",
   "chat.trace.steps": "Pasos",

@@ -74,6 +74,9 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot hat diesen Prozess nicht gestartet. Er kann von Ihnen gestartet worden sein, daher Stoppen ist deaktiviert.",
   "chat.backgroundTasks.notFound": "Der Prozess läuft nicht mehr.",
+  "chat.backgroundTasks.stopRefused":
+    "Diese Hintergrundaufgabe gehört zu einem anderen Agenten oder kann von hier nicht beendet werden.",
+  "chat.backgroundTasks.stopStillRunning": "Der Prozess läuft nach der Aufforderung zum Beenden weiter.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Schritte suchen",
   "chat.trace.steps": "Schritte",

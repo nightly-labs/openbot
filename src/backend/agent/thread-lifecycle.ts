@@ -48,6 +48,7 @@ import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDec
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import { AGENT_ID_VARIABLE } from "./agent-process";
+import { agentShellEnvironment } from "./agent-shell";
 import { readCodexMcpConfig } from "./codex-mcp-config";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -915,6 +916,14 @@ export class ThreadLifecycle {
         // The app-server is shared by every agent, so the agent id is set for each thread rather than
         // for the process. A command that a person starts in the terminal does not have it.
         [`shell_environment_policy.set.${AGENT_ID_VARIABLE}`]: agent.id,
+        // macOS hides the environment of the shells it ships, so the wrapper on `PATH` records the
+        // agent of a command that a session leaves running after its shell is gone.
+        ...Object.fromEntries(
+          Object.entries(agentShellEnvironment({ ...process.env, ...environment })).map(([name, value]) => [
+            `shell_environment_policy.set.${name}`,
+            value,
+          ]),
+        ),
       },
     };
   });

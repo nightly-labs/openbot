@@ -150,6 +150,8 @@ export const messages = {
   "chat.backgroundTasks.unverified": "غير مؤكد",
   "chat.backgroundTasks.unverifiedHint": "لم يبدأ OpenBot هذه العملية. قد تكون عملية بدأتها أنت، لذا الإيقاف معطّل.",
   "chat.backgroundTasks.notFound": "لم تعد هذه العملية قيد التشغيل.",
+  "chat.backgroundTasks.stopRefused": "هذه المهمة في الخلفية تخص وكيلاً آخر أو لا يمكن إيقافها من هنا.",
+  "chat.backgroundTasks.stopStillRunning": "لا تزال العملية قيد التشغيل بعد طلب الإيقاف.",
   "chat.trace.title": "التتبع",
   "chat.trace.search": "البحث في الخطوات",
   "chat.trace.steps": "الخطوات",

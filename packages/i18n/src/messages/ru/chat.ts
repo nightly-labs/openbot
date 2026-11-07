@@ -124,6 +124,9 @@ export const messages = {
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot не запускал этот процесс. Возможно, его запустили вы, поэтому остановка отключена.",
   "chat.backgroundTasks.notFound": "Этот процесс больше не выполняется.",
+  "chat.backgroundTasks.stopRefused":
+    "Эта фоновая задача принадлежит другому агенту или не может быть остановлена отсюда.",
+  "chat.backgroundTasks.stopStillRunning": "Процесс всё ещё выполняется после запроса остановки.",
   "chat.trace.title": "Трассировка",
   "chat.trace.search": "Искать шаги",
   "chat.trace.steps": "Шаги",

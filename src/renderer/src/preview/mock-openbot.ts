@@ -440,6 +440,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       ports: [5173],
       agentId: "research",
       verified: true,
+      stoppable: true,
     },
     {
       id: "51377:1",
@@ -449,6 +450,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       ports: [8000],
       agentId: null,
       verified: false,
+      stoppable: false,
     },
   ];
   const computerUseState = (): ComputerUseState => {

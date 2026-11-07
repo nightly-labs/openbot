@@ -102,8 +102,8 @@ export function BackgroundProcessesSection(props: BackgroundProcessesSectionProp
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={!process.verified || props.stopping.includes(process.id)}
-                    title={process.verified ? undefined : t("settings.backgroundProcesses.unverifiedHint")}
+                    disabled={!process.stoppable || props.stopping.includes(process.id)}
+                    title={process.stoppable ? undefined : t("settings.backgroundProcesses.notStoppableHint")}
                     aria-label={t("settings.backgroundProcesses.stopLabel", { pid: String(process.pid) })}
                     onClick={() => props.onStop(process)}
                   >

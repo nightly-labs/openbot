@@ -144,6 +144,11 @@ export const messages = defineMessages("settings", {
   "settings.backgroundProcesses.unverified": "Unverified",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot did not start this process. It may be a process that you started, so Stop is disabled.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot did not record which agent started this process, so Stop is disabled.",
+  "settings.backgroundProcesses.stopRefused":
+    "This background task belongs to another agent or cannot be stopped from here.",
+  "settings.backgroundProcesses.stopStillRunning": "The process is still running after it was asked to stop.",
   "settings.backgroundProcesses.notFound": "This process is no longer running.",
   "settings.keepRemoteSessions.title": "Fast connection to servers",
   "settings.keepRemoteSessions.description":
