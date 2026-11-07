@@ -94,7 +94,7 @@ export function compareModelVersions(left: AgentModelOption, right: AgentModelOp
  * context window of Claude Fable 5.1.
  */
 export function claudeModelName(id: string): string | null {
-  const parsed = /^([a-z0-9-]+?)(?:\[([a-z0-9]+)\])?$/u.exec(id.trim().toLowerCase());
+  const parsed = /^(?:cc\/)?([a-z0-9-]+?)(?:\[([a-z0-9]+)\])?$/u.exec(id.trim().toLowerCase());
   if (!parsed) return null;
   const [, base = "", variant] = parsed;
   const parts = base.split("-");
