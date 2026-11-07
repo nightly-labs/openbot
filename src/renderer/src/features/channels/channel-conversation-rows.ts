@@ -52,12 +52,13 @@ function foldedEntry(entry: ChannelMessage): boolean {
 
 /**
  * The rows of a channel page. The thinking and narration of a member's turn fold into one thinking
- * row, as in an agent chat, and show as the steps above the member's answer. Before, each part showed
+ * row, as in an agent chat, and show as the steps above the member's answer. With the Natural style
+ * the narration also shows as the member's progress updates (`narrationRows`). Before, each part showed
  * as a message, and a model that streams its whole reasoning (DeepSeek through OpenCode) showed a
  * very long one.
  */
 export function channelConversationRows(entries: readonly ChannelMessage[]): AgentMessage[] {
-  return toAgentMessages(
+  const rows = toAgentMessages(
     entries.map((entry) => ({ ...entry.message, id: entry.id })),
     undefined,
     (message, index) => {
@@ -65,6 +66,15 @@ export function channelConversationRows(entries: readonly ChannelMessage[]): Age
       return entry ? channelConversationMessage(entry) : toAgentMessage(message);
     },
   );
+  // A thinking row names the member of its turn, so its progress updates show as that member's.
+  const turnAuthors = new Map<string, string>();
+  for (const entry of entries)
+    if (entry.message.turnId && foldedEntry(entry) && entry.author.kind !== "member")
+      turnAuthors.set(entry.message.turnId, entry.author.id);
+  return rows.map((row) => {
+    const author = row.kind === "thinking" && row.turnId ? turnAuthors.get(row.turnId) : undefined;
+    return author ? { ...row, senderAgentId: author } : row;
+  });
 }
 
 /**

@@ -193,6 +193,8 @@ interface ClientEvents {
 /** Owns Pi's native sessions. The database owns OpenBot history and agent identity. */
 export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "request";
+  /** Pi names the phase of its text only at `message_end`, where text before a tool call becomes a step. */
+  readonly provisionalAnswers = true;
   /**
    * The memories and section-mates go with the prompts, so the system prompt that a reopened
    * session gets stays the same, and a live session gets a memory change too.
