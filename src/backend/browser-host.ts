@@ -354,7 +354,6 @@ function createBackgroundWindow(): BaseWindow {
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    closable: false,
   });
   window.setIgnoreMouseEvents(true);
   window.setOpacity(0);
@@ -3727,9 +3726,13 @@ export class BrowserHost {
       this.#tabs.get(tab.id) !== tab ||
       this.#activeTabId !== tab.id ||
       !tab.view.getVisible() ||
-      tab.contents.isDestroyed() ||
-      this.#inBackgroundWindow(tab.view)
+      tab.contents.isDestroyed()
     ) {
+      return;
+    }
+    // The page takes the focus when the main window shows again.
+    if (this.#inBackgroundWindow(tab.view)) {
+      tab.focusOnVisible = true;
       return;
     }
     tab.contents.focus();
@@ -3795,7 +3798,8 @@ export class BrowserHost {
   /** Moves the main window's views to the background window or back. True when they moved. */
   #syncBackgroundWindow(): boolean {
     const window = this.#window;
-    if (process.platform !== "darwin" || window.isDestroyed() || this.#destroying) return false;
+    // Hide OpenBot (⌘H) also hides the background window. Showing it then would show OpenBot again.
+    if (process.platform !== "darwin" || window.isDestroyed() || this.#destroying || app.isHidden()) return false;
     const background = !window.isVisible() || window.isMinimized();
     if (background === this.#mainViewsInBackground) return false;
     const from = this.#nativeParent(window);
