@@ -1,14 +1,19 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ClientSideConnection, ContentBlock, InitializeResponse } from "@agentclientprotocol/sdk";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import { parse as parseToml } from "smol-toml";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { GROK_ACP_FLAVOR } from "./acp-flavor";
 import type { GrokCliInfo } from "./cli";
+import { isMissingFileError } from "./file-errors";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
-import { confineSpawnTarget, grokStatePaths, type ProcessConfinement } from "./process-confinement";
-import { type AccountRateLimitsReadResult, getRecord, getString } from "./protocol";
+import { confineSpawnTarget, grokHomeDirectory, grokStatePaths, type ProcessConfinement } from "./process-confinement";
+import { type AccountRateLimitsReadResult, getRecord, getString, isRecord } from "./protocol";
 import { providerCall } from "./provider-client-effects";
 
 export class GrokAgentClient extends AcpAgentClient {
@@ -45,12 +50,12 @@ export class GrokAgentClient extends AcpAgentClient {
         "agent",
         "stdio",
       ],
-      // Grok declares `send_feedback` and `workflow` in each request, about 6.7k characters. Feedback
-      // goes to xAI, and a workflow runs a background agent fleet that OpenBot does not show. Without
-      // workflows Grok declares `update_goal`, about 1k characters. Grok `agent stdio` ignores
-      // `--disallowed-tools`, so only these switches remove the tools.
-      env: { GROK_OAUTH2_REFERRER: "openbot", GROK_FEEDBACK_ENABLED: "0", GROK_WORKFLOWS: "0" },
-      ...(agentEnvironment ? { extraEnv: () => ({ ...agentEnvironment() }) } : {}),
+      env: { GROK_OAUTH2_REFERRER: "openbot" },
+      // Read at each spawn, so a change to the user's `config.toml` applies to the next process.
+      extraEnv: () => {
+        const environment = { ...agentEnvironment?.() };
+        return { ...grokFeatureEnvironment({ ...process.env, ...environment }), ...environment };
+      },
       history,
       signInMessage: sourceText("error.provider.grokSignIn"),
       authenticate,
@@ -61,6 +66,82 @@ export class GrokAgentClient extends AcpAgentClient {
       steer,
     });
   }
+}
+
+/**
+ * Grok features that OpenBot agents do not use, each with its `config.toml` key and the environment
+ * value that turns it off. Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only
+ * these switches remove a tool. Measured with `bun run bench:grok-prompt-settings` on Grok CLI 1.0.70
+ * and Grok Build Fast, in prompt tokens:
+ * - `send_feedback` and `workflow`: 1,707 in each request. Feedback goes to xAI, and a workflow runs
+ *   a background agent fleet that OpenBot does not show. Without workflows Grok declares `update_goal`.
+ * - The turn summary: one more request of about 1,600 after each turn, for a line that OpenBot does
+ *   not show.
+ * - The skills of `~/.claude/skills`: 2,811 in each request with one developer's skills. OpenBot runs
+ *   Claude agents without the user's Claude Code setup by default, too.
+ * The image, video, search, subagent and question tools stay (2026-11-07 user decision): together
+ * they cost 6,104, but an agent can use each of them.
+ */
+const GROK_FEATURE_SWITCHES: ReadonlyArray<{ key: string; env: string }> = [
+  { key: "features.feedback", env: "GROK_FEEDBACK_ENABLED" },
+  { key: "workflows.enabled", env: "GROK_WORKFLOWS" },
+  { key: "features.turn_summary", env: "GROK_TURN_SUMMARY" },
+  { key: "compat.claude.skills", env: "GROK_CLAUDE_SKILLS_ENABLED" },
+];
+
+/**
+ * The environment values that turn off `GROK_FEATURE_SWITCHES`. An environment value wins over all
+ * Grok config layers, so OpenBot sets one only for a feature that neither the user's environment nor
+ * a config layer sets. When a layer does not read or parse, OpenBot sets none, so that it never hides
+ * a value of the user. A project `.grok/config.toml` sets only MCP servers, plugins and permissions.
+ */
+function grokFeatureEnvironment(env: NodeJS.ProcessEnv, home = homedir()): Record<string, string> {
+  const layers = grokConfigLayers(env, grokHomeDirectory(env, home));
+  if (!layers) return {};
+  return Object.fromEntries(
+    GROK_FEATURE_SWITCHES.filter(
+      (feature) => !env[feature.env]?.trim() && !layers.some((layer) => hasConfigKey(layer, feature.key)),
+    ).map((feature) => [feature.env, "0"]),
+  );
+}
+
+/**
+ * The parsed config layers that Grok reads below the environment: `managed_config.toml` and
+ * `config.toml` of the Grok home, the `GROK_CONFIG_PATH` file (JSON or TOML) and the `GROK_CONFIG`
+ * JSON. A missing file is no layer. Null when a layer does not read or parse.
+ */
+function grokConfigLayers(env: NodeJS.ProcessEnv, grokHome: string): DynamicRecord[] | null {
+  const files = [join(grokHome, "managed_config.toml"), join(grokHome, "config.toml"), env.GROK_CONFIG_PATH?.trim()];
+  const inline = env.GROK_CONFIG?.trim();
+  try {
+    const layers = files.flatMap((file) => {
+      const text = file ? readOptionalFile(file) : null;
+      if (text === null) return [];
+      return [file?.endsWith(".json") ? JSON.parse(text) : parseToml(text)];
+    });
+    if (inline) layers.push(JSON.parse(inline));
+    return layers.every(isRecord) ? layers : null;
+  } catch {
+    return null;
+  }
+}
+
+function readOptionalFile(file: string): string | null {
+  try {
+    return readFileSync(file, "utf8");
+  } catch (error) {
+    if (isMissingFileError(error)) return null;
+    throw error;
+  }
+}
+
+/** Whether a config layer sets a dotted key, such as `features.turn_summary`. */
+function hasConfigKey(layer: DynamicRecord, key: string): boolean {
+  const [part = "", ...rest] = key.split(".");
+  if (!Object.hasOwn(layer, part)) return false;
+  if (rest.length === 0) return true;
+  const value = layer[part];
+  return isRecord(value) && hasConfigKey(value, rest.join("."));
 }
 
 const authenticate = Effect.fn("Grok.authenticate")(function* (
