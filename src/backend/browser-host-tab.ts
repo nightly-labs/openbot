@@ -78,6 +78,8 @@ export interface BrowserHostTab {
   scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
+  /** How often the page renderer crashed. A `run_script` stops when this changes. */
+  crashes?: number;
   /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
   documents: number;
   /**

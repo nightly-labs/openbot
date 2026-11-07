@@ -304,7 +304,7 @@ export function developerInstructions(
   const style = options.responseStyle ?? DEFAULT_RESPONSE_STYLE;
   return [
     STYLE_OPENING[style],
-    `Next to your direct tools, openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly, such as openbot_browser.snapshot. tool_call does not run bridge tools. Search before you say you do not have a tool.${
+    `Next to your direct tools, openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly, such as openbot_browser.snapshot. tool_call does not run bridge tools. Browser tools need no search: call tool_call {"name":"openbot_browser.open","arguments":{"url":"https://…"}} at once, or openbot_browser.list_tabs {} or openbot_browser.snapshot {"tabId":"…"} in the same form. The first browser result brings the other browser schemas and guidance. Search before you say you do not have a tool.${
       // Codex makes the `openbot` namespace direct-only (`CODEX_DIRECT_ONLY_NAMESPACES`), so `exec`
       // leaves it out of `ALL_TOOLS`; a model that looked only there said the browser was gone (#5036).
       agent.provider === "codex" ? " In exec, ALL_TOOLS does not list the openbot tools; call them directly." : ""

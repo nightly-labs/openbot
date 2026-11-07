@@ -97,6 +97,7 @@ import {
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
 import { BrowserRecorder } from "./browser-recorder";
 import {
+  BROWSER_PAGE_CRASH_RELOADED,
   BROWSER_SCRIPT_USER_CONTROL_ERROR,
   type BrowserScriptResult,
   type BrowserStepOutcome,
@@ -2046,7 +2047,14 @@ export class BrowserHost {
       Effect.gen({ self: this }, function* () {
         const tab = yield* this.open(args.url, params.threadId, params.ownerAgentId ?? null);
         this.#controls.updateTab(params, tab.id);
-        return textResult({ tab });
+        // The agent reads a page that it opens, so the first snapshot comes with the tab and saves a call.
+        const read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        if (Result.isSuccess(read)) return snapshotTextResult(read.success);
+        const error = read.failure.cause;
+        return textResult({
+          tab,
+          snapshotError: redactText(error instanceof Error ? error.message : String(error)),
+        });
       }),
     list_tabs: (_call, params) => browserSync(() => textResult(this.#toolTabs(params))),
     status: (_call, params) =>
@@ -2239,11 +2247,23 @@ export class BrowserHost {
       Effect.gen({ self: this }, function* () {
         const tabId = args.tabId;
         yield* browserSync(() => this.#requireToolTab(params, tabId));
+        // A step after a renderer crash would act on a reloaded page with refs from the old one.
+        const crashesAtStart = this.#tabs.get(tabId)?.crashes ?? 0;
+        const crashed = () => (this.#tabs.get(tabId)?.crashes ?? 0) !== crashesAtStart;
         const run: BrowserScriptResult = yield* runBrowserScript({
           script: args.script,
           timeoutMs: args.timeoutMs ?? BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS,
           maxSteps: BROWSER_SCRIPT_MAX_STEPS,
-          runStep: (step) => this.#runStep(params, tabId, step, hooks),
+          // A step that waits for the crashed page gets no answer until its timeout.
+          runStep: (step) =>
+            crashed()
+              ? Effect.succeed<BrowserStepOutcome>({ status: "page_crashed" })
+              : Effect.raceFirst(
+                  this.#runStep(params, tabId, step, hooks).pipe(
+                    Effect.map((outcome): BrowserStepOutcome => (crashed() ? { status: "page_crashed" } : outcome)),
+                  ),
+                  this.#rendererGone(tabId),
+                ),
         });
         let result: BrowserScriptResult = run;
         let snapshot: BrowserSnapshot | undefined;
@@ -2613,6 +2633,9 @@ export class BrowserHost {
               true,
             ),
           };
+        case "sleep":
+          yield* Effect.sleep(step.ms);
+          return { status: "ok" };
         case "snapshot":
           return {
             status: "ok",
@@ -3377,6 +3400,27 @@ export class BrowserHost {
       this.#emitChanged();
     });
     contents.on("page-title-updated", changed);
+    // An agent tab whose renderer crashed loads its page again on the next browser call, so the
+    // agent does not fail on a dead tab. A secret, a typed card, or a person's control keeps the
+    // crashed page: a reload could send a form again or lose what the person did.
+    contents.on("render-process-gone", (_event, details) => {
+      if (tab.closing || tab.contents !== contents || contents.isDestroyed() || details.reason === "clean-exit") return;
+      tab.crashes = (tab.crashes ?? 0) + 1;
+      if (tab.secret) return;
+      const reload =
+        (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
+        !tab.filledCard &&
+        !tab.pendingRestore &&
+        !this.#takeoverTabIds.has(tab.id) &&
+        !this.#userControlTabIds.has(tab.id);
+      tab.diagnostics.add({
+        kind: "load",
+        level: "error",
+        message: reload ? BROWSER_PAGE_CRASH_RELOADED : "The page crashed. OpenBot did not reload it.",
+      });
+      if (reload) tab.pendingRestore = () => reloadCrashedPage(tab);
+      this.#emitChanged();
+    });
     // Chromium gives a visible page the focus when a new document commits. A navigation that an
     // agent or the page starts must not take the keys from a person who types in the app.
     let focusedBeforeCommit: WebContents | null = null;
@@ -3740,6 +3784,19 @@ export class BrowserHost {
     if (this.#attachedView === view) this.#attachedView = null;
   }
 
+  /** Succeeds when the renderer of the tab's page crashes. */
+  #rendererGone(tabId: string): Effect.Effect<BrowserStepOutcome> {
+    return Effect.callback<BrowserStepOutcome>((resume) => {
+      const contents = this.#tabs.get(tabId)?.contents;
+      if (!contents || contents.isDestroyed()) return;
+      const gone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails) => {
+        if (details.reason !== "clean-exit") resume(Effect.succeed({ status: "page_crashed" }));
+      };
+      contents.on("render-process-gone", gone);
+      return Effect.sync(() => contents.off("render-process-gone", gone));
+    });
+  }
+
   readonly #requireTab = Effect.fn("BrowserHost.requireTab")(function* (this: BrowserHost, tabId: string) {
     const tab = this.#tabs.get(tabId);
     if (!tab) return yield* browserFailure(new Error(`Unknown browser tab: ${tabId}`));
@@ -3974,6 +4031,20 @@ function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolea
   const current = currentPreviewPage(tab);
   return page.url === current.url && page.document === current.document && page.generation === current.generation;
 }
+const CRASH_RELOAD_TIMEOUT_MS = 30_000;
+
+/** Loads the address of the crashed page in a new renderer. */
+const reloadCrashedPage = Effect.fn("BrowserHost.reloadCrashedPage")(function* (tab: BrowserHostTab) {
+  const url = currentTabUrl(tab);
+  // A CDP command to the crashed page gets no answer, so the page loads first. A failed load shows
+  // its error page, which the next snapshot reports.
+  yield* browserCall(() => tab.contents.loadURL(url && url !== "about:blank" ? url : tab.requestedUrl)).pipe(
+    Effect.timeoutOption(CRASH_RELOAD_TIMEOUT_MS),
+    Effect.ignore,
+  );
+  yield* tab.engine.setEnvironment(tab.environment);
+});
+
 const loadSavedPage = Effect.fn("BrowserHost.loadSavedPage")(function* (tab: BrowserHostTab) {
   yield* browserCall(() => tab.contents.loadURL("about:blank"));
   yield* tab.engine.setEnvironment(tab.environment);
