@@ -135,6 +135,7 @@ export const messages = {
   "conversation.voice.speakNow": "تحدّث الآن",
   "conversation.voice.mute": "كتم الميكروفون",
   "conversation.voice.interrupt": "مقاطعة",
+  "conversation.voice.start": "بدء محادثة صوتية",
   "conversation.voice.end": "إنهاء المحادثة الصوتية",
   "conversation.voice.error": "تعذّر بدء المحادثة الصوتية.",
   "conversation.voice.notSent": "لم تُرسَل الرسالة. تحدّث مرة أخرى.",

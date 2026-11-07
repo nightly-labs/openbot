@@ -128,6 +128,7 @@ export const messages = {
   "conversation.voice.speakNow": "现在可以说话",
   "conversation.voice.mute": "麦克风静音",
   "conversation.voice.interrupt": "打断",
+  "conversation.voice.start": "开始语音对话",
   "conversation.voice.end": "结束语音对话",
   "conversation.voice.error": "无法开始语音对话。",
   "conversation.voice.notSent": "消息未发送。请再说一次。",

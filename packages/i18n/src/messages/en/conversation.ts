@@ -130,6 +130,7 @@ export const messages = defineMessages("conversation", {
   "conversation.voice.speakNow": "Speak now",
   "conversation.voice.mute": "Mute the microphone",
   "conversation.voice.interrupt": "Interrupt",
+  "conversation.voice.start": "Start voice conversation",
   "conversation.voice.end": "End voice conversation",
   "conversation.voice.error": "The voice conversation could not start.",
   "conversation.voice.notSent": "The message was not sent. Speak again.",

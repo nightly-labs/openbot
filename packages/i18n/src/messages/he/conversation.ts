@@ -132,6 +132,7 @@ export const messages = {
   "conversation.voice.speakNow": "אפשר לדבר",
   "conversation.voice.mute": "השתקת המיקרופון",
   "conversation.voice.interrupt": "הפסקה",
+  "conversation.voice.start": "התחלת שיחה קולית",
   "conversation.voice.end": "סיום השיחה הקולית",
   "conversation.voice.error": "לא ניתן להתחיל את השיחה הקולית.",
   "conversation.voice.notSent": "ההודעה לא נשלחה. יש לדבר שוב.",

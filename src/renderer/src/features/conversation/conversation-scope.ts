@@ -415,6 +415,11 @@ export function createConversationViewScope(props: ConversationProps) {
   const startingDeliveryIds = createMemo(
     () => new Set(currentPendingSends().flatMap((send) => (send.starting && send.messageId ? [send.messageId] : []))),
   );
+  // A message goes, or the host starts its turn: the agent has no turn yet, but it soon works. A send
+  // that waits behind a failed one does not go until Retry or Dismiss, so it does not count.
+  const sendStarting = createMemo(() =>
+    currentPendingSends().some((send) => send.state === "sending" || send.starting),
+  );
   const queue = createQueueStore({ props, hiddenAwaitingReplyIds, startingDeliveryIds });
   const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
   const awaitingReplies = channel
@@ -2243,6 +2248,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editingDeliveryId: currentEditingDeliveryId,
     cancelQueuedMessageEdit,
     editingPendingSave,
+    sendStarting,
     expandedEmojiMessageId,
     scrollFades,
     filesOpen,

@@ -133,6 +133,7 @@ export const messages = {
   "conversation.voice.speakNow": "Şimdi konuş",
   "conversation.voice.mute": "Mikrofonu sessize al",
   "conversation.voice.interrupt": "Böl",
+  "conversation.voice.start": "Sesli konuşma başlat",
   "conversation.voice.end": "Sesli konuşmayı bitir",
   "conversation.voice.error": "Sesli konuşma başlatılamadı.",
   "conversation.voice.notSent": "Mesaj gönderilmedi. Yeniden konuş.",
