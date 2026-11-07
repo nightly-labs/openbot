@@ -117,27 +117,12 @@
   animation-delay: 340ms;
 }
 
-/* The follow request: one main button with the network mark, below the thanks. It has the size of the
-   toast buttons. */
-.social-follow-toast-follow {
-  display: flex;
+/* The follow request: one main button with the network mark, below the thanks. It uses the shared
+   toast button row, but starts at the words, not at the end edge. */
+.social-follow-toast .social-follow-toast-follow {
+  justify-content: flex-start;
+  margin-inline-end: 0;
   animation: social-follow-rise var(--openbot-duration-overlay) var(--openbot-ease-out) 120ms both;
-}
-
-.social-follow-toast-follow .ui-button {
-  height: var(--openbot-control-sm);
-  border-radius: var(--openbot-radius-sm);
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    border-color var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    box-shadow var(--openbot-duration-hover) ease,
-    opacity var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-normal) var(--openbot-ease-out);
-}
-
-.social-follow-toast-follow .ui-button:active {
-  transform: scale(0.96);
 }
 
 .social-follow-toast .social-follow-network {

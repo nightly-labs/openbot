@@ -1942,7 +1942,8 @@ html.ui-textarea-resizing {
   box-shadow: var(--openbot-focus-ring);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible {
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible,
+.ui-toast-card-close:focus-visible {
   outline: 0;
   box-shadow:
     inset 0 0 0 1px var(--openbot-border-strong),
@@ -1950,8 +1951,11 @@ html.ui-textarea-resizing {
 }
 
 /* A small round button on the top right corner of the card, with 6px of it outside the card. The 1px
-   ring separates it from the card; it has no drop shadow. */
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button] {
+   ring separates it from the card; it has no drop shadow. A toast that its caller draws (an unstyled
+   sonner toast) uses the same control with the `ui-toast-card-close` class. */
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button],
+.ui-toast-card-close {
+  position: absolute;
   top: calc(-1 * var(--openbot-space-1-5));
   inset-inline-end: calc(-1 * var(--openbot-space-1-5));
   inset-inline-start: auto;
@@ -1973,7 +1977,8 @@ html.ui-textarea-resizing {
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]::after {
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]::after,
+.ui-toast-card-close::after {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1984,14 +1989,17 @@ html.ui-textarea-resizing {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button] {
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button],
+  .ui-toast-card-close {
     pointer-events: none;
     opacity: 0;
   }
 
   .ui-toaster [data-sonner-toast][data-styled="true"]:hover [data-close-button],
   .ui-toaster [data-sonner-toast][data-styled="true"]:focus-within [data-close-button],
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible {
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible,
+  [data-sonner-toast]:hover .ui-toast-card-close,
+  [data-sonner-toast]:focus-within .ui-toast-card-close {
     pointer-events: auto;
     opacity: 1;
   }
@@ -2006,7 +2014,8 @@ html.ui-textarea-resizing {
   }
 
   /* Close is a calm action, not a destructive one. */
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:hover:not(:focus-visible) {
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:hover:not(:focus-visible),
+  .ui-toast-card-close:hover:not(:focus-visible) {
     background: var(--openbot-bg-control-active);
     color: var(--openbot-text-primary);
   }
@@ -2024,53 +2033,16 @@ html.ui-textarea-resizing {
   transform: scale(0.96);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:active {
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:active,
+.ui-toast-card-close:active {
   transform: scale(0.96);
 }
 
-/* A toast that its caller draws (an unstyled sonner toast) uses the close control and the buttons of
-   the shared toast. The card has 16px of end padding; the button row sits 8px from the end edge. */
-.ui-toast-card-close {
-  position: absolute;
-  top: calc(-1 * var(--openbot-space-1-5));
-  inset-inline-end: calc(-1 * var(--openbot-space-1-5));
-  width: var(--openbot-icon-lg);
-  height: var(--openbot-icon-lg);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-surface-raised);
-  box-shadow: 0 0 0 1px var(--openbot-border-strong);
-  color: var(--openbot-text-muted);
-  transition:
-    background-color var(--openbot-duration-normal) ease,
-    color var(--openbot-duration-normal) ease,
-    opacity var(--openbot-duration-normal) ease,
-    transform var(--openbot-duration-normal) var(--openbot-ease-out);
-}
-
+/* A toast that its caller draws (an unstyled sonner toast) uses the buttons of the shared toast. The
+   card has 16px of end padding; the button row sits 8px from the end edge. */
 .ui-toast-card-close > svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
-}
-
-.ui-toast-card-close::after {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--openbot-control-xl);
-  height: var(--openbot-control-xl);
-  content: "";
-  transform: translate(-50%, -50%);
-}
-
-.ui-toast-card-close:focus-visible {
-  outline: 0;
-  box-shadow:
-    inset 0 0 0 1px var(--openbot-border-strong),
-    0 0 0 2px var(--openbot-border-strong);
-}
-
-.ui-toast-card-close:active {
-  transform: scale(0.96);
 }
 
 .ui-toast-card-actions {
@@ -2103,22 +2075,6 @@ html.ui-textarea-resizing {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .ui-toast-card-close {
-    pointer-events: none;
-    opacity: 0;
-  }
-
-  [data-sonner-toast]:hover .ui-toast-card-close,
-  [data-sonner-toast]:focus-within .ui-toast-card-close {
-    pointer-events: auto;
-    opacity: 1;
-  }
-
-  .ui-toast-card-close:hover:not(:focus-visible) {
-    background: var(--openbot-bg-control-active);
-    color: var(--openbot-text-primary);
-  }
-
   .ui-toast-card-actions .ui-button-variant-ghost:hover {
     background: var(--openbot-bg-control-hover);
     color: var(--openbot-text-primary);

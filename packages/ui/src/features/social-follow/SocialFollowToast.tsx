@@ -108,7 +108,7 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
                   <strong id={titleId}>{t("app.socialFollow.thanksTitle")}</strong>
                   <p role="status">{postedLabel(step().network, step().result)}</p>
                 </div>
-                <div class="social-follow-toast-follow">
+                <div class="social-follow-toast-follow ui-toast-card-actions">
                   <Button type="button" variant="default" size="sm" onClick={() => props.onFollow(step().network)}>
                     <SocialNetworkMark network={step().network.id} class="social-follow-mark" />
                     {followLabel(step().network)}
