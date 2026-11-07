@@ -11,16 +11,15 @@
 // request. A variant that drops a feature shows it as a missing tool or skill.
 // Costs a few dozen Haiku turns. `bun run bench:claude-prompt-settings`; `--variant=<name>` runs one
 // variant; `--setup=off|on` runs one setup; `--model=<id>` replaces Claude Haiku. Writes .openbot-build/claude-prompt-settings-bench/report.json.
-import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
-import { type Options, query, type Settings } from "@anthropic-ai/claude-agent-sdk";
-import { CLAUDE_UNFIT_SKILLS, ClaudeAgentClient } from "../src/backend/claude-client";
+import { mkdtemp, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import type { Options, Settings } from "@anthropic-ai/claude-agent-sdk";
+import { CLAUDE_UNFIT_SKILLS } from "../src/backend/claude-client";
 import { type ClaudeCliInfo, resolveClaudeCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
+import { makeGitWorkspace, messageNames, observedQuery, removeRun, startClaudeAgent } from "./claude-agent-harness";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/claude-prompt-settings-bench");
 const REPLY_PROMPT = "Reply with the single word OK. Do not use any tool.";
@@ -137,16 +136,6 @@ const report: {
   runs: [],
 };
 
-function startedThreadId(value: unknown): string {
-  const id = getString(getRecord(value, "thread"), "id");
-  if (!id) throw new Error("thread/start returned no thread id.");
-  return id;
-}
-
-function git(cwd: string, ...args: string[]): void {
-  execFileSync("git", ["-c", "user.name=OpenBot", "-c", "user.email=e2e@openbot.invalid", ...args], { cwd });
-}
-
 /**
  * The query's flag settings with the variant's changes. The client has no state folder here, so it
  * writes no sign-in settings file and the flag settings are an object.
@@ -168,89 +157,40 @@ function withVariantSettings(options: Options, variant: Variant): Options {
   };
 }
 
-const names = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.map((entry) => (typeof entry === "string" ? entry : (getString(entry, "name") ?? JSON.stringify(entry))))
-    : [];
-
 for (const userSetup of setups) {
   for (const variant of variants) {
     const workspace = join(root, `${variant.name}-${userSetup ? "setup" : "plain"}`);
     mkdirSync(workspace, { recursive: true });
-    await writeFile(join(workspace, "notes.md"), "# Garden plan\n\nTomatoes by the wall.\n");
-    await writeFile(join(workspace, "count.txt"), "42\n");
-    git(workspace, "init", "-q");
-    git(workspace, "add", ".");
-    git(workspace, "commit", "-q", "-m", "Start");
+    await makeGitWorkspace(workspace);
 
     let requests = new Map<string, RequestUsage>();
     let init: InitReport | null = null;
-    const createQuery = (params: Parameters<typeof query>[0]) => {
-      const options = params.options ? withVariantSettings(params.options, variant) : params.options;
-      const real = query({ ...params, ...(options ? { options } : {}) });
-      const iterate = real[Symbol.asyncIterator].bind(real);
-      return Object.assign(real, {
-        async *[Symbol.asyncIterator]() {
-          const iterator = iterate();
-          for (;;) {
-            const next = await iterator.next();
-            if (next.done) return;
-            const message = next.value;
-            if (message.type === "system" && message.subtype === "init") {
-              init = {
-                tools: [...message.tools].sort(),
-                skills: names(message.skills).sort(),
-                slashCommands: names(message.slash_commands).sort(),
-                mcpServers: message.mcp_servers.map((server) => `${server.name}:${server.status}`).sort(),
-                plugins: names(message.plugins).sort(),
-                agents: names(message.agents).sort(),
-              };
-            }
-            // A message repeats its request once per content block; the last copy has the final count.
-            if (message.type === "assistant" && message.parent_tool_use_id === null) {
-              const usage = message.message.usage;
-              requests.set(message.message.id, {
-                input: usage.input_tokens,
-                cacheRead: usage.cache_read_input_tokens ?? 0,
-                cacheWrite: usage.cache_creation_input_tokens ?? 0,
-                output: usage.output_tokens,
-              });
-            }
-            yield message;
-          }
-        },
-      });
-    };
-
-    const client = new ClaudeAgentClient(
-      cli,
-      createQuery,
-      undefined,
-      120_000,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      () => userSetup,
+    const createQuery = observedQuery(
+      (message) => {
+        if (message.type === "system" && message.subtype === "init") {
+          init = {
+            tools: [...message.tools].sort(),
+            skills: messageNames(message.skills).sort(),
+            slashCommands: messageNames(message.slash_commands).sort(),
+            mcpServers: message.mcp_servers.map((server) => `${server.name}:${server.status}`).sort(),
+            plugins: messageNames(message.plugins).sort(),
+            agents: messageNames(message.agents).sort(),
+          };
+        }
+        // A message repeats its request once per content block; the last copy has the final count.
+        if (message.type === "assistant" && message.parent_tool_use_id === null) {
+          const usage = message.message.usage;
+          requests.set(message.message.id, {
+            input: usage.input_tokens,
+            cacheRead: usage.cache_read_input_tokens ?? 0,
+            cacheWrite: usage.cache_creation_input_tokens ?? 0,
+            output: usage.output_tokens,
+          });
+        }
+      },
+      (options) => withVariantSettings(options, variant),
     );
-    const completions = new Map<string, () => void>();
-    const failures: string[] = [];
-    client.on("notification", (notification: AppServerNotification) => {
-      if (notification.method === "error") failures.push(JSON.stringify(notification.params));
-      if (notification.method !== "turn/completed") return;
-      // A turn can end as failed or interrupted with no error notification.
-      const status = getString(getRecord(notification.params, "turn"), "status");
-      if (status !== "completed") failures.push(`turn ended as ${status ?? "unknown"}`);
-      const threadId = getString(notification.params, "threadId");
-      if (threadId) completions.get(threadId)?.();
-    });
-    // A tool call asks for approval. The bench accepts each one, as a user who allows the step.
-    client.on("request", (request) => client.respond(request.id, { decision: "accept" }));
-    client.start();
+    const agent = startClaudeAgent(cli, createQuery, { userSetup, requestTimeoutMs: 120_000 });
 
     const run: RunReport = {
       variant: variant.name,
@@ -267,21 +207,16 @@ for (const userSetup of setups) {
       developerInstructions: "You are Ada, a careful assistant in an end-to-end benchmark.",
     };
     const runTurn = async (step: string, prompt: string) => {
-      const threadId = await runCauseEffect(client.request("thread/start", threadParams, startedThreadId));
+      const threadId = await agent.startThread(threadParams);
       requests = new Map();
       init = null;
-      const done = new Promise<void>((resolve) => completions.set(threadId, resolve));
-      await runCauseEffect(
-        client.request(
-          "turn/start",
-          { threadId, model: MODEL, input: [{ type: "text", text: prompt }] },
-          (value) => value,
-        ),
-      );
-      await done;
-      completions.delete(threadId);
-      await runCauseEffect(client.releaseThread(threadId));
-      if (failures.length > 0) throw new Error(`Turn ${step} failed: ${failures.join("; ")}`);
+      try {
+        await agent.runTurn(threadId, MODEL, prompt);
+      } catch (error) {
+        throw new Error(`Turn ${step} failed: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        await runCauseEffect(agent.client.releaseThread(threadId));
+      }
       const list = [...requests.values()];
       const prompted = (usage: RequestUsage) => usage.input + usage.cacheRead + usage.cacheWrite;
       run.turns.push({
@@ -300,7 +235,7 @@ for (const userSetup of setups) {
     } catch (error) {
       run.error = error instanceof Error ? error.message : String(error);
     } finally {
-      await runCauseEffect(client.stop()).catch(() => undefined);
+      await agent.stop();
     }
     report.runs.push(run);
     const reply = run.turns[0];
@@ -316,14 +251,7 @@ for (const userSetup of setups) {
   }
 }
 
-// The CLI keeps each session under ~/.claude/projects in a folder named after the workspace path.
-// Only the folders of this run's temporary workspaces are removed.
-const projects = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
-const runName = basename(root);
-for (const entry of await readdir(projects).catch(() => [])) {
-  if (entry.includes(runName)) await rm(join(projects, entry), { recursive: true, force: true });
-}
-await rm(root, { recursive: true, force: true });
+await removeRun(root);
 
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

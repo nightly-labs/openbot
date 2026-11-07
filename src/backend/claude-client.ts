@@ -200,7 +200,7 @@ export const CLAUDE_UNFIT_SKILLS = [
   "workflow-authoring",
 ];
 /** Bundled coding skills. The model sees their names without their descriptions and can still use them. */
-export const CLAUDE_NAME_ONLY_SKILLS = [
+const CLAUDE_NAME_ONLY_SKILLS = [
   "batch",
   "claude-api",
   "code-review",
@@ -222,33 +222,36 @@ export const CLAUDE_NAME_ONLY_SKILLS = [
  * without the user setup: 16,350 tokens before the skill overrides and Remote Control setting, 14,156
  * after; then 14,130 before `CLAUDE_HOST_TOOLS`, the extra skills and `attribution`.
  *
- * Flag settings come before the user and project settings, so a value of OpenBot would replace a
- * value that the user set. The query leaves out each skill override whose name is a skill of the
- * user or the project that the query loads, and, with the user setup, each key that the user's own
- * settings set.
+ * Flag settings come before the user, project and local settings, so a value of OpenBot would
+ * replace a value that the user set. The query leaves out each skill override whose name is a skill
+ * of the user or the project that the query loads, and each key that a settings file it loads sets.
  */
 const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
   configDirectory: string,
   cwd: string,
   sources: NonNullable<Options["settingSources"]>,
 ) {
-  const userSettings = sources.includes("user") ? yield* readClaudeUserSettings(configDirectory) : {};
+  const files = [
+    ...(sources.includes("user") ? [join(configDirectory, "settings.json")] : []),
+    ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
+    ...(sources.includes("local") ? [join(cwd, ".claude", "settings.local.json")] : []),
+  ];
+  const ownSettings = yield* Effect.forEach(files, readClaudeSettingsFile);
   const ownSkills = new Set([
     ...(sources.includes("user") ? yield* skillFolderNames(join(configDirectory, "skills")) : []),
     ...(sources.includes("project") ? yield* skillFolderNames(join(cwd, ".claude", "skills")) : []),
   ]);
-  const userOverrides = isDynamicRecord(userSettings.skillOverrides) ? userSettings.skillOverrides : {};
+  const ownOverride = (skill: string) =>
+    ownSettings.some((file) => isDynamicRecord(file.skillOverrides) && Object.hasOwn(file.skillOverrides, skill));
   const overrides: Array<[string, "off" | "name-only"]> = [
     ...CLAUDE_UNFIT_SKILLS.map((skill): [string, "off"] => [skill, "off"]),
     ...CLAUDE_NAME_ONLY_SKILLS.map((skill): [string, "name-only"] => [skill, "name-only"]),
   ];
-  const ownAttribution = "attribution" in userSettings || "includeCoAuthoredBy" in userSettings;
+  const ownAttribution = ownSettings.some((file) => "attribution" in file || "includeCoAuthoredBy" in file);
   const settings: Settings = {
     ...(ownAttribution ? {} : { attribution: { commit: "", pr: "" } }),
     disableRemoteControl: true,
-    skillOverrides: Object.fromEntries(
-      overrides.filter(([skill]) => !ownSkills.has(skill) && !Object.hasOwn(userOverrides, skill)),
-    ),
+    skillOverrides: Object.fromEntries(overrides.filter(([skill]) => !ownSkills.has(skill) && !ownOverride(skill))),
   };
   return settings;
 });
@@ -493,19 +496,17 @@ function claudeSettingSources(
 }
 
 /**
- * The user settings file. A missing or unreadable file, or one that is not a JSON object, gives an
+ * One Claude settings file. A missing or unreadable file, or one that is not a JSON object, gives an
  * empty record. The file can hold secrets, so no value of it is logged.
  */
-const readClaudeUserSettings = Effect.fn("readClaudeUserSettings")(function* (configDirectory: string) {
-  const text = yield* Effect.tryPromise(() => readFile(join(configDirectory, "settings.json"), "utf8")).pipe(
-    Effect.option,
-  );
+const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (path: string) {
+  const text = yield* Effect.tryPromise(() => readFile(path, "utf8")).pipe(Effect.option);
   if (Option.isNone(text)) return {};
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.value);
   } catch {
-    queryLogger.warn("OpenBot reads no Claude settings from ~/.claude/settings.json: the file is not valid JSON.");
+    queryLogger.warn("OpenBot reads no values from a Claude settings file: the file is not valid JSON.", { path });
     return {};
   }
   const record: DynamicRecord = isDynamicRecord(parsed) ? parsed : {};
@@ -520,7 +521,7 @@ const readClaudeUserSettings = Effect.fn("readClaudeUserSettings")(function* (co
  * A missing or unreadable file gives nothing. The file can hold secrets, so no value of it is logged.
  */
 const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (configDirectory: string) {
-  const parsed = yield* readClaudeUserSettings(configDirectory);
+  const parsed = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
   const stringSetting = (key: string): string | null => {
     const value = parsed[key];
     return isString(value) ? value : null;
