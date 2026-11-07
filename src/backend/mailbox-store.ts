@@ -1353,8 +1353,9 @@ export class MailboxStore {
         continue;
       // A request the agent sent from a Slack thread or a side thread belongs to that thread, not to
       // its own chat. The teammate it went to still sees it.
-      if ((message.messagingReturn || message.senderTaskId) && ownMessage) continue;
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
+      if ((message.messagingReturn || message.senderTaskId) && ownMessage && !isTaskReport(message, deliveries))
+        continue;
       let relevant = ownMessage;
       let active = false;
       for (const delivery of deliveries) {
@@ -1377,7 +1378,7 @@ export class MailboxStore {
     const turnIds = this.#sourceTurnIds();
     for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
-      if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
+      if (message.sender.kind === "agent" && message.sender.agentId === agentId && !isTaskReport(message, deliveries)) {
         messages.push({
           id: `outbox-${message.id}`,
           turnId: turnIds.get(message.id),
@@ -3572,6 +3573,17 @@ function isChatMessageFromPerson(message: StoredMessage): boolean {
     message.channelId === undefined &&
     message.messaging === undefined &&
     message.messagingReturn === undefined
+  );
+}
+
+function isTaskReport(message: StoredMessage, deliveries: readonly StoredDelivery[]): boolean {
+  const sender = message.sender;
+  return (
+    sender.kind === "agent" &&
+    message.senderTaskId !== undefined &&
+    !message.taskId &&
+    deliveries.length > 0 &&
+    deliveries.every((delivery) => delivery.recipientAgentId === sender.agentId)
   );
 }
 

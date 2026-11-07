@@ -5643,7 +5643,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
     this.#liveVoice?.observe(event);
-    if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
+    if (
+      this.channels?.event(event) ||
+      this.messaging?.event(event, this.#scope) ||
+      this.#tasks?.event(event, this.#scope)
+    )
+      return;
     this.emit("event", event, memberId);
   }
 

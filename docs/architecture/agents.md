@@ -494,7 +494,10 @@ its own transcript, with a note that workspace files were not rolled back. A bra
 open-thread limit.
 
 The agent starts a side thread with the `start_task` OpenBot tool, up to 8 open tasks. On desktop and
-the web, it opens as a tab of the agent and does not take focus. An agent has at most 50
+the web, it opens as a tab of the agent and does not take focus. Such a task sends a result, a
+blocker or a question to the agent's own chat with `report_to_agent`, which runs there as a new turn.
+With `notify: true`, a task that ends, fails or is stopped without a report sends a short notice
+instead. The flag lives in memory, so a restart drops it. An agent has at most 50
 open tasks (`INPUT_LIMITS.agentTasks`, the size of the task list), so each open task stays visible. A message to a
 running task waits in the task, or steers the turn when the agent's busy-message mode is "steer"
 and the provider steers natively, as in the main chat. Stop interrupts the task turn; close moves

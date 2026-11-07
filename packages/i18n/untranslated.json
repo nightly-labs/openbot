@@ -145,6 +145,9 @@
     "zh"
   ],
   "error.backend.replyReferenceUnknown": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.taskReportFailed": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.taskReportInvalid": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.taskReportTaskOnly": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.uiBlockActionNotAllowed": ["de", "es", "fr", "it", "ja", "pl", "pt", "tr"],
   "error.backend.uiBlockAnswerInvalid": ["de", "es", "fr", "it", "ja", "pl", "pt", "tr"],
   "error.backend.vaultItemNotAllowed": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],

@@ -383,4 +383,10 @@ export const messages = defineMessages("error.backend", {
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",
   "error.backend.taskStartFailed": "OpenBot could not start the task. Do the work in this turn instead.",
+  "error.backend.taskReportInvalid":
+    "Give the report a kind (result, blocker or question) and a short text that says what the task found or needs.",
+  "error.backend.taskReportTaskOnly":
+    "Only an open task that you started with start_task can report to your own chat. Give the answer in this conversation instead.",
+  "error.backend.taskReportFailed":
+    "OpenBot could not send the report to your own chat. End the task with the report as your answer.",
 });
