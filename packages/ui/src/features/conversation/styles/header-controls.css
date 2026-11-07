@@ -489,7 +489,8 @@
   background: var(--openbot-warning);
 }
 
-/* The place of an account in its provider's list, when the provider has more than one. */
+/* The place of an account in its provider's list, when the provider has more than one. The API key
+ * account shows a key, as it bills API credit and not the provider's plan. */
 .provider-model-rail-account {
   position: absolute;
   inset-inline-end: -3px;

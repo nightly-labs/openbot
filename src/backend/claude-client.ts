@@ -941,6 +941,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return yield* providerSync(() => (last?.loggedIn === true ? last : { loggedIn: true }));
   });
 
+  /** Whether the CLI uses an Anthropic API key: the saved key, a key account's key, or one that OpenBot inherited. */
+  #usesApiKey(): boolean {
+    return Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY);
+  }
+
   /** The agent environment, with the saved key when `withApiKey`. */
   #environment(withApiKey: boolean): Readonly<Record<string, string>> {
     const key = withApiKey ? this.#fallbackApiKey?.() : null;
@@ -2081,7 +2086,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (status === "failed" && error) {
       this.emit("notification", {
         method: "error",
-        params: { threadId: runtime.id, turnId: turn.id, message: claudeTurnError(error) },
+        params: { threadId: runtime.id, turnId: turn.id, message: claudeTurnError(error, this.#usesApiKey()) },
       });
     }
     this.#emitSubagents(runtime, endSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
@@ -2402,13 +2407,16 @@ const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? S
 /**
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
  * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
- * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550).
+ * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550). Only a
+ * turn on a key gets the key text: a gateway or a plan's extra usage can send the same words. The
+ * key text keeps "credit balance is too low", so `isUsageLimitDiagnostic` still moves the turn to a
+ * backup model (#4616).
  */
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
-function claudeTurnError(error: unknown): string {
+function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
-  if (CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
   const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
   return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
 }
