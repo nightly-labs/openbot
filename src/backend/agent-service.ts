@@ -159,7 +159,7 @@ import {
   type LocalAttentionResponse,
   type PromptResponder,
 } from "./agent/attention-registry";
-import { backgroundModel } from "./agent/background-model";
+import { backgroundModel, withBackgroundEffort } from "./agent/background-model";
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
@@ -1215,17 +1215,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               model: model.id,
               memberModel: selected.model,
             });
+          // A summary runs at the least effort. A routing turn keeps the member's effort, which fits
+          // only the member's model, not the provider's smaller one.
+          const turnModel = background
+            ? withBackgroundEffort(model)
+            : model.id === selected.model
+              ? { ...model, defaultReasoningEffort: selected.reasoningEffort }
+              : model;
           const client = this.#providers.createProfileClient(selected.provider, selected.providerAccountId);
           return yield* this.#profileClients
-            .run(client, (cancelled) =>
-              generateTextWithoutTools(
-                client,
-                // A member's effort fits only the member's model, not the provider's smaller one.
-                model.id === selected.model ? { ...model, defaultReasoningEffort: selected.reasoningEffort } : model,
-                prompt,
-                cancelled,
-              ),
-            )
+            .run(client, (cancelled) => generateTextWithoutTools(client, turnModel, prompt, cancelled))
             .pipe(
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
               // error of the `turn/start` request. It holds the model that ran it the way a refused member turn
@@ -2448,7 +2447,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         });
       const client = this.#providers.createProfileClient(provider, agent?.providerAccountId);
       return yield* this.#profileClients.run(client, (cancelled) =>
-        generateProfile(client, model, input, sections, cancelled),
+        generateProfile(client, withBackgroundEffort(model), input, sections, cancelled),
       );
     },
     Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "generate profile", cause: failure.cause })),

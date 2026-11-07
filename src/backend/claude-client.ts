@@ -1223,11 +1223,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(config.model ? { model: this.#sdkModel(config.model) } : {}),
           ...(appliedEffort ? { effort: appliedEffort } : {}),
           ...(resume ? { resume: threadId } : { sessionId: threadId, title: CLAUDE_SESSION_TITLE }),
-          systemPrompt: {
-            type: "preset",
-            preset: "claude_code",
-            append: config.developerInstructions,
-          },
+          // A call without tools gets only OpenBot's instructions: the `claude_code` preset adds the
+          // coding rules of an agent with tools, which such a call never uses.
+          systemPrompt: config.profileGeneration
+            ? config.developerInstructions
+            : { type: "preset", preset: "claude_code", append: config.developerInstructions },
           ...(Object.keys(extraArgs).length ? { extraArgs } : {}),
           ...(config.profileGeneration
             ? { tools: [] }
