@@ -317,6 +317,17 @@ function exitAfterReply(exit: Promise<void>): Promise<number> {
   });
 }
 
+/** The bench saves no key. */
+const NO_CIPHER = { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" };
+
+/** The cloud speech keys, with none saved: the bench reads with Supertonic only. */
+function noSpeechKeys(temporary: string) {
+  return {
+    elevenlabs: new VoiceApiKeyStore({ path: join(temporary, "speech-elevenlabs-key.json"), cipher: NO_CIPHER }),
+    xai: new VoiceApiKeyStore({ path: join(temporary, "speech-xai-key.json"), cipher: NO_CIPHER }),
+  };
+}
+
 /** Uses the real services: each must stop its host when no request comes for its idle time. */
 async function checkIdleStop(modelId: LocalVoiceModelId, temporary: string, clip: Uint8Array, speech: boolean) {
   const exits: { transcription?: Promise<void>; speech?: Promise<void> } = {};
@@ -324,10 +335,7 @@ async function checkIdleStop(modelId: LocalVoiceModelId, temporary: string, clip
     resourcesRoot: RESOURCES_ROOT,
     modelDirectories: MODEL_DIRECTORIES,
     preferences: new VoicePreferenceStore(join(temporary, "voice-preference.json")),
-    apiKeys: new VoiceApiKeyStore({
-      path: join(temporary, "voice-api-key.json"),
-      cipher: { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" },
-    }),
+    apiKeys: new VoiceApiKeyStore({ path: join(temporary, "voice-api-key.json"), cipher: NO_CIPHER }),
     spawnHost: (): VoiceTranscriptionHostProcess => {
       const child = fork(TRANSCRIPTION_HOST, [], {
         execPath: ELECTRON,
@@ -351,6 +359,7 @@ async function checkIdleStop(modelId: LocalVoiceModelId, temporary: string, clip
     resourcesRoot: RESOURCES_ROOT,
     modelDirectory: join(RESOURCES_ROOT, SUPERTONIC_MODEL_DIRECTORY),
     preferences: new SpeechPreferenceStore(join(temporary, "speech-preference.json")),
+    apiKeys: noSpeechKeys(temporary),
     spawnHost: (): VoiceSpeechHostProcess => {
       const child = fork(SPEECH_HOST, [], {
         execPath: ELECTRON,
@@ -436,6 +445,7 @@ async function main(): Promise<void> {
         resourcesRoot: RESOURCES_ROOT,
         modelDirectory: join(RESOURCES_ROOT, SUPERTONIC_MODEL_DIRECTORY),
         preferences: new SpeechPreferenceStore(join(temporary, "download-speech-preference.json")),
+        apiKeys: noSpeechKeys(temporary),
         spawnHost: () => {
           throw new Error("The download needs no host.");
         },

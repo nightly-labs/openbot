@@ -614,13 +614,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Медленнее. 14 языков. Язык речи вы задаёте сами. Использует около 4 ГБ памяти.",
   "settings.voice.model.size": "Размер загрузки: {size}",
-  "settings.voice.model.downloading": "Загрузка · {received} из {total}",
   "settings.voice.model.failed": "Загрузка прервана. Проверьте подключение и повторите попытку.",
   "settings.voice.model.progressLabel": "Загрузка {name}",
   "settings.voice.model.use": "Использовать",
-  "settings.voice.model.inUse": "Используется",
   "settings.voice.model.downloadLabel": "Скачать {name}",
-  "settings.voice.model.cancelLabel": "Остановить загрузку {name}",
   "settings.voice.model.retryLabel": "Скачать {name} снова",
   "settings.voice.model.useLabel": "Использовать {name} для диктовки",
   "settings.voice.model.removeLabel": "Удалить {name} с этого компьютера",
@@ -642,9 +639,6 @@ export const messages = {
   "settings.voice.removeFailed": "Не удалось удалить модель. Повторите попытку.",
   "settings.voice.model.elevenlabs.description":
     "Передаёт ваш голос в ElevenLabs. Текст появляется во время речи и не меняется. Использует ваш API-ключ, а ElevenLabs списывает плату за каждое использование.",
-  "settings.voice.model.keySaved": "API-ключ сохранён",
-  "settings.voice.model.keyMissing": "Нужен API-ключ ElevenLabs",
-  "settings.voice.apiKey.label": "API-ключ ElevenLabs",
   "settings.voice.apiKey.placeholder": "Вставьте ключ",
   "settings.voice.apiKey.save": "Сохранить ключ",
   "settings.voice.apiKey.remove": "Удалить ключ",

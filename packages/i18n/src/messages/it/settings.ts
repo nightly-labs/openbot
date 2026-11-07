@@ -586,13 +586,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Più lento. 14 lingue. Imposti tu la lingua parlata. Usa circa 4 GB di memoria.",
   "settings.voice.model.size": "Dimensione del download: {size}",
-  "settings.voice.model.downloading": "Download · {received} di {total}",
   "settings.voice.model.failed": "Il download si è interrotto. Controlla la connessione e riprova.",
   "settings.voice.model.progressLabel": "Download di {name}",
   "settings.voice.model.use": "Usa",
-  "settings.voice.model.inUse": "In uso",
   "settings.voice.model.downloadLabel": "Scarica {name}",
-  "settings.voice.model.cancelLabel": "Interrompi il download di {name}",
   "settings.voice.model.retryLabel": "Scarica di nuovo {name}",
   "settings.voice.model.useLabel": "Usa {name} per la dettatura",
   "settings.voice.model.removeLabel": "Rimuovi {name} da questo computer",
@@ -614,9 +611,6 @@ export const messages = {
   "settings.voice.removeFailed": "Impossibile rimuovere il modello. Riprova.",
   "settings.voice.model.elevenlabs.description":
     "Invia la tua voce in streaming a ElevenLabs. Il testo compare mentre parli e non cambia più. Usa la tua chiave API, ed ElevenLabs addebita ogni utilizzo.",
-  "settings.voice.model.keySaved": "Chiave API salvata",
-  "settings.voice.model.keyMissing": "Serve una chiave API di ElevenLabs",
-  "settings.voice.apiKey.label": "Chiave API di ElevenLabs",
   "settings.voice.apiKey.placeholder": "Incolla la chiave",
   "settings.voice.apiKey.save": "Salva chiave",
   "settings.voice.apiKey.remove": "Rimuovi chiave",

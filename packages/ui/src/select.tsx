@@ -123,6 +123,15 @@ export function SelectItem(props: SelectItemProps): JSX.Element {
   );
 }
 
+export type SelectSectionProps = PolymorphicProps<"li", SelectPrimitive.SelectSectionProps<"li">> &
+  Pick<ComponentProps<"li">, "class" | "children">;
+
+/** The name of a group of options, above its options. Use it in the `sectionComponent` of a `Select`. */
+export function SelectSection(props: SelectSectionProps): JSX.Element {
+  const others = omit(props, "class");
+  return <SelectPrimitive.Section class={cx("ui-select-section", props.class)} {...others} />;
+}
+
 /** "new_york", "new york" and "America/New-York" match each other. */
 const searchText = (text: string) =>
   text

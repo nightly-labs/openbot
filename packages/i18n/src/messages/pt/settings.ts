@@ -586,13 +586,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Mais lento. 14 idiomas. Você define o idioma falado. Usa cerca de 4 GB de memória.",
   "settings.voice.model.size": "Tamanho do download: {size}",
-  "settings.voice.model.downloading": "Baixando · {received} de {total}",
   "settings.voice.model.failed": "O download parou. Verifique a conexão e tente de novo.",
   "settings.voice.model.progressLabel": "Baixando {name}",
   "settings.voice.model.use": "Usar",
-  "settings.voice.model.inUse": "Em uso",
   "settings.voice.model.downloadLabel": "Baixar {name}",
-  "settings.voice.model.cancelLabel": "Parar o download de {name}",
   "settings.voice.model.retryLabel": "Baixar {name} de novo",
   "settings.voice.model.useLabel": "Usar {name} para ditado",
   "settings.voice.model.removeLabel": "Remover {name} deste computador",
@@ -614,9 +611,6 @@ export const messages = {
   "settings.voice.removeFailed": "Não foi possível remover o modelo. Tente novamente.",
   "settings.voice.model.elevenlabs.description":
     "Envia sua voz para a ElevenLabs. O texto aparece enquanto você fala e não muda. Usa sua própria chave de API, e a ElevenLabs cobra cada uso.",
-  "settings.voice.model.keySaved": "Chave de API salva",
-  "settings.voice.model.keyMissing": "Precisa de uma chave de API da ElevenLabs",
-  "settings.voice.apiKey.label": "Chave de API da ElevenLabs",
   "settings.voice.apiKey.placeholder": "Cole a chave",
   "settings.voice.apiKey.save": "Salvar chave",
   "settings.voice.apiKey.remove": "Remover chave",

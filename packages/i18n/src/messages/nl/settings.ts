@@ -580,13 +580,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Trager. 14 talen. Je stelt de gesproken taal zelf in. Gebruikt ongeveer 4 GB geheugen.",
   "settings.voice.model.size": "Downloadgrootte: {size}",
-  "settings.voice.model.downloading": "Downloaden · {received} van {total}",
   "settings.voice.model.failed": "De download is gestopt. Controleer de verbinding en probeer het opnieuw.",
   "settings.voice.model.progressLabel": "{name} downloaden",
   "settings.voice.model.use": "Gebruik",
-  "settings.voice.model.inUse": "In gebruik",
   "settings.voice.model.downloadLabel": "Download {name}",
-  "settings.voice.model.cancelLabel": "Stop de download van {name}",
   "settings.voice.model.retryLabel": "Download {name} opnieuw",
   "settings.voice.model.useLabel": "Gebruik {name} voor dicteren",
   "settings.voice.model.removeLabel": "Verwijder {name} van deze computer",
@@ -608,9 +605,6 @@ export const messages = {
   "settings.voice.removeFailed": "Kan het model niet verwijderen. Probeer het opnieuw.",
   "settings.voice.model.elevenlabs.description":
     "Streamt je stem naar ElevenLabs. Tekst verschijnt terwijl je spreekt en blijft staan. Gebruikt je eigen API-sleutel, en ElevenLabs rekent elk gebruik af.",
-  "settings.voice.model.keySaved": "API-sleutel opgeslagen",
-  "settings.voice.model.keyMissing": "Vereist een ElevenLabs-API-sleutel",
-  "settings.voice.apiKey.label": "ElevenLabs-API-sleutel",
   "settings.voice.apiKey.placeholder": "Plak de sleutel",
   "settings.voice.apiKey.save": "Sleutel opslaan",
   "settings.voice.apiKey.remove": "Sleutel verwijderen",

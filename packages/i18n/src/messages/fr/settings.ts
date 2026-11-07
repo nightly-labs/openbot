@@ -602,13 +602,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Plus lent. 14 langues. Vous fixez la langue parlée. Utilise environ 4 Go de mémoire.",
   "settings.voice.model.size": "Taille du téléchargement : {size}",
-  "settings.voice.model.downloading": "Téléchargement · {received} sur {total}",
   "settings.voice.model.failed": "Le téléchargement s’est arrêté. Vérifiez la connexion et réessayez.",
   "settings.voice.model.progressLabel": "Téléchargement de {name}",
   "settings.voice.model.use": "Utiliser",
-  "settings.voice.model.inUse": "Utilisé",
   "settings.voice.model.downloadLabel": "Télécharger {name}",
-  "settings.voice.model.cancelLabel": "Arrêter le téléchargement de {name}",
   "settings.voice.model.retryLabel": "Télécharger {name} à nouveau",
   "settings.voice.model.useLabel": "Utiliser {name} pour la dictée",
   "settings.voice.model.removeLabel": "Retirer {name} de cet ordinateur",
@@ -631,9 +628,6 @@ export const messages = {
   "settings.voice.removeFailed": "Impossible de retirer le modèle. Réessayez.",
   "settings.voice.model.elevenlabs.description":
     "Envoie votre voix à ElevenLabs. Le texte s’affiche pendant que vous parlez et reste stable. Utilise votre propre clé API, et ElevenLabs facture chaque utilisation.",
-  "settings.voice.model.keySaved": "Clé API enregistrée",
-  "settings.voice.model.keyMissing": "Nécessite une clé API ElevenLabs",
-  "settings.voice.apiKey.label": "Clé API ElevenLabs",
   "settings.voice.apiKey.placeholder": "Collez la clé",
   "settings.voice.apiKey.save": "Enregistrer la clé",
   "settings.voice.apiKey.remove": "Supprimer la clé",

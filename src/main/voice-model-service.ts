@@ -4,7 +4,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { mkdir, open, rename, rm, stat } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
-import type { LocalVoiceModelId, SpeechModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
+import type { LocalSpeechModelId, LocalVoiceModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
 import { PARAKEET_MODEL_FILES, SUPERTONIC_MODEL_FILES } from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
@@ -204,7 +204,7 @@ const COHERE_TRANSCRIBE_MODEL_FILES: readonly VoiceModelFile[] = [
 ];
 
 /** A model that OpenBot downloads: a dictation model or the speech model. */
-type DownloadedModelId = LocalVoiceModelId | SpeechModelId;
+type DownloadedModelId = LocalVoiceModelId | LocalSpeechModelId;
 
 /** The directory name of Supertonic 3 in `<userData>/runtimes`. The phone uses the same name. */
 export {

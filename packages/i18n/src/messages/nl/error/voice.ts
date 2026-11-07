@@ -13,16 +13,16 @@ export const messages = {
   "error.voice.prepareRequired":
     "Lokale spraaktranscriptie is niet beschikbaar. Voer `bun run voice:prepare` uit en start OpenBot opnieuw.",
   "error.voice.transcriptionFailed": "OpenBot kon deze opname niet transcriberen.",
-  "error.voice.cloud.keyRequired": "Voeg je ElevenLabs-API-sleutel toe in Instellingen → Spraak.",
+  "error.voice.cloud.keyRequired": "Voeg je {provider}-API-sleutel toe in Instellingen → Spraak.",
   "error.voice.cloud.keyRejected":
-    "ElevenLabs heeft de API-sleutel niet geaccepteerd. Controleer de sleutel in Instellingen → Spraak.",
-  "error.voice.cloud.quotaExceeded": "Je ElevenLabs-tegoed is op.",
-  "error.voice.cloud.rateLimited": "ElevenLabs is bezet. Probeer het zo opnieuw.",
+    "{provider} heeft de API-sleutel niet geaccepteerd. Controleer de sleutel in Instellingen → Spraak.",
+  "error.voice.cloud.quotaExceeded": "Je {provider}-tegoed is op.",
+  "error.voice.cloud.rateLimited": "{provider} is bezet. Probeer het zo opnieuw.",
   "error.voice.cloud.termsRequired":
     "Accepteer de voorwaarden van ElevenLabs in je ElevenLabs-account en probeer het opnieuw.",
   "error.voice.cloud.streamEnded": "De dicteerstream is beëindigd. Neem opnieuw op.",
   "error.voice.cloud.tooLong": "De opname is te lang.",
-  "error.voice.cloud.keySaveFailed": "Kan de ElevenLabs-API-sleutel niet opslaan.",
+  "error.voice.cloud.keySaveFailed": "Kan de {provider}-API-sleutel niet opslaan.",
   "error.voice.speech.runtimeUnavailable": "Lokale spraakuitvoer is niet beschikbaar op dit platform.",
   "error.voice.speech.modelRequired": "Download het spraakuitvoermodel in Instellingen → Spraak.",
   "error.voice.speech.timedOut": "Het voorlezen van het antwoord duurde te lang.",

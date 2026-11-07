@@ -1,12 +1,17 @@
 import {
   isCodexLiveVoice,
+  isElevenLabsSpeechVoice,
+  isSpeechKeyProvider,
   isSpeechLanguage,
+  isSpeechModelId,
   isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerRoutes,
+  isXaiSpeechVoice,
   SPEECH_LIMITS,
+  type SpeechApiKeyInput,
   type SpeechInput,
   type SpeechSettings,
   VOICE_API_KEY_MAX_LENGTH,
@@ -102,6 +107,12 @@ export function parseVoiceApiKey(input: unknown): VoiceApiKeyInput {
   return { key };
 }
 
+/** A key of a provider that reads replies aloud, with the same checks as `parseVoiceApiKey`. */
+export function parseSpeechApiKey(input: unknown): SpeechApiKeyInput {
+  if (!isObject(input) || !isSpeechKeyProvider(input.provider)) throw new Error("A speech provider is required.");
+  return { provider: input.provider, key: parseVoiceApiKey(input).key };
+}
+
 export function parseVoiceStream(input: unknown): VoiceStream {
   if (!isObject(input) || typeof input.streamId !== "string" || !input.streamId || input.streamId.length > 64)
     throw new Error("A voice stream is required.");
@@ -121,16 +132,22 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
   if (
     !isObject(input) ||
     typeof input.readReplies !== "boolean" ||
+    !isSpeechModelId(input.modelId) ||
     !isSpeechVoice(input.voice) ||
+    !isElevenLabsSpeechVoice(input.elevenLabsVoice) ||
+    !isXaiSpeechVoice(input.xaiVoice) ||
     !isSpeechSpeed(input.speed) ||
     typeof input.codexLive !== "boolean" ||
     !(input.codexLiveVoice === null || isCodexLiveVoice(input.codexLiveVoice))
   ) {
-    throw new Error("Speech settings need a known voice and speed.");
+    throw new Error("Speech settings need a known model, voice and speed.");
   }
   return {
     readReplies: input.readReplies,
+    modelId: input.modelId,
     voice: input.voice,
+    elevenLabsVoice: input.elevenLabsVoice,
+    xaiVoice: input.xaiVoice,
     speed: input.speed,
     codexLive: input.codexLive,
     codexLiveVoice: input.codexLiveVoice,
