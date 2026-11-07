@@ -19,8 +19,10 @@ interface QueuePanelProps {
   skills?: ComposerSkill[] | undefined;
   editingDeliveryId?: string | null | undefined;
   canSteer: boolean;
-  /** Steers a queued message into the running turn. Absent where the agent's provider cannot steer. */
+  /** Steers a queued message into the running turn, or with `sendsNow`, stops the turn and sends it next. */
   onSteer?: ((deliveryId: string) => void) | undefined;
+  /** The agent's provider cannot steer, so the row action is Send now. */
+  sendsNow?: boolean | undefined;
   /** Starts a separate task with a queued message. Absent where the host keeps no tasks. */
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
@@ -503,19 +505,27 @@ export function QueuePanel(props: QueuePanelProps) {
                       </Show>
                       <Show when={props.onSteer}>
                         {(steer) => (
-                          <LabelTooltip content={t("queue.item.steerTooltip")}>
+                          <LabelTooltip
+                            content={t(props.sendsNow ? "queue.item.sendNowTooltip" : "queue.item.steerTooltip")}
+                          >
                             <LabelTooltipTrigger
                               as={Button}
                               variant="ghost"
                               type="button"
                               class="agent-queue-steer"
                               disabled={!props.canSteer || !actionable}
-                              aria-label={t("queue.item.steerLabel", { position: delivery.position ?? "" })}
+                              aria-label={t(props.sendsNow ? "queue.item.sendNowLabel" : "queue.item.steerLabel", {
+                                position: delivery.position ?? "",
+                              })}
                               onClick={() => steer()(delivery.id)}
                             >
                               <SteerIcon />
                               <span>
-                                {delivery.status === "starting" ? t("queue.item.steering") : t("queue.item.steer")}
+                                {props.sendsNow
+                                  ? t("queue.item.sendNow")
+                                  : delivery.status === "starting"
+                                    ? t("queue.item.steering")
+                                    : t("queue.item.steer")}
                               </span>
                             </LabelTooltipTrigger>
                           </LabelTooltip>

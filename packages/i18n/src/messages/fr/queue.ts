@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Orienter le message",
   "queue.item.steering": "Orientation",
   "queue.item.steer": "Orienter",
+  "queue.item.sendNowLabel": "Arrêter l’agent et envoyer maintenant le message en file {position}",
+  "queue.item.sendNowTooltip": "Arrêter l’agent et envoyer ce message maintenant",
+  "queue.item.sendNow": "Envoyer maintenant",
   "queue.item.notSteered": "Non orienté",
   "queue.item.steerFallback.providerUnsupported":
     "Ce fournisseur ne peut pas orienter un tour en cours : le message attend dans la file.",

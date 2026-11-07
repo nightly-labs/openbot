@@ -22,6 +22,7 @@ import type { PromptAnswerOptions } from "./features/conversation/conversation-t
 import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
+import { queuedDeliveriesInOrder } from "./queue-reconciliation";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
@@ -427,6 +428,32 @@ const Turns = createSimpleContext({
         });
     }
 
+    /**
+     * For an agent whose provider cannot steer: puts a queued message first and stops the running
+     * turn, so the message runs as the next turn. A message just sent is not in the queue snapshot
+     * yet; it is last in the queue, so first is still the correct place.
+     */
+    function sendQueuedMessageNow(deliveryId: string) {
+      const agent = activeAgent();
+      const turnId = agent ? activeTurns()[agent.id] : null;
+      if (!agent || !turnId) return;
+      const serverId = activeServerId();
+      const analytics = desktopAnalytics.scope();
+      const queued = queuedDeliveriesInOrder(queues()[agent.id]).map((delivery) => delivery.id);
+      const order = [deliveryId, ...queued.filter((id) => id !== deliveryId)];
+      const port = turnsPort().agent;
+      const reorder =
+        queued[0] === deliveryId ? Promise.resolve() : port.reorderQueue({ agentId: agent.id, deliveryIds: order });
+      void reorder
+        // A turn that ended in the meantime has nothing to stop: the message runs next already.
+        .then(() => (activeTurns()[agent.id] === turnId ? port.interrupt({ agentId: agent.id, turnId }) : undefined))
+        .then(() => analytics.track("queue_action", { action: "send_now", result: "succeeded" }))
+        .catch((error) => {
+          analytics.track("queue_action", { action: "send_now", result: "failed", failure_code: "send_now_failed" });
+          appendUiError(agent.id, error, currentText().t("app.errorStatus.stop"), serverId);
+        });
+    }
+
     async function updateQueuedMessage(
       deliveryId: string,
       text: string,
@@ -565,6 +592,7 @@ const Turns = createSimpleContext({
       cancelQueuedMessage,
       cancelWait,
       steerQueuedMessage,
+      sendQueuedMessageNow,
       updateQueuedMessage,
       reorderQueue,
       stopActiveTurn,

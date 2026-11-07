@@ -273,11 +273,13 @@ export function ConversationComposer() {
   };
   /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
   const steers = () => !props.agent || providerSteersTurns(props.agent.provider);
+  /** Steer for a provider that can steer; else Send now, which stops the turn and runs the message next. */
+  const sendQueued = () => (steers() ? props.onSteerQueuedMessage : props.onSendQueuedMessageNow);
   /** Tab sends the draft into the running turn, in place of Send and then Steer on its queue row. */
   const steerOnTab = () =>
     props.activeTurnId &&
     !channel &&
-    steers() &&
+    sendQueued() &&
     !editingDeliveryId() &&
     composerHasContent() &&
     voicePhase() === "idle" &&
@@ -492,7 +494,8 @@ export function ConversationComposer() {
                       skills={installedSkills()}
                       editingDeliveryId={editingDeliveryId()}
                       canSteer={Boolean(props.activeTurnId)}
-                      onSteer={steers() ? props.onSteerQueuedMessage : undefined}
+                      onSteer={sendQueued()}
+                      sendsNow={!steers()}
                       onRunAsTask={props.threads?.onRunQueuedMessage}
                       onCancel={props.onCancelQueuedMessage}
                       onEdit={editQueuedMessage}
