@@ -55,6 +55,7 @@ export const messages = {
   "status.agent.changesReviewing": "적용한 변경 사항을 확인하는 중…",
   "status.agent.agentCoordinating": "다른 에이전트와 조정하는 중…",
   "status.agent.agentResponseReviewing": "다른 에이전트의 응답을 확인하는 중…",
+  "status.agent.commandRunning": "명령을 실행하는 중…",
   "status.agent.toolStepWorking": "다음 도구 단계를 처리하는 중…",
   "status.agent.webSearching": "웹에서 “{query}” 검색 중…",
   "status.agent.urlFetching": "{host} 여는 중…",

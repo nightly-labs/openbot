@@ -58,6 +58,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.changesReviewing": "Reviewing the changes I made…",
   "status.agent.agentCoordinating": "Coordinating with another agent…",
   "status.agent.agentResponseReviewing": "Reviewing the other agent’s response…",
+  "status.agent.commandRunning": "Running a command…",
   "status.agent.toolStepWorking": "Working through the next tool-assisted step…",
   "status.agent.webSearching": "Searching the web for “{query}”…",
   "status.agent.urlFetching": "Visiting {host}…",
