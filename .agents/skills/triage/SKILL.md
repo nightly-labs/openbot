@@ -225,12 +225,12 @@ Go down the table. The first row that applies is the recommendation.
 | Recommendation | When |
 | --- | --- |
 | `decline` | Fit is 0, an earlier decision says no, or scope is `bloated` and priority is not `P1`. |
-| `decline` | UX is 0, and no smaller design keeps the main flow simple. |
+| `decline` | UX is 0, no smaller design keeps the main flow simple, and priority is not `P1`. |
 | `generalize` | Scope is `over-specific`. Name the general mechanism, or the Marketplace item, that covers this need and others. |
 | `build smaller` | Priority `P1` or `P2`, and the request is larger than the gap; or scope is `bloated` and priority is `P1`; or UX is 0 or 1 and a simpler design meets the need. Name the smallest version, what it leaves out, and what a casual user sees. |
 | `build` | Value 10 or more, or priority `P1`. |
-| `defer` | Value 6 to 9. Say what would change the decision, for example more demand. |
-| `decline` | Value 5 or less. |
+| `defer` | Value 7 to 9. Say what would change the decision, for example more demand. |
+| `decline` | Value 6 or less. |
 
 A `defer` or `decline` that the user approves does not close the issue.
 The user closes it.
