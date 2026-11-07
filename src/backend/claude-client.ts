@@ -1093,14 +1093,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // environment has the CPU limit module there (`agentProcessEnvironment`), so it goes into
     // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
     const nodeOptionsSettings: Settings = nodeOptions ? { env: { NODE_OPTIONS: nodeOptions } } : {};
+    const sandbox = config.workspaceOnly
+      ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
+      : null;
     // The sign-in settings can hold keys, so they go in a file that only this user can read, not on
-    // the command line, where `ps` shows them to other users.
+    // the command line, where `ps` shows them to other users. The SDK refuses a settings file path
+    // together with its `sandbox` option, so a Workspace only sandbox goes in the same file (#5583).
     const settingsFile =
       Object.keys(signInSettings).length > 0
         ? stateDirectory
           ? yield* writeClaudeFlagSettings(stateDirectory, threadId, {
               ...signInSettings,
               env: { ...signInSettings.env, ...nodeOptionsSettings.env },
+              ...(sandbox ? { sandbox } : {}),
             }).pipe(
               Effect.catch((error) =>
                 Effect.sync(() => {
@@ -1167,9 +1172,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             : Object.keys(nodeOptionsSettings).length > 0
               ? { settings: nodeOptionsSettings }
               : {}),
+          ...(sandbox && !settingsFile ? { sandbox } : {}),
           ...(config.workspaceOnly
             ? {
-                sandbox: claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders),
                 hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories, config.excludedFolders),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
