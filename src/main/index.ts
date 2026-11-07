@@ -805,7 +805,15 @@ function registerIpcHandlers({
       permissionHelp: computerUsePermissionHelp,
     }),
     ...macAutomationIpcHandlers({ platform: process.platform }),
-    ...backgroundProcessIpcHandlers({ platform: process.platform, agents: () => service.listAgents() }),
+    ...backgroundProcessIpcHandlers({
+      platform: process.platform,
+      agents: () =>
+        service.listAgents().map((agent) => ({
+          id: agent.id,
+          workspacePath: agent.workspacePath,
+          folders: [agent.workspacePath, service.sharedRoot, ...(agent.additionalFolders ?? [])],
+        })),
+    }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials, openLink }),
     ...voiceIpcHandlers({ voice, speech, server: voiceServer, service }),
     ...accountIpcHandlers({ centralAuth, host }),

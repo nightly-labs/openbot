@@ -72,6 +72,7 @@ export const messages = defineMessages("chat", {
   "chat.backgroundTasks.unverified": "Unverified",
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot did not start this process. It may be a process that you started, so Stop is disabled.",
+  "chat.backgroundTasks.notFound": "This process is no longer running.",
   "chat.trace.title": "Trace",
   "chat.trace.search": "Search steps",
   "chat.trace.steps": "Steps",

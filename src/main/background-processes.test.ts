@@ -33,13 +33,17 @@ interface FixtureRow {
 let respond: CommandResponder = () => ({});
 let workspace: string;
 let otherWorkspace: string;
+let additionalFolder: string;
+let sharedFolder: string;
 
 function processTable(rows: readonly FixtureRow[]): string {
   return rows.map((row) => `${row.pid} ${row.ppid} ${UID} ${STARTED} ${row.command}`).join("\n");
 }
 
-function processEnvironment(row: FixtureRow, marked: boolean): string {
-  return ` ${row.pid} ${row.command}${marked ? " OPENBOT_AGENT_PROCESS=1" : ""}\n`;
+function processEnvironment(row: FixtureRow, marked: boolean, agentId?: string): string {
+  return ` ${row.pid} ${row.command}${marked ? " OPENBOT_AGENT_PROCESS=1" : ""}${
+    agentId ? ` OPENBOT_AGENT_ID=${agentId}` : ""
+  }\n`;
 }
 
 function lsofCwd(cwd: string, pid: number = ROOT_PID): string {
@@ -59,10 +63,10 @@ function replyForUnmarkedDarwin(row: FixtureRow, cwd: string): CommandResponder 
   };
 }
 
-function replyForMarkedDarwin(row: FixtureRow, cwd: string): CommandResponder {
+function replyForMarkedDarwin(row: FixtureRow, cwd: string, agentId?: string): CommandResponder {
   return (command, args) => {
     if (command === "ps" && args.includes("-A")) return { stdout: processTable([row]) };
-    if (command === "ps" && args.includes("-E")) return { stdout: processEnvironment(row, true) };
+    if (command === "ps" && args.includes("-E")) return { stdout: processEnvironment(row, true, agentId) };
     if (command === "lsof" && args.includes("-d")) return { stdout: lsofCwd(cwd) };
     return { stdout: "" };
   };
@@ -84,6 +88,8 @@ const row: FixtureRow = {
 beforeAll(async () => {
   workspace = await realpath(await mkdtemp(join(tmpdir(), "openbot-background-process-")));
   otherWorkspace = await realpath(await mkdtemp(join(tmpdir(), "openbot-background-process-other-")));
+  additionalFolder = await realpath(await mkdtemp(join(tmpdir(), "openbot-background-process-additional-")));
+  sharedFolder = await realpath(await mkdtemp(join(tmpdir(), "openbot-background-process-shared-")));
 });
 
 afterAll(async () => {
@@ -168,16 +174,64 @@ describe("left programs without the process marker", () => {
     expect(items?.[0]?.command).toBe(row.command);
   });
 
+  it("uses the agent id from the environment after the process changes folder", async () => {
+    respond = replyForMarkedDarwin(row, otherWorkspace, AGENT.id);
+    const agents = [
+      { ...AGENT, workspacePath: workspace },
+      { ...OTHER_AGENT, workspacePath: otherWorkspace },
+    ];
+
+    const items = await Effect.runPromise(listBackgroundProcesses("darwin", agents, AGENT.id));
+
+    expect(items).toHaveLength(1);
+    expect(items?.[0]?.agentId).toBe(AGENT.id);
+    expect(items?.[0]?.verified).toBe(true);
+    expect(items?.[0]?.command).toBe(row.command);
+  });
+
+  it("attributes an unmarked process in an additional folder or the shared folder", async () => {
+    const additional: FixtureRow = { ...row, pid: ROOT_PID + 3 };
+    const shared: FixtureRow = { ...row, pid: ROOT_PID + 4 };
+    respond = (command, args) => {
+      if (command === "ps" && args.includes("-A")) return { stdout: processTable([additional, shared]) };
+      if (command === "ps" && args.includes("-E")) {
+        return { stdout: processEnvironment(additional, false) + processEnvironment(shared, false) };
+      }
+      if (command === "lsof" && args.includes("-d")) {
+        return {
+          stdout: lsofCwds([
+            { pid: additional.pid, cwd: additionalFolder },
+            { pid: shared.pid, cwd: sharedFolder },
+          ]),
+        };
+      }
+      return { stdout: "" };
+    };
+    const agents = [
+      {
+        ...AGENT,
+        workspacePath: workspace,
+        folders: [workspace, additionalFolder, sharedFolder],
+      },
+    ];
+
+    const items = await Effect.runPromise(listBackgroundProcesses("darwin", agents, AGENT.id));
+
+    expect(items?.map((item) => item.pid).sort()).toEqual([additional.pid, shared.pid].sort());
+    expect(items?.every((item) => item.agentId === AGENT.id && !item.verified)).toBe(true);
+  });
+
   it("does not stop an unmarked orphan that the working directory showed", async () => {
     respond = replyForUnmarkedDarwin(row, workspace);
     const kill = spyOnKill();
 
-    await Effect.runPromise(
+    const result = await Effect.runPromise(
       stopBackgroundProcess("darwin", { id: `${ROOT_PID}:${STARTED_AT}`, agentId: AGENT.id }, [
         { ...AGENT, workspacePath: workspace },
       ]),
     );
 
+    expect(result).toEqual({ stopped: false });
     expect(kill).not.toHaveBeenCalled();
   });
 
@@ -198,12 +252,13 @@ describe("left programs without the process marker", () => {
     respond = replyForMarkedDarwin(row, workspace);
     const kill = spyOnKill();
 
-    await Effect.runPromise(
+    const result = await Effect.runPromise(
       stopBackgroundProcess("darwin", { id: `${ROOT_PID}:${STARTED_AT}`, agentId: AGENT.id }, [
         { ...AGENT, workspacePath: workspace },
       ]),
     );
 
+    expect(result).toEqual({ stopped: true });
     expect(kill).toHaveBeenCalledWith(ROOT_PID, "SIGTERM");
   });
 
@@ -225,6 +280,37 @@ describe("left programs without the process marker", () => {
     expect(kill).not.toHaveBeenCalled();
   });
 
+  it("uses the agent id from the environment when it checks who may stop", async () => {
+    respond = replyForMarkedDarwin(row, workspace, OTHER_AGENT.id);
+    const kill = spyOnKill();
+
+    const result = await Effect.runPromise(
+      stopBackgroundProcess("darwin", { id: `${ROOT_PID}:${STARTED_AT}`, agentId: AGENT.id }, [
+        { ...AGENT, workspacePath: workspace },
+      ]),
+    );
+
+    expect(result).toEqual({ stopped: false });
+    expect(kill).not.toHaveBeenCalled();
+  });
+
+  it("returns false when the process is no longer there", async () => {
+    respond = (command, args) => {
+      if (command === "ps" && args.includes("-A")) return { stdout: "" };
+      return { stdout: "" };
+    };
+    const kill = spyOnKill();
+
+    const result = await Effect.runPromise(
+      stopBackgroundProcess("darwin", { id: `${ROOT_PID}:${STARTED_AT}`, agentId: AGENT.id }, [
+        { ...AGENT, workspacePath: workspace },
+      ]),
+    );
+
+    expect(result).toEqual({ stopped: false });
+    expect(kill).not.toHaveBeenCalled();
+  });
+
   it("rechecks the start time before it sends SIGTERM", async () => {
     let tables = 0;
     respond = (command, args) => {
@@ -239,12 +325,13 @@ describe("left programs without the process marker", () => {
     };
     const kill = spyOnKill();
 
-    await Effect.runPromise(
+    const result = await Effect.runPromise(
       stopBackgroundProcess("darwin", { id: `${ROOT_PID}:${STARTED_AT}`, agentId: AGENT.id }, [
         { ...AGENT, workspacePath: workspace },
       ]),
     );
 
+    expect(result).toEqual({ stopped: false });
     expect(kill).not.toHaveBeenCalled();
   });
 

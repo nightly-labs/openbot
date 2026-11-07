@@ -47,6 +47,7 @@ import {
 import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDecoder } from "../protocol";
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
+import { AGENT_ID_VARIABLE } from "./agent-process";
 import { readCodexMcpConfig } from "./codex-mcp-config";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -911,6 +912,9 @@ export class ThreadLifecycle {
         ...Object.fromEntries(
           Object.entries(environment).map(([name, value]) => [`shell_environment_policy.set.${name}`, value]),
         ),
+        // The app-server is shared by every agent, so the agent id is set for each thread rather than
+        // for the process. A command that a person starts in the terminal does not have it.
+        [`shell_environment_policy.set.${AGENT_ID_VARIABLE}`]: agent.id,
       },
     };
   });

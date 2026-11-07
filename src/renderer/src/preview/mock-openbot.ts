@@ -1327,8 +1327,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       stop: async ({ id, agentId }) => {
         const target = backgroundProcesses.find((process) => process.id === id);
         // Like main: a process without the marker may be one that a person started.
-        if (!target?.verified || target.agentId !== agentId) return;
+        if (!target?.verified || target.agentId !== agentId) return { stopped: false };
         backgroundProcesses = backgroundProcesses.filter((process) => process.id !== id);
+        return { stopped: true };
       },
     },
     computerUse: {

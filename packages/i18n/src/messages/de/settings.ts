@@ -140,6 +140,7 @@ export const messages = {
   "settings.backgroundProcesses.unverified": "Nicht bestätigt",
   "settings.backgroundProcesses.unverifiedHint":
     "OpenBot hat diesen Prozess nicht gestartet. Er kann von Ihnen gestartet worden sein, daher Stoppen ist deaktiviert.",
+  "settings.backgroundProcesses.notFound": "Der Prozess läuft nicht mehr.",
   "settings.keepRemoteSessions.title": "Schnelle Verbindung zu Servern",
   "settings.keepRemoteSessions.description":
     "Die Verbindung zu deinen beigetretenen Servern zwischen Starts beibehalten. OpenBot startet etwa eine Sekunde schneller. Wenn du OpenBot beendest, schließt der OpenBot-Dienst die Verbindung nicht.",

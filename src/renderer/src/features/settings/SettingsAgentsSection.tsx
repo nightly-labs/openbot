@@ -127,6 +127,14 @@ export function createSettingsAgentsSection(options: {
     });
     settingsPort()
       .backgroundProcesses.stop({ id, agentId: process.agentId })
+      .then((result) => {
+        if (result.stopped) return;
+        const { t } = currentText();
+        actionToast.error(t("settings.backgroundProcesses.notFound"), {
+          id: "settings-background-process-stop-not-found",
+          report: { operation: "settings", source: "action", cause_code: "unknown" },
+        });
+      })
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(errorMessage(error, t("settings.backgroundProcesses.stopFailed")), {

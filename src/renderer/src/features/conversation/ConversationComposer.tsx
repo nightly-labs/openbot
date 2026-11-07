@@ -44,7 +44,6 @@ import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, onCleanup, Show } from "solid-js";
-import { actionToast } from "../../action-toast";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { speechReading } from "../speech/speech-playback";
@@ -140,7 +139,7 @@ export function ConversationComposer() {
     agentProviderName,
     sideThreadOpen,
   } = useConversationViewScope();
-  const { t, errorMessage, format, sourceText: localizeSourceText } = useText();
+  const { t, format, sourceText: localizeSourceText } = useText();
   const messageLabel = () =>
     channel
       ? t("channel.composer.placeholder", { name: channel.name() })
@@ -214,16 +213,9 @@ export function ConversationComposer() {
   );
   const unsubscribeBackgroundProcesses = subscribeBackgroundProcesses();
   onCleanup(unsubscribeBackgroundProcesses);
-  async function stopBackgroundTask(process: BackgroundProcess): Promise<void> {
-    try {
-      await stopBackgroundProcess(process);
-    } catch (error) {
-      actionToast.error(errorMessage(error, t("chat.backgroundTasks.stopFailed")), {
-        id: "conversation-background-task-stop-failed",
-        report: { operation: "other", source: "action", cause_code: "unknown" },
-      });
-      throw error;
-    }
+  async function stopBackgroundTask(process: BackgroundProcess): Promise<boolean> {
+    // The card keeps the confirmation open and shows one error, so a failure is not also a toast.
+    return stopBackgroundProcess(process);
   }
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;

@@ -6,10 +6,14 @@
 // variable and such a parent is the root of a left program, also after OpenBot quit and started
 // again. A provider process that OpenBot runs has OpenBot as its parent, so it is never one.
 //
+// The agent id comes from `AGENT_ID_VARIABLE`, which a provider writes into each session that it
+// starts. The working folder is a legacy fallback: a process can change it, and a person can start
+// a program in a workspace.
+//
 // macOS shows the environment of a program, but not of an Apple system program such as `/bin/sleep`.
-// There a program is shown too when its working directory is an agent workspace, but that is display
-// only: anyone can start a program in a workspace. Stop needs the marker, which records that an agent
-// started the program.
+// There a program is shown too when its working directory is an agent folder, but that is display
+// only: anyone can start a program in a workspace. Stop needs the marker, which records that an
+// agent started the program.
 
 import { execFile } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
@@ -17,6 +21,7 @@ import { basename, sep } from "node:path";
 import type { BackgroundProcess, BackgroundProcessStopInput } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { Effect, Schema } from "effect";
+import { AGENT_ID_VARIABLE } from "../backend/agent/agent-process";
 import { causeHelpers } from "../backend/effect-boundary";
 import { AGENT_PROCESS_VARIABLE } from "./server-memory";
 
@@ -34,10 +39,13 @@ const MAX_COMMAND_LENGTH = 500;
 const STOP_GRACE_MS = 3_000;
 const STOP_CHECK_INTERVAL_MS = 100;
 const MARKER = `${AGENT_PROCESS_VARIABLE}=1`;
+const AGENT_ID_PREFIX = `${AGENT_ID_VARIABLE}=`;
 
 export interface BackgroundProcessAgent {
   id: string;
   workspacePath: string;
+  /** The shared and additional folders of the agent, for the legacy working-folder fallback. */
+  folders?: readonly string[];
 }
 
 interface ProcessRow {
@@ -48,12 +56,25 @@ interface ProcessRow {
   command: string;
 }
 
+interface ProcessEnvironment {
+  /** True when the environment of the root has the marker, so an agent started it. */
+  verified: boolean;
+  agentId: string | null;
+}
+
+interface ResolvedAgent {
+  id: string;
+  folders: string[];
+}
+
 interface LeftProcess {
   root: ProcessRow;
   /** The root first, then its descendants. */
   tree: ProcessRow[];
   /** True when the environment of the root has the marker, so an agent started it. */
   verified: boolean;
+  /** The agent from the environment, or the legacy working-folder fallback. */
+  agentId: string | null;
 }
 
 /**
@@ -101,45 +122,72 @@ const readProcessTable = run("ps", ["-A", "-ww", "-o", "pid=,ppid=,uid=,lstart=,
   Effect.map(parseProcessTable),
 );
 
-/** The pids of `candidates` whose environment has the marker. */
-const markedProcesses = Effect.fn("BackgroundProcesses.marked")(function* (
+function environmentOf(text: string): ProcessEnvironment {
+  const values = text.split("\0");
+  const agentId = values.find((value) => value.startsWith(AGENT_ID_PREFIX))?.slice(AGENT_ID_PREFIX.length);
+  return { verified: values.includes(MARKER), agentId: agentId || null };
+}
+
+/** The marker and the agent id from the environment of each candidate. */
+const processEnvironments = Effect.fn("BackgroundProcesses.environments")(function* (
   platform: NodeJS.Platform,
   candidates: readonly number[],
 ) {
-  if (candidates.length === 0) return new Set<number>();
+  if (candidates.length === 0) return new Map<number, ProcessEnvironment>();
   if (platform === "linux") {
-    const marked = yield* Effect.forEach(
+    const environments = yield* Effect.forEach(
       candidates,
       (pid) =>
         io(() => readFile(`/proc/${pid}/environ`, "latin1")).pipe(
-          Effect.map((environment) => `\0${environment}\0`.includes(`\0${MARKER}\0`)),
+          Effect.map(environmentOf),
           // A process can end during the pass.
-          Effect.orElseSucceed(() => false),
+          Effect.orElseSucceed(() => null),
         ),
       { concurrency: 16 },
     );
-    return new Set(candidates.filter((_, index) => marked[index]));
+    return new Map(
+      candidates.flatMap((pid, index) => {
+        const environment = environments[index];
+        return environment ? [[pid, environment] as const] : [];
+      }),
+    );
   }
   const text = yield* run("ps", ["-ww", "-E", "-o", "pid=,command=", "-p", candidates.join(",")]);
-  const marked = new Set<number>();
+  const environments = new Map<number, ProcessEnvironment>();
   for (const line of text.split("\n")) {
     const match = /^\s*(\d+)\s(.*)$/u.exec(line);
-    if (match && ` ${match[2]} `.includes(` ${MARKER} `)) marked.add(Number(match[1]));
+    if (!match) continue;
+    const fields = ` ${match[2]} `;
+    const agentId = (match[2] ?? "")
+      .split(/\s+/u)
+      .find((field) => field.startsWith(AGENT_ID_PREFIX))
+      ?.slice(AGENT_ID_PREFIX.length);
+    environments.set(Number(match[1]), {
+      verified: fields.includes(` ${MARKER} `),
+      agentId: agentId || null,
+    });
   }
-  return marked;
+  return environments;
 });
 
-/** The workspace of each agent as the system sees it, because lsof writes a real path. */
+/** The folders of each agent as the system sees them, because lsof writes a real path. */
 const resolveWorkspaces = Effect.fn("BackgroundProcesses.workspaces")(function* (
   agents: readonly BackgroundProcessAgent[],
 ) {
   return yield* Effect.forEach(
     agents,
-    (agent) =>
-      io(() => realpath(agent.workspacePath)).pipe(
-        Effect.orElseSucceed(() => agent.workspacePath),
-        Effect.map((workspacePath) => ({ id: agent.id, workspacePath })),
-      ),
+    (agent) => {
+      const folders = [...new Set(agent.folders ?? [agent.workspacePath])];
+      return Effect.forEach(
+        folders,
+        (folder) =>
+          io(() => realpath(folder)).pipe(
+            Effect.orElseSucceed(() => folder),
+            Effect.map((workspacePath) => workspacePath),
+          ),
+        { concurrency: 16 },
+      ).pipe(Effect.map((resolved): ResolvedAgent => ({ id: agent.id, folders: resolved })));
+    },
     { concurrency: 16 },
   );
 });
@@ -164,31 +212,31 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (
   const candidates = rows.filter(
     (row) => row.uid === uid && row.pid !== process.pid && (row.ppid === 1 || reapers.has(row.ppid)),
   );
-  const marked = yield* markedProcesses(
+  const environments = yield* processEnvironments(
     platform,
     candidates.map((row) => row.pid),
   );
   // macOS hides the environment of Apple system programs, such as `/bin/sleep` and `/usr/bin/curl`.
-  // Candidates are already limited to this user, so a workspace cwd is enough to attribute a
-  // program that has no marker to that workspace's agent.
-  const unmarked = candidates.filter((row) => !marked.has(row.pid));
-  const workspaces = platform === "darwin" && unmarked.length > 0 ? yield* resolveWorkspaces(agents) : [];
+  // Candidates are already limited to this user, so a folder is enough to attribute a program that
+  // has no marker to that folder's agent.
+  const workspaces = platform === "darwin" && candidates.length > 0 ? yield* resolveWorkspaces(agents) : [];
   const cwds =
     workspaces.length > 0
-      ? yield* lsof(["-a", "-d", "cwd", "-p", unmarked.map((row) => row.pid).join(",")])
+      ? yield* lsof(["-a", "-d", "cwd", "-p", candidates.map((row) => row.pid).join(",")])
       : new Map<number, string[]>();
   const left: LeftProcess[] = [];
   for (const root of candidates) {
-    const verified = marked.has(root.pid);
-    // A working folder only says where a program runs, not who started it: keep such a program for
-    // display, but never treat it as one that this app may stop.
-    const inWorkspace = ownerOf(cwds.get(root.pid)?.[0], workspaces) !== null;
-    if (!verified && !inWorkspace) continue;
+    const environment = environments.get(root.pid);
+    const verified = environment?.verified ?? false;
+    // The environment wins. A working folder only says where a program runs, not who started it:
+    // keep such a program for display, but never treat it as one that this app may stop.
+    const agentId = environment?.agentId ?? ownerOf(cwds.get(root.pid)?.[0], workspaces);
+    if (!verified && agentId === null) continue;
     const tree = [root];
     for (let index = 0; index < tree.length; index++) tree.push(...(children.get(tree[index]?.pid ?? -1) ?? []));
     // An OpenBot that an agent started is never stopped from this one.
     if (tree.some((row) => row.pid === process.pid)) continue;
-    left.push({ root, tree, verified });
+    left.push({ root, tree, verified, agentId });
   }
   return left;
 });
@@ -218,14 +266,20 @@ function lsof(args: readonly string[]): Effect.Effect<Map<number, string[]>> {
   );
 }
 
-function ownerOf(cwd: string | undefined, agents: readonly BackgroundProcessAgent[]): string | null {
+function ownerOf(cwd: string | undefined, agents: readonly ResolvedAgent[]): string | null {
   if (!cwd) return null;
-  let owner: BackgroundProcessAgent | null = null;
+  let owner: string | null = null;
+  let length = -1;
   for (const agent of agents) {
-    const inside = cwd === agent.workspacePath || cwd.startsWith(`${agent.workspacePath}${sep}`);
-    if (inside && agent.workspacePath.length > (owner?.workspacePath.length ?? -1)) owner = agent;
+    for (const folder of agent.folders) {
+      const inside = cwd === folder || cwd.startsWith(`${folder}${sep}`);
+      if (inside && folder.length > length) {
+        owner = agent.id;
+        length = folder.length;
+      }
+    }
   }
-  return owner?.id ?? null;
+  return owner;
 }
 
 /**
@@ -246,16 +300,10 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
   if (platform === "win32") return null;
   const left = yield* findLeftProcesses(platform, agents);
   if (left.length === 0) return [];
-  const roots = left.map(({ root }) => root.pid).join(",");
   const everyPid = left.flatMap(({ tree }) => tree.map((row) => row.pid)).join(",");
-  const [cwds, listening] = yield* Effect.all(
-    [lsof(["-a", "-d", "cwd", "-p", roots]), lsof(["-a", "-iTCP", "-sTCP:LISTEN", "-p", everyPid])],
-    { concurrency: 2 },
-  );
-  // lsof gives the real path of a folder, such as `/private/tmp` for `/tmp` on macOS.
-  const workspaces = yield* resolveWorkspaces(agents);
+  const listening = yield* lsof(["-a", "-iTCP", "-sTCP:LISTEN", "-p", everyPid]);
   return left
-    .map(({ root, tree, verified }): BackgroundProcess => {
+    .map(({ root, tree, verified, agentId: owner }): BackgroundProcess => {
       const ports = new Set<number>();
       for (const row of tree) {
         for (const address of listening.get(row.pid) ?? []) {
@@ -269,7 +317,7 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
         command: verified ? redactText(root.command).slice(0, MAX_COMMAND_LENGTH) : executableOf(root.command),
         startedAt: root.startedAt,
         ports: [...ports].sort((left, right) => left - right),
-        agentId: ownerOf(cwds.get(root.pid)?.[0], workspaces),
+        agentId: owner,
         verified,
       };
     })
@@ -296,25 +344,24 @@ export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(funct
   input: BackgroundProcessStopInput,
   agents: readonly BackgroundProcessAgent[],
 ) {
-  if (platform === "win32") return;
+  if (platform === "win32") return { stopped: false };
   const found = (yield* findLeftProcesses(platform, agents)).find(({ root }) => processId(root) === input.id);
   // A program without the marker may be one that a person started in the workspace: show it only.
-  if (!found?.verified) return;
-  const workspaces = yield* resolveWorkspaces(agents);
-  const cwds = yield* lsof(["-a", "-d", "cwd", "-p", String(found.root.pid)]);
-  if (ownerOf(cwds.get(found.root.pid)?.[0], workspaces) !== input.agentId) return;
+  if (!found?.verified) return { stopped: false };
+  if (found.agentId !== input.agentId) return { stopped: false };
   // The start time comes from a new read: macOS gives it to 1 second, so a pid can be in use again
   // under the same start time. Only a program that is the same as the one that the card showed ends.
   const before = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
   const tree = found.tree.filter((row) => before.get(row.pid) === row.startedAt);
-  if (tree.every((row) => row.pid !== found.root.pid)) return;
+  if (tree.every((row) => row.pid !== found.root.pid)) return { stopped: false };
   const pids = tree.map((row) => row.pid);
   for (const pid of pids) signal(pid, "SIGTERM");
   for (let waited = 0; waited < STOP_GRACE_MS; waited += STOP_CHECK_INTERVAL_MS) {
-    if (!pids.some((pid) => signal(pid, 0))) return;
+    if (!pids.some((pid) => signal(pid, 0))) return { stopped: true };
     yield* Effect.sleep(STOP_CHECK_INTERVAL_MS);
   }
   // A pid that ended in the grace period can name a new program now: only the same start is killed.
   const current = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
   for (const row of tree) if (current.get(row.pid) === row.startedAt) signal(row.pid, "SIGKILL");
+  return { stopped: true };
 });

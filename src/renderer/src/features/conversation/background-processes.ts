@@ -88,7 +88,8 @@ export function subscribeBackgroundProcesses(): () => void {
 }
 
 /** Stops one verified process, then refreshes at once so the row leaves before the next poll. */
-export async function stopBackgroundProcess(process: BackgroundProcess): Promise<void> {
-  await window.openbot.backgroundProcesses.stop({ id: process.id, agentId: process.agentId });
+export async function stopBackgroundProcess(process: BackgroundProcess): Promise<boolean> {
+  const result = await window.openbot.backgroundProcesses.stop({ id: process.id, agentId: process.agentId });
   await refresh();
+  return result.stopped;
 }

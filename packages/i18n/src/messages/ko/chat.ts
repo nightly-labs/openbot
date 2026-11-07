@@ -73,6 +73,7 @@ export const messages = {
   "chat.backgroundTasks.unverified": "확인되지 않음",
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot이 이 프로세스를 시작하지 않았습니다. 직접 시작한 프로세스일 수 있으므로 중지가 비활성화됩니다.",
+  "chat.backgroundTasks.notFound": "이 프로세스는 더 이상 실행 중이 아닙니다.",
   "chat.trace.title": "트레이스",
   "chat.trace.search": "단계 검색",
   "chat.trace.steps": "단계",

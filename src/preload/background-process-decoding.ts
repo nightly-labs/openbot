@@ -1,6 +1,11 @@
 // The programs that agents left running, as main lists them.
 
-import { type BackgroundProcess, isBackgroundProcess } from "@openbot/contracts/ipc";
+import {
+  type BackgroundProcess,
+  type BackgroundProcessStopResult,
+  isBackgroundProcess,
+  isBackgroundProcessStopResult,
+} from "@openbot/contracts/ipc";
 
 function decodeBackgroundProcess(value: unknown): BackgroundProcess {
   if (!isBackgroundProcess(value)) throw new Error("Invalid background process.");
@@ -12,4 +17,9 @@ export function decodeBackgroundProcesses(value: unknown): BackgroundProcess[] |
   if (value === null) return null;
   if (!Array.isArray(value)) throw new Error("Invalid background processes.");
   return value.map(decodeBackgroundProcess);
+}
+
+export function decodeBackgroundProcessStopResult(value: unknown): BackgroundProcessStopResult {
+  if (!isBackgroundProcessStopResult(value)) throw new Error("Invalid background process stop result.");
+  return { stopped: value.stopped };
 }

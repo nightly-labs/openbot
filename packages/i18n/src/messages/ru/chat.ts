@@ -123,6 +123,7 @@ export const messages = {
   "chat.backgroundTasks.unverified": "Не подтверждён",
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot не запускал этот процесс. Возможно, его запустили вы, поэтому остановка отключена.",
+  "chat.backgroundTasks.notFound": "Этот процесс больше не выполняется.",
   "chat.trace.title": "Трассировка",
   "chat.trace.search": "Искать шаги",
   "chat.trace.steps": "Шаги",

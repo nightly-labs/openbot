@@ -7,8 +7,8 @@ import { useDuration } from "./Subagents";
 export interface BackgroundTasksCardProps {
   /** The processes of the agent of this conversation, oldest first. */
   processes: readonly BackgroundProcess[];
-  /** Stops one verified process. A rejection keeps the confirmation open and shows the error. */
-  onStop: (process: BackgroundProcess) => Promise<void>;
+  /** Stops one verified process. False means that it was not found; a rejection shows the error. */
+  onStop: (process: BackgroundProcess) => Promise<boolean>;
 }
 
 /** Ages one row from its start time, on a one-second clock that ends with the row. */
@@ -46,7 +46,11 @@ export function BackgroundTasksCard(props: BackgroundTasksCardProps) {
     setStopping(process.id);
     setError(undefined);
     try {
-      await props.onStop(process);
+      const stopped = await props.onStop(process);
+      if (!stopped) {
+        setError(t("chat.backgroundTasks.notFound"));
+        return;
+      }
       setTarget(undefined);
     } catch (cause) {
       setError(errorMessage(cause, t("chat.backgroundTasks.stopFailed")));

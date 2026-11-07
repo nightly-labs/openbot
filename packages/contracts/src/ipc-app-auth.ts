@@ -459,6 +459,15 @@ export interface BackgroundProcessStopInput {
   agentId: string | null;
 }
 
+/** The result of a stop request: false when the process was not found, unverified, or owned by another agent. */
+export interface BackgroundProcessStopResult {
+  stopped: boolean;
+}
+
+export function isBackgroundProcessStopResult(value: unknown): value is BackgroundProcessStopResult {
+  return isDynamicRecord(value) && isBoolean(value.stopped);
+}
+
 export function isBackgroundProcess(value: unknown): value is BackgroundProcess {
   return (
     isDynamicRecord(value) &&

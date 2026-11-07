@@ -73,6 +73,7 @@ export const messages = {
   "chat.backgroundTasks.unverified": "Non verificato",
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot non ha avviato questo processo. Potrebbe essere un processo avviato da te, quindi Arresta è disattivato.",
+  "chat.backgroundTasks.notFound": "Il processo non è più in esecuzione.",
   "chat.trace.title": "Traccia",
   "chat.trace.search": "Cerca passaggi",
   "chat.trace.steps": "Passaggi",

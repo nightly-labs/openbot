@@ -83,6 +83,7 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
+import { AGENT_ID_VARIABLE } from "./agent-process";
 import { captureBrowser } from "./browser-capture";
 import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
@@ -2517,6 +2518,8 @@ export class ProviderRuntime implements ProviderPort {
       ...(slowStartTimeoutMs === undefined ? {} : { startTimeoutMs: slowStartTimeoutMs }),
       ...(own.confinement ? { confinement: own.confinement } : {}),
       ...(accountEnvironment ? { accountEnvironment } : {}),
+      // This process belongs to one agent, so its tools can name the agent even after a `cd`.
+      agentEnvironment: { [AGENT_ID_VARIABLE]: agentId },
     });
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       yield* client.stop().pipe(Effect.catch(() => Effect.void));
@@ -2966,28 +2969,38 @@ export class ProviderRuntime implements ProviderPort {
         confinement,
         startTimeoutMs,
         accountEnvironment,
+        agentEnvironment,
         interruptibleStart,
       }: {
         confinement?: ProcessConfinement;
         startTimeoutMs?: number;
         /** The home folder of a provider account after the first. */
         accountEnvironment?: Readonly<Record<string, string>>;
+        /** Variables for one agent's own process, after the app-wide agent environment. */
+        agentEnvironment?: Readonly<Record<string, string>>;
         /** An interrupt stops the start and the client, also in an uninterruptible caller. */
         interruptibleStart?: boolean;
       } = {},
     ) {
       const driver = requireProviderDriver(provider);
       let transferred = false;
+      const context = {
+        ...this.#credentials,
+        ...(accountEnvironment ? { accountEnvironment } : {}),
+        ...(agentEnvironment
+          ? {
+              agentEnvironment: (inherited?: NodeJS.ProcessEnv) => ({
+                ...this.#credentials.agentEnvironment?.(inherited),
+                ...agentEnvironment,
+              }),
+            }
+          : {}),
+      };
       return yield* Effect.acquireUseRelease(
         providerStep(() =>
           this.#clientFactory
             ? this.#clientFactory(provider, cli, confinement, accountEnvironment)
-            : driver.createClient(
-                cli,
-                this.#requestTimeoutMs,
-                accountEnvironment ? { ...this.#credentials, accountEnvironment } : this.#credentials,
-                confinement,
-              ),
+            : driver.createClient(cli, this.#requestTimeoutMs, context, confinement),
         ),
         (client) =>
           Effect.gen({ self: this }, function* () {

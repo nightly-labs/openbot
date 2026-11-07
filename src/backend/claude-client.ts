@@ -26,6 +26,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
+import { AGENT_ID_VARIABLE } from "./agent/agent-process";
 import {
   isTurnContextBlock,
   type MemoryContext,
@@ -1053,6 +1054,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
             ...(launchPath ? { PATH: launchPath } : {}),
             ...this.#environment(this.#onApiKey),
+            ...(config.agentId ? { [AGENT_ID_VARIABLE]: config.agentId } : {}),
             ...OPENBOT_CLAUDE_CLIENT,
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.

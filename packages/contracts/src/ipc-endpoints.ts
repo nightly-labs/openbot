@@ -155,6 +155,7 @@ import type {
   BackgroundProcess,
   BackgroundProcessListInput,
   BackgroundProcessStopInput,
+  BackgroundProcessStopResult,
   CentralAuthState,
   ChatWindowTarget,
   CompanySignInScimToken,
@@ -1003,7 +1004,7 @@ export const IPC_ENDPOINTS = {
   // id and the owner that the card showed, and ends the process with its children.
   backgroundProcesses: {
     list: request<BackgroundProcessListInput | undefined, BackgroundProcess[] | null>()("background-processes:list"),
-    stop: request<BackgroundProcessStopInput, void>()("background-processes:stop"),
+    stop: request<BackgroundProcessStopInput, BackgroundProcessStopResult>()("background-processes:stop"),
   },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),

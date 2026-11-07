@@ -73,6 +73,7 @@ export const messages = {
   "chat.backgroundTasks.unverified": "未確認",
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot がこのプロセスを起動した記録はありません。ユーザーが起動したプロセスの可能性があるため、停止は無効です。",
+  "chat.backgroundTasks.notFound": "このプロセスはすでに実行されていません。",
   "chat.trace.title": "トレース",
   "chat.trace.search": "ステップを検索",
   "chat.trace.steps": "ステップ",

@@ -73,6 +73,7 @@ export const messages = {
   "chat.backgroundTasks.unverified": "Doğrulanmadı",
   "chat.backgroundTasks.unverifiedHint":
     "OpenBot bu işlemi başlatmadı. Bu, sizin başlattığınız bir işlem olabilir; bu nedenle Durdur devre dışı.",
+  "chat.backgroundTasks.notFound": "Bu işlem artık çalışmıyor.",
   "chat.trace.title": "İz",
   "chat.trace.search": "Adımlarda ara",
   "chat.trace.steps": "Adımlar",
