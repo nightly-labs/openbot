@@ -357,7 +357,9 @@ function createController({
         onPart: (part) => {
           if (own !== generation) return;
           if (phase !== "speaking") {
-            clearTimers();
+            // The grace timer stays: a turn that ends with only progress updates completes the reading.
+            if (pauseTimer) clearTimeout(pauseTimer);
+            pauseTimer = null;
             setPhase("speaking");
             speechLevel.set(
               withRepeat(
@@ -390,6 +392,19 @@ function createController({
       settled && readIds.at(-1) === answer.id,
     );
     if (complete) pending = null;
+  }
+
+  /**
+   * Ends a reply that has no answer to read. The progress updates that play continue to their end,
+   * then the microphone opens.
+   */
+  function endWithoutAnswer(): void {
+    if (!reading) {
+      listen();
+      return;
+    }
+    pending = null;
+    reading.update(readIds.map((id) => readTexts.get(id) ?? "").join("\n\n"), true);
   }
 
   /**
@@ -452,7 +467,7 @@ function createController({
     }
     // A stopped or failed answer is not read, as on desktop.
     if (answer) {
-      listen();
+      endWithoutAnswer();
       return;
     }
     if (!turnId || active) {
@@ -465,7 +480,7 @@ function createController({
     current.endedAt = Date.now();
     const own = generation;
     graceTimer = setTimeout(() => {
-      if (own === generation && pending === current) listen();
+      if (own === generation && pending === current) endWithoutAnswer();
     }, REPLY_GRACE_MS);
   }
 

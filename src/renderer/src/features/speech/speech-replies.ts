@@ -243,7 +243,8 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   }
   dictated.delete(key);
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
-  else replyEnded(agent);
+  // The progress updates of the turn play to their end before the pane listens again.
+  else void afterReadings(async () => {}).finally(() => replyEnded(agent));
 }
 
 function readProgressUpdates(messages: readonly ConversationMessage[], agent: SpeechAgent): void {
