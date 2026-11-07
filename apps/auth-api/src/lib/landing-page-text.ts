@@ -8,8 +8,8 @@ import type { MobilePlatform } from "./mobile-apps";
 import { slot, slotted } from "./text-slots";
 
 /*
- * The text of the home page, built from `sitePage.landing.*` catalog keys. The route loaders of `/`
- * and `/pl` run `landingPageText` with `loadPageText`, and the sections read plain strings through
+ * The text of the home page, built from `sitePage.landing.*` catalog keys. The route loaders of `/`,
+ * `/pl` and `/pt` run `landingPageText` with `loadPageText`, and the sections read plain strings through
  * `useLandingText`. This module has only a type import of the catalogs, so the sections do not pull
  * them into the browser bundle.
  */

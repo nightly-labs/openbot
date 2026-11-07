@@ -61,6 +61,7 @@ export function siteText(t: AppTranslate) {
       current: {
         en: t("sitePage.site.language.current", { language: appLanguageOption("en").label }),
         pl: t("sitePage.site.language.current", { language: appLanguageOption("pl").label }),
+        pt: t("sitePage.site.language.current", { language: appLanguageOption("pt").label }),
       } satisfies Record<SiteLocale, string>,
     },
     latest: t("sitePage.site.latest"),
@@ -142,7 +143,7 @@ export type FooterTextId = keyof SiteText["footer"]["links"];
 /** The site text in one language, with the `lang` attribute of that language. */
 export interface SiteChrome {
   lang: string;
-  /** The language of the page. Links to a page with a Polish copy go to the copy in this language. */
+  /** The language of the page. Links to a page with localized copies go to the copy in this language. */
   locale: SiteLocale;
   text: SiteText;
 }

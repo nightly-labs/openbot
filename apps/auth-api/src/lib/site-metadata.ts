@@ -235,7 +235,7 @@ export interface HomePageHead {
   title: string;
   description: string;
   questions: readonly LandingQuestion[];
-  /** The path of this language's home page, such as `/` or `/pl`. */
+  /** The path of this language's home page, such as `/`, `/pl` or `/pt`. */
   path: string;
   openGraphLocale: string;
   /** The home page in each language, for `hreflang` links. The first is also `x-default`. */

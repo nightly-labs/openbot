@@ -3,8 +3,8 @@ import type { TeamsSetupId } from "../../lib/teams-page";
 import { slot } from "../../lib/text-slots";
 
 /*
- * The text of the /teams page, built from `sitePage.teams.*` catalog keys. The routes `/teams` and
- * `/pl/teams` run `teamsPageText` with `loadPageText`. This module has only a type import of the
+ * The text of the /teams page, built from `sitePage.teams.*` catalog keys. The routes `/teams`,
+ * `/pl/teams` and `/pt/teams` run `teamsPageText` with `loadPageText`. This module has only a type import of the
  * catalogs, so the page does not pull them into the browser bundle.
  */
 
