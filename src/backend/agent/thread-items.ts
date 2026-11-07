@@ -479,7 +479,7 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     (toolUsage(item)?.kind === "command" ||
       (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash"))
   ) {
-    return sourceText("status.agent.commandRunning");
+    return sourceText("status.agent.commandRunningUnnamed");
   }
   return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.toolStepWorking");
 }
