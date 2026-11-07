@@ -936,6 +936,16 @@ export class ProviderRuntime implements ProviderPort {
     for (const { client } of this.#confined.values()) if (client.releaseIdleThreads) yield* client.releaseIdleThreads();
   }).bind(this);
 
+  /** Closes the threads that only quiet background work holds, in each client, when memory is low. */
+  readonly releaseQuietBackgroundThreads = Effect.fn("ProviderRuntime.releaseQuietBackgroundThreads")(function* (
+    this: ProviderRuntime,
+  ) {
+    for (const client of this.#clients.values())
+      if (client.releaseQuietBackgroundThreads) yield* client.releaseQuietBackgroundThreads();
+    for (const { client } of this.#confined.values())
+      if (client.releaseQuietBackgroundThreads) yield* client.releaseQuietBackgroundThreads();
+  }).bind(this);
+
   listModels(): AgentModelOption[] {
     return this.#modelCatalog.list().filter((model) => !this.#off.has(model.provider));
   }

@@ -7,8 +7,12 @@ export const SHARED_FOLDER_PATH = /^Shared[/\\]/u;
 
 /** A larger named image keeps only its chip. The host does not read or send a larger file. */
 const INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
-/** The cached `data:` URLs together take at most this many characters. */
-const CACHE_CHARACTERS = 64 * 1024 * 1024;
+/**
+ * The cached `data:` URLs together take at most this many characters. The renderer keeps a second
+ * copy of each shown URL and its decoded bitmap, so the cache stays small; an image that scrolls
+ * back into view after eviction is read again from the host.
+ */
+const CACHE_CHARACTERS = 16 * 1024 * 1024;
 
 /**
  * The types that show inline. Each shows as a `data:` URL in an `<img>`, which runs no script and

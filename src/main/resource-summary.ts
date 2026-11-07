@@ -62,7 +62,10 @@ export const RESOURCE_ENUMS = {
   main_loop_delay_max_phase: LOOP_PHASES,
 } as const;
 
-type GroupPropertyName = `${ProcessGroup}_rss_mb_p95` | `${ProcessGroup}_cpu_pct_p95`;
+type GroupPropertyName =
+  | `${ProcessGroup}_rss_mb_p95`
+  | `${ProcessGroup}_private_mb_p95`
+  | `${ProcessGroup}_cpu_pct_p95`;
 type ProviderPropertyName = `provider_${ResourceProvider}_rss_mb_p95` | `provider_${ResourceProvider}_cpu_pct_p95`;
 type GonePropertyName = `gone_${GoneReason}_count`;
 type ChildGonePropertyName = `child_gone_${ChildType}_count`;
@@ -72,7 +75,16 @@ export const RESOURCE_PROPERTY_NAMES = [
   "total_rss_mb_max",
   "total_cpu_pct_p95",
   "total_cpu_pct_max",
-  ...PROCESS_GROUPS.flatMap((group): GroupPropertyName[] => [`${group}_rss_mb_p95`, `${group}_cpu_pct_p95`]),
+  ...PROCESS_GROUPS.flatMap((group): GroupPropertyName[] => [
+    `${group}_rss_mb_p95`,
+    `${group}_private_mb_p95`,
+    `${group}_cpu_pct_p95`,
+  ]),
+  "window_js_heap_mb_p95",
+  "window_js_heap_total_mb_p95",
+  "window_dom_heap_mb_p95",
+  "window_array_buffer_mb_p95",
+  "window_dom_node_count_p95",
   ...RESOURCE_PROVIDERS.flatMap((provider): ProviderPropertyName[] => [
     `provider_${provider}_rss_mb_p95`,
     `provider_${provider}_cpu_pct_p95`,
@@ -342,11 +354,19 @@ function percentile(day: ResourceDay, metric: string, fraction: number): number 
 export const METRIC = {
   rss: (target: string) => `rss_mb.${target}`,
   cpu: (target: string) => `cpu_pct.${target}`,
+  /** Memory that no other process shares. Electron reports it only on Windows. */
+  privateMemory: (target: string) => `private_mb.${target}`,
   providerRss: (provider: ResourceProvider) => `rss_mb.provider.${provider}`,
   providerCpu: (provider: ResourceProvider) => `cpu_pct.provider.${provider}`,
   mainLoop: "loop_ms.main",
   database: "db_ms",
   rendererInput: "renderer_input_ms",
+  /** The heaps of the app window renderers, from the DevTools protocol: V8, Blink's object heap and ArrayBuffers. */
+  windowJsHeap: "js_heap_mb.window",
+  windowJsHeapTotal: "js_heap_total_mb.window",
+  windowDomHeap: "dom_heap_mb.window",
+  windowArrayBuffers: "array_buffer_mb.window",
+  windowDomNodes: "count.window_dom_nodes",
   activeTurns: "count.active_turns",
   browserTabs: "count.browser_tabs",
   providerProcesses: "count.provider_processes",
@@ -387,6 +407,11 @@ export function resourceEventProperties(day: ResourceDay, device: DeviceClass): 
     db_slow_request_count: day.counters[COUNTER.databaseSlow] ?? 0,
     renderer_long_task_count: day.counters[COUNTER.rendererLongTasks] ?? 0,
     renderer_input_delay_ms_p95: roundWhole(percentile(day, METRIC.rendererInput, 0.95)),
+    window_js_heap_mb_p95: roundMb(percentile(day, METRIC.windowJsHeap, 0.95)),
+    window_js_heap_total_mb_p95: roundMb(percentile(day, METRIC.windowJsHeapTotal, 0.95)),
+    window_dom_heap_mb_p95: roundMb(percentile(day, METRIC.windowDomHeap, 0.95)),
+    window_array_buffer_mb_p95: roundMb(percentile(day, METRIC.windowArrayBuffers, 0.95)),
+    window_dom_node_count_p95: roundWhole(percentile(day, METRIC.windowDomNodes, 0.95)),
     renderer_gone_count: day.counters[COUNTER.rendererGone] ?? 0,
     child_gone_count: day.counters[COUNTER.childGone] ?? 0,
     active_turn_count_max: roundWhole(day.peaks[METRIC.activeTurns]),
@@ -401,6 +426,7 @@ export function resourceEventProperties(day: ResourceDay, device: DeviceClass): 
   };
   for (const group of PROCESS_GROUPS) {
     properties[`${group}_rss_mb_p95`] = roundMb(percentile(day, METRIC.rss(group), 0.95));
+    properties[`${group}_private_mb_p95`] = roundMb(percentile(day, METRIC.privateMemory(group), 0.95));
     properties[`${group}_cpu_pct_p95`] = roundWhole(percentile(day, METRIC.cpu(group), 0.95));
   }
   for (const provider of RESOURCE_PROVIDERS) {

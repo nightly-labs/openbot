@@ -16,7 +16,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Result, Schema, Semaphore } from "effect";
+import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -271,6 +271,11 @@ export class ThreadLifecycle {
   readonly #pendingStarts = new Map<string, number>();
   /** The starts of `#pendingStarts` that are not in a side thread: they hold the agent's own chat. */
   readonly #pendingMainStarts = new Map<string, number>();
+  /**
+   * The idle releases whose `thread/unsubscribe` is in flight. A resume of the same session waits
+   * for it: a resume that went first would be undone by the unsubscribe after it.
+   */
+  readonly #idleReleases = new Map<string, Deferred.Deferred<void>>();
 
   constructor(options: ThreadLifecycleOptions) {
     this.#store = options.store;
@@ -550,6 +555,62 @@ export class ThreadLifecycle {
         else count.delete(agentId);
       }
     };
+  }
+
+  /**
+   * Unloads an idle session from its client, to free the processes and MCP servers that the client
+   * holds for it, and keeps the session: its next turn resumes it in `ensureThread`. The result is
+   * `held` when something still needs the session, and `gone` when this client does not hold a
+   * session that can resume.
+   *
+   * `held` adds the checks that the caller owns, such as a pending approval. The routing is dropped
+   * in the same step as the last check, before the release yields, so a start after it sees an
+   * unloaded session and resumes it when the release is done.
+   */
+  readonly releaseIdleSession = Effect.fn("ThreadLifecycle.releaseIdleSession")(function* (
+    this: ThreadLifecycle,
+    externalThreadId: string,
+    client: AgentClient,
+    held: (agentId: string) => boolean,
+  ) {
+    const before = this.#idleSessionState(externalThreadId, client, held);
+    if (before !== "idle") return before;
+    if (!client.holdsBackgroundWork || !client.releaseThread) return "held";
+    const background = yield* Effect.result(client.holdsBackgroundWork(externalThreadId));
+    // A failed check keeps the session: the release could end a terminal that the check did not see.
+    if (Result.isFailure(background) || background.success) return "held";
+    const after = this.#idleSessionState(externalThreadId, client, held);
+    if (after !== "idle") return after;
+    const released = Deferred.makeUnsafe<void>();
+    this.#idleReleases.set(externalThreadId, released);
+    this.#conversation.unloadThread(externalThreadId);
+    yield* this.#releaseProviderSession(externalThreadId, client, true);
+    this.#idleReleases.delete(externalThreadId);
+    yield* Deferred.succeed(released, undefined);
+    return "released";
+  }, Effect.uninterruptible).bind(this);
+
+  #idleSessionState(
+    externalThreadId: string,
+    client: AgentClient,
+    held: (agentId: string) => boolean,
+  ): "idle" | "held" | "gone" {
+    if (this.#conversation.loadedClientFor(externalThreadId) !== client) return "gone";
+    const agentId = this.#conversation.agentForThread(externalThreadId);
+    // A routine session is ephemeral: no rollout is kept to resume it from.
+    if (!agentId || this.#conversation.isRoutineSession(externalThreadId)) return "gone";
+    const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    const session = this.#store.database.activeProviderSession(publicThreadId, client.provider);
+    if (session?.externalSessionId !== externalThreadId) return "gone";
+    if (
+      held(agentId) ||
+      this.#pendingStarts.has(agentId) ||
+      !this.#compaction.mayDrain(agentId) ||
+      this.#mailbox.startingDeliveriesForAgent(agentId).length > 0 ||
+      this.#activeTurnOf(agentId, publicThreadId) !== null
+    )
+      return "held";
+    return "idle";
   }
 
   readonly startProviderThread = Effect.fn("ThreadLifecycle.startProviderThread")(function* (
@@ -1358,6 +1419,8 @@ export class ThreadLifecycle {
     client: AgentClient,
     externalThreadId: string,
   ) {
+    const releasing = this.#idleReleases.get(externalThreadId);
+    if (releasing) yield* Deferred.await(releasing);
     this.#conversation.bindThread(externalThreadId, agent.id);
     const givenSection = this.#sectionKey(agent);
     const params = yield* this.threadParams(agent, client, externalThreadId);

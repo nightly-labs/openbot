@@ -1,6 +1,6 @@
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, Loading, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import { createLanguageStep } from "./features/onboarding/language-step";
@@ -64,7 +64,10 @@ export function AppAccessGate() {
   const detection = useProviderDetection();
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
-  const started = () => setup.setupLoaded() && platform.appInfo() !== null;
+  // The splash also waits for the catalogs of the first language, so the first screen is not in
+  // English. A later language change does not bring the splash back.
+  const languageLoaded = createMemo<boolean>((was) => was === true || i18n.ready());
+  const started = () => setup.setupLoaded() && platform.appInfo() !== null && languageLoaded();
   // The landing demo opens on the workspace at once, with no splash.
   const [splashShown, setSplashShown] = createSignal(!platform.landingPreview);
   // A chat window is a new page too, but it fades as soon as it is ready.

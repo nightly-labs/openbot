@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
 import { TurnContext } from "./agent/turn-context";
@@ -28,6 +28,7 @@ import {
   type ProviderHistoryFragment,
   type ProviderHistoryRequest,
 } from "./provider-history";
+import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 import { registerProviderProcess } from "./provider-processes";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { endProcessTree } from "./windows-process-tree";
@@ -53,6 +54,8 @@ interface ClientEvents {
 const CRASH_RECORD = /\bpanicked at\b|^(?:\S+\s+)?FATAL\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
 /** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
 const STDERR_END_WAIT_MS = 250;
+/** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
+const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
 
 export class AppServerError extends Error {
   constructor(
@@ -125,9 +128,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       env: this.#extraEnv ? { ...process.env, ...this.#extraEnv } : process.env,
       windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
+      detached: PROVIDER_PROCESS_GROUP,
     });
     this.#process = child;
     registerProviderProcess(child, "codex");
+    endProcessGroupOnExit(child);
 
     child.stdin.on("error", (error) => this.#fail(error, child));
     child.stdout.on("data", (chunk: Buffer) => {
@@ -206,14 +211,36 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    *
    * A thread this connection never subscribed to answers `NotSubscribed`, which is not an error
    * here: either way this side has stopped using it.
+   *
+   * `resumes`: an idle release. `thread/resume` loads the same rollout, which holds the memories and
+   * section-mates that its turns were sent, so they do not go again.
    */
   readonly releaseThread = Effect.fn("CodexAppServer.releaseThread")(function* (
     this: CodexAppServerClient,
     threadId: string,
+    resumes = false,
   ) {
-    this.#turnContext.forget(threadId);
+    if (!resumes) this.#turnContext.forget(threadId);
     if (!this.running) return;
     yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
+  });
+
+  /**
+   * Whether the thread has a background terminal. The unload that follows `thread/unsubscribe`
+   * ends every unified exec process of the thread, so a release would stop a dev server or a watch
+   * that the agent left running. `thread/backgroundTerminals/list` is an experimental method; the
+   * `initialize` request turns on `experimentalApi`.
+   */
+  readonly holdsBackgroundWork = Effect.fn("CodexAppServer.holdsBackgroundWork")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    const terminals = yield* this.request(
+      "thread/backgroundTerminals/list",
+      { threadId, limit: 1 },
+      decodeBackgroundTerminals,
+    );
+    return terminals.data.length > 0;
   });
 
   /**

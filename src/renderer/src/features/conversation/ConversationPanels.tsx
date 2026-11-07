@@ -385,6 +385,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   const selectedPane = () => (activeRightPanel() === "side-panel" ? null : sidePanel().selected);
   /** The side thread that shows, and whose tab is selected. */
   const shownThread = () => (activeRightPanel() === "thread" ? shownPanelThreadId() : null);
+  /** The browser tabs that an agent acts in now. Their previews show the page more often. */
+  const busyBrowserTabIds = createMemo(
+    () => new Set(props.browserControlState.sessions.flatMap((session) => (session.tabId ? [session.tabId] : []))),
+  );
   /** With no side thread to show, the side panel lists the panes. */
   const launcherShown = () =>
     activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
@@ -577,6 +581,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>
         <BrowserPreviewSidebar
           tabs={browserTabs()}
+          busyTabIds={busyBrowserTabIds()}
           hidden={browserExpandedOpen()}
           suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
           contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}

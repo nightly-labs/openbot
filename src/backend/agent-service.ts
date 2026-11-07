@@ -163,6 +163,7 @@ import { backgroundModel, withBackgroundEffort } from "./agent/background-model"
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
+import { CodexIdleSessions } from "./agent/codex-idle-sessions";
 import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
@@ -441,6 +442,8 @@ export interface AgentServiceOptions {
    * while memory is low, and only a fixed number of turns run at the same time.
    */
   hostMemory?: HostMemory | null;
+  /** When an idle Codex session is unloaded, and how many idle sessions one app server keeps. Tests make it short. */
+  codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
 }
 
 /** How long a user send's `clientMessageId` answers a retry. A retry follows a lost reply, not a day. */
@@ -454,6 +457,13 @@ const TASK_STOP_WAIT_MS = 15_000;
  * again. Grok 1.0.70 has its whole catalogue about a second after it starts on an expired sign-in.
  */
 const PARTIAL_LIST_RECHECK_MS = 5_000;
+/**
+ * How long a Codex session with no turn stays loaded in its app server. The app server keeps the
+ * MCP servers of each loaded thread, and stops all of them only when the whole process is idle.
+ */
+const CODEX_SESSION_IDLE_RELEASE_MS = 5 * 60_000;
+/** How many idle Codex sessions one app server keeps loaded before the timeout. */
+const CODEX_IDLE_SESSION_LIMIT = 1;
 
 /** The user's update, and the browser profile choice that the profile operations set after their checks. */
 export type AgentUpdate = UpdateAgentInput & {
@@ -504,6 +514,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #attention: AttentionRegistry;
   readonly #images: ImageGenRuntime;
   readonly #threads: ThreadLifecycle;
+  readonly #codexIdleSessions: CodexIdleSessions;
   readonly #memoryHold: MemoryHold;
   readonly #usageLimits: UsageLimitGate;
   readonly #drain: DrainScheduler;
@@ -774,6 +785,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         bindClient: (client) => {
           client.on("notification", (notification) => {
+            if (
+              client.provider === "codex" &&
+              (notification.method === "turn/started" || notification.method === "turn/completed")
+            ) {
+              const threadId = getString(notification.params, "threadId");
+              if (threadId && notification.method === "turn/started") this.#codexIdleSessions.busy(threadId, client);
+              else if (threadId) this.#codexIdleSessions.idle(threadId, client);
+            }
             if (notification.method === "openbot/sessionSettings/updated") {
               const threadId = getString(notification.params, "threadId");
               const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
@@ -833,6 +852,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         onProviderLost: (client) => {
           this.#boot.orphanDeliveriesOf(client.provider, (agentId) => this.#providers.runsOnOwnProcess(agentId));
           this.#compaction.clientEnded(client);
+          this.#codexIdleSessions.clientStopped(client);
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers(client);
           this.#attention.clearApprovals(client);
@@ -848,6 +868,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#attention.clearBrowserTakeovers(client);
             this.#attention.clearApprovals(client);
             this.#compaction.clientEnded(client);
+            this.#codexIdleSessions.clientStopped(client);
             yield* this.#warmGenerations.ownerStopped(client);
             yield* this.#turn.interruptTurnsOf(client);
           }),
@@ -1154,6 +1175,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           logger.warn("Could not read the work steps of an earlier provider session.", { provider, error }),
       },
     });
+    this.#codexIdleSessions = new CodexIdleSessions({
+      releaseAfterMs: options.codexIdleSessions?.releaseAfterMs ?? CODEX_SESSION_IDLE_RELEASE_MS,
+      idleLimit: options.codexIdleSessions?.idleLimit ?? CODEX_IDLE_SESSION_LIMIT,
+      scope: () => this.#scope,
+      tracks: (threadId, client) =>
+        this.#conversation.loadedClientFor(threadId) === client &&
+        this.#conversation.agentForThread(threadId) !== undefined &&
+        !this.#conversation.isRoutineSession(threadId),
+      release: (threadId, client) =>
+        this.#threads.releaseIdleSession(
+          threadId,
+          client,
+          (agentId) => this.#stopping || this.#runsTurn(agentId) || this.#attention.hasAttentionFor(agentId),
+        ),
+    });
     this.#boot = new BootRecovery({
       store,
       mailbox,
@@ -1377,7 +1413,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
         retryWaiting: () => this.#drain.retrySlotWaiters(),
-        releaseIdleThreads: () => this.#providers.releaseIdleThreads(),
+        releaseIdleThreads: () =>
+          Effect.sync(() => this.#codexIdleSessions.releaseIdle()).pipe(
+            Effect.andThen(this.#providers.releaseIdleThreads()),
+          ),
+        releaseQuietBackgroundThreads: () => this.#providers.releaseQuietBackgroundThreads(),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       },
     });
@@ -4594,6 +4634,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#deltas.dispose();
     this.#conversation.dispose();
     this.#threads.dispose();
+    this.#codexIdleSessions.dispose();
     this.#memories.clearPending();
     this.#tables?.dispose();
     this.#attention.clearPrompts();

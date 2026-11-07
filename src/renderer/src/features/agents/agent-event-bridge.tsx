@@ -78,6 +78,7 @@ export function AgentEventBridge() {
     isAgentChatOpen,
     autoMarkAgentMessageRead,
     applyConversationDelta,
+    flushConversationDeltas,
     applyConversationPage,
     markReplyCompleted,
     clearRecentReply,
@@ -122,6 +123,15 @@ export function AgentEventBridge() {
   let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
+    // Streamed text waits for the next frame. Other events apply it first, so each one sees the text
+    // that came before it. Progress and side-thread text do not read the conversations.
+    if (
+      event.type !== "conversation-delta" &&
+      event.type !== "turn-progress" &&
+      event.type !== "agent-task-conversation-delta"
+    ) {
+      flushConversationDeltas();
+    }
     switch (event.type) {
       case "status":
         applyAgentStatus(event.status);
