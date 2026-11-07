@@ -37,6 +37,7 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   app,
+  BaseWindow,
   BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
@@ -338,6 +339,29 @@ const BROWSER_WEB_PREFERENCES = {
   backgroundThrottling: false,
 };
 
+/** The window of `BrowserHost.#backgroundWindow`. It has no page of its own. */
+function createBackgroundWindow(): BaseWindow {
+  const window = new BaseWindow({
+    show: false,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    focusable: false,
+    skipTaskbar: true,
+    hiddenInMissionControl: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    closable: false,
+  });
+  window.setIgnoreMouseEvents(true);
+  window.setOpacity(0);
+  window.excludedFromShownWindowsMenu = true;
+  return window;
+}
+
 /** A smaller panel size is not used for a hidden tab: a page lays out for a phone below it. */
 const MIN_HIDDEN_VIEWPORT = { width: 800, height: 600 };
 /** The height of the tab strip and toolbar of a Chrome window with no bookmarks bar. */
@@ -503,6 +527,14 @@ export class BrowserHost {
   #mainPageListener: ((page: BrowserMainPage | null) => void) | null = null;
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
+  /**
+   * macOS draws no page of a hidden or minimized window. A page that loads there gives no image, so a
+   * snapshot or screenshot waits until its deadline (#5580). While the main window is hidden or
+   * minimized, the views of its tabs are in this window: shown, but transparent, click-through and
+   * never focused. `#mountedViews` still names the main window for them.
+   */
+  #backgroundWindow: BaseWindow | null = null;
+  #mainViewsInBackground = false;
   readonly #takeoverTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
@@ -556,6 +588,16 @@ export class BrowserHost {
     } = {},
   ) {
     this.#window = window;
+    if (process.platform === "darwin") {
+      const syncBackgroundWindow = () => {
+        if (this.#syncBackgroundWindow()) this.#syncAttachedView();
+      };
+      window.on("hide", syncBackgroundWindow);
+      window.on("show", syncBackgroundWindow);
+      window.on("minimize", syncBackgroundWindow);
+      window.on("restore", syncBackgroundWindow);
+      window.once("closed", () => this.#closeBackgroundWindow());
+    }
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
@@ -2721,6 +2763,7 @@ export class BrowserHost {
     const done = Deferred.makeUnsafe<void, BrowserOperationError>();
     this.#destroying = done;
     clearInterval(this.#idleTabSweep);
+    this.#closeBackgroundWindow();
     const result = yield* Effect.exit(
       Effect.gen({ self: this }, function* () {
         // Capture the persisted tab list before removing native views.
@@ -3665,7 +3708,7 @@ export class BrowserHost {
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();
     this.#mainPageListener?.(this.#target === "main" ? { tabId: tab.id, bounds, zoomFactor } : null);
-    if (tab.focusOnVisible) {
+    if (tab.focusOnVisible && !this.#inBackgroundWindow(tab.view)) {
       tab.focusOnVisible = false;
       tab.contents.focus();
     }
@@ -3684,7 +3727,8 @@ export class BrowserHost {
       this.#tabs.get(tab.id) !== tab ||
       this.#activeTabId !== tab.id ||
       !tab.view.getVisible() ||
-      tab.contents.isDestroyed()
+      tab.contents.isDestroyed() ||
+      this.#inBackgroundWindow(tab.view)
     ) {
       return;
     }
@@ -3692,13 +3736,16 @@ export class BrowserHost {
   }
 
   #mountView(view: WebContentsView, window = this.#window): void {
+    if (window === this.#window) this.#syncBackgroundWindow();
+    const parent = this.#nativeParent(window);
     const currentWindow = this.#mountedViews.get(view);
     if (currentWindow === window) {
-      window.contentView.addChildView(view);
+      parent.contentView.addChildView(view);
       return;
     }
-    if (currentWindow && !currentWindow.isDestroyed()) currentWindow.contentView.removeChildView(view);
-    window.contentView.addChildView(view);
+    const currentParent = currentWindow && this.#nativeParent(currentWindow);
+    if (currentParent && !currentParent.isDestroyed()) currentParent.contentView.removeChildView(view);
+    parent.contentView.addChildView(view);
     // Initialize the native viewport before hiding a tab that has never been shown.
     view.setVisible(true);
     view.setBounds(this.#hiddenViewBounds(window));
@@ -3732,10 +3779,57 @@ export class BrowserHost {
     };
   }
 
+  /** The window that holds the views that `#mountedViews` gives to `window`. */
+  #nativeParent(window: BrowserWindow): BaseWindow {
+    return window === this.#window && this.#mainViewsInBackground && this.#backgroundWindow
+      ? this.#backgroundWindow
+      : window;
+  }
+
+  /** On macOS, focusing a page also focuses its window, which would bring OpenBot to the front. */
+  #inBackgroundWindow(view: WebContentsView): boolean {
+    const window = this.#mountedViews.get(view);
+    return window !== undefined && this.#nativeParent(window) !== window;
+  }
+
+  /** Moves the main window's views to the background window or back. True when they moved. */
+  #syncBackgroundWindow(): boolean {
+    const window = this.#window;
+    if (process.platform !== "darwin" || window.isDestroyed() || this.#destroying) return false;
+    const background = !window.isVisible() || window.isMinimized();
+    if (background === this.#mainViewsInBackground) return false;
+    const from = this.#nativeParent(window);
+    if (background) {
+      this.#backgroundWindow ??= createBackgroundWindow();
+      // The views keep their bounds, so the window has the size of the main window's content.
+      this.#backgroundWindow.setBounds(window.getContentBounds());
+      this.#backgroundWindow.showInactive();
+    }
+    this.#mainViewsInBackground = background;
+    const to = this.#nativeParent(window);
+    for (const [view, owner] of this.#mountedViews) {
+      if (owner !== window) continue;
+      if (!from.isDestroyed()) from.contentView.removeChildView(view);
+      to.contentView.addChildView(view);
+    }
+    if (!background) this.#backgroundWindow?.hide();
+    return true;
+  }
+
+  #closeBackgroundWindow(): void {
+    const background = this.#backgroundWindow;
+    this.#backgroundWindow = null;
+    this.#mainViewsInBackground = false;
+    if (!background || background.isDestroyed()) return;
+    for (const view of [...background.contentView.children]) background.contentView.removeChildView(view);
+    background.destroy();
+  }
+
   #unmountView(view: WebContentsView): void {
     view.setVisible(false);
     const window = this.#mountedViews.get(view);
-    if (window && !window.isDestroyed()) window.contentView.removeChildView(view);
+    const parent = window && this.#nativeParent(window);
+    if (parent && !parent.isDestroyed()) parent.contentView.removeChildView(view);
     this.#mountedViews.delete(view);
     if (this.#attachedView === view) this.#attachedView = null;
   }
