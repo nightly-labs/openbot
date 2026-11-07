@@ -63,7 +63,7 @@ import {
   resolveMainWindowBounds,
   writeMainWindowBounds,
 } from "./main-window-state";
-import { createQuitShortcut, type QuitShortcut } from "./quit-shortcut";
+import { createQuitShortcut, isQuitGuarded, type QuitShortcut } from "./quit-shortcut";
 import type { RemoteServerManager } from "./remote-server-manager";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
@@ -1013,7 +1013,8 @@ function macQuitItem(
     accelerator: "Command+Q",
     click: (_item, _window, event) => {
       if (!event.triggeredByAccelerator) return quit("menu");
-      // With no agent at work, a quit stops nothing, so the keys quit at once unless the user guards every quit.
+      // The keys quit at once when the user turned the guard off, or when no agent works and the user
+      // guards only the quits that stop agents.
       if (!guarded()) return quit("shortcut");
       // A second press while the question is open does not open another one, and a quit that has
       // started hid every window and needs no question.
@@ -1109,7 +1110,7 @@ export function configureApplicationMenu(
                 translate,
                 () => {
                   const choice = quitGuard();
-                  return choice === "always" || (choice === "working" && workingAgents().length > 0);
+                  return isQuitGuarded(choice, choice === "working" ? workingAgents() : []);
                 },
                 quit,
               )

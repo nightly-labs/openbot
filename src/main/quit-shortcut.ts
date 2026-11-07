@@ -145,9 +145,9 @@ export function createQuitShortcut({
       // Two presses count only in one window, which showed the hint after the first.
       const doublePress = lastPress?.window === window && now - lastPress.at <= DOUBLE_PRESS_MS;
       lastPress = { window, at: now };
-      const agents = doublePress ? [] : workingAgents();
-      const choice = guard();
-      const guarded = !doublePress && (choice === "always" || (choice === "working" && agents.length > 0));
+      const choice = doublePress ? "never" : guard();
+      const agents = choice === "never" ? [] : workingAgents();
+      const guarded = isQuitGuarded(choice, agents);
       hold = { window, agents, startedAt: now, lastKeyAt: now, repeatGapMs: 0 };
       if (guarded) keepHint(window, agents);
       else complete(hold);
@@ -159,6 +159,11 @@ export function createQuitShortcut({
       else hold = null;
     },
   };
+}
+
+/** True when `Cmd + Q` asks for a hold or a second press before it quits. */
+export function isQuitGuarded(choice: QuitGuard, agents: readonly AgentSummary[]): boolean {
+  return choice === "always" || (choice === "working" && agents.length > 0);
 }
 
 /**
