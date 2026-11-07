@@ -34,7 +34,8 @@
   padding-bottom: var(--composer-stack-overlap);
 }
 
-.composer-stack :is(.awaiting-replies, .agent-queue-panel, .composer-notice, .composer-reply-preview) {
+.composer-stack
+  :is(.awaiting-replies, .background-tasks, .agent-queue-panel, .composer-notice, .composer-reply-preview) {
   z-index: auto;
   margin: -1px 0 0;
   border: 0;

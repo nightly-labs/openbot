@@ -136,6 +136,15 @@ export const messages = {
   "settings.backgroundProcesses.stop": "停止",
   "settings.backgroundProcesses.stopLabel": "プロセス {pid} を停止",
   "settings.backgroundProcesses.stopFailed": "プロセスを停止できませんでした。",
+  "settings.backgroundProcesses.unverified": "未確認",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot がこのプロセスを起動した記録はありません。ユーザーが起動したプロセスの可能性があるため、停止は無効です。",
+  "settings.backgroundProcesses.notStoppableHint":
+    "このプロセスを開始したエージェントが記録されていないため、停止は無効です。",
+  "settings.backgroundProcesses.stopRefused":
+    "このバックグラウンドタスクは別のエージェントのものか、ここから停止できません。",
+  "settings.backgroundProcesses.stopStillRunning": "停止を要求した後もプロセスは実行中です。",
+  "settings.backgroundProcesses.notFound": "このプロセスはすでに実行されていません。",
   "settings.keepRemoteSessions.title": "サーバーへの高速接続",
   "settings.keepRemoteSessions.description":
     "参加しているサーバーへの接続を起動の間も維持します。OpenBot の起動が約 1 秒速くなります。OpenBot を終了しても、OpenBot サービスは接続を閉じません。",

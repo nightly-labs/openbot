@@ -206,7 +206,7 @@ import {
   decodeVoiceTranscriptionResult,
   decodeVoid,
 } from "./app-decoding";
-import { decodeBackgroundProcesses } from "./background-process-decoding";
+import { decodeBackgroundProcesses, decodeBackgroundProcessStopResult } from "./background-process-decoding";
 import {
   decodeBrowserBounds,
   decodeBrowserControlState,
@@ -826,7 +826,7 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   backgroundProcesses: bridgeGroup(IPC_ENDPOINTS.backgroundProcesses, {
     list: decodeBackgroundProcesses,
-    stop: decodeVoid,
+    stop: decodeBackgroundProcessStopResult,
   }),
   providerRuntimes: bridgeGroup(IPC_ENDPOINTS.providerRuntimes, {
     getStatus: decodeProviderRuntimeSnapshot,

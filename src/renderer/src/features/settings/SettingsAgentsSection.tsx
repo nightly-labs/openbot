@@ -120,12 +120,27 @@ export function createSettingsAgentsSection(options: {
       });
   }
 
-  function stopProcess(id: string): void {
+  function stopProcess(process: BackgroundProcess): void {
+    const id = process.id;
     setState((draft) => {
       draft.stopping.push(id);
     });
     settingsPort()
-      .backgroundProcesses.stop(id)
+      .backgroundProcesses.stop({ id, agentId: process.agentId })
+      .then((result) => {
+        if (result.stopped) return;
+        const { t } = currentText();
+        const key =
+          result.reason === "still-running"
+            ? "settings.backgroundProcesses.stopStillRunning"
+            : result.reason === "not-stoppable" || result.reason === "wrong-agent"
+              ? "settings.backgroundProcesses.stopRefused"
+              : "settings.backgroundProcesses.notFound";
+        actionToast.error(t(key), {
+          id: `settings-background-process-stop-${result.reason ?? "not-found"}`,
+          report: { operation: "settings", source: "action", cause_code: "unknown" },
+        });
+      })
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(errorMessage(error, t("settings.backgroundProcesses.stopFailed")), {

@@ -135,6 +135,15 @@ export const messages = {
   "settings.backgroundProcesses.stop": "Stoppen",
   "settings.backgroundProcesses.stopLabel": "Proces {pid} stoppen",
   "settings.backgroundProcesses.stopFailed": "Het proces kon niet worden gestopt.",
+  "settings.backgroundProcesses.unverified": "Niet geverifieerd",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot heeft dit proces niet gestart. Het kan een proces zijn dat je zelf hebt gestart, dus Stoppen is uitgeschakeld.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot heeft niet vastgelegd welke agent dit proces heeft gestart, dus Stoppen is uitgeschakeld.",
+  "settings.backgroundProcesses.stopRefused":
+    "Deze achtergrondtaak hoort bij een andere agent of kan hier niet worden gestopt.",
+  "settings.backgroundProcesses.stopStillRunning": "Het proces draait nog nadat het is gevraagd te stoppen.",
+  "settings.backgroundProcesses.notFound": "Het proces wordt niet meer uitgevoerd.",
   "settings.keepRemoteSessions.title": "Snelle verbinding met servers",
   "settings.keepRemoteSessions.description":
     "Houd de verbinding met de servers waaraan je deelneemt tussen starts open. OpenBot start dan ongeveer een seconde sneller. Als je OpenBot afsluit, sluit de OpenBot-service de verbinding niet.",

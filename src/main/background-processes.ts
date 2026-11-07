@@ -6,15 +6,28 @@
 // variable and such a parent is the root of a left program, also after OpenBot quit and started
 // again. A provider process that OpenBot runs has OpenBot as its parent, so it is never one.
 //
+// The agent id comes from `AGENT_ID_VARIABLE`, which a provider writes into each session that it
+// starts. The working folder is a legacy fallback: a process can change it, and a person can start
+// a program in a workspace.
+//
 // macOS shows the environment of a program, but not of an Apple system program such as `/bin/sleep`.
-// Such a program is not found. The environment stays in memory: it can hold secrets.
+// A shell wrapper that OpenBot puts first on `PATH` records the agent and start time of its shell, so
+// a program that such a shell leaves in the background keeps its agent through the process group.
+// A program is also shown when its working directory is an agent folder, but that is display only:
+// anyone can start a program in a workspace. Stop needs the environment or the shell registry.
 
 import { execFile } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
-import { sep } from "node:path";
-import type { BackgroundProcess } from "@openbot/contracts/ipc";
+import { basename, sep } from "node:path";
+import type {
+  BackgroundProcess,
+  BackgroundProcessStopInput,
+  BackgroundProcessStopResult,
+} from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { Effect, Schema } from "effect";
+import { AGENT_ID_VARIABLE } from "../backend/agent/agent-process";
+import { type AgentShellRegistration, readAgentShellRegistry } from "../backend/agent/agent-shell";
 import { causeHelpers } from "../backend/effect-boundary";
 import { AGENT_PROCESS_VARIABLE } from "./server-memory";
 
@@ -28,28 +41,62 @@ const COMMAND_TIMEOUT_MS = 5_000;
 // With `-E`, macOS writes the environment of each process after its command line.
 const COMMAND_MAX_BUFFER = 32 * 1024 * 1024;
 const MAX_COMMAND_LENGTH = 500;
+/** A process tree past this bound is not shown, because a partial tree cannot be stopped safely. */
+const MAX_TREE_PROCESSES = 4_096;
+/** A page shows a few listening ports; a program with a wider range is still stoppable. */
+const MAX_PORTS = 32;
 /** How long a stopped tree has to end after SIGTERM, before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
 const STOP_CHECK_INTERVAL_MS = 100;
+/** How long SIGKILL has to end the tree before the answer says that it still runs. */
+const KILL_CHECK_MS = 500;
+/** The second that `ps` reports for a start time, plus a small allowance for the wrapper's clock. */
+const SHELL_START_TOLERANCE_MS = 2_000;
 const MARKER = `${AGENT_PROCESS_VARIABLE}=1`;
+const AGENT_ID_PREFIX = `${AGENT_ID_VARIABLE}=`;
 
 export interface BackgroundProcessAgent {
   id: string;
   workspacePath: string;
+  /** The shared and additional folders of the agent, for the legacy working-folder fallback. */
+  folders?: readonly string[];
 }
 
 interface ProcessRow {
   pid: number;
   ppid: number;
+  /** The process group that the shell of an agent started. It survives when the shell ends. */
+  pgid: number;
   uid: number;
   startedAt: number;
   command: string;
+}
+
+interface ProcessEnvironment {
+  /** True when the environment of the root has the marker, so an agent started it. */
+  verified: boolean;
+  agentId: string | null;
+}
+
+interface ResolvedAgent {
+  id: string;
+  folders: string[];
 }
 
 interface LeftProcess {
   root: ProcessRow;
   /** The root first, then its descendants. */
   tree: ProcessRow[];
+  /** True when the environment has the marker or a shell wrapper recorded the process group. */
+  verified: boolean;
+  /** The agent from the environment of the process, never from a working folder. */
+  environmentAgentId: string | null;
+  /** The agent that a shell wrapper recorded for the process group, when `ps -E` hid the environment. */
+  shellAgentId: string | null;
+  /** The agent whose card may stop the process: the environment, then the shell registry. */
+  stopAgentId: string | null;
+  /** For display only: `stopAgentId`, or the owner of the working folder. */
+  agentId: string | null;
 }
 
 /**
@@ -83,50 +130,115 @@ function run(command: string, args: readonly string[]): Effect.Effect<string, Ba
 function parseProcessTable(text: string): ProcessRow[] {
   const rows: ProcessRow[] = [];
   for (const line of text.split("\n")) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]{8}\s+\d{4})\s+(.+?)\s*$/u.exec(line);
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]{8}\s+\d{4})\s+(.+?)\s*$/u.exec(
+      line,
+    );
     if (!match) continue;
-    const [, pid, ppid, uid, started, command] = match;
+    const [, pid, ppid, pgid, uid, started, command] = match;
     const startedAt = Date.parse(started ?? "");
     if (Number.isNaN(startedAt) || !command) continue;
-    rows.push({ pid: Number(pid), ppid: Number(ppid), uid: Number(uid), startedAt, command });
+    rows.push({
+      pid: Number(pid),
+      ppid: Number(ppid),
+      pgid: Number(pgid),
+      uid: Number(uid),
+      startedAt,
+      command,
+    });
   }
   return rows;
 }
 
-const readProcessTable = run("ps", ["-A", "-ww", "-o", "pid=,ppid=,uid=,lstart=,command="]).pipe(
+const readProcessTable = run("ps", ["-A", "-ww", "-o", "pid=,ppid=,pgid=,uid=,lstart=,command="]).pipe(
   Effect.map(parseProcessTable),
 );
 
-/** The pids of `candidates` whose environment has the marker. */
-const markedProcesses = Effect.fn("BackgroundProcesses.marked")(function* (
+function environmentOf(text: string): ProcessEnvironment {
+  const values = text.split("\0");
+  const agentId = values.find((value) => value.startsWith(AGENT_ID_PREFIX))?.slice(AGENT_ID_PREFIX.length);
+  return { verified: values.includes(MARKER), agentId: agentId || null };
+}
+
+/** The marker and the agent id from the environment of each candidate. */
+const processEnvironments = Effect.fn("BackgroundProcesses.environments")(function* (
   platform: NodeJS.Platform,
-  candidates: readonly number[],
+  candidates: readonly ProcessRow[],
 ) {
-  if (candidates.length === 0) return new Set<number>();
+  if (candidates.length === 0) return new Map<number, ProcessEnvironment>();
   if (platform === "linux") {
-    const marked = yield* Effect.forEach(
+    const environments = yield* Effect.forEach(
       candidates,
-      (pid) =>
+      ({ pid }) =>
         io(() => readFile(`/proc/${pid}/environ`, "latin1")).pipe(
-          Effect.map((environment) => `\0${environment}\0`.includes(`\0${MARKER}\0`)),
+          Effect.map(environmentOf),
           // A process can end during the pass.
-          Effect.orElseSucceed(() => false),
+          Effect.orElseSucceed(() => null),
         ),
       { concurrency: 16 },
     );
-    return new Set(candidates.filter((_, index) => marked[index]));
+    return new Map(
+      candidates.flatMap(({ pid }, index) => {
+        const environment = environments[index];
+        return environment ? [[pid, environment] as const] : [];
+      }),
+    );
   }
-  const text = yield* run("ps", ["-ww", "-E", "-o", "pid=,command=", "-p", candidates.join(",")]);
-  const marked = new Set<number>();
+  const pids = candidates.map(({ pid }) => pid).join(",");
+  const text = yield* run("ps", ["-ww", "-E", "-o", "pid=,command=", "-p", pids]);
+  const commands = new Map(candidates.map(({ pid, command }) => [pid, command]));
+  const environments = new Map<number, ProcessEnvironment>();
   for (const line of text.split("\n")) {
     const match = /^\s*(\d+)\s(.*)$/u.exec(line);
-    if (match && ` ${match[2]} `.includes(` ${MARKER} `)) marked.add(Number(match[1]));
+    if (!match) continue;
+    const pid = Number(match[1]);
+    const command = commands.get(pid);
+    // `ps -E` writes the command line and then the environment, without a delimiter. Only the text
+    // past the known command is the environment: a variable name in an argument is not a variable.
+    const named = match[2] ?? "";
+    if (command === undefined || !named.startsWith(command)) {
+      environments.set(pid, { verified: false, agentId: null });
+      continue;
+    }
+    const fields = ` ${named.slice(command.length)} `;
+    const agentId = fields
+      .split(/\s+/u)
+      .find((field) => field.startsWith(AGENT_ID_PREFIX))
+      ?.slice(AGENT_ID_PREFIX.length);
+    environments.set(pid, {
+      verified: fields.includes(` ${MARKER} `),
+      agentId: agentId || null,
+    });
   }
-  return marked;
+  return environments;
+});
+
+/** The folders of each agent as the system sees them, because lsof writes a real path. */
+const resolveWorkspaces = Effect.fn("BackgroundProcesses.workspaces")(function* (
+  agents: readonly BackgroundProcessAgent[],
+) {
+  return yield* Effect.forEach(
+    agents,
+    (agent) => {
+      const folders = [...new Set(agent.folders ?? [agent.workspacePath])];
+      return Effect.forEach(
+        folders,
+        (folder) =>
+          io(() => realpath(folder)).pipe(
+            Effect.orElseSucceed(() => folder),
+            Effect.map((workspacePath) => workspacePath),
+          ),
+        { concurrency: 16 },
+      ).pipe(Effect.map((resolved): ResolvedAgent => ({ id: agent.id, folders: resolved })));
+    },
+    { concurrency: 16 },
+  );
 });
 
 /** The left programs of this user, each with its descendants. */
-const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platform: NodeJS.Platform) {
+const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (
+  platform: NodeJS.Platform,
+  agents: readonly BackgroundProcessAgent[],
+) {
   const rows = yield* readProcessTable;
   const uid = process.getuid?.() ?? -1;
   const children = new Map<number, ProcessRow[]>();
@@ -142,18 +254,67 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platf
   const candidates = rows.filter(
     (row) => row.uid === uid && row.pid !== process.pid && (row.ppid === 1 || reapers.has(row.ppid)),
   );
-  const marked = yield* markedProcesses(
-    platform,
-    candidates.map((row) => row.pid),
+  const environments = yield* processEnvironments(platform, candidates);
+  // A wrapper records the agent of a shell, because macOS hides the environment of Apple programs.
+  const shells: Map<number, AgentShellRegistration> =
+    platform === "darwin" ? yield* Effect.promise(() => readAgentShellRegistry()) : new Map();
+  const rowsByPid = new Map(rows.map((row) => [row.pid, row]));
+  const starts = new Map(
+    candidates.map((row) => {
+      const environmentAgentId = environments.get(row.pid)?.agentId ?? null;
+      const registration = environmentAgentId === null ? shells.get(row.pgid) : undefined;
+      // If the group leader still runs, its start time must be the one that the wrapper recorded.
+      // Otherwise a reused pgid would let an unrelated program claim that shell's agent.
+      const leader = registration ? rowsByPid.get(row.pgid) : undefined;
+      const shellAgentId =
+        registration &&
+        (!leader || Math.abs(leader.startedAt - registration.startedAt * 1000) <= SHELL_START_TOLERANCE_MS)
+          ? registration.agentId
+          : null;
+      return [
+        row.pid,
+        {
+          environmentAgentId,
+          shellAgentId,
+          stopAgentId: environmentAgentId ?? shellAgentId,
+          verified: (environments.get(row.pid)?.verified ?? false) || shellAgentId !== null,
+        },
+      ] as const;
+    }),
   );
+  // macOS hides the environment of Apple system programs, such as `/bin/sleep` and `/usr/bin/curl`.
+  // Only a candidate without an agent from the environment or a shell wrapper needs the fallback.
+  // Candidates are already limited to this user, so a folder is enough to attribute such a program
+  // to that folder's agent for display.
+  const needsFolder = candidates.filter((row) => starts.get(row.pid)?.stopAgentId === null);
+  const workspaces = platform === "darwin" && needsFolder.length > 0 ? yield* resolveWorkspaces(agents) : [];
+  const cwds =
+    workspaces.length > 0
+      ? yield* lsof(["-a", "-d", "cwd", "-p", needsFolder.map((row) => row.pid).join(",")])
+      : new Map<number, string[]>();
   const left: LeftProcess[] = [];
   for (const root of candidates) {
-    if (!marked.has(root.pid)) continue;
+    const start = starts.get(root.pid);
+    if (!start) continue;
+    // The environment or the shell wrapper wins. A working folder only says where a program runs,
+    // not who started it: keep such a program for display, but never treat it as one that this app
+    // may stop. A marker-only process has no stop agent, so its card has no Stop.
+    const agentId = start.stopAgentId ?? ownerOf(cwds.get(root.pid)?.[0], workspaces);
+    if (!start.verified && agentId === null) continue;
     const tree = [root];
-    for (let index = 0; index < tree.length; index++) tree.push(...(children.get(tree[index]?.pid ?? -1) ?? []));
+    let complete = true;
+    for (let index = 0; index < tree.length; index++) {
+      tree.push(...(children.get(tree[index]?.pid ?? -1) ?? []));
+      if (tree.length > MAX_TREE_PROCESSES) {
+        complete = false;
+        break;
+      }
+    }
+    // A partial tree cannot be stopped safely, so it is not offered.
+    if (!complete) continue;
     // An OpenBot that an agent started is never stopped from this one.
     if (tree.some((row) => row.pid === process.pid)) continue;
-    left.push({ root, tree });
+    left.push({ root, tree, ...start, agentId });
   }
   return left;
 });
@@ -183,45 +344,54 @@ function lsof(args: readonly string[]): Effect.Effect<Map<number, string[]>> {
   );
 }
 
-function ownerOf(cwd: string | undefined, agents: readonly BackgroundProcessAgent[]): string | null {
+function ownerOf(cwd: string | undefined, agents: readonly ResolvedAgent[]): string | null {
   if (!cwd) return null;
-  let owner: BackgroundProcessAgent | null = null;
+  let owner: string | null = null;
+  let length = -1;
+  let shared = false;
   for (const agent of agents) {
-    const inside = cwd === agent.workspacePath || cwd.startsWith(`${agent.workspacePath}${sep}`);
-    if (inside && agent.workspacePath.length > (owner?.workspacePath.length ?? -1)) owner = agent;
+    for (const folder of agent.folders) {
+      const inside = cwd === folder || cwd.startsWith(`${folder}${sep}`);
+      if (!inside) continue;
+      if (folder.length > length) {
+        owner = agent.id;
+        length = folder.length;
+        shared = false;
+      } else if (folder.length === length && owner !== agent.id) {
+        // More than one agent names the same folder, so the folder cannot prove which one.
+        shared = true;
+      }
+    }
   }
-  return owner?.id ?? null;
+  return shared ? null : owner;
+}
+
+/**
+ * The name of the program alone. A process that OpenBot did not start can have secrets in its
+ * arguments, such as `--token`, and its command line is not for display.
+ */
+function executableOf(command: string): string {
+  const match = /^(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(command.trim());
+  return basename(match?.[1] ?? match?.[2] ?? match?.[3] ?? "");
 }
 
 /** Null on Windows, where OpenBot cannot find these programs. */
 export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(function* (
   platform: NodeJS.Platform,
   agents: readonly BackgroundProcessAgent[],
+  agentId?: string,
 ) {
   if (platform === "win32") return null;
-  const left = yield* findLeftProcesses(platform);
+  const left = yield* findLeftProcesses(platform, agents);
   if (left.length === 0) return [];
-  const roots = left.map(({ root }) => root.pid).join(",");
   const everyPid = left.flatMap(({ tree }) => tree.map((row) => row.pid)).join(",");
-  const [cwds, listening] = yield* Effect.all(
-    [lsof(["-a", "-d", "cwd", "-p", roots]), lsof(["-a", "-iTCP", "-sTCP:LISTEN", "-p", everyPid])],
-    { concurrency: 2 },
-  );
-  // lsof gives the real path of a folder, such as `/private/tmp` for `/tmp` on macOS.
-  const workspaces = yield* Effect.forEach(
-    agents,
-    (agent) =>
-      io(() => realpath(agent.workspacePath)).pipe(
-        Effect.orElseSucceed(() => agent.workspacePath),
-        Effect.map((workspacePath) => ({ id: agent.id, workspacePath })),
-      ),
-    { concurrency: 16 },
-  );
+  const listening = yield* lsof(["-a", "-iTCP", "-sTCP:LISTEN", "-p", everyPid]);
   return left
-    .map(({ root, tree }): BackgroundProcess => {
+    .map(({ root, tree, verified, stopAgentId, agentId: owner }): BackgroundProcess => {
       const ports = new Set<number>();
       for (const row of tree) {
         for (const address of listening.get(row.pid) ?? []) {
+          if (ports.size >= MAX_PORTS) break;
           const port = Number(address.slice(address.lastIndexOf(":") + 1));
           if (Number.isInteger(port) && port > 0) ports.add(port);
         }
@@ -229,12 +399,15 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
       return {
         id: processId(root),
         pid: root.pid,
-        command: redactText(root.command).slice(0, MAX_COMMAND_LENGTH),
+        command: verified ? redactText(root.command).slice(0, MAX_COMMAND_LENGTH) : executableOf(root.command),
         startedAt: root.startedAt,
         ports: [...ports].sort((left, right) => left - right),
-        agentId: ownerOf(cwds.get(root.pid)?.[0], workspaces),
+        agentId: owner,
+        verified,
+        stoppable: stopAgentId !== null,
       };
     })
+    .filter((process) => agentId === undefined || process.agentId === agentId)
     .sort((left, right) => right.startedAt - left.startedAt);
 });
 
@@ -249,22 +422,40 @@ function signal(pid: number, name: NodeJS.Signals | 0): boolean {
 
 /**
  * Ends one left program and its children: SIGTERM, then SIGKILL to each process that still runs
- * after `STOP_GRACE_MS`. The id must name a left program now, so a page cannot signal another process.
+ * after `STOP_GRACE_MS`. The caller must name a verified process of the agent that its card shows,
+ * so a page cannot signal a program that a person started.
  */
 export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(function* (
   platform: NodeJS.Platform,
-  id: string,
-) {
-  if (platform === "win32") return;
-  const found = (yield* findLeftProcesses(platform)).find(({ root }) => processId(root) === id);
-  if (!found) return;
-  const pids = found.tree.map((row) => row.pid);
+  input: BackgroundProcessStopInput,
+  agents: readonly BackgroundProcessAgent[],
+): Effect.fn.Return<BackgroundProcessStopResult, BackgroundProcessFailure> {
+  if (platform === "win32") return { stopped: false, reason: "unsupported" };
+  const found = (yield* findLeftProcesses(platform, agents)).find(({ root }) => processId(root) === input.id);
+  if (!found) return { stopped: false, reason: "not-found" };
+  // A marker-only program may be one that a person started in the workspace: show it only.
+  if (!found.verified || found.stopAgentId === null) return { stopped: false, reason: "not-stoppable" };
+  if (found.stopAgentId !== input.agentId) return { stopped: false, reason: "wrong-agent" };
+  // The start time comes from a new read: macOS gives it to 1 second, so a pid can be in use again
+  // under the same start time. Only a program that is the same as the one that the card showed ends.
+  const before = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
+  const tree = found.tree.filter((row) => before.get(row.pid) === row.startedAt);
+  if (tree.every((row) => row.pid !== found.root.pid)) return { stopped: false, reason: "not-found" };
+  const pids = tree.map((row) => row.pid);
   for (const pid of pids) signal(pid, "SIGTERM");
   for (let waited = 0; waited < STOP_GRACE_MS; waited += STOP_CHECK_INTERVAL_MS) {
-    if (!pids.some((pid) => signal(pid, 0))) return;
+    if (!pids.some((pid) => signal(pid, 0))) return { stopped: true };
     yield* Effect.sleep(STOP_CHECK_INTERVAL_MS);
   }
   // A pid that ended in the grace period can name a new program now: only the same start is killed.
   const current = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
-  for (const row of found.tree) if (current.get(row.pid) === row.startedAt) signal(row.pid, "SIGKILL");
+  const survivors = tree.filter((row) => current.get(row.pid) === row.startedAt);
+  for (const row of survivors) signal(row.pid, "SIGKILL");
+  // SIGKILL can fail for a process that the user cannot signal, and the tree can still run. A
+  // stopped answer needs the processes to be gone, not only the signal to have been sent.
+  for (let waited = 0; waited < KILL_CHECK_MS; waited += STOP_CHECK_INTERVAL_MS) {
+    if (!survivors.some((row) => signal(row.pid, 0))) return { stopped: true };
+    yield* Effect.sleep(STOP_CHECK_INTERVAL_MS);
+  }
+  return { stopped: false, reason: "still-running" };
 });

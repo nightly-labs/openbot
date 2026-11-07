@@ -141,6 +141,15 @@ export const messages = defineMessages("settings", {
   "settings.backgroundProcesses.stop": "Stop",
   "settings.backgroundProcesses.stopLabel": "Stop process {pid}",
   "settings.backgroundProcesses.stopFailed": "The process could not be stopped.",
+  "settings.backgroundProcesses.unverified": "Unverified",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot did not start this process. It may be a process that you started, so Stop is disabled.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "OpenBot did not record which agent started this process, so Stop is disabled.",
+  "settings.backgroundProcesses.stopRefused":
+    "This background task belongs to another agent or cannot be stopped from here.",
+  "settings.backgroundProcesses.stopStillRunning": "The process is still running after it was asked to stop.",
+  "settings.backgroundProcesses.notFound": "This process is no longer running.",
   "settings.keepRemoteSessions.title": "Fast connection to servers",
   "settings.keepRemoteSessions.description":
     "Keep the connection to your joined servers between launches. OpenBot starts about a second faster. When you quit OpenBot, the OpenBot service does not close the connection.",

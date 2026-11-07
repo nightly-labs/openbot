@@ -44,6 +44,15 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
   String.raw`(["']?(?:${SECRET_LABEL})["']?\s*[=:]+\s*)(\[redacted\]|"[^"]*"|'[^']*'|[^\s,;)}\]]+)`,
   "giu",
 );
+// `--password hunter2` is a flag and a value with no `=`; the assignment rule cannot see it. The
+// long name keeps the rule away from ordinary prose. `-pS3cret` is the short form that MySQL and
+// other command lines attach to its value.
+const LONG_SECRET_FLAG =
+  /((?:^|\s)--(?:password|passwd|passphrase|secret|token|api-key|api_key|access-token|auth-token|private-key)\s+)(?!\[redacted\])([^\s"'`]{3,})/giu;
+const SHORT_PASSWORD_FLAG = /((?:^|\s)-p)(?!-)([^\s"'`]{3,})/gu;
+// A password in a URL's user info, such as `postgres://user:hunter2@localhost/db`. The password
+// ends at the last `@` of the authority, so a password that itself holds an `@` stays whole.
+const URL_USERINFO = /(\b[a-z][a-z0-9+.-]*:\/\/)([^/\s:@]+):([^/\s]+)@/giu;
 // The prefix has to start a token: without the boundary, `sk-` matched inside
 // ordinary words and `risk-register` came out as `ri[redacted]`, erasing the
 // part of a diagnostic that names what failed.
@@ -208,6 +217,9 @@ function applyTextRules(value: string): string {
       .replace(AUTH_HEADER_SECRET, "$1[redacted]")
       .replace(BEARER_SECRET, "[redacted]")
       .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
+      .replace(LONG_SECRET_FLAG, "$1[redacted]")
+      .replace(SHORT_PASSWORD_FLAG, "$1[redacted]")
+      .replace(URL_USERINFO, "$1$2:[redacted]@")
       .replace(JSON_BARE_KEY, redactAssignedValue)
       // After the assignment rule: its value runs over `&`, and a query value redacted first would
       // leave a `]` behind it.

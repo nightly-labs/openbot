@@ -439,14 +439,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       startedAt: Date.now() - 2 * 60 * 60_000,
       ports: [5173],
       agentId: "research",
+      verified: true,
+      stoppable: true,
     },
     {
       id: "51377:1",
       pid: 51377,
-      command: "python3 -m http.server 8000",
+      command: "python3",
       startedAt: Date.now() - 3 * 24 * 60 * 60_000,
       ports: [8000],
       agentId: null,
+      verified: false,
+      stoppable: false,
     },
   ];
   const computerUseState = (): ComputerUseState => {
@@ -1318,9 +1322,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       request: async (targets) => targets.map((target) => ({ target, status: "granted" })),
     },
     backgroundProcesses: {
-      list: async () => clone(backgroundProcesses),
-      stop: async (id) => {
+      list: async (filter) =>
+        clone(
+          filter ? backgroundProcesses.filter((process) => process.agentId === filter.agentId) : backgroundProcesses,
+        ),
+      stop: async ({ id, agentId }) => {
+        const target = backgroundProcesses.find((process) => process.id === id);
+        // Like main: a process without the marker may be one that a person started.
+        if (!target?.verified || target.agentId !== agentId) return { stopped: false };
         backgroundProcesses = backgroundProcesses.filter((process) => process.id !== id);
+        return { stopped: true };
       },
     },
     computerUse: {

@@ -134,6 +134,15 @@ export const messages = {
   "settings.backgroundProcesses.stop": "중지",
   "settings.backgroundProcesses.stopLabel": "프로세스 {pid} 중지",
   "settings.backgroundProcesses.stopFailed": "프로세스를 중지할 수 없어요.",
+  "settings.backgroundProcesses.unverified": "확인되지 않음",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot이 이 프로세스를 시작하지 않았습니다. 직접 시작한 프로세스일 수 있으므로 중지가 비활성화됩니다.",
+  "settings.backgroundProcesses.notStoppableHint":
+    "이 프로세스를 시작한 에이전트가 기록되지 않아 중지가 비활성화되었습니다.",
+  "settings.backgroundProcesses.stopRefused":
+    "이 백그라운드 작업은 다른 에이전트의 것이거나 여기에서 중지할 수 없습니다.",
+  "settings.backgroundProcesses.stopStillRunning": "중지 요청 후에도 프로세스가 계속 실행 중입니다.",
+  "settings.backgroundProcesses.notFound": "이 프로세스는 더 이상 실행 중이 아닙니다.",
   "settings.keepRemoteSessions.title": "서버에 빠르게 연결",
   "settings.keepRemoteSessions.description":
     "참여 중인 서버와의 연결을 실행 사이에도 유지해요. OpenBot이 약 1초 더 빨리 시작돼요. OpenBot을 종료해도 OpenBot 서비스가 연결을 닫지 않아요.",

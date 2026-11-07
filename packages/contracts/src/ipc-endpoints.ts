@@ -153,6 +153,9 @@ import type {
   AppInfo,
   AppSetupState,
   BackgroundProcess,
+  BackgroundProcessListInput,
+  BackgroundProcessStopInput,
+  BackgroundProcessStopResult,
   CentralAuthState,
   ChatWindowTarget,
   CompanySignInScimToken,
@@ -997,10 +1000,11 @@ export const IPC_ENDPOINTS = {
     request: request<readonly MacAutomationTarget[], MacAutomationResult[]>()("mac-automation:request"),
   },
   // The programs that agents left running on this computer. `list` answers null where OpenBot cannot
-  // find them (Windows). `stop` takes the id of one, and ends it with its children.
+  // find them (Windows), and only one agent's processes when it names that agent. `stop` takes the
+  // id and the owner that the card showed, and ends the process with its children.
   backgroundProcesses: {
-    list: request<undefined, BackgroundProcess[] | null>()("background-processes:list"),
-    stop: request<string, void>()("background-processes:stop"),
+    list: request<BackgroundProcessListInput | undefined, BackgroundProcess[] | null>()("background-processes:list"),
+    stop: request<BackgroundProcessStopInput, BackgroundProcessStopResult>()("background-processes:stop"),
   },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),

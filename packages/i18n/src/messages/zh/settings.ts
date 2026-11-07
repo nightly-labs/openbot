@@ -135,6 +135,13 @@ export const messages = {
   "settings.backgroundProcesses.stop": "停止",
   "settings.backgroundProcesses.stopLabel": "停止进程 {pid}",
   "settings.backgroundProcesses.stopFailed": "无法停止该进程。",
+  "settings.backgroundProcesses.unverified": "未验证",
+  "settings.backgroundProcesses.unverifiedHint":
+    "OpenBot 没有启动这个进程。它可能是你自己启动的进程，因此停止功能已禁用。",
+  "settings.backgroundProcesses.notStoppableHint": "OpenBot 没有记录是哪个 agent 启动了这个进程，因此停止已禁用。",
+  "settings.backgroundProcesses.stopRefused": "这个后台任务属于其他 agent，或无法从这里停止。",
+  "settings.backgroundProcesses.stopStillRunning": "请求停止后，进程仍在运行。",
+  "settings.backgroundProcesses.notFound": "这个进程已经不再运行。",
   "settings.keepRemoteSessions.title": "快速连接服务器",
   "settings.keepRemoteSessions.description":
     "在两次启动之间保持与已加入服务器的连接，OpenBot 启动约快一秒。退出 OpenBot 时，OpenBot 服务不会关闭该连接。",

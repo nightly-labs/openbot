@@ -47,6 +47,7 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
+import { AGENT_ID_VARIABLE } from "./agent/agent-process";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
 import {
@@ -619,13 +620,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   /** A process of this agent. `exit` hears an end that `stop` did not start. */
-  #newTransport(exit: (error: Error) => void): AcpConnection {
+  #newTransport(exit: (error: Error) => void, sessionEnv?: Record<string, string>): AcpConnection {
     return new AcpConnection({
       provider: this.options.provider,
       cli: this.#cli,
       argv: this.options.argv,
       env: this.options.env,
-      extraEnv: this.options.extraEnv,
+      extraEnv: sessionEnv ? () => ({ ...this.options.extraEnv?.(), ...sessionEnv }) : this.options.extraEnv,
       confine: this.options.confine,
       privateTemp: this.options.privateTemp,
       label: () => this.#label,
@@ -1393,11 +1394,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #startSessionProcess = Effect.fn("AcpAgentClient.startSessionProcess")(function* (
     this: AcpAgentClient,
     owner: () => AcpThread | null,
+    agentId: string | null,
   ): Effect.fn.Return<AcpConnection, ProviderClientOperationError> {
-    const transport: AcpConnection = this.#newTransport(() => {
-      const thread = owner();
-      if (thread?.transport === transport) thread.needsResume = true;
-    });
+    const transport: AcpConnection = this.#newTransport(
+      () => {
+        const thread = owner();
+        if (thread?.transport === transport) thread.needsResume = true;
+      },
+      agentId ? { [AGENT_ID_VARIABLE]: agentId } : undefined,
+    );
     this.#openingSessionProcesses.add(transport);
     const startTimeout = this.#startTimeout(this.#startTimeoutMs ?? this.#requestTimeoutMs);
     yield* Effect.gen({ self: this }, function* () {
@@ -1599,7 +1604,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         Effect.gen({ self: this }, function* () {
           try {
             if (this.#flavor.sessionProcesses)
-              transport = providerResult(yield* Effect.result(this.#startSessionProcess(() => threadRef)));
+              transport = providerResult(yield* Effect.result(this.#startSessionProcess(() => threadRef, agentId)));
             const sessionTransport = transport;
             const connection = () =>
               sessionTransport ? sessionTransport.requireConnection() : this.#requireConnection();

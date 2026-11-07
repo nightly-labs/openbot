@@ -3,6 +3,8 @@ import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-fil
 import {
   type AccountUsageLimit,
   type AgentWait,
+  type BackgroundProcess,
+  type BackgroundProcessStopResult,
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
@@ -19,6 +21,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, Input } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
+import { BackgroundTasksCard } from "@openbot/ui/features/conversation/BackgroundTasksCard";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -41,11 +44,17 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Loading, lazy, onCleanup, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
+import {
+  backgroundProcesses,
+  setBackgroundProcessAgent,
+  stopBackgroundProcess,
+  subscribeBackgroundProcesses,
+} from "./background-processes";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { useConversationViewScope } from "./conversation-scope";
 import { currentConversationTarget } from "./stores/composer-store";
@@ -190,7 +199,25 @@ export function ConversationComposer() {
   const awaitingVisible = () => awaitingReplies().length > 0 && !pickerOpen();
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
   const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait) && !pickerOpen();
-  const slotOpen = () => queueVisible() || awaitingVisible() || waitsVisible();
+  const backgroundTasks = createMemo(() => {
+    const agentId = props.agent?.id;
+    if (!agentId) return [];
+    return backgroundProcesses()
+      .filter((process) => process.agentId === agentId)
+      .sort((left, right) => left.startedAt - right.startedAt);
+  });
+  const backgroundTasksVisible = () => backgroundTasks().length > 0 && !pickerOpen();
+  const slotOpen = () => queueVisible() || awaitingVisible() || waitsVisible() || backgroundTasksVisible();
+  createEffect(
+    () => props.agent?.id,
+    (agentId) => setBackgroundProcessAgent(agentId),
+  );
+  const unsubscribeBackgroundProcesses = subscribeBackgroundProcesses();
+  onCleanup(unsubscribeBackgroundProcesses);
+  async function stopBackgroundTask(process: BackgroundProcess): Promise<BackgroundProcessStopResult> {
+    // The card keeps the confirmation open and shows one error, so a failure is not also a toast.
+    return stopBackgroundProcess(process);
+  }
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
   /** The reply of this agent that is read aloud. The voice pane shows its own. */
@@ -444,6 +471,7 @@ export function ConversationComposer() {
                   />
                 )}
               </Show>
+              <BackgroundTasksCard processes={backgroundTasks()} onStop={stopBackgroundTask} />
               <Show when={queueVisible() ? queueOwner() : undefined} keyed>
                 {(_owner) => (
                   <Loading>
