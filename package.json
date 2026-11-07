@@ -149,6 +149,7 @@
     "dev:memory": "bun scripts/dev-automation/cli.ts memory",
     "dev:bench": "tsx scripts/dev-automation/bench.ts",
     "bench:browser-tools": "tsx scripts/browser-tools-bench.ts",
+    "bench:hermes-prompt-settings": "bun scripts/hermes-prompt-settings-bench.ts",
     "bench:opencode-prompt-settings": "bun scripts/opencode-prompt-settings-bench.ts",
     "bench:pi-prompt-settings": "bun scripts/pi-prompt-settings-bench.ts",
     "smoke:pi-agent": "bun scripts/pi-agent-smoke.ts",

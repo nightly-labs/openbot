@@ -1070,6 +1070,26 @@ reads project skills only in a git root that `skills.trusted_project_dirs` names
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
 protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
 
+OpenBot gives its Hermes agents two `agent` settings, `HERMES_AGENT_SETTINGS` in
+`src/backend/hermes-settings.ts`: `coding_context: focus` shows the skills of non-coding categories
+by name only, and `disabled_toolsets: [browser]` removes the Hermes browser tools, because each agent
+has `openbot_browser`. `hermesSettingsEnvironment` writes them to a `config.yaml` in
+`<provider state>/hermes-settings/<hash>/` and sets `HERMES_MANAGED_DIR` to that folder. Hermes
+merges a managed `config.yaml` over the user's, and a Hermes process that saves its settings removes
+the managed keys from the user's file. So OpenBot sets only the keys that the user's `config.yaml`
+does not have, and sets nothing when `HERMES_MANAGED_DIR` is set, when `/etc/hermes` exists, or when
+it cannot read the user's file. The chat client and the profile client both get the folder. This has
+two limits. Commands that the agent runs keep `HERMES_MANAGED_DIR`, so in them
+`hermes config set` refuses the two keys as "managed by your administrator". OpenBot reads the
+user's file when the Hermes process starts, so a key that the user adds while an agent runs applies
+only after the next start, and a settings save of that process can remove it from the user's file.
+`bun run bench:hermes-prompt-settings` measures each setting with real
+turns on a free Nous Portal model in a temporary Hermes profile, and writes
+`.openbot-build/hermes-prompt-settings-bench/report.json`. On Hermes 0.21.5 the two settings take a
+reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.hermes` installs its
+own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
+user's runtime, and stops when the launchers change.
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:

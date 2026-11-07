@@ -63,6 +63,7 @@ import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
+import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
@@ -1427,7 +1428,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                 confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() }),
             }
           : {}),
-        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        // The OpenBot settings (`hermes-settings.ts`) for the Hermes folder that the process uses.
+        extraEnv: () => {
+          const agentEnvironment = context.agentEnvironment?.() ?? {};
+          return {
+            ...hermesSettingsEnvironment({ ...process.env, ...agentEnvironment }, context.providerStateDirectory),
+            ...agentEnvironment,
+          };
+        },
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
@@ -1444,6 +1452,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: HERMES_ARGV,
         profileGeneration: true,
         env: {},
+        extraEnv: () => hermesSettingsEnvironment(process.env, context.providerStateDirectory),
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
