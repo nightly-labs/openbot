@@ -63,6 +63,8 @@ export const messages = {
     "Attendez la fin du tour actif et de la file d’attente avant de commencer une nouvelle discussion.",
   "error.agent.waitBeforeCompactContext":
     "Attendez la fin du tour actif et de la file d’attente avant de compacter le contexte.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Attendez la fin du tour actif et de la file d’attente avant de supprimer l’historique.",
   "error.agent.compactContextUnavailable": "Cet agent ne peut pas compacter son contexte maintenant.",
   "error.agent.unknown": "Agent inconnu : {id}",
   "error.agent.onlyUserWidensSettings":

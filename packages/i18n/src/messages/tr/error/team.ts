@@ -60,6 +60,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "Bu bağlantı kanalda yeni konuşmayı veya sıkıştırmayı desteklemiyor.",
   "error.team.channelPictureUnsupported": "Kanal resimleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelDeleteUnsupported": "Kanal silme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.historyDeleteUnsupported": "Geçmiş silme bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelTaskCancelUnsupported": "Kanal görevlerini iptal etme bu bağlantı tarafından desteklenmiyor.",
   "error.team.membersCannotDeleteChannels": "Üyeler kanalları silemez.",
   "error.team.membersCannotArchiveChannels": "Üyeler kanalları arşivleyemez.",

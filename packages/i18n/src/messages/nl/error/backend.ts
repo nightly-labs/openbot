@@ -77,6 +77,7 @@ export const messages = {
   "error.backend.channelWaitBeforeNewConversation":
     "Wacht tot het werk in dit kanaal stopt en start dan een nieuw gesprek.",
   "error.backend.channelWaitBeforeCompact": "Wacht tot het werk in dit kanaal stopt en comprimeer het dan.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Wacht tot het werk in dit kanaal stopt en wis dan de geschiedenis.",
   "error.backend.channelCompactUnavailable":
     "Geen lid van dit kanaal kan zijn context nu comprimeren. Een lid moet eerst in het kanaal antwoorden, en zijn provider moet comprimeren ondersteunen.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",

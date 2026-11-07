@@ -34,6 +34,15 @@ export const messages = {
   "channel.settings.compact.description":
     "De leden houden een korte samenvatting van hun kanaalsessie en gebruiken minder tokens.",
   "channel.settings.compact.failed": "Kan de kanaalcontext niet comprimeren.",
+  "channel.settings.deleteHistory.title": "Geschiedenis wissen",
+  "channel.settings.deleteHistory.description":
+    "De berichten worden gewist en de leden vergeten ze. De kanaalinstellingen blijven.",
+  "channel.settings.deleteHistory.button": "Wissen",
+  "channel.settings.deleteHistory.confirmTitle": "Geschiedenis van {name} wissen?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Alle berichten en bestanden van dit kanaal worden uit OpenBot gewist en de leden vergeten ze. Dit kun je niet ongedaan maken. Leden, instructies, herinneringen, routines en taken veranderen niet.",
+  "channel.settings.deleteHistory.confirm": "Geschiedenis wissen",
+  "channel.settings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} ingesteld", other: "{count} ingesteld" },
   "channel.create.close": "Nieuw kanaal sluiten",

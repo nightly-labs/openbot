@@ -48,6 +48,7 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange": "تعمل مهام لهذا الوكيل. انتظر انتهاءها، أو أوقفها، قبل تغيير المزوّد.",
   "error.agent.waitBeforeClearContext": "انتظر انتهاء الدور النشط وقائمة الانتظار قبل بدء دردشة جديدة.",
   "error.agent.waitBeforeCompactContext": "انتظر انتهاء الدور النشط وقائمة الانتظار قبل ضغط السياق.",
+  "error.agent.waitBeforeDeleteHistory": "انتظر انتهاء الدور النشط وقائمة الانتظار قبل حذف السجل.",
   "error.agent.compactContextUnavailable": "لا يستطيع هذا الوكيل ضغط سياقه الآن.",
   "error.agent.unknown": "وكيل غير معروف: {id}",
   "error.agent.onlyUserWidensSettings":

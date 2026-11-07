@@ -59,6 +59,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "이 연결은 채널의 새 대화나 압축을 지원하지 않습니다.",
   "error.team.channelPictureUnsupported": "이 연결에서는 채널 사진을 지원하지 않아요.",
   "error.team.channelDeleteUnsupported": "이 연결에서는 채널 삭제를 지원하지 않아요.",
+  "error.team.historyDeleteUnsupported": "이 연결에서는 기록 삭제를 지원하지 않아요.",
   "error.team.channelTaskCancelUnsupported": "이 연결에서는 채널 작업 취소를 지원하지 않아요.",
   "error.team.membersCannotDeleteChannels": "멤버는 채널을 삭제할 수 없어요.",
   "error.team.membersCannotArchiveChannels": "멤버는 채널을 보관할 수 없어요.",

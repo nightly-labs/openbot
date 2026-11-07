@@ -47,6 +47,7 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange": "该助手的任务正在运行，请等它们结束或先停止它们，再更改服务商。",
   "error.agent.waitBeforeClearContext": "请等当前轮次和队列结束后再开始新对话。",
   "error.agent.waitBeforeCompactContext": "请等当前轮次和队列结束后再压缩上下文。",
+  "error.agent.waitBeforeDeleteHistory": "请等当前轮次和队列结束后再删除历史记录。",
   "error.agent.compactContextUnavailable": "该助手现在无法压缩上下文。",
   "error.agent.unknown": "未知助手：{id}",
   "error.agent.onlyUserWidensSettings": "只有用户可以给助手完全访问权限或开启 Computer Use，请让用户在助手设置中修改。",

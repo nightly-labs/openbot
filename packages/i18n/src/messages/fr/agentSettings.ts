@@ -190,6 +190,15 @@ export const messages = {
     "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.newChat.confirm": "Nouvelle discussion",
   "agentSettings.newChat.failed": "Impossible de commencer une nouvelle discussion.",
+  "agentSettings.deleteHistory.title": "Supprimer l’historique",
+  "agentSettings.deleteHistory.description":
+    "Les messages de cette discussion sont supprimés et l’agent les oublie. Sa configuration reste.",
+  "agentSettings.deleteHistory.button": "Supprimer",
+  "agentSettings.deleteHistory.confirmTitle": "Supprimer l’historique de la discussion avec {name} ?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Tous les messages et fichiers de cette discussion sont supprimés d’OpenBot et l’agent les oublie. Cette action est irréversible. Les fils secondaires, les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
+  "agentSettings.deleteHistory.confirm": "Supprimer l’historique",
+  "agentSettings.deleteHistory.failed": "Impossible de supprimer l’historique.",
 
   "agentSettings.fullAccess.title": "Donner un accès complet à cet agent ?",
   "agentSettings.fullAccess.askTitle": "Laisser cet agent travailler hors de son espace de travail ?",

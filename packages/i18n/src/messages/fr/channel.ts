@@ -34,6 +34,15 @@ export const messages = {
   "channel.settings.compact.description":
     "Les membres gardent un court résumé de leur session du canal et utilisent moins de jetons.",
   "channel.settings.compact.failed": "Impossible de compacter le contexte du canal.",
+  "channel.settings.deleteHistory.title": "Supprimer l’historique",
+  "channel.settings.deleteHistory.description":
+    "Les messages sont supprimés et les membres les oublient. La configuration du canal reste.",
+  "channel.settings.deleteHistory.button": "Supprimer",
+  "channel.settings.deleteHistory.confirmTitle": "Supprimer l’historique de {name} ?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Tous les messages et fichiers de ce canal sont supprimés d’OpenBot et les membres les oublient. Cette action est irréversible. Les membres, les instructions, les mémoires, les routines et les tâches ne changent pas.",
+  "channel.settings.deleteHistory.confirm": "Supprimer l’historique",
+  "channel.settings.deleteHistory.failed": "Impossible de supprimer l’historique.",
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} configurée", other: "{count} configurées" },
   "channel.create.close": "Fermer le nouveau canal",

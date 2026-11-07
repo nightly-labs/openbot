@@ -18,7 +18,7 @@ import { AgentUsage } from "./database/agent-usage";
 import { type ConversationMarkerExclusions, ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
 import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
-import { deletedThreadMessageIds } from "./database/deleted-thread-messages";
+import { deletedThreadMessageIds, threadMessageIds } from "./database/deleted-thread-messages";
 import {
   type ActiveHostedSiteConversationEvent,
   HostedSiteEventLog,
@@ -322,6 +322,16 @@ export class OpenBotDatabase {
     deletedMessageIds?: readonly string[];
   }): number {
     return this.#conversationWrites.persistConversationChanges(input);
+  }
+
+  /** Deletes every shown message of a thread, for "Delete history". No later write or replay brings one back. */
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
+    return this.#conversationWrites.deleteThreadHistory(input);
+  }
+
+  /** The ids of the shown messages of a thread, in no order. */
+  threadMessageIds(threadId: string): string[] {
+    return threadMessageIds(this.connection, threadId);
   }
 
   /** The ids of the messages that a person deleted from this thread. */

@@ -184,6 +184,15 @@ export const messages = {
     "Der Agent vergisst diesen Chat. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "agentSettings.newChat.confirm": "Neuen Chat starten",
   "agentSettings.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden.",
+  "agentSettings.deleteHistory.title": "Verlauf löschen",
+  "agentSettings.deleteHistory.description":
+    "Die Nachrichten dieses Chats werden gelöscht, und der Agent vergisst sie. Seine Einrichtung bleibt.",
+  "agentSettings.deleteHistory.button": "Löschen",
+  "agentSettings.deleteHistory.confirmTitle": "Chatverlauf mit {name} löschen?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Alle Nachrichten und Dateien dieses Chats werden aus OpenBot gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
+  "agentSettings.deleteHistory.confirm": "Verlauf löschen",
+  "agentSettings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
   "agentSettings.fullAccess.title": "Diesem Agenten vollen Zugriff geben?",
   "agentSettings.fullAccess.askTitle": "Diesen Agenten außerhalb seines Arbeitsbereichs arbeiten lassen?",
   "agentSettings.fullAccess.description":

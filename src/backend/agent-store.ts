@@ -1568,6 +1568,22 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * After "Delete history": the row shows the localized "no messages" text, and the agent keeps its
+   * place in the list.
+   */
+  clearPreview = Effect.fn("AgentStore.clearPreview")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.#requireAgent(id).preview = "";
+      this.#persist("agent.preview-updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
   #readStateEffect = Effect.fn("AgentStore.readState")(function* (
     this: AgentStore,
   ): Effect.fn.Return<StoredState, StoredStateFailure> {

@@ -65,6 +65,7 @@ export const messages = {
     "Questa connessione non supporta una nuova conversazione né la compattazione in un canale.",
   "error.team.channelPictureUnsupported": "Le immagini dei canali non sono supportate da questa connessione.",
   "error.team.channelDeleteUnsupported": "L'eliminazione dei canali non è supportata da questa connessione.",
+  "error.team.historyDeleteUnsupported": "L'eliminazione della cronologia non è supportata da questa connessione.",
   "error.team.channelTaskCancelUnsupported":
     "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",

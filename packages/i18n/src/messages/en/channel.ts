@@ -32,6 +32,15 @@ export const messages = defineMessages("channel", {
   "channel.settings.compact.description":
     "The members keep a short summary of their channel session and use fewer tokens.",
   "channel.settings.compact.failed": "Could not compact the channel context.",
+  "channel.settings.deleteHistory.title": "Delete history",
+  "channel.settings.deleteHistory.description":
+    "The messages go, and the members forget them. The channel setup stays.",
+  "channel.settings.deleteHistory.button": "Delete",
+  "channel.settings.deleteHistory.confirmTitle": "Delete the history of {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "All messages and files of this channel go from OpenBot, and the members forget them. You cannot undo this. The members, instructions, memories, routines, and tasks do not change.",
+  "channel.settings.deleteHistory.confirm": "Delete history",
+  "channel.settings.deleteHistory.failed": "Could not delete the history.",
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} configured", other: "{count} configured" },
   "channel.create.close": "Close new channel",

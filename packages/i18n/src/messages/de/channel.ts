@@ -37,6 +37,15 @@ export const messages = {
   "channel.settings.compact.description":
     "Die Mitglieder behalten eine kurze Zusammenfassung ihrer Kanalsitzung und verbrauchen weniger Tokens.",
   "channel.settings.compact.failed": "Der Kanalkontext konnte nicht komprimiert werden.",
+  "channel.settings.deleteHistory.title": "Verlauf löschen",
+  "channel.settings.deleteHistory.description":
+    "Die Nachrichten werden gelöscht, und die Mitglieder vergessen sie. Die Kanaleinrichtung bleibt.",
+  "channel.settings.deleteHistory.button": "Löschen",
+  "channel.settings.deleteHistory.confirmTitle": "Verlauf von {name} löschen?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Alle Nachrichten und Dateien dieses Kanals werden aus OpenBot gelöscht, und die Mitglieder vergessen sie. Das lässt sich nicht rückgängig machen. Mitglieder, Anweisungen, Erinnerungen, Routinen und Aufgaben ändern sich nicht.",
+  "channel.settings.deleteHistory.confirm": "Verlauf löschen",
+  "channel.settings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
   "channel.settings.routines": "Routinen",
   "channel.settings.routineCount": {
     one: "{count} eingerichtet",

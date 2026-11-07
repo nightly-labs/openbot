@@ -61,6 +61,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "Это подключение не поддерживает новый разговор и сжатие в канале.",
   "error.team.channelPictureUnsupported": "Это подключение не поддерживает изображения каналов.",
   "error.team.channelDeleteUnsupported": "Это подключение не поддерживает удаление каналов.",
+  "error.team.historyDeleteUnsupported": "Это подключение не поддерживает удаление истории.",
   "error.team.channelTaskCancelUnsupported": "Это подключение не поддерживает отмену задач каналов.",
   "error.team.membersCannotDeleteChannels": "Участники не могут удалять каналы.",
   "error.team.membersCannotArchiveChannels": "Участники не могут архивировать каналы.",

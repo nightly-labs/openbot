@@ -75,6 +75,8 @@ export const messages = {
   "error.backend.channelWaitBeforeNewConversation":
     "このチャンネルの作業が終わるまで待ってから、新しい会話を始めてください。",
   "error.backend.channelWaitBeforeCompact": "このチャンネルの作業が終わるまで待ってから、圧縮してください。",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "このチャンネルの作業が終わるまで待ってから、履歴を削除してください。",
   "error.backend.channelCompactUnavailable":
     "今はこのチャンネルのどのメンバーもコンテキストを圧縮できません。メンバーがまずチャンネルで回答し、そのプロバイダーが圧縮に対応している必要があります。",
   "error.backend.channelArchived":

@@ -57,6 +57,7 @@ export const messages = {
   "error.agent.waitBeforeClearContext":
     "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim rozpoczniesz nowy czat.",
   "error.agent.waitBeforeCompactContext": "Zanim skompaktujesz kontekst, poczekaj na koniec aktywnej tury i kolejki.",
+  "error.agent.waitBeforeDeleteHistory": "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim usuniesz historię.",
   "error.agent.compactContextUnavailable": "Ten agent nie może teraz skompaktować kontekstu.",
   "error.agent.unknown": "Nieznany agent: {id}",
   "error.agent.onlyUserWidensSettings":

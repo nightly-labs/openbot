@@ -63,6 +63,8 @@ export const messages = {
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je een nieuwe chat start.",
   "error.agent.waitBeforeCompactContext":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de context comprimeert.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de geschiedenis wist.",
   "error.agent.compactContextUnavailable": "Deze agent kan de context nu niet comprimeren.",
   "error.agent.unknown": "Onbekende agent: {id}",
   "error.agent.onlyUserWidensSettings":

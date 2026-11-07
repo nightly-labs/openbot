@@ -176,6 +176,14 @@ export const messages = {
     "助手会忘记当前对话，消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "agentSettings.newChat.confirm": "开始新对话",
   "agentSettings.newChat.failed": "无法开始新对话。",
+  "agentSettings.deleteHistory.title": "删除历史记录",
+  "agentSettings.deleteHistory.description": "此对话的消息会被删除，智能体也会忘记它们。设置保持不变。",
+  "agentSettings.deleteHistory.button": "删除",
+  "agentSettings.deleteHistory.confirmTitle": "删除与 {name} 的对话历史记录？",
+  "agentSettings.deleteHistory.confirmDescription":
+    "此对话的所有消息和文件都会从 OpenBot 中删除，智能体也会忘记它们。此操作无法撤销。侧边线程、指令、模型、工具、记忆、工作区和浏览器不会改变。",
+  "agentSettings.deleteHistory.confirm": "删除历史记录",
+  "agentSettings.deleteHistory.failed": "无法删除历史记录。",
 
   "agentSettings.fullAccess.title": "授予该助手完全访问权限？",
   "agentSettings.fullAccess.askTitle": "允许该助手在其工作区之外工作？",

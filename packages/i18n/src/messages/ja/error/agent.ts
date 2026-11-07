@@ -62,6 +62,7 @@ export const messages = {
     "新しいチャットを始める前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.waitBeforeCompactContext":
     "コンテキストを圧縮する前に、実行中のターンとキューが終わるのを待ってください。",
+  "error.agent.waitBeforeDeleteHistory": "履歴を削除する前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.compactContextUnavailable": "このエージェントは今コンテキストを圧縮できません。",
   "error.agent.unknown": "不明なエージェントです: {id}",
   "error.agent.onlyUserWidensSettings":

@@ -274,6 +274,13 @@ export function createMockChannels(
     compactChannelContext: async (channelId: string): Promise<void> => {
       requireChannel(channelId);
     },
+    deleteChannelHistory: async (channelId: string): Promise<void> => {
+      const channel = requireChannel(channelId);
+      if ((tasks.get(channelId) ?? []).some((task) => ["queued", "running", "waiting"].includes(task.state)))
+        throw new Error(sourceText("error.backend.channelWaitBeforeDeleteHistory"));
+      messages.set(channelId, []);
+      changed(channel.id, channel.revision);
+    },
     deleteChannelMessage: async (input: { channelId: string; messageId: string }): Promise<void> => {
       const channel = requireChannel(input.channelId);
       const list = messages.get(input.channelId) ?? [];
