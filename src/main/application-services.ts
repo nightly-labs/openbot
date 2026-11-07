@@ -246,6 +246,7 @@ import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
   type LocalServerChildEnvironment,
+  LocalServerMarketplace,
   LocalServerMembers,
   startLocalServerChild,
 } from "./local-server-child";
@@ -2385,8 +2386,15 @@ export async function createApplicationServices({
   });
   // A grant changed on this computer must reach the phones and web clients that show it.
   approvalAutomation.subscribe(() => service.notifyAgentsChanged());
+  // A server on this computer has no account session: the desktop app makes the Marketplace reads that
+  // adding an agent needs.
+  const localServerMarketplace = new LocalServerMarketplace(
+    (line) => process.stdout.write(line),
+    (path) => centralAuth.resolveApiUrl(path),
+  );
+  const marketplaceAuth = localServerChild ? localServerMarketplace : centralAuth;
   const skills = new SkillMarketplaceService(
-    centralAuth,
+    marketplaceAuth,
     () => service.listAgents(),
     // Every skill change ends here: install, update, uninstall, turning one on or off, and a skill
     // an agent creates. The event reaches this computer's windows and the joined clients.
@@ -2396,7 +2404,7 @@ export async function createApplicationServices({
         .pipe(Effect.ensuring(Effect.sync(() => service.notifySkillsChanged(agentId)))),
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
-  const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
+  const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
   const agentTemplates = new AgentTemplateService(centralAuth, service, {
     listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
     installVersion: (input) => skills.installVersion(input),
@@ -3300,6 +3308,10 @@ export async function createApplicationServices({
                 Effect.catch((error) => (isHostNotOnAccount(error.cause) ? Effect.void : Effect.fail(error))),
                 toRemoteWorkflowError,
               ),
+            apiOrigin: new URL(centralAuth.resolveApiUrl("/")).origin,
+            requestAuthorized: (path, init) =>
+              centralAuth.requestAuthorized(path, init, (value) => value).pipe(toRemoteWorkflowError),
+            downloadAuthorized: (path) => centralAuth.downloadAuthorized(path).pipe(toRemoteWorkflowError),
           },
           log: {
             info: (message) => logger.info(message),
@@ -3353,6 +3365,7 @@ export async function createApplicationServices({
         host,
         writeReady: (line) => process.stdout.write(line),
         members: localServerMembers,
+        marketplace: localServerMarketplace,
         readCommands: (onLine) => {
           if (localServerControl) createInterface({ input: localServerControl }).on("line", onLine);
         },

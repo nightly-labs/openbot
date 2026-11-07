@@ -85,7 +85,7 @@ export class SkillMarketplaceService {
   );
 
   constructor(
-    private readonly auth: CentralAuthManager,
+    private readonly auth: Pick<CentralAuthManager, "requestAuthorized" | "downloadAuthorized" | "resolveApiUrl">,
     private readonly listAgents: () => AgentSummary[],
     private readonly refreshAgentRuntime: (agentId: string) => Effect.Effect<void, AgentLifecycleFailed> = () =>
       Effect.void,
