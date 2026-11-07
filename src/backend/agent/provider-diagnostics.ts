@@ -211,6 +211,19 @@ export function isIgnoredConfigDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic is Pi's warning about an unmatched `enabledModels` pattern.
+ *
+ * Pi CLI reads `~/.pi/agent/settings.json` when it starts for Pi, DeepSeek, OpenRouter, or
+ * Inception. When `enabledModels` in that shared file holds a model pattern from another provider,
+ * such as `openai-codex/gpt-5.5`, Pi writes `Warning: No models match pattern "…"` to stderr and
+ * continues (#4157). The RPC client selects its own model per turn, so the warning belongs in the
+ * log.
+ */
+export function isPiModelPatternDiagnostic(message: string): boolean {
+  return /^Warning: No models match pattern "/u.test(message);
+}
+
+/**
  * A glog record whose own severity is info or warning, as in
  * `W0927 21:23:15.702056 14876 step_string_converters.go:923] Checkpoint summary was too long…`.
  *

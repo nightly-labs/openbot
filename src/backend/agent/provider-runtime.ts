@@ -101,6 +101,7 @@ import {
   isIgnoredConfigDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
+  isPiModelPatternDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
@@ -3767,6 +3768,13 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isAcpHandlerDiagnostic(message)) {
         stderrLogger.warn("A provider logged a request that it answered with an error.", {
+          provider: client.provider,
+          message,
+        });
+        return;
+      }
+      if (isPiModelPatternDiagnostic(message)) {
+        stderrLogger.warn("A provider ignored an unmatched model pattern in its configuration.", {
           provider: client.provider,
           message,
         });
