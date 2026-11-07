@@ -106,6 +106,11 @@ export class ThreadFileHistory {
     return preferred?.agentId === agentId ? [...others, ...preferred.paths] : others;
   }
 
+  /** A deleted thread, such as a deleted channel, gives no file to a link in another thread. */
+  forgetThread(threadId: string): void {
+    this.#threads.delete(threadId);
+  }
+
   forgetAgent(agentId: string): void {
     for (const [threadId, history] of this.#threads) {
       if (history.agentId === agentId) this.#threads.delete(threadId);

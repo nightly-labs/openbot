@@ -7,10 +7,10 @@
 // the agent, and sends a message with a link to each file. The person's message must show the shared
 // link and no workspace link, because a person's message in a channel names no workspace. The
 // agent repeats the workspace link, and each link must open its file in the preview panel. A quote of
-// the workspace file must name its absolute path and open the file again. Then the same links must
-// still open from the person's message in the agent's own chat. When the agent's access is not limited
-// to its workspace, the agent reads a file outside its workspace in the channel and links it by its name
-// only; the link must open that file from the agent's tool history. It deletes its channel and its
+// the workspace file must name its absolute path and open the file again. When the agent's access is
+// not limited to its workspace, the agent reads a file outside its workspace in the channel and links
+// it by its name only; the link must open that file from the agent's tool history. Then the same links
+// must still open from the person's message in the agent's own chat. It deletes its channel and its
 // files at the end.
 // Writes .openbot-build/channel-file-link-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
@@ -160,7 +160,7 @@ try {
   };
   await shot("quote-reopened");
 
-  // 5. A file that the agent read outside its workspace in the channel opens from a link with its name only.
+  // 4. A file that the agent read outside its workspace in the channel opens from a link with its name only.
   if (workspaceAccessEnforced(agent)) {
     report.outside = { skipped: "workspace access" };
   } else {
@@ -186,7 +186,7 @@ try {
     await shot("outside-preview");
   }
 
-  // 4. In the agent's own chat, the person's message links both files, and both still open.
+  // 5. In the agent's own chat, the person's message links both files, and both still open.
   await page
     .getByRole("navigation", { name: english("sidebar.nav.label") })
     .getByRole("button", { name: new RegExp(`^${literal(agent.name)},`) })
