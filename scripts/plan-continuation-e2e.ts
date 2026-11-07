@@ -464,11 +464,18 @@ try {
       "Should I go ahead?",
       "Do you want Postgres or SQLite? Shall I continue?",
       "Should I continue with the deploy?",
+      "Should I continue with the rest of the deploy?",
       "I'll now wait for your approval.",
       "Next, I would restart the production service.",
+      "The fix is in. Let me know if you need anything else.",
+      "I'll implement it after your confirmation.",
+      "I'll update you when the build finishes.",
+      "I'll update you on the progress.",
+      "Next, I'll implement it after your confirmation.",
+      "Let me check with the team and get back to you.",
     ];
     // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
-    for (const [index, answer] of answers.slice(0, 5).entries()) {
+    for (const [index, answer] of answers.slice(0, 6).entries()) {
       const mark = loggedTurns().length;
       const id = await send(
         agent.id,
@@ -535,8 +542,8 @@ try {
     const id = await send(
       agent.id,
       `Fix the bug. ${plan(
-        { steps: [], answer: "I found the cause in the parser. I'll now write the fix." },
-        { steps: [], answer: "The fix is in. Do you want me to continue?" },
+        { steps: [], answer: "I found the cause in the parser. Let me fix it in src/parser.ts." },
+        { steps: [], answer: "The fix is in. Do you want me to continue with the remaining files?" },
         { steps: [], answer: "The fix is in and the tests pass." },
       )}`,
     );
