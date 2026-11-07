@@ -28,7 +28,7 @@ const BUSY_FUNCTION = `() => [...document.querySelectorAll(${JSON.stringify(BUSY
   return rect.width > 0 && rect.height > 0;
 })`;
 
-export interface SettleProbe {
+interface SettleProbe {
   busy: boolean;
   /** Milliseconds since the main document started. */
   ageMs: number;
