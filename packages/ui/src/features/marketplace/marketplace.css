@@ -932,6 +932,25 @@ label.marketplace-skill-picker-row:hover {
   white-space: nowrap;
 }
 
+/* The name and the title of an agent stay together; the note stays at the end of the row. */
+.marketplace-skill-picker-agent {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+/* As in the sidebar, a long title gets smaller before the name does, to two characters. */
+.marketplace-skill-picker-agent:has(.agent-role-badge) {
+  --agent-role-badge-collapsed-width: calc(2ch + 9px);
+
+  display: grid;
+  grid-template-columns:
+    fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - var(--openbot-space-1)))
+    minmax(var(--agent-role-badge-collapsed-width), 1fr);
+}
+
 .marketplace-skill-picker-none {
   padding: var(--openbot-space-2);
 }

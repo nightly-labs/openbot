@@ -56,7 +56,7 @@ export const messages = {
   "status.agent.changesReviewing": "Revisando los cambios que hice…",
   "status.agent.agentCoordinating": "Coordinando con otro agente…",
   "status.agent.agentResponseReviewing": "Revisando la respuesta del otro agente…",
-  "status.agent.commandRunning": "Ejecutando un comando…",
+  "status.agent.commandRunningUnnamed": "Ejecutando un comando…",
   "status.agent.toolStepWorking": "Procesando el siguiente paso asistido por herramientas…",
   "status.agent.webSearching": "Buscando en la web «{query}»…",
   "status.agent.urlFetching": "Abriendo {host}…",

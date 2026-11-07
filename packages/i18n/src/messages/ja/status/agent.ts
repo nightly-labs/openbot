@@ -54,7 +54,7 @@ export const messages = {
   "status.agent.changesReviewing": "行った変更を確認しています…",
   "status.agent.agentCoordinating": "別のエージェントと調整しています…",
   "status.agent.agentResponseReviewing": "別のエージェントの応答を確認しています…",
-  "status.agent.commandRunning": "コマンドを実行しています…",
+  "status.agent.commandRunningUnnamed": "コマンドを実行しています…",
   "status.agent.toolStepWorking": "次のツールステップを処理しています…",
   "status.agent.webSearching": "Web で「{query}」を検索しています…",
   "status.agent.urlFetching": "{host} を開いています…",

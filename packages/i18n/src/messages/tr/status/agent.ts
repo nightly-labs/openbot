@@ -56,7 +56,7 @@ export const messages = {
   "status.agent.changesReviewing": "Yapılan değişiklikler inceleniyor…",
   "status.agent.agentCoordinating": "Başka bir ajanla koordinasyon sağlanıyor…",
   "status.agent.agentResponseReviewing": "Diğer ajanın yanıtı inceleniyor…",
-  "status.agent.commandRunning": "Bir komut çalıştırılıyor…",
+  "status.agent.commandRunningUnnamed": "Bir komut çalıştırılıyor…",
   "status.agent.toolStepWorking": "Bir sonraki araç destekli adım işleniyor…",
   "status.agent.webSearching": "Web’de “{query}” aranıyor…",
   "status.agent.urlFetching": "{host} açılıyor…",
