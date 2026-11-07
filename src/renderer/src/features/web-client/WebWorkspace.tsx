@@ -1447,6 +1447,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     messageDeletionSupported: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => canAdministerServer(workspace.state.host?.role),
     pictureSupported: () => false,
+    contextActionsSupported: () => false,
     beforeOpen: () => {
       setCreating(false);
       // Not `showAgents`: the list restores the saved channel after a host connects, and that must

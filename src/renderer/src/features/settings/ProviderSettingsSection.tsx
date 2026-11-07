@@ -50,6 +50,7 @@ import {
   type ProviderKeyApi,
 } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import {
+  type ProviderClaudeUserSetup,
   type ProviderDefaultChoice,
   type ProviderModelVisibilityControl,
   type ProviderPromptCache,
@@ -62,6 +63,7 @@ import { createEffect, createMemo, createSignal, createStore, Show, untrack } fr
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import type { ProviderConnectionApi } from "../../components/provider-connection-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { createProviderClaudeUserSetup } from "./provider-claude-user-setup";
 import { createHostDefaultProvider, type HostDefaultProviderSource } from "./provider-host-default";
 import { createProviderModelVisibility, type ProviderModelVisibilitySource } from "./provider-model-visibility";
 import { createProviderPromptCache, type ProviderPromptCacheSource } from "./provider-prompt-cache";
@@ -115,6 +117,7 @@ interface ProviderSettingsSectionProps {
   usage?: readonly AccountUsageProviderRow[] | undefined;
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   promptCache?: ProviderPromptCache | undefined;
+  claudeUserSetup?: ProviderClaudeUserSetup | undefined;
   modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
 }
 
@@ -290,6 +293,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         menuMount={props.selectMount}
         onDetailChange={props.onDetailChange}
         promptCache={props.promptCache}
+        claudeUserSetup={props.claudeUserSetup}
         modelVisibility={props.modelVisibility}
         footer={
           <>
@@ -566,6 +570,8 @@ export function HostProviderSettingsPanel(
     onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
     /** The Claude page's prompt cache time, for a host with `prompt-cache-ttl-v1` that this account administers. */
     promptCache?: ProviderPromptCacheSource | undefined;
+    /** The Claude page's "Use my Claude Code setup" switch. This computer's desktop app only. */
+    claudeUserSetup?: boolean | undefined;
     /** The Models section of each provider page, for a host with `model-visibility-v1` that this account administers. */
     modelVisibility?: ProviderModelVisibilitySource | undefined;
     /** The Default provider of a joined host with `provider-default-v1` that this account administers. */
@@ -579,6 +585,10 @@ export function HostProviderSettingsPanel(
   );
   const modelVisibility = createProviderModelVisibility(
     () => props.modelVisibility,
+    () => props.agentStatus,
+  );
+  const claudeUserSetup = createProviderClaudeUserSetup(
+    () => props.claudeUserSetup === true,
     () => props.agentStatus,
   );
   const keys = createProviderKeyState({
@@ -648,6 +658,7 @@ export function HostProviderSettingsPanel(
         usage={props.usage}
         onDetailChange={props.onDetailChange}
         promptCache={promptCache()}
+        claudeUserSetup={claudeUserSetup()}
         modelVisibility={modelVisibility()}
         detectionSettings={
           <Show when={props.detectionSettings}>

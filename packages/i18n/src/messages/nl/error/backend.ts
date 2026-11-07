@@ -74,6 +74,11 @@ export const messages = {
     "Het kanaal heeft een start van een opdracht die niet is bevestigd. Controleer het resultaat voordat je het verwijdert.",
   "error.backend.channelNotFound": "Kanaal niet gevonden.",
   "error.backend.channelMemberUnavailable": "Een lid van het kanaal is niet beschikbaar.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Wacht tot het werk in dit kanaal stopt en start dan een nieuw gesprek.",
+  "error.backend.channelWaitBeforeCompact": "Wacht tot het werk in dit kanaal stopt en comprimeer het dan.",
+  "error.backend.channelCompactUnavailable":
+    "Geen lid van dit kanaal kan zijn context nu comprimeren. Een lid moet eerst in het kanaal antwoorden, en zijn provider moet comprimeren ondersteunen.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",

@@ -231,6 +231,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 ora",
   "provider.settings.promptCacheDefault": "Predefinito di Claude Code",
   "provider.settings.promptCacheLoadFailed": "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Usa la mia configurazione di Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Gli agenti caricano CLAUDE.md, skill, agenti, hook e plugin da ~/.claude. Disattivato, ogni turno invia un prompt più breve. I file dello spazio di lavoro vengono comunque caricati.",
+  "provider.settings.claudeUserSetupLoadFailed": "Impossibile caricare l’impostazione di Claude Code.",
   "provider.settings.models": "Modelli",
   "provider.settings.modelsDescription": {
     one: "{shown} di {count} modello appare nel selettore dei modelli.",

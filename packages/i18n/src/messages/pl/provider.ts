@@ -254,6 +254,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 godzina",
   "provider.settings.promptCacheDefault": "Domyślne Claude Code",
   "provider.settings.promptCacheLoadFailed": "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Używaj mojej konfiguracji Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Agenci wczytują Twój CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
+  "provider.settings.claudeUserSetupLoadFailed": "Nie udało się wczytać ustawienia Claude Code.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {
     one: "{shown} z {count} modelu jest w wyborze modelu.",

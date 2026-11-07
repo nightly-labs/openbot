@@ -58,6 +58,7 @@ export const messages = {
   "error.team.providersUnsupported": "Это подключение не поддерживает настройки провайдеров.",
   "error.team.providerNotManaged": "OpenBot не управляет CLI этого провайдера.",
   "error.team.channelsUnsupported": "Это подключение не поддерживает чаты каналов.",
+  "error.team.channelContextUnsupported": "Это подключение не поддерживает новый разговор и сжатие в канале.",
   "error.team.channelPictureUnsupported": "Это подключение не поддерживает изображения каналов.",
   "error.team.channelDeleteUnsupported": "Это подключение не поддерживает удаление каналов.",
   "error.team.channelTaskCancelUnsupported": "Это подключение не поддерживает отмену задач каналов.",

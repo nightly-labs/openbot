@@ -236,6 +236,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 Stunde",
   "provider.settings.promptCacheDefault": "Claude Code-Standard",
   "provider.settings.promptCacheLoadFailed": "Die Prompt-Cache-Dauer dieses Servers konnte nicht geladen werden.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Mein Claude-Code-Setup verwenden",
+  "provider.settings.claudeUserSetupDescription":
+    "Agenten laden deine CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
+  "provider.settings.claudeUserSetupLoadFailed": "Die Claude-Code-Einstellung konnte nicht geladen werden.",
   "provider.settings.models": "Modelle",
   "provider.settings.modelsDescription": {
     one: "{shown} von {count} Modell erscheint in der Modellauswahl.",

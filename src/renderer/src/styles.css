@@ -41,6 +41,7 @@
 @import "@openbot/ui/features/channels/channel-avatar.css";
 @import "./features/channels/channels.css";
 @import "@openbot/ui/features/channels/channel-activity.css";
+@import "@openbot/ui/features/channels/channel-context-actions.css";
 @import "@openbot/ui/features/diagrams/diagrams.css";
 @import "@openbot/ui/features/workflows/workflow-nodes.css";
 @import "@openbot/ui/features/workflows/workflows.css";

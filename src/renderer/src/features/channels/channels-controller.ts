@@ -73,6 +73,11 @@ export interface ChannelsEnvironment {
    * picture: the Team API does not carry it, so a joined server and the browser client cannot.
    */
   pictureSupported: () => boolean;
+  /**
+   * Whether this reader can start a new conversation in a channel or compact it. Only this computer
+   * can: the Team API has no route for them yet.
+   */
+  contextActionsSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
   beforeOpen: () => void;
   /** Whether a message that arrives now is in front of the reader. */
@@ -494,6 +499,24 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (!setChannelImage) throw new Error(currentText().t("channel.error.update"));
         await setChannelImage({ channelId, image });
       }),
+    contextActionsSupported: () =>
+      supported() &&
+      env.contextActionsSupported() &&
+      env.port().agent.clearChannelContext !== undefined &&
+      env.port().agent.compactChannelContext !== undefined,
+    /** "New conversation": the members forget the earlier messages. A failure rejects, for the dialog to show. */
+    clearContext: async (channelId: string) => {
+      const clearChannelContext = env.port().agent.clearChannelContext;
+      if (!clearChannelContext) throw new Error(currentText().t("channel.error.action"));
+      await clearChannelContext(channelId);
+      await refreshAfter();
+    },
+    /** Compacts the channel session of each member now. A failure rejects, for the row to show. */
+    compactContext: async (channelId: string) => {
+      const compactChannelContext = env.port().agent.compactChannelContext;
+      if (!compactChannelContext) throw new Error(currentText().t("channel.error.action"));
+      await compactChannelContext(channelId);
+    },
     refresh,
     retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;

@@ -252,6 +252,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 час",
   "provider.settings.promptCacheDefault": "По умолчанию Claude Code",
   "provider.settings.promptCacheLoadFailed": "Не удалось загрузить время кэша промптов этого сервера.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Агенты загружают ваш CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude. Если выключить, каждый ход отправляет более короткий промпт. Файлы рабочей области загружаются по-прежнему.",
+  "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",

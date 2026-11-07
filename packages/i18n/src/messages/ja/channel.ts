@@ -21,6 +21,17 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "エージェントがここで学んだことはチャンネルのメモリーとして保存され、ほかのチャットには表示されません。",
   "channel.settings.memoryCount": { other: "{count} 件保存済み" },
+  "channel.settings.newConversation.title": "新しい会話",
+  "channel.settings.newConversation.description": "メンバーは以前のメッセージを忘れます。チャンネルの設定は残ります。",
+  "channel.settings.newConversation.button": "開始",
+  "channel.settings.newConversation.confirmTitle": "{name} で新しい会話を始めますか?",
+  "channel.settings.newConversation.confirmDescription":
+    "メンバーはこのチャンネルの以前のメッセージを忘れます。メッセージは区切り線の上に表示されたままです。メンバー、指示、メモリー、ルーティンは変わりません。",
+  "channel.settings.newConversation.confirm": "新しい会話を始める",
+  "channel.settings.newConversation.failed": "新しい会話を始められませんでした。",
+  "channel.settings.compact.title": "コンテキストを圧縮",
+  "channel.settings.compact.description": "メンバーはチャンネルのセッションの短い要約を残し、使うトークンが減ります。",
+  "channel.settings.compact.failed": "チャンネルのコンテキストを圧縮できませんでした。",
   "channel.settings.routines": "ルーティン",
   "channel.settings.routineCount": { other: "{count} 件設定済み" },
   "channel.create.close": "新しいチャンネルを閉じる",

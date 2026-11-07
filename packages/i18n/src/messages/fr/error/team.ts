@@ -60,6 +60,8 @@ export const messages = {
   "error.team.providersUnsupported": "Les réglages des fournisseurs ne sont pas pris en charge par cette connexion.",
   "error.team.providerNotManaged": "OpenBot ne gère pas la CLI de ce fournisseur.",
   "error.team.channelsUnsupported": "Les discussions de canal ne sont pas prises en charge par cette connexion.",
+  "error.team.channelContextUnsupported":
+    "Cette connexion ne prend pas en charge une nouvelle conversation ni la compaction dans un canal.",
   "error.team.channelPictureUnsupported": "Les images de canal ne sont pas prises en charge par cette connexion.",
   "error.team.channelDeleteUnsupported": "La suppression de canaux n’est pas prise en charge par cette connexion.",
   "error.team.channelTaskCancelUnsupported":
