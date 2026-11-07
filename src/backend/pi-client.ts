@@ -1104,7 +1104,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     // Before the notice, so a session that closes when its turn ends is not busy.
     if (thread.turn === turn) thread.turn = null;
     this.#notify("turn/completed", thread, { turn: { id: turn.id, status } });
-    yield* this.#markIdle(thread);
+    // In the background: a failed close of another idle thread must not fail or delay this turn.
+    this.#background(this.#markIdle(thread));
   });
 
   readonly #ui = Effect.fn("PiAgentClient.userInput")(function* (

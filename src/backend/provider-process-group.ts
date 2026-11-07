@@ -1,10 +1,11 @@
 import type { ChildProcess } from "node:child_process";
 
 /**
- * Outside Windows, a provider CLI starts as the leader of a process group of its own (`detached`).
- * Its MCP servers and the processes they start stay in that group. Its shell commands do not: the
- * Claude, Codex and OpenCode CLIs run each command in a group of its own, so a server that the user
- * started from the agent keeps running.
+ * Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of process groups of their own
+ * (`detached`). Their MCP servers and the processes they start stay in that group. Their shell
+ * commands do not: each command runs in a group of its own, so a server that the user started from
+ * the agent keeps running. ACP agents do not get a group: each agent runs its own shell commands, and
+ * some can leave them in the agent's group, where the group stop would end them.
  *
  * Windows has no process group. `taskkill /T` stops the tree there (`windows-process-tree.ts`).
  */

@@ -186,14 +186,16 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
-- Outside Windows, each provider CLI starts as the leader of its own process group
+- Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
   (`src/backend/provider-process-group.ts`). When the CLI exits, OpenBot sends SIGTERM to what is
   left of the group, then SIGKILL after 2 seconds. A child of an MCP server outlived the Claude CLI
   without this. Shell commands run in groups of their own, so a server that the agent started keeps
   running. Windows stops the tree with `taskkill /T`.
 
 `bun run test:codex-idle-thread-release` checks the Codex release with a fake app server.
-`scripts/provider-session-reuse-e2e.ts` checks that the group ends with the Claude, Codex and ACP CLIs.
+`scripts/provider-session-reuse-e2e.ts` checks that the group ends with the Claude and Codex CLIs.
+ACP agents get no group: some leave their shell commands in the agent's group, and the group stop
+would end a server that the user started from the agent.
 
 ## Compaction ownership
 

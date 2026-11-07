@@ -14,7 +14,6 @@ import {
   providerFailure,
   providerSync,
 } from "./provider-client-effects";
-import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 import { registerProviderProcess } from "./provider-processes";
 import { type ProviderTempOptions, spawnWithProviderTemp } from "./provider-temp";
 import { createDiagnosticStream } from "./stderr-diagnostics";
@@ -89,12 +88,10 @@ export class AcpConnection {
         },
         windowsVerbatimArguments: target.windowsVerbatimArguments,
         windowsHide: true,
-        detached: PROVIDER_PROCESS_GROUP,
       }),
     );
     this.#process = child;
     registerProviderProcess(child, this.options.provider);
-    endProcessGroupOnExit(child);
     // A start that times out says nothing of the process. These lines show whether it ran, how long
     // it took to write anything, and how it ended, such as a Windows server that unpacks itself (#2311).
     const startedAt = performance.now();

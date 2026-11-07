@@ -21,11 +21,12 @@
 - A browser preview card asks for a new picture every 3 seconds while the agent works, and every 20
   seconds when the agent is idle.
 - Streamed reply text now updates the chat once per frame, not once per received part.
-- Very long messages (more than 32 KB) are no longer kept in the Markdown cache.
+- The Markdown cache of chat messages now keeps at most about 2 million characters, so long
+  pasted logs do not stay in memory after you close their chat.
 - Played voice replies keep their audio for 3 minutes. A later replay makes the speech again.
 - A live browser view that is not on screen stops receiving frames.
-- When OpenBot stops a provider, it now also stops the processes that the provider's MCP servers
-  started. Before, a child of an MCP server could continue to run, and use memory, after Claude Code
+- When OpenBot stops Claude Code, Codex or Pi, it now also stops the processes that their MCP
+  servers started. Before, a child of an MCP server could continue to run, and use memory, after Claude Code
   stopped.
 - Each app window now loads only English and the language it shows, not all 15 languages. This
   uses about 30 MB less JavaScript memory in the main window and in each helper window.

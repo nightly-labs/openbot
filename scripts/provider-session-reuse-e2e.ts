@@ -7,7 +7,7 @@
 //   Codex session. A revoked approval still replaces it. Before, a grant also replaced it.
 // - antigravity-channel-delta: a channel member on Antigravity gets only the unread channel messages
 //   in its next turn on the same session. Before, each turn got the complete channel packet.
-// - claude-release-ends-process-group, codex-stop-ends-process-group, antigravity-stop-ends-process-group:
+// - claude-release-ends-process-group, codex-stop-ends-process-group:
 //   each stand-in starts a child in its own process group and does not stop it, as an MCP server
 //   leaves its child. When OpenBot closes the provider process, the child must end too. Before, it
 //   stayed with no owner. Each child holds a socket to this check, and the check waits for it to close.
@@ -770,9 +770,8 @@ try {
   // The stop of each client, as when the app quits. The release of an idle provider calls the same stop.
   const stopService = (profile: Profile) => runCauseEffect(profile.agents.stop());
   await runGroupCase("codex-stop-ends-process-group", "codex", stopService);
-  await runGroupCase("antigravity-stop-ends-process-group", "antigravity", stopService);
 
-  report.passed = report.cases.length === 6 && report.cases.every((entry) => entry.passed);
+  report.passed = report.cases.length === 5 && report.cases.every((entry) => entry.passed);
 } finally {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

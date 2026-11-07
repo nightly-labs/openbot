@@ -68,6 +68,15 @@ export class CodexIdleSessions {
     for (const client of clients) this.#releaseOver(client, 0);
   }
 
+  /** The client stopped: its sessions ended with it. */
+  clientStopped(client: AgentClient): void {
+    for (const [externalThreadId, session] of this.#sessions) {
+      if (session.client !== client) continue;
+      this.#disarm(session);
+      this.#sessions.delete(externalThreadId);
+    }
+  }
+
   dispose(): void {
     for (const session of this.#sessions.values()) this.#disarm(session);
     this.#sessions.clear();

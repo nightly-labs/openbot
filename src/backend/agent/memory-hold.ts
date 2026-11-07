@@ -1,6 +1,6 @@
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Scope } from "effect";
-import type { HostMemory, HostMemoryLevel } from "../host-memory";
+import type { HostMemory } from "../host-memory";
 import type { ProviderClientOperationError } from "../provider-client-effects";
 
 export interface MemoryHoldHooks {
@@ -43,7 +43,6 @@ export class MemoryHold {
   readonly #hooks: MemoryHoldHooks;
   #scope = Scope.makeUnsafe();
   readonly #told = new Set<string>();
-  #level: HostMemoryLevel = "ok";
   /**
    * A failed release is reported one time in each low period, and at each change to critical: a held
    * delivery retries it at each sample.
@@ -51,6 +50,8 @@ export class MemoryHold {
   #releaseFailed = false;
   /** A sample comes each 5 s, and a provider can take longer to stop its idle threads. */
   #releasing = false;
+  /** The idle threads were released in this critical period, so a sample in a release cannot skip it. */
+  #criticalReleased = false;
   #unsubscribe: (() => void) | null = null;
 
   constructor(options: MemoryHoldOptions) {
@@ -99,17 +100,17 @@ export class MemoryHold {
   readonly #sampled = Effect.fn("MemoryHold.sampled")(function* (this: MemoryHold) {
     this.#hooks.retryWaiting();
     const level = this.#memory?.level() ?? "ok";
-    const previous = this.#level;
-    this.#level = level;
+    if (level !== "critical") this.#criticalReleased = false;
     // While a delivery waits, at each sample: an idle thread costs only a slower first message, and
     // its timer could hold the queue for minutes with no turn running (#4676).
-    const critical = level === "critical" && previous !== "critical";
+    const critical = level === "critical" && !this.#criticalReleased;
     if (!this.#releasing && level !== "ok") {
       this.#releasing = true;
       // Background work that sent nothing for a long time holds a whole process, also when no
       // delivery waits.
       const releases = [this.#hooks.releaseQuietBackgroundThreads()];
       if (critical || this.#told.size > 0) releases.push(this.#hooks.releaseIdleThreads());
+      if (critical) this.#criticalReleased = true;
       yield* Effect.forEach(
         releases,
         (release) =>

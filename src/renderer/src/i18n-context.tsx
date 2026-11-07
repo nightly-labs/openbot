@@ -28,7 +28,7 @@ export interface I18nValue {
   locale: () => TranslatedLocale;
   t: AppTranslate;
   changeLanguage: (next: AppLanguage) => void;
-  /** False while the requested language loads. The startup splash waits for it. */
+  /** False until the saved language is read and its catalogs are loaded. The startup splash waits for it. */
   ready: () => boolean;
 }
 
@@ -77,6 +77,9 @@ function createLoadedLocale(requested: () => TranslatedLocale): LoadedLocale {
  */
 function createI18nValue(): I18nValue {
   const [language, setLanguage] = createSignal<AppLanguage>(DEFAULT_APP_LANGUAGE);
+  // Until main answers, `language` is the default, not the saved choice: a wait for the language
+  // must not end on the system language's catalogs alone.
+  const [preferenceRead, setPreferenceRead] = createSignal(false);
   // The last value the main process confirmed, which is what a failed write falls back to. The
   // displayed language runs ahead of it while a write is in flight.
   let confirmed: AppLanguage = DEFAULT_APP_LANGUAGE;
@@ -107,6 +110,7 @@ function createI18nValue(): I18nValue {
   function confirm(next: AppLanguage): void {
     confirmed = next;
     if (pending === 0) setLanguage(next);
+    setPreferenceRead(true);
   }
 
   /** Set optimistically so the screen turns at once, and reverted if main refuses the write. */
@@ -136,13 +140,13 @@ function createI18nValue(): I18nValue {
         // `confirm` already respects.
         confirm(preference.language);
       })
-      .catch(() => undefined);
+      .catch(() => setPreferenceRead(true));
     // The main process is the owner, so what it sends is confirmed by definition - including the
     // echo of a change made in this window.
     return appPort().onAppLanguagePreference((preference) => confirm(preference.language));
   });
 
-  return { language, locale, t, changeLanguage, ready: loaded.ready };
+  return { language, locale, t, changeLanguage, ready: () => preferenceRead() && loaded.ready() };
 }
 
 /**
