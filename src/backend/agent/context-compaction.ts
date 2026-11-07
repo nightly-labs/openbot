@@ -39,9 +39,10 @@ const CONTEXT_COMPACTION_THRESHOLD = 0.8;
  * removes: tool schemas, instructions, and the newest messages. Codex compacted such a session five
  * times in five minutes, and each tool result was cut off (#3905). A session left at the threshold or
  * above compacts again after a small growth or a retry, so a share between the threshold and 90%
- * compacted it without end (#5150).
+ * compacted it without end (#5150). A session left just below the threshold reached it again after
+ * one turn: one chat compacted 25 times in 27 minutes.
  */
-const INEFFECTIVE_COMPACTION_SHARE = CONTEXT_COMPACTION_THRESHOLD;
+const INEFFECTIVE_COMPACTION_SHARE = 0.7;
 /** After this many such compactions in a row, OpenBot stops asking for more and tells the user. */
 const INEFFECTIVE_COMPACTION_LIMIT = 2;
 /**
@@ -329,10 +330,11 @@ export class ContextCompaction {
     if (afterCompaction) this.#checkCompaction(budget, agentId);
 
     const pressured = usedTokens / contextWindow >= CONTEXT_COMPACTION_THRESHOLD;
+    // Only a compaction that helps starts the ineffective count again: a session below the threshold
+    // can be one that a compaction left just below it.
     if (!pressured) {
       budget.pending = false;
       budget.lastCompactedTokens = null;
-      budget.ineffectiveCompactions = 0;
       budget.failedCompactions = 0;
       return;
     }
