@@ -1354,7 +1354,7 @@ short-lived signed addresses, in transit only.
   it…"), reactions, and approval requests with the command, folder and reason the provider gave,
   redacted. A failed request posts a fixed sentence, never the provider's error. As for Slack, any
   agent can post redacted text and files from its workspace or the OpenBot shared directory to a
-  linked chat.
+  linked chat. An answer or a post can ping a person that it mentions.
 
 Anyone who can post in a linked chat can give the agents work. The agents run on the host with the
 access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1411,6 +1411,7 @@ restrict or block a number that it sees as automated.
   used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
   On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
   redacted text and files from its workspace or the OpenBot shared directory to the allowed chats.
+  An answer or a post can ping a person that it mentions.
 
 Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
 the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps

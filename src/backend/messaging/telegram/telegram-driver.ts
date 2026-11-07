@@ -27,7 +27,7 @@ import {
   type TelegramGateway,
 } from "../messaging-types";
 import { type TelegramChatState, TelegramChats } from "./telegram-chats";
-import { escapeHtml, telegramChunks, telegramHtml, telegramPlainText } from "./telegram-render";
+import { escapeHtml, hasTelegramMention, telegramChunks, telegramHtml, telegramPlainText } from "./telegram-render";
 import { TelegramTransport } from "./telegram-transport";
 import { TELEGRAM_CALLBACK_PREFIXES, telegramPlacement, telegramThreadKey } from "./telegram-updates";
 
@@ -164,20 +164,23 @@ class TelegramAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     const [first = "", ...rest] = telegramChunks(markdown);
-    let firstId: string;
-    if (replaceMessageId) {
-      firstId = replaceMessageId;
+    let firstId: string | null = null;
+    // An edit notifies nobody, so an answer that mentions a person replaces the status post with a new one.
+    if (replaceMessageId && !hasTelegramMention(first)) {
       const updated = yield* Effect.result(
         this.#answerPart(first, (text) => this.#editText(target, replaceMessageId, text)),
       );
-      if (Result.isFailure(updated)) {
+      if (Result.isSuccess(updated)) firstId = replaceMessageId;
+    }
+    if (firstId === null) {
+      firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
+      // After the post: when the post fails, the status post stays for the next attempt to edit.
+      if (replaceMessageId)
         yield* this.#call("deleteMessage", {
           chat_id: this.#chatNumber(target),
           message_id: Number(replaceMessageId),
         }).pipe(Effect.catch(() => Effect.void));
-        firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
-      }
-    } else firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
+    }
     for (const chunk of rest) yield* this.#answerPart(chunk, (text) => this.#postText(target, text));
     return firstId;
   });
@@ -259,7 +262,7 @@ class TelegramAdapter implements MessagingAdapter {
   /**
    * A marker, not markup: status text is escaped as a whole, which would make a link inert.
    * `#statusHtml` turns the marker back into a mention after the escape. The answer of an agent never
-   * goes through it, so an answer cannot mention anyone.
+   * goes through it: `#answerPart` makes the mentions of an answer.
    */
   mention(userId: string): string {
     return /^[0-9]+$/u.test(userId) ? `@${userId}` : userId;
@@ -298,12 +301,16 @@ class TelegramAdapter implements MessagingAdapter {
     };
   }
 
-  /** One part of an answer as HTML, or as plain text when Telegram cannot parse the HTML. */
+  /**
+   * One part of an answer as HTML, or as plain text when Telegram cannot parse the HTML. In HTML,
+   * `@username` and `@<user id>` mention the person. Plain text mentions nobody: Telegram would also
+   * read a `@name` in code there.
+   */
   #answerPart<A>(
     markdown: string,
     send: (text: { text: string; html: boolean }) => Effect.Effect<A, MessagingAdapterError>,
   ): Effect.Effect<A, MessagingAdapterError> {
-    const html = telegramHtml(markdown);
+    const html = telegramHtml(markdown, (userId) => this.#state.name(userId) ?? userId);
     const plain = () => send({ text: telegramPlainText(markdown), html: false });
     // Escapes make HTML longer than its text. Signal refuses a longer call and closes the socket.
     if (new TextEncoder().encode(html).byteLength > TELEGRAM_TEXT_LIMIT) return plain();
