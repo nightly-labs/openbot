@@ -137,7 +137,7 @@ interface WebWorkspaceState {
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
   prompts: Array<Extract<AgentEvent, { type: "prompt" }>>;
   /** The latest progress detail of each agent's running turn. */
-  progress: Record<string, { turnId: string; detail: string; running?: boolean }>;
+  progress: Record<string, { turnId: string; detail: string; running?: boolean; activity?: string }>;
   takeovers: BrowserTakeoverRequest[];
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
@@ -548,6 +548,7 @@ export function createWebWorkspace(
               turnId: event.turnId,
               detail: cleanAgentMessageText(event.detail),
               ...(event.running ? { running: true } : {}),
+              ...(event.activity ? { activity: event.activity } : {}),
             };
           });
           setStepLines((current) => appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail)));

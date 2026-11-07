@@ -432,6 +432,7 @@ export function createConversationViewScope(props: ConversationProps) {
   });
   const {
     renderedAgentActivity,
+    activeStepActivity,
     agentActivitySpaceReserved,
     setAgentActivitySpaceReserved,
     agentActivity,
@@ -2313,6 +2314,7 @@ export function createConversationViewScope(props: ConversationProps) {
     stopBrowserTab,
     removeAttachment,
     renderedAgentActivity,
+    activeStepActivity,
     providerSilentMinutes,
     providerOffline,
     agentProviderName,

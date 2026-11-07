@@ -195,6 +195,7 @@ export function AgentEventBridge() {
             turnId: event.turnId,
             detail: cleanAgentMessageText(event.detail),
             ...(event.running ? { running: true } : {}),
+            ...(event.activity ? { activity: event.activity } : {}),
           },
         }));
         setTurnStepLines((current) => appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail)));

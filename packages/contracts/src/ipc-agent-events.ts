@@ -37,6 +37,29 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
 
+/**
+ * What a tool step of a turn does, on its `turn-progress` event: `reviewing` when the step ended and
+ * the model reads its result. A client shows it on the agent's avatar. A host before this field
+ * leaves it out, and so does a step that is not a tool step. The event keeps it as text, so that a
+ * client still takes the progress of a later host that sends an activity it does not know.
+ */
+export const AGENT_STEP_ACTIVITIES = [
+  "searching",
+  "browsing",
+  "reading",
+  "running",
+  "editing",
+  "delegating",
+  "working",
+  "reviewing",
+] as const;
+export type AgentStepActivity = (typeof AGENT_STEP_ACTIVITIES)[number];
+
+/** The activity of a `turn-progress` event, or null when it has none or one that this client does not know. */
+export function agentStepActivity(value: string | undefined): AgentStepActivity | null {
+  return AGENT_STEP_ACTIVITIES.find((activity) => activity === value) ?? null;
+}
+
 function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
   return value === "user" || value === "routine" || value === "agent" || value === "unknown";
 }
@@ -152,6 +175,8 @@ export type AgentEvent =
        * for its provider. A host before this field leaves it out, and the client counts silence as before.
        */
       running?: boolean;
+      /** An `AgentStepActivity`, read with `agentStepActivity`. */
+      activity?: string;
     }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
@@ -334,7 +359,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.detail) &&
         value.detail.length > 0 &&
         value.detail.length <= INPUT_LIMITS.promptQuestion &&
-        (value.running === undefined || typeof value.running === "boolean")
+        (value.running === undefined || typeof value.running === "boolean") &&
+        (value.activity === undefined || isBoundedString(value.activity, INPUT_LIMITS.identifier))
       );
     case "routine-thread-turn-completed":
       return (

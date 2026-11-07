@@ -222,6 +222,8 @@ export interface ConversationProps {
   activityDetail?: string | undefined;
   /** A tool step of the running turn still runs, so a long silence is work, not a wait for the provider. */
   activityRunning?: boolean | undefined;
+  /** What the running tool step does, as the host's `turn-progress` names it, for the agent's avatar. */
+  activityKind?: string | undefined;
   /** The host's progress lines of the newest turns, by turn, for the steps of each turn. */
   turnStepLines?: TurnStepLines | undefined;
   skillsMarketplaceOpen?: boolean | undefined;

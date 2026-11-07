@@ -22,9 +22,11 @@
   the agent's newest progress line, such as "Measuring folder sizes first", until the answer
   replaces it. Secrets are removed, and the agent's thinking never goes there. The Stop button stays.
 - With the Natural style, the activity line of an agent chat shows only what the agent does now,
-  such as "Checking Poland's weather". It has no general label, timer or step list. The avatar
-  changes between its thinking, curious, focused and wide-eyed looks while it works. The Classic
-  style keeps the old line.
+  such as "Checking Poland's weather". It has no general label, timer or step list. Each new step
+  label rises into place, and the label stays while the agent reads the step's result. The avatar
+  shows what the step does: a curious look for a search, wide eyes on a web page, a focused look
+  while it reads, an eager one while a command runs, and the thinking dots between steps. The
+  Classic style keeps the old line.
 
 ### Changed
 

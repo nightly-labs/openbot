@@ -725,6 +725,58 @@
   -webkit-text-fill-color: currentColor;
 }
 
+/* The plain line draws a label as Grok Bot does: each new step label rises 4px into place, with no
+   exit, and a soft light runs over it in 60 steps. */
+.agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 0%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 25%,
+    var(--openbot-text-primary) 60%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 75%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation:
+    agent-activity-label-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    agent-activity-label-shine 2.2s steps(60, end) infinite;
+}
+
+.agent-activity-entry[data-plain="true"][data-waiting="true"] .agent-activity-label {
+  animation: agent-activity-label-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes agent-activity-label-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes agent-activity-label-shine {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes agent-activity-label-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-activity-entry[data-plain="true"] .agent-activity-label,
+  .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+    animation: agent-activity-label-fade 120ms ease-out backwards;
+  }
+}
+
 .agent-activity-elapsed {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);

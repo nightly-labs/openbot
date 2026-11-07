@@ -187,6 +187,7 @@ export function ConversationTimeline() {
     sendCardMessage,
     reactToMessage,
     renderedAgentActivity,
+    activeStepActivity,
     providerOffline,
     providerSilentMinutes,
     agentProviderName,
@@ -1606,6 +1607,7 @@ export function ConversationTimeline() {
                       stepsOpenByDefault={showAgentSteps()}
                       waitingFor={waitingProviderName()}
                       plain={plainActivity()}
+                      activity={activeStepActivity()}
                     />
                   )}
                 </Show>

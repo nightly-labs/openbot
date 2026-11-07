@@ -1,6 +1,11 @@
 import { RequestError } from "@agentclientprotocol/sdk";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { agentProviderName, COMPUTER_USE_MCP_SERVER_NAME, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
+import {
+  type AgentStepActivity,
+  agentProviderName,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
@@ -468,6 +473,32 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return completed ? sourceText("status.agent.agentResponseReviewing") : sourceText("status.agent.agentCoordinating");
   }
   return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.toolStepWorking");
+}
+
+const TOOL_USAGE_ACTIVITIES: Readonly<Record<ToolUsageKind, AgentStepActivity>> = {
+  command: "running",
+  file_change: "editing",
+  file_read: "reading",
+  web_search: "searching",
+  web_fetch: "browsing",
+  mcp: "working",
+  image_generation: "editing",
+  subagent: "delegating",
+  other: "working",
+};
+
+/**
+ * What a tool step does, for the `activity` of its `turn-progress` event, or null for an item that is
+ * not a tool step. An ended step is `reviewing`: the model now reads its result.
+ */
+export function toolActivity(item: ThreadItem, completed: boolean): AgentStepActivity | null {
+  if (!isToolItem(item)) return null;
+  if (completed) return "reviewing";
+  if (browserTool(item) !== null) return "browsing";
+  const openBot = openBotTool(item);
+  if (openBot === "send_message") return "delegating";
+  if (openBot === "search_memories" || openBot === "list_memories" || openBot === "read_local_skill") return "reading";
+  return TOOL_USAGE_ACTIVITIES[toolUsage(item)?.kind ?? "other"];
 }
 
 /** The provider account after the first that an agent runs on, or null for the provider's own sign-in. */

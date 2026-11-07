@@ -54,6 +54,18 @@ export const Plain: IndicatorStory = {
     detail: "Checking Poland's weather",
     since: Date.now() - 42_000,
     plain: true,
+    activity: "searching",
+  },
+};
+
+/** The Natural style while a command runs: the avatar shows the eager face of a running step. */
+export const PlainRunningCommand: IndicatorStory = {
+  args: {
+    agent: STORY_AGENTS[0],
+    label: "Thinking it through…",
+    detail: "Measuring folder sizes…",
+    plain: true,
+    activity: "running",
   },
 };
 

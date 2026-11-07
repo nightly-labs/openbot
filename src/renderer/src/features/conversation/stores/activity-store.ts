@@ -1,4 +1,10 @@
-import type { AgentModelId, AgentProviderRef, AgentReasoningEffort } from "@openbot/contracts/ipc";
+import {
+  type AgentModelId,
+  type AgentProviderRef,
+  type AgentReasoningEffort,
+  type AgentStepActivity,
+  agentStepActivity,
+} from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentProfile } from "@openbot/ui/data";
 import { type AgentActivityLabel, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
@@ -110,6 +116,11 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     // The agent's own commentary is shown as plain text, without its Markdown marks (#3425); the host's
     // progress text is in the host's source English and is read here in the user's language.
     return latestActiveCommentary() ?? (progress ? currentText().sourceText(progress) : null);
+  });
+  /** What the running step does, for the agent's avatar. A card or a channel that holds the turn has no step. */
+  const activeStepActivity = createMemo((): AgentStepActivity | null => {
+    if (deps.props.prompt || deps.props.approval || deps.props.browserTakeover || heldByOwnChannelWork()) return null;
+    return agentStepActivity(deps.props.activityKind);
   });
   const agentActivity = createMemo<"Working" | null>(() => (activeActivityId() ? "Working" : null));
   /**
@@ -326,6 +337,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     streamingAgentMessage,
     activeActivityId,
     activeActivityDetail,
+    activeStepActivity,
     agentActivity,
     activityLabel,
     runningTurnRuntime,

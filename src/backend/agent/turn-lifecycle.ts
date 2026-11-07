@@ -1,5 +1,6 @@
 import {
   type AgentEvent,
+  type AgentStepActivity,
   type AgentSummary,
   agentProviderDescriptor,
   type BrowserControlState,
@@ -79,6 +80,7 @@ import {
   isToolItem,
   refusedSessionFailure,
   type ToolUsageSignal,
+  toolActivity,
   toolFailed,
   toolProgressText,
   toolTraceDetail,
@@ -1899,7 +1901,14 @@ export class TurnLifecycle {
     }
     this.#observeTraceStep(turnId, item, completed, toolProgress);
     if (toolProgress) {
-      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
+      const activity = toolActivity(item, completed);
+      this.#emitTurnProgress(
+        agentId,
+        this.#conversation.publicThreadId(agentId, threadId),
+        turnId,
+        toolProgress,
+        activity,
+      );
       return;
     }
     if (item.type !== "agentMessage" || !isString(item.id)) return;
@@ -2076,7 +2085,13 @@ export class TurnLifecycle {
     return message;
   }
 
-  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string): void {
+  #emitTurnProgress(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    text: string,
+    activity: AgentStepActivity | null = null,
+  ): void {
     const running = (this.#runningTurns.get(turnId)?.openTools.size ?? 0) > 0;
     this.#hooks.emit({
       type: "turn-progress",
@@ -2085,6 +2100,7 @@ export class TurnLifecycle {
       turnId,
       detail: text,
       ...(running ? { running } : {}),
+      ...(activity ? { activity } : {}),
     });
   }
 }

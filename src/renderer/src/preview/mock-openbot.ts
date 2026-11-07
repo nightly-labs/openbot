@@ -2938,6 +2938,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           threadId: getSnapshot(input.agentId).threadId ?? `thread-${input.agentId}`,
           turnId,
           detail: "Reviewing your request…",
+          activity: "reading",
         });
         emitAgentEvent({
           type: "turn-progress",
