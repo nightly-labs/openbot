@@ -2118,6 +2118,9 @@ export class OpenBotToolRouter {
       );
       const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
+      // The same rule for a request from a Slack thread or another external conversation (#5517). With
+      // replyToMessageId, the mailbox finds the conversation itself.
+      const messaging = replyTo ? undefined : this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
       const receipt = yield* this.#mailbox
         .enqueue({
@@ -2127,6 +2130,7 @@ export class OpenBotToolRouter {
           sourcePaths: paths,
           replyToMessageId: replyTo,
           ...(expectsReply === undefined ? {} : { expectsReply }),
+          ...(messaging ? { messaging } : {}),
           ...(messagingReturn ? { messagingReturn } : {}),
           ...(senderTaskId ? { senderTaskId } : {}),
           ...(taskId ? { taskId } : {}),
