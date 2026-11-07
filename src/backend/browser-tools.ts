@@ -13,6 +13,7 @@ import {
   BROWSER_FILL_FIELDS_MAX_TEXT_BYTES,
   BROWSER_FILL_FIELDS_MAX_TIMEOUT_MS,
 } from "./browser-fill-fields";
+import { BROWSER_VALUE_TEXT_LIMIT } from "./model-text-limit";
 
 export const OPENBOT_BROWSER_NAMESPACE = "openbot_browser";
 
@@ -480,8 +481,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "evaluate",
-    description:
-      "Evaluate JavaScript in the main frame's own page context, with the same access to page scripts, DOM and cookies as the page itself. Prefer snapshots and semantic actions; use this for inspection or unsupported interactions. Returns only a JSON-serializable value up to 64 KB; you get the first 16,000 characters of its JSON.",
+    description: `Evaluate JavaScript in the main frame's own page context, with the same access to page scripts, DOM and cookies as the page itself. Prefer snapshots and semantic actions; use this for inspection or unsupported interactions. Returns only a JSON-serializable value up to 64 KB; you get the first ${BROWSER_VALUE_TEXT_LIMIT.toLocaleString("en-US")} characters of its JSON.`,
     shape: { tabId, ...evaluateFields },
   }),
   browserTool({

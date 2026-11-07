@@ -127,6 +127,34 @@ async function main(): Promise<void> {
     assert.equal(clicked.success, true, text(clicked));
     measurements.pointFromImageHitsBox = (await page.contents.executeJavaScript("window.boxClicks")) === 1;
 
+    // An emulated viewport: a point read from the image must still hit the box.
+    const shotAndClick = async () => {
+      const css = z
+        .object({ width: z.number(), height: z.number() })
+        .parse(await page.contents.executeJavaScript("({ width: innerWidth, height: innerHeight })"));
+      const emulated = nativeImage.createFromDataURL(image(await call("screenshot", { tabId: page.tab.id })));
+      const size = emulated.getSize();
+      const found = markedBox(emulated);
+      assert(found, "The marked box is not in the emulated screenshot.");
+      const before = Number(await page.contents.executeJavaScript("window.boxClicks"));
+      const at = { x: Math.round((found.left + found.right) / 2), y: Math.round((found.top + found.bottom) / 2) };
+      const result = await call("click", { tabId: page.tab.id, target: { kind: "point", ...at }, snapshot: false });
+      assert.equal(result.success, true, text(result));
+      const after = Number(await page.contents.executeJavaScript("window.boxClicks"));
+      return `${size.width}x${size.height} image, ${css.width}x${css.height} CSS, ${after === before + 1 ? "hit" : "miss"}`;
+    };
+    for (const [name, environment] of [
+      ["emulatedLargerThanView", { preset: "custom", width: 1920, height: 1200, deviceScaleFactor: 1 }],
+      ["emulatedScale3", { preset: "custom", width: 800, height: 600, deviceScaleFactor: 3 }],
+      ["emulatedMobilePreset", { preset: "mobile" }],
+    ] as const) {
+      const set = await call("set_environment", { tabId: page.tab.id, ...environment });
+      assert.equal(set.success, true, text(set));
+      measurements[name] = await shotAndClick();
+    }
+    const reset = await call("set_environment", { tabId: page.tab.id, preset: "fill" });
+    assert.equal(reset.success, true, text(reset));
+
     // Element screenshot of the box.
     const read = parseBrowserToolText(text(await call("snapshot", { tabId: page.tab.id, image: "never" })));
     const boxElement = z
@@ -168,6 +196,14 @@ async function main(): Promise<void> {
       script: `return await evaluate(${JSON.stringify(LARGE_VALUE)});`,
     });
     measurements.runScriptWithSnapshotResultChars = text(scriptWithSnapshot).length;
+
+    // A value whose escaped form is much longer than its JSON: the cut must still end.
+    const quoted = await call("run_script", {
+      tabId: page.tab.id,
+      finalSnapshot: false,
+      script: `return '"'.repeat(20000);`,
+    });
+    measurements.runScriptQuotedResultChars = text(quoted).length;
 
     const long = await open("/long");
     measurements.longSnapshotResultChars = text(await call("snapshot", { tabId: long.tab.id, image: "never" })).length;

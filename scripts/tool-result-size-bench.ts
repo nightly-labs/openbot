@@ -29,6 +29,8 @@ const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-tool-result-size-"));
 const reportPath = join(projectRoot, ".openbot-build/tool-result-size/report.json");
 const runId = randomUUID();
+const measurementSchema = z.union([z.number(), z.boolean(), z.string()]);
+type Measurement = z.infer<typeof measurementSchema>;
 /** About 25k tokens of issue-list text: the size of a long GitHub list. */
 const UPSTREAM_TEXT = Array.from(
   { length: 1_000 },
@@ -63,16 +65,44 @@ try {
     true,
   );
   const report = z
-    .object({ status: z.literal("passed"), runId: z.literal(runId), measurements: z.record(z.string(), z.unknown()) })
+    .object({
+      status: z.literal("passed"),
+      runId: z.literal(runId),
+      measurements: z.record(z.string(), measurementSchema),
+    })
     .loose()
     .parse(JSON.parse(await readFile(reportPath, "utf8")));
   const mcp = await measureGitHubProxy();
-  const full = { ...report, measurements: { ...report.measurements, ...mcp } };
+  const measurements = { ...report.measurements, ...mcp };
+  const failed = expectations(measurements);
+  const full = { ...report, status: failed.length ? "failed" : "passed", failed, measurements };
   await writeFile(reportPath, `${JSON.stringify(full, null, 2)}\n`);
   // Machine-readable summary.
-  process.stdout.write(`${JSON.stringify({ status: full.status, report: reportPath, ...full.measurements })}\n`);
+  process.stdout.write(`${JSON.stringify({ status: full.status, report: reportPath, failed, ...measurements })}\n`);
+  if (failed.length) process.exitCode = 1;
 } finally {
   await rm(buildRoot, { recursive: true, force: true });
+}
+
+/** The names of the measurements that do not meet the change's promise. */
+function expectations(measurements: Record<string, Measurement>): string[] {
+  const under = (name: string, limit: number) => typeof measurements[name] === "number" && measurements[name] <= limit;
+  const hits = (name: string) => typeof measurements[name] === "string" && measurements[name].endsWith(", hit");
+  const checks: Record<string, boolean> = {
+    screenshotMatchesCssViewport: measurements.screenshotMatchesCssViewport === true,
+    pointFromImageHitsBox: measurements.pointFromImageHitsBox === true,
+    emulatedLargerThanView: hits("emulatedLargerThanView"),
+    emulatedScale3: hits("emulatedScale3"),
+    emulatedMobilePreset: hits("emulatedMobilePreset"),
+    // The cap, plus the note.
+    evaluateResultChars: under("evaluateResultChars", 16_500),
+    runScriptResultChars: under("runScriptResultChars", 16_500),
+    runScriptQuotedResultChars: under("runScriptQuotedResultChars", 16_500),
+    githubMcpProxiedTextChars: under("githubMcpProxiedTextChars", 40_500),
+  };
+  return Object.entries(checks)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
 }
 
 async function measureGitHubProxy(): Promise<Record<string, number>> {
