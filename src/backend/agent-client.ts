@@ -26,6 +26,12 @@ export interface AgentClient {
    * tool call or at the end of the turn.
    */
   readonly provisionalAnswers?: boolean;
+  /**
+   * True when the client sends the essential memories and the section-mates with the user turns
+   * (`TurnContext`), so they stay out of the developer instructions. A memory change then keeps the
+   * instructions, and the provider's cached prefix with them.
+   */
+  readonly turnContext?: boolean;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**

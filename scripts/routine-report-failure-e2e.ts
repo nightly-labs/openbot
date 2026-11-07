@@ -56,13 +56,14 @@ const LINK_REASON = "The mirror is down.";
 
 /** A tool call that the fake makes. */
 interface FakeCall {
-  tool: "routine_report_failure" | "routine_no_update";
-  arguments: { reason?: string };
+  tool: "routine_report_failure" | "routine_no_update" | "list_routines";
+  arguments: { reason?: string; agentId?: string };
 }
 
 const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`;
 const reportFailure = (reason: string): FakeCall => ({ tool: "routine_report_failure", arguments: { reason } });
 const noUpdate: FakeCall = { tool: "routine_no_update", arguments: {} };
+const listRoutines: FakeCall = { tool: "list_routines", arguments: {} };
 
 /**
  * A Codex app-server with the methods that the service calls. A turn calls, one at a time, the
@@ -354,7 +355,11 @@ try {
   const finisher = await createAgent("Finisher");
   const since = new Date().toISOString();
 
-  const health = createRoutine(checker.id, "Health check", `Check the server. ${calls(reportFailure(REASON))}`);
+  const health = createRoutine(
+    checker.id,
+    "Health check",
+    `Check the server. ${calls(listRoutines, reportFailure(REASON))}`,
+  );
   const plain = createRoutine(checker.id, "Plain check", "Check the build.");
   const broken = createRoutine(checker.id, "Broken check", "Check the disk. PROVIDER-FAIL");
   const quietFailed = createRoutine(
@@ -452,6 +457,19 @@ try {
     (entry) => entry.method === "turn/start" && entry.turnId === healthRun.delivery.turnId,
   )?.text;
   pass("The Test-run prompt names the tool", healthPrompt?.includes("call the routine_report_failure tool") === true);
+  pass(
+    "The routine prompt does not forbid listing routines",
+    healthPrompt?.includes("Do not create, update, delete, or test routines during this run.") === true &&
+      !healthPrompt.includes("delete, list, or test routines"),
+    healthPrompt,
+  );
+  const listRoutinesTool = toolResults(healthRun.delivery.turnId, "list_routines")[0]?.result;
+  pass(
+    "A routine run can list routines",
+    listRoutinesTool?.success === true &&
+      listRoutinesTool.contentItems.some((item) => item.text.includes("Health check")),
+    listRoutinesTool,
+  );
   const healthTransitions = (await runCauseEffect(agents.readConversation(checker.id))).messages
     .map(routineRunConversationEvent)
     .filter((event) => event?.runId === healthRun.run.id)
