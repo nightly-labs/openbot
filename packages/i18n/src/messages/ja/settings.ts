@@ -100,7 +100,7 @@ export const messages = {
     "メッセージの横にリアクション、返信、その他を表示し、メッセージの間に時刻を表示します。オフにすると、すべての操作と時刻が各メッセージの下に表示されます。",
   "settings.busyMessage.title": "作業中のエージェントの方向を修正",
   "settings.busyMessage.description":
-    "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。ChatGPT と Claude で使えます。",
+    "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。対応していないエージェントでは、キューで待機します。",
   "settings.agentDefaults.title": "デフォルト",
   "settings.agentDefaults.description": "エージェントごとに変更しない限り、エージェントはこのデフォルトに従います。",
   "settings.agentDefaults.value": "デフォルト: {value}",
