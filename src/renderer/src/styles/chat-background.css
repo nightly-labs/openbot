@@ -5,13 +5,16 @@
  *
  * A color that makes text hard to read is made darker in Dark and lighter in Light. In Dark, an OKLCH
  * lightness of at most 0.30 keeps `--openbot-text-muted` at about 4.5:1; the default canvas is 0.22.
- * In Light, at least 0.95 keeps `--openbot-text-muted` at about 4.5:1; the default canvas is 0.97. */
+ * In Light, at least 0.95 keeps `--openbot-text-muted` at about 4.5:1; the default canvas is 0.97.
+ * The chroma limit keeps each hue at that lightness in sRGB. A color out of sRGB is clipped, and the
+ * clip makes it lighter: the most saturated sRGB color at hue 29 gave 3.6:1 in Dark. The presets are
+ * under the limit. */
 :root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark] {
-  --chat-background: oklch(from var(--openbot-chat-background-dark) min(l, 0.3) c h);
+  --chat-background: oklch(from var(--openbot-chat-background-dark) min(l, 0.3) min(c, 0.05) h);
 }
 
 :root[data-openbot-color-scheme="light"][data-openbot-chat-background-light] {
-  --chat-background: oklch(from var(--openbot-chat-background-light) max(l, 0.95) c h);
+  --chat-background: oklch(from var(--openbot-chat-background-light) max(l, 0.95) min(c, 0.02) h);
 }
 
 :root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark]
@@ -41,20 +44,22 @@
 /* In the window, the pane is transparent over the card that the agent list shares, and its header is
  * in the top row. A layer under the pane paints the card part of the chat, with the card's right
  * corners. A side panel in the chat is on it too, as it uses the chat canvas. */
-:root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark]
-  .app-window
-  > .app-frame-edge
-  :is(.conversation-panel:not(.window-page), .direct-conversation)::before,
-:root[data-openbot-color-scheme="light"][data-openbot-chat-background-light]
-  .app-window
-  > .app-frame-edge
-  :is(.conversation-panel:not(.window-page), .direct-conversation)::before {
-  position: absolute;
-  z-index: -1;
-  inset: var(--left-header-height) 0 0;
-  border-start-end-radius: calc(var(--openbot-radius-card) - 1px);
-  border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
-  background: var(--openbot-bg-canvas);
-  content: "";
-  pointer-events: none;
+@media (min-width: 721px) {
+  :root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark]
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel:not(.window-page), .direct-conversation)::before,
+  :root[data-openbot-color-scheme="light"][data-openbot-chat-background-light]
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel:not(.window-page), .direct-conversation)::before {
+    position: absolute;
+    z-index: -1;
+    inset: var(--left-header-height) 0 0;
+    border-start-end-radius: calc(var(--openbot-radius-card) - 1px);
+    border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
+    background: var(--openbot-bg-canvas);
+    content: "";
+    pointer-events: none;
+  }
 }

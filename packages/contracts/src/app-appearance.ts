@@ -1,3 +1,4 @@
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import { isDynamicRecord } from "./runtime-values";
 
 /**
@@ -47,13 +48,10 @@ export type AppThemePaletteColor = (typeof APP_THEME_PALETTE_COLORS)[number];
  * or null for the color of the theme. Light and Dark keep their own color; System shows the one of the
  * scheme that it resolves to, and so does a theme palette.
  */
-export type ChatBackgroundColor = `#${string}`;
+export type ChatBackgroundColor = AvatarColor;
 
-const CHAT_BACKGROUND_COLOR_PATTERN = /^#[0-9a-f]{6}$/u;
-
-export function isChatBackgroundColor(value: unknown): value is ChatBackgroundColor {
-  return typeof value === "string" && CHAT_BACKGROUND_COLOR_PATTERN.test(value);
-}
+/** The same rule as an agent color, because the same color picker gives both. */
+export const isChatBackgroundColor: (value: unknown) => value is ChatBackgroundColor = isAvatarColor;
 
 /** The file name stem of a theme palette file, which is also its saved identifier. */
 export const APP_THEME_PALETTE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;

@@ -9,7 +9,7 @@
 
 import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
 import { type ColorPickerAnchor, ColorPickerPopover, ColorPickerTrigger } from "../../color-picker";
 import { SettingsLinkGroup, SettingsLinkRow } from "../../components/SettingsPanel";
 import { Palette } from "../../icons";
@@ -34,7 +34,10 @@ export function ChatColorDot(props: {
   );
 }
 
-/** The picker in a popup: the chat color picker, or another one with its own presets. */
+/**
+ * The picker in a popup: the chat color picker, or another one with its own presets. The popup calls
+ * it once and gives getters, so a draft change updates the picker and does not build it again.
+ */
 export type ColorPopupPicker = (props: {
   label: string;
   value: AvatarColor | null;
@@ -52,7 +55,17 @@ function ChatColorPopup(props: {
 }) {
   return (
     <ColorPickerPopover anchor={props.anchor} label={props.label} onClose={props.onClose} controls={props.controls}>
-      {props.picker({ label: props.label, value: props.value, onChange: props.onDraft })}
+      {untrack(() =>
+        props.picker({
+          get label() {
+            return props.label;
+          },
+          get value() {
+            return props.value;
+          },
+          onChange: props.onDraft,
+        }),
+      )}
     </ColorPickerPopover>
   );
 }
