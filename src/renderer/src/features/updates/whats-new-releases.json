@@ -2,13 +2,16 @@
   {
     "version": "0.64.0",
     "date": "2026-11-07",
-    "notices": [],
+    "notices": [
+      "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Settings → Providers → Claude → Use my Claude Code setup."
+    ],
     "groups": [
       {
         "type": "added",
         "items": [
           "Put your agents on the new agent dock at the edge of the screen on macOS. Turn it off in Settings → Agent dock.",
           "Agents now write short updates while they work. To get the old style, choose Classic in Server settings → Personality.",
+          "Start a new conversation or compact the context of a channel from its settings.",
           "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
           "Choose who can control this computer with remote desktop in Server settings → Remote desktop.",
           "Use OpenBot in Hebrew, and connect GitLab, Omnisend and ElevenLabs in the Marketplace."
