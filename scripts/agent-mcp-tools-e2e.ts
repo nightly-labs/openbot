@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
@@ -27,9 +28,10 @@ import { NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-mcp-tools-e2e");
 const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
+const HTML_LOGIN_TOKEN = "html-login-token-4b6e12";
 
 /** How each local server answers a request without a token. */
-type Mode = "open" | "sign-in" | "key";
+type Mode = "open" | "sign-in" | "key" | "html-login";
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -46,6 +48,21 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      if (mode === "html-login") {
+        const address = server.address();
+        if (address === null || typeof address !== "object") return json(response, 500, { error: "no address" });
+        if (path === "/login") {
+          response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+          response.end("<!doctype html><title>login</title>");
+          return;
+        }
+        const authorization = request.headers.authorization ?? "";
+        if (path === "/mcp" && !authorization.startsWith("Bearer ")) {
+          response.writeHead(302, { location: `http://127.0.0.1:${address.port}/login` });
+          response.end();
+          return;
+        }
+      }
       if (path !== "/mcp") return json(response, 404, { error: "not found" });
       if (mode === "sign-in")
         return json(response, 401, { error: "unauthorized" }, { "www-authenticate": 'Bearer realm="e2e"' });
@@ -126,6 +143,7 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   open: await mcpServer("open"),
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
+  "html-login": await mcpServer("html-login"),
 };
 const calls: Call[] = [];
 let refreshes = 0;
@@ -249,6 +267,28 @@ try {
   assert.equal(key.signInCards.length, 0);
   assert.ok(row("crm"), "a server that needs a key is saved for the user to add it");
 
+  const htmlLogin = await call("add a server that returns a login page", "save_mcp_server", {
+    name: "coolify",
+    url: servers["html-login"].url,
+  });
+  assert.equal(htmlLogin.result.status, "needs_key");
+  assert.equal(htmlLogin.signInCards.length, 0);
+  assert.equal(htmlLogin.result.error, sourceText("error.backend.mcpHtmlLogin"));
+  assert.ok(row("coolify"), "a server that returns a login page is saved for the user to add a token");
+
+  const coolify = row("coolify");
+  assert.ok(coolify);
+  store.save({ ...coolify, headers: [{ key: "Authorization", value: "Basic e2e" }] });
+  const rejected = await call("a non-bearer header still gets the login page", "test_mcp_server", { name: "coolify" });
+  assert.equal(rejected.result.status, "needs_key");
+  assert.equal(rejected.signInCards.length, 0);
+  assert.equal(rejected.result.error, sourceText("error.backend.mcpHtmlLoginRejected"));
+
+  store.save({ ...coolify, headers: [{ key: "Authorization", value: `Bearer ${HTML_LOGIN_TOKEN}` }] });
+  const accepted = await call("a bearer header reaches the login server", "test_mcp_server", { name: "coolify" });
+  assert.equal(accepted.result.status, "ready");
+  assert.deepEqual(accepted.result.tools, ["search", "read_page", "create_page"]);
+
   const down = await call("a server that does not answer is not saved", "save_mcp_server", {
     name: "down",
     url: await closedUrl(),
@@ -364,6 +404,7 @@ try {
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));
   assert.ok(!everything.includes(URL_SECRET), "the address query reached the agent");
   assert.ok(!everything.includes(HEADER_SECRET), "a header value reached the agent");
+  assert.ok(!everything.includes(HTML_LOGIN_TOKEN), "a bearer token reached the agent");
   report.passed = true;
 } catch (error) {
   report.failures.push(error instanceof Error ? (error.stack ?? error.message) : String(error));
@@ -371,9 +412,10 @@ try {
   report.refreshes = refreshes;
   await Promise.all(Object.values(servers).map((server) => server.close()));
   database.close();
-  await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  // Windows can keep the SQLite directory locked after close. The report is already written.
+  await rm(root, { recursive: true, force: true }).catch(() => undefined);
 }
 
 process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${calls.length} calls. Report: ${join(OUT, "report.json")}\n`);
