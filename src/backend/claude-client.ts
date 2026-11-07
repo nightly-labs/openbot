@@ -161,6 +161,75 @@ const CLAUDE_NATIVE_SCHEDULING = [
  * OpenBot workflow tools.
  */
 const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow", "Skill(workflow-authoring)"];
+/**
+ * Claude tools and agent types for a Claude Code host, which OpenBot is not. `ReportFindings` puts
+ * code review findings in the Claude Code review panel, which OpenBot does not have, and tells the
+ * model not to also write them as text. `DesignSync` and `PushNotification` send to
+ * claude.ai Design and the Claude mobile app. The `statusline-setup` agent edits the Claude Code
+ * status line, `claude-code-guide` answers questions about the Claude Code CLI, and `claude` is a
+ * second `general-purpose`. Together about 1.3k tokens in each request; `general-purpose`, `Explore`,
+ * `Plan` and `web-fetch` stay.
+ */
+const CLAUDE_HOST_TOOLS = [
+  "ReportFindings",
+  "DesignSync",
+  "PushNotification",
+  "Agent(statusline-setup)",
+  "Agent(claude-code-guide)",
+  "Agent(claude)",
+];
+
+/**
+ * Bundled skills that cannot work in an OpenBot agent: their tools are blocked or off there
+ * (`Workflow`, the cron tools, Artifact, Remote Control), or they edit the Claude Code setup that
+ * OpenBot owns. A deny rule refuses a skill's call but keeps its listing, so they go off. A skill
+ * of the user setup with one of these names goes off too.
+ */
+const CLAUDE_UNFIT_SKILLS = [
+  "deep-research",
+  "design",
+  "design-sync",
+  "doctor",
+  "fewer-permission-prompts",
+  "keybindings-help",
+  "loop",
+  "plugin-authoring",
+  "schedule",
+  "send-to-project",
+  "update-config",
+  "workflow-authoring",
+];
+/** Bundled coding skills. The model sees their names without their descriptions and can still use them. */
+const CLAUDE_NAME_ONLY_SKILLS = [
+  "batch",
+  "claude-api",
+  "code-review",
+  "dataviz",
+  "debug",
+  "init",
+  "run",
+  "run-skill-generator",
+  "security-review",
+  "simplify",
+  "verify",
+];
+/**
+ * The flag settings of each query. `disableRemoteControl` takes away `SendToProject` and
+ * `SendToProjectContext`, which send work to other Claude Code sessions, outside OpenBot. The empty
+ * `attribution` keeps Claude's co-author line out of the user's commits and pull requests, and its
+ * instructions out of each request.
+ * `bun run bench:claude-prompt-settings` measured the prompt of each request on CLI 2.1.318, Haiku 5.5,
+ * without the user setup: 16,350 tokens before the skill overrides and Remote Control setting, 14,156
+ * after; then 14,130 before `CLAUDE_HOST_TOOLS`, the extra skills and `attribution`.
+ */
+const OPENBOT_CLAUDE_FLAG_SETTINGS: Settings = {
+  attribution: { commit: "", pr: "" },
+  disableRemoteControl: true,
+  skillOverrides: {
+    ...Object.fromEntries(CLAUDE_UNFIT_SKILLS.map((skill) => [skill, "off" as const])),
+    ...Object.fromEntries(CLAUDE_NAME_ONLY_SKILLS.map((skill) => [skill, "name-only" as const])),
+  },
+};
 
 /** The longest tool description the activity line shows. The model writes about 5 to 10 words. */
 const TOOL_DESCRIPTION_LIMIT = 120;
@@ -1093,6 +1162,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // environment has the CPU limit module there (`agentProcessEnvironment`), so it goes into
     // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
     const nodeOptionsSettings: Settings = nodeOptions ? { env: { NODE_OPTIONS: nodeOptions } } : {};
+    const flagSettings: Settings = { ...OPENBOT_CLAUDE_FLAG_SETTINGS, ...nodeOptionsSettings };
     // The sign-in settings can hold keys, so they go in a file that only this user can read, not on
     // the command line, where `ps` shows them to other users.
     const settingsFile =
@@ -1100,6 +1170,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         ? stateDirectory
           ? yield* writeClaudeFlagSettings(stateDirectory, threadId, {
               ...signInSettings,
+              ...OPENBOT_CLAUDE_FLAG_SETTINGS,
               env: { ...signInSettings.env, ...nodeOptionsSettings.env },
             }).pipe(
               Effect.catch((error) =>
@@ -1148,7 +1219,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(Object.keys(extraArgs).length ? { extraArgs } : {}),
           ...(config.profileGeneration
             ? { tools: [] }
-            : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS] }),
+            : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS, ...CLAUDE_HOST_TOOLS] }),
           settingSources: claudeSettingSources(config, userSetup),
           // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
           // settings, plugin and agent-frontmatter servers into the record above, so two computers
@@ -1162,11 +1233,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           persistSession: config.persistSession,
           additionalDirectories: config.additionalDirectories,
           canUseTool,
-          ...(settingsFile
-            ? { settings: settingsFile }
-            : Object.keys(nodeOptionsSettings).length > 0
-              ? { settings: nodeOptionsSettings }
-              : {}),
+          settings: settingsFile ?? flagSettings,
           ...(config.workspaceOnly
             ? {
                 sandbox: claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders),
