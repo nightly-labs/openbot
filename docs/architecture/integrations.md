@@ -81,6 +81,23 @@ message tags the account with `@<row name>`.
 
 Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
 
+### Members and the MCP servers of a joined server
+
+A host with `mcp-member-access-v1` lets a member, not only an owner or admin, use the routes of
+`mcp-servers-v1`, `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`.
+The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api/mcp-member-access.ts).
+
+| Part | Rule |
+| --- | --- |
+| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer. |
+| Read and add | A member reads the whole list, with its `env` and header values, tests a server, and adds a server, a stdio command too. |
+| Change | A member changes, turns on or off, or removes only a server that the member added. Any other row gets 403 `error.team.mcpServerNotYours`. Owners and admins change every row. |
+| Owners | `McpServerOwnersStore` keeps the member ID of each row that a joined server added, in `openbot-mcp-server-owners-v1.json`. A row with no entry, such as one added on the host, counts as an admin's. A damaged file reads as empty. |
+| Sign-in | A sign-in belongs to an address (`mcpOAuthAccountKey`), not to a row. A member starts, cancels or signs out a sign-in, or changes a sign-in app, only when each row on that address is the member's. Each server keeps one sign-in, which every agent of the host uses. |
+| Providers | Provider sign-ins, account starts and agent links on the relay stay with owners and admins. |
+
+Run `bun run test:mcp-member-access` to check these rules on a real host.
+
 ### How an agent reaches a signed-in MCP server
 
 An agent never gets an OAuth token. `McpGateway.endpoint` gives a provider a route of
@@ -197,17 +214,19 @@ capability answers that the sign-in must be done on the host.
 
 ### Rules
 
-- Only an owner or admin can use a relay route. `requireAdmin` runs on every route.
+- Only an owner or admin can use a relay route. `requireAdmin` runs on every route. With
+  `mcp-member-access-v1`, a member also uses `mcp/start`, `status`, `complete` and `cancel`, under
+  the rules of [Members and the MCP servers of a joined server](#members-and-the-mcp-servers-of-a-joined-server).
 - `flowId` is 128 random bits. A flow completes once, only for the member who started it, and
   ends after `SIGN_IN_RELAY_TTL_MS` (10 minutes). An unknown flow, an expired flow and the flow of
   another member get the same `404`.
 - The client sends only the query of the callback. The host checks `state` against the page address
   that its own sign-in made. A client can never choose a host port, host name or path.
 - The host names a callback only for `http:` on `127.0.0.1`, `localhost` or `[::1]`, with a port.
-- The host chooses the page, so a host that is not honest could ask for a grant of another account
-  in the user's browser. The client therefore:
-  - opens only an `https:` page, and only when the user clicks "Open sign-in page" in the dialog
-    that shows the page's host name;
+- The host chooses the page. The client therefore:
+  - opens only an `https:` page. The desktop app opens it as soon as the sign-in waits, and the
+    dialog shows the page's host name, with "Open sign-in page" to open it again. The browser client
+    opens it only on that click, because a browser blocks a page that no click opened;
   - reads the callback port and path from the page's `redirect_uri`, not from the host's `callback`;
   - refuses a page with no `state`, so its listener hands on only the callback of this sign-in.
 - The client listener refuses a request whose `Host` header is not a loopback name, a method that
@@ -234,7 +253,7 @@ capability answers that the sign-in must be done on the host.
 
 - [ ] The host builds the full callback address from its own record. The client sends only a query.
 - [ ] The host checks `state` before it delivers. The client refuses a page with no `state`.
-- [ ] Nothing opens the page before the user sees its host name and asks.
+- [ ] The client opens only an `https:` page, and the dialog shows its host name.
 - [ ] One flow completes once, for one member, before its deadline.
 - [ ] The code is registered with `registerSecretValue` and never logged.
 - [ ] The route uses `requireAdmin`, and its codec is in an optional capability (not in bootstrap).

@@ -77,7 +77,7 @@ import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerR
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
-import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
+import { serverCanAdminister, serverCanManageMcp, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 export interface ServerSettingsModalProps {
@@ -345,8 +345,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   /**
    * The role check without `configured()`. MCP servers belong to this machine and are spawned
    * by the agents on it, so they are manageable before the user publishes a Team API host at all.
+   * A member of a joined server with `mcp-member-access-v1` manages them too.
    */
-  const canManageMcp = () => serverRoleCanAdminister(props.server);
+  const canManageMcp = () => serverRoleCanAdminister(props.server) || serverCanManageMcp(props.server);
   const actionsAvailable = () => local() || props.server.state === "online";
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;

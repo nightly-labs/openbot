@@ -472,7 +472,7 @@ const server = createServer((request, response) => {
 
   response.setHeader("content-type", "text/html; charset=utf-8");
   response.end(`<!doctype html>
-    <input aria-label="Task" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
+    <input aria-label="Task" onkeydown="window.smokeKeys = (window.smokeKeys ?? '') + event.key" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
     <button aria-label="Save" onclick="document.querySelector('output').textContent = document.querySelector('input').value + '|input:' + document.querySelector('input').dataset.trusted + '|click:' + event.isTrusted">Save</button>
     <a href="/child" target="_blank">Child</a>
     <a href="/download" download>Download</a>
@@ -530,11 +530,12 @@ async function main(): Promise<void> {
   app.setPath("sessionData", userDataPath);
   // A backstop for a phase that hangs, not a performance budget -- and it has to stay clear of the
   // phases that wait on a product timeout on purpose, such as the bounded blocked-frame wait and the
-  // frozen-renderer environment race below.
+  // frozen-renderer environment race below. The main flow takes about two minutes on CI, because each
+  // agent click moves along a path and holds the button as a person does.
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 120_000);
+  }, 180_000);
 
   try {
     if (persistencePhase) {
@@ -2194,12 +2195,14 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
           "End redirected focus",
           "replaced focus target",
+          "redirected input append",
+          "redirected input mid-text",
         );
       for (const name of names) {
         const frameTransfer = name.endsWith("frame focus transfer");
         const siblingTransfer = name === "sibling frame focus transfer";
         const redirectFocus = name.includes("redirected focus") && name !== "End redirected focus";
-        const redirectInput = name === "redirected input" || name === "replaced target" || frameTransfer;
+        const redirectInput = name.startsWith("redirected input") || name === "replaced target" || frameTransfer;
         const replace = [
           "normal replace submit",
           "redirected focus replace",
@@ -2208,9 +2211,18 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
         ].includes(name);
         const empty = name.startsWith("empty");
-        const submit = name !== "normal append" && name !== "empty replacement" && name !== "readonly";
+        const submit = ![
+          "normal append",
+          "empty replacement",
+          "readonly",
+          "redirected input append",
+          "redirected input mid-text",
+        ].includes(name);
+        // Focus that moves after the last character, as in a one-time code box, is not a failure.
+        const movedAfterText = name === "redirected input append";
+        const midText = name === "redirected input mid-text";
         const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
-        const expectedSuccess = !changedBeforeInput && !redirectInput;
+        const expectedSuccess = !changedBeforeInput && (!redirectInput || movedAfterText);
         await frame.executeJavaScript(
           `(() => {
             document.body.innerHTML = '<div id="typing-root"></div>';
@@ -2234,7 +2246,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
               if (event.key === 'Enter') event.preventDefault();
             });
             ${redirectFocus ? "intended.onfocus = () => other.focus();" : ""}
-            ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
+            ${name.startsWith("redirected input") ? "intended.addEventListener('input', () => other.focus());" : ""}
             ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
             ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
             ${
@@ -2294,7 +2306,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           target: target
             ? { kind: "ref", ref: target.ref, revision: snapshot.revision }
             : { kind: "role", role: "textbox", name: "Intended field", exact: true },
-          text: empty ? "" : "X",
+          text: empty ? "" : midText ? "XY" : "X",
           mode: replace ? "replace" : "append",
           submit,
         });
@@ -2330,10 +2342,20 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
                 : replace
                   ? "X"
                   : "alphaX";
-        const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
+        // Typed text arrives as key events, so each typed character has a keydown on the intended field.
+        const expectedKeys =
+          name === "End redirected focus"
+            ? ["End"]
+            : [...(changedBeforeInput || empty ? [] : ["X"]), ...(expectedSuccess && submit ? ["Enter"] : [])];
         const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
         // The error tells the agent whether the text is already in the field.
-        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
+        const expectedError = expectedSuccess
+          ? ""
+          : changedBeforeInput
+            ? "Nothing was typed"
+            : submit
+              ? "Enter was not sent"
+              : "Only the first part of the text is in the field";
         const safe =
           result.success === expectedSuccess &&
           (result.success || toolError(result).includes(expectedError)) &&
@@ -2601,8 +2623,8 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
     // a hidden view has no compositor surface under xvfb, so `capturePage`
     // reports UnknownVizError and a mouse event is hit-tested by the browser
     // process against surface data this view does not have. Typing takes
-    // neither path, because `DOM.focus` and `Input.insertText` are routed
-    // straight to the renderer, so it is the half of native input a background
+    // neither path, because `DOM.focus` and key events go to the focused
+    // widget and are not hit-tested, so it is the half of native input a background
     // tab can prove. Captures and clicks on displayed tabs are proven in the
     // main flow.
     try {
@@ -2612,8 +2634,20 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
       const typed = await runCauseEffect(
         browser.act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" }),
       );
-      if (!typed.text.includes("typed:background|input:true"))
-        throw new Error(`Background input was not native: ${typed.text}`);
+      if (!typed.text.includes("typed:background|input:true")) {
+        const pages = await Promise.all(
+          webContents
+            .getAllWebContents()
+            .filter((contents) => !contents.isDestroyed() && contents.getURL() === `${origin}/`)
+            .map((contents) =>
+              contents.executeJavaScript(
+                "JSON.stringify({ keys: window.smokeKeys ?? '', value: document.querySelector('input')?.value, active: document.activeElement?.ariaLabel ?? document.activeElement?.localName, focus: document.hasFocus(), visibility: document.visibilityState, size: [innerWidth, innerHeight] })",
+                true,
+              ),
+            ),
+        );
+        throw new Error(`Background input was not native: ${typed.text} ${pages.join(" ")}`);
+      }
     } catch (error) {
       failures.push(`input: ${String(error)}`);
     }

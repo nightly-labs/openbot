@@ -140,6 +140,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "当前客户端不支持安全认证。",
   "error.team.agentSettingsUnsupported": "当前连接不支持助手设置。",
   "error.team.adminRequired": "需要管理员权限。",
+  "error.team.mcpServerNotYours": "只有添加此 MCP 服务器的人或管理员可以更改它。",
   "error.team.ownerRequired": "只有此服务器的所有者可以执行此操作。",
   "error.team.requestTooLarge": "请求体过大。",
   "error.team.signInRelayUnsupported": "该服务器无法中继登录，请更新主机上的 OpenBot。",

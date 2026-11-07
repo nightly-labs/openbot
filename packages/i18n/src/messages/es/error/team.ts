@@ -142,6 +142,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Este cliente no admite autenticación segura.",
   "error.team.agentSettingsUnsupported": "Esta conexión no admite ajustes de agentes.",
   "error.team.adminRequired": "Se requiere acceso de administrador.",
+  "error.team.mcpServerNotYours": "Solo la persona que añadió este servidor MCP, o un administrador, puede cambiarlo.",
   "error.team.ownerRequired": "Solo el propietario de este servidor puede hacer esto.",
   "error.team.requestTooLarge": "El cuerpo de la solicitud es demasiado grande.",
   "error.team.signInRelayUnsupported":

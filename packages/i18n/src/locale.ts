@@ -7,6 +7,7 @@ export const TRANSLATED_LOCALES = [
   "de",
   "es",
   "fr",
+  "he",
   "it",
   "ja",
   "ko",
@@ -57,7 +58,7 @@ export function formatLocale(language: AppLanguage, systemLocale: string): strin
 }
 
 /** The locales whose script runs from right to left. The interface mirrors for these. */
-const RIGHT_TO_LEFT_LOCALES: ReadonlySet<TranslatedLocale> = new Set(["ar"]);
+const RIGHT_TO_LEFT_LOCALES: ReadonlySet<TranslatedLocale> = new Set(["ar", "he"]);
 
 export type LayoutDirection = "ltr" | "rtl";
 

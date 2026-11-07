@@ -188,6 +188,9 @@ jobs:
       - name: Run the browser dialogs E2E
         run: xvfb-run -a bun run test:browser-dialogs
 
+      - name: Run the browser fingerprint E2E
+        run: xvfb-run -a bun run test:browser-fingerprint
+
       - name: Run the browser ambiguous targets E2E
         run: xvfb-run -a bun run test:browser-ambiguous-targets
 
@@ -337,6 +340,10 @@ jobs:
       - name: Run the sign-in relay replay E2E test
         if: ${{ !cancelled() }}
         run: bun run test:sign-in-relay-replay
+
+      - name: Run the MCP member access E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-member-access
 
       - name: Run the server mute and unmute E2E test
         if: ${{ !cancelled() }}
@@ -620,6 +627,7 @@ jobs:
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
+            .openbot-build/mcp-member-access-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/push-notification-away-e2e/

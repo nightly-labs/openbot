@@ -7,8 +7,9 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseTestMcpServer } from "../ipc/mcp-inputs";
-import type { TeamApiSignInRelay } from "./dependencies";
+import type { TeamApiMcpServerOwners, TeamApiMcpServers, TeamApiSignInRelay } from "./dependencies";
 import { HttpError } from "./http-error";
+import { requireMcpAccess, requireOwnMcpAddress } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, readJson, requireAdmin, stringField } from "./request-helpers";
 
@@ -20,11 +21,14 @@ const ROUTES: ReadonlySet<string> = new Set(Object.values(SIGN_IN_RELAY_ROUTES))
  *
  * `complete` carries the query of the callback, which holds a grant. It travels only on the encrypted
  * Team channel, and `SignInRelayHost` never logs it. `requireAdmin` runs on every route, and a flow
- * answers only the member who started it.
+ * answers only the member who started it. With `mcp-member-access-v1`, a member also starts the MCP
+ * sign-in of an address that no row of another person uses, and follows the flows they started.
  */
 export async function routeSignInRelay(
   context: TeamApiRequestContext,
   relay: TeamApiSignInRelay | undefined,
+  mcpServers?: Pick<TeamApiMcpServers, "listMcpServers">,
+  owners?: TeamApiMcpServerOwners,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const accountStart =
@@ -46,12 +50,23 @@ export async function routeSignInRelay(
   if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
   if (!relay || !capabilities.has(SIGN_IN_RELAY_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
-  requireAdmin(member);
+  // A provider's sign-in and an agent's link stay with owners and admins. A flow answers only the
+  // member who started it, so a member reads and ends only an MCP sign-in of their own.
+  const memberRoute =
+    url.pathname === SIGN_IN_RELAY_ROUTES.mcpStart ||
+    url.pathname === SIGN_IN_RELAY_ROUTES.status ||
+    url.pathname === SIGN_IN_RELAY_ROUTES.complete ||
+    url.pathname === SIGN_IN_RELAY_ROUTES.cancel;
+  if (!memberRoute) requireAdmin(member);
+  const access = memberRoute ? requireMcpAccess(member, capabilities, owners) : null;
   // `readJson` has already run the body through the `sign-in-relay-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
-    case SIGN_IN_RELAY_ROUTES.mcpStart:
-      return json(200, await runCauseEffect(relay.startMcp(member.id, parseTestMcpServer(body))));
+    case SIGN_IN_RELAY_ROUTES.mcpStart: {
+      const input = parseTestMcpServer(body);
+      requireOwnMcpAddress(access, mcpServers?.listMcpServers() ?? [], input.config.url);
+      return json(200, await runCauseEffect(relay.startMcp(member.id, input)));
+    }
     case SIGN_IN_RELAY_ROUTES.providerStart: {
       // The codec admits only `SIGN_IN_RELAY_PROVIDERS`.
       const provider = SIGN_IN_RELAY_PROVIDERS.find((id) => id === stringField(body, "provider"));
