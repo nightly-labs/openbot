@@ -22,10 +22,11 @@ const reportPath = argument("report-path");
 const runId = argument("run-id");
 
 const cases: string[] = [];
+const measurements: Record<string, number | boolean> = {};
 const snapshotSchema = z.object({ tabId: z.string(), revision: z.number(), url: z.string() });
 const scriptSchema = z.object({
   tabId: z.string(),
-  status: z.enum(["completed", "failed", "timeout", "step_limit", "user_control", "tab_closed"]),
+  status: z.enum(["completed", "failed", "timeout", "step_limit", "user_control", "tab_closed", "page_crashed"]),
   value: z.unknown().optional(),
   error: z.string().optional(),
   steps: z.number(),
@@ -38,6 +39,7 @@ const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   if (url.pathname === "/list") response.end(listPage(Number(url.searchParams.get("page") ?? "1")));
+  else if (url.pathname in PAGES) response.end(PAGES[url.pathname]);
   else response.end(formPage());
 });
 
@@ -281,10 +283,29 @@ async function main(): Promise<void> {
     const isolated = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
-      script: "return [typeof process, typeof require, typeof fetch, typeof setTimeout, typeof XMLHttpRequest];",
+      script: "return [typeof process, typeof require, typeof fetch, typeof XMLHttpRequest];",
     });
-    assert.deepEqual(isolated.outcome.value, ["undefined", "undefined", "undefined", "undefined", "undefined"]);
+    assert.deepEqual(isolated.outcome.value, ["undefined", "undefined", "undefined", "undefined"]);
     recordCases("script-has-no-host-access");
+
+    // A timer is a host sleep step, so it waits through a navigation as well.
+    const slept = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: `
+        const started = Date.now();
+        await sleep(300);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const cancelled = setTimeout(() => log("cancelled timer ran"), 0);
+        clearTimeout(cancelled);
+        await waitFor(100);
+        return Date.now() - started;
+      `,
+    });
+    assert.equal(slept.outcome.status, "completed", slept.outcome.error);
+    assert(Number(slept.outcome.value) >= 600, `The script slept ${slept.outcome.value} ms.`);
+    assert.equal(slept.outcome.log, undefined, "A cleared timer ran.");
+    recordCases("script-sleeps-on-host");
 
     const waited = await runScript({
       tabId: list.tab.id,
@@ -299,6 +320,30 @@ async function main(): Promise<void> {
     });
     assert.deepEqual(waited.outcome.value, [null, "yes", true], waited.outcome.error);
     recordCases("script-evaluate-undefined-is-null", "script-waits-for-page-function");
+
+    // The forms that models write from other libraries wait for the same conditions.
+    const guessed = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: `
+        await waitFor("text", "item-3-1");
+        await waitFor("selector", "ul");
+        await waitFor({ selector: "ul" }, { timeout: 2000 });
+        await waitFor({ target: "ul", state: "visible" });
+        await waitFor({ target: "ul" }, { state: "visible" });
+        await waitFor({ state: "networkidle" }, 5000);
+        await waitFor("item-3-1", 2000);
+        await waitFor(() => true, 2000);
+        let refused = "";
+        try { await waitFor("visible", "li"); } catch (error) { refused = error.message; }
+        return [refused, role("button", { name: "Search", exact: true })];
+      `,
+    });
+    assert.equal(guessed.outcome.status, "completed", guessed.outcome.error);
+    const [refused, roleTarget] = z.tuple([z.string(), z.unknown()]).parse(guessed.outcome.value);
+    assert.match(refused, /waitFor takes/u);
+    assert.deepEqual(roleTarget, { kind: "role", role: "button", name: "Search", exact: true });
+    recordCases("script-accepts-guessed-wait-forms");
 
     const leftOff = await runScript({
       tabId: list.tab.id,
@@ -349,6 +394,115 @@ async function main(): Promise<void> {
     await close(form.tab.id);
     await close(held.tab.id);
 
+    phase("open-snapshot");
+    const opened = parseBrowserToolText(text(await call("open", { url: `${origin}/form` })));
+    const openedPage = snapshotSchema.extend({ elements: z.array(z.object({ name: z.string() })) }).parse(opened);
+    assert(
+      openedPage.elements.some((element) => element.name === "Search"),
+      "open returned no snapshot of the page.",
+    );
+    recordCases("open-returns-snapshot");
+    await close(openedPage.tabId);
+
+    phase("page-settle");
+    const pageSchema = z.object({
+      url: z.string(),
+      elements: z.array(z.object({ name: z.string() })),
+      diagnostics: z.array(z.object({ message: z.string() })).optional(),
+      challenge: z.object({ vendor: z.string(), status: z.string(), waitedMs: z.number() }).optional(),
+    });
+    const readPage = async (tool: string, args: DynamicToolCallParams["arguments"]) => {
+      const started = Date.now();
+      const result = await call(tool, args);
+      const parsed = parseBrowserToolText(text(result));
+      const page = pageSchema.parse(
+        tool === "run_script" ? z.object({ snapshot: z.unknown() }).parse(parsed).snapshot : parsed,
+      );
+      return { page, ms: Date.now() - started, raw: parsed };
+    };
+    const names = (page: z.infer<typeof pageSchema>) => page.elements.map((element) => element.name);
+    const settleTab = await runCauseEffect(host.open(`${origin}/form`, "fixture-thread", "fixture-agent"));
+    const skeleton = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/skeleton` });
+    assert(names(skeleton.page).includes("Loaded"), `The snapshot showed the skeleton: ${names(skeleton.page)}`);
+    measurements.skeletonNavigateMs = skeleton.ms;
+    recordCases("snapshot-waits-for-skeleton");
+    await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-skeleton` });
+    const stuckAgain = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert(stuckAgain.ms < 1_500, `A page that keeps its skeleton waited again: ${stuckAgain.ms} ms.`);
+    measurements.stuckSkeletonSecondSnapshotMs = stuckAgain.ms;
+    recordCases("snapshot-waits-once-per-document");
+
+    phase("challenge");
+    const interstitial = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/challenge` });
+    assert.equal(interstitial.page.url, `${origin}/form`, "The snapshot did not wait for the interstitial.");
+    assert.equal(interstitial.page.challenge?.status, "cleared");
+    measurements.interstitialNavigateMs = interstitial.ms;
+    recordCases("snapshot-waits-for-interstitial");
+    const captcha = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/captcha` });
+    assert.equal(captcha.page.challenge?.status, "needs-user");
+    assert(captcha.ms < 5_000, `An interactive check waited: ${captcha.ms} ms.`);
+    const ordinary = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/article` });
+    assert.equal(ordinary.page.challenge, undefined, "A long page that mentions a captcha read as a check.");
+    recordCases("snapshot-reports-interactive-check", "snapshot-ignores-long-page");
+    const stuckCheck = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-challenge` });
+    // navigate stops its wait at its own timeout; the next read waits only the rest of the 15 s.
+    assert.equal(stuckCheck.page.challenge?.status, "checking", "A check with wait time left asked for a person.");
+    const stuckCheckRest = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(stuckCheckRest.page.challenge?.status, "needs-user", "A check that stayed did not ask for a person.");
+    assert(
+      stuckCheck.ms + stuckCheckRest.ms < 20_000,
+      `The reads of one check waited more than once: ${stuckCheck.ms} + ${stuckCheckRest.ms} ms.`,
+    );
+    const stuckCheckAgain = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(stuckCheckAgain.page.challenge?.status, "needs-user");
+    assert(stuckCheckAgain.ms < 3_000, `A check that stayed waited again: ${stuckCheckAgain.ms} ms.`);
+    measurements.stuckChallengeSecondSnapshotMs = stuckCheckAgain.ms;
+    recordCases("snapshot-waits-for-check-once-per-document");
+
+    phase("modal");
+    const modal = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/modal` });
+    // A fact for the modal-first decision, not a requirement.
+    measurements.modalOutsideButtonInSnapshot = names(modal.page).includes("Outside");
+    assert(names(modal.page).includes("Inside"), "The modal button is missing.");
+    recordCases("snapshot-reads-modal");
+    await close(settleTab.id);
+
+    phase("page-crash");
+    const crashing = await open("/form");
+    const gone = new Promise<void>((resolve) => crashing.contents.once("render-process-gone", () => resolve()));
+    crashing.contents.forcefullyCrashRenderer();
+    await gone;
+    const recovered = await readPage("snapshot", { tabId: crashing.tab.id, image: "never" });
+    assert.equal(recovered.page.url, `${origin}/form`);
+    assert(names(recovered.page).includes("Search"), "The crashed page did not load again.");
+    assert(
+      recovered.page.diagnostics?.some((item) => item.message.includes("The page crashed")),
+      "The snapshot did not report the crash.",
+    );
+    recordCases("crashed-tab-reloads-on-next-call");
+
+    await crashing.contents.executeJavaScript("delete window.fixtureFinish");
+    const crashStarted = Date.now();
+    const crashScript = runScript({
+      tabId: crashing.tab.id,
+      script: `
+        await evaluate("new Promise((resolve) => { window.fixtureFinish = resolve; })");
+        await click(role("button", "Search"));
+      `,
+    });
+    await crashing.contents.executeJavaScript(
+      "new Promise((resolve) => { const ready = () => (window.fixtureFinish ? resolve() : requestAnimationFrame(ready)); ready(); })",
+    );
+    crashing.contents.forcefullyCrashRenderer();
+    const crashOutcome = await crashScript;
+    assert.equal(crashOutcome.outcome.status, "page_crashed", crashOutcome.outcome.error);
+    assert(crashOutcome.outcome.snapshot, "A crashed script returned no fresh snapshot.");
+    assert.equal(await crashing.contents.executeJavaScript("window.clicks"), 0, "A step acted after the crash.");
+    measurements.crashedScriptMs = Date.now() - crashStarted;
+    assert(measurements.crashedScriptMs < 15_000, "A crashed script waited for its deadline.");
+    recordCases("crashed-script-stops");
+    await close(crashing.tab.id);
+
     const report = {
       status: "passed",
       runId,
@@ -357,6 +511,7 @@ async function main(): Promise<void> {
       bunVersion: argument("bun-version"),
       electron: process.versions.electron,
       cases,
+      measurements,
       scope:
         "Owned hidden native process, temporary profile, and loopback pages. BrowserHost.handleDynamicTool for run_script. No provider calls.",
     };
@@ -391,6 +546,33 @@ function recordCases(...names: string[]): void {
     process.stdout.write(`${JSON.stringify({ runId, case: name, status: "passed" })}\n`);
   }
 }
+
+const PAGES: Record<string, string> = {
+  "/skeleton": `<!doctype html><meta charset="utf-8"><title>Skeleton</title>
+    <main><div class="skeleton" aria-busy="true" style="width:240px;height:40px;background:#ddd"></div></main>
+    <script>
+      setTimeout(() => {
+        document.querySelector("main").innerHTML = "<button type='button'>Loaded</button>";
+      }, 1200);
+    </script>`,
+  "/stuck-skeleton": `<!doctype html><meta charset="utf-8"><title>Stuck</title>
+    <div class="skeleton" style="width:240px;height:40px;background:#ddd"></div><button type="button">Stay</button>`,
+  "/challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
+    <div id="challenge-running">Checking your browser before accessing the site.</div>
+    <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/stuck-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
+    <div id="challenge-running">Checking your browser before accessing the site.</div>`,
+  "/captcha": `<!doctype html><meta charset="utf-8"><title>Security check</title>
+    <p>Please complete the security check to continue.</p>
+    <iframe src="/hcaptcha.com/checkbox" style="width:300px;height:80px"></iframe>`,
+  "/hcaptcha.com/checkbox": `<!doctype html><meta charset="utf-8"><label><input type="checkbox">I am human</label>`,
+  "/article": `<!doctype html><meta charset="utf-8"><title>Article</title><h1>Article</h1>
+    <p>${"This article explains how a captcha asks you to verify you are human. ".repeat(40)}</p>`,
+  "/modal": `<!doctype html><meta charset="utf-8"><title>Modal</title>
+    <button type="button">Outside</button>
+    <dialog><p>Confirm</p><button type="button">Inside</button></dialog>
+    <script>document.querySelector("dialog").showModal();</script>`,
+};
 
 function formPage(): string {
   return `<!doctype html><meta charset="utf-8"><title>Form</title>

@@ -164,6 +164,28 @@ const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
     entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),
 );
 
+/**
+ * The browser tools that most tasks use. An agent calls a browser tool without a search, because the
+ * names are in its instructions, so the first browser result in a chat brings these schemas. A search
+ * first cost one model turn on each browser task.
+ */
+const BROWSER_PRIMER_TOOLS = ["open", "snapshot", "navigate", "click", "type", "wait_for", "run_script"].map((tool) =>
+  requireTool(`${OPENBOT_BROWSER_NAMESPACE}.${tool}`),
+);
+
+export function browserToolsPrimer() {
+  return {
+    call: CALL_NOTE,
+    tools: BROWSER_PRIMER_TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+    guidance: toolGuidanceFor(BROWSER_PRIMER_TOOLS),
+  };
+}
+
+/** True when a search or describe result gave the agent browser schemas and their guidance. */
+export function givesBrowserSchemas(result: ReturnType<typeof discoverTools>): boolean {
+  return result.tools.some((tool) => "inputSchema" in tool && tool.name.startsWith(`${OPENBOT_BROWSER_NAMESPACE}.`));
+}
+
 function requireTool(name: string) {
   const tool = BUILTIN_TOOL_CATALOG.find((entry) => entry.name === name);
   if (!tool) throw new Error(sourceText("error.agent.toolRequestInvalid"));

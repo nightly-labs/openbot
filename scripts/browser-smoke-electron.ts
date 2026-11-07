@@ -1808,12 +1808,12 @@ async function main(): Promise<void> {
     }
     const queuedSnapshotStartedAt = Date.now();
     const queuedSnapshot = await callBrowserTool(browser, "snapshot", { tabId: waitTab.id });
-    if (
-      !queuedSnapshot.success ||
-      Date.now() - queuedSnapshotStartedAt > 1_000 ||
-      browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true
-    ) {
-      throw new Error("V2 timed-out navigation did not stop before the tab queue resumed.");
+    const queuedSnapshotMs = Date.now() - queuedSnapshotStartedAt;
+    const queuedTabLoading = browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true;
+    if (!queuedSnapshot.success || queuedSnapshotMs > 1_000 || queuedTabLoading) {
+      throw new Error(
+        `V2 timed-out navigation did not stop before the tab queue resumed: ${queuedSnapshotMs} ms, loading ${queuedTabLoading}, ${queuedSnapshot.success ? "success" : toolError(queuedSnapshot)}.`,
+      );
     }
     const beforeReloadText = String(toolTextPayload(queuedSnapshot)?.text);
     const reloadStartedAt = Date.now();
