@@ -54,6 +54,7 @@ export const messages = {
   "app.rail.schedule": "일정",
   "app.rail.tasks": "작업",
   "app.rail.usage": "사용량",
+  "app.rail.library": "라이브러리",
   "app.rail.marketplace": "마켓플레이스",
   "app.rail.settings": "설정",
   "app.rail.settingsNotice": "설정. {notice}",
