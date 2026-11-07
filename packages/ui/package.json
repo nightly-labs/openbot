@@ -399,6 +399,7 @@
     "./features/files/AgentFilesView": "./src/features/files/AgentFilesView.tsx",
     "./features/files/ConversationFilesPanel": "./src/features/files/ConversationFilesPanel.tsx",
     "./features/files/FileList": "./src/features/files/FileList.tsx",
+    "./features/files/LibraryPage": "./src/features/files/LibraryPage.tsx",
     "./features/files/MachineResources": "./src/features/files/MachineResources.tsx",
     "./features/files/StorageOverview": "./src/features/files/StorageOverview.tsx",
     "./features/files/StorageUsageBar": "./src/features/files/StorageUsageBar.tsx",

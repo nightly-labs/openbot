@@ -55,6 +55,7 @@ export const messages = {
   "app.rail.tasks": "Tareas",
   "app.rail.workflows": "Flujos de trabajo",
   "app.rail.usage": "Uso",
+  "app.rail.library": "Biblioteca",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Ajustes",
   "app.rail.settingsNotice": "Ajustes. {notice}",

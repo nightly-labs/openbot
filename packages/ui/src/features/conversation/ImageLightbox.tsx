@@ -243,6 +243,8 @@ export function ImageLightbox(props: {
   canDownload?: ((attachment: AttachmentSummary) => boolean) | undefined;
   /** The window draws the macOS window controls over the top start corner, so the toolbar leaves room. */
   macWindowControls?: boolean | undefined;
+  /** Names the strip of images. Absent, the images are the ones of one message. */
+  stripLabel?: string | undefined;
   onClose: () => void;
 }) {
   const { t } = useText();
@@ -734,7 +736,10 @@ export function ImageLightbox(props: {
             </Show>
           </div>
           <Show when={images().length > 1}>
-            <nav class="image-lightbox-strip image-lightbox-chrome" aria-label={t("chat.image.lightbox.strip")}>
+            <nav
+              class="image-lightbox-strip image-lightbox-chrome"
+              aria-label={props.stripLabel ?? t("chat.image.lightbox.strip")}
+            >
               <For each={images()}>
                 {(entry, position) => (
                   <Button
