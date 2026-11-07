@@ -21,8 +21,10 @@
 - With the Natural style, the "Working on it…" post in Slack, Discord, Telegram and WhatsApp shows
   the agent's newest progress line, such as "Measuring folder sizes first", until the answer
   replaces it. Secrets are removed, and the agent's thinking never goes there. The Stop button stays.
-- With the Natural style, the activity line of an agent chat shows "Thinking it through…" until
-  the first step, not a random playful text.
+- With the Natural style, the activity line of an agent chat shows only what the agent does now,
+  such as "Checking Poland's weather". It has no general label, timer or step list. The avatar
+  changes between its thinking, curious, focused and wide-eyed looks while it works. The Classic
+  style keeps the old line.
 
 ### Changed
 

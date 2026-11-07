@@ -1,4 +1,3 @@
-import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import type { AgentModelId, AgentProviderRef, AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -86,14 +85,14 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (!activeTurnId) return null;
     const streamingMessage = streamingAgentMessage();
     if (streamingMessage && streamingMessage.itemType !== "commentary") return null;
-    const narrationShown = !deps.props.channel && deps.props.responseStyle === "natural";
+    // The Natural line names only the step that runs. The narration shows as progress updates, and
+    // the thinking stays in the steps.
+    if (!deps.props.channel && deps.props.responseStyle === "natural") return null;
     for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
       const message = deps.props.messages[index];
       if (message?.turnId !== activeTurnId || message.itemType !== "commentary") continue;
       const items = message.items ?? [message.body];
       for (let itemIndex = items.length - 1; itemIndex >= 0; itemIndex -= 1) {
-        // Narration that the chat shows as a progress update is not repeated in the activity line.
-        if (narrationShown && isNarrationItemId(message.itemIds?.[itemIndex], deps.props.agent?.provider)) continue;
         const detail = markdownPreviewText(items[itemIndex] ?? "");
         if (detail) return detail;
       }
@@ -144,8 +143,8 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (!agentId || !activityId) return null;
     const previous = deps.agentActivityLabels.get(agentId);
     if (previous?.activityId === activityId) return previous.label;
-    // A natural agent says what it does in its own words, so the line before its first step is plain
-    // and steady, not a random playful text.
+    // The Natural line shows no general label, so its label only names the work for a screen reader:
+    // a plain, steady text, not a random playful one.
     const label: AgentActivityLabel =
       !deps.props.channel && deps.props.responseStyle === "natural"
         ? "Thinking it through…"

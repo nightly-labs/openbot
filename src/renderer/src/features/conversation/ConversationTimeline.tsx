@@ -625,6 +625,8 @@ export function ConversationTimeline() {
       if (shownSubagentId() !== subagentId) toggleSubagentPanel(subagentId);
     },
   });
+  /** The Natural style shows the plain activity line: what the agent does now, and nothing more. */
+  const plainActivity = () => !channel && props.responseStyle === "natural";
   const channelWorkingSteps = createMemo(() => (channel ? turnSteps.workingSteps(channel.workingTurns()) : []));
   /**
    * A direct chat with no message yet, and no turn, queued send or question. A queued send leaves the
@@ -1603,6 +1605,7 @@ export function ConversationTimeline() {
                       steps={turnSteps.activeSteps()}
                       stepsOpenByDefault={showAgentSteps()}
                       waitingFor={waitingProviderName()}
+                      plain={plainActivity()}
                     />
                   )}
                 </Show>

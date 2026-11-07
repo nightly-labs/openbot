@@ -72,6 +72,23 @@ const HOVER_FACES: readonly HoverFace[] = [
 const WORKING_FACE_MIN_MS = 700;
 const WORKING_FACE_MAX_MS = 3200;
 
+/**
+ * The motions that a working plush with `workingMotions` takes in turn. Each one keeps the body, and
+ * each reads as work: it thinks with the felt dots, looks round with interest, looks hard at the
+ * task, and opens its eyes wide at a find. Faces that read as a mood, such as anger or fear, are not
+ * in the list.
+ */
+const WORKING_MOTIONS: readonly PlushMood[] = [
+  { state: "thinking", expression: "attentif", busy: true },
+  { state: "idle", expression: "curieux", busy: true },
+  { state: "idle", expression: "attentif", busy: true },
+  { state: "wide", expression: null, busy: true },
+];
+
+/** How long a working plush keeps one motion. A motion needs about two seconds to read. */
+const WORKING_MOTION_MIN_MS = 2_200;
+const WORKING_MOTION_MAX_MS = 3_800;
+
 /** A photo has no face to move, so a busy agent's photo breathes: a slow scale of the whole circle. */
 const PHOTO_BREATHE = "0.03";
 
@@ -124,6 +141,11 @@ interface AgentAvatarProps {
    */
   workingFaces?: boolean;
   /**
+   * A working plush takes the motions of `WORKING_MOTIONS` in turn, not only the felt dots. Use it
+   * on the one line that shows an agent at work, so that a long step still looks alive.
+   */
+  workingMotions?: boolean;
+  /**
    * Makes the eyes and the space between them larger. A small avatar, 24-40px, shows its face better
    * with larger eyes. 1 is the default size. A photo avatar ignores it.
    */
@@ -172,6 +194,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
           transition={props.transition ?? "pop"}
           followPointer={props.followPointer === true}
           workingFaces={props.workingFaces === true}
+          workingMotions={props.workingMotions === true}
           eyeScale={props.eyeScale}
           class={className()}
           style={props.style}
@@ -208,6 +231,7 @@ function GeneratedAvatar(props: {
   transition: PlushTransition;
   followPointer: boolean;
   workingFaces: boolean;
+  workingMotions: boolean;
   eyeScale?: number | undefined;
   class: string;
   style?: Record<string, string> | undefined;
@@ -220,12 +244,14 @@ function GeneratedAvatar(props: {
   const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
-  const plushMood = createMemo(
-    (): PlushMood =>
-      cyclesFaces()
-        ? { state: "idle", expression: reducedMotion() ? "attentif" : workingFace(), busy: true }
-        : PLUSH_MOODS[props.mood],
-  );
+  // The face cycle wins: the sidebar badge already shows the work there.
+  const cyclesMotions = () => props.workingMotions && !props.workingFaces && props.mood === "working";
+  const [workingMotion, setWorkingMotion] = createSignal(0);
+  const plushMood = createMemo((): PlushMood => {
+    if (cyclesFaces()) return { state: "idle", expression: reducedMotion() ? "attentif" : workingFace(), busy: true };
+    if (cyclesMotions() && !reducedMotion()) return WORKING_MOTIONS[workingMotion()] ?? PLUSH_MOODS.working;
+    return PLUSH_MOODS[props.mood];
+  });
   const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue, props.color));
   const restingExpression = () => props.expression ?? profile().expression;
   // A preview of a chosen shape or eyes keeps the face it shows, so the choice stays visible on hover.
@@ -254,8 +280,10 @@ function GeneratedAvatar(props: {
   const flatAppearance = createMemo(() => {
     const presentation = avatarMoodPresentation(props.mood);
     const hover = hovered() ? hoverFace() : null;
-    const working = cyclesFaces() ? plushMood().expression : null;
-    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : presentation.state;
+    // The flat Bloub takes the face of a working motion, and of its states only `wide`, which keeps the body.
+    const working = cyclesFaces() || cyclesMotions() ? plushMood().expression : null;
+    const motionState = cyclesMotions() && plushMood().state === "wide" ? "wide" : null;
+    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : (motionState ?? presentation.state);
     return {
       shape: props.shape ?? profile().shape,
       color: profile().color,
@@ -294,6 +322,27 @@ function GeneratedAvatar(props: {
             schedule();
           },
           WORKING_FACE_MIN_MS + Math.random() * (WORKING_FACE_MAX_MS - WORKING_FACE_MIN_MS),
+        );
+      };
+      schedule();
+      return () => window.clearTimeout(timer);
+    },
+  );
+
+  // A new turn starts with the felt dots, and each motion then changes to a different one.
+  createEffect(
+    () => cyclesMotions() && !reducedMotion(),
+    (cycling) => {
+      setWorkingMotion(0);
+      if (!cycling) return;
+      let timer = 0;
+      const schedule = () => {
+        timer = window.setTimeout(
+          () => {
+            setWorkingMotion((current) => nextWorkingMotion(current));
+            schedule();
+          },
+          WORKING_MOTION_MIN_MS + Math.random() * (WORKING_MOTION_MAX_MS - WORKING_MOTION_MIN_MS),
         );
       };
       schedule();
@@ -463,6 +512,12 @@ function randomHoverFace(previous: HoverFace | null, resting: ExpressionId): Hov
 function nextWorkingFace(current: ExpressionId | null): ExpressionId {
   const choices = AVATAR_EXPRESSIONS.filter((face) => face !== current);
   return choices[Math.floor(Math.random() * choices.length)] ?? "attentif";
+}
+
+/** The index of a working motion other than `current`. */
+function nextWorkingMotion(current: number): number {
+  const next = Math.floor(Math.random() * (WORKING_MOTIONS.length - 1));
+  return next >= current ? next + 1 : next;
 }
 
 function avatarAnimationPhase(seed: string): number {

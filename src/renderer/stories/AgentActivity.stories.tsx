@@ -46,6 +46,26 @@ export const WaitingForProvider: IndicatorStory = {
   },
 };
 
+/** The Natural style: the avatar moves through its work motions, and the line names only the running step. */
+export const Plain: IndicatorStory = {
+  args: {
+    agent: STORY_AGENTS[0],
+    label: "Thinking it through…",
+    detail: "Checking Poland's weather",
+    since: Date.now() - 42_000,
+    plain: true,
+  },
+};
+
+/** The Natural style before the first step: only the moving avatar shows. */
+export const PlainBeforeFirstStep: IndicatorStory = {
+  args: {
+    agent: STORY_AGENTS[0],
+    label: "Thinking it through…",
+    plain: true,
+  },
+};
+
 // The desktop app icon, scaled down and inlined so the story needs no network.
 // It stands in for an agent’s uploaded avatar: the circular crop and the rings
 // flying around it are what this story is for.

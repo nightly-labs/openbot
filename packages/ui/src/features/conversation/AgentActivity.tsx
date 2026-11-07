@@ -88,6 +88,11 @@ export function AgentActivityIndicator(props: {
    * network. The line then says that it waits, with no shine, because a silent provider is not visible work.
    */
   waitingFor?: string | null | undefined;
+  /**
+   * The line shows only what the agent does now, as the step names it, and nothing more: no label
+   * while no step is named, no time and no steps. The avatar takes several working motions in turn.
+   */
+  plain?: boolean | undefined;
 }) {
   const { t, format } = useText();
   const label = () => {
@@ -95,6 +100,8 @@ export function AgentActivityIndicator(props: {
     if (provider) return t("chat.activity.waitingFor", { provider });
     return props.detail ?? t(agentActivityLabelKey(props.label));
   };
+  /** The text on the line. A plain line shows no general label: the moving avatar says that the agent works. */
+  const shownLabel = () => (props.plain && !props.waitingFor && !props.detail ? null : label());
   const statusLabel = () => {
     const name = props.agent?.name ?? t("chat.activity.agentFallback");
     const provider = props.waitingFor;
@@ -106,7 +113,9 @@ export function AgentActivityIndicator(props: {
   // the avatar reads its mood in a tracked effect, where a new memo halts the reactive system.
   const mood = () => (props.waitingFor ? "connecting" : "working");
   const waiting = () => (props.waitingFor ? "true" : undefined);
-  const elapsedMs = createElapsed(() => (props.phase === "exiting" ? undefined : props.since));
+  const plain = () => props.plain === true;
+  const shownSteps = () => (props.plain ? undefined : props.steps);
+  const elapsedMs = createElapsed(() => (props.phase === "exiting" || props.plain ? undefined : props.since));
   const elapsed = createMemo(() => {
     const ms = elapsedMs();
     if (ms < ELAPSED_VISIBLE_AFTER_MS) return null;
@@ -120,12 +129,12 @@ export function AgentActivityIndicator(props: {
     <div class="agent-activity-entry" data-state={props.phase ?? "active"} data-waiting={waiting()}>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true" aria-label={statusLabel()} />
       <AgentActivityBody
-        steps={props.steps}
+        steps={shownSteps()}
         stepsOpenByDefault={props.stepsOpenByDefault}
         live={props.phase !== "exiting"}
       >
-        <AgentAvatar agent={props.agent} mood={mood()} class="agent-activity-avatar" />
-        <span class="agent-activity-label">{label()}</span>
+        <AgentAvatar agent={props.agent} mood={mood()} workingMotions={plain()} class="agent-activity-avatar" />
+        <Show when={shownLabel()}>{(text) => <span class="agent-activity-label">{text()}</span>}</Show>
         <Show when={elapsed()}>{(time) => <span class="agent-activity-elapsed">{time()}</span>}</Show>
       </AgentActivityBody>
     </div>
