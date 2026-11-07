@@ -1,4 +1,4 @@
-// Shared by the OpenCode prompt bench and the OpenCode agent smoke: the real `opencode` provider
+// Shared by the OpenCode prompt bench, the OpenCode agent smoke and the OpenCode tool-trim e2e: the real `opencode` provider
 // driver and the real OpenCode binary, against a fake OpenAI-compatible model on loopback. OpenCode
 // runs in a temporary HOME and XDG folders, so it never reads the developer's own config, keys or
 // sessions, and it gets its own service port, so it does not meet a running OpenBot's.
