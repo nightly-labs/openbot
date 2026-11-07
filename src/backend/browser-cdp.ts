@@ -33,10 +33,13 @@ import {
 import {
   buttonMask,
   dispatchMouseClick,
+  dispatchPointerMove,
   dispatchShortcut,
+  dispatchText,
   dispatchTextKey,
   modifierMask,
   namedKey,
+  type PointerPoint,
   SHIFT_MODIFIER,
 } from "./browser-cdp-input";
 import {
@@ -199,10 +202,33 @@ const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
 /** Frames inside frames. Past this the focus is treated as in the last frame reached. */
 const MAX_FOCUSED_FRAME_DEPTH = 8;
 
+// Counts the key events that reach the target's window, in the automation world, so the page does
+// not see the listener. `TYPED_KEY_ARRIVED_FUNCTION` reads the count and removes the listener. A key
+// also arrived when the text changed: a page listener that stops the event can hide it from the count.
+const COUNT_TYPED_KEYS = `
+  globalThis.openbotTypedKeys?.view.removeEventListener('keydown', globalThis.openbotTypedKeys.listener, true);
+  const typedKeys = {
+    view: this.ownerDocument.defaultView, count: 0, text: 'value' in this ? String(this.value) : this.textContent,
+    listener: () => { typedKeys.count += 1; },
+  };
+  typedKeys.view.addEventListener('keydown', typedKeys.listener, true);
+  globalThis.openbotTypedKeys = typedKeys;`;
+const TYPED_KEY_ARRIVED_FUNCTION = `function(expected) {
+  const typedKeys = globalThis.openbotTypedKeys;
+  if (!typedKeys) return true;
+  typedKeys.view.removeEventListener('keydown', typedKeys.listener, true);
+  globalThis.openbotTypedKeys = undefined;
+  const text = 'value' in this ? String(this.value) : this.textContent;
+  return typedKeys.count >= expected || text !== typedKeys.text;
+}`;
+const SAVE_TYPED_TEXT_FUNCTION = `function() {
+  if (globalThis.openbotTypedKeys) globalThis.openbotTypedKeys.text = 'value' in this ? String(this.value) : this.textContent;
+}`;
 /**
  * True when this node holds focus in its own document: every shadow root on the way up names it or
  * its host as active. It starts inside the node, so a closed shadow root does not hide it.
  */
+
 const HOLDS_FOCUS_FUNCTION = `function() {
   if (!this.isConnected) return false;
   for (let node = this;;) {
@@ -294,6 +320,8 @@ export class BrowserCdpEngine {
    * move between a press and a release names this one.
    */
   #viewButton: "left" | "middle" | "right" | null = null;
+  /** Where the last mouse event put the pointer, so the next agent move starts there. */
+  #pointer: { point: PointerPoint; sessionId: string | undefined } | null = null;
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
@@ -815,7 +843,9 @@ export class BrowserCdpEngine {
         const modifiers = modifierMask(options.modifiers ?? []);
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
-        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
+        const from = this.#pointerIn(sessionId);
+        this.#pointer = { point: coordinates, sessionId };
+        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId, from);
       }),
     );
   });
@@ -832,7 +862,9 @@ export class BrowserCdpEngine {
         const { sessionId, ...coordinates } = point;
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
-        yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates }, sessionId);
+        const from = this.#pointerIn(sessionId);
+        this.#pointer = { point: coordinates, sessionId };
+        yield* dispatchPointerMove(send, from, coordinates, 0, sessionId);
       }),
     );
   });
@@ -856,7 +888,10 @@ export class BrowserCdpEngine {
         // A frame in another process can keep its own active element after the page takes focus, so
         // each frame element on the way up must hold focus too.
         const checkFocus = (
-          key: "error.backend.browserTypingFocusMoved" | "error.backend.browserTypingSubmitSkipped",
+          key:
+            | "error.backend.browserTypingFocusMoved"
+            | "error.backend.browserTypingFocusMovedWhileTyping"
+            | "error.backend.browserTypingSubmitSkipped",
         ) =>
           Effect.forEach(
             chain,
@@ -884,6 +919,7 @@ export class BrowserCdpEngine {
           resolved.backendNodeId,
           `function(mode) {
           if (!('value' in this) && !this.isContentEditable) throw new Error('Target does not accept text.');
+          ${COUNT_TYPED_KEYS}
           if (mode === 'replace') {
             if ('select' in this && typeof this.select === 'function') this.select();
             else {
@@ -911,14 +947,41 @@ export class BrowserCdpEngine {
         }
         yield* checkFocus("error.backend.browserTypingFocusMoved");
         yield* browserSync(() => assertBeforeDeadline(deadline));
-        yield* send("Input.insertText", { text }, resolved.sessionId);
+        const keyArrived = this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          TYPED_KEY_ARRIVED_FUNCTION,
+          [useEndKey === true ? 2 : 1],
+          resolved.sessionId,
+        ).pipe(
+          Effect.map((arrived) => arrived !== false),
+          // A handler that removed the target after the key shows that the key arrived.
+          Effect.catch(() => Effect.succeed(true)),
+        );
+        yield* dispatchText(send, text, resolved.sessionId, {
+          keyArrived,
+          saveText: this.#callOnNode(
+            send,
+            resolved.backendNodeId,
+            SAVE_TYPED_TEXT_FUNCTION,
+            [],
+            resolved.sessionId,
+          ).pipe(Effect.asVoid),
+          // Short text arrives one key at a time. The deadline can pass, or a key handler can move focus
+          // to another element, after the page already has part of the text.
+          beforeNext: (typed, total) =>
+            browserSync(() => assertTypingProgressBeforeDeadline(deadline, typed, total)).pipe(
+              Effect.andThen(checkFocus("error.backend.browserTypingFocusMovedWhileTyping")),
+            ),
+        });
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
         // the snapshot" and `submit: true` would insert the text without ever submitting it.
         if (options.submit === true) {
           yield* checkFocus("error.backend.browserTypingSubmitSkipped");
-          yield* browserSync(() => assertBeforeDeadline(deadline));
+          const total = [...text].length;
+          yield* browserSync(() => assertTypingProgressBeforeDeadline(deadline, total, total));
           yield* dispatchShortcut(send, "Enter", resolved.sessionId);
         }
       }),
@@ -2294,6 +2357,7 @@ export class BrowserCdpEngine {
             return;
           }
           const held = this.#viewButton;
+          this.#pointer = { point: { x: input.x, y: input.y }, sessionId: undefined };
           if (input.action === "down") this.#viewButton = input.button;
           if (input.action === "up") this.#viewButton = null;
           yield* send("Input.dispatchMouseEvent", {
@@ -2439,6 +2503,12 @@ export class BrowserCdpEngine {
    */
   releaseViewButton(): void {
     this.#viewButton = null;
+  }
+
+  /** The pointer's last point, when it is in the coordinates of the frame of `sessionId`. */
+  #pointerIn(sessionId: string | undefined): PointerPoint | undefined {
+    const pointer = this.#pointer;
+    return pointer && pointer.sessionId === sessionId ? pointer.point : undefined;
   }
 
   readonly navigate = Effect.fn("BrowserCdp.navigate")(function* (

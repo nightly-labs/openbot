@@ -48,6 +48,7 @@ export default defineConfig({
         input: {
           index: resolve("src/preload/index.ts"),
           teamWebrtc: resolve("src/preload/team-webrtc.ts"),
+          browserPage: resolve("src/preload/browser-page.ts"),
         },
         output: {
           format: "cjs",

@@ -156,7 +156,9 @@ Preserve the following boundaries, and their tests where they exist:
 - Electron sandboxing, context isolation, navigation policy, and IPC sender validation.
 - Attachment realpath, MIME, size, quota, and managed-protocol checks.
 - Queue serialization, idempotency, crash reconciliation, and atomic persistence.
-- The remote browser session's lack of preload and `window.openbot` access.
+- The browser tabs' page preload (`src/preload/browser-page.ts`): it only changes page values in the
+  page world. It has no IPC and exposes no world, so a page gets no `window.openbot` and no path to
+  main. `scripts/verify-preload-bundle.ts` checks this.
 - Secret redaction and agent child-process cleanup.
 
 Full agent access is intentional today, but new privileges or network surfaces still require an
