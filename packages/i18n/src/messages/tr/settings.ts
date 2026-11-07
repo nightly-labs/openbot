@@ -63,6 +63,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "Bilgisayarı pildeyken de uyanık tut. Pil daha hızlı biter.",
   "settings.restoreWorkspace.title": "Başlangıçta son çalışma alanını geri yükle",
   "settings.restoreWorkspace.description": "Önceki oturumunuzdaki çalışma alanını ve görevleri açın.",
+  "settings.quitGuard.title": "Çıkmak için ⌘Q'yu basılı tut",
+  "settings.quitGuard.description":
+    "Çıkmak için ⌘Q'yu basılı tutun veya iki kez basın. “Asla” seçiliyken tek bir ⌘Q çıkar ve ajanları durdurur.",
+  "settings.quitGuard.working": "Ajanlar çalışırken",
+  "settings.quitGuard.always": "Her zaman",
+  "settings.quitGuard.never": "Asla",
   "settings.externalLinks.title": "Harici bağlantıları şurada aç",
   "settings.externalLinks.description":
     "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır.",

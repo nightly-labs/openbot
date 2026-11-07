@@ -65,6 +65,12 @@ export const messages = {
     "Не давать компьютеру засыпать и при работе от батареи. Батарея разряжается быстрее.",
   "settings.restoreWorkspace.title": "Восстанавливать последнее рабочее пространство при запуске",
   "settings.restoreWorkspace.description": "Открывать рабочее пространство и задачи из предыдущего сеанса.",
+  "settings.quitGuard.title": "Удерживать ⌘Q для выхода",
+  "settings.quitGuard.description":
+    "Удерживайте ⌘Q или нажмите дважды, чтобы выйти. С вариантом «Никогда» одно нажатие ⌘Q закрывает приложение и останавливает агентов.",
+  "settings.quitGuard.working": "Пока агенты работают",
+  "settings.quitGuard.always": "Всегда",
+  "settings.quitGuard.never": "Никогда",
   "settings.externalLinks.title": "Открывать внешние ссылки в",
   "settings.externalLinks.description": "Здесь открываются ссылки из чатов, страниц входа и оплаты.",
   "settings.externalLinks.defaultBrowser": "Основной браузер",

@@ -64,6 +64,12 @@ export const messages = {
     "Houd de computer ook op batterijstroom wakker. De batterij loopt dan sneller leeg.",
   "settings.restoreWorkspace.title": "Herstel de laatste werkruimte bij openen",
   "settings.restoreWorkspace.description": "Open de werkruimte en taken van je vorige sessie.",
+  "settings.quitGuard.title": "⌘Q ingedrukt houden om te stoppen",
+  "settings.quitGuard.description":
+    "Houd ⌘Q ingedrukt of druk twee keer om te stoppen. Met ‘Nooit’ stopt één ⌘Q OpenBot en de agents.",
+  "settings.quitGuard.working": "Als agents werken",
+  "settings.quitGuard.always": "Altijd",
+  "settings.quitGuard.never": "Nooit",
   "settings.externalLinks.title": "Open externe links in",
   "settings.externalLinks.description": "Links in chats, inlogpagina’s en betaalpagina’s openen hier.",
   "settings.externalLinks.defaultBrowser": "Standaardbrowser",

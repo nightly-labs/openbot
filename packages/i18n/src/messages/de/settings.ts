@@ -66,6 +66,12 @@ export const messages = {
     "Den Computer auch im Akkubetrieb wach halten. Der Akku entlädt sich schneller.",
   "settings.restoreWorkspace.title": "Letzten Arbeitsbereich beim Start wiederherstellen",
   "settings.restoreWorkspace.description": "Den Arbeitsbereich und die Aufgaben der letzten Sitzung öffnen.",
+  "settings.quitGuard.title": "⌘Q zum Beenden halten",
+  "settings.quitGuard.description":
+    "Halte ⌘Q gedrückt oder drücke zweimal, um zu beenden. Mit „Nie“ beendet ein einziges ⌘Q OpenBot und stoppt die Agenten.",
+  "settings.quitGuard.working": "Wenn Agenten arbeiten",
+  "settings.quitGuard.always": "Immer",
+  "settings.quitGuard.never": "Nie",
   "settings.externalLinks.title": "Externe Links öffnen in",
   "settings.externalLinks.description": "Links in Chats, Anmeldeseiten und Abrechnungsseiten öffnen sich hier.",
   "settings.externalLinks.defaultBrowser": "Standardbrowser",

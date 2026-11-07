@@ -806,8 +806,8 @@ export const IPC_ENDPOINTS = {
     chatWindows: event<ChatWindowTarget[]>()("app:chat-windows"),
     // Main reads `Cmd + Q` before the page does, so it tells the window when to show the hint that
     // the key must be held or pressed twice. The hint names the local agents that work, which a quit
-    // stops. An empty list removes it.
-    quitShortcutHint: event<ClientAgentSummary[]>()("app:quit-shortcut-hint"),
+    // stops, and is empty when the user guards every quit and no agent works. Null removes it.
+    quitShortcutHint: event<ClientAgentSummary[] | null>()("app:quit-shortcut-hint"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),

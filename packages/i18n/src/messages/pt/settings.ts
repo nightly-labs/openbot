@@ -66,6 +66,12 @@ export const messages = {
     "Mantenha o computador acordado também na bateria. A bateria descarrega mais rápido.",
   "settings.restoreWorkspace.title": "Restaurar o último espaço de trabalho ao iniciar",
   "settings.restoreWorkspace.description": "Abra o espaço de trabalho e as tarefas da sessão anterior.",
+  "settings.quitGuard.title": "Manter ⌘Q para sair",
+  "settings.quitGuard.description":
+    "Mantenha ⌘Q pressionado ou pressione duas vezes para sair. Com “Nunca”, um ⌘Q sai e para os agentes.",
+  "settings.quitGuard.working": "Enquanto agentes trabalham",
+  "settings.quitGuard.always": "Sempre",
+  "settings.quitGuard.never": "Nunca",
   "settings.externalLinks.title": "Abrir links externos em",
   "settings.externalLinks.description": "Links de chats, páginas de login e páginas de cobrança abrem aqui.",
   "settings.externalLinks.defaultBrowser": "Navegador padrão",

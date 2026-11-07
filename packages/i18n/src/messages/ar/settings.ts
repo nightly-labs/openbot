@@ -63,6 +63,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "إبقاء الحاسوب في وضع التشغيل على البطارية أيضًا. تنفد البطارية أسرع.",
   "settings.restoreWorkspace.title": "استعادة آخر مساحة عمل عند التشغيل",
   "settings.restoreWorkspace.description": "فتح مساحة العمل والمهام من جلستك السابقة.",
+  "settings.quitGuard.title": "اضغط ⌘Q مطولًا للإنهاء",
+  "settings.quitGuard.description":
+    "اضغط ⌘Q مطولًا أو مرتين للإنهاء. مع «أبدًا»، تؤدي ضغطة ⌘Q واحدة إلى الإنهاء وإيقاف الوكلاء.",
+  "settings.quitGuard.working": "أثناء عمل الوكلاء",
+  "settings.quitGuard.always": "دائمًا",
+  "settings.quitGuard.never": "أبدًا",
   "settings.externalLinks.title": "فتح الروابط الخارجية في",
   "settings.externalLinks.description": "تُفتح هنا الروابط في الدردشات وصفحات تسجيل الدخول وصفحات الفوترة.",
   "settings.externalLinks.defaultBrowser": "المتصفح الافتراضي",

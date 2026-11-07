@@ -65,6 +65,12 @@ export const messages = {
     "Mantieni il computer attivo anche a batteria. La batteria si scarica più in fretta.",
   "settings.restoreWorkspace.title": "Ripristina l'ultimo workspace all'avvio",
   "settings.restoreWorkspace.description": "Apri il workspace e le attività della sessione precedente.",
+  "settings.quitGuard.title": "Tieni premuto ⌘Q per uscire",
+  "settings.quitGuard.description":
+    "Tieni premuto ⌘Q o premilo due volte per uscire. Con «Mai», un solo ⌘Q esce e ferma gli agenti.",
+  "settings.quitGuard.working": "Mentre gli agenti lavorano",
+  "settings.quitGuard.always": "Sempre",
+  "settings.quitGuard.never": "Mai",
   "settings.externalLinks.title": "Apri i link esterni in",
   "settings.externalLinks.description": "I link nelle chat, nelle pagine di accesso e di fatturazione si aprono qui.",
   "settings.externalLinks.defaultBrowser": "Browser predefinito",

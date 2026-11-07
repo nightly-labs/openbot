@@ -1,4 +1,12 @@
-import { APP_INTERFACE_SIZES, type AppInterfaceSize, type AppVariant, type AvatarColor } from "@openbot/contracts/ipc";
+import {
+  APP_INTERFACE_SIZES,
+  type AppInterfaceSize,
+  type AppVariant,
+  type AvatarColor,
+  QUIT_GUARDS,
+  type QuitGuard,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Item,
   ItemActions,
@@ -30,6 +38,12 @@ import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
+const quitGuardOptions = [...QUIT_GUARDS];
+const QUIT_GUARD_LABEL = {
+  working: "settings.quitGuard.working",
+  always: "settings.quitGuard.always",
+  never: "settings.quitGuard.never",
+} as const satisfies Record<QuitGuard, AppTextKey>;
 
 interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
@@ -244,6 +258,37 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.restoreWorkspace.title")}
             description={i18n.t("settings.restoreWorkspace.description")}
           />
+          <Show when={props.value.quitGuard}>
+            {(quitGuard) => (
+              <Item data-settings-row="settings.quitGuard.title" class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.quitGuard.title")}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.quitGuard.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Select<QuitGuard>
+                    class="settings-modal-select"
+                    options={quitGuardOptions}
+                    value={quitGuard()}
+                    onChange={(value) => value && value !== quitGuard() && props.onUpdateSetting("quitGuard", value)}
+                    placement="bottom-end"
+                    itemComponent={(selectProps) => (
+                      <SelectItem item={selectProps.item}>
+                        {i18n.t(QUIT_GUARD_LABEL[selectProps.item.rawValue])}
+                      </SelectItem>
+                    )}
+                  >
+                    <SelectTrigger size="sm" aria-label={i18n.t("settings.quitGuard.title")}>
+                      <SelectValue<QuitGuard>>
+                        {(state) => i18n.t(QUIT_GUARD_LABEL[state.selectedOption()])}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent mount={props.selectMount} />
+                  </Select>
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
         </ItemGroup>
       </SettingsSection>
 

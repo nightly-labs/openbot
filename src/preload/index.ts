@@ -120,6 +120,7 @@ import {
   decodeProviderCodeLoginStart,
   decodeProviderUsageResetOutcomeFromMain,
   decodeProviderUsageResetsFromMain,
+  decodeQuitShortcutHint,
   decodeRoutine,
   decodeRoutineCalendar,
   decodeRoutineFeed,
@@ -774,7 +775,7 @@ const openbotApi: OpenBotDesktopApi = {
     openChatWindow: decodeVoid,
     getChatWindows: decodeChatWindowTargets,
     chatWindows: decodeChatWindowTargets,
-    quitShortcutHint: decodeAgents,
+    quitShortcutHint: decodeQuitShortcutHint,
   }),
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,

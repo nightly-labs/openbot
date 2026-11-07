@@ -1,6 +1,6 @@
 import type { AgentModelOption } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { decodeAgentStatusFromMain } from "./agent-decoding";
+import { decodeAgentStatusFromMain, decodeQuitShortcutHint } from "./agent-decoding";
 
 const proModel = {
   provider: "antigravity",
@@ -46,6 +46,20 @@ describe("decodeAgentStatusFromMain", () => {
       expect(() => decodeAgentStatusFromMain(statusWithAccountModels(models))).toThrow(
         "Invalid agent status response.",
       );
+    }
+  });
+});
+
+// Null hides the hint. An empty list shows it with no names: the user guards every quit and no agent works.
+describe("decodeQuitShortcutHint", () => {
+  it("keeps the hidden hint and the hint with no agents apart", () => {
+    expect(decodeQuitShortcutHint(null)).toBeNull();
+    expect(decodeQuitShortcutHint([])).toEqual([]);
+  });
+
+  it("refuses a value that is not an agent list", () => {
+    for (const value of [undefined, {}, [{ id: 1 }]]) {
+      expect(() => decodeQuitShortcutHint(value)).toThrow("Invalid agent list response.");
     }
   });
 });

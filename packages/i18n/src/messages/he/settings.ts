@@ -62,6 +62,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "השארת המחשב ער גם בעבודה על סוללה. הסוללה מתרוקנת מהר יותר.",
   "settings.restoreWorkspace.title": "שחזור סביבת העבודה האחרונה בהפעלה",
   "settings.restoreWorkspace.description": "פתיחת סביבת העבודה והמשימות מהסשן הקודם.",
+  "settings.quitGuard.title": "החזקת ⌘Q ליציאה",
+  "settings.quitGuard.description":
+    "יש להחזיק את ⌘Q או ללחוץ עליו פעמיים כדי לצאת. עם „אף פעם”, לחיצה אחת על ⌘Q יוצאת ועוצרת את הסוכנים.",
+  "settings.quitGuard.working": "כשסוכנים עובדים",
+  "settings.quitGuard.always": "תמיד",
+  "settings.quitGuard.never": "אף פעם",
   "settings.externalLinks.title": "פתיחת קישורים חיצוניים ב",
   "settings.externalLinks.description": "קישורים בצ'אטים, בעמודי התחברות ובעמודי חיוב נפתחים כאן.",
   "settings.externalLinks.defaultBrowser": "דפדפן ברירת המחדל",

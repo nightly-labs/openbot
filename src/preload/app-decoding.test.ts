@@ -15,6 +15,7 @@ import {
   decodeAccountSessions,
   decodeAnalyticsPreference,
   decodeAppAppearancePreference,
+  decodeAppBehaviorPreference,
   decodeAppInfo,
   decodeAppLanguagePreference,
   decodeApprovalAutomationPreference,
@@ -108,6 +109,22 @@ const voiceServer = {
 };
 
 const valid: [string, (value: unknown) => unknown, unknown][] = [
+  [
+    "app behavior with a quit guard",
+    decodeAppBehaviorPreference,
+    {
+      launchAtLogin: true,
+      keepRunningInBackground: false,
+      keepAwake: null,
+      keepAwakeOnBattery: null,
+      quitGuard: "always",
+    },
+  ],
+  [
+    "app behavior with no quit guard",
+    decodeAppBehaviorPreference,
+    { launchAtLogin: true, keepRunningInBackground: false, keepAwake: null, keepAwakeOnBattery: null, quitGuard: null },
+  ],
   ["a voice server", decodeVoiceServerSettings, voiceServer],
   ["no voice server", decodeVoiceServerSettings, null],
   [
@@ -279,6 +296,22 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  [
+    "an unknown quit guard",
+    decodeAppBehaviorPreference,
+    {
+      launchAtLogin: true,
+      keepRunningInBackground: false,
+      keepAwake: null,
+      keepAwakeOnBattery: null,
+      quitGuard: "sometimes",
+    },
+  ],
+  [
+    "a missing quit guard",
+    decodeAppBehaviorPreference,
+    { launchAtLogin: true, keepRunningInBackground: false, keepAwake: null, keepAwakeOnBattery: null },
+  ],
   ["sent message stats with a negative count", decodeSentMessageStats, { firstSentAt: null, sentCount: -1 }],
   [
     "app info with an install ID that is not text",

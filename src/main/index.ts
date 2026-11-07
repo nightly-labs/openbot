@@ -6,8 +6,10 @@ import {
   type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
+  DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
 import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
@@ -523,6 +525,11 @@ function workingAgents(): AgentSummary[] {
   return [...services.service.workingAgents(), ...(services.localServers?.workingAgents() ?? [])];
 }
 
+/** The user's `Cmd + Q` guard. Before the services exist, the default. */
+function quitGuard(): QuitGuard {
+  return services?.appBehavior.quitGuard ?? DEFAULT_QUIT_GUARD;
+}
+
 const windows = createMainWindowController({
   holder: windowHolder,
   statePath: join(app.getPath("userData"), MAIN_WINDOW_STATE_FILE),
@@ -551,6 +558,7 @@ const windows = createMainWindowController({
   reportError: (message, error) => logger.error(message, toLogValue(error)),
   quitFromShortcut: () => quitFor("shortcut"),
   workingAgents,
+  quitGuard,
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -1596,6 +1604,7 @@ if (!hasSingleInstanceLock) {
         language.translate,
         () => windowHolder.current,
         workingAgents,
+        quitGuard,
         quitFor,
       );
       // The way back to a window hidden in the background, and the sign that a member controls
@@ -1636,6 +1645,7 @@ if (!hasSingleInstanceLock) {
           language.translate,
           () => windowHolder.current,
           workingAgents,
+          quitGuard,
           quitFor,
         );
         tray.relabel();

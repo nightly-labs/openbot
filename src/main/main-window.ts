@@ -21,6 +21,7 @@ import {
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type MacPermissionId,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
 import {
@@ -166,6 +167,8 @@ export interface MainWindowContext {
   quitFromShortcut: () => void;
   /** The agents that a quit stops, here and on the servers on this computer. See `createQuitShortcut`. */
   workingAgents: () => AgentSummary[];
+  /** A function, not a value: the user can change the choice while the window is open. */
+  quitGuard: () => QuitGuard;
 }
 
 export interface MainWindowController {
@@ -205,6 +208,7 @@ export function createMainWindowController({
   reportError,
   quitFromShortcut,
   workingAgents,
+  quitGuard,
 }: MainWindowContext): MainWindowController {
   const quitShortcut =
     process.platform === "darwin"
@@ -212,6 +216,7 @@ export function createMainWindowController({
           quit: quitFromShortcut,
           isQuitting,
           workingAgents,
+          guard: quitGuard,
           showHint: (window, agents) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, agents),
         })
       : null;
@@ -995,12 +1000,12 @@ let quitConfirmationOpen = false;
  * routines (#4149). In a focused OpenBot page the keys never get here: `createQuitShortcut` quits
  * when they are held or pressed twice. The item gets the keys only with no OpenBot page focused, such
  * as with the window closed or a sign-in window focused. No page can show the hint there, so OpenBot
- * asks. A click on
- * the item, the Dock, a system logout and an update still quit at once.
+ * asks when the user's quit guard applies. A click on the item, the Dock, a system logout and an
+ * update still quit at once.
  */
 function macQuitItem(
   translate: AppTranslate,
-  agentsWork: () => boolean,
+  guarded: () => boolean,
   quit: (source: MenuQuitSource) => void,
 ): MenuItemConstructorOptions {
   return {
@@ -1008,8 +1013,8 @@ function macQuitItem(
     accelerator: "Command+Q",
     click: (_item, _window, event) => {
       if (!event.triggeredByAccelerator) return quit("menu");
-      // With no agent at work, a quit stops nothing, so the keys quit at once.
-      if (!agentsWork()) return quit("shortcut");
+      // With no agent at work, a quit stops nothing, so the keys quit at once unless the user guards every quit.
+      if (!guarded()) return quit("shortcut");
       // A second press while the question is open does not open another one, and a quit that has
       // started hid every window and needs no question.
       if (quitConfirmationOpen || windowsKeptHidden) return;
@@ -1054,6 +1059,7 @@ export function configureApplicationMenu(
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
   workingAgents: () => AgentSummary[],
+  quitGuard: () => QuitGuard,
   quit: (source: MenuQuitSource) => void,
 ): void {
   Menu.setApplicationMenu(
@@ -1099,7 +1105,14 @@ export function configureApplicationMenu(
           { role: "unhide" },
           { type: "separator" },
           process.platform === "darwin"
-            ? macQuitItem(translate, () => workingAgents().length > 0, quit)
+            ? macQuitItem(
+                translate,
+                () => {
+                  const choice = quitGuard();
+                  return choice === "always" || (choice === "working" && workingAgents().length > 0);
+                },
+                quit,
+              )
             : { role: "quit" },
         ],
       },
