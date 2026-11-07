@@ -619,7 +619,11 @@ function PresetButton(props: { label: string; icon: SolidElement; onSelect: () =
 /* The Quote button, so the presets do not clip it. */
 const QUOTE_ACTION_WIDTH = 84;
 
-function isQuoteShortcut(event: KeyboardEvent, modifier: QuoteShortcutModifier): boolean {
+/** ⌘⇧. on macOS, Ctrl+Shift+. elsewhere. A key that a visual reply page gives to the app counts too. */
+export function isQuoteShortcut(
+  event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "shiftKey" | "altKey" | "code">,
+  modifier: QuoteShortcutModifier,
+): boolean {
   const modifierDown = modifier === "meta" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   return modifierDown && event.shiftKey && !event.altKey && event.code === "Period";
 }

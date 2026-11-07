@@ -328,6 +328,7 @@ export const messages = {
   "chat.code.copy": "Копировать код",
   "chat.visual.loadFailed": "Не удалось загрузить: {title}",
   "chat.visual.fullScreen": "Во весь экран",
+  "chat.visual.openInSidePanel": "Открыть в боковой панели",
   "chat.visual.exitFullScreen": "Выйти из полноэкранного режима",
   "chat.preview.switchLabel": "Предпросмотр или код",
   "chat.preview.code": "Код",

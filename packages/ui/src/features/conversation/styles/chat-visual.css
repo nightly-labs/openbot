@@ -109,31 +109,33 @@
   background: var(--openbot-bg-sidebar);
 }
 
-/* The expand button shows when the pointer or the focus is on the page. */
-:where(.ui-button).chat-visual-expand {
+/* The page buttons show when the pointer or the focus is on the page. */
+.chat-visual-actions {
   position: absolute;
   top: var(--openbot-space-2);
   inset-inline-end: var(--openbot-space-2);
+  display: flex;
+  gap: var(--openbot-space-1);
   opacity: 0;
   transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-.chat-visual-expand svg {
+.chat-visual-actions svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
 }
 
-.chat-visual-box:popover-open > .chat-visual-expand {
+.chat-visual-box:popover-open > .chat-visual-actions {
   display: none;
 }
 
-.chat-visual-box:hover > .chat-visual-expand,
-.chat-visual-box:focus-within > .chat-visual-expand {
+.chat-visual-box:hover > .chat-visual-actions,
+.chat-visual-box:focus-within > .chat-visual-actions {
   opacity: 1;
 }
 
 @media (hover: none) {
-  :where(.ui-button).chat-visual-expand {
+  .chat-visual-actions {
     opacity: 1;
   }
 }
