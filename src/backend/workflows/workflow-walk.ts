@@ -10,9 +10,10 @@
  * branch never leaves a run waiting.
  *
  * A join is a node with more than one edge from the nodes before it, apart from loop edges. When a
- * node before a join failed or was stopped, the join still runs on the other answers, and that node
- * keeps its place in the inputs with the reason it has no answer. So a step after a fan-out can see
- * that a branch is missing. An output posts its input, so it gets only the answers.
+ * node before a join failed or was stopped, the join still runs on the other answers. At a model or
+ * agent join, that node keeps its place in the inputs with the reason it has no answer, so the model
+ * can see that a branch is missing. The other steps get only the answers: an output posts its input,
+ * and a condition or an approval hands its input on to the nodes after it, outputs too.
  *
  * A loop edge (`workflowLoopEdges`) goes back to an earlier node. It does not hold that node back.
  * When it is active and newer than the node's own step, the node is due again with the loop edge's
@@ -148,9 +149,12 @@ export function soloInputs(
   return edgeInputs(kind, incoming(graph.edges).get(nodeId) ?? [], loops, answered);
 }
 
+/** The longest error that a missing answer quotes, so a long provider error costs few tokens. */
+const MISSING_ERROR_LIMIT = 300;
+
 /**
- * The inputs of a node by its edges, in edge order: the answer of each active edge, and at a join,
- * the reason for each node before it that failed or was stopped.
+ * The inputs of a node by its edges, in edge order: the answer of each active edge, and at a model
+ * or agent join, the reason for each node before it that failed or was stopped.
  */
 function edgeInputs(
   kind: WorkflowNode["kind"] | undefined,
@@ -158,7 +162,7 @@ function edgeInputs(
   loops: ReadonlySet<string>,
   latest: ReadonlyMap<string, StoredWorkflowStep>,
 ): string[] {
-  const join = kind !== "output" && edges.filter((edge) => !loops.has(edge.id)).length > 1;
+  const join = (kind === "llm" || kind === "agent") && edges.filter((edge) => !loops.has(edge.id)).length > 1;
   return edges.flatMap((edge) => {
     const source = latest.get(edge.from);
     if (!source) return [];
@@ -172,7 +176,9 @@ function missingAnswer(source: StoredWorkflowStep): string[] {
   if (source.status === "stopped") return ["No answer: this step was stopped."];
   if (source.status !== "failed") return [];
   const error = source.error?.trim();
-  return [error ? `No answer: this step failed. Error: ${error}` : "No answer: this step failed."];
+  if (!error) return ["No answer: this step failed."];
+  const quoted = error.length > MISSING_ERROR_LIMIT ? `${error.slice(0, MISSING_ERROR_LIMIT)}…` : error;
+  return [`No answer: this step failed. Error: ${quoted}`];
 }
 
 function edgeActive(edge: WorkflowEdge, source: StoredWorkflowStep): boolean {
