@@ -326,7 +326,8 @@ is one folder per plugin in [`marketplace/plugin-catalog/`](../../marketplace/pl
    names how the user connects:
    - `link`: a browser sign-in. OpenBot is the OAuth client (`McpOAuth` in
      [`mcp-oauth-provider.ts`](../../src/backend/mcp-oauth-provider.ts)): discovery, dynamic
-     registration, PKCE and refresh. The tokens stay in encrypted storage. No bridge program.
+     registration or a client metadata document, PKCE and refresh. The tokens stay in encrypted
+     storage. No bridge program.
    - `key`: one or two fields that go into a `header` (http) or an `env` value (stdio).
    - `local`: steps that the user does on the computer that runs the server.
 
@@ -357,11 +358,19 @@ only when the smoke passes for it:
 | `auth` | The server must |
 | --- | --- |
 | None | Answer `initialize` with no credential. |
-| `link` | Refuse `initialize` with a 401 and a `Bearer` challenge. Publish protected-resource metadata that names an authorization server. That server's metadata lists a `registration_endpoint`, `S256` in `code_challenge_methods_supported` and the `code` response type. Its endpoints use https and public addresses. |
+| `link` | Refuse `initialize` with a 401 and a `Bearer` challenge. Publish protected-resource metadata that names an authorization server. That server's metadata lists a `registration_endpoint` or sets `client_id_metadata_document_supported`, and lists `S256` in `code_challenge_methods_supported` and the `code` response type. Its endpoints use https and public addresses. |
 
-A `link` server with no `registration_endpoint` fails: each user would have to register a sign-in app
-first. Use a `key` flow for it, or leave it out. The smoke reads metadata only. It never registers a
-client and never sends a credential.
+A `link` server with neither fails: each user would have to register a sign-in app first. Use a `key`
+flow for it, or leave it out. The smoke reads metadata only. It never registers a client and never
+sends a credential.
+
+A server with no `registration_endpoint` that sets `client_id_metadata_document_supported` gets
+OpenBot's client metadata document (CIMD, SEP-991) as the `client_id`:
+`https://openbot.run/oauth/mcp-client.json`, which `apps/auth-api` serves
+([`mcp-client[.]json.ts`](../../apps/auth-api/src/routes/oauth/mcp-client%5B.%5Djson.ts)). Its
+`redirect_uris` are `http://127.0.0.1:28417/mcp-auth` and `openbot://mcp-auth`. A server that
+offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
+loopback address has another port, and a server that compares ports refuses it.
 
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the

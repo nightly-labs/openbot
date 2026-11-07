@@ -8,9 +8,9 @@
  * list. That belongs in the log, not in an error the user is asked to read.
  *
  * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
- * this app. So does a server this app configured - the user asked for it here, and the reason it
- * does not start is something only they can fix. `configuredNames` is what separates the two: a
- * server the user configured in their own provider files is still nobody's failure but theirs.
+ * this app. A server this app configured is an MCP line too. The caller finds that server and
+ * reports it as the server's failure, not the provider's: the user asked for it here, and only they
+ * can fix it.
  *
  * Grok's CLI also loads the servers in `~/.claude.json`, `~/.cursor/mcp.json` and `.mcp.json`. One
  * there that asks for OAuth ends its transport with the `rmcp` worker's own sentence,
@@ -19,10 +19,22 @@
  * error" toast (#1199). The worker's sentence is matched as it stands, because no other part of a
  * provider writes it.
  */
-export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
+export function isMcpSubsystemDiagnostic(message: string): boolean {
   if (/openbot/i.test(message)) return false;
-  if (configuredNames.some((name) => name && message.includes(name))) return false;
   return /\b(mcp|rmcp)\b|\bworker quit with (?:fatal|join error|reason):/i.test(message);
+}
+
+/**
+ * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
+ *
+ * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
+ * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. A bare `401` is
+ * not enough: a port, an id or a line number can be 401.
+ */
+export function isMcpSignInDiagnostic(message: string): boolean {
+  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot authenticated\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+    message,
+  );
 }
 
 /**

@@ -1,4 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -70,6 +71,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #decoder = new JsonLineDecoder();
   readonly #pending = new Map<RequestId, PendingRequest>();
   readonly #toolRequests = new Map<RequestId, { threadId: string; turnId: string; controller: AbortController }>();
+  /**
+   * The Codex id of each server request, by the id OpenBot gives it. Each process numbers its requests
+   * from 0, so its ids are not unique among the processes of other accounts or after a restart (#5465).
+   */
+  readonly #serverRequestIds = new Map<string, RequestId>();
   readonly #interruptedTurns = new Set<string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   /** The end of a process that failed. `stop` waits for it, because `#process` no longer holds it. */
@@ -97,6 +103,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     this.#stopping = false;
     this.#decoder = new JsonLineDecoder();
+    // An answer to a request of the previous process must not reach a request of this one.
+    this.#serverRequestIds.clear();
     const target = cliSpawnTarget(this.#executable, ["app-server", "--listen", "stdio://"]);
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
@@ -342,13 +350,21 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
-    this.#toolRequests.delete(id);
-    this.#write({ id, result });
+    const codexId = this.#takeServerRequestId(id);
+    if (codexId !== undefined) this.#write({ id: codexId, result });
   }
 
   respondError(id: RequestId, error: RpcError): void {
+    const codexId = this.#takeServerRequestId(id);
+    if (codexId !== undefined) this.#write({ id: codexId, error });
+  }
+
+  #takeServerRequestId(id: RequestId): RequestId | undefined {
     this.#toolRequests.delete(id);
-    this.#write({ id, error });
+    if (!isString(id)) return undefined;
+    const codexId = this.#serverRequestIds.get(id);
+    this.#serverRequestIds.delete(id);
+    return codexId;
   }
 
   #write(message: unknown): void {
@@ -361,6 +377,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #handleMessage(message: RpcMessage): void {
     if ("method" in message) {
       if ("id" in message) {
+        const id = randomUUID();
+        this.#serverRequestIds.set(id, message.id);
         let signal: AbortSignal | undefined;
         if (
           message.method === "item/tool/call" &&
@@ -369,21 +387,21 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           isString(message.params.turnId)
         ) {
           const controller = new AbortController();
-          this.#toolRequests.set(message.id, {
+          this.#toolRequests.set(id, {
             threadId: message.params.threadId,
             turnId: message.params.turnId,
             controller,
           });
           signal = controller.signal;
           if (this.#interruptedTurns.has(JSON.stringify([message.params.threadId, message.params.turnId]))) {
-            this.#toolRequests.delete(message.id);
+            this.#toolRequests.delete(id);
             controller.abort();
           }
         }
         this.emit("request", {
           ...(signal ? { signal } : {}),
           method: message.method,
-          id: message.id,
+          id,
           params: message.params,
         });
       } else {

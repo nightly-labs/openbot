@@ -154,6 +154,11 @@ export interface AgentExchangeSummary {
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
   /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
   expectsReply?: boolean;
+  /**
+   * The sender's side thread that sent an incoming message. The sender link opens it. The Team API
+   * does not carry it, so a joined client opens the sender's own chat.
+   */
+  senderTaskId?: string;
 }
 
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
@@ -178,7 +183,8 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
           (isNumber(delivery.position) && Number.isInteger(delivery.position) && delivery.position >= 1)) &&
         (delivery.error === null || isBoundedString(delivery.error, INPUT_LIMITS.messageText)),
     ) &&
-    (value.expectsReply === undefined || isBoolean(value.expectsReply))
+    (value.expectsReply === undefined || isBoolean(value.expectsReply)) &&
+    (value.senderTaskId === undefined || isIdentifier(value.senderTaskId))
   );
 }
 

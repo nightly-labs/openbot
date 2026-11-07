@@ -33,9 +33,10 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} bestaat al, dus deze kopie is opgeslagen als {saved}.",
   "error.import.fileSkipped": "{name}: het bestand {file} is overgeslagen. {reason}",
   "error.import.chooseZip": "Kies een .zip-bestand.",
-  "error.import.zipTooLarge": "De export moet een .zip van minder dan 500 MB zijn.",
+  "error.import.zipTooLarge": "De export moet een .zip van minder dan 2 GB zijn.",
   "error.import.unsafeFile": "De export bevat een onveilig bestand: {name}",
-  "error.import.expandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 500 MB en {limit} bestanden.",
+  "error.import.expandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 2 GB en {limit} bestanden.",
+  "error.import.remoteExpandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 500 MB en {limit} bestanden.",
   "error.import.zipInvalid":
     "Het gekozen bestand is geen geldige .zip. Als Grok Bot het nog opslaat, wacht dan en kies het opnieuw.",
   "error.import.empty": "De export is leeg.",

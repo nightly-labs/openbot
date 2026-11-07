@@ -247,6 +247,10 @@ export const messages = {
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。MCP 設定を開いて「サインイン」を選択してください。",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} は MCP サーバー {name} を起動できませんでした。MCP 設定を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":

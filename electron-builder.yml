@@ -30,6 +30,11 @@ files:
   - "!node_modules/@anthropic-ai/claude-agent-sdk-darwin-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-win32-*/**/*"
+  # The TypeScript source of Effect. Its package exports point only to `dist`.
+  - "!node_modules/effect/src/**/*"
+  # Nothing reads the source maps of the dependencies, and they were 150 MB of the 414 MB app.asar.
+  # A hosted server fetches the whole app.asar from its lazy disk before OpenBot can start.
+  - "!node_modules/**/*.map"
 asarUnpack:
   # The database host is loaded by path as a separate process, not required into the main bundle.
   - out/main/agent-database-host.js

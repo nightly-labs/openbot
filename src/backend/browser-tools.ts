@@ -252,7 +252,10 @@ const BROWSER_TOOL_DEFINITIONS = [
         .describe(
           "Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry.",
         ),
-      loginId: identifier
+      loginId: z
+        .string()
+        .min(1)
+        .max(INPUT_LIMITS.vaultLoginId)
         .optional()
         .describe(
           "For password or authenticator: the id of a saved login from list_logins. OpenBot fills its password or current code without asking the user.",

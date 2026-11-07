@@ -336,6 +336,7 @@ function chatActionMarker(
       messageId: message.exchange.messageId,
       replyToMessageId: message.exchange.replyToMessageId,
       expectsReply: message.exchange.expectsReply !== false,
+      ...(message.exchange.senderTaskId === undefined ? {} : { senderTaskId: message.exchange.senderTaskId }),
     };
   }
   if (isContextResetMarker(message)) return { kind: "context-reset", timestamp: message.createdAt };

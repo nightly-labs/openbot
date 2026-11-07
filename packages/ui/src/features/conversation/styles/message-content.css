@@ -609,6 +609,10 @@
   gap: 10px;
 }
 
+.message-show-full {
+  justify-self: start;
+}
+
 .message-content-resize {
   min-width: 0;
 }

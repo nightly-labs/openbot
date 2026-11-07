@@ -596,8 +596,8 @@ rules for new modules.
 Attach MP3 audio and MOV video through the file picker or drag and drop. The limits are 100 MB per
 file, 250 MB per message, and 10 files per message. OpenBot gives the agent the original file; it does
 not play, decode, transcribe, or validate the recording during import. Damaged recordings can be
-attached for inspection. Analysis depends on the tools available to the agent. For other audio or
-video formats, export as MP3, MOV, or MP4, or attach a text transcript. Remote hosts must advertise the
+attached for inspection. Analysis depends on the tools available to the agent. Other audio or video
+formats attach as files of other types do (see below). Remote hosts must advertise the
 `media-attachments` capability; update the host if this feature is unavailable.
 
 MP4 video uses the same limits and rules as MOV. Remote hosts must also advertise the
@@ -612,6 +612,12 @@ capability.
 SVG images use the same limits. The chat shows an SVG as an image, but the agent gets it as a file,
 not as an image: providers take only raster images, so the agent reads the SVG text. Open shows an SVG
 in the file manager. Remote hosts must advertise the `svg-attachments` capability.
+
+Files of all other types use the same limits, for example VPN profiles, certificates, and
+infrastructure configuration. OpenBot stores the file unchanged, with no preview, and the agent gets
+its path and reads it with its own tools. Open shows the file in the file manager. Remote hosts must
+advertise the `any-file-attachments` capability. An older host takes only the types above and its
+list of documents, text, data, and source files.
 
 ## Local data and network boundaries
 

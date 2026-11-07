@@ -1114,26 +1114,35 @@ export class HostService extends EventEmitter<HostEvents> {
       if (!gateway || !optionalRegisterRemoteHost || !optionalIssueRemoteHostTicket) {
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.webRtcNotConfigured")) });
       }
+      // The bridge window loads while the account server answers, and `gateway.start` uses that load.
+      // A failed load does not stop the start: `gateway.start` loads the window again.
+      yield* Effect.forkChild(gateway.prepare().pipe(Effect.ignore));
       yield* this.#registerRemoteHost(
         optionalRegisterRemoteHost,
         yield* remoteDecode(() => this.#requiredOwnerMemberId()),
         automatic,
       );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
-      if (this.#usesAccountDirectory() && optionalListRemoteMembers) {
-        yield* this.#memberWrites.withPermit(
-          Effect.flatMap(optionalListRemoteMembers(identity.serverId), (members) =>
-            this.#syncRemoteDirectory(identity.serverId, members),
-          ),
-        );
-        if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
-      }
+      const syncMembers =
+        this.#usesAccountDirectory() && optionalListRemoteMembers
+          ? this.#memberWrites.withPermit(
+              Effect.flatMap(optionalListRemoteMembers(identity.serverId), (members) =>
+                // A failed ticket request must not stop the sync between the member write and the
+                // session close.
+                this.#syncRemoteDirectory(identity.serverId, members).pipe(Effect.uninterruptible),
+              ),
+            )
+          : Effect.void;
       // The host peer meets its devices on its home Signal machine. Chat apps and webhooks stay on
-      // the entry Signal through their own tickets.
+      // the entry Signal through their own tickets. The ticket does not need the member list, so
+      // both requests go at the same time.
       const failedSignalUrl = this.#unreachedSignalUrl;
-      const bootstrap = yield* optionalIssueRemoteHostTicket(
-        identity.serverId,
-        failedSignalUrl === null ? {} : { failedSignalUrl },
+      const [, bootstrap] = yield* Effect.all(
+        [
+          syncMembers,
+          optionalIssueRemoteHostTicket(identity.serverId, failedSignalUrl === null ? {} : { failedSignalUrl }),
+        ],
+        { concurrency: 2 },
       );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       yield* gateway

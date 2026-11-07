@@ -10,6 +10,7 @@ import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { diskRestoreEnded, diskRestoring } from "../backend/disk-restore";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
@@ -246,6 +247,7 @@ import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
   type LocalServerChildEnvironment,
+  LocalServerMarketplace,
   LocalServerMembers,
   startLocalServerChild,
 } from "./local-server-child";
@@ -1486,8 +1488,15 @@ export async function createApplicationServices({
         .pipe(Effect.asVoid, toProviderRuntimeFailure);
     },
   });
+  // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
+  let updateCheckWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
-    runCauseEffect(providerRuntimes.stop()),
+    runCauseEffect(
+      Effect.gen(function* () {
+        if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        yield* providerRuntimes.stop();
+      }),
+    ),
   );
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await runCauseEffect(providerRuntimes.initialize());
@@ -2361,7 +2370,17 @@ export async function createApplicationServices({
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   // After the status forward, so the offer a check finds reaches the renderer.
   const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
-  providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  // A hosted server checks after its disk restore: the check reads and removes CLI versions, and the
+  // start of the server waits for its own files first.
+  if (diskRestoring()) {
+    updateCheckWait = Effect.runFork(
+      diskRestoreEnded.pipe(
+        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
+      ),
+    );
+  } else {
+    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  }
   if (appUpgraded)
     void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
       logger.warn("The provider CLI app version did not save.", toLogValue(error)),
@@ -2403,8 +2422,15 @@ export async function createApplicationServices({
   });
   // A grant changed on this computer must reach the phones and web clients that show it.
   approvalAutomation.subscribe(() => service.notifyAgentsChanged());
+  // A server on this computer has no account session: the desktop app makes the Marketplace reads that
+  // adding an agent needs.
+  const localServerMarketplace = new LocalServerMarketplace(
+    (line) => process.stdout.write(line),
+    (path) => centralAuth.resolveApiUrl(path),
+  );
+  const marketplaceAuth = localServerChild ? localServerMarketplace : centralAuth;
   const skills = new SkillMarketplaceService(
-    centralAuth,
+    marketplaceAuth,
     () => service.listAgents(),
     // Every skill change ends here: install, update, uninstall, turning one on or off, and a skill
     // an agent creates. The event reaches this computer's windows and the joined clients.
@@ -2414,7 +2440,7 @@ export async function createApplicationServices({
         .pipe(Effect.ensuring(Effect.sync(() => service.notifySkillsChanged(agentId)))),
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
-  const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
+  const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
   const agentTemplates = new AgentTemplateService(centralAuth, service, {
     listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
     installVersion: (input) => skills.installVersion(input),
@@ -3318,6 +3344,10 @@ export async function createApplicationServices({
                 Effect.catch((error) => (isHostNotOnAccount(error.cause) ? Effect.void : Effect.fail(error))),
                 toRemoteWorkflowError,
               ),
+            apiOrigin: new URL(centralAuth.resolveApiUrl("/")).origin,
+            requestAuthorized: (path, init) =>
+              centralAuth.requestAuthorized(path, init, (value) => value).pipe(toRemoteWorkflowError),
+            downloadAuthorized: (path) => centralAuth.downloadAuthorized(path).pipe(toRemoteWorkflowError),
           },
           log: {
             info: (message) => logger.info(message),
@@ -3371,6 +3401,7 @@ export async function createApplicationServices({
         host,
         writeReady: (line) => process.stdout.write(line),
         members: localServerMembers,
+        marketplace: localServerMarketplace,
         readCommands: (onLine) => {
           if (localServerControl) createInterface({ input: localServerControl }).on("line", onLine);
         },
@@ -3580,10 +3611,14 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
   const agentInitialization = new AgentInitializationGate((rosterLoaded) =>
     Effect.gen(function* () {
-      yield* Fiber.join(computerUseWarmUp);
-      yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
-      // A client's agent list waits only until here. The steps below do not change the roster.
-      yield* rosterLoaded;
+      // A client's agent list waits only until the agents are restored, not for the provider starts.
+      // The providers start after the computer-use warm-up: it decides whether the MCP entry is
+      // there, and a session made while it still probes would keep a command that it can stop.
+      yield* service.initialize({
+        heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)),
+        rosterLoaded,
+        beforeProviderStart: Fiber.join(computerUseWarmUp).pipe(Effect.asVoid),
+      });
       yield* eventsRuntime.start();
       yield* automation.sync();
       // Picks up the flows a restart stopped between one agent's answer and the next agent's message.

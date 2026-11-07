@@ -25,6 +25,7 @@ import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
@@ -50,6 +51,7 @@ import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
+import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { isIncomingAgentMessage } from "./conversation-read-state";
@@ -133,6 +135,7 @@ export function ConversationTimeline() {
     closeChatSearch,
     composerHasContent,
     copiedMessageId,
+    quotedMessageId,
     branchThread,
     dismissPendingSend,
     downloadMessageImageFile,
@@ -417,7 +420,13 @@ export function ConversationTimeline() {
             agents={props.agents}
             referencedMessage={quoted()}
             referencedAuthorName={quotedAuthorName()}
-            onSelectAgent={props.onSelectAgent}
+            // The sender's name opens the side thread that sent the message, or else the sender's own chat.
+            // Another agent, such as a mention in the text, opens as before.
+            onSelectAgent={(agentId) =>
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent(agentId)
+            }
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
@@ -1329,6 +1338,10 @@ export function ConversationTimeline() {
                           <ChatMessageRow
                             message={message() ?? initialMessage}
                             author={author()}
+                            showFull={
+                              chatSearchOpen() && chatSearchOpensMessage(message()?.body ?? "", chatSearchQuery())
+                            }
+                            open={quotedMessageId() === message()?.id && chatSearchCanOpen(message()?.body ?? "")}
                             showAuthor={
                               author().kind === "member" || (channel && author().kind === "agent")
                                 ? !continuesRun()

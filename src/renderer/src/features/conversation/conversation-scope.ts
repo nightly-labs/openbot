@@ -83,6 +83,12 @@ const READER_INPUT_WINDOW_MS = 250;
  */
 const handledSettingsRequests = new WeakSet<AgentSettingsRequest>();
 
+/**
+ * Message focus requests that a chat has already scrolled to. The request also stays set, so a chat that
+ * mounts again, after a channel or another page, must not scroll back to the message that was picked before.
+ */
+const handledMessageFocusRequests = new WeakSet<NonNullable<ConversationProps["messageFocusRequest"]>>();
+
 /** An http or https page that the built-in browser can show. A relayed sign-in page needs this computer's browser. */
 function builtInBrowserPage(url: string): boolean {
   const page = URL.parse(url);
@@ -1132,7 +1138,6 @@ export function createConversationViewScope(props: ConversationProps) {
   let stickToLatest = true;
   let lastConversationIdentity: string | undefined;
   let lastPanelAgentId: string | undefined;
-  let lastHandledMessageFocusNonce: number | undefined;
   const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest | undefined>(undefined);
   let lastRuntimeSettingsSignature: string | undefined;
   async function saveAgentPatch(
@@ -1402,7 +1407,7 @@ export function createConversationViewScope(props: ConversationProps) {
       messageIds: props.messages.map((message) => message.id).join("\u0000"),
     }),
     ({ request, agentId, loaded }) => {
-      if (!request || request.agentId !== agentId || !loaded || request.nonce === lastHandledMessageFocusNonce) return;
+      if (!request || request.agentId !== agentId || !loaded || handledMessageFocusRequests.has(request)) return;
       requestAnimationFrame(() => {
         // A message in a group of agent messages has no row of its own, so the group row is the target.
         const messageId = CSS.escape(request.messageId);
@@ -1410,7 +1415,7 @@ export function createConversationViewScope(props: ConversationProps) {
           `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
         );
         if (!target) return;
-        lastHandledMessageFocusNonce = request.nonce;
+        handledMessageFocusRequests.add(request);
         // The message the user picked replaces the opening at the unread divider.
         unreadOpening = { ...unreadOpening, pending: false, holding: false };
         stickToLatest = false;
@@ -1465,6 +1470,9 @@ export function createConversationViewScope(props: ConversationProps) {
     else moveThreadToPanel(id);
   }
 
+  /** The message that a quote jump opened. A long message draws only its start, and the passage can be later. */
+  const [quotedMessageId, setQuotedMessageId] = createSignal<string | null>(null);
+
   /** Scrolls to the passage that a quote points to and marks it. A file passage opens in the side panel. */
   function openQuote(messageId: string, text: string) {
     stopRevealingFileQuote();
@@ -1474,7 +1482,10 @@ export function createConversationViewScope(props: ConversationProps) {
       if (shown || openQuotedFile(file)) revealFileQuote(document, file, text);
       return;
     }
-    if (!showQuotedText(messageId, text)) void revealQuote(messageId, text);
+    setQuotedMessageId(messageId);
+    flush();
+    if (showQuotedText(messageId, text)) setQuotedMessageId(null);
+    else void revealQuote(messageId, text);
   }
 
   /* An attachment opens from its record, so it must be in a loaded message. */
@@ -1506,6 +1517,8 @@ export function createConversationViewScope(props: ConversationProps) {
     const agentId = props.agent?.id;
     const row = await replyJump.reveal(messageId, undefined, agentId);
     if (row && props.agent?.id === agentId) showQuotedText(messageId, text);
+    // The message stays open for the reader; a later jump to it must open it again.
+    setQuotedMessageId((current) => (current === messageId ? null : current));
   }
 
   function showQuotedText(messageId: string, text: string): boolean {
@@ -2212,6 +2225,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerFocusRequest,
     composerHasContent,
     copiedMessageId,
+    quotedMessageId,
     copyMessage,
     messageText,
     pasteFiles,

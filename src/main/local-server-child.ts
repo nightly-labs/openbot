@@ -15,12 +15,19 @@
  * The account directory needs an account session, which this process does not have. When it must read
  * its members, it writes a request line to stdout, and the desktop app writes the list to the control
  * pipe. After the desktop app changes a member, it writes the new list without a request.
+ *
+ * The Marketplace also needs an account session. To add an agent from a listing, this process writes
+ * each read to stdout, and the desktop app makes it with its own session and writes the answer to the
+ * control pipe (`LocalServerMarketplace`).
  */
 
+import { randomUUID } from "node:crypto";
 import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
 import type { Readable } from "node:stream";
+import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Schema, Semaphore } from "effect";
+import { CentralAuthOperationError } from "./central-auth-effects";
 import { decodeRemoteMembers, type RemoteMemberRecord } from "./central-auth-records";
 import type { HostService } from "./host-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
@@ -34,6 +41,10 @@ export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
 export const LOCAL_SERVER_MEMBERS_REQUEST = "OPENBOT_LOCAL_SERVER_REQUEST members";
 /** How long a read of the account directory waits for the parent's answer. */
 const LOCAL_SERVER_MEMBERS_TIMEOUT_MS = 30_000;
+/** The prefix of a stdout line that asks the parent for a Marketplace read. It holds no secret. */
+const LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX = "OPENBOT_LOCAL_SERVER_REQUEST marketplace ";
+/** How long a Marketplace read waits for the parent's answer: longer than the parent's 30 s download limit. */
+const LOCAL_SERVER_MARKETPLACE_TIMEOUT_MS = 60_000;
 
 /**
  * The pipe from the desktop app on Windows: there Electron replaces `process.stdin` with a stream that
@@ -98,6 +109,14 @@ const localServerCommandSchema = Schema.Union([
   Schema.Struct({ type: Schema.Literal("unpublish") }),
   Schema.Struct({ type: Schema.Literal("members"), members: Schema.Unknown }),
   Schema.Struct({ type: Schema.Literal("members-unavailable") }),
+  // The answer to one Marketplace read: `error` when it failed, else `bytes` (base64) for a file, else `value`.
+  Schema.Struct({
+    type: Schema.Literal("marketplace"),
+    id: Schema.String,
+    value: Schema.optional(Schema.Unknown),
+    bytes: Schema.optional(Schema.String),
+    error: Schema.optional(Schema.String),
+  }),
 ]);
 export type LocalServerCommand = typeof localServerCommandSchema.Type;
 type ParsedLocalServerCommand =
@@ -118,6 +137,28 @@ function parseLocalServerCommand(line: string): ParsedLocalServerCommand | null 
   try {
     const command = decodeLocalServerCommand(JSON.parse(line));
     return command.type === "members" ? { type: "members", members: decodeRemoteMembers(command) } : command;
+  } catch {
+    return null;
+  }
+}
+
+/** A Marketplace read that this process asks the parent to make with its account session. */
+const localServerMarketplaceRequestSchema = Schema.Struct({
+  id: Schema.String,
+  method: Schema.Literals(["GET", "POST"]),
+  path: Schema.String,
+  /** The bytes of a file, not a JSON answer. */
+  download: Schema.Boolean,
+  body: Schema.optional(Schema.String),
+});
+export type LocalServerMarketplaceRequest = typeof localServerMarketplaceRequestSchema.Type;
+const decodeLocalServerMarketplaceRequest = Schema.decodeUnknownSync(localServerMarketplaceRequestSchema);
+
+/** Null for a line that is not a Marketplace request. */
+export function parseLocalServerMarketplaceRequest(line: string): LocalServerMarketplaceRequest | null {
+  if (!line.startsWith(LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX)) return null;
+  try {
+    return decodeLocalServerMarketplaceRequest(JSON.parse(line.slice(LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX.length)));
   } catch {
     return null;
   }
@@ -172,6 +213,98 @@ export class LocalServerMembers {
   }
 }
 
+type LocalServerMarketplaceAnswer = Extract<LocalServerCommand, { type: "marketplace" }>;
+
+function requestFailed(): CentralAuthOperationError {
+  return new CentralAuthOperationError({ cause: new Error(sourceText("error.team.requestFailed")) });
+}
+
+/**
+ * The Marketplace reads of this server, which the parent makes with its account session: the listing
+ * of an agent to add, its avatar and skills, and the install counts. The parent refuses other reads.
+ * It has the shape of `CentralAuthManager` that the Marketplace services use.
+ */
+export class LocalServerMarketplace {
+  readonly #write: (line: string) => void;
+  readonly #resolveApiUrl: (path: string) => string;
+  readonly #pending = new Map<string, Deferred.Deferred<LocalServerMarketplaceAnswer, CentralAuthOperationError>>();
+
+  constructor(write: (line: string) => void, resolveApiUrl: (path: string) => string) {
+    this.#write = write;
+    this.#resolveApiUrl = resolveApiUrl;
+  }
+
+  resolveApiUrl(path: string): string {
+    return this.#resolveApiUrl(path);
+  }
+
+  requestAuthorized<T>(
+    path: string,
+    init: RequestInit,
+    decoder: (value: unknown) => T,
+  ): Effect.Effect<T, CentralAuthOperationError> {
+    return this.#ask(path, init, false).pipe(
+      Effect.flatMap((answer) =>
+        Effect.try({ try: () => decoder(answer.value), catch: (cause) => new CentralAuthOperationError({ cause }) }),
+      ),
+    );
+  }
+
+  downloadAuthorized(path: string): Effect.Effect<Uint8Array, CentralAuthOperationError> {
+    return this.#ask(path, { method: "GET" }, true).pipe(
+      Effect.flatMap((answer) =>
+        answer.bytes === undefined
+          ? Effect.fail(requestFailed())
+          : Effect.succeed(new Uint8Array(Buffer.from(answer.bytes, "base64"))),
+      ),
+    );
+  }
+
+  /** Gives the parent's answer to the read that waits for it. False when no read waits for it. */
+  answer(answer: LocalServerMarketplaceAnswer): boolean {
+    const pending = this.#pending.get(answer.id);
+    if (!pending) return false;
+    this.#pending.delete(answer.id);
+    Deferred.doneUnsafe(
+      pending,
+      answer.error === undefined
+        ? Exit.succeed(answer)
+        : Exit.fail(new CentralAuthOperationError({ cause: new Error(answer.error) })),
+    );
+    return true;
+  }
+
+  #ask(
+    path: string,
+    init: RequestInit,
+    download: boolean,
+  ): Effect.Effect<LocalServerMarketplaceAnswer, CentralAuthOperationError> {
+    return Effect.suspend(() => {
+      const method = init.method ?? "GET";
+      // The parent makes only GET and POST reads.
+      if (method !== "GET" && method !== "POST") return Effect.fail(requestFailed());
+      const id = randomUUID();
+      const pending = Deferred.makeUnsafe<LocalServerMarketplaceAnswer, CentralAuthOperationError>();
+      this.#pending.set(id, pending);
+      const request: LocalServerMarketplaceRequest = {
+        id,
+        method,
+        path,
+        download,
+        ...(typeof init.body === "string" ? { body: init.body } : {}),
+      };
+      this.#write(`${LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX}${JSON.stringify(request)}\n`);
+      return Deferred.await(pending).pipe(
+        Effect.timeoutOrElse({
+          duration: LOCAL_SERVER_MARKETPLACE_TIMEOUT_MS,
+          orElse: () => Effect.fail(requestFailed()),
+        }),
+        Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
+      );
+    });
+  }
+}
+
 /** How this server meets the owner's devices once the parent registered it. */
 interface LocalServerPublisher {
   publish(machineToken: string): Effect.Effect<void, RemoteWorkflowError>;
@@ -208,6 +341,8 @@ export interface StartLocalServerChildOptions {
   host: Pick<HostService, "startLoopbackOnly" | "applyAccountDirectory">;
   /** The reads of the account directory that wait for the parent. */
   members: Pick<LocalServerMembers, "answer">;
+  /** The Marketplace reads that wait for the parent. */
+  marketplace: Pick<LocalServerMarketplace, "answer">;
   writeReady: (line: string) => void;
   /** Calls `onLine` with each line of the control pipe. */
   readCommands: (onLine: (line: string) => void) => void;
@@ -228,6 +363,7 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   readCommands,
   publisher,
   members,
+  marketplace,
   warn,
 }: StartLocalServerChildOptions) {
   if (!teamStore.configured)
@@ -245,6 +381,10 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   readCommands((line) => {
     const command = parseLocalServerCommand(line);
     if (!command) return;
+    if (command.type === "marketplace") {
+      marketplace.answer(command);
+      return;
+    }
     if (command.type === "members-unavailable") {
       members.answer(null);
       return;

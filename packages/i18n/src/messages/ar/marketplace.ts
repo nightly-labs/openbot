@@ -239,6 +239,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
   "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
   "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
+  "marketplace.plugin.elevenlabs.tagline": "الكلام والأصوات ووكلاء الصوت",
+  "marketplace.plugin.elevenlabs.description":
+    "يتيح ElevenLabs للوكلاء تحويل النص إلى كلام، والعمل مع الأصوات، وإنشاء وكلاء صوت ElevenLabs واختبارهم ومراجعتهم ومراجعة محادثاتهم. يعود الصوت المُنشأ كرابط تنزيل صالح لمدة قصيرة. يسجّل كل مستخدم الدخول إلى حساب ElevenLabs الخاص به عبر المتصفح، وكل عملية إنشاء تستهلك أرصدة ذلك الحساب.",
+  "marketplace.plugin.elevenlabs.app":
+    "تحويل النص إلى كلام، والأصوات، وإدارة وكلاء الصوت، عبر خادم MCP من ElevenLabs مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.elevenlabs.prompt.speech": "اقرأ هذه الفقرة بصوت هادئ من ElevenLabs وأعطني الملف الصوتي.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "اعرض وكلاء الصوت لدي في ElevenLabs والصوت الذي يستخدمه كل واحد.",
+  "marketplace.plugin.elevenlabs.prompt.conversations": "لخّص آخر عشر محادثات لوكيل الصوت الخاص بالدعم.",
   "marketplace.plugin.appleApps.tagline": "البريد والتقويم والمزيد على جهاز Mac",
   "marketplace.plugin.appleApps.description":
     "تتيح Apple apps للوكلاء استخدام البريد والتقويم وجهات الاتصال والتذكيرات والملاحظات والرسائل وSafari على جهاز Mac هذا. تعمل على macOS فقط. يشغّل OpenBot mcp-icloud، وهو خادم مجتمعي لم تصنعه Apple ولا OpenBot. يتحكم الخادم في التطبيقات عبر AppleScript على هذا الحاسوب، ولا يحتاج إلى حساب ولا مفتاح. عند تثبيته، يمكن لـ OpenBot أن يطلب من macOS الوصول إلى كل هذه التطبيقات دفعة واحدة، مع طلب واحد لكل تطبيق. وإن لم تفعل، يسأل macOS في أول مرة يستخدم فيها وكيل أحد التطبيقات. لتغيير ذلك لاحقًا، افتح إعدادات النظام › الخصوصية والأمن › الأتمتة. يمكن للوكلاء إرسال البريد الإلكتروني ورسائل iMessage، وتغيير الأحداث وجهات الاتصال والتذكيرات أو حذفها، لذا راجع كل عملية كتابة قبل الموافقة عليها. ما تقرؤه الأدوات، مثل نص البريد الإلكتروني، يذهب إلى مزوّد نموذج الوكيل.",
@@ -360,6 +368,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "أرسل مسودة إعلان الإطلاق إلى قائمة الإصدار التجريبي.",
   "marketplace.plugin.resend.prompt.status": "هل وصل بريد الفاتورة إلى العميل؟",
   "marketplace.plugin.resend.prompt.template": "صُغ رسالة بريد لإعادة تعيين كلمة المرور للمسار الجديد.",
+  "marketplace.plugin.omnisend.tagline": "التسويق عبر البريد الإلكتروني والرسائل النصية",
+  "marketplace.plugin.omnisend.description":
+    "يتيح Omnisend للوكلاء قراءة تقارير الحملات والنماذج، والعثور على جهات الاتصال والشرائح، وإنشاء الحملات والأتمتة وقوالب البريد والنماذج والمنتجات وتعديلها. يسجّل كل مستخدم الدخول إلى حسابه في Omnisend عبر المتصفح ويختار مستوى الوصول في شاشة الموافقة. مع صلاحية الكتابة، يستطيع الوكلاء أيضًا إرسال الحملات وحذف البيانات. اختر الوصول للقراءة فقط إذا كان الوكلاء يحتاجون إلى التقارير فقط.",
+  "marketplace.plugin.omnisend.app":
+    "الحملات والأتمتة وجهات الاتصال والشرائح والنماذج والتقارير، عبر خادم MCP الخاص بـ Omnisend مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
+  "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
   "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
   "marketplace.plugin.composio.description":
     "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",
