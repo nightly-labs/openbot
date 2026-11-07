@@ -101,7 +101,7 @@ export const messages = {
     "Bir mesajın yanında Tepki ver, Yanıtla ve Daha fazla seçeneklerini, mesajların arasında da saati gösterir. Kapalıyken tüm işlemler ve saat her mesajın altında görünür.",
   "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
   "settings.busyMessage.description":
-    "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. ChatGPT ve Claude ile çalışır.",
+    "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. Bunu desteklemeyen ajanlarda kuyrukta bekler.",
   "settings.agentDefaults.title": "Varsayılanlar",
   "settings.agentDefaults.description": "Bir ajan için değiştirmediğiniz sürece ajanlar bu varsayılanları izler.",
   "settings.agentDefaults.value": "Varsayılan: {value}",

@@ -99,7 +99,7 @@ export const messages = {
     "הצגת תגובה, מענה ועוד לצד הודעה, ואת השעה בין הודעות. כשההגדרה כבויה, כל הפעולות והשעה מוצגות מתחת לכל הודעה.",
   "settings.busyMessage.title": "הכוונת סוכנים בזמן שהם עובדים",
   "settings.busyMessage.description":
-    "הודעות חדשות מצטרפות לעבודה הנוכחית של הסוכן ולא לתור. עובד עם ChatGPT ועם Claude.",
+    "הודעות חדשות מצטרפות לעבודה הנוכחית של הסוכן ולא לתור. בסוכנים שלא תומכים בזה, ההודעות ממתינות בתור.",
   "settings.agentDefaults.title": "ברירות מחדל",
   "settings.agentDefaults.description": "הסוכנים פועלים לפי ברירות המחדל האלה, אלא אם משנים אותן לסוכן.",
   "settings.agentDefaults.value": "ברירת מחדל: {value}",

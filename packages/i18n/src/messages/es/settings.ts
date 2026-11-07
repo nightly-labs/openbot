@@ -103,7 +103,7 @@ export const messages = {
     "Muestra Reaccionar, Responder y Más junto a un mensaje, y la hora entre los mensajes. Si está desactivado, todas las acciones y la hora se muestran debajo de cada mensaje.",
   "settings.busyMessage.title": "Orientar a los agentes mientras trabajan",
   "settings.busyMessage.description":
-    "Los mensajes nuevos se incorporan al trabajo actual del agente, no a la cola. Funciona con ChatGPT y Claude.",
+    "Los mensajes nuevos se incorporan al trabajo actual del agente, no a la cola. Con los agentes que no lo admiten, esperan en la cola.",
   "settings.agentDefaults.title": "Predeterminados",
   "settings.agentDefaults.description": "Los agentes siguen estos valores, salvo que los cambies para un agente.",
   "settings.agentDefaults.value": "Predeterminado: {value}",
