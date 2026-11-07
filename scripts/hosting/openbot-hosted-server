@@ -13,16 +13,29 @@ umask 077
 # each of its processes at the same time. An Xvfb that stops first ends OpenBot before it closes its
 # database. So this gives the signal to OpenBot only and waits for it; the unit then stops the rest.
 if [ "${1:-}" = --stop ]; then
-  pid=$(cat "$XDG_RUNTIME_DIR/openbot.pid" 2>/dev/null) || exit 0
+  pid=$(cat "$XDG_RUNTIME_DIR/openbot.pid" 2>/dev/null) || pid=""
   # The PID is still OpenBot when it is a process named openbot in the cgroup of this unit, as this
   # script is. Do not compare /proc/$pid/exe with /opt/OpenBot/app/openbot: after a resume, OpenBot
   # starts from the FUSE mount of /opt, and when boat moves /opt back to the disk, the two are
   # different files. The stop then sent no signal, and OpenBot ended with its database open.
-  [[ $pid =~ ^[1-9][0-9]*$ ]] || exit 0
-  [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = openbot ] || exit 0
-  [ "$(cat "/proc/$pid/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup)" ] || exit 0
-  kill -TERM "$pid" 2>/dev/null || exit 0
-  while [ -e "/proc/$pid" ]; do sleep 0.2; done
+  if [[ $pid =~ ^[1-9][0-9]*$ ]] &&
+    [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = openbot ] &&
+    [ "$(cat "/proc/$pid/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup)" ] &&
+    kill -TERM "$pid" 2>/dev/null; then
+    while [ -e "/proc/$pid" ]; do sleep 0.2; done
+  fi
+  # Then wait at most 10 s for the main process (dbus-run-session). When OpenBot exits, xvfb-run
+  # stops its display and runs `xauth remove`, which locks ~/.Xauthority with ~/.Xauthority-c. The
+  # unit sends its stop signal to the remaining processes when this script ends. An xauth that
+  # stopped with the lock held left the lock file, and each later start of xvfb-run then failed.
+  main=${MAINPID:-}
+  if [[ $main =~ ^[1-9][0-9]*$ ]]; then
+    for _ in $(seq 1 50); do
+      # A process that exited stays a zombie (state Z) until systemd collects it.
+      grep -qs '^State:[[:space:]]*[^Z[:space:]]' "/proc/$main/status" || break
+      sleep 0.2
+    done
+  fi
   exit 0
 fi
 state="$HOME/.config/openbot-hosted"
@@ -143,6 +156,14 @@ export GNOME_KEYRING_CONTROL
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret)
 if [ "$mode" = hosted ]; then
+  # xauth locks ~/.Xauthority with ~/.Xauthority-c and ~/.Xauthority-l, and it does not remove a
+  # lock that a stopped xauth left. xvfb-run then waits 20 to 40 s for xauth and exits with
+  # status 1 at each start, and the unit starts again and again. An xauth holds the lock only while
+  # it writes, so with no xauth of this user, a lock file is stale. pgrep returns 1 only when it
+  # finds no process.
+  search=0
+  pgrep -u "$(id -u)" -x xauth >/dev/null 2>&1 || search=$?
+  if [ "$search" -eq 1 ]; then rm -f "$HOME/.Xauthority-c" "$HOME/.Xauthority-l"; fi
   for _ in $(seq 1 60); do
     if DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority" xdpyinfo >/dev/null 2>&1; then
       export OPENBOT_AGENT_DISPLAY=:0
