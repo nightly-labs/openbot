@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grigio",
   "settings.logoColor.white": "Bianco",
+  "settings.chatBackground.title": "Sfondo della chat",
+  "settings.chatBackground.description":
+    "Ogni tema mantiene il proprio colore. Un colore che rende il testo difficile da leggere diventa più scuro o più chiaro.",
+  "settings.chatBackground.light": "Sfondo della chat nel tema Chiaro",
+  "settings.chatBackground.dark": "Sfondo della chat nel tema Scuro",
+  "settings.chatBackground.default": "Predefinito",
   "settings.chatColor.title": "Colore della chat",
   "settings.chatColor.description": "Colora le bolle dei tuoi messaggi. Anche le persone sui tuoi server lo vedono.",
   "settings.chatColor.yours": "Il tuo colore della chat",

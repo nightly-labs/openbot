@@ -17,6 +17,8 @@ let current: AppAppearancePreference = {
   transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
   palette: null,
   palettes: [],
+  chatBackgroundLight: null,
+  chatBackgroundDark: null,
 };
 const listeners = new Set<() => void>();
 

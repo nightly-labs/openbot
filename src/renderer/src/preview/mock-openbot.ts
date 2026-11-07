@@ -498,6 +498,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
     palette: null,
     palettes: [],
+    chatBackgroundLight: null,
+    chatBackgroundDark: null,
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
