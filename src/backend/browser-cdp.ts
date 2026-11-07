@@ -787,7 +787,7 @@ export class BrowserCdpEngine {
             { concurrency: "unbounded" },
           );
         let [metrics, [parsed, focus], challenge, settle] = yield* Effect.all(
-          [send("Page.getLayoutMetrics"), collect(), detectChallenge(this.#contents), probeSettle(send)],
+          [send("Page.getLayoutMetrics"), collect(), detectChallenge(this.#contents, send), probeSettle(send)],
           { concurrency: "unbounded" },
         );
         // A page that still shows loading placeholders, or a new page with no controls yet, would

@@ -2,9 +2,7 @@ import type { BrowserChallenge } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Option } from "effect";
 import type { WebContents } from "electron";
-
-/** The isolated world of the challenge check. The page cannot change what it reads. */
-const CHALLENGE_WORLD = 1_020;
+import { automationContextId, type SendCommand } from "./browser-cdp-values";
 
 /** How long a snapshot waits for a check that clears by itself, such as a Cloudflare interstitial. */
 export const CHALLENGE_WAIT_MS = 15_000;
@@ -95,14 +93,23 @@ function readChallenge(value: unknown): DetectedChallenge | null {
   return { vendor: value.vendor, kind, signal: value.signal };
 }
 
-/** Reads the main frame for a bot check. A failure or a non-web page gives `null`. */
-export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (contents: WebContents) {
+/**
+ * Reads the main frame for a bot check in the isolated automation world, so the page cannot change
+ * what it reads. It uses CDP like the snapshot: on Linux, `executeJavaScriptInIsolatedWorld` does not
+ * return for a document whose navigation was stopped. A failure or a non-web page gives `null`.
+ */
+export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (
+  contents: WebContents,
+  send: SendCommand,
+) {
   if (contents.isDestroyed()) return null;
   const url = contents.getURL();
   if (!url.startsWith("https://") && !url.startsWith("http://")) return null;
-  return yield* Effect.tryPromise(() =>
-    contents.executeJavaScriptInIsolatedWorld(CHALLENGE_WORLD, [{ code: CHALLENGE_SCRIPT }]),
-  ).pipe(
+  return yield* Effect.gen(function* () {
+    const contextId = yield* automationContextId(send);
+    const result = yield* send("Runtime.evaluate", { expression: CHALLENGE_SCRIPT, contextId, returnByValue: true });
+    return isDynamicRecord(result.result) ? result.result.value : undefined;
+  }).pipe(
     Effect.map(readChallenge),
     Effect.timeoutOption(CHECK_TIMEOUT_MS),
     Effect.map((option) => Option.getOrNull(option)),
