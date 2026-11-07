@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "現在のアクティビティ",
   "chat.steps.show": "ステップを表示",
   "chat.steps.hide": "ステップを隠す",
+  "chat.steps.showError": "エラーを表示",
+  "chat.steps.hideError": "エラーを隠す",
   "chat.steps.list": "エージェントのステップ",
   "chat.steps.count": { other: "{count} ステップ" },
   "chat.steps.failed": { other: "{count} 件失敗" },

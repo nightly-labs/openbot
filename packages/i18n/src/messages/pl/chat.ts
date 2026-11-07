@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Bieżąca aktywność",
   "chat.steps.show": "Pokaż kroki",
   "chat.steps.hide": "Ukryj kroki",
+  "chat.steps.showError": "Pokaż błąd",
+  "chat.steps.hideError": "Ukryj błąd",
   "chat.steps.list": "Kroki agenta",
   "chat.steps.count": { one: "{count} krok", few: "{count} kroki", many: "{count} kroków", other: "{count} kroku" },
   "chat.steps.failed": {

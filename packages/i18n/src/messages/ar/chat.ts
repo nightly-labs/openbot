@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "النشاط الحالي",
   "chat.steps.show": "إظهار الخطوات",
   "chat.steps.hide": "إخفاء الخطوات",
+  "chat.steps.showError": "إظهار الخطأ",
+  "chat.steps.hideError": "إخفاء الخطأ",
   "chat.steps.list": "خطوات الوكيل",
   "chat.steps.count": {
     zero: "لا خطوات",

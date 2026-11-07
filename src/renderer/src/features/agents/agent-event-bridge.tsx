@@ -197,7 +197,9 @@ export function AgentEventBridge() {
             ...(event.activity ? { activity: event.activity } : {}),
           },
         }));
-        setTurnStepLines((current) => appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail)));
+        setTurnStepLines((current) =>
+          appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail), event.error),
+        );
         return;
       case "queue-changed":
         queueSnapshotRequests.set(event.snapshot.agentId, (queueSnapshotRequests.get(event.snapshot.agentId) ?? 0) + 1);

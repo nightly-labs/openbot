@@ -13,6 +13,12 @@ const LOCAL_IDENTITY_KEYS = [
   "SKILLS_ADMIN_TOKEN",
 ] as const;
 
+/**
+ * Manual harness tests read these with `dotenvx run`. Provider CLIs read them from the environment
+ * too, so the dev stack must not pass them on: a dev thread would spend the shared token budget.
+ */
+const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY"]);
+
 export function withoutDecryptionKeys(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("DOTENV_")));
 }
@@ -23,11 +29,12 @@ export async function loadSharedDevelopmentEnvironment(
 ): Promise<Record<string, string>> {
   const privateKey = environment.DOTENV_PRIVATE_KEY_DEV;
   if (!privateKey?.trim()) return {};
-  return decryptEnvironment(
+  const values = await decryptEnvironment(
     join(projectRoot, "apps/auth-api/.env.dev"),
     { DOTENV_PRIVATE_KEY_DEV: privateKey },
     "Cannot decrypt shared development settings. Check the development key.",
   );
+  return Object.fromEntries(Object.entries(values).filter(([key]) => !MANUAL_TEST_KEYS.has(key)));
 }
 
 async function decryptEnvironment(

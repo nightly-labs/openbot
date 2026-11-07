@@ -1751,7 +1751,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const call = turn.toolCalls.get(toolCallId);
         if (!call) continue;
         turn.toolCalls.delete(toolCallId);
-        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError);
+        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError ? text : null);
       }
       return;
     }
@@ -1875,14 +1875,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  /** `failed` is the tool result's `is_error`, such as a shell command with a non-zero exit. */
+  /**
+   * `failure` is the text of a tool result with `is_error`, such as a shell command with a non-zero
+   * exit. The agent service redacts it before it shows it.
+   */
   #emitToolCall(
     runtime: ThreadRuntime,
     id: string,
     name: string,
     completed: boolean,
     input?: unknown,
-    failed = false,
+    failure: string | null = null,
   ): void {
     const turn = runtime.activeTurn;
     if (!turn) return;
@@ -1908,7 +1911,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           id,
           type: "toolCall",
           name,
-          status: completed ? (failed ? "failed" : "completed") : "in_progress",
+          status: completed ? (failure === null ? "completed" : "failed") : "in_progress",
+          ...(completed && failure ? { error: failureEnds(failure) } : {}),
           // The skill that a `Skill` call loads, for the turn's activity line.
           ...(name === "Skill" && isRecord(input) && typeof input.skill === "string"
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }
@@ -2704,6 +2708,16 @@ function threadConfigKey(config: ThreadConfig, withModel: boolean): string {
     effort: withModel ? (config.effort ?? null) : null,
   };
   return JSON.stringify(Object.entries(fields).sort(([a], [b]) => (a < b ? -1 : 1)));
+}
+
+/**
+ * A tool error of a size that an item can hold. It keeps both ends: a command's error is at the end,
+ * another tool's at the start. The cut is in the middle, far from the text that the step shows, so a
+ * secret that it divides cannot show there.
+ */
+function failureEnds(text: string): string {
+  const half = Math.floor(INPUT_LIMITS.messageText / 2);
+  return text.length <= INPUT_LIMITS.messageText ? text : `${text.slice(0, half)}\n…\n${text.slice(-half)}`;
 }
 
 function parseAuthStatus(stdout: unknown): DynamicRecord | null {

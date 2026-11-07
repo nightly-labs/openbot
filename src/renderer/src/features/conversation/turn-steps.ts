@@ -20,6 +20,7 @@ function sameSteps(left: readonly AgentStep[], right: readonly AgentStep[]): boo
       const other = right[index];
       if (other?.id !== step.id || other.kind !== step.kind) return false;
       if (step.kind === "memory" && other.kind === "memory" && other.change.action !== step.change.action) return false;
+      if (step.kind === "progress" && other.kind === "progress" && other.error !== step.error) return false;
       return stepText(other) === stepText(step);
     })
   );
@@ -107,6 +108,7 @@ function storedSpans(
       const subagent = subagentTitles.get(step.id);
       const command = step.command?.trim().split("\n", 1)[0];
       const span: TraceSpan = { id, parentId: "turn", name: labels.progress(text), kind: "tool", failed, start, end };
+      if (failed && step.error) span.error = step.error;
       if (step.recipientAgentIds?.length) {
         span.kind = "handoff";
         span.name = labels.message(labels.agentNames(step.recipientAgentIds));
@@ -150,7 +152,20 @@ function guessedSpans(timed: readonly TimedStep[], lastEnd: number, labels: Trac
         end,
       });
     } else if (step.kind === "progress") {
-      spans.push({ id: step.id, parentId: "turn", name: labels.progress(step.text), kind: "tool", start: at, end });
+      const span: TraceSpan = {
+        id: step.id,
+        parentId: "turn",
+        name: labels.progress(step.text),
+        kind: "tool",
+        start: at,
+        end,
+      };
+      // Only a failed tool step has an error.
+      if (step.error) {
+        span.failed = true;
+        span.error = step.error;
+      }
+      spans.push(span);
     }
   }
   return spans;
@@ -229,7 +244,7 @@ export function createTurnSteps(deps: {
     }
     const lines = deps.lines()?.[turnId] ?? [];
     for (const line of lines) {
-      timed.push({ step: { id: line.id, kind: "progress", text: line.text }, at: line.at });
+      timed.push({ step: { id: line.id, kind: "progress", text: line.text, error: line.error }, at: line.at });
     }
     // After a restart the progress lines are gone. The stored trace keeps the text and start of each
     // tool step, so the turn keeps its steps.
@@ -237,7 +252,10 @@ export function createTurnSteps(deps: {
       for (const step of sources().traces.get(turnId)?.steps ?? []) {
         const at = Date.parse(step.startedAt);
         if (step.kind !== "tool" || !step.text?.trim() || !Number.isFinite(at)) continue;
-        timed.push({ step: { id: `${turnId}:trace:${step.id}`, kind: "progress", text: step.text }, at });
+        timed.push({
+          step: { id: `${turnId}:trace:${step.id}`, kind: "progress", text: step.text, error: step.error },
+          at,
+        });
       }
     }
     // A stable sort keeps the thoughts in their order when they share a time.
