@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "הפעילות הנוכחית",
   "chat.steps.show": "הצגת השלבים",
   "chat.steps.hide": "הסתרת השלבים",
+  "chat.steps.showError": "הצגת השגיאה",
+  "chat.steps.hideError": "הסתרת השגיאה",
   "chat.steps.list": "שלבי הסוכן",
   "chat.steps.count": { one: "שלב אחד", two: "שני שלבים", other: "{count} שלבים" },
   "chat.steps.failed": { one: "אחד נכשל", two: "שניים נכשלו", other: "{count} נכשלו" },

@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Geçerli etkinlik",
   "chat.steps.show": "Adımları göster",
   "chat.steps.hide": "Adımları gizle",
+  "chat.steps.showError": "Hatayı göster",
+  "chat.steps.hideError": "Hatayı gizle",
   "chat.steps.list": "Ajan adımları",
   "chat.steps.count": { one: "{count} adım", other: "{count} adım" },
   "chat.steps.failed": { one: "{count} başarısız", other: "{count} başarısız" },

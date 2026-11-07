@@ -117,6 +117,13 @@ respond.
 A provider turn uses the signed-in subscription. Send model turns only
 when the feature needs them, and keep the prompts short.
 
+For a harness test with an API key, use the Inception Labs key
+`INCEPTION_API_KEY` in `apps/auth-api/.env.dev` (OpenAI-compatible,
+`https://api.inceptionlabs.ai/v1`, models such as `mercury-3`). Load it with
+`bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <main checkout>/.env.keys -- <command>`.
+Never print it. The token budget is small: ask the user before a benchmark
+or a run of many turns.
+
 ## Step 4 — Clean up
 
 - Stop each stack you started with `bun run dev:stop`. Leave a stack that
