@@ -34,6 +34,7 @@ import {
   FILE_TYPE_FILTERS,
   type FileQuery,
   type FileSort,
+  type FileTypeFilter,
   fileCountLabel,
   fileDayLabel,
   fileTypeCounts,
@@ -115,22 +116,15 @@ export function FileList(props: FileListProps) {
     <section class="file-list" data-compact={props.compact ? "true" : undefined} aria-label={props.label}>
       <Show when={!props.query}>
         <div class="file-list-toolbar">
-          <div class="file-list-search">
-            <Search class="file-list-search-icon" aria-hidden="true" />
-            <Input
-              type="search"
-              size="sm"
-              class="file-list-search-input"
-              placeholder={t("files.list.search")}
-              aria-label={t("files.list.search")}
-              value={ownQuery.search}
-              onValueChange={(value) =>
-                setQuery((draft) => {
-                  draft.search = value;
-                })
-              }
-            />
-          </div>
+          <FileSearch
+            label={t("files.list.search")}
+            value={ownQuery.search}
+            onChange={(value) =>
+              setQuery((draft) => {
+                draft.search = value;
+              })
+            }
+          />
           <Select<FileSort>
             options={FILE_SORTS.map((sort) => sort.value)}
             value={ownQuery.sort}
@@ -154,28 +148,15 @@ export function FileList(props: FileListProps) {
             <SelectContent />
           </Select>
         </div>
-        <fieldset class="file-list-filters" aria-label={t("files.list.type")}>
-          <For each={FILE_TYPE_FILTERS.filter((filter) => filter.value === "all" || counts()[filter.value] > 0)}>
-            {(filter) => (
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                class="file-list-filter"
-                aria-pressed={ownQuery.type === filter.value ? "true" : "false"}
-                data-cuelume-tap="select"
-                onClick={() =>
-                  setQuery((draft) => {
-                    draft.type = filter.value;
-                  })
-                }
-              >
-                {t(filter.label)}
-                <span class="file-list-filter-count">{counts()[filter.value]}</span>
-              </Button>
-            )}
-          </For>
-        </fieldset>
+        <FileTypeFilters
+          counts={counts()}
+          value={ownQuery.type}
+          onChange={(type) =>
+            setQuery((draft) => {
+              draft.type = type;
+            })
+          }
+        />
       </Show>
 
       <FileListStatus
@@ -254,6 +235,53 @@ export function FileList(props: FileListProps) {
 }
 
 /** The loading, error and empty states of a file list. The children show when there are files. */
+/** The search box of a file list. */
+export function FileSearch(props: { label: string; value: string; onChange: (value: string) => void; class?: string }) {
+  return (
+    <div class={props.class ? `file-list-search ${props.class}` : "file-list-search"}>
+      <Search class="file-list-search-icon" aria-hidden="true" />
+      <Input
+        type="search"
+        size="sm"
+        class="file-list-search-input"
+        placeholder={props.label}
+        aria-label={props.label}
+        value={props.value}
+        onValueChange={props.onChange}
+      />
+    </div>
+  );
+}
+
+/** One chip for each file type that has files, with its count. "All" always shows. */
+export function FileTypeFilters(props: {
+  counts: Record<FileTypeFilter, number>;
+  value: FileTypeFilter;
+  onChange: (type: FileTypeFilter) => void;
+}) {
+  const { t } = useText();
+  return (
+    <fieldset class="file-list-filters" aria-label={t("files.list.type")}>
+      <For each={FILE_TYPE_FILTERS.filter((filter) => filter.value === "all" || props.counts[filter.value] > 0)}>
+        {(filter) => (
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            class="file-list-filter"
+            aria-pressed={props.value === filter.value ? "true" : "false"}
+            data-cuelume-tap="select"
+            onClick={() => props.onChange(filter.value)}
+          >
+            {t(filter.label)}
+            <span class="file-list-filter-count">{props.counts[filter.value]}</span>
+          </Button>
+        )}
+      </For>
+    </fieldset>
+  );
+}
+
 export function FileListStatus(props: {
   loading?: boolean | undefined;
   error?: string | null | undefined;

@@ -1004,6 +1004,8 @@
   display: block;
   width: 100%;
   height: auto;
+  /* A square until the picture loads, so a picture below the fold does not load at once. */
+  aspect-ratio: auto 1 / 1;
 }
 
 .ui-button.library-file-card {

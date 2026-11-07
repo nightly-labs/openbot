@@ -4,16 +4,16 @@ import type { AgentProfile } from "@openbot/ui/data";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { LibraryPage } from "@openbot/ui/features/files/LibraryPage";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, flush, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
+import { createSignal, flush, Loading, lazy, onCleanup, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { toAgentProfile } from "../../app-message-projection";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
 import { useServers } from "../servers/servers-context";
 import { filesPort } from "./files-port";
-import { canManageStorage, createStorageUsage } from "./storage-usage";
+import { canManageStorage, createServerAgents, createStorageUsage } from "./storage-usage";
+import { escapeClosesViewer } from "./viewer-escape";
 
 const FilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
@@ -37,30 +37,13 @@ export function LibraryPanel(props: { serverId: string }) {
   const navigation = useNavigation();
   const platform = usePlatform();
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), filesPort);
-  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
+  const agents = createServerAgents(() => props.serverId);
   const [viewing, setViewing] = createSignal<Viewing | null>(null);
   const canDelete = () => {
     const server = servers().find((candidate) => candidate.id === props.serverId);
     return server ? canManageStorage(server) : false;
   };
   const macWindowControls = () => platform.appInfo()?.platform === "darwin";
-
-  createEffect(
-    () => props.serverId,
-    (serverId) => {
-      let current = true;
-      untrack(filesPort)
-        .agent.listAgents(serverId)
-        .then((list) => {
-          if (current) setAgents(list.map(toAgentProfile));
-        })
-        // Without names the cards still show their chats; the storage read reports its own failure.
-        .catch(() => undefined);
-      return () => {
-        current = false;
-      };
-    },
-  );
 
   function showInChat(file: StoredFileRow): void {
     if (file.agentId && file.messageId) navigation.selectGlobalSearchMessage(file.agentId, file.messageId);
@@ -75,7 +58,9 @@ export function LibraryPanel(props: { serverId: string }) {
     try {
       const preview = await attachmentFilePreview(file);
       if (preview.previewKind === "none") return act(file, "open");
-      setViewing({ file, preview, origin });
+      // A list row gives no origin. The row that has focus opened the file.
+      const focused = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+      setViewing({ file, preview, origin: origin ?? focused });
     } catch (error) {
       actionToast.error(t("files.storage.openFailed", { name: file.name }), {
         description: errorMessage(error, t("files.storage.tryAgain")),
@@ -123,7 +108,7 @@ function LibraryViewer(props: {
 }) {
   const platform = usePlatform();
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && !event.defaultPrevented) props.onClose();
+    if (escapeClosesViewer(event)) props.onClose();
   };
   document.addEventListener("keydown", onKeyDown);
   onCleanup(() => document.removeEventListener("keydown", onKeyDown));

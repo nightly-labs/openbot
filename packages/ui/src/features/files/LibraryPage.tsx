@@ -1,13 +1,12 @@
-import { Button, Input, LayoutGrid, List, Search } from "@openbot/ui";
+import { Button, LayoutGrid, List } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { fileBadge } from "../conversation/AttachmentCards";
 import { attachmentReferenceBadge, attachmentReferenceTone } from "../conversation/AttachmentReference";
 import { ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "../conversation/ImageLightbox";
-import { FileDeleteDialog, FileList, FileListStatus, FileRowMenu } from "./FileList";
+import { FileDeleteDialog, FileList, FileListStatus, FileRowMenu, FileSearch, FileTypeFilters } from "./FileList";
 import {
-  FILE_TYPE_FILTERS,
   type FileTypeFilter,
   fileTypeCounts,
   queryFiles,
@@ -112,39 +111,11 @@ export function LibraryPage(props: LibraryPageProps) {
               <List aria-hidden="true" />
             </Button>
           </fieldset>
-          <div class="file-list-search library-search">
-            <Search class="file-list-search-icon" aria-hidden="true" />
-            <Input
-              type="search"
-              size="sm"
-              class="file-list-search-input"
-              placeholder={t("files.library.search")}
-              aria-label={t("files.library.search")}
-              value={search()}
-              onValueChange={setSearch}
-            />
-          </div>
+          <FileSearch class="library-search" label={t("files.library.search")} value={search()} onChange={setSearch} />
         </div>
       </header>
       <FileListStatus loading={props.loading} error={props.error} onRetry={props.onRetry} empty={files().length === 0}>
-        <fieldset class="file-list-filters" aria-label={t("files.list.type")}>
-          <For each={FILE_TYPE_FILTERS.filter((filter) => filter.value === "all" || counts()[filter.value] > 0)}>
-            {(filter) => (
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                class="file-list-filter"
-                aria-pressed={type() === filter.value ? "true" : "false"}
-                data-cuelume-tap="select"
-                onClick={() => setType(filter.value)}
-              >
-                {t(filter.label)}
-                <span class="file-list-filter-count">{counts()[filter.value]}</span>
-              </Button>
-            )}
-          </For>
-        </fieldset>
+        <FileTypeFilters counts={counts()} value={type()} onChange={setType} />
         <Show
           when={shown().length > 0}
           fallback={
@@ -178,52 +149,59 @@ export function LibraryPage(props: LibraryPageProps) {
           >
             <ul class="library-grid">
               <For each={shown()} keyed={(file) => file.id}>
-                {(file) => (
-                  <li class="library-tile" data-kind={isPicture(file()) ? "image" : "file"}>
-                    <Show
-                      when={isPicture(file())}
-                      fallback={
+                {(file) => {
+                  // The key is the id, so the tile keeps it until the tile goes.
+                  const id = untrack(() => file().id);
+                  onCleanup(() => thumbnails.delete(id));
+                  return (
+                    <li class="library-tile" data-kind={isPicture(file()) ? "image" : "file"}>
+                      <Show
+                        when={isPicture(file())}
+                        fallback={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            class="library-file-card"
+                            // As in the list, only a file on this computer opens.
+                            disabled={file().status !== "available"}
+                            onClick={(event) => open(file(), event.currentTarget)}
+                          >
+                            <span class="library-file-name">
+                              <span
+                                class="files-file-visual"
+                                data-file-tone={attachmentReferenceTone(file().name)}
+                                aria-hidden="true"
+                              >
+                                {attachmentReferenceBadge(file().name) ?? fileBadge(file())}
+                              </span>
+                              <span class="library-truncate">{file().name}</span>
+                            </span>
+                            <span class="library-file-source library-truncate">
+                              {file().conversation?.title ?? agentName(file().agentId)}
+                            </span>
+                          </Button>
+                        }
+                      >
                         <Button
                           type="button"
                           variant="ghost"
-                          class="library-file-card"
+                          class="library-picture"
+                          aria-label={file().name}
+                          ref={(element) => thumbnails.set(id, element)}
                           onClick={(event) => open(file(), event.currentTarget)}
                         >
-                          <span class="library-file-name">
-                            <span
-                              class="files-file-visual"
-                              data-file-tone={attachmentReferenceTone(file().name)}
-                              aria-hidden="true"
-                            >
-                              {attachmentReferenceBadge(file().name) ?? fileBadge(file())}
-                            </span>
-                            <span class="library-truncate">{file().name}</span>
-                          </span>
-                          <span class="library-file-source library-truncate">
-                            {file().conversation?.title ?? agentName(file().agentId)}
-                          </span>
+                          <img src={file().previewUrl ?? ""} alt="" loading="lazy" />
                         </Button>
-                      }
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        class="library-picture"
-                        aria-label={file().name}
-                        ref={(element) => thumbnails.set(file().id, element)}
-                        onClick={(event) => open(file(), event.currentTarget)}
-                      >
-                        <img src={file().previewUrl ?? ""} alt="" loading="lazy" />
-                      </Button>
-                    </Show>
-                    <FileRowMenu
-                      file={file()}
-                      canDelete={props.canDelete === true && file().deletable}
-                      class="library-tile-menu"
-                      onAction={(action) => act(file(), action)}
-                    />
-                  </li>
-                )}
+                      </Show>
+                      <FileRowMenu
+                        file={file()}
+                        canDelete={props.canDelete === true && file().deletable}
+                        class="library-tile-menu"
+                        onAction={(action) => act(file(), action)}
+                      />
+                    </li>
+                  );
+                }}
               </For>
             </ul>
           </Show>
