@@ -157,6 +157,7 @@
     "./team-protocol/conversation-file-search-v1": "./src/team-protocol/conversation-file-search-v1.ts",
     "./team-protocol/routine-flows-v1": "./src/team-protocol/routine-flows-v1.ts",
     "./team-protocol/routine-recovery-v1": "./src/team-protocol/routine-recovery-v1.ts",
+    "./team-protocol/routine-run-place-v1": "./src/team-protocol/routine-run-place-v1.ts",
     "./team-protocol/routine-results-v1": "./src/team-protocol/routine-results-v1.ts",
     "./team-protocol/webhook-tests-v1": "./src/team-protocol/webhook-tests-v1.ts",
     "./team-protocol/webhook-sender-secret-v1": "./src/team-protocol/webhook-sender-secret-v1.ts",

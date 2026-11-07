@@ -113,7 +113,7 @@ import {
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
-import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
@@ -133,8 +133,8 @@ import {
 } from "@openbot/team-client/remote-directory";
 import {
   createRemoteTeamPeer,
-  MOBILE_ATTACHMENT_BYTES,
   type RemoteFileUpload,
+  type RemoteLargeDownload,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamPeerActions,
@@ -655,7 +655,13 @@ export function createWebWorkspaceRuntime(
     if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
     return value;
   }
-  async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
+  async function request(
+    method: string,
+    path: string,
+    body: TeamProtocolV2Json = {},
+    upload?: RemoteFileUpload,
+    largeDownload?: RemoteLargeDownload,
+  ) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const requestHostId = lockedHostId;
@@ -669,6 +675,7 @@ export function createWebWorkspaceRuntime(
       body,
       ...(upload === undefined ? {} : { upload }),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      ...(largeDownload === undefined ? {} : { largeDownload }),
     });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
@@ -1239,15 +1246,18 @@ export function createWebWorkspaceRuntime(
       if (!support.anyFile) assertSupportedAttachmentName(file.name);
       if (!isSupportedAttachmentNameFor(file.name, support))
         throw new Error(currentText().t("webClient.error.fileType"));
-      if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+      if (file.size > WEB_FILE_BYTES) throw new Error(currentText().t("error.remote.fileTooLarge"));
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (currentUpload !== uploadGeneration || uploadHostGeneration !== generation)
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       const mimeType = file.type || "application/octet-stream";
       const value = await Effect.runPromise(
-        uploadAttachmentDraft(teamApi, { name: file.name, mimeType, base64: bytesToBase64(bytes) }).pipe(
-          Effect.mapError((error) => error.cause),
-        ),
+        uploadAttachmentDraft(teamApi, {
+          name: file.name,
+          mimeType,
+          base64: bytesToBase64(bytes),
+          maxBytes: WEB_FILE_BYTES,
+        }).pipe(Effect.mapError((error) => error.cause)),
       );
       if (currentUpload !== uploadGeneration) {
         if (uploadHostGeneration === generation)
@@ -1272,16 +1282,20 @@ export function createWebWorkspaceRuntime(
       revokeLocalDraftPreviews([id]);
     },
     async download(id) {
-      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
+      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
     },
     async sharedFile(path) {
       const query = new URLSearchParams({ path });
-      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`));
+      return decodeWebFile(
+        await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
     async workspaceFile(agentId, path) {
       // The released URL spells the agent `botId`.
       const query = new URLSearchParams({ botId: agentId, path });
-      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
+      return decodeWebFile(
+        await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
     async workspaceDirectory(agentId, path) {
       if (!capabilities.includes(WORKSPACE_DIRECTORY_CAPABILITY))
@@ -1510,13 +1524,19 @@ export function createWebWorkspaceRuntime(
   };
 }
 
+/**
+ * The largest file that the browser sends or reads through the host connection: the host's limit, as
+ * on desktop. The phone keeps its smaller limit, because its native bridge copies each file.
+ */
+const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
+/** A file read asks for the larger limit. Without it, the connection refuses a file above the phone's limit. */
+const WEB_FILE_DOWNLOAD: RemoteLargeDownload = { maxBytes: WEB_FILE_BYTES };
+
 function decodeWebFile(value: unknown): WebFile {
   if (!isDynamicRecord(value)) throw new Error(currentText().t("error.remote.invalidData"));
   const base64 = requiredString(value, "base64");
-  if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-  if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
-    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  if ((base64.length / 4) * 3 - padding > WEB_FILE_BYTES) throw new Error(currentText().t("error.remote.fileTooLarge"));
   return {
     name: requiredString(value, "name"),
     mimeType: requiredString(value, "mimeType"),

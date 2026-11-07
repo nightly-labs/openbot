@@ -26,6 +26,12 @@
   border-radius: var(--openbot-radius-md);
 }
 
+/* An agent in the agent dock list, at the size of the server marks. */
+.settings-agent-dock-avatar {
+  width: 32px;
+  height: 32px;
+}
+
 .settings-dynamic-island-preview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

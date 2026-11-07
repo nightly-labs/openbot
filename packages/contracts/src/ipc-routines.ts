@@ -176,8 +176,8 @@ export interface RoutineFields {
   /** Absent from a host that does not store it, for the same reason as `limitPolicy`. */
   missedPolicy?: RoutineMissedPolicy;
   /**
-   * Set only on an agent routine of this computer's host. A channel routine and the released Team
-   * API leave it out.
+   * Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`.
+   * A channel routine and the released Team API routes leave it out.
    */
   runIn?: RoutineRunPlace;
   createdAt: string;

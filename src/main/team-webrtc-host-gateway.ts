@@ -175,6 +175,14 @@ export class TeamWebRtcHostGateway {
     );
   }).bind(this);
 
+  /**
+   * Loads the bridge window before the Signal ticket exists. `start` then uses the same load, so a
+   * host start does not wait for the window after its account requests.
+   */
+  readonly prepare = Effect.fn("HostGateway.prepare")(function* (this: TeamWebRtcHostGateway) {
+    yield* this.#bridge.start();
+  }).bind(this);
+
   readonly stop = Effect.fn("HostGateway.stop")(function* (this: TeamWebRtcHostGateway) {
     if (this.#stopping) return yield* Deferred.await(this.#stopping);
     const stopped = Deferred.makeUnsafe<void, RemoteWorkflowError>();

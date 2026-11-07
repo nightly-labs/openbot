@@ -8,6 +8,7 @@ import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc"
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
+import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
@@ -1320,20 +1321,21 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
+  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
   const output = yield* providerCall(() =>
     target
       ? execFileAsync(
           process.env.ComSpec?.trim() || "cmd.exe",
           ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
           {
-            timeout: CLI_VERSION_TIMEOUT_MS,
+            timeout,
             maxBuffer: 64 * 1024,
             windowsHide: true,
             windowsVerbatimArguments: true,
           },
         )
       : execFileAsync(candidate, ["--version"], {
-          timeout: CLI_VERSION_TIMEOUT_MS,
+          timeout,
           maxBuffer: 64 * 1024,
           windowsHide: process.platform === "win32",
           env: { ...process.env, ...cliPathEnvironment(launch) },

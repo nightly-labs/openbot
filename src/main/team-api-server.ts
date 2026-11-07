@@ -116,6 +116,7 @@ import {
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -312,6 +313,7 @@ import { routePushNotifications } from "./team-api/route-push-notifications";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
+import { routeRoutineRunPlace } from "./team-api/route-routine-run-place";
 import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
@@ -1057,6 +1059,11 @@ export class TeamApiServer {
         return;
       if ((await routeBrowserProxies(context, this.#options.browserProfiles)) === "handled") return;
       if ((await routeRoutineResults(context, this.#options.admin, hidden)) === "handled") return;
+      if (
+        (await routeRoutineRunPlace(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
+        "handled"
+      )
+        return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
@@ -2369,6 +2376,7 @@ export class TeamApiServer {
           if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
+          if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;

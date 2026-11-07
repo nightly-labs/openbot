@@ -330,7 +330,7 @@ The local host also records how the agents are used:
 when there is no install ID.
 - **Startup time.** Once per start, the host sends how long the start took, rounded: until the
   window could show, until the services were ready, and until the workspace loaded; the name of the
-  slowest startup step from a fixed list; and whether it was the first start since the computer
+  slowest startup step from a fixed list, and how long each step of that list took; and whether it was the first start since the computer
   booted, a later one, or the first start of a new version. To know this, the app keeps the time and
   version of its last start in a local file that is not sent. Paths and names are not sent.
 - **Connection time.** When this computer connects to a remote server, the host sends how long the
@@ -1355,7 +1355,7 @@ short-lived signed addresses, in transit only.
   it…", or the redacted progress line, as for Slack), reactions, and approval requests with the command, folder and reason the provider gave,
   redacted. A failed request posts a fixed sentence, never the provider's error. As for Slack, any
   agent can post redacted text and files from its workspace or the OpenBot shared directory to a
-  linked chat.
+  linked chat. An answer or a post can ping a person that it mentions.
 
 Anyone who can post in a linked chat can give the agents work. The agents run on the host with the
 access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1412,6 +1412,7 @@ restrict or block a number that it sees as automated.
   used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
   On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
   redacted text and files from its workspace or the OpenBot shared directory to the allowed chats.
+  An answer or a post can ping a person that it mentions.
 
 Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
 the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps

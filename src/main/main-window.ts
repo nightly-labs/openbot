@@ -652,6 +652,45 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
   return window;
 }
 
+/** The agent dock at the right edge of the screen: a transparent panel above the other apps. */
+export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
+  const window = new BrowserWindow({
+    ...bounds,
+    show: false,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    focusable: false,
+    hiddenInMissionControl: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    type: "panel",
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      devTools: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  // The chat composer makes the panel key. It must not activate the app and bring the main window up.
+  preventPanelActivation(window);
+  // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
+  window.webContents.setZoomMode("isolated");
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
+  });
+  return window;
+}
+
 /**
  * The overlay that carries the Computer Use rim over the window an agent works in.
  *
@@ -895,6 +934,12 @@ export function hideWindowsForQuit(): void {
 export function showMainWindow(window: BrowserWindow): void {
   if (windowsKeptHidden) return;
   presentMainWindow(window, process.platform, () => app.show());
+}
+
+export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
+  const url = helperRendererUrl(process.env.ELECTRON_RENDERER_URL);
+  url.searchParams.set("surface", "agent-dock");
+  return window.loadURL(url.toString());
 }
 
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {

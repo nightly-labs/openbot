@@ -17,7 +17,8 @@
 //
 // The child has no account session, so it cannot read its members from the account directory. It
 // asks on stdout, and this process writes the list to its control pipe. After this app changes a
-// member of the server, it writes the new list without a request.
+// member of the server, it writes the new list without a request. In the same way, this process makes
+// the Marketplace reads that adding an agent needs, with its own session, and only those reads.
 
 import { type ChildProcess, type SpawnOptions, spawn as spawnProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -39,7 +40,9 @@ import {
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
   type LocalServerCommand,
+  type LocalServerMarketplaceRequest,
   type LocalServerReady,
+  parseLocalServerMarketplaceRequest,
 } from "../local-server-child";
 import type { LocalServerAttachInput, RemoteServerManager } from "../remote-server-manager";
 import type { TokenCipher } from "../remote-server-store";
@@ -142,6 +145,64 @@ interface LocalServerAccount {
   listMembers(hostId: string): Effect.Effect<RemoteMemberRecord[], RemoteWorkflowError>;
   /** Removes a deleted server. A server that the account service refuses for good counts as removed. */
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
+  /** The origin of the account service. */
+  apiOrigin: string;
+  /** A JSON request with this app's session. Only the Marketplace reads below get here. */
+  requestAuthorized(path: string, init: RequestInit): Effect.Effect<unknown, RemoteWorkflowError>;
+  /** A file with this app's session. Only the Marketplace reads below get here. */
+  downloadAuthorized(path: string): Effect.Effect<Uint8Array, RemoteWorkflowError>;
+}
+
+/**
+ * The account service reads that a child may ask for: what adding or updating an agent from a listing
+ * reads (`AgentMarketplaceService.install`), what adding or listing a Marketplace skill reads
+ * (`SkillMarketplaceService`), and their install counts. Any other read is refused, so a child cannot
+ * use the account session for anything else.
+ */
+const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boolean; path: RegExp }> = [
+  { method: "GET", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/listing$/u },
+  { method: "GET", download: true, path: /^\/v1\/marketplace\/agents\/[^/]+\/avatar$/u },
+  // A skill, not the list of the user's own submissions.
+  { method: "GET", download: false, path: /^\/v1\/skills\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/content$/u },
+  { method: "GET", download: false, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/u },
+  { method: "POST", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/install$/u },
+  { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
+];
+
+const installReceiptSchema = Schema.Struct({ receiptId: Schema.String });
+const decodeInstallReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(installReceiptSchema));
+
+/** The path and the request to make for a child's read, or null when the read is not allowed. */
+function allowedMarketplaceRead(
+  request: LocalServerMarketplaceRequest,
+  apiOrigin: string,
+): { path: string; init: RequestInit } | null {
+  let url: URL;
+  try {
+    url = new URL(request.path, apiOrigin);
+  } catch {
+    return null;
+  }
+  // An id never holds `%`, so an encoded `/` cannot move a read to another route.
+  if (url.origin !== apiOrigin || url.pathname.includes("%")) return null;
+  const allowed = MARKETPLACE_READS.some(
+    (read) => read.method === request.method && read.download === request.download && read.path.test(url.pathname),
+  );
+  if (!allowed) return null;
+  const path = `${url.pathname}${url.search}`;
+  if (request.method === "GET") return request.body === undefined ? { path, init: { method: "GET" } } : null;
+  // An install count sends only its receipt id.
+  try {
+    const { receiptId } = decodeInstallReceipt(request.body);
+    return {
+      path,
+      init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** A server on this computer, as the owner's other devices see it (`local-servers-v1`). */
@@ -441,6 +502,56 @@ export class LocalServers {
     );
   }
 
+  /**
+   * Makes a Marketplace read for a child with this app's session and writes the answer to it. A read that
+   * is not allowed, or that fails, gets the reason, so that the child does not wait.
+   */
+  #readMarketplace(id: string, running: RunningChild, request: LocalServerMarketplaceRequest): void {
+    const read = allowedMarketplaceRead(request, this.#options.account.apiOrigin);
+    // The request holds the read and its ids only, no secret.
+    if (!read)
+      this.#options.log.warn("A server on this computer asked for an account read that is not allowed.", {
+        method: request.method,
+        path: request.path,
+      });
+    const answer: Effect.Effect<LocalServerCommand, RemoteWorkflowError> = !read
+      ? Effect.succeed({ type: "marketplace", id: request.id, error: sourceText("error.team.requestFailed") })
+      : request.download
+        ? this.#options.account.downloadAuthorized(read.path).pipe(
+            Effect.map(
+              (bytes): LocalServerCommand => ({
+                type: "marketplace",
+                id: request.id,
+                bytes: Buffer.from(bytes).toString("base64"),
+              }),
+            ),
+          )
+        : this.#options.account
+            .requestAuthorized(read.path, read.init)
+            .pipe(Effect.map((value): LocalServerCommand => ({ type: "marketplace", id: request.id, value })));
+    Effect.runFork(
+      Effect.forkIn(
+        answer.pipe(
+          // The same sentence as on the desktop app's own server, such as "Sign in is required."
+          Effect.catch(({ cause }) =>
+            Effect.succeed<LocalServerCommand>({
+              type: "marketplace",
+              id: request.id,
+              error: cause instanceof Error ? cause.message : sourceText("error.team.requestFailed"),
+            }),
+          ),
+          Effect.flatMap((command) =>
+            Effect.sync(() => {
+              if (this.#running.get(id) === running) this.#send(id, command);
+            }),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+  }
+
   /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
@@ -562,6 +673,11 @@ export class LocalServers {
       createInterface({ input: child.stdout }).on("line", (line) => {
         if (line === LOCAL_SERVER_MEMBERS_REQUEST) {
           this.#readMembers(entry.id);
+          return;
+        }
+        const marketplace = parseLocalServerMarketplaceRequest(line);
+        if (marketplace) {
+          this.#readMarketplace(entry.id, running, marketplace);
           return;
         }
         const value = parseReadyLine(line);

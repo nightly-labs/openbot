@@ -1295,6 +1295,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       setFrame: async () => undefined,
       onShown: () => () => undefined,
     },
+    agentDock: {
+      publishPresentation: async () => undefined,
+      getPresentation: async () => null,
+      onPresentation: () => () => undefined,
+      performAction: async () => undefined,
+      onAction: () => () => undefined,
+      setInteractive: async () => undefined,
+      onCloseChat: () => () => undefined,
+      listDisplays: async () => [{ id: 1, label: "Built-in Retina Display", primary: true, internal: true }],
+      drag: async () => undefined,
+      onMoved: () => () => undefined,
+    },
     dynamicIsland: {
       getPreference: async () => clone(dynamicIslandPreference),
       setPreference: async (preference) => {

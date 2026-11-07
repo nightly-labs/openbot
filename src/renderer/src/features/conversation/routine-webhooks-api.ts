@@ -107,14 +107,15 @@ export function desktopEventRoutinesApi(
 
 /**
  * The browser adapter. A failed call rejects with the host's error, not the transport wrapper.
- * `recovery`, `tests` and `senderSecret` read at call time whether the connected host has
- * `routine-recovery-v1`, `webhook-tests-v1` and `webhook-sender-secret-v1`.
+ * `recovery`, `tests`, `senderSecret` and `runPlaces` read at call time whether the connected host has
+ * `routine-recovery-v1`, `webhook-tests-v1`, `webhook-sender-secret-v1` and `routine-run-place-v1`.
  */
 export function webEventRoutinesApi(
   request: TeamApiRequest,
   recovery: () => boolean = () => false,
   tests: () => boolean = () => false,
   senderSecret: () => boolean = () => false,
+  runPlaces: () => boolean = () => false,
 ): EventRoutinesApi {
   const run = <A>(effect: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> =>
     runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
@@ -132,8 +133,8 @@ export function webEventRoutinesApi(
       return senderSecret() ? setSecret : undefined;
     },
     getStatus: () => run(getEventStatus(request)),
-    listRoutines: (input) => run(listEventRoutines(request, input, recovery())),
-    saveRoutine: (input) => run(saveEventRoutine(request, input, recovery())),
+    listRoutines: (input) => run(listEventRoutines(request, input, recovery(), runPlaces())),
+    saveRoutine: (input) => run(saveEventRoutine(request, input, recovery(), runPlaces())),
     deleteRoutine: (input) => run(deleteEventRoutine(request, input)),
     testRoutine: (input) => run(testEventRoutine(request, input)),
     rotateSecret: (input) => run(rotateEventRoutineSecret(request, input)),

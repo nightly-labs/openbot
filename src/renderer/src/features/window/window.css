@@ -90,6 +90,17 @@
     inset-inline-start: var(--server-rail-width);
   }
 
+  /* The agent dock in the window has its column at the right edge, as wide as the dock
+   * (`DOCK_WIDTH` in `agent-dock-motion.ts`), so it does not cover the card. */
+  .app-window > .app-frame-edge.app-frame-agent-dock {
+    --agent-dock-column: calc(64px - var(--window-edge) - 1px);
+    padding-inline-end: calc(var(--window-edge) + 1px + var(--agent-dock-column));
+  }
+
+  .app-window > .app-frame-edge.app-frame-agent-dock::before {
+    inset-inline-end: calc(var(--window-edge) + var(--agent-dock-column));
+  }
+
   .app-window > .app-frame-edge > .server-rail {
     background: var(--window-frame);
   }

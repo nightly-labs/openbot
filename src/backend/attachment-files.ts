@@ -24,7 +24,8 @@ import type {
   QueueDelivery,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
+import { isHeldTargetError } from "./atomic-json-file";
 import { type AttachmentOperationError, attachmentCall, attachmentFailure, attachmentSync } from "./attachment-effects";
 import { sha256File } from "./file-hash";
 import { isWithin } from "./workspace-paths";
@@ -33,6 +34,13 @@ const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 const MAX_FILE_BYTES = ATTACHMENT_LIMITS.fileBytes;
 const MAX_TOTAL_BYTES = ATTACHMENT_LIMITS.totalBytes;
 const TRANSFER_MANIFEST_FILE = ".openbot-transfer.json";
+/**
+ * The waits before each new rename of a transfer folder when Windows answers `EPERM`, `EACCES` or
+ * `EBUSY`. Antivirus and the search indexer open the files just copied into the folder for a moment,
+ * and Windows does not rename a folder that has an open file. One try failed a send (#5458). About
+ * 3 s in all, because the user waits for the send.
+ */
+const HELD_TRANSFER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000];
 
 export interface StoredAttachment extends AttachmentSummary {
   path: string;
@@ -371,7 +379,15 @@ export class AttachmentFiles {
           createdAt,
           attachments: attachments.map(manifestAttachment),
         });
-        yield* attachmentCall(() => rename(temporaryRoot, finalRoot)).pipe(Effect.uninterruptible);
+        for (let attempt = 0; ; attempt += 1) {
+          const renamed = yield* Effect.result(
+            attachmentCall(() => rename(temporaryRoot, finalRoot)).pipe(Effect.uninterruptible),
+          );
+          if (Result.isSuccess(renamed)) break;
+          const wait = HELD_TRANSFER_WAITS_MS[attempt];
+          if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
+          yield* Effect.sleep(wait);
+        }
         completed = true;
         return attachments;
       } catch (error) {

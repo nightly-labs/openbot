@@ -1,6 +1,7 @@
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import { render } from "@solidjs/web";
 import { syncAppearance } from "./appearance-choice";
+import { AgentDockSurface } from "./features/agent-dock/AgentDockSurface";
 import { BrowserDockSurface } from "./features/browser/BrowserDockSurface";
 import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";
 import { ComputerUsePermissionHelp, permissionFromQuery } from "./features/computer-use/ComputerUsePermissionHelp";
@@ -42,6 +43,12 @@ render(() => {
     return (
       <I18nProvider>
         <BrowserDockSurface />
+      </I18nProvider>
+    );
+  if (surface === "agent-dock")
+    return (
+      <I18nProvider>
+        <AgentDockSurface />
       </I18nProvider>
     );
   if (surface === "computer-use-highlight")
