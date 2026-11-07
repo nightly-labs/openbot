@@ -1,12 +1,11 @@
 import { type ChatWindowTarget, canAdministerServer } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
-import { computeSidebarAgentStates, sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import { sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
@@ -20,8 +19,7 @@ import { useTurns } from "../../turns";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { useAgentActions } from "../agents/agent-actions";
-import { attentionByAgent } from "../agents/agent-runtime-snapshot";
-import { agentThreadAttention } from "../agents/agent-thread-attention";
+import { createAgentActivity } from "../agents/agent-activity";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
@@ -94,9 +92,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
-  const { activeTurns, subagentTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } =
-    useTurns();
-  const { agentUnreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
+  const { pendingPrompts, approvals } = useTurns();
+  const { agentUnreadReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople, teamPresence } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
@@ -204,34 +201,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     },
   );
 
-  /* The turn events of a side thread reach only its thread list, so an agent that works in a side
-   * thread is found there. A subagent that runs on after its turn keeps its agent at work. */
-  const workingTurns = createMemo(() => {
-    const turns = { ...activeTurns() };
-    const subagents = subagentTurns();
-    for (const agent of agentList()) {
-      const running = agentTasks.snapshot(agent.id)?.tasks.find((task) => task.state === "running");
-      if (running && !turns[agent.id]) turns[agent.id] = running.activeTurnId ?? running.id;
-      const subagentTurn = subagents[agent.id];
-      if (subagentTurn && !turns[agent.id]) turns[agent.id] = subagentTurn;
-    }
-    return turns;
-  });
-
-  /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
-   * thread stays out of "Needs you", because selecting the row cannot answer it. */
-  const sidebarAgentStates = createMemo(() =>
-    computeSidebarAgentStates({
-      agentIds: agentList().map((agent) => agent.id),
-      activeTurns: workingTurns(),
-      queues: queues(),
-      unreadReplies: agentUnreadReplies(),
-      recentReplies: recentReplies(),
-      ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
-      failedTurns: failedTurns(),
-      usageLimits: usageLimits(),
-    }),
-  );
+  const { agentStates: sidebarAgentStates, agentMoods } = createAgentActivity();
 
   /* A wait in a channel thread goes to the channel instead. Selecting the channel opens the view
    * that answers it. */
@@ -244,20 +214,6 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       approvals: approvals(),
     });
   });
-
-  /* The badge says what an agent is doing; the face says how it is going. `isAgentWorking` is
-   * shared, and a routine mark only replaces the badge for that same agent. */
-  const agentMoods = createMemo(() =>
-    computeAgentAvatarMoods({
-      agentIds: agentList().map((agent) => agent.id),
-      activeTurns: workingTurns(),
-      queues: queues(),
-      failedTurns: failedTurns(),
-      pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
-      pendingApprovals: pendingApprovals(),
-      recentReplies: recentReplies(),
-    }),
-  );
 
   return (
     <>

@@ -1,6 +1,9 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentDefaults,
+  AgentDockAction,
+  AgentDockDragPhase,
+  AgentDockPresentation,
   AgentMemoryLimitPreference,
   AgentProviderId,
   AppBehaviorPreferenceChange,
@@ -33,6 +36,7 @@ import type {
   RendererTimingReport,
   ReplaceHostedSiteInput,
   SaveSetupInput,
+  SetAgentDockInteractiveInput,
   SetAnalyticsPreferenceInput,
   SetAppAppearancePreferenceInput,
   SetAppInterfaceSizePreferenceInput,
@@ -50,6 +54,10 @@ import {
   decodeExternalLinkTarget,
   IDLE_RESTART_TARGETS,
   isAgentDefaults,
+  isAgentDockAction,
+  isAgentDockDragPhase,
+  isAgentDockInteractive,
+  isAgentDockPresentation,
   isAgentMemoryLimit,
   isAgentModel,
   isAgentProvider,
@@ -293,6 +301,26 @@ export function parseBrowserDockAction(input: unknown): BrowserDockAction {
 export function parseBrowserDockFrame(input: unknown): BrowserDockFrame {
   if (isBrowserDockFrame(input)) return input;
   throw new Error("Browser dock frame is invalid.");
+}
+
+export function parseAgentDockPresentation(input: unknown): AgentDockPresentation | null {
+  if (input === null || isAgentDockPresentation(input)) return input;
+  throw new Error("Agent dock presentation is invalid.");
+}
+
+export function parseAgentDockAction(input: unknown): AgentDockAction {
+  if (isAgentDockAction(input)) return input;
+  throw new Error("Agent dock action is invalid.");
+}
+
+export function parseAgentDockInteractive(input: unknown): SetAgentDockInteractiveInput {
+  if (isAgentDockInteractive(input)) return input;
+  throw new Error("Agent dock interaction state is required.");
+}
+
+export function parseAgentDockDragPhase(input: unknown): AgentDockDragPhase {
+  if (isAgentDockDragPhase(input)) return input;
+  throw new Error("Agent dock drag phase is invalid.");
 }
 
 export function parseMacPermission(input: unknown): MacPermissionId {
