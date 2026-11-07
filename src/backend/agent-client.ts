@@ -21,8 +21,9 @@ export interface AgentClient {
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   /**
-   * True when a streaming `final_answer` item can still become a step: the provider names no phase,
-   * and the client classifies the text only at the next tool call or at the end of the turn.
+   * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
+   * become a step: the provider names no phase, and the client classifies the text only at the next
+   * tool call or at the end of the turn.
    */
   readonly provisionalAnswers?: boolean;
   readonly running: boolean;

@@ -18,6 +18,7 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
       id,
       ...(thinking.turnId === undefined ? {} : { turnId: thinking.turnId }),
       author: "agent",
+      ...(thinking.senderAgentId === undefined ? {} : { senderAgentId: thinking.senderAgentId }),
       body,
       time: createdAt ? formatMessageTime(createdAt) : thinking.time,
       ...(createdAt ? { createdAt } : {}),

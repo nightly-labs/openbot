@@ -192,6 +192,8 @@ interface ClientEvents {
 /** Owns Pi's native sessions. The database owns OpenBot history and agent identity. */
 export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "request";
+  /** Pi names the phase of its text only at `message_end`, where text before a tool call becomes a step. */
+  readonly provisionalAnswers = true;
   readonly provider: "pi" | KeyOnlyProviderId;
   readonly #bridge = new LocalMcpBridge();
   readonly #requests = new PendingServerRequests((request) => this.emit("request", request));
