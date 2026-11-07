@@ -65,7 +65,7 @@ export function AgentEventBridge() {
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, applyUserHiddenAgents } =
     useAgents();
-  const { setConversationErrors, setConversationErrorRuns, setConversationErrorLinks } = useConversationController();
+  const { setConversationErrors, setConversationErrorRuns } = useConversationController();
   const { setUiErrors } = useUiErrors();
   const agentTasks = useAgentTasks();
   const {
@@ -387,16 +387,10 @@ export function AgentEventBridge() {
           const provider = event.provider ? providerDisplayName(event.provider) : null;
           const run =
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
-          setConversationErrorRuns((current) => {
-            if (run) return { ...current, [key]: { message, run } };
-            if (!(key in current)) return current;
-            const { [key]: _replaced, ...next } = current;
-            return next;
-          });
           // Google asks the user to verify the account in a browser before Gemini answers (#2419).
           const link = event.link;
-          setConversationErrorLinks((current) => {
-            if (link) return { ...current, [key]: { message, link } };
+          setConversationErrorRuns((current) => {
+            if (run || link) return { ...current, [key]: { message, run, ...(link ? { link } : {}) } };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;

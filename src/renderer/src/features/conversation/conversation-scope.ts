@@ -168,7 +168,6 @@ export function createConversationViewScope(props: ConversationProps) {
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
-    conversationErrorLinks,
     voicePhase,
     setVoicePhase,
     voiceModelProgress,
@@ -400,22 +399,18 @@ export function createConversationViewScope(props: ConversationProps) {
     const entry = composerErrorReferences()[composerDraftKey(target)];
     return entry?.message === message ? entry.reference : null;
   });
-  /** The provider and model of the run behind the shown error. A later error of another run shows none. */
-  const currentChatErrorRun = createMemo(() => {
+  /** The run and account page behind the shown error. A later error of another run shows neither. */
+  const currentChatErrorEntry = createMemo(() => {
     const target = currentTarget();
     const message = currentChatError();
     if (!target || !message) return null;
     const entry = conversationErrorRuns()[composerDraftKey(target)];
-    return entry?.message === message ? entry.run : null;
+    return entry?.message === message ? entry : null;
   });
-  /** The page that fixes the account behind the shown error. A later error shows none. */
-  const currentChatErrorLink = createMemo(() => {
-    const target = currentTarget();
-    const message = currentChatError();
-    if (!target || !message) return null;
-    const entry = conversationErrorLinks()[composerDraftKey(target)];
-    return entry?.message === message ? entry.link : null;
-  });
+  /** The provider and model of the run behind the shown error. */
+  const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
+  /** The page that fixes the account behind the shown error (#2419). */
+  const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));

@@ -167,13 +167,12 @@ export function createStableConversationState(
   // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
   const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
-  /** The provider and model of the run behind each conversation error, keyed like `conversationErrors`. */
+  /**
+   * The provider and model of the run behind each conversation error, and the page that fixes the
+   * account (#2419), keyed like `conversationErrors`.
+   */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string }>
-  >({});
-  /** The page that fixes the account behind each conversation error (#2419), keyed like `conversationErrors`. */
-  const [conversationErrorLinks, setConversationErrorLinks] = createSignal<
-    Record<string, { message: string; link: string }>
+    Record<string, { message: string; run: string | null; link?: string }>
   >({});
   createEffect(
     () => {
@@ -399,8 +398,6 @@ export function createStableConversationState(
     setConversationErrors,
     conversationErrorRuns,
     setConversationErrorRuns,
-    conversationErrorLinks,
-    setConversationErrorLinks,
     composerErrors,
     setComposerErrors,
     composerErrorReferences,
