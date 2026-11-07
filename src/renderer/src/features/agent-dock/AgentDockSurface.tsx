@@ -174,6 +174,13 @@ export function AgentDockSurface() {
 
   const serverId = createMemo(() => presentation()?.serverId ?? null);
   const voice = createAgentDockVoice(() => serverId() ?? "local");
+  /* A dock of another server starts with no chat, shelf or drag: the old dock reports no end when it goes. */
+  createEffect(serverId, () => {
+    chatOpen = false;
+    shelfShown = false;
+    dragging = false;
+    sync();
+  });
 
   /* Each server has its own dock; a new presentation of the same server keeps the open chat. */
   return (

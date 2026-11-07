@@ -141,8 +141,16 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
 
   /* The unread answers of the seated agents, for the finished-work shelf. The shelf hides each one
      after some time; the seat keeps its unread badge. */
+  let firstSeen = new Map<string, number>();
   const results = createMemo((): AgentDockResult[] => {
     if (!preference().results) return [];
+    /* An answer with no time keeps the time when the dock first saw it, so the presentation stays the same. */
+    const seen = new Map<string, number>();
+    const seenAt = (id: string) => {
+      const at = firstSeen.get(id) ?? Date.now();
+      seen.set(id, at);
+      return at;
+    };
     const all = seats().flatMap((seat) => {
       const conversation = conversations[seat.agent.id];
       const unread = conversation?.read?.unreadCount ?? 0;
@@ -151,8 +159,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
         conversation?.messages ?? [],
         unread,
         conversation?.read?.firstUnreadMessageId ?? null,
-      ).flatMap((message) => dockResult(seat.agent.id, message) ?? []);
+      ).flatMap((message) => dockResult(seat.agent.id, message, seenAt) ?? []);
     });
+    firstSeen = seen;
     return all.sort((a, b) => a.at - b.at).slice(-AGENT_DOCK_LIMITS.results);
   });
 
@@ -392,7 +401,11 @@ const RESULT_LABEL = 120;
 const BLOCK_MARKER = /^(#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/;
 
 /** A plain copy of one answer for the shelf: its first file, or else its first line of text. */
-function dockResult(agentId: string, message: AgentMessage): AgentDockResult | null {
+function dockResult(
+  agentId: string,
+  message: AgentMessage,
+  seenAt: (messageId: string) => number,
+): AgentDockResult | null {
   const file = (message.attachments ?? []).find(isAttachmentSummary);
   const line = message.body
     .split("\n")
@@ -406,6 +419,6 @@ function dockResult(agentId: string, message: AgentMessage): AgentDockResult | n
     agentId,
     kind: file ? "file" : "message",
     label,
-    at: Number.isFinite(at) && at >= 0 ? at : Date.now(),
+    at: Number.isFinite(at) && at >= 0 ? at : seenAt(message.id),
   };
 }

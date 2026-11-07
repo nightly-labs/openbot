@@ -16,6 +16,7 @@ import {
   createStore,
   createUniqueId,
   For,
+  onCleanup,
   onSettled,
   Show,
   untrack,
@@ -344,9 +345,13 @@ export function AgentDock(props: AgentDockProps) {
    * the window stops. The window speed, not the pointer speed: a dock held at the end of the edge does not
    * stretch.
    */
+  /** Ends the drag that runs. A dock that goes during a drag gets no pointer up. */
+  let endDrag: (() => void) | undefined;
+  onCleanup(() => endDrag?.());
+
   function startDrag(event: PointerEvent & { currentTarget: Element }) {
     const drag = props.onDrag;
-    if (!drag || event.button !== 0) return;
+    if (!drag || event.button !== 0 || endDrag) return;
     event.preventDefault();
     const element = event.currentTarget;
     element.setPointerCapture(event.pointerId);
@@ -381,6 +386,7 @@ export function AgentDock(props: AgentDockProps) {
       moved = true;
     };
     const end = () => {
+      endDrag = undefined;
       cancelAnimationFrame(frame);
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", end);
@@ -395,6 +401,7 @@ export function AgentDock(props: AgentDockProps) {
     element.addEventListener("pointerup", end);
     element.addEventListener("pointercancel", end);
     element.addEventListener("lostpointercapture", end);
+    endDrag = end;
   }
 
   /** Moves the seats, the add button and the dock body to the layout of `seats`. */
@@ -633,11 +640,12 @@ export function AgentDock(props: AgentDockProps) {
     const text = (draft ?? state.drafts[id] ?? "").trim();
     if (!text) return;
     const key = ++pendingKey;
+    const after = props.chat(id).messages.at(-1)?.id ?? null;
     setState((draft) => {
       draft.drafts[id] = "";
       draft.errors[id] = null;
       draft.sending[id] = true;
-      draft.pending[id] = [...(draft.pending[id] ?? []), { key, text, messageId: null }];
+      draft.pending[id] = [...(draft.pending[id] ?? []), { key, text, messageId: null, after }];
     });
     const result = await props.onSend(id, text);
     setState((draft) => {

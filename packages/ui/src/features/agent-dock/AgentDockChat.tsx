@@ -57,6 +57,8 @@ export interface AgentDockPendingMessage {
   key: number;
   text: string;
   messageId: string | null;
+  /** The last message of the chat when the user sent it: the host's copy comes after it. */
+  after: string | null;
 }
 
 /** The microphone of one chat in the panel. */
@@ -85,13 +87,14 @@ export function isDockMessage(message: AgentMessage): boolean {
   return message.body.trim().length > 0;
 }
 
-/** True when the host's copy of a pending message has arrived. */
+/**
+ * True when the host's copy of a pending message has arrived. An earlier message with the same text is
+ * not the copy. When the mark is no longer in the list, all the messages are later.
+ */
 function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
-  return messages.some(
-    (message) =>
-      (pending.messageId !== null && message.id === pending.messageId) ||
-      (message.author === "you" && message.body.trim() === pending.text),
-  );
+  if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
+  const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
+  return messages.slice(start).some((message) => message.author === "you" && message.body.trim() === pending.text);
 }
 
 export function AgentDockChat(props: {

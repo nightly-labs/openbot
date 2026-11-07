@@ -167,6 +167,12 @@ export class AgentDockWindowController {
     main.on("resized", follow);
     main.on("enter-full-screen", follow);
     main.on("leave-full-screen", follow);
+    // A new main renderer has no open dock chat, so the dock that shows one closes it.
+    main.webContents.on("did-finish-load", () => {
+      const owner = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
+      this.#chatOwner = null;
+      if (owner) sendToRenderer(owner.window, IPC_ENDPOINTS.agentDock.closeChat);
+    });
   }
 
   /**
@@ -348,7 +354,12 @@ export class AgentDockWindowController {
         window.setIgnoreMouseEvents(true, { forward: true });
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;
+          // A reloaded dock renderer has no open chat and no drag.
+          this.#release(entry);
           sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, this.#presentation);
+        });
+        window.webContents.on("render-process-gone", () => {
+          if (owned()) this.#release(entry);
         });
         window.once("ready-to-show", () => {
           if (!owned() || this.#presentation === null) return;
@@ -393,11 +404,18 @@ export class AgentDockWindowController {
     if (!window.isDestroyed()) window.destroy();
   }
 
-  /** A dock window that closes with its chat open closes the chat, so the main renderer stops reading it. */
   #forget(window: BrowserWindow): void {
     const entry = this.#windows.find((item) => item.window === window);
     if (!entry) return;
     this.#windows = this.#windows.filter((item) => item !== entry);
+    this.#release(entry);
+  }
+
+  /**
+   * A dock window that closes, reloads or crashes with its chat open closes the chat, so the main
+   * renderer stops reading it. Its drag ends too.
+   */
+  #release(entry: DockWindow): void {
     if (this.#drag?.rendererId === entry.rendererId) this.#drag = null;
     if (this.#chatOwner !== entry.rendererId) return;
     this.#chatOwner = null;
