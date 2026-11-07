@@ -1,3 +1,5 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
   type ChannelMessage,
   type ChannelTask,
@@ -69,6 +71,8 @@ interface LiveConversationInput {
   foreground: boolean;
   /** The agent's conversation; null in a channel. */
   conversation: { messages: readonly ConversationMessage[]; activeTurnId: string | null } | null;
+  /** The agent's provider, which names the ids of its progress updates. Undefined in a channel. */
+  provider: AgentProviderRef | undefined;
   /** The channel; null in an agent chat. */
   channel: LiveChannel | null;
   deliveries: readonly Pick<QueueDelivery, "messageId" | "turnId">[];
@@ -337,8 +341,9 @@ function createController({
   }
 
   /**
-   * Reads the answer while the agent writes it. A turn can answer in more than one message: their
-   * texts join in order, so the text only grows. The phase turns to speaking when the first part plays.
+   * Reads the answer while the agent writes it. A turn can answer in more than one message, and its
+   * progress updates come before the answer: their texts join in order, so the text only grows. The
+   * phase turns to speaking when the first part plays.
    */
   function readAnswer(answer: ConversationMessage, complete: boolean): void {
     if (!reading) {
@@ -407,6 +412,20 @@ function createController({
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
+    // Each progress update is read when it is complete, as on desktop.
+    const provider = input().provider;
+    for (const update of conversation.messages)
+      if (
+        turnId &&
+        update.turnId === turnId &&
+        update.author === "assistant" &&
+        update.itemType === "commentary" &&
+        update.status !== "streaming" &&
+        update.text.trim() &&
+        !readTexts.has(update.id) &&
+        isNarrationItemId(update.id, provider)
+      )
+        readAnswer(update, false);
     // The answer plays while it streams. It is complete when it is done and its turn has ended.
     if (answer && (answer.status === "streaming" || answer.status === "completed")) {
       current.endedAt = null;

@@ -239,7 +239,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   speech_reply: {
-    trigger: "voice_conversation" | "dictation" | "read_aloud";
+    trigger: "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
     result: AnalyticsResult;
     /** False when the user or a new turn stopped the reading. */
     completed?: boolean;

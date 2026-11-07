@@ -651,6 +651,7 @@ export function ChatView({
     focused: isFocused,
     foreground: foregroundVisit,
     conversation,
+    provider: failureAgent?.provider,
     channel: liveChannel,
     deliveries: queue?.deliveries ?? NO_DELIVERIES,
     outboxMessages,
