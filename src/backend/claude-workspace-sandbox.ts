@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readlink, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import type { HookCallbackMatcher, Options, SdkPluginConfig } from "@anthropic-ai/claude-agent-sdk";
+import type { HookCallbackMatcher, Options, SdkPluginConfig, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Result } from "effect";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
@@ -34,7 +34,7 @@ import { type ProviderClientOperationError, providerCall, providerFailure } from
 export function claudeWorkspaceSandbox(
   roots: readonly string[],
   excluded: readonly string[] = [],
-): NonNullable<Options["sandbox"]> {
+): NonNullable<Settings["sandbox"]> {
   return {
     enabled: true,
     failIfUnavailable: true,
