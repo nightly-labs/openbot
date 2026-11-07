@@ -13,6 +13,7 @@ import {
 import { browserCall, browserSync } from "./browser-effects";
 import type { DialogTabResult } from "./browser-tab-operations";
 import { BROWSER_SCRIPT_MAX_SLEEP_MS, type BrowserStep, parseBrowserStep } from "./browser-tools";
+import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import { withTimeout } from "./with-timeout";
 
 const MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
@@ -326,7 +327,7 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
             const text = JSON.stringify(state.value);
             if (text === undefined) return result("completed");
             if (text.length > RESULT_LIMIT_CHARS)
-              return result("failed", { error: "The script result is larger than 64 KB. Return less data." });
+              return result("failed", { error: `The script result is larger than 64 KB. ${BROWSER_VALUE_TOO_LARGE}` });
             const value: BrowserJsonValue = JSON.parse(text);
             return result("completed", { value });
           }
