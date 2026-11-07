@@ -530,11 +530,12 @@ async function main(): Promise<void> {
   app.setPath("sessionData", userDataPath);
   // A backstop for a phase that hangs, not a performance budget -- and it has to stay clear of the
   // phases that wait on a product timeout on purpose, such as the bounded blocked-frame wait and the
-  // frozen-renderer environment race below.
+  // frozen-renderer environment race below. The main flow takes about two minutes on CI, because each
+  // agent click moves along a path and holds the button as a person does.
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 120_000);
+  }, 180_000);
 
   try {
     if (persistencePhase) {
