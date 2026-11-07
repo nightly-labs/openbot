@@ -1895,8 +1895,9 @@ export class TurnLifecycle {
     if (yield* this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
     const toolProgress = toolProgressText(item, completed);
     const openTools = this.#runningTurns.get(turnId)?.openTools;
+    let lastToolClosed = false;
     if (openTools && isToolItem(item) && isString(item.id)) {
-      if (completed) openTools.delete(item.id);
+      if (completed) lastToolClosed = openTools.delete(item.id) && openTools.size === 0;
       else openTools.add(item.id);
     }
     this.#observeTraceStep(turnId, item, completed, toolProgress);
@@ -1908,6 +1909,18 @@ export class TurnLifecycle {
         turnId,
         toolProgress,
         activity,
+      );
+      return;
+    }
+    // A tool whose end adds no line, such as a memory search, still ends its step. Without this the
+    // client keeps `running` and the face of that step until the next line.
+    if (lastToolClosed) {
+      this.#emitTurnProgress(
+        agentId,
+        this.#conversation.publicThreadId(agentId, threadId),
+        turnId,
+        sourceText("status.agent.toolResultReviewing"),
+        "reviewing",
       );
       return;
     }

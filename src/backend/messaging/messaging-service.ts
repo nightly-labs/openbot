@@ -1833,7 +1833,8 @@ export class MessagingService {
       // The agent's newest progress line takes the place of "Working"; the Stop button stays. A
       // request that already ended, or whose status post failed, gets no edit.
       if (!live || !post?.messageId || !post.stopToken || post.final) return;
-      const text = redactText(activity.text);
+      // Only the host makes a platform mention, so the mention markers go.
+      const text = redactText(activity.text).replace(MENTION_MARKERS, "");
       yield* live.adapter
         .edit(target, post.messageId, {
           text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
