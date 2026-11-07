@@ -2,7 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { randomUUID, type UUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -15,6 +15,7 @@ import {
   query,
   type SDKUserMessage,
   type SessionMessage,
+  type Settings,
   type SpawnedProcess,
   type SpawnOptions,
   tool,
@@ -384,6 +385,57 @@ function claudeSettingSources(
   const user: NonNullable<Options["settingSources"]> = userSetup ? ["user"] : [];
   return config.workspaceOnly ? user : [...user, "project", "local"];
 }
+
+/**
+ * The sign-in part of the user settings, for a query that does not load the user settings: the
+ * account and API backend keys, which cost no prompt tokens. The sign-in probe reads the whole file,
+ * so without them an agent turn could use another account or backend than the provider settings
+ * show: Bedrock, Vertex or a gateway set in `env`, or an `apiKeyHelper`. They go in as flag settings.
+ * A missing or unreadable file gives nothing. The file can hold secrets, so no value of it is logged.
+ */
+const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (configDirectory: string) {
+  const text = yield* Effect.tryPromise(() => readFile(join(configDirectory, "settings.json"), "utf8")).pipe(
+    Effect.option,
+  );
+  if (Option.isNone(text)) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.value);
+  } catch {
+    queryLogger.warn(
+      "Claude starts without the sign-in settings of ~/.claude/settings.json: the file is not valid JSON.",
+    );
+    return {};
+  }
+  if (!isDynamicRecord(parsed)) return {};
+  const stringSetting = (key: string): string | null => {
+    const value = parsed[key];
+    return isString(value) ? value : null;
+  };
+  const apiKeyHelper = stringSetting("apiKeyHelper");
+  const proxyAuthHelper = stringSetting("proxyAuthHelper");
+  const awsCredentialExport = stringSetting("awsCredentialExport");
+  const awsAuthRefresh = stringSetting("awsAuthRefresh");
+  const gcpAuthRefresh = stringSetting("gcpAuthRefresh");
+  const forceLoginMethod = parsed.forceLoginMethod;
+  const forceLoginOrgUUID = parsed.forceLoginOrgUUID;
+  const env = isDynamicRecord(parsed.env)
+    ? Object.fromEntries(Object.entries(parsed.env).filter((entry): entry is [string, string] => isString(entry[1])))
+    : {};
+  const settings: Settings = {
+    ...(apiKeyHelper ? { apiKeyHelper } : {}),
+    ...(proxyAuthHelper ? { proxyAuthHelper } : {}),
+    ...(awsCredentialExport ? { awsCredentialExport } : {}),
+    ...(awsAuthRefresh ? { awsAuthRefresh } : {}),
+    ...(gcpAuthRefresh ? { gcpAuthRefresh } : {}),
+    ...(isOneOf(["claudeai", "console", "gateway"] as const, forceLoginMethod) ? { forceLoginMethod } : {}),
+    ...(isString(forceLoginOrgUUID) || (Array.isArray(forceLoginOrgUUID) && forceLoginOrgUUID.every(isString))
+      ? { forceLoginOrgUUID }
+      : {}),
+    ...(Object.keys(env).length > 0 ? { env } : {}),
+  };
+  return settings;
+});
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
@@ -982,13 +1034,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const userSetup = !config.profileGeneration && this.#userSetup();
     const skillPlugin =
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
+    const configDirectory =
+      this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+    // A profile generation loads no settings at all; the user setup brings the whole user settings file.
+    const signInSettings: Settings =
+      config.profileGeneration || userSetup ? {} : yield* claudeSignInSettings(configDirectory);
     const homeSkillPlugin =
       stateDirectory && userSetup
-        ? yield* claudeHomeSkillPlugin(
-            stateDirectory,
-            this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"),
-            config.cwd,
-          ).pipe(
+        ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(
             // The home skills are an addition: a state folder that cannot hold the links must not stop the session.
             Effect.catch((error) =>
               Effect.sync(() => {
@@ -1065,7 +1118,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           // The SDK deletes NODE_OPTIONS from the environment of the CLI. On a server the agent
           // environment has the CPU limit module there (`agentProcessEnvironment`), so it goes into
           // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
-          ...(nodeOptions ? { settings: { env: { NODE_OPTIONS: nodeOptions } } } : {}),
+          // The sign-in settings of the user settings file join it there when the user settings do not load.
+          ...(nodeOptions || Object.keys(signInSettings).length > 0
+            ? {
+                settings: {
+                  ...signInSettings,
+                  ...(nodeOptions || signInSettings.env
+                    ? { env: { ...signInSettings.env, ...(nodeOptions ? { NODE_OPTIONS: nodeOptions } : {}) } }
+                    : {}),
+                },
+              }
+            : {}),
           ...(config.workspaceOnly
             ? {
                 sandbox: claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders),
