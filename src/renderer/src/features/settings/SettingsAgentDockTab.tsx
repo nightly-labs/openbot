@@ -35,6 +35,7 @@ import {
 export interface AgentDockSettingsModel {
   server: { id: string; name: string } | null;
   agents: readonly ComposerAgent[];
+  hiddenAgentIds: ReadonlySet<string>;
 }
 
 const PLACEMENT_LABEL = {
@@ -54,7 +55,9 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
   const aboveApps = () => preference().shown && preference().placement === "screen";
   const seats = createMemo(() => {
     const server = props.model.server;
-    return server ? agentDockSeats(server.id) : [];
+    return server
+      ? agentDockSeats(server.id, () => props.model.agents.map((agent) => agent.id), props.model.hiddenAgentIds)
+      : [];
   });
 
   function setOnDock(serverId: string, agentId: string, onDock: boolean): void {

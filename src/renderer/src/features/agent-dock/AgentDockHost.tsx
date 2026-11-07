@@ -13,6 +13,7 @@ import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
 import { AgentDock, type AgentDockChatModel } from "@openbot/ui/features/agent-dock/AgentDock";
 import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
 import { appPort } from "../../app-port";
@@ -24,10 +25,12 @@ import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
+import { useSidebar } from "../sidebar/sidebar-context";
 import { agentDockPort } from "./agent-dock-port";
 import {
   type AgentDockPlacement,
   agentDockSeats,
+  sameAgentDockSeats,
   saveAgentDockOffset,
   setAgentDockSeats,
   useAgentDockPreference,
@@ -94,8 +97,22 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const { agentList, userHiddenAgentIds } = useAgents();
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply } = useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const preference = useAgentDockPreference();
-  const seatIds = createMemo(() => agentDockSeats(serverId));
+  const seatIds = createMemo(
+    () =>
+      agentDockSeats(
+        serverId,
+        () =>
+          sidebarAgentOrder(agentList(), {
+            layout: sidebarLayout(),
+            pinnedItems: pinnedSidebarItems(),
+            hiddenAgentIds: userHiddenAgentIds(),
+          }).map((agent) => agent.id),
+        userHiddenAgentIds(),
+      ),
+    { equals: sameAgentDockSeats },
+  );
   const [openAgentId, setOpenAgentId] = createSignal<string | null>(null);
 
   const saveSeats = (seats: string[]) => setAgentDockSeats(serverId, seats);
