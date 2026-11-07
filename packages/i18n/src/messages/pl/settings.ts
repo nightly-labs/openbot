@@ -67,7 +67,7 @@ export const messages = {
   "settings.externalLinks.description": "Tu otwierają się linki z czatów, stron logowania i płatności.",
   "settings.externalLinks.defaultBrowser": "Przeglądarka",
   "settings.externalLinks.openbot": "OpenBot",
-  "settings.externalLinks.defaultBrowserNamed": "Domyślna przeglądarka ({name})",
+  "settings.externalLinks.defaultBrowserNamed": "Przeglądarka ({name})",
   "settings.externalLinks.otherApp": "Inna aplikacja…",
   "settings.externalLinks.command": "Polecenie…",
   "settings.externalLinks.commandLabel": "Polecenie przeglądarki",
