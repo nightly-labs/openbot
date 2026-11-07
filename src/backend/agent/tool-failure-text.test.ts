@@ -38,10 +38,7 @@ describe("toolFailureText", () => {
 
   it("keeps the end of a long command output, where the error is", () => {
     const output = `${"line\n".repeat(CONVERSATION_TRACE_TEXT_LIMIT)}npm ERR! token ${secret} is not valid`;
-    const text = toolFailureText(
-      item({ type: "commandExecution", status: "failed", aggregatedOutput: output }),
-      redact,
-    );
+    const text = toolFailureText(item({ type: "toolCall", name: "Bash", status: "failed", error: output }), redact);
     expect(text?.endsWith("npm ERR! token ••• is not valid")).toBe(true);
     expect(text?.length).toBe(CONVERSATION_TRACE_TEXT_LIMIT);
   });

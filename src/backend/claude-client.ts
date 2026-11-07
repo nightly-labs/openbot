@@ -1853,7 +1853,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           type: "toolCall",
           name,
           status: completed ? (failure === null ? "completed" : "failed") : "in_progress",
-          ...(completed && failure ? { error: failure.slice(0, INPUT_LIMITS.messageText) } : {}),
+          ...(completed && failure ? { error: failureEnds(failure) } : {}),
           // The skill that a `Skill` call loads, for the turn's activity line.
           ...(name === "Skill" && isRecord(input) && typeof input.skill === "string"
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }
@@ -2672,6 +2672,16 @@ function readSectionTeammates(value: unknown): SectionTeammates | null {
       isRecord(member) && isString(member.id) && isString(member.name) && isString(member.title),
   );
   return members.length > 0 ? { name: value.name, members } : null;
+}
+
+/**
+ * A tool error of a size that an item can hold. It keeps both ends: a command's error is at the end,
+ * another tool's at the start. The cut is in the middle, far from the text that the step shows, so a
+ * secret that it divides cannot show there.
+ */
+function failureEnds(text: string): string {
+  const half = Math.floor(INPUT_LIMITS.messageText / 2);
+  return text.length <= INPUT_LIMITS.messageText ? text : `${text.slice(0, half)}\n…\n${text.slice(-half)}`;
 }
 
 function parseAuthStatus(stdout: unknown): DynamicRecord | null {

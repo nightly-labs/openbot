@@ -433,18 +433,37 @@ function resultText(value: unknown, depth = 0): string | null {
 }
 
 /**
- * The error text of a tool step that failed, for the step's "Show error" output. `redact` runs on the
- * whole text before the cut, because a cut through a secret leaves a part that no rule recognizes.
- * A command keeps the end of its output, where the error is; other tools keep the start.
+ * The part of a failed result that is redacted. It is much longer than the kept text, so a secret
+ * that this first cut divides stays out of the kept text, and a large output is not read in full.
+ */
+const FAILURE_WINDOW = CONVERSATION_TRACE_TEXT_LIMIT * 16;
+
+/** Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool. */
+function isShellCommand(item: ThreadItem): boolean {
+  return (
+    toolUsage(item)?.kind === "command" ||
+    (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash")
+  );
+}
+
+/**
+ * The error text of a tool step that failed, for the step's "Show error" output. `redact` runs before
+ * the cut, because a cut through a secret leaves a part that no rule recognizes. A command keeps the
+ * end of its output, where the error is; other tools keep the start.
  */
 export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
   if (getString(item, "status") !== "failed") return null;
   const raw = resultText(item);
   if (!raw) return null;
-  const text = redact(raw).trim();
+  const tail = isShellCommand(item);
+  const window = raw.length <= FAILURE_WINDOW ? raw : tail ? raw.slice(-FAILURE_WINDOW) : raw.slice(0, FAILURE_WINDOW);
+  const text = redact(window).trim();
   const limit = CONVERSATION_TRACE_TEXT_LIMIT;
   if (text.length <= limit) return text || null;
-  return item.type === "commandExecution" ? `…${text.slice(1 - limit)}` : `${text.slice(0, limit - 1)}…`;
+  // A cut between the two halves of a surrogate pair leaves half a character, which goes.
+  return tail
+    ? `…${text.slice(1 - limit).replace(/^[\uDC00-\uDFFF]/u, "")}`
+    : `${text.slice(0, limit - 1).replace(/[\uD800-\uDBFF]$/u, "")}…`;
 }
 
 /** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */
@@ -520,11 +539,7 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   }
   // Last, so that a command with a title such as "Run the tests" keeps the text above. A command that
   // never returns then reads as a command, not as an unknown step (#5485). Pi names its shell tool `bash`.
-  if (
-    !completed &&
-    (toolUsage(item)?.kind === "command" ||
-      (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash"))
-  ) {
+  if (!completed && isShellCommand(item)) {
     return sourceText("status.agent.commandRunningUnnamed");
   }
   return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.toolStepWorking");
