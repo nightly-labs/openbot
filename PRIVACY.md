@@ -1045,14 +1045,15 @@ Network traffic can also occur when:
 - the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
-  in the application data folder. The request carries no user data. The text of a reply that is read
-  aloud, and its audio, stay on the computer. The setting and the chosen voice are saved in
+  in the application data folder. The request carries no user data. When Supertonic reads a reply
+  aloud, the text and its audio stay on the computer. The setting and the chosen voice are saved in
   `speech-preference.json` in the same folder. When the user selects an ElevenLabs model (Flash
   v2.5, Multilingual v2 or Eleven v3) or xAI Text to Speech as the spoken replies model, OpenBot
-  sends the text of each reply that it reads, the chosen model and the voice to `api.elevenlabs.io`
-  or `api.x.ai` with the user's own API key, and receives the audio. Listen sends a short sample
-  text. Nothing else is sent: no conversation, file or agent instruction. The provider handles the
-  text and the audio under its own policy and the user's plan. Supertonic sends nothing. In the Voice pane, the spoken reply runs on this
+  sends the text of each reply that it reads, the chosen model, the voice and the speech language to
+  `api.elevenlabs.io` or `api.x.ai` with the user's own API key, and receives the audio. Listen
+  sends a short sample text. Nothing else is sent: no conversation, file or agent instruction. The
+  provider handles the text and the audio under its own policy and the user's plan.
+  In the Voice pane, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
   **Settings → Voice**: a local model runs on this computer, and ElevenLabs gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,

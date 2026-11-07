@@ -80,10 +80,14 @@ export function createSettingsVoiceStore(active: () => boolean) {
       draft.statuses[status.modelId] = status;
     });
 
-  const setSpeechStatus = (status: SpeechModelStatus) =>
+  /** A status of another model, such as a Supertonic download that ends after a change to xAI, is old. */
+  const setSpeechStatus = (status: SpeechModelStatus) => {
+    const chosen = state.speech.settings?.modelId;
+    if (chosen && status.modelId !== chosen) return;
     setState((draft) => {
       draft.speech.status = status;
     });
+  };
 
   // The tab listens only while it is open, and reads every status again each time it opens.
   createEffect(active, (isActive) => {
@@ -280,7 +284,12 @@ export function createSettingsVoiceStore(active: () => boolean) {
       if (!saved) return;
       void voicePort()
         .voice.getSpeechModelStatus()
-        .then(setSpeechStatus)
+        .then((status) => {
+          setSpeechStatus(status);
+          // Back to Supertonic while replies are read aloud: download it, as Read replies aloud does.
+          if (state.speech.settings?.readReplies && !state.server?.routes.speech && supertonicMissing())
+            downloadSpeech();
+        })
         .catch((error: unknown) => fail(error, "settings.voice.loadFailed"));
     });
   }

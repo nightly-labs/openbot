@@ -27,6 +27,12 @@ const ELEVENLABS_MODELS: Partial<Record<CloudSpeechModelId, { modelId: string; l
   "elevenlabs-v3": { modelId: "eleven_v3", languageCode: true },
 };
 
+/**
+ * ElevenLabs refuses a `language_code` that the model does not support. Flash v2.5 does not list
+ * Estonian, Latvian, Lithuanian or Slovenian, so the model finds these languages itself.
+ */
+const ELEVENLABS_UNLISTED_LANGUAGES: ReadonlySet<SpeechLanguage> = new Set(["et", "lt", "lv", "sl"]);
+
 /** The voice IDs of the ElevenLabs default voices. */
 const ELEVENLABS_VOICE_IDS: Record<ElevenLabsSpeechVoice, string> = {
   alice: "Xb7hH8MSUJpSbSDYk0k2",
@@ -121,7 +127,9 @@ export function speakInCloud(
       body: {
         text: request.text,
         model_id: model.modelId,
-        ...(model.languageCode ? { language_code: request.language } : {}),
+        ...(model.languageCode && !ELEVENLABS_UNLISTED_LANGUAGES.has(request.language)
+          ? { language_code: request.language }
+          : {}),
       },
     },
   );

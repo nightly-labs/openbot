@@ -468,13 +468,14 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             disabled={!speech().settings}
             mount={props.selectMount}
           />
-          <Show when={speechCloud()}>
-            {(cloud) => (
+          {/* Keyed: a new provider gets an empty key field, so a draft key is not saved for the other provider. */}
+          <Show when={speechCloud()?.provider} keyed>
+            {(provider) => (
               <VoiceKeyRow
-                provider={cloud().provider}
-                saved={speechKeySaved(cloud().provider)}
-                onSave={(key) => props.store.saveSpeechApiKey(cloud().provider, key)}
-                onRemove={() => void props.store.removeSpeechApiKey(cloud().provider)}
+                provider={provider}
+                saved={speechKeySaved(provider)}
+                onSave={(key) => props.store.saveSpeechApiKey(provider, key)}
+                onRemove={() => void props.store.removeSpeechApiKey(provider)}
               />
             )}
           </Show>
