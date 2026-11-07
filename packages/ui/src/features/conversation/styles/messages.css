@@ -646,10 +646,10 @@
   grid-template-rows: 0fr;
 }
 
-/* The slot keeps its room, so the line enters and leaves in place: only its face and text animate,
-   and the messages above do not move. */
-.agent-activity-slot[data-reserved="true"] > .agent-activity-entry,
-.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-state="exiting"] {
+/* The slot keeps the room of a plain line, so that line enters and leaves in place: only its face and
+   text animate, and the messages above do not move. A line with steps is taller, so it still opens. */
+.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"],
+.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"][data-state="exiting"] {
   grid-template-rows: 1fr;
   transition: none;
 }
