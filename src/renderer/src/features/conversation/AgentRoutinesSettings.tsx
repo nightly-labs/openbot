@@ -531,9 +531,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
-        ...(props.port.runIn ? { runIn: current.runIn } : {}),
+        // Only a changed place goes: a remote host sends it on a route of its own, after the save.
+        ...(props.port.runIn && current.runIn !== ((current.id ? draftBase?.runIn : undefined) ?? "chat")
+          ? { runIn: current.runIn }
+          : {}),
       });
-      const saved = result.routine;
+      // A remote answer leaves out the place that the host kept.
+      const saved =
+        props.port.runIn && result.routine.runIn === undefined
+          ? { ...result.routine, runIn: current.runIn }
+          : result.routine;
       setRoutines((items) => {
         const next = items.some((routine) => routine.id === saved.id)
           ? items.map((routine) => (routine.id === saved.id ? saved : routine))

@@ -599,13 +599,20 @@ export function teamAgentRoutinesApi(
   request: TeamApiRequest,
   runPlaces: () => boolean = () => false,
 ): TeamAgentRoutinesApi {
-  const withRunPlace = async (routine: Routine, runIn: RoutineRunPlace | undefined): Promise<Routine> => {
+  // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
+  // and a second save does not make a second routine.
+  const withRunPlace = async (
+    routine: Routine,
+    runIn: RoutineRunPlace | undefined,
+    created = false,
+  ): Promise<Routine> => {
     if (!runIn || !runPlaces()) return routine;
-    const place = await request("POST", ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+    const placed = request("POST", ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
       agentId: routine.agentId,
       routineId: routine.id,
       runIn,
     });
+    const place = created ? await placed.catch(() => ({ runIn: "chat" as const })) : await placed;
     return { ...routine, runIn: place.runIn };
   };
   return {
@@ -627,6 +634,7 @@ export function teamAgentRoutinesApi(
           decodeTeamProtocolV2Json(input),
         ),
         runIn,
+        true,
       ),
     updateRoutine: async ({ runIn, ...input }) =>
       withRunPlace(

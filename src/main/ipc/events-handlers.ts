@@ -25,6 +25,7 @@ import {
 } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -42,6 +43,8 @@ import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
+
+const runPlaceLogger = createOpenBotLogger("routine-run-place");
 
 interface EventsRemoteServers {
   supportsCapability(
@@ -120,11 +123,22 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
           );
           const agentId = runPlaceAgent(serverId, input.owner);
           if (agentId === null || input.runIn === undefined) return saved;
-          const place = await remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+          const placed = remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
             agentId,
             routineId: saved.routine.id,
             runIn: input.runIn,
           });
+          // The new routine exists, so a failed place does not fail the create: it runs in the chat,
+          // and a second save does not make a second routine.
+          const place =
+            input.id === undefined
+              ? await placed.catch(() => {
+                  runPlaceLogger.warn(
+                    "The run place of a new remote routine was not set. The routine runs in the chat.",
+                  );
+                  return { runIn: "chat" as const };
+                })
+              : await placed;
           return { ...saved, routine: { ...saved.routine, runIn: place.runIn } };
         },
       }),

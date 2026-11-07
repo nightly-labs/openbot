@@ -21,6 +21,7 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { AgentService } from "../../backend/agent-service";
@@ -46,6 +47,8 @@ import {
 } from "./agent-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler } from "./scoped-handler";
+
+const runPlaceLogger = createOpenBotLogger("routine-run-place");
 
 interface RoutineIpcDependencies {
   service: AgentService;
@@ -88,7 +91,7 @@ export function routineIpcHandlers({
                 method: "POST",
                 body: parsed,
               })
-              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn))),
+              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn, true))),
           ),
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
@@ -156,22 +159,34 @@ export function routineIpcHandlers({
 
 /**
  * The released routine routes leave out where a routine runs, so a host with `routine-run-place-v1`
- * gets the place on its own route after the save. A host without it keeps the saved place.
+ * gets the place on its own route after the save. A host without it keeps the saved place. The new
+ * routine exists, so a failed place does not fail the create: the routine runs in the chat, and a
+ * second save does not make a second routine.
  */
 function withRemoteRunPlace(
   remoteServers: RemoteServerManager,
   serverId: string,
   routine: Routine,
   runIn: RoutineRunPlace | undefined,
+  created = false,
 ) {
   if (!runIn || !remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY))
     return Effect.succeed(routine);
-  return remoteServers
+  const placed = remoteServers
     .request(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
       method: "POST",
       body: { agentId: routine.agentId, routineId: routine.id, runIn },
     })
-    .pipe(Effect.map((place) => ({ ...routine, runIn: place.runIn })));
+    .pipe(Effect.map((place): Routine => ({ ...routine, runIn: place.runIn })));
+  if (!created) return placed;
+  return placed.pipe(
+    Effect.catch(() =>
+      Effect.sync((): Routine => {
+        runPlaceLogger.warn("The run place of a new remote routine was not set. The routine runs in the chat.");
+        return { ...routine, runIn: "chat" };
+      }),
+    ),
+  );
 }
 
 function calendar(input: { from: string; to: string }, source: RoutineCalendarSource<RemoteWorkflowError>) {

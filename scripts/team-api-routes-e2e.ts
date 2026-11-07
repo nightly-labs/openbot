@@ -445,8 +445,8 @@ const agentAccess: TeamApiAgentAccess = {
   copyAgent: unused("agentAccess.copyAgent"),
 };
 
-// The routine records of `agent-ada` for `routine-run-place-v1`: a schedule routine and a webhook
-// routine, both in the agent's chat. A save records its input and keeps the new place.
+// The routine records of `agent-ada` for `routine-run-place-v1`: a schedule routine, a webhook routine
+// and a `once` routine, all in the agent's chat. A save records its input and keeps the new place.
 const routineRecordTimes = { createdAt: "2026-11-01T08:00:00.000Z", updatedAt: "2026-11-01T08:00:00.000Z" };
 let routineRecords: OwnedRoutineRecord[] = [
   {
@@ -483,6 +483,24 @@ let routineRecords: OwnedRoutineRecord[] = [
       url: "https://hooks.example.test/route-hook",
       eventType: "deploy",
       filters: [],
+      ...routineRecordTimes,
+    },
+    ...routineRecordTimes,
+  },
+  {
+    id: "routine-once",
+    ownerId: "agent-ada",
+    name: "Launch day check",
+    instruction: "Check the launch.",
+    active: true,
+    timezone: "Europe/Warsaw",
+    runIn: "chat",
+    trigger: {
+      kind: "schedule",
+      id: "trigger-once",
+      routineId: "routine-once",
+      schedule: { kind: "once", date: "2026-12-01", time: "09:00" },
+      nextRunAt: "2026-12-01T08:00:00.000Z",
       ...routineRecordTimes,
     },
     ...routineRecordTimes,
@@ -6009,16 +6027,39 @@ try {
       json: { agentId: "agent-ada" },
       capabilities,
     });
+    const adminBefore = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
     check(
-      "a member reads the place of each routine of the agent, a webhook routine too",
+      "a member reads the places of the schedule routines that the released routes show; an admin also reads the webhook routines; nobody reads a `once` routine",
       before.status === 200 &&
-        isDeepStrictEqual(before.body, {
+        isDeepStrictEqual(before.body, { routines: [{ routineId: "routine-ada", runIn: "chat" }] }) &&
+        isDeepStrictEqual(adminBefore.body, {
           routines: [
             { routineId: "routine-ada", runIn: "chat" },
             { routineId: "routine-hook", runIn: "chat" },
           ],
         }),
-      summary(before),
+      [summary(before), summary(adminBefore)],
+    );
+    const memberHook = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-hook", runIn: "thread" },
+      capabilities,
+    });
+    const onceSet = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-once", runIn: "thread" },
+      capabilities,
+    });
+    check(
+      "a member who changes a webhook routine, and anybody who changes a `once` routine, gets 404 routineGone, and the host saves nothing",
+      errorIs(memberHook, 404, sourceText("error.backend.routineGone")) &&
+        errorIs(onceSet, 404, sourceText("error.backend.routineGone")) &&
+        saves().length === 0,
+      [summary(memberHook), summary(onceSet)],
     );
     const schedule = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
       token: bobToken,
@@ -6026,12 +6067,12 @@ try {
       capabilities,
     });
     const webhook = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
-      token: bobToken,
+      token: adaToken,
       json: { agentId: "agent-ada", routineId: "routine-hook", runIn: "thread" },
       capabilities,
     });
     check(
-      "a member with manage access moves a schedule routine and a webhook routine to their own threads; the host changes only the place, with no routine card in the chat",
+      "a member with manage access moves a schedule routine, and an admin a webhook routine, to their own threads; the host changes only the place, with no routine card in the chat",
       schedule.status === 200 &&
         isDeepStrictEqual(schedule.body, { routineId: "routine-ada", runIn: "thread" }) &&
         webhook.status === 200 &&

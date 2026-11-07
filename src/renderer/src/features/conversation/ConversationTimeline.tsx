@@ -507,7 +507,8 @@ export function ConversationTimeline() {
   const webhookRoutines = createChatWebhookRoutines(webhookRoutineSource);
   /**
    * Opens the side thread of a routine's runs. A routine that now runs in the chat has no link, also when
-   * an earlier run made a thread: its new runs are not there. A remote host does not send the place.
+   * an earlier run made a thread: its new runs are not there. A remote host without
+   * `routine-run-place-v1` does not send the place, so its routines keep the link.
    */
   const openRoutineThread = (routineId: string) => {
     const routine =
