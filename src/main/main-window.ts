@@ -55,7 +55,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { preventPanelActivation } from "./mac-panel-activation";
+import { hidePanelFromWindowSwitchers, preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -652,6 +652,8 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
   // The island is the topmost window on every Space. Without this, macOS can give it activation
   // when the user switches to an application that has no window there.
   preventPanelActivation(window);
+  // While its text field is focused, the island is the main window, and AltTab would list it.
+  hidePanelFromWindowSwitchers(window);
   // Chromium shares zoom per origin. The main window zoom would shrink this fixed-size window's
   // viewport and move the shared avatar out of the expanded panel.
   window.webContents.setZoomMode("isolated");
@@ -692,6 +694,8 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   });
   // The chat composer makes the panel key. It must not activate the app and bring the main window up.
   preventPanelActivation(window);
+  // While its chat composer is focused, the dock is the main window, and AltTab would list it.
+  hidePanelFromWindowSwitchers(window);
   // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
