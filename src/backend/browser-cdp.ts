@@ -954,18 +954,17 @@ export class BrowserCdpEngine {
           // A handler that removed the target after the key shows that the key arrived.
           Effect.catch(() => Effect.succeed(true)),
         );
-        yield* dispatchText(send, text, resolved.sessionId, keyArrived);
-        // Short text arrives one key at a time, and a key handler can move focus to another element.
-        yield* checkFocus(
-          options.submit === true
-            ? "error.backend.browserTypingSubmitSkipped"
-            : "error.backend.browserTypingFocusMovedWhileTyping",
-        );
+        yield* dispatchText(send, text, resolved.sessionId, {
+          keyArrived,
+          // Short text arrives one key at a time, and a key handler can move focus to another element.
+          beforeNext: checkFocus("error.backend.browserTypingFocusMovedWhileTyping"),
+        });
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
         // the snapshot" and `submit: true` would insert the text without ever submitting it.
         if (options.submit === true) {
+          yield* checkFocus("error.backend.browserTypingSubmitSkipped");
           yield* browserSync(() => assertBeforeDeadline(deadline));
           yield* dispatchShortcut(send, "Enter", resolved.sessionId);
         }

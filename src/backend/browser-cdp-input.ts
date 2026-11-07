@@ -269,21 +269,37 @@ const MAX_KEYED_TEXT = 128;
  */
 const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;
 
-/**
- * `keyArrived` tells whether the first key event reached the page. Chromium can drop key events
- * for a tab that it accepts inserted text for, as for a hidden tab under Xvfb, and drops them with
- * no error. The text is then inserted, as it was before keys.
- */
+interface TextChecks {
+  /**
+   * Tells whether the first key event reached the page. Chromium can drop key events for a tab that
+   * it accepts inserted text for, as for a hidden tab under Xvfb, and drops them with no error. The
+   * rest of the text is then inserted, as it was before keys.
+   */
+  readonly keyArrived?: Effect.Effect<boolean, BrowserOperationError>;
+  /**
+   * Runs before each key or insert after the first one, and fails when a key handler moved focus.
+   * Focus that moves after the last character, as in a one-time code box, is not a failure.
+   */
+  readonly beforeNext?: Effect.Effect<void, BrowserOperationError>;
+}
+
 export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
   send: SendCommand,
   text: string,
   sessionId?: string,
-  keyArrived?: Effect.Effect<boolean, BrowserOperationError>,
+  checks: TextChecks = {},
 ) {
   if (text.length === 0 || text.length > MAX_KEYED_TEXT || EDITOR_COMPLETED_TEXT.test(text)) {
     yield* send("Input.insertText", { text }, sessionId);
     return;
   }
+  let sent = false;
+  const beforePiece = Effect.gen(function* () {
+    if (sent && checks.beforeNext) yield* checks.beforeNext;
+    sent = true;
+  });
+  const insert = (piece: string) =>
+    beforePiece.pipe(Effect.andThen(send("Input.insertText", { text: piece }, sessionId)));
   const characters = [...text];
   let pending = "";
   let keyed = false;
@@ -292,16 +308,17 @@ export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
       pending += character;
       continue;
     }
-    if (pending) yield* send("Input.insertText", { text: pending }, sessionId);
+    if (pending) yield* insert(pending);
     pending = "";
+    yield* beforePiece;
     yield* dispatchTextKey(send, character, sessionId);
-    if (!keyed && keyArrived && !(yield* keyArrived)) {
-      yield* send("Input.insertText", { text: characters.slice(index).join("") }, sessionId);
+    if (!keyed && checks.keyArrived && !(yield* checks.keyArrived)) {
+      yield* insert(characters.slice(index).join(""));
       return;
     }
     keyed = true;
   }
-  if (pending) yield* send("Input.insertText", { text: pending }, sessionId);
+  if (pending) yield* insert(pending);
 });
 
 export const dispatchTextKey = Effect.fn("Browser.dispatchTextKey")(function* (

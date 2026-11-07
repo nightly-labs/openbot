@@ -2195,6 +2195,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "End redirected focus",
           "replaced focus target",
           "redirected input append",
+          "redirected input mid-text",
         );
       for (const name of names) {
         const frameTransfer = name.endsWith("frame focus transfer");
@@ -2209,9 +2210,18 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
         ].includes(name);
         const empty = name.startsWith("empty");
-        const submit = !["normal append", "empty replacement", "readonly", "redirected input append"].includes(name);
+        const submit = ![
+          "normal append",
+          "empty replacement",
+          "readonly",
+          "redirected input append",
+          "redirected input mid-text",
+        ].includes(name);
+        // Focus that moves after the last character, as in a one-time code box, is not a failure.
+        const movedAfterText = name === "redirected input append";
+        const midText = name === "redirected input mid-text";
         const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
-        const expectedSuccess = !changedBeforeInput && !redirectInput;
+        const expectedSuccess = !changedBeforeInput && (!redirectInput || movedAfterText);
         await frame.executeJavaScript(
           `(() => {
             document.body.innerHTML = '<div id="typing-root"></div>';
@@ -2295,7 +2305,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           target: target
             ? { kind: "ref", ref: target.ref, revision: snapshot.revision }
             : { kind: "role", role: "textbox", name: "Intended field", exact: true },
-          text: empty ? "" : "X",
+          text: empty ? "" : midText ? "XY" : "X",
           mode: replace ? "replace" : "append",
           submit,
         });
@@ -2344,7 +2354,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
             ? "Nothing was typed"
             : submit
               ? "Enter was not sent"
-              : "Part of the text can be in another element";
+              : "Only the first part of the text is in the field";
         const safe =
           result.success === expectedSuccess &&
           (result.success || toolError(result).includes(expectedError)) &&

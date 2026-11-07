@@ -346,9 +346,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserTypingFocusMoved":
     "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMovedWhileTyping":
-    "The page moved focus away while the text was typed. Part of the text can be in another element. Take a fresh snapshot and check the field before you type again.",
+    "The page moved focus away before all the text was typed. Only the first part of the text is in the field. Take a fresh snapshot and check the field before you type again.",
   "error.backend.browserTypingSubmitSkipped":
-    "The page moved focus away while the text was typed, so Enter was not sent. Part of the text can be in another element. Take a fresh snapshot and check the field before you type again.",
+    "The text is in the field, but the page moved focus away, so Enter was not sent. Do not type the text again. Take a fresh snapshot.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
     "The server answered {status}. Check the URL. The link may be wrong, expired, or deleted.",
