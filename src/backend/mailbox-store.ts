@@ -623,9 +623,26 @@ export class MailboxStore {
       this.#changes.messageIds.add(messageId);
       for (const delivery of deliveries) this.#changes.deliveryIds.add(delivery.id);
       for (const draft of usedDrafts) this.#changes.draftIds.add(draft.id);
+      // A late final answer settles its request in the same commit as the answer itself.
+      const answered = isAnswer(message) ? answeredDeliveryIds(this.#state) : new Set<string>();
+      const settled = this.#state.deliveries
+        .filter(
+          (delivery) =>
+            answered.has(delivery.id) && (delivery.status === "failed" || delivery.status === "interrupted"),
+        )
+        .map((delivery) => ({ delivery, status: delivery.status, error: delivery.error }));
+      for (const { delivery } of settled) {
+        delivery.status = "completed";
+        delivery.error = null;
+        this.#changes.deliveryIds.add(delivery.id);
+      }
       try {
         this.#persist();
       } catch (error) {
+        for (const { delivery, status, error: previousError } of settled) {
+          delivery.status = status;
+          delivery.error = previousError;
+        }
         const deliveryIds = new Set(deliveries.map((delivery) => delivery.id));
         this.#state.messages = this.#state.messages.filter((candidate) => candidate.id !== messageId);
         this.#state.deliveries = this.#state.deliveries.filter((candidate) => !deliveryIds.has(candidate.id));
@@ -2072,12 +2089,15 @@ export class MailboxStore {
     error: string | null = null,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
+      // This request already has its own committed answer. A later failure of the shared turn
+      // belongs to that turn and the other unfinished requests, not to this answered request.
+      const answered = status !== "completed" && answeredDeliveryIds(this.#state).has(deliveryId);
       // Redacted here, not at the call site: this text is written to the database and read back by
       // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
       // a custom endpoint can carry that endpoint's API key or a header value.
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
-        status,
-        error: error === null ? null : redactText(error),
+        status: answered ? "completed" : status,
+        error: answered || error === null ? null : redactText(error),
       });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -3219,11 +3239,13 @@ export class MailboxStore {
 
 function normalizeStoredState(value: StoredState): StoredState {
   const nextOrderByAgent = new Map<string, number>();
+  const answered = answeredDeliveryIds(value);
   const deliveries = value.deliveries.map((delivery) => {
     const fallback = nextOrderByAgent.get(delivery.recipientAgentId) ?? 0;
     const queueOrder = Number.isFinite(delivery.queueOrder) ? delivery.queueOrder : fallback;
     nextOrderByAgent.set(delivery.recipientAgentId, Math.max(fallback, queueOrder + 1));
-    return { ...delivery, queueOrder };
+    const recover = answered.has(delivery.id) && (delivery.status === "failed" || delivery.status === "interrupted");
+    return { ...delivery, queueOrder, ...(recover ? { status: "completed" as const, error: null } : {}) };
   });
   return {
     ...value,
@@ -3235,6 +3257,41 @@ function normalizeStoredState(value: StoredState): StoredState {
       actor: reaction.actor ?? { kind: "user" },
     })),
   };
+}
+
+/**
+ * Durable final answers, bound to the request's worker and original sender, are completion evidence.
+ * A stored request expects a reply by default. Enqueue stores `expectsReply` only for an explicit `false`.
+ */
+function answeredDeliveryIds(state: StoredState): Set<string> {
+  const messages = new Map(state.messages.map((message) => [message.id, message]));
+  // Failure notes use the reply wire shape, but never prove that the teammate answered.
+  const failureNotes = new Set(
+    Object.entries(state.idempotency)
+      .filter(([key]) => key.startsWith("failed-request:"))
+      .map(([, messageId]) => messageId),
+  );
+  const destinations = new Map<string, Set<string>>();
+  for (const delivery of state.deliveries) {
+    const recipients = destinations.get(delivery.messageId) ?? new Set<string>();
+    recipients.add(delivery.recipientAgentId);
+    destinations.set(delivery.messageId, recipients);
+  }
+  const answers = new Map<string, Set<string>>();
+  for (const reply of state.messages) {
+    if (!isAnswer(reply) || failureNotes.has(reply.id)) continue;
+    const request = messages.get(reply.replyToMessageId);
+    if (request?.sender.kind !== "agent" || request.expectsReply === false) continue;
+    if (!destinations.get(reply.id)?.has(request.sender.agentId)) continue;
+    const workers = answers.get(request.id) ?? new Set<string>();
+    workers.add(reply.sender.agentId);
+    answers.set(request.id, workers);
+  }
+  return new Set(
+    state.deliveries
+      .filter((delivery) => answers.get(delivery.messageId)?.has(delivery.recipientAgentId))
+      .map((delivery) => delivery.id),
+  );
 }
 
 function compareQueueOrder(left: StoredDelivery, right: StoredDelivery): number {
