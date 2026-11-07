@@ -63,12 +63,14 @@ import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
+import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
+import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
   type CustomProviderSource,
   customProvidersOn,
@@ -966,12 +968,17 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: {},
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
-        extraEnv: () => ({
-          ...context.agentEnvironment?.(),
-          ...opencodeEnv(cli, context),
-          ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
-          ...(confinement ? OPENCODE_CONFINED_ENV : {}),
-        }),
+        extraEnv: () => {
+          const agentEnvironment = context.agentEnvironment?.();
+          return {
+            ...agentEnvironment,
+            ...opencodeEnv(cli, context),
+            // A file below the user's project config. `OPENCODE_AGENT_CONFIG` is above all of it.
+            ...openCodeAgentDefaultsEnv(context.providerStateDirectory, { ...process.env, ...agentEnvironment }),
+            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...(confinement ? OPENCODE_CONFINED_ENV : {}),
+          };
+        },
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
         // A stalled or refused turn on a custom endpoint names the endpoint, not OpenCode (#3234).
@@ -1421,7 +1428,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                 confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() }),
             }
           : {}),
-        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        // The OpenBot settings (`hermes-settings.ts`) for the Hermes folder that the process uses.
+        extraEnv: () => {
+          const agentEnvironment = context.agentEnvironment?.() ?? {};
+          return {
+            ...hermesSettingsEnvironment({ ...process.env, ...agentEnvironment }, context.providerStateDirectory),
+            ...agentEnvironment,
+          };
+        },
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
@@ -1438,6 +1452,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: HERMES_ARGV,
         profileGeneration: true,
         env: {},
+        extraEnv: () => hermesSettingsEnvironment(process.env, context.providerStateDirectory),
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
