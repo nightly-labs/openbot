@@ -108,6 +108,7 @@ function storedSpans(
       const subagent = subagentTitles.get(step.id);
       const command = step.command?.trim().split("\n", 1)[0];
       const span: TraceSpan = { id, parentId: "turn", name: labels.progress(text), kind: "tool", failed, start, end };
+      if (failed && step.error) span.error = step.error;
       if (step.recipientAgentIds?.length) {
         span.kind = "handoff";
         span.name = labels.message(labels.agentNames(step.recipientAgentIds));
@@ -151,7 +152,20 @@ function guessedSpans(timed: readonly TimedStep[], lastEnd: number, labels: Trac
         end,
       });
     } else if (step.kind === "progress") {
-      spans.push({ id: step.id, parentId: "turn", name: labels.progress(step.text), kind: "tool", start: at, end });
+      const span: TraceSpan = {
+        id: step.id,
+        parentId: "turn",
+        name: labels.progress(step.text),
+        kind: "tool",
+        start: at,
+        end,
+      };
+      // Only a failed tool step has an error.
+      if (step.error) {
+        span.failed = true;
+        span.error = step.error;
+      }
+      spans.push(span);
     }
   }
   return spans;
