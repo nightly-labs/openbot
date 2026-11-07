@@ -63,6 +63,12 @@ export const messages = {
     "배터리 전원일 때도 컴퓨터를 절전 모드로 전환하지 않아요. 배터리가 더 빨리 닳아요.",
   "settings.restoreWorkspace.title": "실행 시 마지막 워크스페이스 복원",
   "settings.restoreWorkspace.description": "이전 세션의 워크스페이스와 작업을 열어요.",
+  "settings.quitGuard.title": "⌘Q를 길게 눌러 종료",
+  "settings.quitGuard.description":
+    "종료하려면 ⌘Q를 길게 누르거나 두 번 누르세요. '안 함'이면 ⌘Q를 한 번 눌러도 종료되고 에이전트가 멈춥니다.",
+  "settings.quitGuard.working": "에이전트 작업 중",
+  "settings.quitGuard.always": "항상",
+  "settings.quitGuard.never": "안 함",
   "settings.externalLinks.title": "외부 링크 열기",
   "settings.externalLinks.description": "채팅, 로그인 페이지, 결제 페이지의 링크가 여기에서 열려요.",
   "settings.externalLinks.defaultBrowser": "기본 브라우저",

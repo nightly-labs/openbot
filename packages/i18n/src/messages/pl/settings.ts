@@ -63,6 +63,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "Nie usypiaj komputera także na baterii. Bateria rozładuje się szybciej.",
   "settings.restoreWorkspace.title": "Przywracaj ostatni obszar roboczy po uruchomieniu",
   "settings.restoreWorkspace.description": "Otwieraj obszar roboczy i zadania z poprzedniej sesji.",
+  "settings.quitGuard.title": "Przytrzymaj ⌘Q, aby zamknąć",
+  "settings.quitGuard.description":
+    "Przytrzymaj ⌘Q lub naciśnij dwa razy, aby zamknąć. Przy „Nigdy” jedno ⌘Q zamyka aplikację i zatrzymuje agentów.",
+  "settings.quitGuard.working": "Gdy agenci pracują",
+  "settings.quitGuard.always": "Zawsze",
+  "settings.quitGuard.never": "Nigdy",
   "settings.externalLinks.title": "Otwieraj linki zewnętrzne w",
   "settings.externalLinks.description": "Tu otwierają się linki z czatów, stron logowania i płatności.",
   "settings.externalLinks.defaultBrowser": "Przeglądarka",

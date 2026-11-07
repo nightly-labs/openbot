@@ -1427,6 +1427,7 @@ export async function createApplicationServices({
     offersBackground: !hostedServer && !serverModeEnvironment && !localServerChild,
     menuBar: process.platform === "darwin",
     offersKeepAwake: process.platform !== "linux" && !hostedServer && !serverModeEnvironment && !localServerChild,
+    offersQuitGuard: process.platform === "darwin" && !hostedServer && !serverModeEnvironment && !localServerChild,
   });
   await runCauseEffect(appBehavior.load());
   void Effect.runPromise(appBehavior.refreshLoginItem()).catch((error) =>

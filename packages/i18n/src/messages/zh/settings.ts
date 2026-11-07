@@ -64,6 +64,11 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "使用电池供电时也保持电脑唤醒，电量会消耗得更快。",
   "settings.restoreWorkspace.title": "启动时恢复上次的工作区",
   "settings.restoreWorkspace.description": "打开上次会话中的工作区和任务。",
+  "settings.quitGuard.title": "按住 ⌘Q 退出",
+  "settings.quitGuard.description": "按住 ⌘Q 或按两次以退出。选择“从不”时，按一次 ⌘Q 就会退出并停止助手。",
+  "settings.quitGuard.working": "助手工作时",
+  "settings.quitGuard.always": "始终",
+  "settings.quitGuard.never": "从不",
   "settings.externalLinks.title": "打开外部链接的方式",
   "settings.externalLinks.description": "聊天、登录页面和账单页面中的链接在这里打开。",
   // The two link targets. The saved value stays in English; only the label is translated.

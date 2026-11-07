@@ -79,6 +79,7 @@ import {
   isRemoteNetworkRoute,
   isSkillCategory,
   MAC_AUTOMATION_TARGETS,
+  QUIT_GUARDS,
   RENDERER_TIMING_LIMITS,
 } from "@openbot/contracts/ipc";
 import {
@@ -222,12 +223,20 @@ export function parseIdleRestartTarget(input: unknown): IdleRestartTarget {
   return input;
 }
 
+const APP_BEHAVIOR_SWITCHES = ["launchAtLogin", "keepRunningInBackground", "keepAwake", "keepAwakeOnBattery"] as const;
+
+/** At least one switch or the quit guard. */
 export function parseAppBehaviorPreferenceChange(input: unknown): AppBehaviorPreferenceChange {
-  return parseSwitches(
-    input,
-    ["launchAtLogin", "keepRunningInBackground", "keepAwake", "keepAwakeOnBattery"],
-    "The app behavior setting is required.",
-  );
+  const message = "The app behavior setting is required.";
+  if (!isDynamicRecord(input)) throw new Error(message);
+  const hasSwitch = APP_BEHAVIOR_SWITCHES.some((key) => input[key] !== undefined);
+  const change: AppBehaviorPreferenceChange = hasSwitch ? parseSwitches(input, APP_BEHAVIOR_SWITCHES, message) : {};
+  if (input.quitGuard !== undefined) {
+    if (!isOneOf(QUIT_GUARDS, input.quitGuard)) throw new Error(message);
+    change.quitGuard = input.quitGuard;
+  }
+  if (Object.keys(change).length === 0) throw new Error(message);
+  return change;
 }
 
 export function parseUpdatePreference(input: unknown): UpdatePreferenceChange {

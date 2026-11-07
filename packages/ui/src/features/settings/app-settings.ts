@@ -6,6 +6,7 @@ import {
   DEFAULT_AGENT_MEMORY_LIMIT,
   DEFAULT_EXTERNAL_LINK_PREFERENCE,
   type ExternalLinkTarget,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
 /** Which chord sends a message. Re-exported here so settings state can name the same type. */
 import type { SendShortcutMode } from "../conversation/send-shortcut";
@@ -32,6 +33,8 @@ export interface GeneralSettingsValue {
   /** Null where `keepAwake` is null. */
   keepAwakeOnBattery: boolean | null;
   restoreLastWorkspace: boolean;
+  /** Null hides the select: only the Mac desktop app guards `Cmd + Q`. */
+  quitGuard: QuitGuard | null;
   externalLinkTarget: ExternalLinkTarget;
   desktopNotifications: boolean;
   /** Notifications show the start of the agent's reply, question or command. */
@@ -79,6 +82,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   keepAwake: null,
   keepAwakeOnBattery: null,
   restoreLastWorkspace: true,
+  quitGuard: null,
   externalLinkTarget: DEFAULT_EXTERNAL_LINK_PREFERENCE.target,
   desktopNotifications: true,
   notificationPreview: true,

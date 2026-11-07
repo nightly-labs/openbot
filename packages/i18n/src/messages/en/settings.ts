@@ -66,6 +66,11 @@ export const messages = defineMessages("settings", {
     "Keep the computer awake on battery power too. The battery runs down faster.",
   "settings.restoreWorkspace.title": "Restore the last workspace on launch",
   "settings.restoreWorkspace.description": "Open the workspace and tasks from your previous session.",
+  "settings.quitGuard.title": "Hold ⌘Q to quit",
+  "settings.quitGuard.description": "Hold ⌘Q or press it twice to quit. With Never, one ⌘Q quits and stops the agents.",
+  "settings.quitGuard.working": "While agents work",
+  "settings.quitGuard.always": "Always",
+  "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
   "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
   // The two link targets. The saved value stays in English; only the label is translated.
