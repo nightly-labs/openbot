@@ -445,10 +445,15 @@ const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => vo
 // The roles of this host. Empty roles give every member `manage`, as a host without roles does; the
 // message delete checks set "everyone" to a lower level for one agent.
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
+/** The host's access listener. Only the live voice check sends a change in this run. */
+const accessListeners = new Set<(serverId: string, state: AgentAccessState) => void>();
 const agentAccess: TeamApiAgentAccess = {
   get: () => accessLevels,
   levels: () => accessLevels,
-  subscribe: () => () => undefined,
+  subscribe: (listener) => {
+    accessListeners.add(listener);
+    return () => accessListeners.delete(listener);
+  },
   set: unused("agentAccess.set"),
   copyAgent: unused("agentAccess.copyAgent"),
 };
@@ -6734,6 +6739,25 @@ try {
         ]),
       [summary(noSignIn), callsOf("startLiveVoice").at(-1)],
     );
+    // Each spoken request goes to the agent as the member's message: a member who cannot chat any more loses the voice.
+    const revoked = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-revoked" },
+    });
+    accessLevels = { revision: 14, everyone: { "agent-ada": "view" }, roles: [] };
+    for (const listener of accessListeners) listener(store.getIdentity()?.serverId ?? "", accessLevels);
+    const stopsAfterRevoke = callsOf("stopLiveVoice").slice(1);
+    accessLevels = { revision: 15, everyone: {}, roles: [] };
+    for (const listener of accessListeners) listener(store.getIdentity()?.serverId ?? "", accessLevels);
+    check(
+      "a member who loses chat access to the agent loses the voice, and the host stops it only once",
+      revoked.status === 200 &&
+        field(revoked.body, "sessionId") === "voice-2" &&
+        isDeepStrictEqual(stopsAfterRevoke, [["voice-2", bobId]]) &&
+        callsOf("stopLiveVoice").length === 2,
+      [summary(revoked), callsOf("stopLiveVoice")],
+    );
     // A voice that runs when the member's last event connection closes stops with it.
     const second = await call("POST", LIVE_VOICE_ROUTES.start, {
       token: bobToken,
@@ -6754,9 +6778,9 @@ try {
     check(
       "the host stops a member's voice when the last event connection of its logical session closes",
       second.status === 200 &&
-        field(second.body, "sessionId") === "voice-2" &&
+        field(second.body, "sessionId") === "voice-3" &&
         stoppedOnClose &&
-        isDeepStrictEqual(callsOf("stopLiveVoice").at(-1), ["voice-2", bobId]),
+        isDeepStrictEqual(callsOf("stopLiveVoice").at(-1), ["voice-3", bobId]),
       [summary(second), callsOf("stopLiveVoice")],
     );
   }

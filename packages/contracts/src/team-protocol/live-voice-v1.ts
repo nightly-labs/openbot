@@ -28,8 +28,8 @@ export const LIVE_VOICE_ROUTES = {
 export const LIVE_VOICE_EVENT = "live-voice";
 
 const SDP_LIMIT = 65_536;
-const TRANSCRIPT_LIMIT = 100_000;
-const REASON_LIMIT = 4_000;
+export const LIVE_VOICE_TRANSCRIPT_LIMIT = 100_000;
+export const LIVE_VOICE_REASON_LIMIT = 4_000;
 
 /** The voices of this contract. A later Codex voice needs a second capability string. */
 const LIVE_VOICE_NAMES = [
@@ -126,13 +126,17 @@ export function liveVoiceEvent(value: unknown): LiveVoiceEvent | null {
   if (!isIdentifier(sessionId)) throw new Error("Invalid live voice event.");
   if (kind === "transcript") {
     const { role, text, final } = value;
-    if ((role !== "user" && role !== "assistant") || !isText(text, TRANSCRIPT_LIMIT) || typeof final !== "boolean")
+    if (
+      (role !== "user" && role !== "assistant") ||
+      !isText(text, LIVE_VOICE_TRANSCRIPT_LIMIT) ||
+      typeof final !== "boolean"
+    )
       throw new Error("Invalid live voice event.");
     return { type: LIVE_VOICE_EVENT, kind, sessionId, role, text, final };
   }
   if (kind === "ended") {
     const { error } = value;
-    if (error !== null && !isText(error, REASON_LIMIT)) throw new Error("Invalid live voice event.");
+    if (error !== null && !isText(error, LIVE_VOICE_REASON_LIMIT)) throw new Error("Invalid live voice event.");
     return { type: LIVE_VOICE_EVENT, kind, sessionId, error };
   }
   throw new Error("Invalid live voice event.");

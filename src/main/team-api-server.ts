@@ -8,6 +8,7 @@ import {
   type AgentEvent,
   type AgentSummary,
   AnalyticsInputError,
+  agentAccessRank,
   type ChatColors,
   canAdministerServer,
   type DirectConversationPage,
@@ -1184,8 +1185,14 @@ export class TeamApiServer {
           agents: this.#options.agents,
           hiddenAgentIds: hidden,
           sessions: this.#liveVoiceSessions,
-          hasEventConnection: (teamSessionId) =>
-            [...this.#eventClients.values()].some((connection) => connection.sessionId === teamSessionId),
+          hasEventConnection: (teamSessionId, memberId) =>
+            [...this.#eventClients].some(
+              ([client, connection]) =>
+                connection.sessionId === teamSessionId &&
+                connection.memberId === memberId &&
+                connection.capabilities.has(LIVE_VOICE_CAPABILITY) &&
+                client.readyState === webSockets.WebSocket.OPEN,
+            ),
         })) === "handled"
       )
         return;
@@ -2301,6 +2308,14 @@ export class TeamApiServer {
     for (const [client, connection] of this.#eventClients)
       if (connection.capabilities.has("agent-runtime-snapshots")) this.#sendRuntimeSnapshot(client, connection, false);
     this.#publishPresence();
+    // Each spoken request goes to the agent as the member's message, so a member who cannot chat any more loses the voice.
+    const liveVoice = this.#options.liveVoice;
+    if (liveVoice)
+      for (const voice of this.#liveVoiceSessions.all())
+        if (agentAccessRank(this.agentLevel(voice.memberId, voice.agentId)) < agentAccessRank("chat")) {
+          this.#liveVoiceSessions.remove(voice.sessionId);
+          void runCauseEffect(liveVoice.stopLiveVoice(voice.sessionId, voice.memberId)).catch(() => undefined);
+        }
   }
 
   /**

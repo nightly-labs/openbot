@@ -7,6 +7,7 @@ import type {
   SpeechAudio,
   SpeechModelStatus,
   SpeechSettings,
+  VoiceLiveEvent,
   VoiceLiveSession,
   VoiceModelStatus,
   VoiceServerProbe,
@@ -17,6 +18,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   decodeLiveVoiceSessionResponse,
+  isLiveVoiceName,
   LIVE_VOICE_CAPABILITY,
   LIVE_VOICE_ROUTES,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
@@ -26,6 +28,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { acceptEmpty } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { voiceLiveEventFromWire } from "../team-api/route-live-voice";
 import type { VoiceServerService } from "../voice-server-service";
 import type { VoiceSpeechService } from "../voice-speech-service";
 import type { VoiceTranscriptionService } from "../voice-transcription-service";
@@ -58,6 +61,8 @@ export interface VoiceIpcDependencies {
   service: Pick<AgentService, "prepareVoiceRecording" | "startLiveVoice" | "stopLiveVoice">;
   /** A joined server answers the WebRTC offer of an agent there with its own Codex sign-in (`live-voice-v1`). */
   remoteServers: Pick<RemoteServerManager, "request" | "supportsCapability" | "on">;
+  /** Sends a live voice event of a joined server to the windows. */
+  forwardLiveEvent(event: VoiceLiveEvent): void;
 }
 
 /** A start can wait for the host to start Codex, and then up to 20 seconds for the answer of OpenAI. */
@@ -69,6 +74,7 @@ export function voiceIpcHandlers({
   server,
   service,
   remoteServers,
+  forwardLiveEvent,
 }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
   // A window that closes, reloads or crashes cannot stop its live voice any more, so main stops it.
   const liveSessions = new WeakMap<WebContents, Set<string>>();
@@ -85,9 +91,23 @@ export function voiceIpcHandlers({
       }),
     );
   };
-  // A session that the server ended needs no stop.
+  // The host sends a member's live voice events only to that member's connections. A session that
+  // the server ended needs no stop.
   remoteServers.on("liveVoice", (_serverId, event) => {
     if (event.kind === "ended") remoteSessions.delete(event.sessionId);
+    forwardLiveEvent(voiceLiveEventFromWire(event));
+  });
+  // The host ends the sessions of a closed event connection, but its end cannot arrive any more.
+  // "connecting" is left out: a retry of a connection that is still open shows it too.
+  remoteServers.on("changed", (servers) => {
+    const lost = new Set(
+      servers.filter((summary) => summary.state !== "online" && summary.state !== "connecting").map(({ id }) => id),
+    );
+    for (const [sessionId, serverId] of remoteSessions)
+      if (lost.has(serverId)) {
+        remoteSessions.delete(sessionId);
+        forwardLiveEvent({ type: "ended", sessionId, error: null });
+      }
   });
   const stopLiveSessions = (owner: WebContents) => {
     const sessions = liveSessions.get(owner);
@@ -217,7 +237,8 @@ export function voiceIpcHandlers({
                   body: {
                     agentId: input.agentId,
                     sdp: input.sdp,
-                    ...(codexLiveVoice ? { voice: codexLiveVoice } : {}),
+                    // A voice that this contract does not name would make the host refuse the start.
+                    ...(isLiveVoiceName(codexLiveVoice) ? { voice: codexLiveVoice } : {}),
                   },
                   timeoutMs: REMOTE_LIVE_START_TIMEOUT_MS,
                 }),

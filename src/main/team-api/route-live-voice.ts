@@ -4,7 +4,9 @@ import {
   decodeLiveVoiceStopRequest,
   LIVE_VOICE_CAPABILITY,
   LIVE_VOICE_EVENT,
+  LIVE_VOICE_REASON_LIMIT,
   LIVE_VOICE_ROUTES,
+  LIVE_VOICE_TRANSCRIPT_LIMIT,
   type LiveVoiceEvent,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
@@ -14,12 +16,15 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { memberSender, readJson, requireAgentLevel } from "./request-helpers";
 
-/** The member and the logical session that started each live voice session of a member. */
+/** The member, the agent and the logical session that started each live voice session of a member. */
 export class TeamLiveVoiceSessions {
-  readonly #owners = new Map<string, { readonly memberId: string; readonly teamSessionId: string }>();
+  readonly #owners = new Map<
+    string,
+    { readonly memberId: string; readonly agentId: string; readonly teamSessionId: string }
+  >();
 
-  add(sessionId: string, memberId: string, teamSessionId: string): void {
-    this.#owners.set(sessionId, { memberId, teamSessionId });
+  add(sessionId: string, memberId: string, agentId: string, teamSessionId: string): void {
+    this.#owners.set(sessionId, { memberId, agentId, teamSessionId });
   }
 
   remove(sessionId: string): void {
@@ -32,9 +37,21 @@ export class TeamLiveVoiceSessions {
       .filter(([, owner]) => owner.teamSessionId === teamSessionId)
       .map(([sessionId, owner]) => ({ sessionId, memberId: owner.memberId }));
   }
+
+  /** Each live voice session, with its member and agent. */
+  all(): { readonly sessionId: string; readonly memberId: string; readonly agentId: string }[] {
+    return [...this.#owners].map(([sessionId, owner]) => ({
+      sessionId,
+      memberId: owner.memberId,
+      agentId: owner.agentId,
+    }));
+  }
 }
 
-/** The wire form of a live voice event of the agent service. */
+/**
+ * The wire form of a live voice event of the agent service. The text is cut to the limits of the
+ * contract, as the client refuses a longer event and closes its event stream.
+ */
 export function liveVoiceWireEvent(event: VoiceLiveEvent): LiveVoiceEvent {
   return event.type === "transcript"
     ? {
@@ -42,10 +59,22 @@ export function liveVoiceWireEvent(event: VoiceLiveEvent): LiveVoiceEvent {
         kind: "transcript",
         sessionId: event.sessionId,
         role: event.role,
-        text: event.text,
+        text: event.text.slice(0, LIVE_VOICE_TRANSCRIPT_LIMIT),
         final: event.final,
       }
-    : { type: LIVE_VOICE_EVENT, kind: "ended", sessionId: event.sessionId, error: event.error };
+    : {
+        type: LIVE_VOICE_EVENT,
+        kind: "ended",
+        sessionId: event.sessionId,
+        error: event.error === null ? null : event.error.slice(0, LIVE_VOICE_REASON_LIMIT),
+      };
+}
+
+/** The IPC form of a live voice event of a joined server. The reverse of `liveVoiceWireEvent`. */
+export function voiceLiveEventFromWire(event: LiveVoiceEvent): VoiceLiveEvent {
+  return event.kind === "transcript"
+    ? { type: "transcript", sessionId: event.sessionId, role: event.role, text: event.text, final: event.final }
+    : { type: "ended", sessionId: event.sessionId, error: event.error };
 }
 
 export interface LiveVoiceRouteOptions {
@@ -53,8 +82,8 @@ export interface LiveVoiceRouteOptions {
   agents: Pick<TeamApiAgents, "listAgents">;
   hiddenAgentIds: ReadonlySet<string>;
   sessions: TeamLiveVoiceSessions;
-  /** True while the logical session has an open event connection, which carries the transcript. */
-  hasEventConnection(teamSessionId: string): boolean;
+  /** True while the member has an open `live-voice-v1` event connection in the logical session, which carries the transcript. */
+  hasEventConnection(teamSessionId: string, memberId: string): boolean;
 }
 
 /**
@@ -99,7 +128,8 @@ export async function routeLiveVoice(
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
   requireAgentLevel(context, input.agentId, "chat");
   // Without an event connection the member gets no transcript and no end, and nothing would stop the session.
-  if (!options.hasEventConnection(sessionId)) throw new HttpError(409, sourceText("error.voice.live.disconnected"));
+  if (!options.hasEventConnection(sessionId, member.id))
+    throw new HttpError(409, sourceText("error.voice.live.disconnected"));
   let session: VoiceLiveSession;
   try {
     session = await runCauseEffect(
@@ -114,6 +144,11 @@ export async function routeLiveVoice(
     if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
     throw error;
   }
-  options.sessions.add(session.sessionId, member.id, sessionId);
+  // The connection can close while Codex waits for OpenAI. The close then found no session to stop.
+  if (!options.hasEventConnection(sessionId, member.id)) {
+    await runCauseEffect(liveVoice.stopLiveVoice(session.sessionId, member.id));
+    throw new HttpError(409, sourceText("error.voice.live.disconnected"));
+  }
+  options.sessions.add(session.sessionId, member.id, input.agentId, sessionId);
   return json(200, { sessionId: session.sessionId, sdp: session.sdp });
 }
