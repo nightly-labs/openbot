@@ -1,4 +1,5 @@
 import type { AppLanguage } from "@openbot/contracts/app-language";
+import type { HourCycle } from "@openbot/contracts/ipc";
 
 /** The languages a catalog exists for. `"system"` resolves to one of these; it is never one itself. */
 export const TRANSLATED_LOCALES = [
@@ -49,12 +50,12 @@ export function resolveLocale(language: AppLanguage, systemLocale: string): Tran
  * `hourCycle` is the clock that the computer's own setting selects, such as the macOS "24-hour
  * time" setting. Every time written in the returned locale follows it, whatever the language.
  */
-export function formatLocale(language: AppLanguage, systemLocale: string, hourCycle?: "h12" | "h23"): string {
+export function formatLocale(language: AppLanguage, systemLocale: string, hourCycle?: HourCycle): string {
   return withHourCycle(dateLocale(language, systemLocale), hourCycle);
 }
 
 /** `tag` with a `-u-hc-` extension, which every date format of the tag follows: `en-US-u-hc-h23`. */
-export function withHourCycle(tag: string, hourCycle: "h12" | "h23" | undefined): string {
+export function withHourCycle(tag: string, hourCycle: HourCycle | undefined): string {
   if (!hourCycle) return tag;
   try {
     return new Intl.Locale(tag, { hourCycle }).toString();
