@@ -88,6 +88,7 @@ import {
   promptResolution,
   questionPromptText,
   uiBlockPromptResult,
+  userMessagePromptResult,
   validPromptQuestions,
   vaultPromptResult,
   vaultRequestFormSpec,
@@ -1829,6 +1830,45 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
     }
+  }
+
+  /**
+   * The user wrote in a chat while its turn waits on a question or a UI block there. The turn reads
+   * no message until that tool call returns, and a queued message starts only when the turn ends, so
+   * each would wait for the other. The questions and blocks of the turn close as skipped, with a note
+   * to follow the message. A form whose key or item is being saved finishes on its own. Approvals,
+   * MCP elicitations and browser takeovers stay: a message must not refuse an action or end a sign-in.
+   */
+  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
+        continue;
+      if (pending.saving || pending.responseKind === "mcp-elicitation") continue;
+      this.#prompts.delete(requestId);
+      clearTimeout(pending.autoAnswer?.timer);
+      this.#emitInputResolved("prompt", requestId, agentId);
+      this.#routines.markRunningForTurn(turnId);
+      if (pending.client.running) {
+        try {
+          pending.client.respond(pending.id, userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId));
+        } catch (error) {
+          logger.warn("Unable to close a prompt for a new user message", { error: toLogValue(error) });
+        }
+      }
+      try {
+        // The card shows as the user's own skip does.
+        this.#resolvePersistedPrompt(
+          pending,
+          { status: "cancelled" },
+          pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
+        );
+      } catch (error) {
+        this.#emitError("prompt_persistence_failed", error, agentId);
+      }
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
   }
 
   /** Expires the prompts of one lost provider client, or of all clients when none is given. */

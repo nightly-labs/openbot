@@ -314,6 +314,24 @@ export function expiredPromptResult(
   };
 }
 
+/**
+ * The answer for a question or block that the user did not answer because they wrote a new message
+ * in the chat. Only the model reads it. The message reaches the agent as a steer or as the next turn.
+ */
+export function userMessagePromptResult(
+  responseKind: "dynamic-tool" | "user-input" | "ui-block",
+  blockId: string | undefined,
+): DynamicToolResult | { answers: Record<string, never> } {
+  // `request_user_input` has no field for a note: empty answers are what a skip gives.
+  if (responseKind === "user-input") return { answers: {} };
+  const value = {
+    status: "skipped",
+    ...(blockId ? { blockId } : {}),
+    next: "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.",
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
 /** What a blocking UI block (`ask_ui`) ended with. */
 export type UiBlockPromptOutcome =
   | { status: "answered"; blockId: string; response: UiBlockResponse }
