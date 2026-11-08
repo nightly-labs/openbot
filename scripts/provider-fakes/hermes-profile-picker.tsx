@@ -59,13 +59,13 @@ async function chooseEffort(effort: "High" | "Medium") {
   await openModels("Hermes");
   const trigger = await screen.findByLabelText("Agent reasoning effort", { exact: true });
   fireEvent.keyDown(trigger, { key: "ArrowDown" });
-  fireEvent.click(await screen.findByRole("option", { name: effort, exact: true }));
+  fireEvent.click(await screen.findByRole("option", { name: effort }));
 }
 
 async function chooseProfile(name: string) {
   const trigger = await screen.findByRole("button", { name: /^Hermes profile/u });
   fireEvent.keyDown(trigger, { key: "ArrowDown" });
-  fireEvent.click(await screen.findByRole("option", { name, exact: true }));
+  fireEvent.click(await screen.findByRole("option", { name }));
 }
 
 function createFixture(name: ProfilePickerCase, result: ProfilePickerResult) {
@@ -334,10 +334,7 @@ window.runHermesProfilePicker = async (cases) => {
           !screen.queryByRole("option", { name: /Inherited beta/u }),
           "Loading does not offer another profile's models.",
         );
-        verify(
-          !screen.queryByRole("button", { name: "Connect", exact: true }),
-          "Loading does not connect the inherited profile.",
-        );
+        verify(!screen.queryByRole("button", { name: "Connect" }), "Loading does not connect the inherited profile.");
         verify(result.runtimeUpdates.length === 0, "Loading does not save a model choice.");
         fixture.release("work", 0, work);
         await screen.findByRole("option", { name: /Work beta/u });
@@ -351,7 +348,7 @@ window.runHermesProfilePicker = async (cases) => {
           "An unavailable explicit profile does not fall back to inherited models.",
         );
         verify(
-          !screen.queryByRole("button", { name: "Connect", exact: true }),
+          !screen.queryByRole("button", { name: "Connect" }),
           "An unavailable explicit profile does not connect another profile.",
         );
         verify(result.runtimeUpdates.length === 0, "An unavailable selected catalog cannot save a model.");
@@ -424,7 +421,7 @@ window.runHermesProfilePicker = async (cases) => {
             result.runtimeUpdates.length === 0,
             "Inherited sign-in readiness still blocks an unavailable inherited model.",
           );
-          fireEvent.click(await screen.findByRole("button", { name: "Connect", exact: true }));
+          fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
           verify(
             result.connected.length === 1 && result.connected[0] === "hermes",
             "Inherited Connect keeps its released provider route.",
