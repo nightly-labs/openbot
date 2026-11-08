@@ -1780,8 +1780,12 @@ export class TurnLifecycle {
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
-          onSuccess: (requesterId) => {
-            if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+          onSuccess: (requesterIds) => {
+            for (const requesterId of requesterIds) {
+              this.#mailboxSync.emitQueue(requesterId);
+              // An answer for a request that a teammate's answer continued has its own requester.
+              this.#hooks.scheduleDrain(requesterId);
+            }
           },
         }),
       );
@@ -1795,17 +1799,32 @@ export class TurnLifecycle {
     text: string,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
-    const messageId = delivery.delivery.messageId;
+    // An answer to a request that this agent sent for a teammate's request continues that request.
+    for (const requestId of this.#mailbox.answeredRequestIds(agentId, delivery.delivery.messageId))
+      yield* this.#relayRequestResult(agentId, turnId, requestId, text);
+  }, Effect.uninterruptible);
+
+  readonly #relayRequestResult = Effect.fn("TurnLifecycle.relayRequestResult")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    messageId: string,
+    text: string,
+  ) {
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
-    const recipientAgentId = delivery.delivery.sender.agentId;
+    const recipientAgentId = this.#mailbox.senderAgentId(messageId);
     if (
       !originAgentId ||
+      !recipientAgentId ||
       originAgentId === agentId ||
       // The sender said it wants no answer, so the turn's result stays with this agent. Without
       // this the sender is woken for an echo of work it only wanted to know about.
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId)
+      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId) ||
+      // The agent sent parts of the request to teammates and waits for them, so this turn's text is
+      // a status, not the result. The turn that reads the last answer sends the result (#5631).
+      this.#mailbox.hasOpenPartRequests(agentId, messageId)
     )
       return;
 

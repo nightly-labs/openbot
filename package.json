@@ -317,6 +317,7 @@
     "test:webhook-analytics": "bun scripts/webhook-analytics-e2e.ts",
     "test:agent-channel-manage": "bun scripts/agent-channel-manage-e2e.ts",
     "test:agent-channel-create": "bun scripts/agent-channel-create-e2e.ts",
+    "test:nested-delegation-result": "bun scripts/nested-delegation-result-e2e.ts",
     "test:agent-workflow-gate": "bun scripts/agent-workflow-gate-e2e.ts",
     "test:agent-profile-accounts": "bun scripts/agent-profile-accounts-e2e.ts",
     "test:claude-usage-resume": "bun scripts/claude-usage-resume-e2e.ts",
