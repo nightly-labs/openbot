@@ -768,11 +768,11 @@ export function agentIpcHandlers({
           const update = colors && avatarColor ? rest : fields;
           if (colors && avatarColor !== undefined)
             await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
-          // The released agent route refuses a change without a profile field. When only the colours
-          // changed, they went on their own routes above, so the agent is read again instead (#5708).
-          const profileChanged = Object.entries(update).some(
-            ([key, value]) => key !== "agentId" && value !== undefined,
-          );
+          // The released agent route refuses a change without a profile field. When a colour went on its
+          // own route above and nothing else changed, the agent is read again instead (#5708).
+          const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
+          const profileChanged =
+            !colourRouted || Object.entries(update).some(([key, value]) => key !== "agentId" && value !== undefined);
           const patched = profileChanged
             ? await runCauseEffect(
                 remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
