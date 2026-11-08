@@ -74,7 +74,6 @@ export const messages = {
   "agent.error.restoreFailed": "エージェントを復元できませんでした",
   "agent.error.hiddenFailed": "変更を保存できませんでした。もう一度お試しください。",
   "agent.error.settingsFailed": "エージェントの設定を保存できませんでした",
-  "agent.error.avatarFailed": "アバターを更新できませんでした",
   "agent.error.adminOnly": "エージェントの設定を変更できるのはサーバー管理者だけです。",
   "agent.error.continueFailed": "エージェントは続行できませんでした。もう一度お試しください。",
   "agent.error.mcpNotStarted": "MCP サーバーが起動していません",
