@@ -1,5 +1,5 @@
 import type { ClientAgentSummary } from "@openbot/contracts/ipc";
-import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -81,9 +81,10 @@ const AgentActions = createSimpleContext({
 
     /** Asks the host for the agent. */
     function requestNewAgent(draft: NewAgentDraft) {
-      const createModelSupported =
-        activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
-      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported));
+      const local = activeServer()?.kind !== "remote";
+      const createModelSupported = local || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
+      const welcomeSupported = local || activeServerSupportsCapability(AGENT_WELCOME_CAPABILITY);
+      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported, welcomeSupported));
     }
 
     /** Synchronous, so a caller that also selects the agent does both in the same update. */

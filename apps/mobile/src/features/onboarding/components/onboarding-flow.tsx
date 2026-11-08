@@ -15,7 +15,6 @@ import { useCSSVariable } from "uniwind";
 import type { AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import type { WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
-import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AgentStep } from "@/features/onboarding/components/agent-step";
@@ -426,7 +425,7 @@ export function OnboardingFlow({
       const agentId = await createAgent({
         name: trimmedName,
         description: draft.description.trim(),
-        initialMessage: agentInitialMessage(draft.description, firstTask),
+        firstTask,
         avatarSeed: draft.seed,
         avatarHue: draft.hue,
         avatarColor: draft.color,

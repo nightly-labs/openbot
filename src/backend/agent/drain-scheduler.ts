@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { AGENT_PROVIDERS, type AgentModelOption, type AgentSummary } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  AGENT_WELCOME_ITEM_TYPE,
+  type AgentModelOption,
+  type AgentSummary,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema } from "effect";
@@ -856,6 +861,8 @@ export class DrainScheduler {
           text: item.text,
           createdAt: item.createdAt,
           status: "completed",
+          // Marked as the mailbox marks it, so no client shows the setup message.
+          ...(this.#mailbox.isWelcomeDelivery(item.id) ? { itemType: AGENT_WELCOME_ITEM_TYPE } : {}),
         });
       }
       this.#conversation.emitConversation(snapshot);

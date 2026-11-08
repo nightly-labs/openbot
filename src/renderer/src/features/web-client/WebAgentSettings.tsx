@@ -1,6 +1,6 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentStatus, ClientAgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
-import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   createFirstAgentDraft,
   FIRST_AGENT_SUGGESTIONS,
@@ -143,7 +143,7 @@ export function WebAgentSettings(props: {
       await props.runtime.createAgent({
         name: value.name,
         description: value.purpose,
-        initialMessage: createAgentInitialMessage(value),
+        initialMessage: createAgentInitialMessage(value, props.capabilities.includes(AGENT_WELCOME_CAPABILITY)),
         avatarSeed: value.avatarSeed,
         avatarHue: value.avatarHue,
         ...(supportsModelSelection() && selectedModel && isKnownAgentProvider(selectedModel.provider)
