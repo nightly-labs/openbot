@@ -54,6 +54,8 @@ const context = createSimpleContext({
     const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
     /** The search of the server settings page. The server settings show only the sections that match it. */
     const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
+    /** Each Enter in the server settings search adds one. The server settings then open the first match. */
+    const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
 
     const page = createMemo<WindowPage>(() => {
       if (serverSettings.serverSettingsOpen()) return "server-settings";
@@ -142,6 +144,8 @@ const context = createSimpleContext({
       settingsPlacement,
       serverSettingsQuery,
       setServerSettingsQuery: (query: string) => setServerSettingsQuery(query),
+      openFirstServerSectionRequest,
+      openFirstServerSection: () => setOpenFirstServerSectionRequest((request) => request + 1),
       pageBack,
       /** Shows the agents and closes the other pages. */
       showAgents() {

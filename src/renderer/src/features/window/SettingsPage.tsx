@@ -172,13 +172,19 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       footer={
         <Show
           when={props.kind === "personal"}
-          fallback={<PersonalSettingsLink account={signedInAccount()} onOpen={() => settings.openAppSettings(null)} />}
+          fallback={
+            <PersonalSettingsLink
+              account={signedInAccount()}
+              // The footer row closes with this page, so the focus goes back to what opened the first page.
+              onOpen={() => settings.openAppSettings(serverSettings.serverSettingsRestoreTarget())}
+            />
+          }
         >
           <Show when={activeServer()}>
             {(server) => (
               <ServerSettingsLink
                 server={server()}
-                onOpen={() => serverSettings.openServerSettings(server().id, null)}
+                onOpen={() => serverSettings.openServerSettings(server().id, settings.appSettingsRestoreTarget())}
               />
             )}
           </Show>
@@ -200,7 +206,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
         onInput={setQuery}
         onEnter={() => {
           if (props.kind === "server") {
-            openFirstSettingsSection(nav, () => setQuery(""));
+            openFirstSettingsSection(nav, windowPage.openFirstServerSection, query);
             return;
           }
           const top = results()?.[0];

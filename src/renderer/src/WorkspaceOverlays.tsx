@@ -718,6 +718,8 @@ function ServerSettings() {
           open={serverSettingsOpen() && windowPage.settingsPlacement("server") !== undefined}
           page={windowPage.settingsPlacement("server")}
           sectionQuery={windowPage.serverSettingsQuery()}
+          openFirstSectionRequest={windowPage.openFirstServerSectionRequest()}
+          onFirstSectionOpened={() => windowPage.setServerSettingsQuery("")}
           restoreFocusTarget={serverSettingsRestoreTarget()}
           platform={platform.appInfo()?.platform ?? "darwin"}
           server={server()}

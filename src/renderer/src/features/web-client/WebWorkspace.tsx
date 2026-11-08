@@ -1024,6 +1024,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
   /** The search of the server settings page, which filters its section list. It clears when the page closes. */
   const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
+  /** Each Enter in that search adds one. The server settings then open the first match. */
+  const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
   /** Where the panel of a settings page shows, or nothing while that page is not on screen. */
   function settingsPlacement(kind: SettingsKind): SettingsPagePlacement | undefined {
     const mounts = settingsMounts();
@@ -2186,7 +2188,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               value={serverSettingsQuery()}
                               onInput={setServerSettingsQuery}
                               onEnter={() =>
-                                openFirstSettingsSection(settingsMounts()?.nav, () => setServerSettingsQuery(""))
+                                openFirstSettingsSection(
+                                  settingsMounts()?.nav,
+                                  () => setOpenFirstServerSectionRequest((request) => request + 1),
+                                  serverSettingsQuery,
+                                )
                               }
                             />
                           </Show>
@@ -2455,6 +2461,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         open={serverSettings.state.open && settingsPlacement("server") !== undefined}
                         page={settingsPlacement("server")}
                         sectionQuery={serverSettingsQuery()}
+                        openFirstSectionRequest={openFirstServerSectionRequest()}
+                        onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
                         platform="darwin"

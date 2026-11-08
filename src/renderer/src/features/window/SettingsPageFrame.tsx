@@ -4,7 +4,7 @@ import { ServerMark } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { onSettled, Show } from "solid-js";
+import { flush, onSettled, Show } from "solid-js";
 
 /**
  * The frame of a settings page, on desktop and on the web: the heading and the section list at the
@@ -89,15 +89,15 @@ export function SettingsSearchField(props: { value: string; onInput: (value: str
 }
 
 /**
- * Opens the first section that the section list of a server settings page shows, and clears the
- * search, so the list shows every section again. The focus moves to that section.
+ * Asks the server settings to open the first section that the search finds, then moves the focus to that
+ * section. The server settings clear the search when they open a section; with no match, nothing changes.
  */
-export function openFirstSettingsSection(nav: HTMLElement | undefined, clearQuery: () => void): void {
-  const first = nav?.querySelector<HTMLElement>(".settings-modal-nav-item");
-  if (!first) return;
-  first.click();
-  clearQuery();
-  first.focus();
+export function openFirstSettingsSection(nav: HTMLElement | undefined, request: () => void, query: () => string) {
+  request();
+  // The section opens, and the tabs move their focus key to it, before the focus moves.
+  flush();
+  if (query()) return;
+  nav?.querySelector<HTMLElement>(".settings-modal-nav-item[data-selected]")?.focus();
 }
 
 /** The heading of a server settings page: the server mark and name, as the server menu shows them. */

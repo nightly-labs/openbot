@@ -52,7 +52,7 @@ import {
   type HostedSiteDeleteResult,
 } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
@@ -268,6 +268,10 @@ export interface ServerSettingsModalProps {
   page: SettingsPagePlacement | undefined;
   /** The search of the settings page. The section list shows only the sections whose title or description holds it. */
   sectionQuery?: string | undefined;
+  /** A new number opens the first section that the search finds. */
+  openFirstSectionRequest?: number | undefined;
+  /** Called when a request opened a section. The page then clears its search. */
+  onFirstSectionOpened?: (() => void) | undefined;
 }
 
 export interface ServerHostedSitesOptions {
@@ -483,7 +487,38 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const { title, description } = sections[value];
     return t(title).toLocaleLowerCase().includes(needle) || t(description).toLocaleLowerCase().includes(needle);
   };
-  const navSections = () => NAV_SECTIONS.filter((item) => sectionSupported(item.value) && sectionMatches(item.value));
+  /** The sections that the search finds. Without a search, each section that this server supports. */
+  const matchingSections = createMemo(() =>
+    NAV_SECTIONS.filter((item) => sectionSupported(item.value) && sectionMatches(item.value)),
+  );
+  /**
+   * The section list. The open section stays in it, so the search does not open a different section
+   * while the user types.
+   */
+  const navSections = createMemo(() =>
+    NAV_SECTIONS.filter(
+      (item) => matchingSections().includes(item) || (item.value === section() && sectionSupported(item.value)),
+    ),
+  );
+  /** Each new request of the page opens the first section that the search finds, and the page clears its search. */
+  let handledOpenFirstRequest = untrack(() => props.openFirstSectionRequest ?? 0);
+  createEffect(
+    () => props.openFirstSectionRequest ?? 0,
+    (request) => {
+      if (request === handledOpenFirstRequest) return;
+      handledOpenFirstRequest = request;
+      const first = untrack(matchingSections)[0];
+      if (!first) return;
+      setSection(first.value);
+      untrack(() => props.onFirstSectionOpened?.());
+    },
+  );
+  /** What a screen reader hears while the user types a search. */
+  const searchStatus = () => {
+    if (!props.sectionQuery?.trim()) return "";
+    const count = matchingSections().length;
+    return count > 0 ? t("app.settingsPage.resultCount", { count }) : t("app.settingsPage.noResults");
+  };
   const members = createServerMembersSection(
     host,
     {
@@ -782,9 +817,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 }}
               </For>
             </Tabs.List>
-            <Show when={navSections().length === 0}>
+            <Show when={matchingSections().length === 0}>
               <p class="settings-page-empty">{t("app.settingsPage.noResults")}</p>
             </Show>
+            <span class="sr-only" role="status">
+              {searchStatus()}
+            </span>
           </>
         }
       >
