@@ -420,6 +420,57 @@ try {
     JSON.stringify(directReceived),
   );
 
+  // 4. A -> C, and C ends its turn with no text: A gets a note, not silence.
+  control.steps = {
+    xa1: { send: { recipientAgentIds: [c.id], text: "STEP:xc1", expectsReply: true }, say: "A waits for C." },
+    xc1: { say: "" },
+  };
+  saveControl();
+  since = new Date().toISOString();
+  await runCauseEffect(agents.sendMessage({ agentId: a.id, text: "STEP:xa1" }, { id: "local", name: "Alex" }));
+  const silentDirect = await waitFor("A's request to C", () => requestId(a.id, c.id, "STEP:xc1"));
+  await waitFor(
+    "the silent request to end",
+    () => settled(all) && received(a.id, silentDirect, names, since).length > 0,
+  );
+  await waitFor("the silent request to stay settled", () => settled(all));
+  const silentDirectReceived = received(a.id, silentDirect, names, since);
+  report.scenarios.push({ name: "A -> C, C ends with no text", received: silentDirectReceived });
+  pass(
+    "When C ends with no text, A gets the no-answer note",
+    silentDirectReceived.length === 1 &&
+      silentDirectReceived[0]?.from === "C" &&
+      silentDirectReceived[0].repliesToRequest &&
+      silentDirectReceived[0].text.includes("the teammate ended its turn with no answer"),
+    JSON.stringify(silentDirectReceived),
+  );
+
+  // 5. A -> B -> C, and C ends with no text: B gets the note, and A gets B's answer after it.
+  control.steps = {
+    ya1: { send: { recipientAgentIds: [b.id], text: "STEP:yb1", expectsReply: true }, say: "A waits for B." },
+    yb1: {
+      send: { recipientAgentIds: [c.id], text: "STEP:yc1", expectsReply: true },
+      say: "B sent the work to C and waits for C's reply.",
+    },
+    yc1: { say: "" },
+  };
+  saveControl();
+  since = new Date().toISOString();
+  await runCauseEffect(agents.sendMessage({ agentId: a.id, text: "STEP:ya1" }, { id: "local", name: "Alex" }));
+  const silentNested = await waitFor("A's request to B", () => requestId(a.id, b.id, "STEP:yb1"));
+  await waitFor("the silent chain to end", () => settled(all) && received(a.id, silentNested, names, since).length > 0);
+  await waitFor("the silent chain to stay settled", () => settled(all));
+  const silentNestedReceived = received(a.id, silentNested, names, since);
+  report.scenarios.push({ name: "A -> B -> C, C ends with no text", received: silentNestedReceived });
+  pass(
+    "When C ends with no text, A gets B's later answer once, not B's status",
+    silentNestedReceived.length === 1 &&
+      silentNestedReceived[0]?.from === "B" &&
+      silentNestedReceived[0].repliesToRequest &&
+      silentNestedReceived[0].text === "Done.",
+    JSON.stringify(silentNestedReceived),
+  );
+
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

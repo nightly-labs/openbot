@@ -1452,13 +1452,18 @@ export class TurnLifecycle {
           !continuation &&
           !this.#conversation.isExecutionThread(snapshot.threadId) &&
           terminal === "completed" &&
-          latestAssistant
+          latestAssistant?.text.trim()
         ) {
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
-        if (!continuation && terminal === "failed") {
+        // A turn with no text sends no result either, so the agent that asked would wait with no end.
+        const silent =
+          terminal === "completed" &&
+          !latestAssistant?.text.trim() &&
+          !this.#conversation.isExecutionThread(snapshot.threadId);
+        if (!continuation && (terminal === "failed" || silent)) {
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
         }
         // The requester holds the answers of the other teammates until each request has ended, so

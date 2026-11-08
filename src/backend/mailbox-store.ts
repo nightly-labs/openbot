@@ -2147,7 +2147,8 @@ export class MailboxStore {
    * result that never comes (#5055). The note goes where a result would go, as a reply from the
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
    * `markTerminal` redacted. A failed answer from a teammate that helped with a request answers that
-   * request (#5631). Returns the agents to wake.
+   * request (#5631). A turn that completed with no text and sent the asker nothing gives no result
+   * either, so it gets a note too. Returns the agents to wake.
    */
   answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
     this: MailboxStore,
@@ -2156,7 +2157,8 @@ export class MailboxStore {
   ): Effect.fn.Return<string[], StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const failed = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
-    if (delivery?.status !== "failed" || failed?.sender.kind !== "agent" || failed.channelId) return [];
+    const silent = delivery?.status === "completed";
+    if ((delivery?.status !== "failed" && !silent) || failed?.sender.kind !== "agent" || failed.channelId) return [];
     const teammateId = delivery.recipientAgentId;
     const requests = this.#answeredRequests(teammateId, failed.id, this.#sourceTurnIds(), new Set());
     const requesterIds: string[] = [];
@@ -2171,7 +2173,11 @@ export class MailboxStore {
         originAgentId === teammateId ||
         request.expectsReply === false ||
         this.hasReplyFrom(teammateId, request.id) ||
-        (chained && this.hasOpenPartRequests(teammateId, request.id))
+        (silent &&
+          deliveryTurnIds(delivery).some((turnId) =>
+            this.hasAgentMessageFromTurnTo(teammateId, turnId, requesterId),
+          )) ||
+        ((chained || silent) && this.hasOpenPartRequests(teammateId, request.id))
       )
         continue;
       const answerTaskId = this.answerTaskId(teammateId, request.id, [requesterId]);
@@ -2179,12 +2185,20 @@ export class MailboxStore {
       yield* this.enqueue({
         sender: { kind: "agent", agentId: teammateId },
         recipientAgentIds: [requesterId],
-        text: [
-          "Status: blocked",
-          `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
-          "Evidence: none",
-          "Unblock: The user must fix the cause, then ask for the request again.",
-        ].join("\n"),
+        text: (silent
+          ? [
+              "Status: blocked",
+              "Result: OpenBot note, not written by this teammate: the teammate ended its turn with no answer.",
+              "Evidence: none",
+              "Unblock: Ask the teammate again, or do the work another way.",
+            ]
+          : [
+              "Status: blocked",
+              `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
+              "Evidence: none",
+              "Unblock: The user must fix the cause, then ask for the request again.",
+            ]
+        ).join("\n"),
         replyToMessageId: request.id,
         ...(taskId ? { taskId } : {}),
         expectsReply: false,
