@@ -19,7 +19,7 @@ import type {
 import { assignedSkillCount, isRemovableSkill, isSkillEnabled, mcpConfigErrors } from "@openbot/contracts/ipc";
 import { createMarketplaceShareUrl, type MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accounts";
-import { type McpConnectFlow, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
+import { type McpConnectFlow, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { TOAST_DURATION, toast } from "@openbot/ui";
 import { connectorSummary } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
@@ -832,7 +832,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const accountName = (app: MarketplacePluginApp, row: McpServerConfig) =>
     row.name === app.server.name ? app.name : row.name;
   function appConnection(app: MarketplacePluginApp): MarketplaceAppConnection {
-    const accounts = heldApps(app).map((row) => ({
+    const rows = heldApps(app);
+    const accounts = rows.map((row) => ({
       id: row.id,
       name: accountName(app, row),
       signInNeeded: signIns()[row.id]?.needsSignIn === true,
@@ -844,6 +845,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       signInNeeded: accounts.some((account) => account.signInNeeded),
       accounts,
       multipleAccounts: accounts.length > 0 && accountsOffered(app),
+      keySaved: rows[0] !== undefined && savedKeyFlow(app.server.auth, rows[0]) !== null,
     };
   }
   /** The agent that a plugin's skills go to: the open conversation, else the first agent. */
@@ -980,7 +982,10 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const [uninstalling, setUninstalling] = createSignal<MarketplacePluginDetail | null>(null);
 
   function connectStep(app: MarketplacePluginApp, config: McpServerConfig): Promise<McpServerConfig | null> {
-    const [first, ...rest] = flowsHere(app);
+    // A row that a key saved opens on the key again, so a new key does not start with a sign-in.
+    const here = flowsHere(app);
+    const saved = savedKeyFlow(here, config);
+    const [first, ...rest] = saved ? [saved, ...here.filter((flow) => flow !== saved)] : here;
     if (!first) return Promise.resolve(config);
     return new Promise((resolve) => {
       setConnecting({
@@ -1078,12 +1083,6 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   }
 
   /**
-   * A browser sign-in saves its grant on the computer that finishes it, and a local server answers
-   * only on the computer that runs it, so an app that asks for either is connected on the host
-   * itself. A host that relays its sign-ins finishes a browser sign-in in this computer's browser
-   * and keeps the grant itself. False, with the error shown, when one of `apps` cannot connect here.
-   */
-  /**
    * The ways into `app` that work from here. On a joined server a local server answers only on the
    * host, and a browser sign-in needs a host that relays it; a key works from any computer.
    */
@@ -1093,6 +1092,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     return flows.filter((flow) => flow.kind === "key" || (flow.kind === "link" && Boolean(signInRelay())));
   }
 
+  /**
+   * A browser sign-in saves its grant on the computer that finishes it, and a local server answers
+   * only on the computer that runs it, so an app that asks for either is connected on the host
+   * itself. A host that relays its sign-ins finishes a browser sign-in in this computer's browser
+   * and keeps the grant itself. False, with the error shown, when one of `apps` cannot connect here.
+   */
   function canConnectHere(plugin: MarketplacePluginDetail, apps: readonly MarketplacePluginApp[]): boolean {
     const hostOnly = apps.find((app) => (app.server.auth ?? []).length > 0 && flowsHere(app).length === 0);
     if (!hostOnly) return true;

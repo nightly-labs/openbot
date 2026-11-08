@@ -1,5 +1,5 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { isListingUrl, type McpAuthValues, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
+import { isListingUrl, type McpAuthValues, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import type {
   MobilePlugin,
   MobilePluginApp,
@@ -82,9 +82,12 @@ function isPluginAppConfig(config: McpServerConfig, app: MobilePluginApp): boole
   const server = app.server;
   if (config.name !== server.name || config.transport !== server.transport) return false;
   if (server.transport === "http") {
-    // A listing that asks for the user's own link cannot know the address, only its host.
+    if (config.url === server.url) return true;
+    // A listing that asks for the user's own link cannot know the address, only its host. A row
+    // that a key saved is also matched on the host: an earlier version of the listing can have
+    // saved the user's own link, as Composio 1.1.0 did.
     const userLink = (server.auth ?? []).some((flow) => flow.kind === "key" && flow.fields.some((field) => field.url));
-    return userLink ? isListingUrl(config.url, server.url) : config.url === server.url;
+    return isListingUrl(config.url, server.url) && (userLink || savedKeyFlow(server.auth, config) !== null);
   }
   return (
     config.command === server.command &&

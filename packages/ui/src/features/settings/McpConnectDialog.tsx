@@ -57,8 +57,10 @@ export function McpConnectDialog(props: McpConnectDialogProps) {
   /* The way in that is not on screen. A local server is never offered in place of a sign-in or a key. */
   const otherIndex = () => props.flows.findIndex((other, at) => at !== index() && other.kind !== "local");
   function useOther() {
+    const next = otherIndex();
+    if (next === -1) return;
     if (flow().kind === "link") props.onCancelSignIn?.();
-    setIndex(otherIndex());
+    setIndex(next);
   }
   const other = () => {
     const kind = props.flows[otherIndex()]?.kind;
@@ -66,7 +68,8 @@ export function McpConnectDialog(props: McpConnectDialogProps) {
     if (kind === "key") return t("mcp.connect.useKey");
     return null;
   };
-  const alternative = (
+  /* Each dialog makes its own button: one element cannot be in the dialog that closes and in the one that opens. */
+  const alternative = () => (
     <Show when={other()}>
       {(label) => (
         <Button type="button" variant="outline" onClick={useOther}>
@@ -87,7 +90,7 @@ export function McpConnectDialog(props: McpConnectDialogProps) {
           connectOnOpen
           hostName={props.signInHostName}
           onCancelSignIn={props.onCancelSignIn}
-          alternative={alternative}
+          alternative={alternative()}
         />
         {props.signInExtra}
       </Match>
@@ -102,7 +105,7 @@ export function McpConnectDialog(props: McpConnectDialogProps) {
             onCancel={props.onCancel}
             onOpenUrl={props.onOpenUrl}
             hostName={props.hostName}
-            alternative={alternative}
+            alternative={alternative()}
           />
         )}
       </Match>

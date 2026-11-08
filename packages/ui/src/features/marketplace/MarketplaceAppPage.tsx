@@ -366,11 +366,11 @@ function localAddress(entry: MarketplacePluginApp): string {
 function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: MarketplacePluginApp }) {
   const { t } = useText();
   const model = () => props.scope.model;
-  const setup = () => pluginAppSetup(props.entry);
   const connection = () => props.app.connections[props.entry.id] ?? NOT_HELD;
+  const setup = () => (connection().keySaved ? "key" : pluginAppSetup(props.entry));
   const host = () => model().appHostName ?? t("mcp.connect.thisComputer");
   const keyField = () => {
-    const fields = mcpFlowFields(props.entry.server.auth?.[0]);
+    const fields = mcpFlowFields(props.entry.server.auth?.find((flow) => flow.kind === "key"));
     return (fields.find((field) => !field.optional) ?? fields[0])?.label ?? "";
   };
   const description = () => {

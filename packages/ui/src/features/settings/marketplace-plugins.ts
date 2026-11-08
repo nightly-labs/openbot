@@ -11,7 +11,7 @@
 
 import type { MacAutomationTarget, McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
 import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
-import { isListingUrl, type McpAuth, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
+import { isListingUrl, type McpAuth, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 
 /** One of the example questions a plugin listing opens with. */
 export interface MarketplacePluginPrompt {
@@ -59,9 +59,10 @@ interface MarketplacePluginServerBase {
  * The name alone cannot say so. `McpServerStore` keeps names unique, so a server the user wrote by
  * hand can own a catalog name while pointing somewhere else entirely; treating that row as the
  * plugin's would delete the user's own configuration on uninstall and forget the sign-in kept for
- * it. The address - or the command and its words - is compared as well, and nothing else: the
- * connect step adds the credential the user typed to the row that is saved, so headers, environment
- * and enabled state all differ legitimately from what the listing states.
+ * it. The address - or the command and its words - is compared as well. Of the headers, only the
+ * name of the key header that the listing names counts: the connect step adds the credential the
+ * user typed to the row that is saved, so header values, environment and enabled state all differ
+ * legitimately from what the listing states.
  */
 export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): boolean {
   const server = app.server;
@@ -71,9 +72,12 @@ export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePlugi
     // account" writes. Any other row must have the catalog name.
     if (mcpAccountFragment(config.url) === null && config.name !== server.name) return false;
     const url = withoutMcpAccountFragment(config.url);
-    // A listing that asks for the user's own link cannot know the address, only its host.
+    if (url === server.url) return true;
+    // A listing that asks for the user's own link cannot know the address, only its host. A row
+    // that a key saved is also matched on the host: an earlier version of the listing can have
+    // saved the user's own link, as Composio 1.1.0 did.
     const userLink = (server.auth ?? []).some((flow) => mcpFlowFields(flow).some((field) => field.url));
-    return userLink ? isListingUrl(url, server.url) : url === server.url;
+    return isListingUrl(url, server.url) && (userLink || savedKeyFlow(server.auth, config) !== null);
   }
   if (config.name !== server.name) return false;
   return (

@@ -81,6 +81,11 @@ export interface MarketplaceAppConnection {
    * separate sign-in for each account (`mcp-accounts-v1`).
    */
   multipleAccounts: boolean;
+  /**
+   * The first row holds the key that a key flow of the listing names. A listing with a sign-in and
+   * a key then shows the key, not the sign-in. Absent is false.
+   */
+  keySaved?: boolean;
 }
 
 /**
