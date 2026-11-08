@@ -314,6 +314,24 @@ export function expiredPromptResult(
   };
 }
 
+/** What the model reads when the user wrote in the chat instead of answering a card or a sign-in. */
+export const USER_WROTE_INSTEAD_NEXT =
+  "The user wrote a new message in this chat instead of answering. Follow that message: it is in your input or comes next. Ask again only if you still need the answer.";
+
+/**
+ * The answer for a question or block that the user passed over by writing in the chat. Only the model
+ * reads it; the message itself reaches the agent as a steer or as the next turn.
+ */
+export function userWroteInsteadPromptResult(
+  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
+  blockId: string | null,
+): DynamicToolResult | { answers: Record<string, never> } | { action: "cancel"; content: null; _meta: null } {
+  if (responseKind === "mcp-elicitation") return { action: "cancel", content: null, _meta: null };
+  if (responseKind === "user-input") return { answers: {} };
+  const value = { status: "skipped", ...(blockId ? { blockId } : {}), next: USER_WROTE_INSTEAD_NEXT };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
 /** What a blocking UI block (`ask_ui`) ended with. */
 export type UiBlockPromptOutcome =
   | { status: "answered"; blockId: string; response: UiBlockResponse }
@@ -488,11 +506,15 @@ export function vaultPromptResult(
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** `vault` says what happened to a password that the user asked to keep in the Vault. */
+/**
+ * `vault` says what happened to a password that the user asked to keep in the Vault. `next` replaces
+ * the default next step, such as when the user wrote in the chat instead of taking the tab.
+ */
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
   vaultSkipped?: string,
+  next?: string,
 ): DynamicToolResult {
   return {
     success: true,
@@ -503,7 +525,11 @@ export function browserTakeoverResult(
           status: decision === "complete" ? "completed" : "cancelled",
           ...(vault ? { vault } : {}),
           ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(decision === "complete" ? { next: "Take a fresh snapshot and continue the task." } : {}),
+          ...(next
+            ? { next }
+            : decision === "complete"
+              ? { next: "Take a fresh snapshot and continue the task." }
+              : {}),
         }),
       },
     ],

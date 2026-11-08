@@ -87,7 +87,9 @@ import {
   promptQuestions,
   promptResolution,
   questionPromptText,
+  USER_WROTE_INSTEAD_NEXT,
   uiBlockPromptResult,
+  userWroteInsteadPromptResult,
   validPromptQuestions,
   vaultPromptResult,
   vaultRequestFormSpec,
@@ -1831,6 +1833,55 @@ export class AttentionRegistry {
     }
   }
 
+  /**
+   * The user wrote in a chat while its turn waits on a card or a sign-in there. The agent reads no
+   * message until that tool call returns, and a queued message waits for the turn to end, so the turn
+   * would wait forever. Each open question or block of the turn closes as skipped, and each takeover
+   * as cancelled, with a note that a message came instead. A form whose key or item is being saved,
+   * and a takeover whose secret is being filled, finish on their own. Approvals stay: they guard an
+   * action, and an owner-only one is not every member's to refuse.
+   */
+  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
+        continue;
+      if (pending.saving) continue;
+      this.#prompts.delete(requestId);
+      clearTimeout(pending.autoAnswer?.timer);
+      this.#emitInputResolved("prompt", requestId, pending.agentId);
+      this.#routines.markRunningForTurn(pending.turnId);
+      if (pending.client.running) {
+        try {
+          pending.client.respond(
+            pending.id,
+            userWroteInsteadPromptResult(pending.responseKind, pending.uiBlock?.blockId ?? null),
+          );
+        } catch (error) {
+          logger.warn("Unable to answer a prompt the user wrote past", { error: toLogValue(error) });
+        }
+      }
+      try {
+        this.#resolvePersistedPrompt(
+          pending,
+          { status: "cancelled" },
+          pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
+        );
+      } catch (error) {
+        this.#emitError("prompt_persistence_failed", error, pending.agentId);
+      }
+      changed = true;
+    }
+    for (const [requestId, pending] of this.#takeovers) {
+      const { request } = pending;
+      if (request.agentId !== agentId || request.threadId !== publicThreadId || request.turnId !== turnId) continue;
+      if (pending.submitting) continue;
+      // Resolving emits its own runtime snapshot.
+      this.#resolveBrowserTakeover(requestId, pending, "cancel", undefined, USER_WROTE_INSTEAD_NEXT);
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
   /** Expires the prompts of one lost provider client, or of all clients when none is given. */
   clearPrompts(client?: AgentClient): void {
     for (const [requestId, pending] of this.#prompts) {
@@ -2067,6 +2118,7 @@ export class AttentionRegistry {
     pending: PendingBrowserTakeover,
     decision: RespondToBrowserTakeoverInput["decision"],
     vault?: string,
+    next?: string,
   ): void {
     pending.secret?.cancel();
     this.#routines.markRunningForTurn(pending.request.turnId);
@@ -2082,7 +2134,7 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped));
+    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped, next));
   }
 
   #persistQuestionPrompt(

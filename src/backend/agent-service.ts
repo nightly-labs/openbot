@@ -5519,6 +5519,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ),
         );
     yield* this.#steerWhenBusy(agent, task, snapshot, delivery.delivery.id, true);
+    // A turn that waits on a card or a sign-in in this chat reads no message until that call returns,
+    // so the person who wrote instead of answering would wait forever. A stopped turn clears its own.
+    const waitingTurnId = snapshot.activeTurnId;
+    if (snapshot.threadId && waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
+      this.#attention.releaseForUserMessage(agent.id, snapshot.threadId, waitingTurnId);
     if (!task) {
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       this.#conversation.emitConversation(snapshot);
