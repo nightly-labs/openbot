@@ -164,9 +164,13 @@ export const messages = {
     "Sla een DeepSeek-API-sleutel op deze computer op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.deepseekKey.label": "DeepSeek-API-sleutel",
   "provider.openrouterKey.title": "OpenRouter-API-sleutel",
+  "provider.trustedrouterKey.title": "TrustedRouter-API-sleutel",
   "provider.openrouterKey.description":
     "Sla een OpenRouter-API-sleutel op deze computer op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.trustedrouterKey.description":
+    "Sla een TrustedRouter-API-sleutel op deze computer op om de modellen van TrustedRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.openrouterKey.label": "OpenRouter-API-sleutel",
+  "provider.trustedrouterKey.label": "TrustedRouter-API-sleutel",
   "provider.openCodeKey.title": "Inloggen bij OpenCode Go",
   "provider.openCodeKey.description":
     "Gratis modellen hebben geen account nodig. Een sleutel ontgrendelt de betaalde Go-modellen.",

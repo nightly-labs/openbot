@@ -96,6 +96,36 @@ const KEY_EXTENSIONS = {
 }
 `,
   },
+  // TrustedRouter serves models through OpenAI chat completions. Pi has no built-in TrustedRouter
+  // provider, so this extension registers one for this process only. The list holds TrustedRouter's
+  // routes that take tool calls (https://api.trustedrouter.com/v1/models). Each route picks the
+  // upstream model per request, so its price varies and the cost is left at zero; OpenBot reports no
+  // usage for this provider. Model ids keep TrustedRouter's `trustedrouter/<route>` form.
+  trustedrouter: {
+    variable: "OPENBOT_PI_TRUSTEDROUTER_API_KEY",
+    source: `export default function (pi) {${readKey("trustedrouter", "OPENBOT_PI_TRUSTEDROUTER_API_KEY")}
+  const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const model = (route, name, contextWindow) => ({
+    id: "trustedrouter/" + route, name, reasoning: false, input: ["text"], contextWindow, maxTokens: 32768, cost,
+  });
+  pi.registerProvider("trustedrouter", {
+    baseUrl: "https://api.trustedrouter.com/v1",
+    api: "openai-completions",
+    apiKey,
+    models: [
+      model("auto", "Auto", 1048576),
+      model("efficient", "Efficient", 1050000),
+      model("fast", "Fast", 131072),
+      model("professional", "Professional", 1048576),
+      model("advanced", "Advanced", 1050000),
+      model("frontier", "Frontier", 1050000),
+      model("zdr", "ZDR", 1048576),
+      model("e2e", "E2E", 1048576),
+    ],
+  });
+}
+`,
+  },
 } as const satisfies Record<KeyOnlyProviderId, { variable: string; source: string }>;
 
 /** Owns one temporary, key-free extension file that gives a key-only provider its key in Pi. */

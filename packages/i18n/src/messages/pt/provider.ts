@@ -165,9 +165,13 @@ export const messages = {
     "Salve uma chave de API da DeepSeek neste computador para usar os modelos da DeepSeek. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.deepseekKey.label": "Chave de API da DeepSeek",
   "provider.openrouterKey.title": "Chave de API do OpenRouter",
+  "provider.trustedrouterKey.title": "Chave de API do TrustedRouter",
   "provider.openrouterKey.description":
     "Salve uma chave de API do OpenRouter neste computador para usar os modelos do OpenRouter. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.trustedrouterKey.description":
+    "Salve uma chave de API do TrustedRouter neste computador para usar os modelos do TrustedRouter. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.openrouterKey.label": "Chave de API do OpenRouter",
+  "provider.trustedrouterKey.label": "Chave de API do TrustedRouter",
   "provider.openCodeKey.title": "Entrar no OpenCode Go",
   "provider.openCodeKey.description":
     "Os modelos gratuitos não exigem uma conta. Uma chave libera os modelos pagos do Go.",

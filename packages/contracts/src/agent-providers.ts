@@ -39,6 +39,7 @@ export const AGENT_PROVIDERS = [
   "devin",
   "copilot",
   "mistral",
+  "trustedrouter",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -601,6 +602,31 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  // TrustedRouter's models run in the Pi CLI that OpenBot downloads for Pi, with a key the user saves
+  // here. Pi has no built-in TrustedRouter provider. Pi's own sign-in and models stay on the Pi row.
+  trustedrouter: {
+    id: "trustedrouter",
+    displayName: "TrustedRouter",
+    cliName: "Pi CLI",
+    onboardingDescription: "Many models with a TrustedRouter API key",
+    signInMessage: "Add a TrustedRouter API key to continue.",
+    installGuideLink: null,
+    defaultModel: "trustedrouter/auto",
+    legacyModelPrefix: null,
+    authKind: "trustedrouter",
+    pickerOrder: 17,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   // Hermes Agent (`hermes acp`) from Nous Research, which the user installs. It keeps its memories,
   // skills and sign-ins in `~/.hermes`, as the user's own Hermes does. A Nous Portal subscription
   // signs it in (`hermes auth add nous`); the models of every provider Hermes is signed in to are listed.
@@ -723,7 +749,8 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
  * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8, and Kimi, Devin, GitHub Copilot, Mistral and Hermes, which no frozen protocol names.
+ * from protocol 8, and Kimi, Devin, GitHub Copilot, Mistral, Hermes and TrustedRouter, which no frozen
+ * protocol names.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
@@ -739,6 +766,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "trustedrouter",
   "hermes",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
@@ -751,7 +779,12 @@ export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
  * The providers that sign in only with an API key that the user saves in OpenBot. They run in the Pi
  * CLI, so their Connect and Reconnect open the key dialog.
  */
-export const KEY_ONLY_PROVIDERS = ["inception", "deepseek", "openrouter"] as const satisfies readonly AgentProviderId[];
+export const KEY_ONLY_PROVIDERS = [
+  "inception",
+  "deepseek",
+  "openrouter",
+  "trustedrouter",
+] as const satisfies readonly AgentProviderId[];
 export type KeyOnlyProviderId = (typeof KEY_ONLY_PROVIDERS)[number];
 
 export function isKeyOnlyProvider(provider: AgentProviderRef): provider is KeyOnlyProviderId {

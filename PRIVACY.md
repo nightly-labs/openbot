@@ -1743,6 +1743,19 @@ with the key, for the models that the key can use. Pi keeps its session files in
 files. OpenRouter's terms apply: <https://openrouter.ai/terms>. OpenRouter agents stay on this
 computer: OpenBot does not show them to team members.
 
+### TrustedRouter
+
+TrustedRouter agents run in the Pi CLI that OpenBot downloads for Pi. On this computer, Connect on the
+TrustedRouter row saves a TrustedRouter API key. OpenBot encrypts it in its existing provider
+credential store, gives it to the local Pi process in its environment, and redacts it from logs. Pi
+does not write the key to a file. Prompts, attachments, and tool results go to that process, and Pi
+sends them with this key to `api.trustedrouter.com`. TrustedRouter sends the request to the company
+that serves the model its route selects, and that company's terms also apply. OpenBot keeps the list
+of TrustedRouter routes in the app and does not contact TrustedRouter to read it. Pi keeps its
+session files in its own folder, as for Pi agents. OpenBot does not copy or upload these files.
+TrustedRouter's terms apply: <https://trustedrouter.com/terms>. TrustedRouter agents stay on this
+computer: OpenBot does not show them to team members.
+
 ### Local model servers
 
 When Server settings shows the Providers section of this computer, and once on the onboarding

@@ -175,9 +175,13 @@ export const messages = {
     "אפשר לשמור מפתח DeepSeek API במחשב הזה כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.deepseekKey.label": "מפתח DeepSeek API",
   "provider.openrouterKey.title": "מפתח OpenRouter API",
+  "provider.trustedrouterKey.title": "מפתח TrustedRouter API",
   "provider.openrouterKey.description":
     "אפשר לשמור מפתח OpenRouter API במחשב הזה כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.trustedrouterKey.description":
+    "אפשר לשמור מפתח TrustedRouter API במחשב הזה כדי להשתמש במודלים ש-TrustedRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.openrouterKey.label": "מפתח OpenRouter API",
+  "provider.trustedrouterKey.label": "מפתח TrustedRouter API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",
   "provider.openCodeKey.unreadable": "המפתח השמור אינו קריא. יש להדביק אותו שוב, או להסיר אותו.",

@@ -785,6 +785,17 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     validateAccount: () => undefined,
   },
   {
+    id: "trustedrouter",
+    // The key is pasted into OpenBot. Pi's own sign-in stays on the Pi row.
+    signIn: { kind: "external" },
+    cliProvider: "pi",
+    resolveCli: resolvePiCli,
+    createClient: (cli, timeout, context, confinement) => piClient("trustedrouter", cli, timeout, context, confinement),
+    createProfileClient: (cli, timeout, context) => piProfileClient("trustedrouter", cli, timeout, context),
+    authState: (account) => ({ kind: "trustedrouter", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
     id: "muse",
     signIn: { kind: "muse-device", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     // On this computer only: no Team API protocol carries a Muse code sign-in.

@@ -96,12 +96,13 @@ const PI_CATALOG_REFRESH_TIMEOUT_MS = 4_000;
 
 /**
  * The variable from which `pi update --models` reads each key-only provider's key. Pi has no built-in
- * Inception provider, so there is no catalog to refresh for it.
+ * Inception or TrustedRouter provider, so there is no catalog to refresh for them.
  */
 const PI_CATALOG_KEY_VARIABLES: Record<KeyOnlyProviderId, string | null> = {
   inception: null,
   deepseek: "DEEPSEEK_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
+  trustedrouter: null,
 };
 
 const PiSessionUsage = Schema.Struct({

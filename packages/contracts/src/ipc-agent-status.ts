@@ -177,6 +177,7 @@ export type AgentAuthState =
   | { kind: "inception"; email: string | null }
   | { kind: "deepseek"; email: string | null }
   | { kind: "openrouter"; email: string | null }
+  | { kind: "trustedrouter"; email: string | null }
   | { kind: "hermes"; email: string | null }
   | { kind: "acp"; email: string | null };
 

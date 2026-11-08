@@ -398,6 +398,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "أضف مفتاح Inception API للمتابعة.",
   "error.provider.deepseekSignIn": "أضف مفتاح DeepSeek API للمتابعة.",
   "error.provider.openrouterSignIn": "أضف مفتاح OpenRouter API للمتابعة.",
+  "error.provider.trustedrouterSignIn": "أضف مفتاح TrustedRouter API للمتابعة.",
   "error.provider.terminalLoginFailed":
     "تعذّر فتح نافذة طرفية لتسجيل الدخول. افتح واجهة CLI للمزوّد على هذا المضيف وسجّل الدخول فيها، ثم حدّث المزوّدين.",
   "error.provider.nativeArchiveInvalid": "لا يحتوي تنزيل المزوّد على تثبيت صالح.",

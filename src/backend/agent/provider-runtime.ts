@@ -2329,7 +2329,7 @@ export class ProviderRuntime implements ProviderPort {
           this.#hooks.onProviderResumed(provider);
         }),
     );
-    // A provider that runs this CLI, such as Inception, DeepSeek or OpenRouter on Pi, moves to the new binary
+    // A provider that runs this CLI, such as Inception, DeepSeek, OpenRouter or TrustedRouter on Pi, moves to the new binary
     // when its own turns end. One with no process, such as one that found no CLI, is checked again now.
     for (const driver of BUILT_IN_PROVIDER_DRIVERS) {
       if (driver.cliProvider !== provider || this.#off.has(driver.id)) continue;
@@ -3204,9 +3204,11 @@ export class ProviderRuntime implements ProviderPort {
               ? sourceText("error.provider.deepseekSignIn")
               : provider === "openrouter"
                 ? sourceText("error.provider.openrouterSignIn")
-                : provider === "hermes"
-                  ? sourceText("error.provider.hermesSignIn")
-                  : agentProviderDescriptor(provider).signInMessage)
+                : provider === "trustedrouter"
+                  ? sourceText("error.provider.trustedrouterSignIn")
+                  : provider === "hermes"
+                    ? sourceText("error.provider.hermesSignIn")
+                    : agentProviderDescriptor(provider).signInMessage)
     );
   }
 
