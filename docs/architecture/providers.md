@@ -1124,7 +1124,7 @@ change requires an idle agent and retires its continuation, while its conversati
 to a previous profile starts a fresh continuation. A restart with the same selection can resume it.
 The local picker uses the selected profile's catalog result for model and effort availability.
 It prepares a saved profile's catalog while another provider is active, without changing that provider.
-An explicit catalog failure keeps the selection and offers profile retry, without inherited sign-in.
+With Hermes selected, an explicit catalog failure keeps the selection and offers profile retry.
 The local selector is not sent through released Team API adapters. Hermes profiles are not security
 sandboxes. See the [Hermes profile guide](https://hermes-agent.nousresearch.com/docs/user-guide/profiles).
 
