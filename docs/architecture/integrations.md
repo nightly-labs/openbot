@@ -387,7 +387,8 @@ A server with no `registration_endpoint` that sets `client_id_metadata_document_
 OpenBot's client metadata document (CIMD, SEP-991) as the `client_id`:
 `https://openbot.run/oauth/mcp-client.json`, which `apps/auth-api` serves
 ([`mcp-client[.]json.ts`](../../apps/auth-api/src/routes/oauth/mcp-client%5B.%5Djson.ts)). Its
-`redirect_uris` are `http://127.0.0.1:28417/mcp-auth` and `openbot://mcp-auth`. A server that
+`redirect_uris` holds only `http://127.0.0.1:28417/mcp-auth`: ElevenLabs refuses a document that
+also lists a custom scheme such as `openbot://mcp-auth` (#5748). A server that
 offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
 loopback address has another port, and a server that compares ports refuses it.
 
