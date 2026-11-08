@@ -153,7 +153,7 @@ const Conversation = createSimpleContext({
     const rawAgentMessageBodies = new Map<string, string>();
     /** The streamed text that arrived since the last frame, in arrival order. */
     let queuedDeltas: ConversationDeltaEvent[] = [];
-    let deltaFrame: number | undefined;
+    let cancelDeltaFrame: (() => void) | undefined;
 
     /** Each change of the conversations applies the queued text first, so the changes keep their order. */
     function setConversations(update: (current: Record<string, ConversationState>) => void): void {
@@ -193,7 +193,20 @@ const Conversation = createSimpleContext({
     /** The chats that the user marked unread. They stay unread until the user opens them again. */
     const heldUnreadAgentChats = new Set<string>();
 
-    let conversationFrame: number | undefined;
+    let cancelConversationFrame: (() => void) | undefined;
+
+    /**
+     * Runs `run` at the next frame. A hidden or minimized window gets no frames, but the agent dock above
+     * other apps shows these chats, so there a timer runs it.
+     */
+    function onNextFrame(run: () => void): () => void {
+      if (document.visibilityState === "hidden") {
+        const timer = setTimeout(run);
+        return () => clearTimeout(timer);
+      }
+      const frame = requestAnimationFrame(run);
+      return () => cancelAnimationFrame(frame);
+    }
 
     /** The key of the wait in an agent's own chat: the conversations here are those chats. */
     function ownChatAttentionKey(agentId: string): string {
@@ -381,17 +394,19 @@ const Conversation = createSimpleContext({
         else rawAgentMessageBodies.delete(key);
       }
       pendingConversationSnapshots.set(agentId, snapshot);
-      if (conversationFrame !== undefined) return;
-      conversationFrame = requestAnimationFrame(() => {
-        conversationFrame = undefined;
-        // Text that came after a snapshot applies that snapshot first.
-        flushConversationDeltas();
-        const snapshots = [...pendingConversationSnapshots.values()];
-        pendingConversationSnapshots.clear();
-        for (const pendingSnapshot of snapshots) {
-          applyConversation(pendingSnapshot, isAgentChatReadable(pendingSnapshot.agentId));
-        }
-      });
+      cancelConversationFrame ??= onNextFrame(applyPendingConversations);
+    }
+
+    function applyPendingConversations(): void {
+      cancelConversationFrame?.();
+      cancelConversationFrame = undefined;
+      // Text that came after a snapshot applies that snapshot first.
+      flushConversationDeltas();
+      const snapshots = [...pendingConversationSnapshots.values()];
+      pendingConversationSnapshots.clear();
+      for (const pendingSnapshot of snapshots) {
+        applyConversation(pendingSnapshot, isAgentChatReadable(pendingSnapshot.agentId));
+      }
     }
 
     // A rail page, such as Usage or Settings, covers the workspace content, so the chat under it is not the
@@ -523,7 +538,7 @@ const Conversation = createSimpleContext({
      */
     function applyConversationDelta(event: ConversationDeltaEvent) {
       queuedDeltas.push(event);
-      deltaFrame ??= requestAnimationFrame(flushConversationDeltas);
+      cancelDeltaFrame ??= onNextFrame(flushConversationDeltas);
     }
 
     /** Whether a delta changes the conversation now: an applied or waiting snapshot can already hold it. */
@@ -538,8 +553,8 @@ const Conversation = createSimpleContext({
      * that applies: each of them has a higher revision, so each would apply after it.
      */
     function flushConversationDeltas(): void {
-      if (deltaFrame !== undefined) cancelAnimationFrame(deltaFrame);
-      deltaFrame = undefined;
+      cancelDeltaFrame?.();
+      cancelDeltaFrame = undefined;
       if (queuedDeltas.length === 0) return;
       const events = queuedDeltas;
       queuedDeltas = [];
@@ -1162,11 +1177,13 @@ const Conversation = createSimpleContext({
       setPresentedPromptResolutions((current) => ({ ...current, [agentId]: requestKey }));
     }
 
-    // The scheduler holds a frame handle across the microtask boundary, so the
-    // provider owns cancelling it. Nothing else here needs teardown.
+    // A frame asked for before the window hid comes only when it shows again, so the change of
+    // visibility applies what waits for it.
+    document.addEventListener("visibilitychange", applyPendingConversations);
     onCleanup(() => {
-      if (conversationFrame !== undefined) cancelAnimationFrame(conversationFrame);
-      if (deltaFrame !== undefined) cancelAnimationFrame(deltaFrame);
+      document.removeEventListener("visibilitychange", applyPendingConversations);
+      cancelConversationFrame?.();
+      cancelDeltaFrame?.();
     });
 
     return {
