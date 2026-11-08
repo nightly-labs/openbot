@@ -156,13 +156,15 @@ const foldChar = (char: string) =>
 /**
  * The folded text, and for each of its code units the index of the character in `text` that made
  * it. Folding can change the length, so this map finds the matched part in the original name.
+ * A run of spaces and separators becomes one space: "Sales - EU" is "sales eu".
  */
 function foldName(text: string) {
   let folded = "";
   const source: number[] = [];
   let index = 0;
   for (const char of text) {
-    const part = foldChar(char);
+    const raw = foldChar(char);
+    const part = raw === " " && folded.endsWith(" ") ? "" : raw;
     folded += part;
     for (let unit = 0; unit < part.length; unit++) source.push(index);
     index += char.length;
@@ -356,7 +358,12 @@ function TaskAgentSelect(props: {
               if (option) choose(option);
             }}
             itemComponent={(item) => (
-              <Combobox.Item item={item.item} class="tasks-page-agent-option">
+              <Combobox.Item
+                item={item.item}
+                class="tasks-page-agent-option"
+                // The combobox has no selection, so the row says that it is the current agent.
+                aria-selected={item.item.rawValue.id === props.agentId ? "true" : "false"}
+              >
                 <AgentAvatar agent={item.item.rawValue} class="tasks-page-avatar" />
                 <MatchedAgentName name={item.item.rawValue.name} query={query()} />
                 <Show when={item.item.rawValue.id === props.agentId}>
