@@ -51,6 +51,7 @@ export const messages = {
     "משימות של הסוכן הזה פועלות. יש להמתין לסיומן, או לעצור אותן, לפני החלפת ספק.",
   "error.agent.waitBeforeClearContext": "יש להמתין לסיום התור הפעיל ולריקון התור לפני תחילת צ'אט חדש.",
   "error.agent.waitBeforeCompactContext": "יש להמתין לסיום התור הפעיל ולריקון התור לפני דחיסת ההקשר.",
+  "error.agent.waitBeforeDeleteHistory": "יש להמתין לסיום התור הפעיל ולריקון התור לפני מחיקת ההיסטוריה.",
   "error.agent.compactContextUnavailable": "הסוכן הזה לא יכול לדחוס את ההקשר שלו כעת.",
   "error.agent.unknown": "סוכן לא מוכר: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -95,6 +96,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "רק המחשב שמריץ את הסוכן יכול לשנות את ההגדרה הזו.",
   "error.agent.sideQuestionBusy": "יותר מדי שאלות צדדיות פועלות. יש לנסות שוב בעוד רגע.",
   "error.agent.sideQuestionFailed": "הסוכן לא הצליח לענות על השאלה הצדדית. יש לנסות שוב.",
+  "error.agent.webSearchSignIn": "חיפוש באינטרנט דורש התחברות ל-Codex עם חשבון ChatGPT.",
+  "error.agent.webSearchBusy": "פועלים יותר מדי חיפושים ושאלות צד. נסו שוב בעוד רגע.",
+  "error.agent.webSearchFailed": "החיפוש באינטרנט לא הסתיים. נסו שוב.",
   "error.agent.busyMessageModeLocalOnly": "אפשר להגדיר מה קורה להודעות בזמן שהסוכן עובד רק במחשב שמריץ את הסוכן.",
   "error.agent.backupModelsLocalOnly": "אפשר להגדיר מודלי גיבוי רק במחשב שמריץ את הסוכן.",
   "error.agent.taskLimitLocalOnly": "אפשר להגדיר את מגבלת המשימות רק במחשב שמריץ את הסוכן.",

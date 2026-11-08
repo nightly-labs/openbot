@@ -133,18 +133,42 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
 // virtualization re-renders settled messages often). Cap the size so a long
 // session cannot grow this without bound.
 const LEXER_CACHE_LIMIT = 200;
-const lexerCache = new Map<string, TokensList>();
-const inlineLexerCache = new Map<string, Token[]>();
+/**
+ * Tokens hold copies of the text, so 200 large bodies, such as pasted logs, would keep many megabytes
+ * after their messages are gone. The cache also keeps at most this many characters, and a body that
+ * is longer is lexed again on each render.
+ */
+const LEXER_CACHE_CHARACTERS = 2 * 1024 * 1024;
+
+/** Keeps the newest entries, within a count and a character budget. */
+class LexerCache<T> {
+  readonly #entries = new Map<string, T>();
+  #characters = 0;
+
+  get(body: string): T | undefined {
+    return this.#entries.get(body);
+  }
+
+  set(body: string, tokens: T): void {
+    if (body.length > LEXER_CACHE_CHARACTERS || this.#entries.has(body)) return;
+    this.#entries.set(body, tokens);
+    this.#characters += body.length;
+    for (const oldest of this.#entries.keys()) {
+      if (this.#entries.size <= LEXER_CACHE_LIMIT && this.#characters <= LEXER_CACHE_CHARACTERS) break;
+      this.#entries.delete(oldest);
+      this.#characters -= oldest.length;
+    }
+  }
+}
+
+const lexerCache = new LexerCache<TokensList>();
+const inlineLexerCache = new LexerCache<Token[]>();
 
 function lexBlockTokens(body: string, cache: boolean): TokensList {
   if (!cache) return markdown.lexer(body);
   const cached = lexerCache.get(body);
   if (cached) return cached;
   const tokens = markdown.lexer(body);
-  if (lexerCache.size >= LEXER_CACHE_LIMIT) {
-    const oldest = lexerCache.keys().next();
-    if (!oldest.done) lexerCache.delete(oldest.value);
-  }
   lexerCache.set(body, tokens);
   return tokens;
 }
@@ -191,10 +215,6 @@ function lexInlineTokens(body: string): Token[] {
   const cached = inlineLexerCache.get(body);
   if (cached) return cached;
   const tokens = markdown.Lexer.lexInline(body, markdown.defaults);
-  if (inlineLexerCache.size >= LEXER_CACHE_LIMIT) {
-    const oldest = inlineLexerCache.keys().next();
-    if (!oldest.done) inlineLexerCache.delete(oldest.value);
-  }
   inlineLexerCache.set(body, tokens);
   return tokens;
 }

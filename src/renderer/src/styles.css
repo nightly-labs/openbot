@@ -58,6 +58,7 @@
 @import "./features/settings/settings-modal.css";
 @import "@openbot/ui/features/window/page-rail.css";
 @import "./features/window/window.css";
+@import "./features/files/library.css";
 @import "@openbot/ui/features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
@@ -93,6 +94,8 @@
 @import "@openbot/ui/skill-preview.css";
 /* After the page styles: the transparent window replaces their backgrounds. */
 @import "./styles/window-glass.css";
+/* After the transparent window: the chat background replaces its canvas in conversations. */
+@import "./styles/chat-background.css";
 
 @source "../../../packages/ui/src";
 

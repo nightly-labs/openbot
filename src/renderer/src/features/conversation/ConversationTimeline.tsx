@@ -1,3 +1,4 @@
+import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
@@ -40,7 +41,7 @@ import { createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack 
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { currentDevicePlatform } from "../../send-shortcut-preference";
+import { currentDevicePlatform, deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -195,6 +196,7 @@ export function ConversationTimeline() {
     replyToMessage,
     addPageText,
     setPageContext,
+    quoteSelection,
     retryPendingSend,
     scheduleUnreadDividerVisibilityUpdate,
     setChatSearchQuery,
@@ -342,7 +344,7 @@ export function ConversationTimeline() {
 
   const runtime = conversationRuntime(props);
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
-  const loadImageFile = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
+  const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
   const instructionsCalls = agentInstructionsCalls();
   /** View and Undo on an instructions change line: the file is in the workspace on this computer. */
   const localInstructionsCalls = () =>
@@ -860,6 +862,11 @@ export function ConversationTimeline() {
                     .filter((attachment) => attachment.name === path);
                   return matches.length === 1 ? matches[0] : undefined;
                 };
+                const imageScope = () => ({
+                  serverId: props.server?.id ?? "local",
+                  messageId: message()?.id ?? initialMessage.id,
+                  agentId: workspaceAgentId(),
+                });
                 // A chip joins a file name to the folder that the message names. When nothing is there,
                 // the name opens as the agent wrote it, from its workspace (#5270).
                 const writtenFile = (asWritten: string | undefined) => {
@@ -1204,6 +1211,13 @@ export function ConversationTimeline() {
                   // A visual reply is the agent's page. It shows above the final reply, with no bubble.
                   const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
                   const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
+                  // The page quotes as its file, as in the side panel, so the quote chip opens the page.
+                  const pageQuoteId = () =>
+                    fileQuoteId({
+                      source: "attachment",
+                      attachmentId: visual().attachment.id,
+                      name: visual().attachment.name,
+                    });
                   const [page, setPage] = createSignal<{ html?: string; failed?: boolean }>({});
                   if (loadPage && !pageUrl()) {
                     let mounted = true;
@@ -1264,6 +1278,9 @@ export function ConversationTimeline() {
                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
+                            onQuote={(text) => quoteSelection(pageQuoteId(), text)}
+                            quoteShortcut={deviceQuoteShortcut(props.platform)}
+                            onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
                             isAppShortcut={isChatVisualAppShortcut}
                             macWindowControls={props.platform === "darwin"}
                           />
@@ -1404,6 +1421,9 @@ export function ConversationTimeline() {
                             steps={stepsInRow() ? stepsDisclosure() : undefined}
                             actionsBeside={actionsBeside()}
                             animate={animateEntrance}
+                            // Natural shows a message once it is complete. Its bubble enters with all of its
+                            // text, so the height does not grow while the words fade in.
+                            textAtOnce={plainActivity()}
                             agents={props.agents}
                             skills={installedSkills()}
                             referencedMessage={referencedMessage()}
@@ -1441,17 +1461,14 @@ export function ConversationTimeline() {
                             mediaSource={runtime.attachmentMedia}
                             downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
-                            loadImageFile={
-                              loadImageFile &&
-                              ((file) =>
-                                loadImageFile(file, {
-                                  serverId: props.server?.id ?? "local",
-                                  messageId: message()?.id ?? initialMessage.id,
-                                  agentId: workspaceAgentId(),
-                                }))
-                            }
+                            loadImageFile={messageImageFiles && ((file) => messageImageFiles.load(file, imageScope()))}
                             onDownloadImageFile={
-                              loadImageFile && ((file) => downloadMessageImageFile(file, workspaceAgentId()))
+                              messageImageFiles &&
+                              ((file) =>
+                                downloadMessageImageFile(
+                                  messageImageFiles.source(file, imageScope()),
+                                  workspaceAgentId(),
+                                ))
                             }
                             actions={
                               <>

@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "בז'",
   "settings.logoColor.gray": "אפור",
   "settings.logoColor.white": "לבן",
+  "settings.chatBackground.title": "רקע הצ'אט",
+  "settings.chatBackground.description":
+    "כל ערכת נושא שומרת על צבע משלה. צבע שמקשה על קריאת הטקסט נעשה כהה או בהיר יותר.",
+  "settings.chatBackground.light": "רקע הצ'אט בערכה בהירה",
+  "settings.chatBackground.dark": "רקע הצ'אט בערכה כהה",
+  "settings.chatBackground.default": "ברירת מחדל",
   "settings.chatColor.title": "צבע הצ'אט",
   "settings.chatColor.description": "צובע את הבועות של ההודעות שלך. גם אנשים בשרתים שלך רואים אותו.",
   "settings.chatColor.yours": "צבע הצ'אט שלך",
@@ -62,6 +68,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "השארת המחשב ער גם בעבודה על סוללה. הסוללה מתרוקנת מהר יותר.",
   "settings.restoreWorkspace.title": "שחזור סביבת העבודה האחרונה בהפעלה",
   "settings.restoreWorkspace.description": "פתיחת סביבת העבודה והמשימות מהסשן הקודם.",
+  "settings.quitGuard.title": "החזקת ⌘Q ליציאה",
+  "settings.quitGuard.description":
+    "יש להחזיק את ⌘Q או ללחוץ עליו פעמיים כדי לצאת. עם „אף פעם”, לחיצה אחת על ⌘Q יוצאת ועוצרת את הסוכנים.",
+  "settings.quitGuard.working": "כשסוכנים עובדים",
+  "settings.quitGuard.always": "תמיד",
+  "settings.quitGuard.never": "אף פעם",
   "settings.externalLinks.title": "פתיחת קישורים חיצוניים ב",
   "settings.externalLinks.description": "קישורים בצ'אטים, בעמודי התחברות ובעמודי חיוב נפתחים כאן.",
   "settings.externalLinks.defaultBrowser": "דפדפן ברירת המחדל",
@@ -87,7 +99,7 @@ export const messages = {
     "הצגת תגובה, מענה ועוד לצד הודעה, ואת השעה בין הודעות. כשההגדרה כבויה, כל הפעולות והשעה מוצגות מתחת לכל הודעה.",
   "settings.busyMessage.title": "הכוונת סוכנים בזמן שהם עובדים",
   "settings.busyMessage.description":
-    "הודעות חדשות מצטרפות לעבודה הנוכחית של הסוכן ולא לתור. עובד עם ChatGPT ועם Claude.",
+    "הודעות חדשות מצטרפות לעבודה הנוכחית של הסוכן ולא לתור. בסוכנים שלא תומכים בזה, ההודעות ממתינות בתור.",
   "settings.agentDefaults.title": "ברירות מחדל",
   "settings.agentDefaults.description": "הסוכנים פועלים לפי ברירות המחדל האלה, אלא אם משנים אותן לסוכן.",
   "settings.agentDefaults.value": "ברירת מחדל: {value}",
@@ -235,7 +247,7 @@ export const messages = {
   "settings.tab.notifications.title": "התראות",
   "settings.tab.notifications.description": "בחירת האופן ש-OpenBot מתריע.",
   "settings.tab.voice.title": "קול",
-  "settings.tab.voice.description": "הכתבה בתיבת ההודעה. מודלים מקומיים רצים במחשב הזה; ElevenLabs רץ בענן.",
+  "settings.tab.voice.description": "הכתבה בתיבת ההודעה. מודלים מקומיים רצים במחשב הזה; ElevenLabs ו-Groq רצים בענן.",
   "settings.tab.computerUse.title": "שליטה במחשב",
   "settings.tab.computerUse.description":
     "מאפשר לסוכנים של OpenBot במחשב הזה לראות את האפליקציות שלו ולהשתמש בהן. סוכנים בשרת אחר משתמשים במחשב של אותו שרת.",
@@ -597,6 +609,10 @@ export const messages = {
   "settings.voice.removeFailed": "לא ניתן להסיר את המודל. יש לנסות שוב.",
   "settings.voice.model.elevenlabs.description":
     "משדר את הקול שלך אל ElevenLabs. הטקסט מוצג בזמן הדיבור ואינו משתנה. משתמש במפתח ה-API שלך, ו-ElevenLabs מחייבת על כל שימוש.",
+  "settings.voice.model.groqTurbo.description":
+    "שולח כל הקלטה אל Groq כשמפסיקים. מהיר ותומך בשפות רבות. משתמש במפתח ה-API שלך, ו-Groq מחייבת על כל שימוש.",
+  "settings.voice.model.groqLarge.description":
+    "שולח כל הקלטה אל Groq כשמפסיקים. מדויק יותר מ-turbo, אבל איטי יותר. משתמש במפתח ה-API שלך, ו-Groq מחייבת על כל שימוש.",
   "settings.voice.apiKey.placeholder": "הדבקת המפתח",
   "settings.voice.apiKey.save": "שמירת מפתח",
   "settings.voice.apiKey.remove": "הסרת מפתח",

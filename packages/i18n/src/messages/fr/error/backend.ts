@@ -77,6 +77,8 @@ export const messages = {
   "error.backend.channelWaitBeforeNewConversation":
     "Attendez la fin du travail dans ce canal, puis démarrez une nouvelle conversation.",
   "error.backend.channelWaitBeforeCompact": "Attendez la fin du travail dans ce canal, puis compactez-le.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Attendez la fin du travail dans ce canal, puis supprimez son historique.",
   "error.backend.channelCompactUnavailable":
     "Aucun membre de ce canal ne peut compacter son contexte maintenant. Un membre doit d’abord répondre dans le canal, et son fournisseur doit prendre en charge la compaction.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
@@ -347,6 +349,8 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
+  "error.backend.browserCertificateUntrusted":
+    "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",

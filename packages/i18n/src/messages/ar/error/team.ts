@@ -60,6 +60,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "هذا الاتصال لا يدعم محادثة جديدة أو الضغط في قناة.",
   "error.team.channelPictureUnsupported": "صور القنوات غير مدعومة في هذا الاتصال.",
   "error.team.channelDeleteUnsupported": "حذف القنوات غير مدعوم في هذا الاتصال.",
+  "error.team.historyDeleteUnsupported": "حذف السجل غير مدعوم في هذا الاتصال.",
   "error.team.channelTaskCancelUnsupported": "إلغاء مهام القنوات غير مدعوم في هذا الاتصال.",
   "error.team.membersCannotDeleteChannels": "لا يمكن للأعضاء حذف القنوات.",
   "error.team.membersCannotArchiveChannels": "لا يمكن للأعضاء أرشفة القنوات.",
@@ -84,6 +85,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "عرض المجلدات غير مدعوم في هذا الاتصال.",
   "error.team.conversationFileSearchUnsupported": "البحث في الملفات غير مدعوم في هذا الاتصال.",
   "error.team.sideQuestionUnsupported": "الأسئلة الجانبية غير مدعومة في هذا الاتصال.",
+  "error.team.liveVoiceUnsupported": "لا يدعم هذا الخادم صوت Codex المباشر. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.routineFlowsUnsupported": "لا يدعم هذا الخادم تدفقات المهام الدورية. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.routineCanvasTooLarge":
     "لوحة هذه المهمة الدورية كبيرة جدًا لإرسالها إلى هذا الجهاز. اختصر تعليمات المهمة الدورية على الحاسوب الذي يشغّل الخادم.",

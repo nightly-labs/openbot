@@ -188,6 +188,15 @@ export const messages = {
     "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
+  "agentSettings.deleteHistory.title": "Elimina cronologia",
+  "agentSettings.deleteHistory.description":
+    "I messaggi di questa chat vengono eliminati e l'agente li dimentica. La sua configurazione resta.",
+  "agentSettings.deleteHistory.button": "Elimina",
+  "agentSettings.deleteHistory.confirmTitle": "Eliminare la cronologia della chat con {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Tutti i messaggi e i file di questa chat vengono eliminati da OpenBot e l'agente li dimentica. Non puoi annullare. Thread secondari, istruzioni, modello, strumenti, memorie, spazio di lavoro e browser non cambiano.",
+  "agentSettings.deleteHistory.confirm": "Elimina cronologia",
+  "agentSettings.deleteHistory.failed": "Impossibile eliminare la cronologia.",
 
   "agentSettings.fullAccess.title": "Dare accesso completo a questo agente?",
   "agentSettings.fullAccess.askTitle": "Far lavorare questo agente fuori dal suo workspace?",

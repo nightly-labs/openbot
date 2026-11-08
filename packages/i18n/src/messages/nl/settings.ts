@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grijs",
   "settings.logoColor.white": "Wit",
+  "settings.chatBackground.title": "Chatachtergrond",
+  "settings.chatBackground.description":
+    "Elk thema houdt een eigen kleur. Een kleur die tekst moeilijk leesbaar maakt, wordt donkerder of lichter.",
+  "settings.chatBackground.light": "Chatachtergrond in Licht",
+  "settings.chatBackground.dark": "Chatachtergrond in Donker",
+  "settings.chatBackground.default": "Standaard",
   "settings.chatColor.title": "Chatkleur",
   "settings.chatColor.description": "Geeft de ballonnen van je berichten een tint. Mensen op je servers zien hem ook.",
   "settings.chatColor.yours": "Jouw chatkleur",
@@ -64,6 +70,12 @@ export const messages = {
     "Houd de computer ook op batterijstroom wakker. De batterij loopt dan sneller leeg.",
   "settings.restoreWorkspace.title": "Herstel de laatste werkruimte bij openen",
   "settings.restoreWorkspace.description": "Open de werkruimte en taken van je vorige sessie.",
+  "settings.quitGuard.title": "⌘Q ingedrukt houden om te stoppen",
+  "settings.quitGuard.description":
+    "Houd ⌘Q ingedrukt of druk twee keer om te stoppen. Met ‘Nooit’ stopt één ⌘Q OpenBot en de agents.",
+  "settings.quitGuard.working": "Als agents werken",
+  "settings.quitGuard.always": "Altijd",
+  "settings.quitGuard.never": "Nooit",
   "settings.externalLinks.title": "Open externe links in",
   "settings.externalLinks.description": "Links in chats, inlogpagina’s en betaalpagina’s openen hier.",
   "settings.externalLinks.defaultBrowser": "Standaardbrowser",
@@ -89,7 +101,7 @@ export const messages = {
     "Toont Reageren, Beantwoorden en Meer naast een bericht, en de tijd tussen berichten. Als dit uit staat, staan alle acties en de tijd onder elk bericht.",
   "settings.busyMessage.title": "Stuur agents bij terwijl ze werken",
   "settings.busyMessage.description":
-    "Nieuwe berichten gaan naar het huidige werk van de agent, niet naar de wachtrij. Werkt met ChatGPT en Claude.",
+    "Nieuwe berichten gaan naar het huidige werk van de agent, niet naar de wachtrij. Bij agents die dit niet kunnen, wachten ze in de wachtrij.",
   "settings.agentDefaults.title": "Standaarden",
   "settings.agentDefaults.description": "Agents volgen deze standaarden, tenzij je ze voor een agent wijzigt.",
   "settings.agentDefaults.value": "Standaard: {value}",
@@ -246,7 +258,7 @@ export const messages = {
   "settings.tab.notifications.description": "Kies hoe OpenBot je waarschuwt.",
   "settings.tab.voice.title": "Spraak",
   "settings.tab.voice.description":
-    "Dicteren in het berichtvak. Lokale modellen draaien op deze computer; ElevenLabs draait in de cloud.",
+    "Dicteren in het berichtvak. Lokale modellen draaien op deze computer; ElevenLabs en Groq draaien in de cloud.",
   "settings.tab.computerUse.title": "PC-besturing",
   "settings.tab.computerUse.description":
     "Laat agents in de OpenBot van deze computer de apps ervan zien en gebruiken. Agents op een andere server gebruiken de computer van die server.",
@@ -605,6 +617,10 @@ export const messages = {
   "settings.voice.removeFailed": "Kan het model niet verwijderen. Probeer het opnieuw.",
   "settings.voice.model.elevenlabs.description":
     "Streamt je stem naar ElevenLabs. Tekst verschijnt terwijl je spreekt en blijft staan. Gebruikt je eigen API-sleutel, en ElevenLabs rekent elk gebruik af.",
+  "settings.voice.model.groqTurbo.description":
+    "Stuurt elke opname naar Groq als je stopt. Snel, en kent veel talen. Gebruikt je eigen API-sleutel, en Groq rekent elk gebruik af.",
+  "settings.voice.model.groqLarge.description":
+    "Stuurt elke opname naar Groq als je stopt. Nauwkeuriger dan turbo, maar trager. Gebruikt je eigen API-sleutel, en Groq rekent elk gebruik af.",
   "settings.voice.apiKey.placeholder": "Plak de sleutel",
   "settings.voice.apiKey.save": "Sleutel opslaan",
   "settings.voice.apiKey.remove": "Sleutel verwijderen",

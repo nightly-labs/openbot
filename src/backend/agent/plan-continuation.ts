@@ -15,10 +15,13 @@ const NEXT_STEP_LIMIT = 2;
 const NEXT_STEP_ANSWER_MAX = 400;
 /** Verbs that mean "go on with the same work". "Proceed" and "go ahead" ask for approval, so they block. */
 const CONTINUE_VERB = "(?:continue|keep going|go on|carry on|move on)";
-const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+(?:steps|work|plan|list)))?|remaining(?:\s+(?:steps|work|items|parts|ones))?|steps?\s+\d+))?`;
+/** Parts of the same work. A named action, such as "the rest of the deploy", is not in it, so it blocks. */
+const WORK_PARTS =
+  "(?:steps|work|items|parts|ones|tasks|files|tests|changes|fixes|edits|checks|pages|sections|list|plan)";
+const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+${WORK_PARTS}))?|remaining(?:\s+${WORK_PARTS})?|steps?\s+\d+))?`;
 /**
  * A last line that only asks whether to go on with the work, such as "Shall I continue?" or "Step
- * one is done. Want me to continue with the next step?". Text in front of the question must end a
+ * one is done. Want me to continue with the remaining files?". Text in front of the question must end a
  * statement, so another question in the line still blocks. A question about a named action, such as
  * "Should I continue with the deploy?" or "Proceed?", does not match: the user must answer it.
  */
@@ -26,12 +29,36 @@ const ASKS_TO_CONTINUE = new RegExp(
   String.raw`^(?:[^?？]*[.!]\s+)?(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
   "i",
 );
+/** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
+const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
+/**
+ * The rest of a next-step sentence must not wait for someone or something: an offer to the user
+ * ("… if you want"), the user's approval, a later time, or another person ("… get back to you").
+ */
+const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|get\s+back|once\s+approved|(?:your|the\s+user['’]s)\s+(?:approval|confirmation|permission)|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
 /**
  * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
  * answer that says the agent waits, holds or stops does not match.
  */
-const NAMES_NEXT_STEP =
-  /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
+const NAMES_NEXT_STEP = new RegExp(
+  String.raw`(?:\blet me now\b|\bnow let me\b|\bi['’]ll now\b|\bi will now\b|\bnow i(?:['’]ll| will)\b|\bnext,?\s+i(?:['’]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)${NOT_WAITING}[^.!?\n]{0,100}[.:…]?\s*$`,
+  "i",
+);
+
+/**
+ * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
+ * The continuation note does not approve a risky action in any case.
+ */
+const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch)`;
+/**
+ * A last sentence in which the agent says that it does the next work, such as "Let me run the tests."
+ * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …", "I'll keep an eye on
+ * it." and "I'll update you …" do not match.
+ */
+const ANNOUNCES_WORK = new RegExp(
+  String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
+  "i",
+);
 
 /** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
 const WAITS_FOR_USER =
@@ -60,7 +87,8 @@ export function waitsForUser(answer: string | undefined): boolean {
 function stoppedBeforeNextStep(answer: string | undefined): boolean {
   if (asksToContinue(answer)) return true;
   const text = answer?.trim() ?? "";
-  return text.length > 0 && text.length <= NEXT_STEP_ANSWER_MAX && NAMES_NEXT_STEP.test(text.slice(-160));
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX) return false;
+  return NAMES_NEXT_STEP.test(text.slice(-160)) || ANNOUNCES_WORK.test(text.replace(/[*_`>#]/g, "").trimEnd());
 }
 
 interface ContinuationCount {

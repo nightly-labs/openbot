@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Текущая активность",
   "chat.steps.show": "Показать шаги",
   "chat.steps.hide": "Скрыть шаги",
+  "chat.steps.showError": "Показать ошибку",
+  "chat.steps.hideError": "Скрыть ошибку",
   "chat.steps.list": "Шаги агента",
   "chat.steps.count": { one: "{count} шаг", few: "{count} шага", many: "{count} шагов", other: "{count} шага" },
   "chat.steps.failed": {
@@ -328,6 +330,7 @@ export const messages = {
   "chat.code.copy": "Копировать код",
   "chat.visual.loadFailed": "Не удалось загрузить: {title}",
   "chat.visual.fullScreen": "Во весь экран",
+  "chat.visual.openInSidePanel": "Открыть в боковой панели",
   "chat.visual.exitFullScreen": "Выйти из полноэкранного режима",
   "chat.preview.switchLabel": "Предпросмотр или код",
   "chat.preview.code": "Код",

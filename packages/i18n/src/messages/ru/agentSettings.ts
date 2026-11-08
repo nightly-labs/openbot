@@ -210,6 +210,15 @@ export const messages = {
     "Агент забудет этот чат. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "agentSettings.newChat.confirm": "Начать новый чат",
   "agentSettings.newChat.failed": "Не удалось начать новый чат.",
+  "agentSettings.deleteHistory.title": "Удалить историю",
+  "agentSettings.deleteHistory.description":
+    "Сообщения этого чата удаляются, и агент их забывает. Его настройки остаются.",
+  "agentSettings.deleteHistory.button": "Удалить",
+  "agentSettings.deleteHistory.confirmTitle": "Удалить историю чата с {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Все сообщения и файлы этого чата будут удалены из OpenBot, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
+  "agentSettings.deleteHistory.confirm": "Удалить историю",
+  "agentSettings.deleteHistory.failed": "Не удалось удалить историю.",
 
   "agentSettings.fullAccess.title": "Дать этому агенту полный доступ?",
   "agentSettings.fullAccess.askTitle": "Разрешить этому агенту работать за пределами рабочего пространства?",

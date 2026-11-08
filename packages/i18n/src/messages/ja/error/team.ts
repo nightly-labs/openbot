@@ -60,6 +60,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "この接続はチャンネルでの新しい会話と圧縮に対応していません。",
   "error.team.channelPictureUnsupported": "この接続ではチャンネル画像を使用できません。",
   "error.team.channelDeleteUnsupported": "この接続ではチャンネルを削除できません。",
+  "error.team.historyDeleteUnsupported": "この接続では履歴を削除できません。",
   "error.team.channelTaskCancelUnsupported": "この接続ではチャンネルのタスクを中止できません。",
   "error.team.membersCannotDeleteChannels": "メンバーはチャンネルを削除できません。",
   "error.team.membersCannotArchiveChannels": "メンバーはチャンネルをアーカイブできません。",
@@ -84,6 +85,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "この接続ではフォルダーを表示できません。",
   "error.team.conversationFileSearchUnsupported": "この接続ではファイルを検索できません。",
   "error.team.sideQuestionUnsupported": "この接続ではサイド質問を使えません。",
+  "error.team.liveVoiceUnsupported":
+    "このサーバーは Codex ライブ音声に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
   "error.team.routineFlowsUnsupported":
     "このサーバーはルーティンフローに対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
   "error.team.routineCanvasTooLarge":

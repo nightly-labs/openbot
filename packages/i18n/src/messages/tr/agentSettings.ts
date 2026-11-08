@@ -184,6 +184,14 @@ export const messages = {
     "Ajan bu sohbeti unutur. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
+  "agentSettings.deleteHistory.title": "Geçmişi sil",
+  "agentSettings.deleteHistory.description": "Bu sohbetin mesajları silinir ve ajan onları unutur. Kurulumu kalır.",
+  "agentSettings.deleteHistory.button": "Sil",
+  "agentSettings.deleteHistory.confirmTitle": "{name} ile sohbet geçmişi silinsin mi?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Bu sohbetin tüm mesajları ve dosyaları OpenBot'tan silinir ve ajan onları unutur. Bu işlem geri alınamaz. Yan konular, talimatlar, model, araçlar, anılar, çalışma alanı ve tarayıcı değişmez.",
+  "agentSettings.deleteHistory.confirm": "Geçmişi sil",
+  "agentSettings.deleteHistory.failed": "Geçmiş silinemedi.",
   "agentSettings.fullAccess.title": "Bu ajana tam erişim verilsin mi?",
   "agentSettings.fullAccess.askTitle": "Bu ajan çalışma alanının dışında çalışabilsin mi?",
   "agentSettings.fullAccess.description":

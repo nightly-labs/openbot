@@ -62,6 +62,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "Esta conexão não suporta uma nova conversa nem compactação em um canal.",
   "error.team.channelPictureUnsupported": "Esta conexão não oferece suporte a imagens de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexão não oferece suporte à exclusão de canais.",
+  "error.team.historyDeleteUnsupported": "Esta conexão não oferece suporte à exclusão do histórico.",
   "error.team.channelTaskCancelUnsupported": "Esta conexão não oferece suporte ao cancelamento de tarefas de canais.",
   "error.team.membersCannotDeleteChannels": "Membros não podem excluir canais.",
   "error.team.membersCannotArchiveChannels": "Membros não podem arquivar canais.",
@@ -86,6 +87,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Esta conexão não oferece suporte à exibição de pastas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexão não oferece suporte à pesquisa de arquivos.",
   "error.team.sideQuestionUnsupported": "Esta conexão não oferece suporte a perguntas à parte.",
+  "error.team.liveVoiceUnsupported":
+    "Este servidor não oferece suporte à voz ao vivo do Codex. Atualize o OpenBot no computador que o executa.",
   "error.team.routineFlowsUnsupported":
     "Este servidor não oferece suporte a fluxos de rotinas. Atualize o OpenBot no computador que o executa.",
   "error.team.routineCanvasTooLarge":

@@ -824,7 +824,8 @@ to ungroup an agent; deleting a section also ungroups its agents without deletin
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
 
-`html_render` publishes a visual reply: an HTML page that shows above the agent's reply. The router
+`html_render` publishes a visual reply: an HTML page that shows above the agent's reply. On desktop
+and in the web client, a button on the page opens it as a file tab of the side panel too. The router
 stores the page as a generated `text/html` attachment and adds an assistant message with the item
 type `visual-reply:<height>` and the page title as its text (`@openbot/contracts/chat-visual`). A
 client that does not know the item type shows the title and the file. A visual message is not
@@ -834,14 +835,17 @@ the page on `openbot-visual:` (`openbot-remote-visual:` for a remote host) with
 the same sandbox without `allow-same-origin`. The page runs its scripts and can load files from the
 network, but it has an opaque origin, gets no permission, and talks to the app only with the checked
 messages of `parseChatVisualMessage`: its height, its theme, its display mode, a link, a message, its
-context, an image and an app shortcut. The frame script gives the page `window.openbotPage`
+context, the selected text, an image and an app shortcut. The frame script gives the page `window.openbotPage`
 (`sendMessage`, `setContext`, `requestFullscreen`, `exitFullscreen`, `displayMode`) over the MCP Apps
 methods `ui/message`, `ui/update-model-context` and `ui/request-display-mode`. A link, a message, the
 context, an image, full screen and a shortcut need the frame to have the focus and the user's
 activation, so a page acts only after a click or a key in it. A message goes at the end of the draft,
-and the user sends it. The context is a quote tag of the visual message
-at the start of the draft, so it shows as a quote chip and is saved and sent with the draft; the
-page's next context replaces it. Full screen puts the frame's
+and the user sends it. The context is a quote tag of the visual message (in the side panel, of the
+message that holds the page) at the start of the draft, so it shows as a quote chip and is saved and sent with the draft; the
+page's next context replaces it. The frame script reports the text that the user selects in the
+page, and the chat or the panel shows the Quote action of a chat selection over it. Quote, or the
+quote shortcut in the page, adds the text as a quote of the page file, so the chip opens the page in
+the side panel. In the chat, full screen puts the frame's
 box in the top layer with the Popover API, so the frame does not load again; it exits before the app
 opens a dialog for the page. Only the renderer's allowlist of shortcuts (`chat-visual-shortcuts.ts`)
 leaves the page, as a key event on the frame element. Mobile runs the

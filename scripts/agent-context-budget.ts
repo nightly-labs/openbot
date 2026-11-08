@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { type AgentModelOption, type AgentSummary, DEFAULT_AGENT_DEFAULTS } from "@openbot/contracts/ipc";
 import { developerInstructions } from "../src/backend/agent/developer-instructions";
 import { listModelsPayload } from "../src/backend/agent/model-tools";
-import { BUILTIN_TOOL_CATALOG, VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { BUILTIN_TOOL_CATALOG, visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { toolGuidance } from "../src/backend/agent/tool-guidance";
 import { runDebtRatchet } from "./debt-ratchet";
 
@@ -34,16 +34,18 @@ const agent: AgentSummary = {
   avatarUrl: null,
 };
 
-/** The options that `ThreadLifecycle.#instructions` passes, with nothing connected and no section. */
+/**
+ * The options that `ThreadLifecycle.#instructions` passes, with nothing connected and no section.
+ * Both clients send the memories and the section-mates with the turns (`AgentClient.turnContext`).
+ */
 function instructions(provider: "claude" | "codex"): string {
-  const inTurns = provider === "claude";
   return developerInstructions({ ...agent, provider }, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
     computerUseInOwnChat: false,
     sideThread: false,
     passwordVault: false,
     storedMemoryCount: 0,
-    memoriesInTurns: inTurns,
-    teammatesInTurns: inTurns,
+    memoriesInTurns: true,
+    teammatesInTurns: true,
     sectionTeammates: null,
     homeSkills: [],
   });
@@ -73,7 +75,8 @@ function measure(): Map<string, number> {
   return new Map([
     ["instructions.claude", bytes(instructions("claude"))],
     ["instructions.codex", bytes(instructions("codex"))],
-    ["visible-tools", bytes(VISIBLE_DYNAMIC_TOOLS)],
+    // Pi has no web search of its own, so its visible tools name the whole catalog.
+    ["visible-tools", bytes(visibleDynamicTools("pi"))],
     ["catalog.schemas", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.inputSchema))],
     ["catalog.descriptions", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.description))],
     ["guidance", sum([...guidance])],

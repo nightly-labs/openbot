@@ -28,6 +28,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
       <form method="post" action="/search"><label>Override password<input id="override-password" name="password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
+      <form method="post" action="/session"><label>Masked password<input id="masked-password" type="text" style="-webkit-text-security: disc"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); setTimeout(() => this.submit())"><label>Checked password<input id="checked-password" name="password" type="password"></label></form>`
           : ""
@@ -105,7 +106,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(tab.id));
       }
     }
-    // A field built for something else must not take a vault password: its value can reach a URL.
+    // A field built for something else must not take a vault password: its value can reach a URL. A
+    // text field that the page masks as a password, as some bank sign-in pages do, is a password field.
     // A password field may, in any form, but a navigation that carries a vault value is blocked and the
     // user finishes. A form that the page sends with its own script, as many sign-in forms with no
     // method do, still signs in.
@@ -117,6 +119,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       ["#override-password", true, "/login", "takeover"],
       ["#checked-password", true, "/login", "takeover"],
       ["#post-password", true, "/session", "submitted"],
+      ["#masked-password", true, "/session", "submitted"],
       ["#script-password", true, "/complete", "submitted"],
     ] as const) {
       const tab = await runCauseEffect(

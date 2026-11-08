@@ -59,6 +59,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "이 연결은 채널의 새 대화나 압축을 지원하지 않습니다.",
   "error.team.channelPictureUnsupported": "이 연결에서는 채널 사진을 지원하지 않아요.",
   "error.team.channelDeleteUnsupported": "이 연결에서는 채널 삭제를 지원하지 않아요.",
+  "error.team.historyDeleteUnsupported": "이 연결에서는 기록 삭제를 지원하지 않아요.",
   "error.team.channelTaskCancelUnsupported": "이 연결에서는 채널 작업 취소를 지원하지 않아요.",
   "error.team.membersCannotDeleteChannels": "멤버는 채널을 삭제할 수 없어요.",
   "error.team.membersCannotArchiveChannels": "멤버는 채널을 보관할 수 없어요.",
@@ -83,6 +84,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "이 연결에서는 폴더 표시를 지원하지 않아요.",
   "error.team.conversationFileSearchUnsupported": "이 연결에서는 파일 검색을 지원하지 않아요.",
   "error.team.sideQuestionUnsupported": "이 연결에서는 사이드 질문을 지원하지 않아요.",
+  "error.team.liveVoiceUnsupported":
+    "이 서버는 Codex 라이브 음성을 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
   "error.team.routineFlowsUnsupported":
     "이 서버는 루틴 플로우를 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
   "error.team.routineCanvasTooLarge":

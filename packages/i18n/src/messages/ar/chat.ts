@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "النشاط الحالي",
   "chat.steps.show": "إظهار الخطوات",
   "chat.steps.hide": "إخفاء الخطوات",
+  "chat.steps.showError": "إظهار الخطأ",
+  "chat.steps.hideError": "إخفاء الخطأ",
   "chat.steps.list": "خطوات الوكيل",
   "chat.steps.count": {
     zero: "لا خطوات",
@@ -379,6 +381,7 @@ export const messages = {
   "chat.code.copy": "نسخ التعليمات البرمجية",
   "chat.visual.loadFailed": "تعذّر تحميل {title}",
   "chat.visual.fullScreen": "ملء الشاشة",
+  "chat.visual.openInSidePanel": "فتح في اللوحة الجانبية",
   "chat.visual.exitFullScreen": "الخروج من ملء الشاشة",
   "chat.preview.switchLabel": "المعاينة أو التعليمات البرمجية",
   "chat.preview.code": "التعليمات البرمجية",

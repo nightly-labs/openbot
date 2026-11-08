@@ -53,6 +53,11 @@ export function ChannelEditor(props: ChannelEditorProps) {
   const { t } = useText();
   const agentList = channels.agents;
   const channel = () => channels.state.page?.channel;
+  /** "Delete history" for the settings, or nothing when the host cannot delete it. */
+  function deleteHistoryAction(channelId: string): (() => Promise<void>) | undefined {
+    if (!channels.historyDeletionSupported()) return undefined;
+    return () => channels.deleteHistory(channelId);
+  }
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
   const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });
   let lastSignature = "";
@@ -405,6 +410,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
             channelName={current().name}
             startNewConversation={() => channels.clearContext(current().id)}
             compact={() => channels.compactContext(current().id)}
+            deleteHistory={deleteHistoryAction(current().id)}
           />
         )}
       </Show>

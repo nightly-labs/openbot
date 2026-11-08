@@ -1,0 +1,367 @@
+[
+  {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "A nova página Biblioteca, na barra da janela, mostra todas as imagens e arquivos dos chats de um servidor.",
+          "Exclua o histórico de um chat ou de um canal nas configurações dele. A configuração, as memórias e as rotinas continuam.",
+          "Ouça as respostas em voz alta com ElevenLabs ou xAI, e dite com Groq, usando sua própria chave de API em Configurações → Voz.",
+          "Adicione o Mistral como provedor.",
+          "Abra uma página que um agente cria como uma aba do painel lateral, ao lado do chat.",
+          "Escolha uma cor de fundo do chat para o tema Claro e outra para o tema Escuro em Configurações → Geral."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Os agentes usam menos tokens em cada solicitação com Claude, Codex, Pi, OpenCode, Grok e Hermes.",
+          "O OpenBot usa menos memória para abas do navegador, agentes inativos e janelas do app.",
+          "As abas do navegador dos agentes esperam as verificações antirrobô que passam sozinhas, e terminam tarefas curtas em menos etapas.",
+          "As notificações têm um novo visual."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agora os agentes usam um login que você salva em um gerenciador de senhas ou no Vault depois que o chat deles começou.",
+          "Um servidor volta a se conectar ao Signal quando o Signal não responde, então os dispositivos não veem mais “O computador anfitrião está offline.” até reiniciar.",
+          "A Dynamic Island e o dock de agentes não fazem mais outros apps travarem enquanto um agente trabalha.",
+          "Agentes do Claude com uma chave de API da Anthropic agora usam o crédito promocional de API dessa chave."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "Se seus agentes do Claude usam seu próprio CLAUDE.md, suas habilidades ou seus hooks, ative Configurações → Provedores → Claude → Usar minha configuração do Claude Code."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Coloque seus agentes no novo dock de agentes, na borda da tela, no macOS. Desative-o em Configurações → Dock de agentes.",
+          "Agora os agentes escrevem atualizações curtas enquanto trabalham. Para voltar ao estilo antigo, escolha Clássico em Configurações do servidor → Personalidade.",
+          "Inicie uma nova conversa ou compacte o contexto de um canal nas configurações dele.",
+          "Os membros que entram em um servidor podem adicionar seus próprios servidores MCP e conectar apps como o Trello.",
+          "Escolha quem pode controlar este computador com a área de trabalho remota em Configurações do servidor → Área de trabalho remota.",
+          "Use o OpenBot em hebraico, e conecte GitLab, Omnisend e ElevenLabs na Loja."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Anexe a um chat arquivos de qualquer tipo, como um certificado ou um perfil de VPN.",
+          "O app web abre e envia arquivos de até 100 MB.",
+          "Uma mensagem mostra Reagir, Responder e Mais quando você passa o ponteiro sobre ela. Desative Configurações → Geral → Ações de mensagem compactas para ver a linha completa.",
+          "No Mac, o ⌘Q pede que você o mantenha pressionado só enquanto um agente trabalha."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Menções em posts do Slack, Discord, Telegram e WhatsApp agora notificam a pessoa.",
+          "Quando a cota de um provedor acaba, o agente continua o trabalho no primeiro modelo de reserva disponível.",
+          "Um chat que compactava de novo após cada turno agora para as compactações automáticas depois de 2 seguidas.",
+          "O OpenBot não fecha mais quando uma ação do navegador de um agente espera em uma página que carrega outra página.",
+          "Os logins do Proton Pass funcionam depois que o OpenBot reinicia."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Escolha em Configurações → Agentes quando o cartão do plano inicia sozinho uma tarefa longa, ou deixe que ele inicie só quando você tocar em Iniciar.",
+          "Escolha a conta do provedor ao criar um agente, se o provedor tiver mais de uma conta conectada.",
+          "Altere em Configurações → Agentes → Scripts locais quantas solicitações os scripts locais podem enviar a cada agente em uma hora.",
+          "A página Uso tem uma aba Habilidade que mostra com que frequência seus agentes carregam cada habilidade e quanto isso custa.",
+          "Conecte o Higgsfield na Loja para criar imagens, vídeos e áudio."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "O seletor de cor do chat tem 11 novas cores predefinidas, e o código, as tabelas e os cartões em um balão colorido usam a cor dele.",
+          "Os cartões em que um agente pede uma resposta, como um formulário de chave de API, têm a mesma aparência das perguntas do agente.",
+          "Peça a um agente em um canal para criar um novo canal ou alterar outro canal, e ele faz isso nesse canal."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O Claude continua conectado depois que o OpenBot reinicia ou atualiza, e os agentes do Claude usam menos da janela de uso de 5 horas.",
+          "As mensagens antigas que você carrega em um chat longo continuam carregadas. O chat não volta mais para as últimas mensagens.",
+          "As compactações automáticas de um chat do ChatGPT (Codex), Muse, Pi ou Antigravity param após 2 falhas seguidas, então o chat não esgota mais o limite do plano.",
+          "A voz do GPT funciona com todos os agentes, também quando o agente usa um modelo do Codex.",
+          "O navegador preenche os logins salvos do Proton Pass."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.62.0",
+    "date": "2026-11-05",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Dê a um perfil do navegador seu próprio proxy em Configurações do servidor → Perfis do navegador, ou use seu próprio computador como proxy dele em um servidor em que você entrou.",
+          "Conecte o Proton Pass na Loja. O navegador preenche os logins do cofre que você compartilha com o OpenBot.",
+          "Digite @ no chat de um agente para marcar uma das abas do navegador ou um dos tópicos paralelos dele.",
+          "Configurações → Voz tem mais dois modelos de ditado local: Parakeet Unified EN e Cohere Transcribe.",
+          "Um tópico mostra um ponto azul quando o agente escreveu nele e você ainda não leu.",
+          "Os agentes podem enviar arquivos para chats do WhatsApp, Slack, Discord e Telegram, e criar repositórios no GitHub.",
+          "Baixe o Hermes Agent em Configurações → Provedores, e exclua um provedor e a CLI dele com um só botão."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "As rotinas voltam a ser executadas no chat do agente. Ative “Executar em um tópico separado” para manter uma rotina no próprio tópico.",
+          "As perguntas do agente aparecem em um só balão, uma pergunta por vez.",
+          "Quando um agente pede uma chave de API, a chave vai para o Vault de todos os agentes por padrão.",
+          "Os ícones têm uma só espessura de linha e ficam brancos quando você passa o ponteiro sobre eles."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O OpenBot gasta menos energia quando está aberto sem nenhuma tarefa.",
+          "Chats longos rolam sem travar e abrem mais rápido.",
+          "O OpenBot não fica mais parado em “Conectando ao OpenBot” ou na tela de carregamento do servidor ao iniciar.",
+          "As execuções de rotinas voltam a ter Uso do computador quando ele está ativado para o agente."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.61.0",
+    "date": "2026-11-04",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Exclua uma mensagem de um chat: clique nela com o botão direito e selecione Excluir. Isso funciona em chats de agentes, tarefas paralelas e canais.",
+          "Os agentes podem criar, alterar e executar fluxos de trabalho, e você vê cada etapa sendo montada na página Fluxos de trabalho.",
+          "Converse com um agente do Codex com a Voz ao vivo do Codex. Ative em Configurações → Voz.",
+          "Devin e GitHub Copilot são novos provedores em Mais provedores.",
+          "Escolha uma cor de chat para cada agente e para você. Os agentes também têm mais cores de avatar.",
+          "Os agentes podem salvar no Vault uma chave de API ou uma senha que você cola no chat.",
+          "Rotinas de webhook aceitam solicitações Standard Webhooks, como as do Composio, Svix, Clerk e Resend.",
+          "Conecte Coinbase, Robinhood ou RevenueCat na aba Apps da Loja."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Cada rotina de um agente é executada no próprio tópico, então as rotinas e o chat não esperam mais uns pelos outros.",
+          "Os agentes concluem mais partes de uma tarefa antes de parar, e pedem confirmação com um cartão antes de enviar, publicar, excluir ou pagar.",
+          "Os selos da barra lateral têm visual de feltro, e um canal fixado mostra quantas mensagens não lidas tem."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Um canal com um histórico longo volta a abrir rápido.",
+          "No Linux, o OpenBot não pede mais para você entrar de novo após cada reinício quando o chaveiro não guarda a chave dele.",
+          "No Windows, os líderes de canal voltam a encaminhar as mensagens, e você pode criar um servidor neste computador.",
+          "Quando uma versão mais antiga do OpenBot abre dados que uma versão mais nova salvou, ela instala a versão mais recente."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Converse com seus agentes pelo WhatsApp. Vincule um número em Loja → Apps → WhatsApp. Um número separado é mais seguro, porque o WhatsApp pode bloquear números que considera automatizados.",
+          "Inicie um fluxo de trabalho quando alguém mencionar o OpenBot no Slack ou em um grupo do Telegram, e envie o resultado de volta para lá.",
+          "Use o OpenBot em árabe. O layout é espelhado da direita para a esquerda.",
+          "Desative modelos em Configurações do servidor → Provedores. O seletor de modelos mostra primeiro os modelos mais novos, e os mais antigos ficam recolhidos.",
+          "As Configurações do servidor têm um Audit log com as mudanças de membros, funções e acesso de agentes.",
+          "Login corporativo: o proprietário de um servidor pode conectar Microsoft Entra ID, Okta, Google Workspace ou outro provedor OpenID Connect em Membros → Company sign-in. Assim, pessoas com um e-mail da empresa entram sem convite.",
+          "Dê a um canal uma imagem ou um ícone nas configurações do canal.",
+          "Um canal pode ter as próprias memórias, e um agente pode enviar uma tarefa para um canal a partir do seu chat direto.",
+          "Os tópicos paralelos têm Responder em cada mensagem.",
+          "Downloads e uploads de um servidor em que você entrou mostram o progresso, e um upload que falhou tem um botão Repetir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "As mensagens do chat usam mais espaço de uma janela larga.",
+          "Cada arquivo que você abre a partir de um chat ganha a própria aba no painel lateral.",
+          "Um texto colado com mais de 4.000 caracteres vira um anexo pasted-text.txt, então a mensagem mantém todo o texto.",
+          "O OpenBot é gratuito para uso pessoal, e a primeira execução informa isso."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Os códigos de login chegam a usuários de todas as regiões.",
+          "Uma janela branca após uma falha volta a carregar sozinha.",
+          "Quando o Claude não consegue acessar o servidor dele, o chat mostra as novas tentativas.",
+          "Um agente com modelos de reserva passa para o próximo quando um saldo de créditos ou uma cota acaba antes de ele começar a escrever."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.59.0",
+    "date": "2026-11-02",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kimi é um novo provedor. O OpenBot baixa a CLI do Kimi Code, e você entra com sua conta do Kimi Code.",
+          "Use o Hermes Agent, da Nous Research, como provedor, com suas próprias memórias, habilidades e logins.",
+          "No Mac, o OpenBot tem um ícone na barra de menus. Depois que você fecha a janela, o ícone do Dock some e as tarefas continuam em execução.",
+          "Inicie um fluxo de trabalho quando alguém mencionar o OpenBot no Discord, e envie o resultado de volta como resposta, post ou reação.",
+          "Pastas da barra lateral podem conter pastas, em até três níveis. Arraste um chat ou uma pasta para dentro de uma pasta.",
+          "Escolha os níveis de raciocínio Nenhum, Mínimo e Ultra quando um modelo os oferecer.",
+          "Agentes e canais fixados ficam iguais em cada dispositivo que se conecta a um servidor.",
+          "Anexe imagens SVG a um chat. O agente lê o texto do SVG.",
+          "Conecte mais de uma conta do Notion, e conecte o ClickUp em Apps.",
+          "Um agente pode pedir que você adicione um login, um cartão ou um endereço ao Vault. Você digita o segredo, e o agente recebe só o nome."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "No Mac, mantenha ⌘Q pressionado ou pressione duas vezes para sair. Um toque por engano não para mais seus agentes.",
+          "Um agente continua sozinho com mais frequência quando o plano dele ainda tem etapas pendentes.",
+          "Imagens coladas aparecem como miniaturas acima da caixa de mensagem, e imagens enviadas aparecem em tamanho real.",
+          "Agentes sem foto agora mostram um robô de pelúcia macio que mostra o que o agente faz."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Menções e mensagens diretas do Slack voltam a chegar ao OpenBot quando um computador com o espaço de trabalho do Slack está desligado.",
+          "Celulares e outros dispositivos conseguem se conectar aos seus servidores logo que o computador sai do modo de repouso.",
+          "Um upload em um chat não bloqueia mais o Enviar em outros chats.",
+          "O texto que você copia do OpenBot é colado em outros apps sem as cores do app."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.58.0",
+    "date": "2026-11-01",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Inicie um fluxo de trabalho pelo GitHub: um gatilho do GitHub é executado com novas issues, comentários, pull requests, revisões, verificações com falha ou uma menção a @openbotgit.",
+          "Altere o GitHub a partir de um fluxo de trabalho: comente, adicione rótulos, atribua, revise, feche ou crie uma issue como o GitHub App do OpenBot.",
+          "A Loja tem 17 novos agentes do OpenBot, como QA Tester, PR Shepherd e Chief of Staff, e 15 novas habilidades para eles.",
+          "Uso mostra o limite mensal do OpenCode Go como uma terceira barra."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Um servidor em que você entrou abre muito mais rápido. Os agentes e a barra lateral da sua última visita aparecem na hora enquanto o app se conecta.",
+          "Na web, trocar para outro servidor leva cerca de 1 segundo, e não de 2 a 3 segundos.",
+          "A janela abre cerca de 3 segundos mais cedo quando a Dynamic Island está ativada."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Você pode mover uma mensagem da fila quando mais de 32 mensagens esperam na fila.",
+          "Um turno do Pi que não envia nada por 10 minutos agora para com uma mensagem.",
+          "Um provedor personalizado aparece no seletor de modelos quando o OpenCode ou o Pi não está instalado.",
+          "Nomes de modelo longos no seletor de modelos passam para uma segunda linha."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.57.0",
+    "date": "2026-10-31",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ramifique uma conversa: clique com o botão direito na última mensagem do agente em um turno e selecione Ramificar daqui. Um novo tópico abre com a conversa até essa mensagem.",
+          "As configurações do agente têm uma página Instruções que mostra o arquivo AGENTS.md do agente. Quando o agente altera as instruções, o chat mostra a mudança com Desfazer.",
+          "A Loja está em openbot.run. Cada agente e cada habilidade têm a própria página, e Copiar link compartilha essa página.",
+          "Um agente pode responder a um alerta ou a uma confirmação de um site que a própria ação do navegador dele abriu.",
+          "Uma tarefa de canal parada ou com falha tem um botão Cancelar tarefa."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "As memórias abrem no painel de configurações do agente, com um título curto para cada memória e um campo de busca.",
+          "Os agentes enviam menos tokens em cada solicitação, com todos os provedores.",
+          "Cada rotina aparece como um cartão próprio, com uma chave que pausa ou retoma a rotina.",
+          "Configurações › Notificações mostra um cartão para cada servidor, com Tudo, Se precisar e Nada em um só controle."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "As atualizações no app são instaladas em Macs lentos, como os Macs com Intel.",
+          "Uma aba inativa do navegador de um agente usa muito menos memória.",
+          "Um agente com um modelo do OpenCode Go passa para o modelo de reserva ao atingir o limite de uso do Go.",
+          "O painel de visualização de arquivos é atualizado quando o agente altera o arquivo aberto."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.56.0",
+    "date": "2026-10-30",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Os agentes fazem várias ações do navegador em uma só etapa, como digitar uma busca, pressionar Enter e esperar os resultados. As tarefas do navegador terminam mais cedo e usam menos tokens.",
+          "Clique com o botão direito em uma mensagem de um agente e selecione Marcar como não lido para ler de novo mais tarde.",
+          "Quando você tem outro servidor, pode ocultar o servidor Local no menu dele. Os agentes, chats e arquivos dele continuam no seu computador.",
+          "Escolha em Configurações › Notificações o som que toca quando uma tarefa termina."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Um provedor usa a CLI que você instalou quando ela tem a mesma versão da cópia do OpenBot ou uma mais nova.",
+          "Sua resposta sobre a análise de uso acompanha sua conta nos seus outros dispositivos. Se você desativou a análise de uso antes desta versão, ela continua desativada neste computador até você mudar aqui.",
+          "Arraste a alça do campo Instruções para deixá-lo mais alto."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "As verificações da Cloudflare passam no navegador integrado.",
+          "Cada CLI de provedor usa cerca de metade do espaço em disco: o OpenBot mantém uma só versão.",
+          "Uma mensagem que você envia a um agente que atingiu um limite de uso tenta o provedor de novo na hora.",
+          "Na barra lateral, um chat que você arrasta cai na seção abaixo do ponteiro."
+        ]
+      }
+    ]
+  }
+]

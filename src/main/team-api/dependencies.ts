@@ -59,6 +59,7 @@ import type {
   SidebarPinsSnapshot,
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
+  VoiceLiveEvent,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
@@ -613,6 +614,14 @@ export type TeamApiPasswordManagers = Pick<
 /** `vault-v1`: the Vault of this host, for an owner or admin. The route uses no CSV import. */
 export type TeamApiVault = VaultService;
 
+/**
+ * `live-voice-v1`: Codex live voice for a member. The host starts the Codex process; the audio goes
+ * between the member's client and OpenAI. `subscribe` gives each transcript and end with its owner.
+ */
+export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVoice"> & {
+  subscribe(listener: (event: VoiceLiveEvent, memberId: string | null) => void): () => void;
+};
+
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
@@ -637,6 +646,7 @@ export interface TeamApiOptions {
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
   machine?: TeamApiMachine;
+  liveVoice?: TeamApiLiveVoice;
   hostedSites?: TeamApiHostedSites;
   agentImport?: TeamApiAgentImport;
   instanceTransfer?: TeamApiInstanceTransfer;

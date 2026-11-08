@@ -597,10 +597,15 @@ try {
     "Secrets stay outside provider input and tool results",
     [PASSWORD, CODE].every((value) => !JSON.stringify(entries).includes(value)),
   );
+  // Codex gets the saved-login rules with the first user turn, not in the developer instructions.
+  const firstTurnText = (threadId: unknown) =>
+    entries.find((entry) => entry.method === "turn/start" && entry.threadId === threadId)?.text ?? "";
   const routineRule = "In a routine run, first check saved logins with openbot_browser.list_logins";
   pass(
     "Routine sessions receive the saved-login rule",
-    routineStarts.every((entry) => entry.instructions?.includes(routineRule)),
+    routineStarts.every(
+      (entry) => firstTurnText(entry.threadId).includes(routineRule) && !entry.instructions?.includes(routineRule),
+    ),
   );
   pass(
     "Discovered browser guidance reports only a sign-in that needs the user",
@@ -611,7 +616,7 @@ try {
   pass(
     "Routine guidance reports steps that need a person",
     routineStarts.every((entry) =>
-      entry.instructions?.includes("do not call request_takeover or submit_secret without loginId"),
+      firstTurnText(entry.threadId).includes("do not call request_takeover or submit_secret without loginId"),
     ),
   );
   pass("Each routine run starts one new session", routineStarts.length === 3);

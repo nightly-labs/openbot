@@ -57,6 +57,8 @@ export const messages = {
   "error.agent.waitBeforeClearContext":
     "Дождитесь, пока завершатся текущий ход и очередь, прежде чем начинать новый чат.",
   "error.agent.waitBeforeCompactContext": "Дождитесь завершения активного хода и очереди, прежде чем сжимать контекст.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Дождитесь, пока завершатся текущий ход и очередь, прежде чем удалять историю.",
   "error.agent.compactContextUnavailable": "Этот агент сейчас не может сжать свой контекст.",
   "error.agent.unknown": "Неизвестный агент: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -105,6 +107,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Изменить этот параметр можно только на компьютере, где работает агент.",
   "error.agent.sideQuestionBusy": "Выполняется слишком много побочных вопросов. Повторите попытку чуть позже.",
   "error.agent.sideQuestionFailed": "Агенту не удалось ответить на побочный вопрос. Повторите попытку.",
+  "error.agent.webSearchSignIn": "Для веб-поиска нужен вход в Codex с аккаунтом ChatGPT.",
+  "error.agent.webSearchBusy": "Выполняется слишком много поисков и побочных вопросов. Повторите попытку чуть позже.",
+  "error.agent.webSearchFailed": "Веб-поиск не завершился. Повторите попытку.",
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",

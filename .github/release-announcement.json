@@ -1,10 +1,10 @@
 {
-  "version": "0.64.0",
+  "version": "0.65.0",
   "highlights": [
-    "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Use my Claude Code setup in Settings → Providers → Claude.",
-    "Put your agents on the new agent dock at the edge of your Mac screen, and chat with them from there.",
-    "Agents now write short updates while they work. Choose Classic in Server settings to keep the old style.",
-    "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
-    "Attach a file of any type to a chat, and send files of up to 100 MB from the web app."
+    "A new Library page shows every picture and file from your chats, with search and filters.",
+    "Agents now use logins that you save in a password manager or the Vault, also after their chat started.",
+    "Read replies aloud with ElevenLabs or xAI, dictate with Groq, and add Mistral as a provider.",
+    "Agents use fewer tokens on most providers, and OpenBot uses less memory for tabs and idle agents.",
+    "Delete the history of a chat or a channel, and open an agent's page as a side panel tab."
   ]
 }

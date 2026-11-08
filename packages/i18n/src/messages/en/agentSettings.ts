@@ -186,6 +186,15 @@ export const messages = defineMessages("agentSettings", {
     "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.newChat.confirm": "Start new chat",
   "agentSettings.newChat.failed": "Could not start a new chat.",
+  "agentSettings.deleteHistory.title": "Delete history",
+  "agentSettings.deleteHistory.description":
+    "The messages of this chat go, and the agent forgets them. Its setup stays.",
+  "agentSettings.deleteHistory.button": "Delete",
+  "agentSettings.deleteHistory.confirmTitle": "Delete the chat history with {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "All messages and files of this chat go from OpenBot, and the agent forgets them. You cannot undo this. Side threads, instructions, model, tools, memories, workspace, and browser do not change.",
+  "agentSettings.deleteHistory.confirm": "Delete history",
+  "agentSettings.deleteHistory.failed": "Could not delete the history.",
 
   "agentSettings.fullAccess.title": "Give this agent full access?",
   "agentSettings.fullAccess.askTitle": "Let this agent work outside its workspace?",

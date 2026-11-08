@@ -29,6 +29,11 @@ export const messages = {
   "settings.logoColor.beige": "بيج",
   "settings.logoColor.gray": "رمادي",
   "settings.logoColor.white": "أبيض",
+  "settings.chatBackground.title": "خلفية الدردشة",
+  "settings.chatBackground.description": "يحتفظ كل مظهر بلونه الخاص. يصبح اللون الذي يصعّب قراءة النص أغمق أو أفتح.",
+  "settings.chatBackground.light": "خلفية الدردشة في المظهر الفاتح",
+  "settings.chatBackground.dark": "خلفية الدردشة في المظهر الداكن",
+  "settings.chatBackground.default": "الافتراضي",
   "settings.chatColor.title": "لون الدردشة",
   "settings.chatColor.description": "يلوّن فقاعات رسائلك. يراه الأشخاص على خوادمك أيضًا.",
   "settings.chatColor.yours": "لون دردشتك",
@@ -63,6 +68,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "إبقاء الحاسوب في وضع التشغيل على البطارية أيضًا. تنفد البطارية أسرع.",
   "settings.restoreWorkspace.title": "استعادة آخر مساحة عمل عند التشغيل",
   "settings.restoreWorkspace.description": "فتح مساحة العمل والمهام من جلستك السابقة.",
+  "settings.quitGuard.title": "اضغط ⌘Q مطولًا للإنهاء",
+  "settings.quitGuard.description":
+    "اضغط ⌘Q مطولًا أو مرتين للإنهاء. مع «أبدًا»، تؤدي ضغطة ⌘Q واحدة إلى الإنهاء وإيقاف الوكلاء.",
+  "settings.quitGuard.working": "أثناء عمل الوكلاء",
+  "settings.quitGuard.always": "دائمًا",
+  "settings.quitGuard.never": "أبدًا",
   "settings.externalLinks.title": "فتح الروابط الخارجية في",
   "settings.externalLinks.description": "تُفتح هنا الروابط في الدردشات وصفحات تسجيل الدخول وصفحات الفوترة.",
   "settings.externalLinks.defaultBrowser": "المتصفح الافتراضي",
@@ -88,7 +99,7 @@ export const messages = {
     "يعرض التفاعل والرد والمزيد بجانب الرسالة، والوقت بين الرسائل. عند إيقافه تظهر كل الإجراءات والوقت تحت كل رسالة.",
   "settings.busyMessage.title": "توجيه الوكلاء أثناء عملهم",
   "settings.busyMessage.description":
-    "تنضم الرسائل الجديدة إلى العمل الحالي للوكيل، لا إلى قائمة الانتظار. يعمل مع ChatGPT وClaude.",
+    "تنضم الرسائل الجديدة إلى العمل الحالي للوكيل، لا إلى قائمة الانتظار. مع الوكلاء الذين لا يدعمون ذلك، تنتظر الرسائل في قائمة الانتظار.",
   "settings.agentDefaults.title": "الإعدادات الافتراضية",
   "settings.agentDefaults.description": "يتبع الوكلاء هذه الإعدادات الافتراضية، ما لم تغيّرها لوكيل.",
   "settings.agentDefaults.value": "الافتراضي: {value}",
@@ -245,7 +256,7 @@ export const messages = {
   "settings.tab.notifications.description": "اختر كيف ينبّهك OpenBot.",
   "settings.tab.voice.title": "الصوت",
   "settings.tab.voice.description":
-    "الإملاء في مربع الرسالة. تعمل النماذج المحلية على هذا الحاسوب؛ ويعمل ElevenLabs في السحابة.",
+    "الإملاء في مربع الرسالة. تعمل النماذج المحلية على هذا الحاسوب؛ ويعمل ElevenLabs وGroq في السحابة.",
   "settings.tab.computerUse.title": "التحكم في الحاسوب",
   "settings.tab.computerUse.description":
     "السماح للوكلاء في OpenBot على هذا الحاسوب برؤية تطبيقاته واستخدامها. يستخدم الوكلاء على خادم آخر حاسوب ذلك الخادم.",
@@ -637,6 +648,10 @@ export const messages = {
   "settings.voice.removeFailed": "تعذّرت إزالة النموذج. حاول مرة أخرى.",
   "settings.voice.model.elevenlabs.description":
     "يبث صوتك إلى ElevenLabs. يظهر النص أثناء حديثك ويبقى ثابتًا. يستخدم مفتاح API الخاص بك، وتحتسب ElevenLabs كل استخدام.",
+  "settings.voice.model.groqTurbo.description":
+    "يرسل كل تسجيل إلى Groq عند الإيقاف. سريع ويدعم لغات كثيرة. يستخدم مفتاح API الخاص بك، وتحتسب Groq كل استخدام.",
+  "settings.voice.model.groqLarge.description":
+    "يرسل كل تسجيل إلى Groq عند الإيقاف. أدق من turbo لكنه أبطأ. يستخدم مفتاح API الخاص بك، وتحتسب Groq كل استخدام.",
   "settings.voice.apiKey.placeholder": "الصق المفتاح",
   "settings.voice.apiKey.save": "حفظ المفتاح",
   "settings.voice.apiKey.remove": "إزالة المفتاح",

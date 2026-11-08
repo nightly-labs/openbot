@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Bieżąca aktywność",
   "chat.steps.show": "Pokaż kroki",
   "chat.steps.hide": "Ukryj kroki",
+  "chat.steps.showError": "Pokaż błąd",
+  "chat.steps.hideError": "Ukryj błąd",
   "chat.steps.list": "Kroki agenta",
   "chat.steps.count": { one: "{count} krok", few: "{count} kroki", many: "{count} kroków", other: "{count} kroku" },
   "chat.steps.failed": {
@@ -333,6 +335,7 @@ export const messages = {
   "chat.code.copy": "Kopiuj kod",
   "chat.visual.loadFailed": "Nie można wczytać: {title}",
   "chat.visual.fullScreen": "Pełny ekran",
+  "chat.visual.openInSidePanel": "Otwórz w panelu bocznym",
   "chat.visual.exitFullScreen": "Zamknij pełny ekran",
   "chat.preview.switchLabel": "Podgląd lub kod",
   "chat.preview.code": "Kod",

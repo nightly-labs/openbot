@@ -165,6 +165,7 @@ const evaluateFields = {
 };
 
 export const BROWSER_SCRIPT_MAX_STEPS = 200;
+export const BROWSER_SCRIPT_MAX_SLEEP_MS = 25_000;
 const BROWSER_SCRIPT_MAX_CHARS = 20_000;
 export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
 const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
@@ -181,6 +182,8 @@ const browserStepSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("wait_for"), ...waitForFields }),
   z.strictObject({ action: z.literal("evaluate"), ...evaluateFields }),
   z.strictObject({ action: z.literal("snapshot") }),
+  // A script has no timers of its own, so a pause is a step that the host waits out.
+  z.strictObject({ action: z.literal("sleep"), ms: z.number().int().min(0).max(BROWSER_SCRIPT_MAX_SLEEP_MS) }),
 ]);
 
 export type BrowserStep = z.infer<typeof browserStepSchema>;
@@ -195,7 +198,7 @@ export function parseBrowserStep(value: unknown): BrowserStep {
 const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "open",
-    description: "Open an HTTP(S) URL in a new persistent private-browser tab.",
+    description: "Open an HTTP(S) URL in a new persistent private-browser tab; returns its first snapshot.",
     shape: { url: requiredString(INPUT_LIMITS.browserUrl) },
   }),
   browserTool({
@@ -525,7 +528,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "run_script",
     description:
-      "Run a short JavaScript program that drives one tab in one call and returns one final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, and for loops, such as paging until a condition holds. It runs in an isolated sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(condition, text, or page function), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
       script: requiredString(BROWSER_SCRIPT_MAX_CHARS),

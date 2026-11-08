@@ -59,6 +59,7 @@ import {
   routineReportFailureToolSchema,
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
+  webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
@@ -136,9 +137,11 @@ import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool }
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import {
+  browserToolsPrimer,
   CODEX_DEFERRED_MCP_NOTE,
   DEFERRED_MCP_NOTE,
   discoverTools,
+  givesBrowserSchemas,
   namesInSearch,
   resolveDeferredTool,
 } from "./tool-catalog";
@@ -158,6 +161,19 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "remove_api_key",
   "save_api_key",
 ]);
+
+/**
+ * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
+ * interruption runs the operation's finalizers, which stop a browser action or a side Codex process.
+ */
+function requestAborted(signal: AbortSignal | undefined) {
+  return Effect.callback<never>((resume) => {
+    const abort = () => resume(Effect.interrupt);
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
+    return Effect.sync(() => signal?.removeEventListener("abort", abort));
+  });
+}
 
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
@@ -211,6 +227,8 @@ export interface OpenBotToolRouterHooks {
    * busy-message mode is "steer". Otherwise the message waits in the queue.
    */
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
+  /** The answer of one web search for the agent, from a side turn whose only tool is web search. */
+  searchWeb(agentId: string, query: string): Effect.Effect<string, ToolOperationFailed>;
 }
 
 export interface OpenBotToolRouterOptions {
@@ -291,6 +309,8 @@ export class OpenBotToolRouter {
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
+  /** Provider threads whose agent has the browser schemas, from a search or from a first browser result. */
+  readonly #browserSchemasGiven = new Set<string>();
 
   constructor(options: OpenBotToolRouterOptions) {
     this.#history = new HistoryTools({
@@ -391,11 +411,12 @@ export class OpenBotToolRouter {
               let result: ReturnType<typeof discoverTools>;
               try {
                 this.#requireAgent(agentId);
-                result = discoverTools(params);
+                result = discoverTools(params, client.provider);
               } catch {
                 client.respond(request.id, openBotToolFailure(invalid));
                 return;
               }
+              if (givesBrowserSchemas(result)) this.#browserSchemasGiven.add(params.threadId);
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
               const found =
@@ -407,7 +428,7 @@ export class OpenBotToolRouter {
               return;
             }
             if (params.tool === "tool_call") {
-              const resolved = resolveDeferredTool(params);
+              const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
                 client.respond(request.id, openBotToolFailure(invalid));
                 return;
@@ -556,18 +577,24 @@ export class OpenBotToolRouter {
               }
             });
             const signal = toolRequest.signal;
-            const cancelled = Effect.callback<never>((resume) => {
-              const abort = () => resume(Effect.interrupt);
-              if (signal?.aborted) abort();
-              else signal?.addEventListener("abort", abort, { once: true });
-              return Effect.sync(() => signal?.removeEventListener("abort", abort));
-            });
             if (signal?.aborted) return;
             const result = yield* operation.pipe(
-              Effect.raceFirst(cancelled),
+              Effect.raceFirst(requestAborted(signal)),
               Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
-            if (!signal?.aborted && client.running) client.respond(toolRequest.id, result);
+            if (signal?.aborted || !client.running) return;
+            const threadId = toolRequest.params.threadId;
+            if (this.#browserSchemasGiven.has(threadId)) client.respond(toolRequest.id, result);
+            else {
+              this.#browserSchemasGiven.add(threadId);
+              client.respond(toolRequest.id, {
+                ...result,
+                contentItems: [
+                  ...result.contentItems,
+                  { type: "inputText", text: JSON.stringify({ browserTools: browserToolsPrimer() }) },
+                ],
+              });
+            }
             return;
           }
           if (toolRequest.params.namespace === "openbot") {
@@ -622,7 +649,8 @@ export class OpenBotToolRouter {
               CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
-              tool === "messaging_post";
+              tool === "messaging_post" ||
+              tool === "web_search";
             // A workflow tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
               correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
@@ -634,9 +662,12 @@ export class OpenBotToolRouter {
               Effect.tap((result) => Effect.sync(() => client.respond(toolRequest.id, result))),
             );
             // Both store a file and then add the message that names it.
-            yield* tool === "attach_files_to_response" || tool === "html_render"
-              ? Effect.uninterruptible(response)
-              : response;
+            if (tool === "attach_files_to_response" || tool === "html_render") yield* Effect.uninterruptible(response);
+            // A side Codex search can take up to two minutes on the user's ChatGPT quota, so Stop ends it.
+            else if (tool === "web_search") {
+              if (toolRequest.signal?.aborted) return;
+              yield* response.pipe(Effect.raceFirst(requestAborted(toolRequest.signal)));
+            } else yield* response;
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${toolRequest.params.namespace}`);
@@ -1109,6 +1140,12 @@ export class OpenBotToolRouter {
 
     if (params.tool === "html_render") {
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
+    }
+
+    if (params.tool === "web_search") {
+      const args = webSearchToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const answer = yield* this.#hooks.searchWeb(senderAgentId, args.query);
+      return { success: true, contentItems: [{ type: "inputText", text: answer }] };
     }
 
     if (params.tool === "list_sites") {

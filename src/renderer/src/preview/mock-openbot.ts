@@ -291,7 +291,8 @@ export interface MockSentMessage {
 
 /**
  * The trace of a finished mock turn that ends at `endedAt`, as a host records it: a thought, three
- * tool steps with the progress text that `turn-progress` sent (the web search failed), and the answer.
+ * tool steps with the progress text that `turn-progress` sent (the web search failed, with its error), and the
+ * answer.
  */
 function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
   const end = endedAt.getTime();
@@ -315,6 +316,7 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
         startedAt: at(2_340),
         endedAt: at(3_910),
         failed: true,
+        error: "fetch failed: getaddrinfo ENOTFOUND search.example.com",
       },
       {
         id: `${turnId}:edit`,
@@ -487,6 +489,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     keepRunningInBackground: false,
     keepAwake: false,
     keepAwakeOnBattery: false,
+    quitGuard: "working",
   };
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
@@ -497,6 +500,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
     palette: null,
     palettes: [],
+    chatBackgroundLight: null,
+    chatBackgroundDark: null,
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -2482,6 +2487,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             preview: "",
             updatedAt: null,
           }),
+          // Only a named profile carries over, as in the agent store.
+          ...(source.browserProfileId === undefined
+            ? {}
+            : { ownBrowserSession: true, browserProfileId: source.browserProfileId }),
           threadId: null,
         };
         agents = [...agents, agent];
@@ -3306,6 +3315,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             status: "completed",
             itemType: CONTEXT_RESET_ITEM_TYPE,
           });
+        });
+      },
+      deleteHistory: async (agentId: string) => {
+        updateSnapshot(agentId, (snapshot) => {
+          snapshot.messages = [];
         });
       },
       compactContext: async () => undefined,

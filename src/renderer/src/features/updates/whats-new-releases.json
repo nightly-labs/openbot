@@ -1,5 +1,41 @@
 [
   {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "A Library page in the window rail shows every picture and file from the chats of a server.",
+          "Delete the history of a chat or a channel in its settings. The setup, memories and routines stay.",
+          "Read replies aloud with ElevenLabs or xAI, and dictate with Groq, with your own API key in Settings → Voice.",
+          "Add Mistral as a provider.",
+          "Open a page that an agent makes as a side panel tab next to the chat.",
+          "Choose a chat background color for the Light theme and another one for the Dark theme in Settings → General."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents use fewer tokens in each request on Claude, Codex, Pi, OpenCode, Grok and Hermes.",
+          "OpenBot uses less memory for browser tabs, idle agents and app windows.",
+          "Agent browser tabs wait for bot checks that pass by themselves, and finish short tasks in fewer steps.",
+          "Notifications have a new look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agents now use a login that you save in a password manager or the Vault after their chat started.",
+          "A server connects to Signal again when Signal does not answer, so devices no longer see \"The host is offline.\" until a restart.",
+          "The Dynamic Island and the agent dock no longer make other apps stutter while an agent works.",
+          "Claude agents on an Anthropic API key now use the key's promotional API credit."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.64.0",
     "date": "2026-11-07",
     "notices": [

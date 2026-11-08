@@ -49,7 +49,7 @@ import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
-import { loadServerPersonality, serverResponseStyle } from "../servers/server-personality";
+import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -121,22 +121,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
-  // The server's response style decides whether progress updates show as messages. Main answers
-  // "classic" for a joined server until the server says what it supports, so the read waits for a
-  // negotiated protocol.
-  const personalityServerId = () => {
-    const server = activeServer();
-    return server && (server.kind === "local" || server.compatibility?.negotiatedProtocol != null)
-      ? server.id
-      : undefined;
-  };
-  createEffect(personalityServerId, (serverId) => {
-    if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
-  });
-  const responseStyle = () => {
-    const serverId = activeServer()?.id;
-    return serverId ? serverResponseStyle(serverId) : undefined;
-  };
+  const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -170,6 +155,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     cancelQueuedMessage,
     cancelWait,
     steerQueuedMessage,
+    sendQueuedMessageNow,
     updateQueuedMessage,
     reorderQueue,
     stopActiveTurn,
@@ -264,6 +250,19 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const server = activeServer();
     if (!agent || !server || !serverSupportsCapability(server, "context-reset-v1")) return undefined;
     return () => turnsPort().agent.clearContext(agent.id, server.id);
+  });
+
+  /** "Delete history" of the active agent's own chat. The Team API has no route for it. */
+  const deleteActiveAgentHistory = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || server?.kind !== "local") return undefined;
+    return async () => {
+      await turnsPort().agent.deleteHistory(agent.id, server.id);
+      // A window around a search result keeps the messages that an empty snapshot does not name, so
+      // the chat reads its latest page again.
+      await loadLatestAgentMessages(agent.id);
+    };
   });
 
   /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */
@@ -714,6 +713,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentDefaults={generalSettings().agentDefaults}
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
+        onDeleteAgentHistory={deleteActiveAgentHistory()}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}
@@ -721,6 +721,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         threads={threads()}
         onCancelWait={cancelWait}
         onSteerQueuedMessage={steerQueuedMessage}
+        onSendQueuedMessageNow={sendQueuedMessageNow}
         onUpdateQueuedMessage={updateQueuedMessage}
         onReorderQueue={reorderQueue}
         onActivateBrowserTab={activateBrowserTab}

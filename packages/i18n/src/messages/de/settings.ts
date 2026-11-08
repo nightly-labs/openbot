@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grau",
   "settings.logoColor.white": "Weiß",
+  "settings.chatBackground.title": "Chathintergrund",
+  "settings.chatBackground.description":
+    "Jedes Design behält seine eigene Farbe. Eine Farbe, die Text schwer lesbar macht, wird dunkler oder heller.",
+  "settings.chatBackground.light": "Chathintergrund im Design Hell",
+  "settings.chatBackground.dark": "Chathintergrund im Design Dunkel",
+  "settings.chatBackground.default": "Standard",
   "settings.chatColor.title": "Chatfarbe",
   "settings.chatColor.description":
     "Färbt die Blasen deiner Nachrichten ein. Personen auf deinen Servern sehen sie auch.",
@@ -66,6 +72,12 @@ export const messages = {
     "Den Computer auch im Akkubetrieb wach halten. Der Akku entlädt sich schneller.",
   "settings.restoreWorkspace.title": "Letzten Arbeitsbereich beim Start wiederherstellen",
   "settings.restoreWorkspace.description": "Den Arbeitsbereich und die Aufgaben der letzten Sitzung öffnen.",
+  "settings.quitGuard.title": "⌘Q zum Beenden halten",
+  "settings.quitGuard.description":
+    "Halte ⌘Q gedrückt oder drücke zweimal, um zu beenden. Mit „Nie“ beendet ein einziges ⌘Q OpenBot und stoppt die Agenten.",
+  "settings.quitGuard.working": "Wenn Agenten arbeiten",
+  "settings.quitGuard.always": "Immer",
+  "settings.quitGuard.never": "Nie",
   "settings.externalLinks.title": "Externe Links öffnen in",
   "settings.externalLinks.description": "Links in Chats, Anmeldeseiten und Abrechnungsseiten öffnen sich hier.",
   "settings.externalLinks.defaultBrowser": "Standardbrowser",
@@ -91,7 +103,7 @@ export const messages = {
     "Zeigt Reagieren, Antworten und Mehr neben einer Nachricht und die Uhrzeit zwischen den Nachrichten. Ist es aus, stehen alle Aktionen und die Uhrzeit unter jeder Nachricht.",
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
-    "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Funktioniert mit ChatGPT und Claude.",
+    "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Bei Agenten, die das nicht können, warten sie in der Warteschlange.",
   "settings.agentDefaults.title": "Standardwerte",
   "settings.agentDefaults.description": "Agenten folgen diesen Standardwerten, außer du änderst sie für einen Agenten.",
   "settings.agentDefaults.value": "Standard: {value}",
@@ -249,7 +261,7 @@ export const messages = {
   "settings.tab.notifications.description": "Lege fest, wie OpenBot dich benachrichtigt.",
   "settings.tab.voice.title": "Diktat",
   "settings.tab.voice.description":
-    "Diktat im Nachrichtenfeld. Lokale Modelle laufen auf diesem Computer, ElevenLabs läuft in der Cloud.",
+    "Diktat im Nachrichtenfeld. Lokale Modelle laufen auf diesem Computer, ElevenLabs und Groq laufen in der Cloud.",
   "settings.tab.computerUse.title": "PC-Steuerung",
   "settings.tab.computerUse.description":
     "Agenten im OpenBot dieses Computers dürfen seine Apps sehen und bedienen. Agenten auf einem anderen Server nutzen dessen Computer.",
@@ -627,6 +639,10 @@ export const messages = {
   "settings.voice.removeFailed": "Das Modell konnte nicht entfernt werden. Versuche es erneut.",
   "settings.voice.model.elevenlabs.description":
     "Überträgt deine Stimme an ElevenLabs. Der Text erscheint beim Sprechen und bleibt stabil. Nutzt deinen eigenen API-Schlüssel, und ElevenLabs berechnet jede Nutzung.",
+  "settings.voice.model.groqTurbo.description":
+    "Sendet jede Aufnahme beim Stoppen an Groq. Schnell und für viele Sprachen. Nutzt deinen eigenen API-Schlüssel, und Groq berechnet jede Nutzung.",
+  "settings.voice.model.groqLarge.description":
+    "Sendet jede Aufnahme beim Stoppen an Groq. Genauer als turbo, aber langsamer. Nutzt deinen eigenen API-Schlüssel, und Groq berechnet jede Nutzung.",
   "settings.voice.apiKey.placeholder": "Schlüssel einfügen",
   "settings.voice.apiKey.save": "Schlüssel speichern",
   "settings.voice.apiKey.remove": "Schlüssel entfernen",

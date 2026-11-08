@@ -80,6 +80,8 @@ export const messages = {
   "error.backend.channelWaitBeforeNewConversation":
     "Aguarde o trabalho neste canal terminar e depois inicie uma nova conversa.",
   "error.backend.channelWaitBeforeCompact": "Aguarde o trabalho neste canal terminar e depois compacte-o.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Aguarde o trabalho neste canal terminar e depois exclua o histórico.",
   "error.backend.channelCompactUnavailable":
     "Nenhum membro deste canal pode compactar o contexto agora. Um membro precisa responder no canal primeiro, e o provedor dele precisa suportar compactação.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
@@ -337,6 +339,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
+  "error.backend.browserCertificateUntrusted":
+    "O certificado de segurança deste site não é confiável, por isso a página não abriu.",
   "error.backend.browserLowMemory":
     "Este servidor está com pouca memória, por isso o navegador não pode abrir outra aba. Feche uma aba ou aguarde os outros agentes terminarem.",
   "error.backend.browserOpenFailed": "Não foi possível abrir {url}: {reason}",

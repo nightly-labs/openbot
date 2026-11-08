@@ -4,7 +4,7 @@
 // the request header of the socket that `openScribeSocket` opens; nothing here logs it, and the
 // provider's own error text is not logged or shown either, only its category.
 
-import { AUTOMATIC_VOICE_LANGUAGE, SPEECH_KEY_PROVIDER_NAMES, type VoiceLanguage } from "@openbot/contracts/ipc";
+import { AUTOMATIC_VOICE_LANGUAGE, VOICE_KEY_PROVIDER_NAMES, type VoiceLanguage } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -74,15 +74,15 @@ export class VoiceStreamFailure extends Error {}
 function failureFor(category: string): VoiceStreamFailure {
   if (category === "auth_error" || category === "http-401" || category === "http-403")
     return new VoiceStreamFailure(
-      sourceText("error.voice.cloud.keyRejected", { provider: SPEECH_KEY_PROVIDER_NAMES.elevenlabs }),
+      sourceText("error.voice.cloud.keyRejected", { provider: VOICE_KEY_PROVIDER_NAMES.elevenlabs }),
     );
   if (category === "quota_exceeded")
     return new VoiceStreamFailure(
-      sourceText("error.voice.cloud.quotaExceeded", { provider: SPEECH_KEY_PROVIDER_NAMES.elevenlabs }),
+      sourceText("error.voice.cloud.quotaExceeded", { provider: VOICE_KEY_PROVIDER_NAMES.elevenlabs }),
     );
   if (category === "rate_limited" || category === "http-429" || category === "resource_exhausted")
     return new VoiceStreamFailure(
-      sourceText("error.voice.cloud.rateLimited", { provider: SPEECH_KEY_PROVIDER_NAMES.elevenlabs }),
+      sourceText("error.voice.cloud.rateLimited", { provider: VOICE_KEY_PROVIDER_NAMES.elevenlabs }),
     );
   if (category === "unaccepted_terms") return new VoiceStreamFailure(sourceText("error.voice.cloud.termsRequired"));
   return new VoiceStreamFailure(sourceText("error.voice.transcriptionFailed"));

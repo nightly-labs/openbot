@@ -71,6 +71,7 @@ export const messages = {
   "error.backend.channelMemberUnavailable": "أحد أعضاء القناة غير متاح.",
   "error.backend.channelWaitBeforeNewConversation": "انتظر حتى يتوقف العمل في هذه القناة، ثم ابدأ محادثة جديدة.",
   "error.backend.channelWaitBeforeCompact": "انتظر حتى يتوقف العمل في هذه القناة، ثم اضغطها.",
+  "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",
   "error.backend.channelCompactUnavailable":
     "لا يمكن لأي عضو في هذه القناة ضغط سياقه الآن. يجب أن يرد العضو في القناة أولًا، وأن يدعم مزوده الضغط.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
@@ -312,6 +313,7 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserCertificateUntrusted": "شهادة الأمان لهذا الموقع غير موثوقة، لذلك لم تُفتح الصفحة.",
   "error.backend.browserLowMemory":
     "ذاكرة هذا الخادم منخفضة، لذا لا يمكن للمتصفح فتح علامة تبويب أخرى. أغلق علامة تبويب، أو انتظر حتى ينتهي الوكلاء الآخرون.",
   "error.backend.browserOpenFailed": "تعذّر فتح {url}: {reason}",

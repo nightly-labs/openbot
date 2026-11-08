@@ -70,6 +70,7 @@ export const messages = {
   "error.backend.channelMemberUnavailable": "חבר בערוץ אינו זמין.",
   "error.backend.channelWaitBeforeNewConversation": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז התחילו שיחה חדשה.",
   "error.backend.channelWaitBeforeCompact": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז דחסו אותו.",
+  "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
   "error.backend.channelCompactUnavailable":
     "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
@@ -311,6 +312,7 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
+  "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",
   "error.backend.browserOpenFailed": "לא ניתן לפתוח את {url}: {reason}",

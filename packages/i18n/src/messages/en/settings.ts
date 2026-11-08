@@ -30,6 +30,12 @@ export const messages = defineMessages("settings", {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gray",
   "settings.logoColor.white": "White",
+  "settings.chatBackground.title": "Chat background",
+  "settings.chatBackground.description":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
+  "settings.chatBackground.light": "Chat background in Light",
+  "settings.chatBackground.dark": "Chat background in Dark",
+  "settings.chatBackground.default": "Default",
   "settings.chatColor.title": "Chat color",
   "settings.chatColor.description": "Tints the bubbles of your messages. People on your servers see it too.",
   "settings.chatColor.yours": "Your chat color",
@@ -66,6 +72,11 @@ export const messages = defineMessages("settings", {
     "Keep the computer awake on battery power too. The battery runs down faster.",
   "settings.restoreWorkspace.title": "Restore the last workspace on launch",
   "settings.restoreWorkspace.description": "Open the workspace and tasks from your previous session.",
+  "settings.quitGuard.title": "Hold ⌘Q to quit",
+  "settings.quitGuard.description": "Hold ⌘Q or press it twice to quit. With Never, one ⌘Q quits and stops the agents.",
+  "settings.quitGuard.working": "While agents work",
+  "settings.quitGuard.always": "Always",
+  "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
   "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
   // The two link targets. The saved value stays in English; only the label is translated.
@@ -93,7 +104,7 @@ export const messages = defineMessages("settings", {
     "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
-    "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",
+    "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
   // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "Defaults",
   "settings.agentDefaults.description": "Agents follow these defaults, unless you change them for an agent.",
@@ -249,7 +260,7 @@ export const messages = defineMessages("settings", {
   "settings.tab.notifications.description": "Choose how OpenBot alerts you.",
   "settings.tab.voice.title": "Voice",
   "settings.tab.voice.description":
-    "Dictation in the message box. Local models run on this computer; ElevenLabs runs in the cloud.",
+    "Dictation in the message box. Local models run on this computer; ElevenLabs and Groq run in the cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Let agents on this computer's OpenBot see and use its apps. Agents on another server use that server's computer.",
@@ -629,6 +640,10 @@ export const messages = defineMessages("settings", {
   "settings.voice.removeFailed": "Could not remove the model. Try again.",
   "settings.voice.model.elevenlabs.description":
     "Streams your voice to ElevenLabs. Text shows while you speak and stays fixed. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.model.groqTurbo.description":
+    "Sends each recording to Groq when you stop. Fast, and knows many languages. Uses your own API key, and Groq bills each use.",
+  "settings.voice.model.groqLarge.description":
+    "Sends each recording to Groq when you stop. More accurate than turbo, but slower. Uses your own API key, and Groq bills each use.",
   "settings.voice.apiKey.placeholder": "Paste the key",
   "settings.voice.apiKey.save": "Save key",
   "settings.voice.apiKey.remove": "Remove key",

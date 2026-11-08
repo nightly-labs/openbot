@@ -62,6 +62,7 @@ export const messages = {
     "Deze verbinding ondersteunt geen nieuw gesprek of comprimeren in een kanaal.",
   "error.team.channelPictureUnsupported": "Deze verbinding ondersteunt geen kanaalafbeeldingen.",
   "error.team.channelDeleteUnsupported": "Deze verbinding ondersteunt het verwijderen van kanalen niet.",
+  "error.team.historyDeleteUnsupported": "Deze verbinding ondersteunt het wissen van de geschiedenis niet.",
   "error.team.channelTaskCancelUnsupported": "Deze verbinding ondersteunt het annuleren van kanaaltaken niet.",
   "error.team.membersCannotDeleteChannels": "Leden kunnen geen kanalen verwijderen.",
   "error.team.membersCannotArchiveChannels": "Leden kunnen geen kanalen archiveren.",
@@ -86,6 +87,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Deze verbinding ondersteunt het tonen van mappen niet.",
   "error.team.conversationFileSearchUnsupported": "Deze verbinding ondersteunt het zoeken in bestanden niet.",
   "error.team.sideQuestionUnsupported": "Deze verbinding ondersteunt geen zijvragen.",
+  "error.team.liveVoiceUnsupported":
+    "Deze server ondersteunt geen Codex live spraak. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.routineFlowsUnsupported":
     "Deze server ondersteunt geen routineflows. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.routineCanvasTooLarge":

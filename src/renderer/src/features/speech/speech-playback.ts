@@ -50,10 +50,11 @@ export interface VoiceRecordingSummary {
 const RECORDING_PEAK_COUNT = 40;
 /**
  * How many replies keep their audio after a full reading, and how long they can be together, in
- * seconds. One minute of speech is about 10 MB.
+ * seconds. One minute of speech is about 10 MB. A reply that is dropped is synthesized again when
+ * it plays, and a reply longer than this limit is never kept.
  */
 const SPOKEN_AUDIO_LIMIT = 12;
-const SPOKEN_AUDIO_SECONDS = 10 * 60;
+const SPOKEN_AUDIO_SECONDS = 3 * 60;
 /**
  * How many recordings stay decoded for playback. A decoded recording can be 20 MB; its waveform
  * stays after it is dropped, and a new play decodes it again.

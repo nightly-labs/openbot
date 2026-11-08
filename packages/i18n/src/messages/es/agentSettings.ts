@@ -183,6 +183,15 @@ export const messages = {
     "El agente olvida este chat. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
+  "agentSettings.deleteHistory.title": "Eliminar historial",
+  "agentSettings.deleteHistory.description":
+    "Los mensajes de este chat se eliminan y el agente los olvida. Su configuración se mantiene.",
+  "agentSettings.deleteHistory.button": "Eliminar",
+  "agentSettings.deleteHistory.confirmTitle": "¿Eliminar el historial del chat con {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Todos los mensajes y archivos de este chat se eliminan de OpenBot y el agente los olvida. No se puede deshacer. Los hilos secundarios, las instrucciones, el modelo, las herramientas, las memorias, el espacio de trabajo y el navegador no cambian.",
+  "agentSettings.deleteHistory.confirm": "Eliminar historial",
+  "agentSettings.deleteHistory.failed": "No se pudo eliminar el historial.",
   "agentSettings.fullAccess.title": "¿Dar acceso completo a este agente?",
   "agentSettings.fullAccess.askTitle": "¿Dejar que este agente trabaje fuera de su espacio de trabajo?",
   "agentSettings.fullAccess.description":

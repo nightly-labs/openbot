@@ -35,31 +35,31 @@ syncLogoColor();
 render(() => {
   if (surface === "dynamic-island")
     return (
-      <I18nProvider>
+      <I18nProvider waitForLanguage>
         <DynamicIslandSurface />
       </I18nProvider>
     );
   if (surface === "browser-dock")
     return (
-      <I18nProvider>
+      <I18nProvider waitForLanguage>
         <BrowserDockSurface />
       </I18nProvider>
     );
   if (surface === "agent-dock")
     return (
-      <I18nProvider>
+      <I18nProvider waitForLanguage>
         <AgentDockSurface />
       </I18nProvider>
     );
   if (surface === "computer-use-highlight")
     return (
-      <I18nProvider>
+      <I18nProvider waitForLanguage>
         <ComputerUseHighlightSurface />
       </I18nProvider>
     );
   if (surface === "computer-use-permission-help")
     return (
-      <I18nProvider>
+      <I18nProvider waitForLanguage>
         <ComputerUsePermissionHelp
           permission={permissionFromQuery(window.location.search)}
           sunshine={query.get("application") === "sunshine"}

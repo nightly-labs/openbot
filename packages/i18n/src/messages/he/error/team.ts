@@ -59,6 +59,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "החיבור הזה אינו תומך בשיחה חדשה או בדחיסה בערוץ.",
   "error.team.channelPictureUnsupported": "תמונות ערוץ אינן נתמכות בחיבור הזה.",
   "error.team.channelDeleteUnsupported": "מחיקת ערוצים אינה נתמכת בחיבור הזה.",
+  "error.team.historyDeleteUnsupported": "מחיקת היסטוריה אינה נתמכת בחיבור הזה.",
   "error.team.channelTaskCancelUnsupported": "ביטול משימות ערוץ אינו נתמך בחיבור הזה.",
   "error.team.membersCannotDeleteChannels": "חברים אינם יכולים למחוק ערוצים.",
   "error.team.membersCannotArchiveChannels": "חברים אינם יכולים להעביר ערוצים לארכיון.",
@@ -83,6 +84,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "הצגת תיקיות אינה נתמכת בחיבור הזה.",
   "error.team.conversationFileSearchUnsupported": "חיפוש קבצים אינו נתמך בחיבור הזה.",
   "error.team.sideQuestionUnsupported": "שאלות צד אינן נתמכות בחיבור הזה.",
+  "error.team.liveVoiceUnsupported": "השרת הזה אינו תומך בקול החי של Codex. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "error.team.routineFlowsUnsupported": "השרת הזה אינו תומך בתהליכי שגרה. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "error.team.routineCanvasTooLarge":
     "קנבס השגרה הזה גדול מדי לשליחה למכשיר הזה. יש לקצר את הוראות השגרה במחשב שמריץ את השרת.",

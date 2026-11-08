@@ -21,7 +21,9 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { AmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
+import { createScrollFades } from "../../components/createScrollFades";
 import type { ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
@@ -37,6 +39,7 @@ import {
 } from "./AgentDockChat";
 import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
+  addCenterY,
   createMotion,
   DOCK_LEFT,
   DOCK_PAD,
@@ -59,6 +62,8 @@ import {
   PANEL_WIDTH,
   SEAT,
   SEAT_CENTER_X,
+  SEAT_PITCH,
+  SEAT_VIEW_INSET,
   SLIDE_END,
   SNAPPY,
   SOFT,
@@ -67,6 +72,9 @@ import {
   STRETCH_FOLLOW,
   STRETCH_PER_SPEED,
   seatCenterY,
+  seatsHeight,
+  seatView,
+  seatViewTop,
   stagedCurve,
   TUCK,
   TUCK_DISTANCE,
@@ -175,6 +183,8 @@ let pendingKey = 0;
 const SEAT_LAG = 0.3;
 /** The space between the shelf and the dock body. */
 const SHELF_GAP = 12;
+/** The faded edge of the seat view, where more seats are above or below. */
+const SEAT_FADE = 24;
 
 export function AgentDock(props: AgentDockProps) {
   const { t } = useText();
@@ -215,12 +225,21 @@ export function AgentDock(props: AgentDockProps) {
   let handleArc!: SVGPathElement;
   let handleHit!: SVGPathElement;
   let shelf: HTMLUListElement | undefined;
+  let seatScroll!: HTMLDivElement;
+  let seatList!: HTMLDivElement;
   const seatElements = new Map<string, HTMLElement>();
+  const seatFades = createScrollFades();
+  onCleanup(() => seatFades.stop());
 
   const motion = createMotion(() => render());
   const initialCount = initialSeats.length;
   const dockH = motion.spring(dockHeight(initialCount), WOBBLY);
-  const addY = motion.spring(seatCenterY(initialCount, initialCount), WOBBLY);
+  const addY = motion.spring(addCenterY(initialCount), WOBBLY);
+  /**
+   * The scroll height of the seats. It shrinks on a spring, so the seats above a seat that goes move
+   * down smoothly when the view is scrolled to the end.
+   */
+  const listH = motion.spring(SEAT_VIEW_INSET + seatsHeight(initialCount), SOFT);
   /** Open progress: 0 is the seat, 1 is the full panel. Width leads height for a liquid stretch. */
   const panelOpen = motion.spring(0, PANEL_OPEN);
   // 0 while the panel opens, 1 while it closes: a close goes back as a drop, not as a tall bar.
@@ -237,6 +256,10 @@ export function AgentDock(props: AgentDockProps) {
   /** How far the dock is in the edge: 0 is out, TUCK_DISTANCE is hidden. */
   const tuck = motion.spring(untrack(() => props.tucked) ? TUCK_DISTANCE : 0, TUCK);
   const [dragging, setDragging] = createSignal(false);
+  /** The pointer is on a part of the dock that takes it. The stage itself lets the pointer through. */
+  const [pointerOn, setPointerOn] = createSignal(false);
+  // The dock stays above the other apps. A working agent moves on it only while the user uses the dock.
+  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {
@@ -251,9 +274,50 @@ export function AgentDock(props: AgentDockProps) {
     seatSprings(id, seatCenterY(index, initialCount));
   });
 
+  /** A seat moves in the seat view, and the view moves with the dock. */
   function placeSeat(element: HTMLElement, springs: { y: Spring; scale: Spring }) {
-    const y = springs.y.value - SEAT / 2 - stretch.value * SEAT_LAG;
+    const y = springs.y.value - SEAT / 2 - seatViewTop(dockH.value);
     element.style.transform = `translateY(${y}px) scale(${Math.max(0, springs.scale.value)})`;
+  }
+
+  /** The largest scroll of the seat view for this many seats. */
+  function maxScroll(count: number) {
+    return seatsHeight(count) - seatView(count);
+  }
+
+  /**
+   * The centre y of a seat on the stage at a scroll of the seat view. A seat outside the view gives
+   * the nearest place in the view, so the neck stays on the dock.
+   */
+  function seatY(id: string, seats: readonly string[] = state.seats, scroll = seatScroll.scrollTop) {
+    const count = seats.length;
+    const first = seatCenterY(0, count);
+    const last = first + Math.max(0, seatView(count) - SEAT_PITCH);
+    return Math.min(last, Math.max(first, seatCenterY(seats.indexOf(id), count) - scroll));
+  }
+
+  /** The scroll that shows the whole seat clear of the faded edges, with the least move. */
+  function revealScroll(index: number) {
+    const count = state.seats.length;
+    const top = SEAT_VIEW_INSET + index * SEAT_PITCH;
+    const height = SEAT_VIEW_INSET + seatView(count);
+    const current = seatScroll.scrollTop;
+    const scroll = Math.min(top - SEAT_FADE, Math.max(current, top + SEAT + SEAT_FADE - height));
+    return Math.min(maxScroll(count), Math.max(0, scroll));
+  }
+
+  function scrollSeats(top: number) {
+    if (Math.abs(seatScroll.scrollTop - top) < 1) return;
+    seatScroll.scrollTo({ top, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  }
+
+  /** The neck follows the open seat when the seats scroll. */
+  function followScroll() {
+    seatFades.measure();
+    const open = state.open;
+    if (!open) return;
+    neckY.to(seatY(open));
+    motion.kick();
   }
 
   function render() {
@@ -268,6 +332,9 @@ export function AgentDock(props: AgentDockProps) {
     const cut = LIQUID_PAD + DOCK_LEFT - 2;
     liquid.style.clipPath = `polygon(0 0, ${cut}px 0, ${cut}px ${bandTop}px, 100% ${bandTop}px, 100% ${bandBottom}px, ${cut}px ${bandBottom}px, ${cut}px 100%, 0 100%)`;
     addSeat.style.transform = `translateY(${addY.value - SEAT / 2 - pull * SEAT_LAG}px)`;
+    seatScroll.style.top = `${seatViewTop(height) - pull * SEAT_LAG}px`;
+    seatScroll.style.height = `${Math.max(0, height - DOCK_PAD * 2 - SEAT + SEAT_VIEW_INSET)}px`;
+    seatList.style.height = `${Math.max(0, listH.value)}px`;
     // The shelf stands on the line between the last agent and the add button.
     if (shelf) shelf.style.bottom = `${PANEL_HEIGHT - (addY.value - SEAT / 2 - pull * SEAT_LAG)}px`;
     const arc = dockHandlePath(height, pull);
@@ -409,12 +476,16 @@ export function AgentDock(props: AgentDockProps) {
     const count = seats.length;
     const move = (spring: Spring, value: number) => (instant ? spring.jump(value) : spring.to(value));
     move(dockH, dockHeight(count));
-    move(addY, seatCenterY(count, count));
+    move(addY, addCenterY(count));
+    // New room for seats comes at once, so a new seat is never cut; the room of a seat that goes shrinks.
+    const listHeight = SEAT_VIEW_INSET + seatsHeight(count);
+    if (listHeight > listH.value) listH.jump(listHeight);
+    else move(listH, listHeight);
     seats.forEach((id, index) => {
       move(seatSprings(id).y, seatCenterY(index, count));
     });
     const open = state.open;
-    if (open) move(neckY, seatCenterY(seats.indexOf(open), count));
+    if (open) move(neckY, seatY(open, seats));
     motion.kick();
   }
 
@@ -422,7 +493,10 @@ export function AgentDock(props: AgentDockProps) {
     const index = state.seats.indexOf(id);
     if (index < 0) return;
     finishRecording(id);
-    const y = seatCenterY(index, state.seats.length);
+    // A seat at a faded edge scrolls into the view; the panel grows from where the seat stops.
+    const scroll = revealScroll(index);
+    scrollSeats(scroll);
+    const y = seatY(id, state.seats, scroll);
     const wasOpen = state.open !== null;
     setState((draft) => {
       draft.open = id;
@@ -515,7 +589,7 @@ export function AgentDock(props: AgentDockProps) {
     const id = state.open;
     if (!id) return;
     finishRecording();
-    originY.jump(seatCenterY(state.seats.indexOf(id), state.seats.length));
+    originY.jump(seatY(id));
     if (panelOpen.value > 0.98) closing.jump(1);
     else closing.to(1);
     // The neck holds the blob until it is back in the dock, so no gap opens on the way in.
@@ -544,13 +618,18 @@ export function AgentDock(props: AgentDockProps) {
     setState((draft) => {
       draft.seats.push(id);
     });
+    // The view scrolls to the end, so the new seat shows. The new room below the view needs no motion.
+    const scroll = maxScroll(seats.length);
+    listH.jump(SEAT_VIEW_INSET + seatsHeight(seats.length));
+    seatList.style.height = `${listH.value}px`;
+    scrollSeats(scroll);
     // A drop comes in from the left at the add button and flows into the new seat.
     dropX.jump(DOCK_LEFT - 120);
-    dropY.jump(seatCenterY(index, index));
+    dropY.jump(addCenterY(index));
     dropR.jump(0);
     dropR.to(SEAT / 2);
     dropX.to(SEAT_CENTER_X, () => dropR.to(0));
-    dropY.to(targetY);
+    dropY.to(targetY - scroll);
     springs.scale.jump(0);
     window.setTimeout(() => {
       springs.scale.to(1);
@@ -585,7 +664,7 @@ export function AgentDock(props: AgentDockProps) {
     };
     leaving.add(id);
     dropX.jump(SEAT_CENTER_X);
-    dropY.jump(springs.y.value);
+    dropY.jump(springs.y.value - seatScroll.scrollTop);
     dropR.jump(SEAT / 2);
     dropX.to(DOCK_LEFT - 110);
     dropR.to(0);
@@ -704,230 +783,260 @@ export function AgentDock(props: AgentDockProps) {
       data-side={props.side ?? "right"}
       data-draggable={props.onDrag ? "" : undefined}
       data-dragging={dragging() ? "" : undefined}
+      data-ambient-motion={ambientMotion() ? undefined : "paused"}
       style={{ width: `${STAGE_WIDTH}px`, height: `${PANEL_HEIGHT}px` }}
+      onPointerOver={() => setPointerOn(true)}
+      onPointerOut={(event) => {
+        if (!(event.relatedTarget instanceof Node && stage.contains(event.relatedTarget))) setPointerOn(false);
+      }}
     >
-      <svg class="agent-dock-filter" aria-hidden="true" width="0" height="0">
-        <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
-          <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
-        </filter>
-      </svg>
-
-      {/* The liquid: the dock, the neck, the panel and the drop under the goo filter. */}
-      <div
-        class="agent-dock-liquid"
-        aria-hidden="true"
-        style={{ filter: `url(#${filterId})` }}
-        ref={(element) => (liquid = element)}
-      >
-        <svg class="agent-dock-shapes" width={LIQUID_WIDTH} height={LIQUID_HEIGHT} aria-hidden="true">
-          <path ref={(element) => (dockBody = element)} />
-          <path ref={(element) => (neck = element)} />
+      <AmbientMotion when={ambientMotion()}>
+        <svg class="agent-dock-filter" aria-hidden="true" width="0" height="0">
+          <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
+            <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
+          </filter>
         </svg>
-        <div class="agent-dock-panel-body" ref={(element) => (panelBody = element)} />
-        <div class="agent-dock-drop" ref={(element) => (drop = element)} />
-      </div>
-      {/* The dock and the panel again, without the filter, so the tips and corners stay sharp. */}
-      <svg class="agent-dock-edge" width={LIQUID_WIDTH} height={LIQUID_HEIGHT} aria-hidden="true">
-        <path ref={(element) => (dockEdge = element)} />
-        <rect ref={(element) => (panelEdge = element)} />
-      </svg>
 
-      {/* The handle below the dock. Only the handle moves the dock. */}
-      <svg class="agent-dock-handle" width={LIQUID_WIDTH} height={LIQUID_HEIGHT} aria-hidden="true">
-        <path class="agent-dock-handle-arc" stroke-width={HANDLE_STROKE} ref={(element) => (handleArc = element)} />
-        {/* A wider clear stroke, so the thin arc is easy to take. */}
-        <path
-          class="agent-dock-handle-hit"
-          stroke-width={HANDLE_STROKE * 5}
-          ref={(element) => (handleHit = element)}
-          onPointerDown={startDrag}
-        />
-      </svg>
-
-      {/* The dock body between and around the seats. It takes the pointer, so a click there does not go
-          through to the app under the dock. */}
-      <div
-        class="agent-dock-hit"
-        aria-hidden="true"
-        ref={(element) => (hitArea = element)}
-        style={{ left: `${DOCK_LEFT}px`, width: `${DOCK_WIDTH}px` }}
-      />
-
-      <nav class="agent-dock-seats" aria-label={t("agent.dock.label")}>
-        <For each={state.seats}>
-          {(id) => (
-            <div
-              class="agent-dock-seat"
-              ref={(element) => {
-                seatElements.set(id, element);
-                placeSeat(element, seatSprings(id));
-              }}
-              style={{ left: `${DOCK_LEFT + DOCK_PAD}px` }}
-            >
-              <Show when={seatFor(id)}>
-                {(seat) => (
-                  <ContextMenu.Root modal={false}>
-                    <ContextMenu.Trigger
-                      as="button"
-                      type="button"
-                      class="agent-dock-seat-button"
-                      aria-label={t("agent.dock.chatWith", { name: seat().agent.name })}
-                      aria-pressed={state.open === id ? "true" : "false"}
-                      data-open={state.open === id ? "" : undefined}
-                      onClick={() => toggleSeat(id)}
-                      onKeyDown={closeOnEscape}
-                    >
-                      <SidebarPinnedAvatar agent={seat().agent} mood={seat().mood} agentState={() => seat().state} />
-                    </ContextMenu.Trigger>
-                    <ContextMenu.Portal>
-                      <ContextMenu.Content>
-                        <ContextMenu.Item
-                          onSelectAfterClose={() => {
-                            if (state.open === id) closeChat(false);
-                            props.onOpenInMain(id);
-                          }}
-                        >
-                          <Maximize2 aria-hidden="true" />
-                          {t("agent.dock.openInMain")}
-                        </ContextMenu.Item>
-                        <Show when={props.onOpenWindow}>
-                          {(open) => (
-                            <ContextMenu.Item
-                              onSelectAfterClose={() => {
-                                if (state.open === id) closeChat(false);
-                                open()(id);
-                              }}
-                            >
-                              <AppWindow aria-hidden="true" />
-                              {t("agent.dock.openWindow")}
-                            </ContextMenu.Item>
-                          )}
-                        </Show>
-                        <ContextMenu.Separator />
-                        <ContextMenu.Item onSelectAfterClose={() => props.onRemove(id)}>
-                          <PanelRight aria-hidden="true" />
-                          {t("agent.dock.remove")}
-                        </ContextMenu.Item>
-                      </ContextMenu.Content>
-                    </ContextMenu.Portal>
-                  </ContextMenu.Root>
-                )}
-              </Show>
-            </div>
-          )}
-        </For>
+        {/* The liquid: the dock, the neck, the panel and the drop under the goo filter. */}
         <div
-          class="agent-dock-seat"
-          ref={(element) => (addSeat = element)}
-          style={{ left: `${DOCK_LEFT + DOCK_PAD}px` }}
+          class="agent-dock-liquid"
+          aria-hidden="true"
+          style={{ filter: `url(#${filterId})` }}
+          ref={(element) => (liquid = element)}
         >
-          {/* The menu reads its placement once, so a change of edge makes a new menu. */}
-          <Show when={menuPlacement()} keyed>
-            {(placement) => (
-              <DropdownMenu.Root placement={placement} gutter={12}>
-                <DropdownMenu.Trigger class="agent-dock-seat-button agent-dock-add" aria-label={t("agent.dock.add")}>
-                  <Plus aria-hidden="true" />
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content>
-                    <For
-                      each={props.available}
-                      fallback={<DropdownMenu.Item disabled>{t("agent.dock.allAdded")}</DropdownMenu.Item>}
-                    >
-                      {(agent) => (
-                        <DropdownMenu.Item onSelectAfterClose={() => props.onAdd(agent.id)}>
-                          <AgentAvatar agent={agent} motion="idle" class="agent-dock-menu-avatar" />
-                          {agent.name}
-                        </DropdownMenu.Item>
-                      )}
-                    </For>
-                    <Show when={props.onOpenSettings}>
-                      {(open) => (
-                        <>
-                          <DropdownMenu.Separator />
-                          <DropdownMenu.Item onSelectAfterClose={() => open()()}>
-                            <Settings aria-hidden="true" />
-                            {t("agent.dock.settings")}
-                          </DropdownMenu.Item>
-                        </>
+          <svg class="agent-dock-shapes" width={LIQUID_WIDTH} height={LIQUID_HEIGHT} aria-hidden="true">
+            <path ref={(element) => (dockBody = element)} />
+            <path ref={(element) => (neck = element)} />
+          </svg>
+          <div class="agent-dock-panel-body" ref={(element) => (panelBody = element)} />
+          <div class="agent-dock-drop" ref={(element) => (drop = element)} />
+        </div>
+        {/* The dock and the panel again, without the filter, so the tips and corners stay sharp. */}
+        <svg class="agent-dock-edge" width={LIQUID_WIDTH} height={LIQUID_HEIGHT} aria-hidden="true">
+          <path ref={(element) => (dockEdge = element)} />
+          <rect ref={(element) => (panelEdge = element)} />
+        </svg>
+
+        {/* The handle below the dock. Only the handle moves the dock. */}
+        <svg class="agent-dock-handle" width={LIQUID_WIDTH} height={LIQUID_HEIGHT} aria-hidden="true">
+          <path class="agent-dock-handle-arc" stroke-width={HANDLE_STROKE} ref={(element) => (handleArc = element)} />
+          {/* A wider clear stroke, so the thin arc is easy to take. */}
+          <path
+            class="agent-dock-handle-hit"
+            stroke-width={HANDLE_STROKE * 5}
+            ref={(element) => (handleHit = element)}
+            onPointerDown={startDrag}
+          />
+        </svg>
+
+        {/* The dock body between and around the seats. It takes the pointer, so a click there does not go
+          through to the app under the dock. */}
+        <div
+          class="agent-dock-hit"
+          aria-hidden="true"
+          ref={(element) => (hitArea = element)}
+          style={{ left: `${DOCK_LEFT}px`, width: `${DOCK_WIDTH}px` }}
+        />
+
+        <nav class="agent-dock-seats" aria-label={t("agent.dock.label")}>
+          {/* The seats scroll when more agents are on the dock than the screen holds. */}
+          <div
+            class={["agent-dock-seat-scroll", seatFades.classes()]}
+            ref={(element) => {
+              seatScroll = element;
+              seatFades.bind(element);
+            }}
+            style={{ left: `${DOCK_LEFT}px`, width: `${DOCK_WIDTH}px`, "--agent-dock-seat-fade": `${SEAT_FADE}px` }}
+            onScroll={followScroll}
+          >
+            <div
+              class="agent-dock-seat-list"
+              ref={(element) => {
+                seatList = element;
+                seatFades.watch(element);
+              }}
+            >
+              <For each={state.seats}>
+                {(id) => (
+                  <div
+                    class="agent-dock-seat"
+                    ref={(element) => {
+                      seatElements.set(id, element);
+                      placeSeat(element, seatSprings(id));
+                    }}
+                    style={{ left: `${DOCK_PAD}px` }}
+                  >
+                    <Show when={seatFor(id)}>
+                      {(seat) => (
+                        <ContextMenu.Root modal={false}>
+                          <ContextMenu.Trigger
+                            as="button"
+                            type="button"
+                            class="agent-dock-seat-button"
+                            aria-label={t("agent.dock.chatWith", { name: seat().agent.name })}
+                            aria-pressed={state.open === id ? "true" : "false"}
+                            data-open={state.open === id ? "" : undefined}
+                            onClick={() => toggleSeat(id)}
+                            onKeyDown={closeOnEscape}
+                          >
+                            <SidebarPinnedAvatar
+                              agent={seat().agent}
+                              mood={seat().mood}
+                              agentState={() => seat().state}
+                            />
+                          </ContextMenu.Trigger>
+                          <ContextMenu.Portal>
+                            <ContextMenu.Content>
+                              <ContextMenu.Item
+                                onSelectAfterClose={() => {
+                                  if (state.open === id) closeChat(false);
+                                  props.onOpenInMain(id);
+                                }}
+                              >
+                                <Maximize2 aria-hidden="true" />
+                                {t("agent.dock.openInMain")}
+                              </ContextMenu.Item>
+                              <Show when={props.onOpenWindow}>
+                                {(open) => (
+                                  <ContextMenu.Item
+                                    onSelectAfterClose={() => {
+                                      if (state.open === id) closeChat(false);
+                                      open()(id);
+                                    }}
+                                  >
+                                    <AppWindow aria-hidden="true" />
+                                    {t("agent.dock.openWindow")}
+                                  </ContextMenu.Item>
+                                )}
+                              </Show>
+                              <ContextMenu.Separator />
+                              <ContextMenu.Item onSelectAfterClose={() => props.onRemove(id)}>
+                                <PanelRight aria-hidden="true" />
+                                {t("agent.dock.remove")}
+                              </ContextMenu.Item>
+                            </ContextMenu.Content>
+                          </ContextMenu.Portal>
+                        </ContextMenu.Root>
                       )}
                     </Show>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-            )}
-          </Show>
-        </div>
-      </nav>
-
-      <AgentDockShelf
-        results={props.results ?? []}
-        agent={(id) => seatFor(id)?.agent ?? props.agents.find((agent) => agent.id === id)}
-        hidden={state.open !== null}
-        stage={() => stage}
-        onOpen={openChat}
-        onShownChange={(shown) => props.onShelfChange?.(shown)}
-        ref={(element) => {
-          shelf = element;
-          element.style.right = `${STAGE_WIDTH - DOCK_LEFT + SHELF_GAP}px`;
-          motion.kick();
-        }}
-      />
-
-      {/* The panel content, over the liquid panel. */}
-      <section
-        class="agent-dock-panel"
-        ref={(element) => (panelContent = element)}
-        aria-label={shownSeat() ? t("agent.dock.chatWith", { name: shownSeat()?.agent.name ?? "" }) : undefined}
-        data-open={state.open ? "" : undefined}
-        inert={state.open ? undefined : true}
-        onKeyDown={closeOnEscape}
-        style={{
-          left: `${DOCK_LEFT - PANEL_GAP - PANEL_WIDTH}px`,
-          width: `${PANEL_WIDTH}px`,
-          height: `${PANEL_HEIGHT}px`,
-        }}
-      >
-        <Show when={state.shown} keyed>
-          {(id) => (
-            <Show when={seatFor(id)}>
-              {(seat) => (
-                <AgentDockChat
-                  agent={seat().agent}
-                  mood={seat().mood}
-                  chat={props.chat(id)}
-                  draft={state.drafts[id] ?? ""}
-                  pending={state.pending[id] ?? []}
-                  error={state.errors[id] ?? null}
-                  sending={state.sending[id] ?? false}
-                  focusRequest={state.focus}
-                  onDraftChange={(value) =>
-                    setState((draft) => {
-                      draft.drafts[id] = value;
-                    })
-                  }
-                  onSend={() => void send()}
-                  onClose={() => closeChat()}
-                  onRemove={() => props.onRemove(id)}
-                  onOpenInMain={() => {
-                    closeChat(false);
-                    props.onOpenInMain(id);
-                  }}
-                  onOpenWindow={openWindowFor(id)}
-                  voice={chatVoice(id)}
-                  agents={props.agents}
-                  onSelectAgent={(agentId) => {
-                    closeChat(false);
-                    props.onSelectAgent?.(agentId);
-                  }}
-                  onOpenLink={(url) => props.onOpenLink?.(url)}
-                />
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+          <div
+            class="agent-dock-seat"
+            ref={(element) => (addSeat = element)}
+            style={{ left: `${DOCK_LEFT + DOCK_PAD}px` }}
+          >
+            {/* The menu reads its placement once, so a change of edge makes a new menu. */}
+            <Show when={menuPlacement()} keyed>
+              {(placement) => (
+                <DropdownMenu.Root placement={placement} gutter={12}>
+                  <DropdownMenu.Trigger class="agent-dock-seat-button agent-dock-add" aria-label={t("agent.dock.add")}>
+                    <Plus aria-hidden="true" />
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content>
+                      <For
+                        each={props.available}
+                        fallback={<DropdownMenu.Item disabled>{t("agent.dock.allAdded")}</DropdownMenu.Item>}
+                      >
+                        {(agent) => (
+                          <DropdownMenu.Item onSelectAfterClose={() => props.onAdd(agent.id)}>
+                            <AgentAvatar agent={agent} motion="idle" class="agent-dock-menu-avatar" />
+                            {agent.name}
+                          </DropdownMenu.Item>
+                        )}
+                      </For>
+                      <Show when={props.onOpenSettings}>
+                        {(open) => (
+                          <>
+                            <DropdownMenu.Separator />
+                            <DropdownMenu.Item onSelectAfterClose={() => open()()}>
+                              <Settings aria-hidden="true" />
+                              {t("agent.dock.settings")}
+                            </DropdownMenu.Item>
+                          </>
+                        )}
+                      </Show>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
               )}
             </Show>
-          )}
-        </Show>
-      </section>
+          </div>
+        </nav>
+
+        <AgentDockShelf
+          results={props.results ?? []}
+          agent={(id) => seatFor(id)?.agent ?? props.agents.find((agent) => agent.id === id)}
+          hidden={state.open !== null}
+          stage={() => stage}
+          onOpen={openChat}
+          onShownChange={(shown) => props.onShelfChange?.(shown)}
+          ref={(element) => {
+            shelf = element;
+            element.style.right = `${STAGE_WIDTH - DOCK_LEFT + SHELF_GAP}px`;
+            motion.kick();
+          }}
+        />
+
+        {/* The panel content, over the liquid panel. */}
+        <section
+          class="agent-dock-panel"
+          ref={(element) => (panelContent = element)}
+          aria-label={shownSeat() ? t("agent.dock.chatWith", { name: shownSeat()?.agent.name ?? "" }) : undefined}
+          data-open={state.open ? "" : undefined}
+          inert={state.open ? undefined : true}
+          onKeyDown={closeOnEscape}
+          style={{
+            left: `${DOCK_LEFT - PANEL_GAP - PANEL_WIDTH}px`,
+            width: `${PANEL_WIDTH}px`,
+            height: `${PANEL_HEIGHT}px`,
+          }}
+        >
+          <Show when={state.shown} keyed>
+            {(id) => (
+              <Show when={seatFor(id)}>
+                {(seat) => (
+                  <AgentDockChat
+                    agent={seat().agent}
+                    mood={seat().mood}
+                    chat={props.chat(id)}
+                    draft={state.drafts[id] ?? ""}
+                    pending={state.pending[id] ?? []}
+                    error={state.errors[id] ?? null}
+                    sending={state.sending[id] ?? false}
+                    focusRequest={state.focus}
+                    onDraftChange={(value) =>
+                      setState((draft) => {
+                        draft.drafts[id] = value;
+                      })
+                    }
+                    onSend={() => void send()}
+                    onClose={() => closeChat()}
+                    onRemove={() => props.onRemove(id)}
+                    onOpenInMain={() => {
+                      closeChat(false);
+                      props.onOpenInMain(id);
+                    }}
+                    onOpenWindow={openWindowFor(id)}
+                    voice={chatVoice(id)}
+                    agents={props.agents}
+                    onSelectAgent={(agentId) => {
+                      closeChat(false);
+                      props.onSelectAgent?.(agentId);
+                    }}
+                    onOpenLink={(url) => props.onOpenLink?.(url)}
+                  />
+                )}
+              </Show>
+            )}
+          </Show>
+        </section>
+      </AmbientMotion>
     </div>
   );
 }

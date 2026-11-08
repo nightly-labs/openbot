@@ -4,6 +4,7 @@ import {
   CODEX_LIVE_VOICES,
   type CodexLiveVoice,
   cloudSpeechModel,
+  type DictationKeyProvider,
   ELEVENLABS_SPEECH_VOICES,
   ELEVENLABS_VOICE_MODEL_ID,
   isElevenLabsSpeechVoice,
@@ -55,7 +56,6 @@ import {
   type ModelDownload,
   ModelDownloadToasts,
   type ModelFile,
-  type ModelPlace,
   VoiceKeyRow,
   VoiceModelRow,
 } from "./VoiceModelRow";
@@ -68,6 +68,8 @@ const MODEL_DESCRIPTION = {
   "whisper-turbo": "settings.voice.model.whisper.description",
   "cohere-transcribe-03-2026": "settings.voice.model.cohere.description",
   [ELEVENLABS_VOICE_MODEL_ID]: "settings.voice.model.elevenlabs.description",
+  "groq-whisper-large-v3-turbo": "settings.voice.model.groqTurbo.description",
+  "groq-whisper-large-v3": "settings.voice.model.groqLarge.description",
 } as const satisfies Record<VoiceModelInfo["id"], AppTextKey>;
 
 const SPEECH_MODEL_DESCRIPTION = {
@@ -88,7 +90,7 @@ const SPEECH_CHOICES: readonly ModelChoice<SpeechModelId>[] = [
  * The voices of each speech model place. The arrays stay the same objects: a new array makes the
  * Select send its value again, and that write starts the same change again.
  */
-const VOICE_OPTIONS: Record<ModelPlace, string[]> = {
+const VOICE_OPTIONS: Record<"local" | SpeechKeyProvider, string[]> = {
   local: [...SPEECH_VOICES],
   elevenlabs: [...ELEVENLABS_SPEECH_VOICES],
   xai: [...XAI_SPEECH_VOICES],
@@ -265,11 +267,30 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
 
   /** The ElevenLabs key is one key for dictation and spoken replies. */
   const elevenLabsKeySaved = () => props.store.state.statuses[ELEVENLABS_VOICE_MODEL_ID]?.phase === "ready";
+  /** The provider of the cloud model in use, or undefined for a model on this computer. */
+  const cloudProvider = (): DictationKeyProvider | undefined => {
+    const model = activeModel();
+    return model?.kind === "cloud" ? model.provider : undefined;
+  };
+  /** A cloud model is ready when the key of its provider is saved. */
+  const cloudKeySaved = () => {
+    const id = settings()?.modelId;
+    return id ? props.store.state.statuses[id]?.phase === "ready" : false;
+  };
+  /** The ElevenLabs key also reads replies aloud, so it saves through the speech route. */
+  const saveCloudKey = (provider: DictationKeyProvider, key: string) =>
+    provider === "elevenlabs"
+      ? props.store.saveSpeechApiKey(provider, key)
+      : props.store.saveDictationApiKey(provider, key);
+  const removeCloudKey = (provider: DictationKeyProvider) =>
+    void (provider === "elevenlabs"
+      ? props.store.removeSpeechApiKey(provider)
+      : props.store.removeDictationApiKey(provider));
   const dictationChoices = createMemo((): ModelChoice<VoiceModelId>[] =>
     shownModels().map((model) => ({
       id: model.id,
       name: model.name,
-      place: model.kind === "cloud" ? "elevenlabs" : "local",
+      place: model.kind === "cloud" ? model.provider : "local",
     })),
   );
   const dictationDescription = () => {
@@ -415,13 +436,15 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             disabled={!settings()}
             mount={props.selectMount}
           />
-          <Show when={activeModel()?.kind === "cloud"}>
-            <VoiceKeyRow
-              provider="elevenlabs"
-              saved={elevenLabsKeySaved()}
-              onSave={(key) => props.store.saveSpeechApiKey("elevenlabs", key)}
-              onRemove={() => void props.store.removeSpeechApiKey("elevenlabs")}
-            />
+          <Show when={cloudProvider()} keyed>
+            {(provider) => (
+              <VoiceKeyRow
+                provider={provider}
+                saved={cloudKeySaved()}
+                onSave={(key) => saveCloudKey(provider, key)}
+                onRemove={() => removeCloudKey(provider)}
+              />
+            )}
           </Show>
           <Item data-settings-row="settings.voice.language.section" class="settings-modal-row">
             <ItemContent>

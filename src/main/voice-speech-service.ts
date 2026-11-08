@@ -3,13 +3,13 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   cloudSpeechModel,
-  SPEECH_KEY_PROVIDER_NAMES,
   SPEECH_MODEL_ID,
   SPEECH_VOICES,
   type SpeechAudio,
   type SpeechInput,
   type SpeechModelStatus,
   type SpeechSettings,
+  VOICE_KEY_PROVIDER_NAMES,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -164,7 +164,7 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
       if (!key)
         return yield* new VoiceOperationError({
           cause: new Error(
-            sourceText("error.voice.cloud.keyRequired", { provider: SPEECH_KEY_PROVIDER_NAMES[cloud.provider] }),
+            sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider] }),
           ),
         });
       const startedAt = Date.now();
@@ -259,7 +259,7 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
           progress: null,
           // A voice conversation shows this when it cannot start.
           message: sourceText("error.voice.cloud.keyRequired", {
-            provider: SPEECH_KEY_PROVIDER_NAMES[cloud.provider],
+            provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider],
           }),
         };
   }

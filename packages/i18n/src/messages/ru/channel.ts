@@ -37,6 +37,15 @@ export const messages = {
   "channel.settings.compact.title": "Сжать контекст",
   "channel.settings.compact.description": "Участники сохраняют краткую сводку сессии канала и тратят меньше токенов.",
   "channel.settings.compact.failed": "Не удалось сжать контекст канала.",
+  "channel.settings.deleteHistory.title": "Удалить историю",
+  "channel.settings.deleteHistory.description":
+    "Сообщения удаляются, и участники их забывают. Настройки канала остаются.",
+  "channel.settings.deleteHistory.button": "Удалить",
+  "channel.settings.deleteHistory.confirmTitle": "Удалить историю канала {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Все сообщения и файлы этого канала будут удалены из OpenBot, и участники их забудут. Это нельзя отменить. Участники, инструкции, воспоминания, рутины и задачи не изменятся.",
+  "channel.settings.deleteHistory.confirm": "Удалить историю",
+  "channel.settings.deleteHistory.failed": "Не удалось удалить историю.",
   "channel.settings.routines": "Регулярные задачи",
   "channel.settings.routineCount": {
     one: "Настроено: {count}",

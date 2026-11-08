@@ -74,7 +74,6 @@ export const messages = {
   "agent.error.restoreFailed": "Не удалось восстановить агента",
   "agent.error.hiddenFailed": "Изменение не сохранено. Повторите попытку.",
   "agent.error.settingsFailed": "Не удалось сохранить настройки агента",
-  "agent.error.avatarFailed": "Не удалось обновить аватар",
   "agent.error.adminOnly": "Настройки агента может менять только администратор сервера.",
   "agent.error.continueFailed": "Агент не смог продолжить. Повторите попытку.",
   "agent.error.mcpNotStarted": "Сервер MCP не запущен",

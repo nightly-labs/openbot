@@ -30,6 +30,11 @@ export const messages = {
   "settings.logoColor.beige": "米色",
   "settings.logoColor.gray": "灰色",
   "settings.logoColor.white": "白色",
+  "settings.chatBackground.title": "聊天背景",
+  "settings.chatBackground.description": "每个主题保留各自的颜色。让文字难以阅读的颜色会变深或变浅。",
+  "settings.chatBackground.light": "浅色主题中的聊天背景",
+  "settings.chatBackground.dark": "深色主题中的聊天背景",
+  "settings.chatBackground.default": "默认",
   "settings.chatColor.title": "聊天颜色",
   "settings.chatColor.description": "为你的消息气泡着色。你服务器上的成员也能看到。",
   "settings.chatColor.yours": "你的聊天颜色",
@@ -64,6 +69,11 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "使用电池供电时也保持电脑唤醒，电量会消耗得更快。",
   "settings.restoreWorkspace.title": "启动时恢复上次的工作区",
   "settings.restoreWorkspace.description": "打开上次会话中的工作区和任务。",
+  "settings.quitGuard.title": "按住 ⌘Q 退出",
+  "settings.quitGuard.description": "按住 ⌘Q 或按两次以退出。选择“从不”时，按一次 ⌘Q 就会退出并停止助手。",
+  "settings.quitGuard.working": "助手工作时",
+  "settings.quitGuard.always": "始终",
+  "settings.quitGuard.never": "从不",
   "settings.externalLinks.title": "打开外部链接的方式",
   "settings.externalLinks.description": "聊天、登录页面和账单页面中的链接在这里打开。",
   // The two link targets. The saved value stays in English; only the label is translated.
@@ -89,7 +99,8 @@ export const messages = {
   "settings.compactMessageActions.description":
     "在消息旁显示“回应”“回复”和“更多”，并在消息之间显示时间。关闭后，所有操作和时间都显示在每条消息下方。",
   "settings.busyMessage.title": "助手工作时的消息处理方式",
-  "settings.busyMessage.description": "新消息会并入助手当前的工作，而不是进入队列。支持 ChatGPT 和 Claude。",
+  "settings.busyMessage.description":
+    "新消息会并入助手当前的工作，而不是进入队列。不支持此功能的助手会让消息在队列中等待。",
   // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "默认值",
   "settings.agentDefaults.description": "助手会遵循这些默认值，除非你为某个助手单独更改。",
@@ -238,7 +249,7 @@ export const messages = {
   "settings.tab.notifications.title": "通知",
   "settings.tab.notifications.description": "选择 OpenBot 提醒你的方式。",
   "settings.tab.voice.title": "语音",
-  "settings.tab.voice.description": "消息框中的听写。本地模型在本机运行，ElevenLabs 在云端运行。",
+  "settings.tab.voice.description": "消息框中的听写。本地模型在本机运行，ElevenLabs 和 Groq 在云端运行。",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "允许这台电脑上 OpenBot 的助手查看并操作这台电脑上的应用。其他服务器上的助手使用那台服务器的电脑。",
@@ -592,6 +603,10 @@ export const messages = {
   "settings.voice.removeFailed": "无法移除该模型，请重试。",
   "settings.voice.model.elevenlabs.description":
     "将你的语音实时传给 ElevenLabs。说话时文字会同步显示并保持固定。使用你自己的 API 密钥，ElevenLabs 会按次计费。",
+  "settings.voice.model.groqTurbo.description":
+    "停止后将每段录音发送给 Groq。速度快，支持多种语言。使用你自己的 API 密钥，Groq 会按次计费。",
+  "settings.voice.model.groqLarge.description":
+    "停止后将每段录音发送给 Groq。比 turbo 更准确，但更慢。使用你自己的 API 密钥，Groq 会按次计费。",
   "settings.voice.apiKey.placeholder": "粘贴密钥",
   "settings.voice.apiKey.save": "保存密钥",
   "settings.voice.apiKey.remove": "移除密钥",

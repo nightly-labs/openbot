@@ -398,6 +398,11 @@
   --openbot-duration-toast-exit: 220ms;
   --openbot-duration-island-content: 340ms;
   --openbot-duration-island-content-exit: 220ms;
+  /*
+   * A new turn shows the working agent after this wait. The local host starts a turn at once, so a
+   * shorter wait shows the agent while the sent message still moves in. Grok Bot shows it after 670–900ms.
+   */
+  --openbot-agent-activity-show-delay: 750ms;
   --openbot-agent-activity-exit-delay: 500ms;
   /* A loading indicator waits this long, so a fast answer replaces it before it shows. */
   --openbot-loading-indicator-delay: 400ms;
@@ -468,6 +473,10 @@
 }
 
 [data-provider="copilot"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="mistral"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
 

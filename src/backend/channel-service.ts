@@ -39,6 +39,7 @@ import {
   ChannelHistory,
   type ChannelTextModel,
   type DeliveredChannelContext,
+  type DeliveredChannelText,
   historyMessagePart,
   isMemberThinking,
   sameRequest,
@@ -238,14 +239,14 @@ export class ChannelService {
   readonly #deltas = new Map<string, { sessionId: string; text: string }>();
   /**
    * The cursors that this process accepted, by channel, agent and session, with the channel facts
-   * that the session got. A cursor from an earlier run is not used: an earlier version did not reset
-   * it at a compaction.
+   * and memories that the session got. A cursor from an earlier run is not used: an earlier version
+   * did not reset it at a compaction.
    */
-  readonly #acceptedContexts = new Map<string, string>();
+  readonly #acceptedContexts = new Map<string, DeliveredChannelText>();
   /** By delivery: the count of in-place message changes when its packet was built. */
   readonly #preparedChanges = new Map<string, number>();
-  /** By delivery: the channel facts in its packet. */
-  readonly #preparedFacts = new Map<string, string>();
+  /** By delivery: the channel facts and memories in its packet. */
+  readonly #preparedFacts = new Map<string, DeliveredChannelText>();
 
   constructor(
     database: OpenBotDatabase,
@@ -500,6 +501,40 @@ export class ChannelService {
   });
 
   /**
+   * "Delete history": every message of the channel leaves the view and the stored history, with its
+   * files, and the members forget the channel as after "New conversation". The members,
+   * instructions, memories, routines and tasks stay. Work that still runs or waits refuses it, and
+   * `members.busy` and `members.end` work as for `clearContext`.
+   */
+  readonly deleteHistory = Effect.fn("ChannelService.deleteHistory")(function* (
+    this: ChannelService,
+    channelId: string,
+    members: {
+      busy: (contexts: ReadonlyArray<{ agentId: string; threadId: string }>) => boolean;
+      end: (threadIds: readonly string[]) => Effect.Effect<void>;
+    },
+  ) {
+    yield* this.#serialize(
+      channelId,
+      Effect.gen({ self: this }, function* () {
+        if (this.#deletedChannels.has(channelId))
+          return yield* channelFailure(new Error(sourceText("error.backend.channelNotFound")));
+        const channel = yield* channelSync(() => this.store.get(channelId));
+        if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+        yield* this.#requireIdle(channelId, "error.backend.channelWaitBeforeDeleteHistory");
+        const contexts = yield* channelSync(() => this.store.contexts(channelId));
+        if (members.busy(contexts))
+          return yield* channelFailure(new Error(sourceText("error.backend.channelWaitBeforeDeleteHistory")));
+        yield* channelSync(() => this.store.deleteHistory(channel));
+        // A failure here leaves copies that no message shows; a second request removes them.
+        yield* this.mailbox.deleteChannelMessageCopies(channelId, "all").pipe(Effect.mapError(channelFailure));
+        yield* members.end(contexts.map((context) => context.threadId));
+      }).pipe(Effect.uninterruptible),
+    );
+    this.publish(channelId);
+  });
+
+  /**
    * The member sessions that "Compact now" compacts: the execution thread of each member with an
    * active provider session. Work that still runs or waits refuses it, as for a new conversation.
    */
@@ -516,7 +551,10 @@ export class ChannelService {
   /** Refuses while a task of the channel is queued, running, or waits for other work. */
   #requireIdle(
     channelId: string,
-    key: "error.backend.channelWaitBeforeNewConversation" | "error.backend.channelWaitBeforeCompact",
+    key:
+      | "error.backend.channelWaitBeforeNewConversation"
+      | "error.backend.channelWaitBeforeCompact"
+      | "error.backend.channelWaitBeforeDeleteHistory",
   ): Effect.Effect<void, ChannelOperationError> {
     return channelSync(() => this.store.tasks(channelId)).pipe(
       Effect.flatMap((tasks) =>
@@ -2369,7 +2407,10 @@ export class ChannelService {
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
     else this.#deltas.delete(delivery.delivery.id);
-    this.#preparedFacts.set(delivery.delivery.id, history.channelFacts);
+    this.#preparedFacts.set(delivery.delivery.id, {
+      channelFacts: history.channelFacts,
+      channelMemories: history.channelMemories,
+    });
     const current = (yield* channelSync(() => this.store.tasks(channel.id))).find((item) => item.id === task.id);
     if (
       !current ||
@@ -2405,11 +2446,13 @@ export class ChannelService {
     )
       return null;
     const session = this.store.database.activeProviderSession(context.threadId, agent.provider);
+    const delivered = this.#acceptedContexts.get(JSON.stringify([channelId, agent.id, context.sessionId]));
     return session?.externalSessionId === context.sessionId
       ? {
           sessionId: context.sessionId,
           throughSequence: context.throughSequence,
-          channelFacts: this.#acceptedContexts.get(JSON.stringify([channelId, agent.id, context.sessionId])) ?? null,
+          channelFacts: delivered?.channelFacts ?? null,
+          channelMemories: delivered?.channelMemories ?? null,
         }
       : null;
   }
@@ -2420,10 +2463,10 @@ export class ChannelService {
     sessionId: string,
     throughSequence: number,
     summaryVersion: number,
-    channelFacts: string,
+    delivered: DeliveredChannelText,
   ): void {
     this.store.acceptContext(channelId, agentId, sessionId, throughSequence, summaryVersion);
-    this.#acceptedContexts.set(JSON.stringify([channelId, agentId, sessionId]), channelFacts);
+    this.#acceptedContexts.set(JSON.stringify([channelId, agentId, sessionId]), delivered);
   }
 
   /** The packet of a delivery with only the unread messages, and the session that read the others. */
@@ -2483,8 +2526,8 @@ export class ChannelService {
             sessionId,
             cursor.throughSequence,
             cursor.summaryVersion,
-            // Unknown facts never match, so the next delta gives them again.
-            facts ?? "",
+            // Unknown text never matches, so the next delta gives the facts and memories again.
+            facts ?? { channelFacts: null, channelMemories: null },
           ),
         );
       }
@@ -2703,14 +2746,15 @@ export class ChannelService {
         !message.questionPrompt
       )
         continue;
-      // OpenCode's text before a tool call streams as the answer and becomes a step only at that
-      // call. Copied while it streamed, each such note showed as the member's message and then
-      // folded (#4844). The agent's own chat still streams it; the channel gets it when it completes.
+      // OpenCode's text before a tool call streams as the answer, and Pi's streams with no phase. Each
+      // becomes a step only at that call. Copied while it streamed, each such note showed as the
+      // member's message and then folded (#4844). The agent's own chat still streams it; the channel
+      // gets it when it completes.
       if (
         !original &&
         message.author === "assistant" &&
         message.status === "streaming" &&
-        message.itemType === "final_answer" &&
+        (message.itemType === "final_answer" || message.itemType === "agentMessage") &&
         provisionalAnswers()
       )
         continue;
@@ -3577,7 +3621,7 @@ export class ChannelService {
             session.externalSessionId,
             cursor.throughSequence,
             cursor.summaryVersion,
-            history.channelFacts,
+            { channelFacts: history.channelFacts, channelMemories: history.channelMemories },
           ),
         );
     }

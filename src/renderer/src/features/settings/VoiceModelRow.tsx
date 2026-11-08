@@ -1,7 +1,7 @@
 import {
-  SPEECH_KEY_PROVIDER_NAMES,
-  type SpeechKeyProvider,
   type SpeechModelStatus,
+  VOICE_KEY_PROVIDER_NAMES,
+  type VoiceKeyProvider,
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import {
@@ -29,9 +29,9 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createRoot, createStore, getOwner, onCleanup, runWithOwner, Show, untrack } from "solid-js";
 
 /** Where a model runs: on this computer, or at a provider with the user's own key. */
-export type ModelPlace = "local" | SpeechKeyProvider;
+export type ModelPlace = "local" | VoiceKeyProvider;
 
-const PLACE_ORDER: readonly ModelPlace[] = ["local", "elevenlabs", "xai"];
+const PLACE_ORDER: readonly ModelPlace[] = ["local", "elevenlabs", "groq", "xai"];
 
 export interface ModelChoice<Id extends string> {
   id: Id;
@@ -48,14 +48,14 @@ interface ModelGroup<Id extends string> {
 /** The name under the provider in the menu: the provider name is the group name, so it is not repeated. */
 function shortName(choice: ModelChoice<string>): string {
   if (choice.place === "local") return choice.name;
-  const provider = `${SPEECH_KEY_PROVIDER_NAMES[choice.place]} `;
+  const provider = `${VOICE_KEY_PROVIDER_NAMES[choice.place]} `;
   return choice.name.startsWith(provider) ? choice.name.slice(provider.length) : choice.name;
 }
 
 /** The name on the menu button: the provider name and the model name. */
 function fullName(choice: ModelChoice<string>): string {
   if (choice.place === "local") return choice.name;
-  const provider = SPEECH_KEY_PROVIDER_NAMES[choice.place];
+  const provider = VOICE_KEY_PROVIDER_NAMES[choice.place];
   return choice.name.startsWith(`${provider} `) ? choice.name : `${provider} ${choice.name}`;
 }
 
@@ -97,7 +97,7 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
       ids: props.choices.filter((choice) => choice.place === place).map((choice) => choice.id),
     })).filter((group) => group.ids.length > 0);
   const groupName = (place: ModelPlace) =>
-    place === "local" ? t("settings.voice.model.group.local") : SPEECH_KEY_PROVIDER_NAMES[place];
+    place === "local" ? t("settings.voice.model.group.local") : VOICE_KEY_PROVIDER_NAMES[place];
   const phase = () => props.file?.status?.phase;
   const fileText = (): string | null => {
     const file = props.file;
@@ -190,7 +190,7 @@ function modelFullName(choice: ModelChoice<string> | undefined): string {
 }
 
 interface VoiceKeyRowProps {
-  provider: SpeechKeyProvider;
+  provider: VoiceKeyProvider;
   saved: boolean;
   /** Saves the key. The answer is false when main could not save it. */
   onSave: (key: string) => Promise<boolean>;
@@ -205,7 +205,7 @@ interface VoiceKeyRowProps {
 export function VoiceKeyRow(props: VoiceKeyRowProps) {
   const { t } = useText();
   const [key, setKey] = createStore({ draft: "", saving: false });
-  const provider = () => SPEECH_KEY_PROVIDER_NAMES[props.provider];
+  const provider = () => VOICE_KEY_PROVIDER_NAMES[props.provider];
   const label = () => t("settings.voice.apiKey.providerLabel", { provider: provider() });
   const save = async () => {
     const draft = key.draft.trim();

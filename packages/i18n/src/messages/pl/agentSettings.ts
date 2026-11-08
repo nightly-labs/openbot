@@ -203,6 +203,15 @@ export const messages = {
     "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
+  "agentSettings.deleteHistory.title": "Usuń historię",
+  "agentSettings.deleteHistory.description":
+    "Wiadomości tego czatu znikają, a agent o nich zapomina. Jego konfiguracja zostaje.",
+  "agentSettings.deleteHistory.button": "Usuń",
+  "agentSettings.deleteHistory.confirmTitle": "Usunąć historię czatu z {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
+  "agentSettings.deleteHistory.confirm": "Usuń historię",
+  "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",
   "agentSettings.fullAccess.askTitle": "Pozwolić temu agentowi pracować poza obszarem roboczym?",
   "agentSettings.fullAccess.description":

@@ -65,6 +65,7 @@ export const messages = {
     "Questa connessione non supporta una nuova conversazione né la compattazione in un canale.",
   "error.team.channelPictureUnsupported": "Le immagini dei canali non sono supportate da questa connessione.",
   "error.team.channelDeleteUnsupported": "L'eliminazione dei canali non è supportata da questa connessione.",
+  "error.team.historyDeleteUnsupported": "L'eliminazione della cronologia non è supportata da questa connessione.",
   "error.team.channelTaskCancelUnsupported":
     "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",
@@ -92,6 +93,8 @@ export const messages = {
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
   "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
+  "error.team.liveVoiceUnsupported":
+    "Questo server non supporta la voce dal vivo di Codex. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineFlowsUnsupported":
     "Questo server non supporta i flussi di routine. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineCanvasTooLarge":

@@ -65,9 +65,14 @@ class ProcessConfinementUnavailableError extends Error {
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 
+/** The state directory of the Grok CLI: `$GROK_HOME`, or `~/.grok`. */
+export function grokHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.GROK_HOME?.trim() || join(home, ".grok");
+}
+
 /** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
 export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const grokHome = env.GROK_HOME?.trim() || join(home, ".grok");
+  const grokHome = grokHomeDirectory(env, home);
   return {
     writable: [grokHome],
     protected: [
@@ -338,6 +343,63 @@ export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+/** The home folder of Mistral Vibe: `$VIBE_HOME`, or `~/.vibe`. */
+export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.VIBE_HOME?.trim() || join(home, ".vibe");
+}
+
+/**
+ * Mistral Vibe 3.1.0 writes its session logs, history, caches, locks and the folders that it trusts
+ * in its home folder. Its settings and MCP servers (`config.toml`), the saved API key (`.env`), the
+ * trusted folders, hooks, instructions, tools, skills, agents, prompts and plugins are in that folder
+ * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache is a
+ * settings layer, so it stays read-only too. On macOS the CLI reads the API key of a sign-in from the
+ * login Keychain with `security` (`keychainLockFiles`).
+ */
+export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const vibeHome = mistralHomeDirectory(env, home);
+  makeMistralTrustedFolders(vibeHome);
+  return {
+    writable: [vibeHome],
+    writableContents: keychainLockFiles(),
+    protected: [
+      "config.toml",
+      ".env",
+      "trusted_folders.toml",
+      "hooks.toml",
+      "AGENTS.md",
+      "tools",
+      "skills",
+      "skills.toml",
+      "skills-registry-cache",
+      "agents",
+      "prompts",
+      "plugins",
+      "projects.toml",
+      "local_projects.toml",
+      "managed_config_cache.json",
+      "connector_bootstrap_cache.json",
+    ].map((name) => join(vibeHome, name)),
+  };
+}
+
+/**
+ * At each start, Mistral Vibe 3.1.0 writes an empty `trusted_folders.toml` when the file is missing.
+ * When it cannot, it stops, and a confined process cannot write that file. Thus OpenBot makes the
+ * file when it is missing, with the same contents.
+ */
+function makeMistralTrustedFolders(vibeHome: string): void {
+  mkdirSync(vibeHome, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(join(vibeHome, "trusted_folders.toml"), "trusted = []\nuntrusted = []\n", {
+      flag: "wx",
+      mode: 0o600,
+    });
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
+}
+
 /** The folder of Devin's sign-in and sessions: `$XDG_DATA_HOME/devin`, on macOS too. */
 export function devinDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return join(env.XDG_DATA_HOME?.trim() || join(home, ".local", "share"), "devin");
@@ -504,6 +566,9 @@ const PROJECT_SETTINGS = [
   ".clinerules",
   // Kimi reads its project skills and instructions from `.kimi`.
   ".kimi",
+  // Mistral Vibe reads its project settings, MCP servers, hooks, tools, skills, agents and prompts
+  // from `.vibe`.
+  ".vibe",
   // Devin reads its project settings, MCP servers, hooks and skills from `.devin`, and Windsurf
   // rules and hooks from `.windsurf`.
   ".devin",

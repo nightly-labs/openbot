@@ -60,6 +60,7 @@ export const messages = defineMessages("error.team", {
     "This connection does not support a new conversation or compaction in a channel.",
   "error.team.channelPictureUnsupported": "Channel pictures are not supported by this connection.",
   "error.team.channelDeleteUnsupported": "Channel deletion is not supported by this connection.",
+  "error.team.historyDeleteUnsupported": "Deleting the history is not supported by this connection.",
   "error.team.channelTaskCancelUnsupported": "Cancelling channel tasks is not supported by this connection.",
   "error.team.membersCannotDeleteChannels": "Members cannot delete channels.",
   "error.team.membersCannotArchiveChannels": "Members cannot archive channels.",
@@ -84,6 +85,8 @@ export const messages = defineMessages("error.team", {
   "error.team.workspaceDirectoryUnsupported": "Showing folders is not supported by this connection.",
   "error.team.conversationFileSearchUnsupported": "Searching files is not supported by this connection.",
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
+  "error.team.liveVoiceUnsupported":
+    "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.routineCanvasTooLarge":

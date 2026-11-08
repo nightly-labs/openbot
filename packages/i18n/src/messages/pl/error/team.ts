@@ -60,6 +60,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "To połączenie nie obsługuje nowej rozmowy ani kompaktowania w kanale.",
   "error.team.channelPictureUnsupported": "To połączenie nie obsługuje obrazów kanałów.",
   "error.team.channelDeleteUnsupported": "To połączenie nie obsługuje usuwania kanałów.",
+  "error.team.historyDeleteUnsupported": "To połączenie nie obsługuje usuwania historii.",
   "error.team.channelTaskCancelUnsupported": "To połączenie nie obsługuje anulowania zadań kanałów.",
   "error.team.membersCannotDeleteChannels": "Członkowie nie mogą usuwać kanałów.",
   "error.team.membersCannotArchiveChannels": "Członkowie nie mogą archiwizować kanałów.",
@@ -84,6 +85,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "To połączenie nie obsługuje pokazywania folderów.",
   "error.team.conversationFileSearchUnsupported": "To połączenie nie obsługuje wyszukiwania plików.",
   "error.team.sideQuestionUnsupported": "To połączenie nie obsługuje pytań pobocznych.",
+  "error.team.liveVoiceUnsupported":
+    "Ten serwer nie obsługuje głosu na żywo Codex. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.routineFlowsUnsupported":
     "Ten serwer nie obsługuje przepływów rutyn. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.routineCanvasTooLarge":

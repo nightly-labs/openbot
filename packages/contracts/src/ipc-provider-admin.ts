@@ -197,6 +197,7 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       kimi: decodeLaterRuntime(providers.kimi),
       devin: decodeLaterRuntime(providers.devin),
       copilot: decodeLaterRuntime(providers.copilot),
+      mistral: decodeLaterRuntime(providers.mistral),
       pi: decodeLaterRuntime(providers.pi),
       muse: decodeLaterRuntime(providers.muse),
       // Only a `providers-v8` host that can install Hermes sends a Hermes row. Without one the row

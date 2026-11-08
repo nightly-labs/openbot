@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Mesajı yönlendir",
   "queue.item.steering": "Yönlendiriliyor",
   "queue.item.steer": "Yönlendir",
+  "queue.item.sendNowLabel": "Ajanı durdur ve sıradaki {position}. mesajı şimdi gönder",
+  "queue.item.sendNowTooltip": "Ajanı durdur ve bu mesajı şimdi gönder",
+  "queue.item.sendNow": "Şimdi gönder",
   "queue.item.notSteered": "Yönlendirilmedi",
   "queue.item.steerFallback.providerUnsupported":
     "Bu sağlayıcı çalışan bir turu yönlendiremez, bu yüzden mesaj kuyrukta bekler.",

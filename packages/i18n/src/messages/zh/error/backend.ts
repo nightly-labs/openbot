@@ -69,6 +69,7 @@ export const messages = {
   "error.backend.channelMemberUnavailable": "有频道成员不可用。",
   "error.backend.channelWaitBeforeNewConversation": "请等此频道中的工作停止后再开始新对话。",
   "error.backend.channelWaitBeforeCompact": "请等此频道中的工作停止后再压缩。",
+  "error.backend.channelWaitBeforeDeleteHistory": "请等此频道中的工作停止后再删除其历史记录。",
   "error.backend.channelCompactUnavailable":
     "此频道现在没有成员可以压缩上下文。成员必须先在频道中回答,且其提供方必须支持压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
@@ -300,6 +301,7 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "代理 {name} 没有响应，因此页面没有打开。",
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
+  "error.backend.browserCertificateUntrusted": "此网站的安全证书不受信任，因此页面没有打开。",
   "error.backend.browserLowMemory": "该服务器内存不足，浏览器无法再打开标签页。请关闭一个标签页，或等其他助手结束。",
   "error.backend.browserOpenFailed": "无法打开 {url}：{reason}",
   "error.backend.popupSecureInput": "安全输入期间弹窗被阻止。请完成或取消安全输入，再从页面重试。",

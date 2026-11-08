@@ -232,6 +232,8 @@ export interface AgentMessage {
   itemIds?: string[];
   /** When the host wrote each of `items`, to place them between a turn's progress lines. */
   itemCreatedAt?: string[];
+  /** Whether the host still writes each of `items`. */
+  itemStreaming?: boolean[];
   plan?: AgentMessagePlan | undefined;
   /** The subagents that the agent started in this turn, on a `subagents` message. */
   subagents?: ConversationSubagent[] | undefined;

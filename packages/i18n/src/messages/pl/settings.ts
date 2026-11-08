@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "Beżowy",
   "settings.logoColor.gray": "Szary",
   "settings.logoColor.white": "Biały",
+  "settings.chatBackground.title": "Tło czatu",
+  "settings.chatBackground.description":
+    "Każdy motyw ma własny kolor. Kolor, przy którym tekst trudno czytać, staje się ciemniejszy lub jaśniejszy.",
+  "settings.chatBackground.light": "Tło czatu w motywie Jasny",
+  "settings.chatBackground.dark": "Tło czatu w motywie Ciemny",
+  "settings.chatBackground.default": "Domyślne",
   "settings.chatColor.title": "Kolor czatu",
   "settings.chatColor.description": "Barwi dymki twoich wiadomości. Widzą go też osoby na twoich serwerach.",
   "settings.chatColor.yours": "Twój kolor czatu",
@@ -63,6 +69,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "Nie usypiaj komputera także na baterii. Bateria rozładuje się szybciej.",
   "settings.restoreWorkspace.title": "Przywracaj ostatni obszar roboczy po uruchomieniu",
   "settings.restoreWorkspace.description": "Otwieraj obszar roboczy i zadania z poprzedniej sesji.",
+  "settings.quitGuard.title": "Przytrzymaj ⌘Q, aby zamknąć",
+  "settings.quitGuard.description":
+    "Przytrzymaj ⌘Q lub naciśnij dwa razy, aby zamknąć. Przy „Nigdy” jedno ⌘Q zamyka aplikację i zatrzymuje agentów.",
+  "settings.quitGuard.working": "Gdy agenci pracują",
+  "settings.quitGuard.always": "Zawsze",
+  "settings.quitGuard.never": "Nigdy",
   "settings.externalLinks.title": "Otwieraj linki zewnętrzne w",
   "settings.externalLinks.description": "Tu otwierają się linki z czatów, stron logowania i płatności.",
   "settings.externalLinks.defaultBrowser": "Przeglądarka",
@@ -89,7 +101,7 @@ export const messages = {
     "Pokazuje Reaguj, Odpowiedz i Więcej obok wiadomości, a godzinę między wiadomościami. Gdy jest wyłączone, wszystkie akcje i godzina są pod każdą wiadomością.",
   "settings.busyMessage.title": "Kieruj agentami podczas pracy",
   "settings.busyMessage.description":
-    "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. Działa z ChatGPT i Claude.",
+    "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. W przypadku agentów, które tego nie obsługują, czekają w kolejce.",
   "settings.agentDefaults.title": "Domyślne",
   "settings.agentDefaults.description": "Agenci stosują te ustawienia, chyba że zmienisz je dla agenta.",
   "settings.agentDefaults.value": "Domyślnie: {value}",
@@ -248,7 +260,7 @@ export const messages = {
   "settings.tab.notifications.description": "Wybierz, jak OpenBot cię powiadamia.",
   "settings.tab.voice.title": "Głos",
   "settings.tab.voice.description":
-    "Dyktowanie w polu wiadomości. Modele lokalne działają na tym komputerze, a ElevenLabs w chmurze.",
+    "Dyktowanie w polu wiadomości. Modele lokalne działają na tym komputerze, a ElevenLabs i Groq w chmurze.",
   "settings.tab.computerUse.title": "Sterowanie PC",
   "settings.tab.computerUse.description":
     "Pozwól agentom OpenBot na tym komputerze widzieć jego aplikacje i ich używać. Agenci na innym serwerze używają komputera tego serwera.",
@@ -639,6 +651,10 @@ export const messages = {
   "settings.voice.removeFailed": "Nie udało się usunąć modelu. Spróbuj ponownie.",
   "settings.voice.model.elevenlabs.description":
     "Przesyła twój głos do ElevenLabs. Tekst pojawia się w trakcie mówienia i się nie zmienia. Używa twojego klucza API, a ElevenLabs nalicza opłatę za każde użycie.",
+  "settings.voice.model.groqTurbo.description":
+    "Wysyła każde nagranie do Groq po zatrzymaniu. Szybki i obsługuje wiele języków. Używa twojego klucza API, a Groq nalicza opłatę za każde użycie.",
+  "settings.voice.model.groqLarge.description":
+    "Wysyła każde nagranie do Groq po zatrzymaniu. Dokładniejszy niż turbo, ale wolniejszy. Używa twojego klucza API, a Groq nalicza opłatę za każde użycie.",
   "settings.voice.apiKey.placeholder": "Wklej klucz",
   "settings.voice.apiKey.save": "Zapisz klucz",
   "settings.voice.apiKey.remove": "Usuń klucz",

@@ -58,6 +58,8 @@ export interface ChatMessageRowProps {
   /** Opens a folded long message, as its "Show full message" button does. The reader can fold it again. */
   open?: boolean | undefined;
   animate?: boolean;
+  /** An entering agent message shows its text at once instead of fading its words in. */
+  textAtOnce?: boolean | undefined;
   agents: AgentProfile[];
   skills?: InstalledSkill[] | undefined;
   referencedMessage?: AgentMessage | undefined;
@@ -207,7 +209,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       frame={frame}
       showFull={props.showFull}
       open={props.open}
-      animate={props.animate}
+      animate={props.animate === true && props.textAtOnce !== true}
       message={props.message}
       referencedMessage={props.referencedMessage}
       referencedAuthorName={props.referencedAuthorName}

@@ -16,7 +16,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Result, Schema, Semaphore } from "effect";
+import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -50,6 +50,7 @@ import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDec
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import { readCodexMcpConfig } from "./codex-mcp-config";
+import { type CodexPromptSettings, codexPromptSettings } from "./codex-prompt-settings";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById } from "./delivery-content";
@@ -70,7 +71,7 @@ import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
-import { VISIBLE_DYNAMIC_TOOLS } from "./tool-catalog";
+import { visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
   type PromptInstructionsFile,
@@ -107,7 +108,7 @@ const logger = createOpenBotLogger("thread-lifecycle");
 const CODEX_MCP_ADAPTER_VERSION = 10;
 
 /** What a provider other than Codex, or a Codex with no file to read, has in its own files. */
-const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {} };
+const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {}, read: null };
 
 /**
  * Providers whose client starts its process again with the MCP servers and skills of that moment
@@ -158,7 +159,7 @@ const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
  * direct because from `exec` a model often reads `result.content` instead of `generatedImage(result)`:
  * it then sees no image and tells the user that the image failed, although the chat shows it.
  */
-const CODEX_DIRECT_ONLY_NAMESPACES = [...VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name), "image_gen"];
+const CODEX_DIRECT_ONLY_NAMESPACES = [...visibleDynamicTools("codex").map((namespace) => namespace.name), "image_gen"];
 
 /** The provider switch waits for the capture, so its read is short. */
 const CAPTURE_READ_TIMEOUT_MS = 10_000;
@@ -248,6 +249,12 @@ export class ThreadLifecycle {
   readonly #routineThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   /**
+   * The section-mates and the saved-logins state that each loaded session got at its start or resume,
+   * for a client with `turnContext`. A change does not change the tool fingerprint, so the next turn
+   * resumes the session to give the new state to the turn context, as a memory change does.
+   */
+  readonly #givenTurnContext = new Map<string, string>();
+  /**
    * Routine digests and the cleanup after a turn change a handoff one at a time. A routine thread
    * runs beside the chat, so its digest can arrive while a chat turn starts with the handoff.
    */
@@ -264,6 +271,11 @@ export class ThreadLifecycle {
   readonly #pendingStarts = new Map<string, number>();
   /** The starts of `#pendingStarts` that are not in a side thread: they hold the agent's own chat. */
   readonly #pendingMainStarts = new Map<string, number>();
+  /**
+   * The idle releases whose `thread/unsubscribe` is in flight. A resume of the same session waits
+   * for it: a resume that went first would be undone by the unsubscribe after it.
+   */
+  readonly #idleReleases = new Map<string, Deferred.Deferred<void>>();
 
   constructor(options: ThreadLifecycleOptions) {
     this.#store = options.store;
@@ -502,7 +514,10 @@ export class ThreadLifecycle {
         });
         return replacement;
       }
-      if (this.#conversation.loadedClientFor(session.externalSessionId) !== client) {
+      if (
+        this.#conversation.loadedClientFor(session.externalSessionId) !== client ||
+        this.#turnContextChanged(currentAgent, client, session.externalSessionId)
+      ) {
         const resumed = yield* Effect.result(this.resumeThread(currentAgent, client, session.externalSessionId));
         if (Result.isFailure(resumed)) {
           if (!isMissingProviderSessionError(resumed.failure.cause, client.provider)) return yield* resumed.failure;
@@ -540,6 +555,62 @@ export class ThreadLifecycle {
         else count.delete(agentId);
       }
     };
+  }
+
+  /**
+   * Unloads an idle session from its client, to free the processes and MCP servers that the client
+   * holds for it, and keeps the session: its next turn resumes it in `ensureThread`. The result is
+   * `held` when something still needs the session, and `gone` when this client does not hold a
+   * session that can resume.
+   *
+   * `held` adds the checks that the caller owns, such as a pending approval. The routing is dropped
+   * in the same step as the last check, before the release yields, so a start after it sees an
+   * unloaded session and resumes it when the release is done.
+   */
+  readonly releaseIdleSession = Effect.fn("ThreadLifecycle.releaseIdleSession")(function* (
+    this: ThreadLifecycle,
+    externalThreadId: string,
+    client: AgentClient,
+    held: (agentId: string) => boolean,
+  ) {
+    const before = this.#idleSessionState(externalThreadId, client, held);
+    if (before !== "idle") return before;
+    if (!client.holdsBackgroundWork || !client.releaseThread) return "held";
+    const background = yield* Effect.result(client.holdsBackgroundWork(externalThreadId));
+    // A failed check keeps the session: the release could end a terminal that the check did not see.
+    if (Result.isFailure(background) || background.success) return "held";
+    const after = this.#idleSessionState(externalThreadId, client, held);
+    if (after !== "idle") return after;
+    const released = Deferred.makeUnsafe<void>();
+    this.#idleReleases.set(externalThreadId, released);
+    this.#conversation.unloadThread(externalThreadId);
+    yield* this.#releaseProviderSession(externalThreadId, client, true);
+    this.#idleReleases.delete(externalThreadId);
+    yield* Deferred.succeed(released, undefined);
+    return "released";
+  }, Effect.uninterruptible).bind(this);
+
+  #idleSessionState(
+    externalThreadId: string,
+    client: AgentClient,
+    held: (agentId: string) => boolean,
+  ): "idle" | "held" | "gone" {
+    if (this.#conversation.loadedClientFor(externalThreadId) !== client) return "gone";
+    const agentId = this.#conversation.agentForThread(externalThreadId);
+    // A routine session is ephemeral: no rollout is kept to resume it from.
+    if (!agentId || this.#conversation.isRoutineSession(externalThreadId)) return "gone";
+    const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    const session = this.#store.database.activeProviderSession(publicThreadId, client.provider);
+    if (session?.externalSessionId !== externalThreadId) return "gone";
+    if (
+      held(agentId) ||
+      this.#pendingStarts.has(agentId) ||
+      !this.#compaction.mayDrain(agentId) ||
+      this.#mailbox.startingDeliveriesForAgent(agentId).length > 0 ||
+      this.#activeTurnOf(agentId, publicThreadId) !== null
+    )
+      return "held";
+    return "idle";
   }
 
   readonly startProviderThread = Effect.fn("ThreadLifecycle.startProviderThread")(function* (
@@ -602,6 +673,7 @@ export class ThreadLifecycle {
     yield* this.#releaseProviderSession(externalThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
+    this.#givenTurnContext.delete(externalThreadId);
     this.#compaction.forgetThread(externalThreadId);
     this.#pendingHandoffs.delete(externalThreadId);
   }, Effect.uninterruptible).bind(this);
@@ -674,7 +746,6 @@ export class ThreadLifecycle {
     const own = yield* this.codexOwnServersEffect(client, mcpServers, toolRuntimes);
     // The same single reading, so the manifest records the variables this session was started with.
     const environment = this.#agentEnvironment();
-    // The same single reading, so the manifest records the section-mates these instructions name.
     const section = this.#sectionTeammates(agent.id);
     // Read before the configuration, which starts the same listener: both see one port.
     const proxy = client.provider === "codex" ? yield* this.#proxyFingerprint(mcpServers) : null;
@@ -703,9 +774,9 @@ export class ThreadLifecycle {
         instructionsFile,
       ),
       serviceName: "openbot",
-      dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+      dynamicTools: visibleDynamicTools(client.provider),
     };
-    return { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params };
+    return { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params };
   });
 
   readonly #startProviderThread = Effect.fn("ThreadLifecycle.prepareProviderThread")(function* (
@@ -715,7 +786,9 @@ export class ThreadLifecycle {
     publicThreadId: string,
     reason?: "configuration-change" | "missing-session",
   ) {
-    const { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params } =
+    // Read before the params: a change that lands after it then resumes the session at the next turn.
+    const givenContext = this.#turnContextKey(owner);
+    const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
@@ -743,17 +816,7 @@ export class ThreadLifecycle {
           const approvals = this.#toolApprovals(mcpServers, own);
           yield* this.#writeToolManifest(
             externalThreadId,
-            this.toolFingerprint(
-              agent,
-              mcpServers,
-              own,
-              approvals,
-              toolRuntimes,
-              environment,
-              section,
-              proxy,
-              instructionsFile,
-            ),
+            this.toolFingerprint(agent, mcpServers, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
             approvals,
           );
         }
@@ -797,6 +860,7 @@ export class ThreadLifecycle {
         });
       return yield* prepared.failure;
     }
+    this.#rememberTurnContext(client, externalThreadId, givenContext);
     this.#conversation.bindThread(externalThreadId, agent.id, publicThreadId);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
@@ -889,7 +953,8 @@ export class ThreadLifecycle {
         "features.goals": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
-      } & ReturnType<typeof codexSandboxConfig>;
+      } & CodexPromptSettings &
+        ReturnType<typeof codexSandboxConfig>;
     },
     ThreadOperationFailed
   > {
@@ -905,6 +970,7 @@ export class ThreadLifecycle {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
         ...CODEX_FEATURES_CONFIG,
+        ...codexPromptSettings(own.read),
         // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
         // script can be longer, and Codex would drop its end.
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
@@ -997,10 +1063,9 @@ export class ThreadLifecycle {
    * of a resumed session. It holds paths only. It is added only when it is not empty, so a
    * computer with no GitHub connection keeps the fingerprints it had.
    *
-   * The section-mates go in for the same reason as the profile: they are in the instructions. Only
-   * their sorted ids go in, so a reorder or a rename in the section does not drop the history of
-   * each agent in it; a member who joins or leaves does. An agent with no section adds no value and
-   * keeps its fingerprint.
+   * The section-mates and the memories stay out: they go with the turns (`turnContext`), so a change
+   * keeps the session. `legacySection` gives the fingerprint of a session from before that change,
+   * which had the sorted ids of its section-mates: `hasCurrentToolsEffect` accepts it once.
    *
    * The OAuth proxy goes in for the same reason as the MCP set: a session keeps the proxy address it
    * was given, and a row that gains a sign-in moves from its own URL to a proxy route. Only a set
@@ -1013,16 +1078,16 @@ export class ThreadLifecycle {
     approvals: CodexToolApprovals,
     toolRuntimes: McpToolRuntimes,
     environment: Readonly<Record<string, string>>,
-    section: SectionTeammates | null,
     proxy: string | null,
     instructionsFile: InstructionsFileInPrompt,
+    legacySection: SectionTeammates | null = null,
   ): string {
     const folders = existingAgentFolders(agent);
     const excluded = workspaceExcludedFolders(agent);
     return createHash("sha256")
       .update(
         JSON.stringify([
-          VISIBLE_DYNAMIC_TOOLS,
+          visibleDynamicTools(agent.provider),
           mcpFingerprintValues(configs),
           Object.keys(disabled).sort(),
           // A revoked approval must also replace a loaded session with the old tool policy.
@@ -1044,7 +1109,7 @@ export class ThreadLifecycle {
             ...(agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults()) ? ["quick-acknowledgement"] : []),
           ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
-          ...(section ? [section.members.map((member) => member.id).sort()] : []),
+          ...(legacySection ? [legacySection.members.map((member) => member.id).sort()] : []),
           ...(proxy ? [proxy] : []),
           // A loaded session keeps the instruction file that it read or got at its start, so a change
           // to the file adds a new value. Only another file name, or a file with text, adds a value.
@@ -1091,6 +1156,23 @@ export class ThreadLifecycle {
    */
   #sessionAgent(agent: AgentSummary, publicThreadId: string): AgentSummary {
     return this.#computerUseInOwnChat(agent, publicThreadId) ? { ...agent, computerUse: false } : agent;
+  }
+
+  /**
+   * What the turn context gets apart from the memories: the section-mates (names, titles and order
+   * count) and whether saved logins are shared.
+   */
+  #turnContextKey(agent: AgentSummary): string {
+    return JSON.stringify([this.#sectionTeammates(agent.id), this.#passwordVaultConnected()]);
+  }
+
+  #rememberTurnContext(client: AgentClient, externalThreadId: string, key: string): void {
+    if (client.turnContext === true) this.#givenTurnContext.set(externalThreadId, key);
+  }
+
+  #turnContextChanged(agent: AgentSummary, client: AgentClient, externalThreadId: string): boolean {
+    const given = this.#givenTurnContext.get(externalThreadId);
+    return client.turnContext === true && given !== undefined && given !== this.#turnContextKey(agent);
   }
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
@@ -1155,10 +1237,34 @@ export class ThreadLifecycle {
     const instructionsFile = yield* this.#instructionsFile(agent, client);
     const newline = stored.success.indexOf("\n");
     const storedFingerprint = newline < 0 ? stored.success : stored.success.slice(0, newline);
+    // Also the form of a session from before the section-mates went with the turns, with their ids.
+    // That session keeps the old list in its instructions, and its first turn sends the current one.
+    const matches = (sessionApprovals: CodexToolApprovals, sections: readonly (SectionTeammates | null)[]) =>
+      threadStep(() =>
+        sections.some(
+          (legacySection) =>
+            storedFingerprint ===
+            this.toolFingerprint(
+              agent,
+              configs,
+              own,
+              sessionApprovals,
+              toolRuntimes,
+              environment,
+              proxy,
+              instructionsFile,
+              legacySection,
+            ),
+        ),
+      );
     const fingerprint = yield* threadStep(() =>
-      this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, instructionsFile),
+      this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
     );
     if (storedFingerprint === fingerprint) return true;
+    if (section && (yield* matches(approvals, [section]))) {
+      yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
+      return true;
+    }
     if (newline < 0) return false;
     // An approval given since the start is in the loaded session already: Codex saved it from that
     // session's answer. Only a revoked one needs a new session. The manifest takes the new approvals,
@@ -1167,28 +1273,15 @@ export class ThreadLifecycle {
       decodeToolApprovals(JSON.parse(stored.success.slice(newline + 1))),
     ).pipe(Effect.orElseSucceed(() => null));
     if (!sessionApprovals || approvalRevoked(sessionApprovals, approvals)) return false;
-    const sessionFingerprint = yield* threadStep(() =>
-      this.toolFingerprint(
-        agent,
-        configs,
-        own,
-        sessionApprovals,
-        toolRuntimes,
-        environment,
-        section,
-        proxy,
-        instructionsFile,
-      ),
-    );
-    if (storedFingerprint !== sessionFingerprint) return false;
+    if (!(yield* matches(sessionApprovals, section ? [null, section] : [null]))) return false;
     yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
     return true;
   });
 
   /**
-   * The developer instructions of a session start or resume, with what is connected now. Claude
-   * gets the memories and the section-mates apart, and its client sends them with the turns: see
-   * `memoriesInTurns`. A change in the system prompt writes the full conversation to the cache again.
+   * The developer instructions of a session start or resume, with what is connected now. A client
+   * with `turnContext` gets the memories and the section-mates apart, and sends them with the turns:
+   * see `memoriesInTurns`. A change in the system prompt writes the full conversation to the cache again.
    */
   #instructions(
     agent: AgentSummary,
@@ -1210,8 +1303,9 @@ export class ThreadLifecycle {
       responseStyle: this.#responseStyle(),
       memoryLimit: this.#memories.limit(),
       storedMemoryCount: this.#memories.listFor(agent.id).length,
-      memoriesInTurns: client.provider === "claude",
-      teammatesInTurns: client.provider === "claude",
+      memoriesInTurns: client.turnContext === true,
+      teammatesInTurns: client.turnContext === true,
+      savedLoginsInTurns: client.turnContext === true,
       sectionTeammates: section,
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
@@ -1233,7 +1327,9 @@ export class ThreadLifecycle {
           developerInstructions: instructions,
           memoryContext: memoryContext(memories, options),
           sectionTeammates: section,
-          ...(options.responseStyle === "natural" ? { turnStyleReminder: true } : {}),
+          savedLogins: options.passwordVault,
+          // Measured for Claude only: deep in a long thread, it skipped the natural style's first line.
+          ...(options.responseStyle === "natural" && client.provider === "claude" ? { turnStyleReminder: true } : {}),
         }
       : { developerInstructions: instructions };
   }
@@ -1310,7 +1406,7 @@ export class ThreadLifecycle {
         configs,
         yield* this.#instructionsFile(agent, client),
       ),
-      ...(client.provider === "codex" ? {} : { dynamicTools: VISIBLE_DYNAMIC_TOOLS }),
+      ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),
       ...(yield* this.codexConfigEffect(
         agent,
         client,
@@ -1328,7 +1424,10 @@ export class ThreadLifecycle {
     client: AgentClient,
     externalThreadId: string,
   ) {
+    const releasing = this.#idleReleases.get(externalThreadId);
+    if (releasing) yield* Deferred.await(releasing);
     this.#conversation.bindThread(externalThreadId, agent.id);
+    const givenContext = this.#turnContextKey(agent);
     const params = yield* this.threadParams(agent, client, externalThreadId);
     const resumed = yield* Effect.result(
       client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed),
@@ -1340,6 +1439,7 @@ export class ThreadLifecycle {
         .pipe(toThreadOperationFailed);
       yield* client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed);
     }
+    this.#rememberTurnContext(client, externalThreadId, givenContext);
     this.#conversation.markThreadLoaded(externalThreadId, client);
   }).bind(this);
 
@@ -1410,6 +1510,7 @@ export class ThreadLifecycle {
     this.#store.database.deactivateProviderSessions(publicThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
+    this.#givenTurnContext.delete(externalThreadId);
     this.#compaction.forgetThread(externalThreadId);
     this.#pendingHandoffs.delete(externalThreadId);
   }
@@ -1551,7 +1652,7 @@ export class ThreadLifecycle {
     const sessions = this.#store.database.listProviderSessions(threadId).filter((one) => one.state === "active");
     if (reloadProvider && sessions.length > 0 && sessions.every((one) => one.provider === reloadProvider)) {
       for (const session of sessions) {
-        yield* this.#releaseProviderSession(session.externalSessionId);
+        yield* this.#releaseProviderSession(session.externalSessionId, undefined, true);
         this.#conversation.unloadThread(session.externalSessionId);
       }
       return;
@@ -1578,10 +1679,12 @@ export class ThreadLifecycle {
     this: ThreadLifecycle,
     externalThreadId: string,
     client: AgentClient | undefined = this.#conversation.openClientFor(externalThreadId),
+    resumes = false,
   ) {
+    this.#givenTurnContext.delete(externalThreadId);
     if (!client?.releaseThread) return;
     yield* client
-      .releaseThread(externalThreadId)
+      .releaseThread(externalThreadId, resumes)
       .pipe(
         Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
       );

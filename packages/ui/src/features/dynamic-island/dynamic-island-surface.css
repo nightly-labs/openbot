@@ -403,6 +403,11 @@
   border-top-color: currentColor;
 }
 
+/* The island is above every app all day. Its spinner turns only while the user looks at it. */
+.openbot-dynamic-island-transition-root[data-ambient-motion="paused"] .ui-spinner {
+  animation-play-state: paused;
+}
+
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-surface-compact-name {
   opacity: 0;
 }

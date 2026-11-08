@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grigio",
   "settings.logoColor.white": "Bianco",
+  "settings.chatBackground.title": "Sfondo della chat",
+  "settings.chatBackground.description":
+    "Ogni tema mantiene il proprio colore. Un colore che rende il testo difficile da leggere diventa più scuro o più chiaro.",
+  "settings.chatBackground.light": "Sfondo della chat nel tema Chiaro",
+  "settings.chatBackground.dark": "Sfondo della chat nel tema Scuro",
+  "settings.chatBackground.default": "Predefinito",
   "settings.chatColor.title": "Colore della chat",
   "settings.chatColor.description": "Colora le bolle dei tuoi messaggi. Anche le persone sui tuoi server lo vedono.",
   "settings.chatColor.yours": "Il tuo colore della chat",
@@ -65,6 +71,12 @@ export const messages = {
     "Mantieni il computer attivo anche a batteria. La batteria si scarica più in fretta.",
   "settings.restoreWorkspace.title": "Ripristina l'ultimo workspace all'avvio",
   "settings.restoreWorkspace.description": "Apri il workspace e le attività della sessione precedente.",
+  "settings.quitGuard.title": "Tieni premuto ⌘Q per uscire",
+  "settings.quitGuard.description":
+    "Tieni premuto ⌘Q o premilo due volte per uscire. Con «Mai», un solo ⌘Q esce e ferma gli agenti.",
+  "settings.quitGuard.working": "Mentre gli agenti lavorano",
+  "settings.quitGuard.always": "Sempre",
+  "settings.quitGuard.never": "Mai",
   "settings.externalLinks.title": "Apri i link esterni in",
   "settings.externalLinks.description": "I link nelle chat, nelle pagine di accesso e di fatturazione si aprono qui.",
   "settings.externalLinks.defaultBrowser": "Browser predefinito",
@@ -90,7 +102,7 @@ export const messages = {
     "Mostra Reagisci, Rispondi e Altro accanto a un messaggio e l’ora tra i messaggi. Se disattivato, tutte le azioni e l’ora compaiono sotto ogni messaggio.",
   "settings.busyMessage.title": "Indirizza gli agenti mentre lavorano",
   "settings.busyMessage.description":
-    "I nuovi messaggi si uniscono al lavoro in corso dell'agente, non alla coda. Funziona con ChatGPT e Claude.",
+    "I nuovi messaggi si uniscono al lavoro in corso dell'agente, non alla coda. Con gli agenti che non lo supportano, restano in coda.",
   "settings.agentDefaults.title": "Predefiniti",
   "settings.agentDefaults.description":
     "Gli agenti seguono queste impostazioni, a meno che tu non le cambi per un agente.",
@@ -247,7 +259,7 @@ export const messages = {
   "settings.tab.notifications.description": "Scegli come OpenBot ti avvisa.",
   "settings.tab.voice.title": "Voce",
   "settings.tab.voice.description":
-    "Dettatura nella casella del messaggio. I modelli locali funzionano su questo computer; ElevenLabs funziona nel cloud.",
+    "Dettatura nella casella del messaggio. I modelli locali funzionano su questo computer; ElevenLabs e Groq funzionano nel cloud.",
   "settings.tab.computerUse.title": "Controllo PC",
   "settings.tab.computerUse.description":
     "Consenti agli agenti dell'OpenBot di questo computer di vedere e usare le sue app. Gli agenti su un altro server usano il computer di quel server.",
@@ -611,6 +623,10 @@ export const messages = {
   "settings.voice.removeFailed": "Impossibile rimuovere il modello. Riprova.",
   "settings.voice.model.elevenlabs.description":
     "Invia la tua voce in streaming a ElevenLabs. Il testo compare mentre parli e non cambia più. Usa la tua chiave API, ed ElevenLabs addebita ogni utilizzo.",
+  "settings.voice.model.groqTurbo.description":
+    "Invia ogni registrazione a Groq quando ti fermi. Veloce e con molte lingue. Usa la tua chiave API, e Groq addebita ogni utilizzo.",
+  "settings.voice.model.groqLarge.description":
+    "Invia ogni registrazione a Groq quando ti fermi. Più preciso di turbo, ma più lento. Usa la tua chiave API, e Groq addebita ogni utilizzo.",
   "settings.voice.apiKey.placeholder": "Incolla la chiave",
   "settings.voice.apiKey.save": "Salva chiave",
   "settings.voice.apiKey.remove": "Rimuovi chiave",

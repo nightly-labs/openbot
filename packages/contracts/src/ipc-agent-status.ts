@@ -171,6 +171,7 @@ export type AgentAuthState =
   | { kind: "kimi"; email: string | null }
   | { kind: "devin"; email: string | null }
   | { kind: "copilot"; email: string | null }
+  | { kind: "mistral"; email: string | null }
   | { kind: "pi"; email: string | null }
   | { kind: "muse"; email: string | null }
   | { kind: "inception"; email: string | null }

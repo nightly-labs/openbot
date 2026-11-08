@@ -1,4 +1,4 @@
-import type { BrowserTakeoverRequest, CentralAuthUser } from "@openbot/contracts/ipc";
+import type { AgentStatus, BrowserTakeoverRequest, CentralAuthUser } from "@openbot/contracts/ipc";
 import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
@@ -17,6 +17,7 @@ import {
   serverSendsWebhookTests,
   serverSetsWebhookSenderSecret,
 } from "../servers/server-capabilities";
+import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -93,13 +94,18 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     takeovers,
     hiddenAgentIds: userHiddenAgentIds,
   });
+  // A named function, not a ternary in the prop: the compiler makes a memo for a ternary, and the
+  // composer reads this prop in an effect, where Solid cannot make a memo.
+  const shownAgentStatus = (): AgentStatus =>
+    scope.loaded() ? agentStatus() : { ...agentStatus(), phase: "starting" };
+  const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
   return (
     <Conversation
       channel={view.source}
       notice={<ChannelErrorNotice />}
       platform={platform.appInfo()?.platform}
       connectors={connectors.active}
-      agentStatus={scope.loaded() ? agentStatus() : { ...agentStatus(), phase: "starting" }}
+      agentStatus={shownAgentStatus()}
       agent={undefined}
       agents={agentList()}
       mentionAgents={view.mentionAgents()}
@@ -117,6 +123,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       workspaceCovered={windowPage.conversationCovered()}
       browserControlState={browserControlState()}
       server={activeServer()}
+      responseStyle={responseStyle()}
       presence={teamPresence()}
       currentUserEmail={props.account().email}
       isOwnSender={isOwnSender}

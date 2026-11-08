@@ -34,6 +34,15 @@ export const messages = {
   "channel.settings.compact.description":
     "I membri conservano un breve riepilogo della sessione del canale e usano meno token.",
   "channel.settings.compact.failed": "Impossibile compattare il contesto del canale.",
+  "channel.settings.deleteHistory.title": "Elimina cronologia",
+  "channel.settings.deleteHistory.description":
+    "I messaggi vengono eliminati e i membri li dimenticano. La configurazione del canale resta.",
+  "channel.settings.deleteHistory.button": "Elimina",
+  "channel.settings.deleteHistory.confirmTitle": "Eliminare la cronologia di {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Tutti i messaggi e i file di questo canale vengono eliminati da OpenBot e i membri li dimenticano. Non puoi annullare. Membri, istruzioni, memorie, routine e attività non cambiano.",
+  "channel.settings.deleteHistory.confirm": "Elimina cronologia",
+  "channel.settings.deleteHistory.failed": "Impossibile eliminare la cronologia.",
   "channel.settings.routines": "Routine",
   "channel.settings.routineCount": { one: "{count} configurata", other: "{count} configurate" },
   "channel.create.close": "Chiudi il nuovo canale",

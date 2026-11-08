@@ -34,6 +34,7 @@ const meta = {
     maxWidth: () => 640,
     onClose: fn(),
     onStartNewChat: fn(async () => {}),
+    onDeleteHistory: fn(async () => {}),
     onResize: fn(),
     onResizeEnd: fn(),
     onUpdateAgent: fn(async () => undefined),

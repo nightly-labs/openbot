@@ -949,6 +949,14 @@ export class ConversationRuntime {
     return this.#snapshots.get(agentId);
   }
 
+  /**
+   * After "Delete history" of the agent's own chat: the next read of the deleted ids comes from the
+   * database, which now holds every message of the thread. The caller replaces the snapshot.
+   */
+  forgetDeletedHistory(threadId: string): void {
+    this.#deletedMessageIds.delete(threadId);
+  }
+
   clearLoadedThreads(): void {
     this.#loadedThreads.clear();
     this.#unloadedThreads.clear();

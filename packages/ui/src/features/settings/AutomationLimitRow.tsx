@@ -34,7 +34,9 @@ export interface AutomationLimitRowProps {
  */
 export function AutomationLimitRow(props: AutomationLimitRowProps) {
   const { t, format } = useText();
-  const options = createMemo(() => choices(props.value));
+  // A new options array makes the Select report its value again, so the array changes only with the limit.
+  const value = createMemo(() => props.value);
+  const options = createMemo(() => choices(value()));
   const choiceText = (limit: number) => t("settings.automationLimit.option", { limit: format.number(limit) });
 
   return (
@@ -49,7 +51,8 @@ export function AutomationLimitRow(props: AutomationLimitRowProps) {
           value={props.value}
           placement="bottom-end"
           onChange={(next) => {
-            if (next !== null) props.onChange(next);
+            // The Select also reports the current value. Saving it again would start a loop (#5614).
+            if (next !== null && next !== props.value) props.onChange(next);
           }}
           itemComponent={(item) => <SelectItem item={item.item}>{choiceText(item.item.rawValue)}</SelectItem>}
         >

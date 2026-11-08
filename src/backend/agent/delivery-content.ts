@@ -282,23 +282,20 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
     const replyProtocol = delivery.replyToMessageId
       ? [
-          "This is a reply to a message you sent earlier.",
-          "Surface or summarize the result naturally for the user, and start with the name of the teammate.",
-          "When the reply reports partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate, and do not repeat a failed call unchanged. Give the user the blocker and the action from its Unblock line only when the user must act. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
-          "Reply to the teammate only when the message requests another action, or when you have new information that unblocks its work. Do not send it the same request again. Otherwise do not send an acknowledgement and avoid reply loops.",
+          "This replies to a message you sent. Give the result to the user naturally, starting with the teammate's name.",
+          "For partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate; do not repeat a failed call unchanged. Give the user the blocker and its Unblock action only when the user must act. When OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
+          "Reply to the teammate only for another requested action or new information that unblocks its work, never with the same request or an acknowledgement.",
         ]
       : delivery.expectsReply === false
         ? [
             NO_ANSWER_LINE,
-            "Use it if it changes your work, and continue with what you were doing.",
-            "Do not send a reply, an acknowledgement, or a result for it. OpenBot sends the sender nothing back.",
+            "Use it if it changes your work, and continue. Send no reply, acknowledgement or result: OpenBot sends the sender nothing back.",
           ]
         : [
-            `Finish the whole request, then send a concise result back to ${senderName} with openbot.send_message.`,
-            "When something fails, find the cause and try other ways before you report it. Use Status: blocked only when the sender or the user must act.",
-            `Use recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", and expectsReply false.`,
-            "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When Status is blocked, add a fourth line, Unblock: <the one action that unblocks the task>. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
-            "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
+            `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
+            "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
+            "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
+            "Never acknowledge without a Status line.",
           ];
     text = [
       `${TEAMMATE_HEADER} ${senderName} (${senderAgentId}).`,
@@ -322,7 +319,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `Run type: ${runKind}`,
       `Scheduled for: ${delivery.sender.scheduledFor}`,
       "The routine already exists, and its schedule is already configured.",
-      "Do not create, update, delete, list, or test routines during this run.",
+      "Do not create, update, delete, or test routines during this run.",
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun

@@ -74,6 +74,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelWaitBeforeNewConversation":
     "Wait until the work in this channel stops, then start a new conversation.",
   "error.backend.channelWaitBeforeCompact": "Wait until the work in this channel stops, then compact it.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
   "error.backend.channelCompactUnavailable":
     "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
@@ -328,6 +329,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
+  "error.backend.browserCertificateUntrusted":
+    "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",

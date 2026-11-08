@@ -10,8 +10,9 @@ import { Effect, Exit, Fiber, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import { extractJsonObject } from "../structured-output";
 import type { AgentMemories } from "./agent-memories";
-import { backgroundModel } from "./background-model";
+import { backgroundModel, withBackgroundEffort } from "./background-model";
 import { memoryChangesMessage } from "./memory-changes-message";
+import { conversationKey, type MemoryReviewCursors } from "./memory-review-cursors";
 import { MemoryReviewResult, memoryReviewPrompt } from "./memory-review-prompt";
 import type { ProfileClients } from "./profile-clients";
 import { type GenerationObserver, GenerationUsageLimitError, generateTextWithoutTools } from "./profile-generation";
@@ -56,6 +57,8 @@ export interface MemoryReviewOptions {
    * reviews, also after a pause, a clear and a closed side thread. Omitted, `MEMORY_REVIEW_INTERVAL`.
    */
   interval?(): number;
+  /** Keeps the cursors through a restart. Omitted, they live in memory only. */
+  cursors?: MemoryReviewCursors;
 }
 
 /** One conversation that a review reads: the agent's own chat (`threadId` null) or one side thread. */
@@ -80,7 +83,8 @@ interface ReviewedConversation {
  * memories, and proposes changes that `AgentMemories` applies with the checks of the memory tools.
  * One review runs at a time, and only when a profile client stays free for the user. A review that
  * cannot start waits, and starts when the running review ends or at the next turn. The counts live
- * in memory only.
+ * in memory only; the cursors are also saved (`MemoryReviewCursors`), so the first review after a
+ * restart reads only the messages that no finished review read.
  *
  * It never imports the agent service facade.
  */
@@ -106,7 +110,7 @@ export class MemoryReview {
     counts: boolean,
     memoryCommitted: boolean,
   ) {
-    const conversation = this.#conversation(agentId, threadId);
+    const conversation = yield* this.#conversation(agentId, threadId);
     yield* this.#stopIdle(conversation);
     this.#flush(conversation);
     if (counts && memoryCommitted) {
@@ -115,6 +119,8 @@ export class MemoryReview {
         Effect.orElseSucceed(() => []),
       );
       this.#moveCursor(conversation, messages);
+      // The turn end does not wait for the disk: the next delivery starts at once.
+      yield* this.#saveCursor(conversation).pipe(Effect.forkIn(this.#scope));
       return;
     }
     if (counts) conversation.turns += 1;
@@ -126,7 +132,7 @@ export class MemoryReview {
 
   /** The agent's chat was cleared: the chat that the clear ended gets its review now. */
   readonly chatCleared = Effect.fn("MemoryReview.chatCleared")(function* (this: MemoryReview, agentId: string) {
-    const conversation = this.#conversation(agentId, null);
+    const conversation = yield* this.#conversation(agentId, null);
     yield* this.#stopIdle(conversation);
     this.#flush(conversation);
     yield* this.#start(conversation);
@@ -157,6 +163,7 @@ export class MemoryReview {
     if (conversation) yield* this.#stopIdle(conversation);
     const running = this.#running;
     if (running?.key === key) yield* Fiber.interrupt(running.fiber);
+    yield* this.#options.cursors?.set(agentId, threadId, null) ?? Effect.void;
   }).bind(this);
 
   /** Ends the agent's reviews and forgets its counts, before the agent is deleted. */
@@ -168,6 +175,7 @@ export class MemoryReview {
     }
     const running = this.#running;
     if (running?.agentId === agentId) yield* Fiber.interrupt(running.fiber);
+    yield* this.#options.cursors?.forgetAgent(agentId) ?? Effect.void;
   }).bind(this);
 
   readonly dispose = Effect.fn("MemoryReview.dispose")(function* (this: MemoryReview) {
@@ -186,13 +194,40 @@ export class MemoryReview {
     return this.#interval() <= 0;
   }
 
-  #conversation(agentId: string, threadId: string | null): ReviewedConversation {
+  readonly #conversation = Effect.fn("MemoryReview.conversation")(function* (
+    this: MemoryReview,
+    agentId: string,
+    threadId: string | null,
+  ) {
     const key = conversationKey(agentId, threadId);
     const known = this.#conversations.get(key);
     if (known) return known;
-    const conversation = { key, agentId, threadId, turns: 0, cursor: null, heldLine: null, idle: null, waiting: false };
+    const cursors = this.#options.cursors;
+    if (cursors) yield* cursors.load();
+    // `load` can yield, and another call can add the conversation first.
+    const added = this.#conversations.get(key);
+    if (added) return added;
+    const conversation: ReviewedConversation = {
+      key,
+      agentId,
+      threadId,
+      turns: 0,
+      cursor: cursors?.get(agentId, threadId) ?? null,
+      heldLine: null,
+      idle: null,
+      waiting: false,
+    };
     this.#conversations.set(key, conversation);
     return conversation;
+  }).bind(this);
+
+  /**
+   * Saves the cursor when a review ends or fails, and when the agent changed its memories itself. A
+   * review that a stop interrupts keeps the earlier cursor, so the next run reads its messages again.
+   */
+  #saveCursor(conversation: ReviewedConversation): Effect.Effect<void> {
+    if (this.#conversations.get(conversation.key) !== conversation) return Effect.void;
+    return this.#options.cursors?.set(conversation.agentId, conversation.threadId, conversation.cursor) ?? Effect.void;
   }
 
   readonly #stopIdle = Effect.fn("MemoryReview.stopIdle")(function* (
@@ -240,7 +275,7 @@ export class MemoryReview {
           // A usage limit belongs to the user's own turns: the review does not mark the model.
           if (failure.cause instanceof GenerationUsageLimitError) return;
           logger.warn("Could not review the agent's memories.", { error: failure.cause });
-        }),
+        }).pipe(Effect.andThen(this.#saveCursor(conversation))),
       ),
       Effect.ensuring(
         Effect.suspend(() => {
@@ -278,11 +313,12 @@ export class MemoryReview {
       conversation.turns = 0;
       const excerpt = reviewExcerpt(messages, conversation.cursor);
       this.#moveCursor(conversation, messages);
-      if (!excerpt.some((message) => message.author === "user")) return;
+      if (!excerpt.some((message) => message.author === "user")) return yield* this.#saveCursor(conversation);
       const agent = options.listAgents().find((candidate) => candidate.id === agentId);
-      if (!agent) return;
+      if (!agent || options.stopping()) return;
       const model = backgroundModel(agent, yield* options.models(agent));
-      if (!model || options.stopping()) return;
+      if (options.stopping()) return;
+      if (!model) return yield* this.#saveCursor(conversation);
       if (!options.profileClients.hasSpare()) {
         // A user turn took the spare client while the model list loaded: wait, and read these turns then.
         conversation.turns += before.turns;
@@ -310,7 +346,7 @@ export class MemoryReview {
       const answer = yield* options.profileClients.run(client, (cancelled) =>
         generateTextWithoutTools(
           client,
-          model.id === agent.model ? { ...model, defaultReasoningEffort: agent.reasoningEffort } : model,
+          withBackgroundEffort(model),
           prompt,
           cancelled,
           options.usageObserver(agent, model),
@@ -322,10 +358,12 @@ export class MemoryReview {
       const operations = result.operations.filter(
         (operation) => operation.type === "add" || !hidden.has(operation.memoryId),
       );
-      if (operations.length === 0 || options.stopping()) return;
+      if (options.stopping()) return;
+      if (operations.length === 0) return yield* this.#saveCursor(conversation);
       if (!options.listAgents().some((candidate) => candidate.id === agentId)) return;
       const turnId = `memory-review-${randomUUID()}`;
       const changes = yield* Effect.try(() => options.memories.applyReview(agentId, base, operations, turnId));
+      yield* this.#saveCursor(conversation);
       const line = memoryChangesMessage(turnId, changes, options.redact);
       if (!line) return;
       if (options.turnActive(agentId, threadId)) conversation.heldLine = line;
@@ -351,14 +389,11 @@ export class MemoryReview {
   }
 }
 
-function conversationKey(agentId: string, threadId: string | null): string {
-  return threadId === null ? agentId : `${agentId}\u0000${threadId}`;
-}
-
 /**
  * The part of the chat that a review reads: after the last reviewed message and after the last clear
  * of the context. A clear that just happened is passed over, so its review reads the chat it ended.
- * After a restart the cursor is gone, and the review reads the latest messages.
+ * A cursor that is not in the messages, as after a delete or with no saved cursor, makes the review
+ * read the latest messages.
  */
 function reviewExcerpt(messages: readonly ConversationMessage[], cursor: string | null) {
   let end = messages.length;

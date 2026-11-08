@@ -59,6 +59,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "此连接不支持在频道中开始新对话或压缩。",
   "error.team.channelPictureUnsupported": "当前连接不支持频道图片。",
   "error.team.channelDeleteUnsupported": "当前连接不支持删除频道。",
+  "error.team.historyDeleteUnsupported": "当前连接不支持删除历史记录。",
   "error.team.channelTaskCancelUnsupported": "当前连接不支持取消频道任务。",
   "error.team.membersCannotDeleteChannels": "成员不能删除频道。",
   "error.team.membersCannotArchiveChannels": "成员不能归档频道。",
@@ -82,6 +83,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "当前连接不支持显示文件夹。",
   "error.team.conversationFileSearchUnsupported": "当前连接不支持搜索文件。",
   "error.team.sideQuestionUnsupported": "当前连接不支持旁问。",
+  "error.team.liveVoiceUnsupported": "该服务器不支持 Codex 实时语音，请更新运行它的电脑上的 OpenBot。",
   "error.team.routineFlowsUnsupported": "该服务器不支持自动化任务流程，请更新运行它的电脑上的 OpenBot。",
   "error.team.routineCanvasTooLarge":
     "该自动化任务画布过大，无法发送到这台设备。请在运行服务器的电脑上精简自动化任务指令。",

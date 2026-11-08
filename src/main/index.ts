@@ -6,10 +6,12 @@ import {
   type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
+  DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
-import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, localeDirection, resolveLocale, translateFor, withHourCycle } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -147,6 +149,7 @@ import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
+import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
@@ -505,7 +508,10 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
-  getFormat: () => createFormat(services?.language.locale ?? "en"),
+  getFormat: () => {
+    const locale = services?.language.locale ?? "en";
+    return createFormat(locale, withHourCycle(locale, systemHourCycle()));
+  },
   // The desktop app shows the notifications of a local server, as it does for every joined server.
   desktopNotificationsEnabled: () =>
     !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),
@@ -521,6 +527,11 @@ const {
 function workingAgents(): AgentSummary[] {
   if (!services) return [];
   return [...services.service.workingAgents(), ...(services.localServers?.workingAgents() ?? [])];
+}
+
+/** The user's `Cmd + Q` guard. Before the services exist, the default. */
+function quitGuard(): QuitGuard {
+  return services?.appBehavior.quitGuard ?? DEFAULT_QUIT_GUARD;
 }
 
 const windows = createMainWindowController({
@@ -551,6 +562,7 @@ const windows = createMainWindowController({
   reportError: (message, error) => logger.error(message, toLogValue(error)),
   quitFromShortcut: () => quitFor("shortcut"),
   workingAgents,
+  quitGuard,
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -829,7 +841,14 @@ function registerIpcHandlers({
       claudeUserSetup,
       openLink,
     }),
-    ...voiceIpcHandlers({ voice, speech, server: voiceServer, service }),
+    ...voiceIpcHandlers({
+      voice,
+      speech,
+      server: voiceServer,
+      service,
+      remoteServers,
+      forwardLiveEvent: forwardVoiceLiveEvent,
+    }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
@@ -1596,6 +1615,7 @@ if (!hasSingleInstanceLock) {
         language.translate,
         () => windowHolder.current,
         workingAgents,
+        quitGuard,
         quitFor,
       );
       // The way back to a window hidden in the background, and the sign that a member controls
@@ -1636,6 +1656,7 @@ if (!hasSingleInstanceLock) {
           language.translate,
           () => windowHolder.current,
           workingAgents,
+          quitGuard,
           quitFor,
         );
         tray.relabel();

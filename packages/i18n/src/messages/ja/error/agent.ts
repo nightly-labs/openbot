@@ -62,6 +62,7 @@ export const messages = {
     "新しいチャットを始める前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.waitBeforeCompactContext":
     "コンテキストを圧縮する前に、実行中のターンとキューが終わるのを待ってください。",
+  "error.agent.waitBeforeDeleteHistory": "履歴を削除する前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.compactContextUnavailable": "このエージェントは今コンテキストを圧縮できません。",
   "error.agent.unknown": "不明なエージェントです: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -114,6 +115,9 @@ export const messages = {
     "この設定を変更できるのは、エージェントを実行しているコンピューターだけです。",
   "error.agent.sideQuestionBusy": "実行中のサイド質問が多すぎます。しばらくしてからもう一度お試しください。",
   "error.agent.sideQuestionFailed": "エージェントはサイド質問に回答できませんでした。もう一度お試しください。",
+  "error.agent.webSearchSignIn": "Web 検索には ChatGPT アカウントでの Codex へのサインインが必要です。",
+  "error.agent.webSearchBusy": "実行中の検索とサイド質問が多すぎます。少し待ってからもう一度お試しください。",
+  "error.agent.webSearchFailed": "Web 検索が完了しませんでした。もう一度お試しください。",
   "error.agent.busyMessageModeLocalOnly":
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":

@@ -64,6 +64,11 @@ export interface AcpFlavor {
    */
   modelSetUnsaved?(error: RequestError): boolean;
   /**
+   * A `session/set_config_option` failure after which the session already has the new value. The
+   * agent changes the session first and then fails to save the value as its default.
+   */
+  configSetUnsaved?(error: RequestError): boolean;
+  /**
    * The agent frees what a session holds only when its process ends, not at `session/close`. Model
    * discovery then resumes one probe session for each process rather than opening another.
    */
@@ -79,8 +84,15 @@ export interface AcpFlavor {
     failedSession(stderrLine: string): string | undefined;
     /** The start of an answer that is the failure text, when no stderr line came. */
     answerIsFailure: RegExp;
+    /** The failure text of a model step that ended with neither text nor tool calls. */
+    emptyOutputFailure?: RegExp;
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
+    /**
+     * The https link in the failure text that the user must open to fix their account, or `null`.
+     * The turn fails as a sign-in failure, and the error banner opens the link.
+     */
+    accountLink?(text: string): string | null;
     /** The message of an answer chunk that reports an exhausted quota, or `null`. */
     quota(text: string): string | null;
     /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
@@ -143,8 +155,20 @@ export interface AcpFlavor {
    * turn and ends the process, so the next turn starts a process that reads the sign-in again.
    */
   signInLostChunk?: RegExp;
+  /**
+   * A whole answer chunk that tells that the plan is used up, sent as answer text in a turn that
+   * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
+   */
+  planUsedUpChunk?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
+  /**
+   * The agent reads the project files (instructions, skills, hooks) only of a folder that the user
+   * trusted or that the session adds. OpenBot puts the workspace first in `additionalDirectories` of
+   * each `session/new`, `session/load` and `session/resume`, and sends them although the agent does
+   * not advertise them.
+   */
+  workspaceAsAdditionalDirectory?: true;
   /**
    * OpenBot opens a saved session with `session/load`, also when the agent advertises
    * `session/resume`, and this tells from a successful load reply that the session is missing.
@@ -196,6 +220,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // again (#4614).
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
+  // Cursor sends a used-up plan as one chunk in the same form, and then ends the turn as a success
+  // (#5668). Only the full chunk matches, so an answer that quotes the text stays an answer.
+  planUsedUpChunk: /^\n\nUpgrade your plan to continue$/u,
   // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
   // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
   processWideModel: true,
@@ -231,6 +258,25 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
+};
+
+/**
+ * Mistral Vibe 3.1.0 refuses `session/load` and `session/resume` of a session that it does not have
+ * with "Invalid params", the message `Session not found: <id>` and `{ session_id: <id> }`. Only that
+ * session counts: a wrong config value is also "Invalid params".
+ */
+export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === sessionId : null,
+  // Vibe 3.1.0 reads no `AGENTS.md`, `.vibe` or `.agents/skills` in a folder that the user did not
+  // trust. A folder in `additionalDirectories` counts as trusted for that session only, so the
+  // workspace goes there, and nothing goes to the user's `trusted_folders.toml`. Its ACP trust
+  // decision would write that file: Vibe 3.1.0 takes only `trust_cwd`, `trust_repo` and `decline`.
+  workspaceAsAdditionalDirectory: true,
+  // Vibe 3.1.0 changes the session's model or thinking level, and then saves it as the default in
+  // `config.toml`. In a confined process that file is protected, and the save fails with "Invalid
+  // params" and "Layer 'user-toml': cannot write config file at <path>".
+  configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
 };
 
 /**

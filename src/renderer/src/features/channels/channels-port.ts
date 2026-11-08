@@ -30,8 +30,8 @@ export interface ChannelsPort {
     Partial<Pick<OpenBotDesktopApi["agent"], "deleteChannelMessage">> &
     /** Only the desktop has it: the Team API does not carry a channel picture. */
     Partial<Pick<OpenBotDesktopApi["agent"], "setChannelImage">> &
-    /** Only the desktop has them: the Team API has no route to clear or compact a channel's context. */
-    Partial<Pick<OpenBotDesktopApi["agent"], "clearChannelContext" | "compactChannelContext">>;
+    /** Only the desktop has them: the Team API has no route to clear, compact or delete a channel's history. */
+    Partial<Pick<OpenBotDesktopApi["agent"], "clearChannelContext" | "compactChannelContext" | "deleteChannelHistory">>;
   eventRoutines?: EventRoutinesApi | undefined;
   browser: Pick<OpenBotDesktopApi["browser"], "capturePreview">;
   openUrl: OpenBotDesktopApi["openUrl"];

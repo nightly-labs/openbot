@@ -64,6 +64,7 @@ export const messages = {
     "Diese Verbindung unterstützt keine neue Unterhaltung und kein Komprimieren in einem Kanal.",
   "error.team.channelPictureUnsupported": "Diese Verbindung unterstützt keine Kanalbilder.",
   "error.team.channelDeleteUnsupported": "Diese Verbindung unterstützt das Löschen von Kanälen nicht.",
+  "error.team.historyDeleteUnsupported": "Diese Verbindung unterstützt das Löschen des Verlaufs nicht.",
   "error.team.channelTaskCancelUnsupported": "Diese Verbindung unterstützt das Abbrechen von Kanalaufgaben nicht.",
   "error.team.membersCannotDeleteChannels": "Mitglieder können keine Kanäle löschen.",
   "error.team.membersCannotArchiveChannels": "Mitglieder können keine Kanäle archivieren.",
@@ -89,6 +90,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Diese Verbindung unterstützt das Anzeigen von Ordnern nicht.",
   "error.team.conversationFileSearchUnsupported": "Diese Verbindung unterstützt das Suchen von Dateien nicht.",
   "error.team.sideQuestionUnsupported": "Diese Verbindung unterstützt keine Nebenfragen.",
+  "error.team.liveVoiceUnsupported":
+    "Dieser Server unterstützt keine Codex-Live-Sprache. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.routineFlowsUnsupported":
     "Dieser Server unterstützt keine Routinenabläufe. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.routineCanvasTooLarge":

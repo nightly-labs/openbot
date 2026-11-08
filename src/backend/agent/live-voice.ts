@@ -4,6 +4,7 @@ import type {
   AgentReasoningEffort,
   AgentSummary,
   CodexLiveVoice,
+  ConversationMessageSender,
   VoiceLiveEvent,
   VoiceLiveSession,
   VoiceLiveStart,
@@ -29,6 +30,8 @@ import {
 
 /** How long Codex has to answer the WebRTC offer of a live voice session. */
 const ANSWER_TIMEOUT_MS = 20_000;
+/** The longest reason from Codex in an end message, so the message fits the Team API event. */
+const REASON_LIMIT = 1_000;
 /** How Codex reports that OpenAI refused the call: `unexpected status 401 Unauthorized: …`. */
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
@@ -65,21 +68,37 @@ export interface LiveVoiceReply {
   readonly text: string;
 }
 
+/**
+ * Who started a session: a member of this server, or the user of this computer (null). Each owner has
+ * at most one session, and only the owner gets its events.
+ */
+export interface LiveVoiceOwner {
+  readonly memberId: string;
+  /** The sender of the spoken requests in the chat. */
+  readonly sender: ConversationMessageSender | undefined;
+}
+
 export interface LiveVoiceHooks {
   agent(agentId: string): AgentSummary;
   /** A new Codex process that is not started yet. It runs no agent: it only connects the voice. */
   relay(agent: AgentSummary): Effect.Effect<LiveVoiceRelay, { readonly cause: unknown }>;
   /** Sends a spoken request to the agent as the user's message, and gives its delivery id. */
-  send(agentId: string, text: string): Effect.Effect<string, { readonly cause: unknown }>;
+  send(
+    agentId: string,
+    text: string,
+    sender: ConversationMessageSender | undefined,
+  ): Effect.Effect<string, { readonly cause: unknown }>;
   /** The reply to a delivery, or null while the agent still works on it. */
   reply(agentId: string, deliveryId: string): LiveVoiceReply | null;
-  emit(event: VoiceLiveEvent): void;
+  /** `memberId` is null for a session of this computer. */
+  emit(event: VoiceLiveEvent, memberId: string | null): void;
   redact(text: string): string;
 }
 
 interface LiveSession {
   readonly id: string;
   readonly agentId: string;
+  readonly owner: LiveVoiceOwner | null;
   readonly client: AgentClient;
   readonly cwd: string;
   threadId: string | null;
@@ -107,7 +126,7 @@ interface PendingAsk {
  * depend on the agent's provider or model, and a model change does not end it. The chat shows each
  * request and answer as usual.
  *
- * One session runs at a time.
+ * One session runs at a time for each owner: the user of this computer, or one member of the server.
  */
 export class LiveVoice {
   readonly #hooks: LiveVoiceHooks;
@@ -115,27 +134,32 @@ export class LiveVoice {
   readonly #asks = new Set<PendingAsk>();
   /** The stops of relay processes that still run, so that `dispose` can wait for them. */
   readonly #closing = new Set<Fiber.Fiber<void>>();
-  /** Counts the starts, so that a start that a newer one replaced does not keep its session. */
-  #starts = 0;
+  /** Counts the starts of each owner, so that a start that a newer one replaced does not keep its session. */
+  readonly #starts = new Map<string | null, number>();
 
   constructor(hooks: LiveVoiceHooks) {
     this.#hooks = hooks;
   }
 
-  /** `voice` is the user's choice in Settings; null lets OpenAI choose. */
+  /** `voice` is the user's choice in Settings; null lets OpenAI choose. `owner` is null for this computer. */
   readonly start = Effect.fn("LiveVoice.start")(function* (
     this: LiveVoice,
     input: VoiceLiveStart,
     voice: CodexLiveVoice | null,
+    owner: LiveVoiceOwner | null = null,
   ) {
     const agent = yield* liveStep(() => this.#hooks.agent(input.agentId));
-    for (const session of [...this.#sessions.values()]) yield* this.#stopSession(session);
-    const start = ++this.#starts;
+    const key = owner?.memberId ?? null;
+    for (const session of [...this.#sessions.values()])
+      if ((session.owner?.memberId ?? null) === key) yield* this.#stopSession(session);
+    const start = (this.#starts.get(key) ?? 0) + 1;
+    this.#starts.set(key, start);
     const relay = yield* this.#hooks.relay(agent).pipe(toLiveVoiceFailed);
     const cwd = yield* makeToollessDirectory().pipe(toLiveVoiceFailed);
     const session: LiveSession = {
       id: randomUUID(),
       agentId: agent.id,
+      owner,
       client: relay.client,
       cwd,
       threadId: null,
@@ -182,7 +206,8 @@ export class LiveVoice {
         )
         .pipe(toLiveVoiceFailed);
       const threadId = getString(getRecord(thread, "thread"), "id");
-      if (!threadId || start !== this.#starts) return yield* liveFailure(sourceText("error.voice.live.disconnected"));
+      if (!threadId || start !== this.#starts.get(key))
+        return yield* liveFailure(sourceText("error.voice.live.disconnected"));
       session.threadId = threadId;
       yield* relay.client
         .request(
@@ -219,9 +244,14 @@ export class LiveVoice {
     return { sessionId: session.id, sdp } satisfies VoiceLiveSession;
   });
 
-  readonly stop = Effect.fn("LiveVoice.stop")(function* (this: LiveVoice, sessionId: string) {
+  /** Stops a session of `memberId`; null stops a session of this computer. A session of another owner stays. */
+  readonly stop = Effect.fn("LiveVoice.stop")(function* (
+    this: LiveVoice,
+    sessionId: string,
+    memberId: string | null = null,
+  ) {
     const session = this.#sessions.get(sessionId);
-    if (session) yield* this.#stopSession(session);
+    if (session && (session.owner?.memberId ?? null) === memberId) yield* this.#stopSession(session);
   });
 
   /**
@@ -264,7 +294,11 @@ export class LiveVoice {
         if (role !== "user" && role !== "assistant") return;
         const final = notification.method === "thread/realtime/transcript/done";
         const text = getString(params, final ? "text" : "delta");
-        if (text) this.#hooks.emit({ type: "transcript", sessionId: session.id, role, text, final });
+        if (text)
+          this.#hooks.emit(
+            { type: "transcript", sessionId: session.id, role, text, final },
+            session.owner?.memberId ?? null,
+          );
         return;
       }
     }
@@ -287,7 +321,7 @@ export class LiveVoice {
       return;
     }
     Effect.runFork(
-      this.#hooks.send(session.agentId, text).pipe(
+      this.#hooks.send(session.agentId, text, session.owner?.sender).pipe(
         Effect.match({
           onFailure: (failure) =>
             this.#respond(session, request.id, {
@@ -331,7 +365,7 @@ export class LiveVoice {
     if (!message) return sourceText("error.voice.live.disconnected");
     // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
     if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
-    return sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message) });
+    return sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
   }
 
   readonly #stopSession = Effect.fn("LiveVoice.stopSession")(function* (this: LiveVoice, session: LiveSession) {
@@ -360,7 +394,7 @@ export class LiveVoice {
     );
     this.#closing.add(closing);
     closing.addObserver(() => this.#closing.delete(closing));
-    if (announce) this.#hooks.emit({ type: "ended", sessionId: session.id, error });
+    if (announce) this.#hooks.emit({ type: "ended", sessionId: session.id, error }, session.owner?.memberId ?? null);
   }
 }
 

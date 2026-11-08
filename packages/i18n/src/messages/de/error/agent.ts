@@ -66,6 +66,8 @@ export const messages = {
     "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du einen neuen Chat beginnst.",
   "error.agent.waitBeforeCompactContext":
     "Warte, bis der aktive Durchlauf und die Warteschlange fertig sind, bevor du den Kontext komprimierst.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du den Verlauf löschst.",
   "error.agent.compactContextUnavailable": "Dieser Agent kann seinen Kontext jetzt nicht komprimieren.",
   "error.agent.unknown": "Unbekannter Agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -123,6 +125,9 @@ export const messages = {
     "Nur der Computer, auf dem der Agent läuft, kann diese Einstellung ändern.",
   "error.agent.sideQuestionBusy": "Es laufen zu viele Nebenfragen. Versuche es gleich noch einmal.",
   "error.agent.sideQuestionFailed": "Der Agent konnte die Nebenfrage nicht beantworten. Versuche es erneut.",
+  "error.agent.webSearchSignIn": "Die Websuche braucht eine Codex-Anmeldung mit einem ChatGPT-Konto.",
+  "error.agent.webSearchBusy": "Es laufen zu viele Suchen und Nebenfragen. Versuche es gleich noch einmal.",
+  "error.agent.webSearchFailed": "Die Websuche wurde nicht abgeschlossen. Versuche es erneut.",
   "error.agent.busyMessageModeLocalOnly":
     "Das Verhalten von Nachrichten während der Arbeit des Agenten kann nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsLocalOnly":

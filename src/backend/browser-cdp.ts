@@ -76,6 +76,7 @@ import {
   type SendCommand,
   stringValue,
 } from "./browser-cdp-values";
+import { type DetectedChallenge, detectChallenge } from "./browser-challenge";
 import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
 import {
   type BrowserFillFieldsProgress,
@@ -86,6 +87,8 @@ import {
 } from "./browser-fill-fields";
 import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
 import { createFramePacer } from "./browser-screencast-pacing";
+import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
+import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import type { VaultCardSecret } from "./vault-items";
 
 const ACTION_TIMEOUT_MS = 10_000;
@@ -102,6 +105,8 @@ export interface SnapshotReadResult {
   snapshot: BrowserSnapshot;
   recommendImage: boolean;
   imageReason: string;
+  /** A bot check on the main frame. The tab read decides whether to wait for it. */
+  challenge: DetectedChallenge | null;
 }
 
 /** The page state that an action reports when it does not read a snapshot. */
@@ -123,6 +128,8 @@ export interface SnapshotContext {
   environment: BrowserEnvironment;
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
+  /** The time, as `Date.now()`, at which the read times out. A settle wait ends before it. */
+  deadline: number;
 }
 
 export interface BrowserScreencastOptions {
@@ -328,6 +335,12 @@ export class BrowserCdpEngine {
   /** The page sizes of the open views that asked for one. The newest one applies. */
   readonly #viewViewports: Array<{ width: number; height: number }> = [];
   #navigationGeneration = 0;
+  /** Counts new documents only. A same-document navigation, such as `history.replaceState`, keeps it. */
+  #documentGeneration = 0;
+  /** The document whose loading markers stayed for a full settle wait. Its snapshots do not wait again. */
+  #settleTimedOutDocument = -1;
+  /** The `timeOrigin` of the document that already waited for its first content. It does not wait again. */
+  #emptyWaitedDocument = -1;
   readonly #cardScrub: CardValueScrub;
 
   readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
@@ -342,8 +355,9 @@ export class BrowserCdpEngine {
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
-       * field is a password field, or every field asks for a one-time code. The fingerprint check of
-       * `enter` keeps this true until the fill.
+       * field is a password field, or every field asks for a one-time code. A text field that the page
+       * masks with `-webkit-text-security` is a password field. The fingerprint check of `enter` keeps
+       * this true until the fill; the mask is read here only, because a page can change it as it fills.
        */
       fields: { password: boolean; oneTimeCode: boolean };
       /**
@@ -423,7 +437,7 @@ export class BrowserCdpEngine {
             send,
             node.backendNodeId,
             `function() {
-              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
+              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
           );
@@ -729,6 +743,7 @@ export class BrowserCdpEngine {
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
+      if (details.isMainFrame && !details.isSameDocument) this.#documentGeneration += 1;
       this.#targets.clear();
       this.#lastSnapshot = null;
     });
@@ -763,15 +778,48 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<SnapshotReadResult, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        const navigationGeneration = this.#navigationGeneration;
-        const [metrics, parsed, focus] = yield* Effect.all(
-          [
-            send("Page.getLayoutMetrics"),
-            collectBoundedSnapshot(send, this.#snapshotTargets(), context.revision, true),
-            collectFocus(send).pipe(Effect.catch(() => Effect.succeed(null))),
-          ],
+        let navigationGeneration = this.#navigationGeneration;
+        const documentGeneration = this.#documentGeneration;
+        const collect = () =>
+          Effect.all(
+            [
+              collectBoundedSnapshot(send, this.#snapshotTargets(), context.revision, true),
+              collectFocus(send).pipe(Effect.catch(() => Effect.succeed(null))),
+            ],
+            { concurrency: "unbounded" },
+          );
+        let [metrics, [parsed, focus], challenge, settle] = yield* Effect.all(
+          [send("Page.getLayoutMetrics"), collect(), detectChallenge(this.#contents, send), probeSettle(send)],
           { concurrency: "unbounded" },
         );
+        // A page that still shows loading placeholders, or a new page with no controls yet, would
+        // make the agent take a second snapshot. Wait a short time in this one instead. A bot check
+        // has its own wait in the tab read.
+        const busyWait = settle?.busy === true && this.#settleTimedOutDocument !== documentGeneration;
+        const emptyWait =
+          settle !== null &&
+          !settle.busy &&
+          parsed.elements.length === 0 &&
+          settle.emptyWaitMs > 0 &&
+          settle.document !== this.#emptyWaitedDocument;
+        // The second collect needs time before the read's deadline.
+        const settleBudget = Math.min(
+          busyWait ? SETTLE_BUSY_WAIT_MS : (settle?.emptyWaitMs ?? 0),
+          context.deadline - Date.now() - SETTLE_RESERVE_MS,
+        );
+        if (
+          challenge === null &&
+          (busyWait || emptyWait) &&
+          settleBudget > 0 &&
+          navigationGeneration === this.#navigationGeneration
+        ) {
+          if (emptyWait && settle !== null) this.#emptyWaitedDocument = settle.document;
+          const settled = yield* waitForSettle(send, emptyWait, settleBudget);
+          if (!settled && busyWait) this.#settleTimedOutDocument = documentGeneration;
+          // A page that loads often sets its URL with history.replaceState. That keeps the document.
+          if (documentGeneration === this.#documentGeneration) navigationGeneration = this.#navigationGeneration;
+          if (navigationGeneration === this.#navigationGeneration) [parsed, focus] = yield* collect();
+        }
         if (navigationGeneration !== this.#navigationGeneration) {
           return yield* browserFailure(new Error("Page navigated during the browser snapshot. Take a fresh snapshot."));
         }
@@ -802,7 +850,7 @@ export class BrowserCdpEngine {
             ? "iframe"
             : "low-semantic-coverage";
         // The kept references compare the page with the unscrubbed elements.
-        return { snapshot: this.#cardScrub.snapshot(snapshot), recommendImage, imageReason };
+        return { snapshot: this.#cardScrub.snapshot(snapshot), recommendImage, imageReason, challenge };
       }),
     );
   });
@@ -2105,13 +2153,20 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     target?: BrowserTarget,
     deadline?: number,
+    /**
+     * Scale the image to CSS pixels, for the model. A pixel of the image is then a CSS pixel of a
+     * point target and of snapshot bounds, and a 2x display does not make the image four times larger.
+     * The user's preview keeps the full resolution.
+     */
+    cssPixels = false,
   ): Effect.fn.Return<NativeImage, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const clip = target ? yield* this.#elementClipEffect(send, target, deadline) : undefined;
         const environment = this.#appliedEnvironment(this.#environment);
         const fill = !environment || environment.viewport.mode === "fill";
-        if (fill) {
+        let cssSize: { width: number; height: number } | undefined;
+        if (fill || (cssPixels && !clip)) {
           // Hidden views need a capture surface. Preserve the page's full viewport,
           // including scrollbars: layoutViewport.clientWidth would shrink it and
           // can dispose a responsive page's OAuth callback during preview capture.
@@ -2122,15 +2177,26 @@ export class BrowserCdpEngine {
             returnByValue: true,
           });
           const viewport = recordValue(recordValue(result.result)?.value);
-          yield* send("Emulation.setDeviceMetricsOverride", {
-            width: numberValue(viewport?.width),
-            height: numberValue(viewport?.height),
-            deviceScaleFactor: numberValue(viewport?.scale),
-            mobile: false,
-          });
+          cssSize = { width: numberValue(viewport?.width), height: numberValue(viewport?.height) };
+          if (fill) {
+            yield* send("Emulation.setDeviceMetricsOverride", {
+              ...cssSize,
+              deviceScaleFactor: numberValue(viewport?.scale),
+              mobile: false,
+            });
+          }
+        }
+        if (clip) {
+          // The clip is in view pixels, which page zoom scales.
+          const zoom = this.#contents.getZoomFactor();
+          cssSize = { width: Math.round(clip.width / zoom), height: Math.round(clip.height / zoom) };
         }
         return yield* Effect.gen({ self: this }, function* () {
-          return yield* browserCall(() => this.#contents.capturePage(clip));
+          const image = yield* browserCall(() => this.#contents.capturePage(clip));
+          if (!cssPixels || !cssSize || cssSize.width < 1 || cssSize.height < 1) return image;
+          const size = image.getSize();
+          if (size.width <= cssSize.width && size.height <= cssSize.height) return image;
+          return image.resize({ ...cssSize, quality: "good" });
         }).pipe(
           Effect.ensuring(
             Effect.gen({ self: this }, function* () {
@@ -2665,7 +2731,9 @@ export class BrowserCdpEngine {
           return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
         const bytes = Buffer.byteLength(serialized, "utf8");
         if (bytes > MAX_RESULT_BYTES) {
-          return yield* browserFailure(new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes).`));
+          return yield* browserFailure(
+            new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes). ${BROWSER_VALUE_TOO_LARGE}`),
+          );
         }
         // `serialized` is the value the caller receives, so parse that rather than asserting over
         // `value`: JSON.stringify already dropped anything a JSON value cannot hold.
