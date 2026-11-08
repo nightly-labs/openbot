@@ -69,6 +69,11 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "バッテリー駆動中もスリープさせません。バッテリーの消耗が早くなります。",
   "settings.restoreWorkspace.title": "起動時に前回のワークスペースを復元する",
   "settings.restoreWorkspace.description": "前回のセッションのワークスペースとタスクを開きます。",
+  "settings.startupChat.title": "起動時に開く",
+  "settings.startupChat.description": "アプリの起動時に表示するチャットです。",
+  "settings.startupChat.lastChat": "前回のチャット",
+  "settings.startupChat.otherServer": "別のサーバーのエージェント",
+  "settings.startupChat.unlistedAgent": "一覧にないエージェント",
   "settings.quitGuard.title": "⌘Q の長押しで終了",
   "settings.quitGuard.description":
     "終了するには ⌘Q を長押しするか、2 回押します。「しない」では、⌘Q を 1 回押すと終了し、エージェントが停止します。",

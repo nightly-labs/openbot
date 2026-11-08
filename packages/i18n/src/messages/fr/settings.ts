@@ -75,6 +75,11 @@ export const messages = {
     "Garder l’ordinateur éveillé aussi sur batterie. La batterie se décharge plus vite.",
   "settings.restoreWorkspace.title": "Restaurer le dernier espace de travail au lancement",
   "settings.restoreWorkspace.description": "Rouvrir l’espace de travail et les tâches de votre session précédente.",
+  "settings.startupChat.title": "Ouvrir au lancement",
+  "settings.startupChat.description": "Le chat que l’app affiche au démarrage.",
+  "settings.startupChat.lastChat": "Dernier chat",
+  "settings.startupChat.otherServer": "Un agent d’un autre serveur",
+  "settings.startupChat.unlistedAgent": "Un agent absent de la liste",
   "settings.quitGuard.title": "Maintenir ⌘Q pour quitter",
   "settings.quitGuard.description":
     "Maintenez ⌘Q ou appuyez deux fois pour quitter. Avec « Jamais », un seul ⌘Q quitte et arrête les agents.",

@@ -69,6 +69,11 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "Nie usypiaj komputera także na baterii. Bateria rozładuje się szybciej.",
   "settings.restoreWorkspace.title": "Przywracaj ostatni obszar roboczy po uruchomieniu",
   "settings.restoreWorkspace.description": "Otwieraj obszar roboczy i zadania z poprzedniej sesji.",
+  "settings.startupChat.title": "Otwieraj po uruchomieniu",
+  "settings.startupChat.description": "Czat, który aplikacja pokazuje po uruchomieniu.",
+  "settings.startupChat.lastChat": "Ostatni czat",
+  "settings.startupChat.otherServer": "Agent na innym serwerze",
+  "settings.startupChat.unlistedAgent": "Agent spoza listy",
   "settings.quitGuard.title": "Przytrzymaj ⌘Q, aby zamknąć",
   "settings.quitGuard.description":
     "Przytrzymaj ⌘Q lub naciśnij dwa razy, aby zamknąć. Przy „Nigdy” jedno ⌘Q zamyka aplikację i zatrzymuje agentów.",

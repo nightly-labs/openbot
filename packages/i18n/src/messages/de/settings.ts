@@ -72,6 +72,11 @@ export const messages = {
     "Den Computer auch im Akkubetrieb wach halten. Der Akku entlädt sich schneller.",
   "settings.restoreWorkspace.title": "Letzten Arbeitsbereich beim Start wiederherstellen",
   "settings.restoreWorkspace.description": "Den Arbeitsbereich und die Aufgaben der letzten Sitzung öffnen.",
+  "settings.startupChat.title": "Beim Start öffnen",
+  "settings.startupChat.description": "Der Chat, den die App beim Start zeigt.",
+  "settings.startupChat.lastChat": "Letzter Chat",
+  "settings.startupChat.otherServer": "Ein Agent auf einem anderen Server",
+  "settings.startupChat.unlistedAgent": "Ein Agent, der nicht in der Liste ist",
   "settings.quitGuard.title": "⌘Q zum Beenden halten",
   "settings.quitGuard.description":
     "Halte ⌘Q gedrückt oder drücke zweimal, um zu beenden. Mit „Nie“ beendet ein einziges ⌘Q OpenBot und stoppt die Agenten.",

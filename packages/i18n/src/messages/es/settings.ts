@@ -71,6 +71,11 @@ export const messages = {
     "Mantener el ordenador activo también con batería. La batería se agota antes.",
   "settings.restoreWorkspace.title": "Restaurar el último espacio de trabajo al iniciar",
   "settings.restoreWorkspace.description": "Abrir el espacio de trabajo y las tareas de la sesión anterior.",
+  "settings.startupChat.title": "Abrir al iniciar",
+  "settings.startupChat.description": "El chat que muestra la app al iniciarse.",
+  "settings.startupChat.lastChat": "Último chat",
+  "settings.startupChat.otherServer": "Un agente de otro servidor",
+  "settings.startupChat.unlistedAgent": "Un agente que no está en la lista",
   "settings.quitGuard.title": "Mantener ⌘Q para salir",
   "settings.quitGuard.description":
     "Mantén pulsado ⌘Q o púlsalo dos veces para salir. Con «Nunca», un solo ⌘Q sale y detiene los agentes.",
