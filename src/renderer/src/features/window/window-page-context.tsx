@@ -52,6 +52,8 @@ const context = createSimpleContext({
     const { activeServerId } = useServers();
     /** The elements of the settings page that the settings panel shows in. The page sets them. */
     const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
+    /** The search of the server settings page. The server settings show only the sections that match it. */
+    const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
 
     const page = createMemo<WindowPage>(() => {
       if (serverSettings.serverSettingsOpen()) return "server-settings";
@@ -138,6 +140,8 @@ const context = createSimpleContext({
       setTasksAgentsOpen: (open: boolean) => setTasksAgentsOpen(open),
       setSettingsMounts,
       settingsPlacement,
+      serverSettingsQuery,
+      setServerSettingsQuery: (query: string) => setServerSettingsQuery(query),
       pageBack,
       /** Shows the agents and closes the other pages. */
       showAgents() {
