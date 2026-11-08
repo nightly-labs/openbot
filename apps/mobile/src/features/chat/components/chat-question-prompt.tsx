@@ -58,9 +58,13 @@ export function ChatQuestionPrompt({
     );
   const confirm = confirmBlockOf(prompt, uiBlock);
   const choice = choiceBlockOf(prompt, uiBlock);
+  // The field rows of a confirm card fill it with flex-1, so they add nothing to a width taken from the
+  // content. The card gets its height at the widest width it could have, and the rows are drawn at the
+  // narrower one: the text wraps again and runs over the next row. A set width keeps the two the same.
+  const readOnlyCardClass = `${confirm ? "w-full " : ""}max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3`;
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
+      <View className={readOnlyCardClass}>
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
@@ -76,10 +80,7 @@ export function ChatQuestionPrompt({
     prompt.resolution ?? controller?.resolution ?? (controller ? null : { status: "expired" as const });
   if (resolution) {
     return (
-      <View
-        className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
-      >
+      <View className={readOnlyCardClass} style={{ borderCurve: "circular" }}>
         <View className="flex-row items-center gap-2">
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">
