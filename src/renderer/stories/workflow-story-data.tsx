@@ -34,6 +34,9 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     connectionId: STORY_CONNECTION,
     placeId,
     label: `#${placeId}`,
+    platform: "slack" as const,
+    connection: "Northwind",
+    name: `#${placeId}`,
   })),
   channels: [
     { id: "story-channel-launch", name: "launch" },

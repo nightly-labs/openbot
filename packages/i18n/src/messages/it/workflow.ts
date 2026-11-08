@@ -164,8 +164,10 @@ export const messages = {
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",
-  "workflow.output.target.messagingChannel": "Luogo di messaggistica",
-  "workflow.output.target.chatChannel": "Canale OpenBot",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "Cerca canali",
+  "workflow.output.postsAs": "Pubblica come",
+  "workflow.output.postsAsNote": "Una nota; nessuna attività parte",
   "workflow.output.target.file": "File",
   "workflow.output.target.notify": "Notifica",
   "workflow.output.path": "Percorso del file",

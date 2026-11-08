@@ -9,6 +9,7 @@ import {
   type AgentProviderRef,
   type AgentStatus,
   type ClientAgentModelOption,
+  type MessagingPlatform,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
   type WorkflowNodeKind,
@@ -46,6 +47,10 @@ export interface WorkflowPlace {
   placeId: string;
   /** The name of the place, as the user knows it, such as "#general". */
   label: string;
+  /** The app, the connection and the place name alone, so a list can group the places by connection. */
+  platform: MessagingPlatform;
+  connection: string;
+  name: string;
 }
 
 /** A Discord server that a Discord trigger listens to or that a Discord output acts on. */

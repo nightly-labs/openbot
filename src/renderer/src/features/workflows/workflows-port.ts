@@ -125,6 +125,9 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
           connectionId: connection.connectionId,
           placeId: place.id,
           label: `${connection.connectionName} · ${place.name}`,
+          platform: connection.platform,
+          connection: connection.connectionName,
+          name: place.name,
         })),
       );
     },

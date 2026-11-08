@@ -164,8 +164,10 @@ export const messages = {
 
   "workflow.output.title": "Çıktı",
   "workflow.output.name": "çıktı",
-  "workflow.output.target.messagingChannel": "Mesajlaşma yeri",
-  "workflow.output.target.chatChannel": "OpenBot kanalı",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "Kanal ara",
+  "workflow.output.postsAs": "Şu şekilde paylaşır",
+  "workflow.output.postsAsNote": "Not; görev başlamaz",
   "workflow.output.target.file": "Dosya",
   "workflow.output.target.notify": "Bildirim",
   "workflow.output.path": "Dosya yolu",
