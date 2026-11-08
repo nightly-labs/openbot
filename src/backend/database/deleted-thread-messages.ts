@@ -133,7 +133,8 @@ export function recordDeletedThreadHistory(db: DatabaseSync, threadId: string, d
 /**
  * Removes every message from the payloads of one thread's rows in `table`, one row at a time: a long
  * thread's events hold full snapshots, too large to read all at once. Only a payload with a snapshot
- * or a message key ("…Message" or "…Messages") can carry one.
+ * or a message key ("…Message" or "…Messages") can carry one. The alias is required: SQLite names a
+ * `rowid` column after the `INTEGER PRIMARY KEY` that it aliases, such as `sequence`.
  */
 function scrubAllMessages(
   db: DatabaseSync,
@@ -144,11 +145,11 @@ function scrubAllMessages(
   const rowIds = databaseRows(
     db
       .prepare(
-        `SELECT rowid FROM ${table}
+        `SELECT rowid AS row_key FROM ${table}
          WHERE ${where} AND (instr(payload_json, 'Message') > 0 OR instr(payload_json, '"snapshot"') > 0)`,
       )
       .all(threadId),
-  ).map((row) => requiredNumberColumn(row, "rowid"));
+  ).map((row) => requiredNumberColumn(row, "row_key"));
   const read = db.prepare(`SELECT payload_json FROM ${table} WHERE rowid = ?`);
   const update = db.prepare(`UPDATE ${table} SET payload_json = ? WHERE rowid = ?`);
   const isMessage = (value: unknown) => isDynamicRecord(value) && isString(value.id);
