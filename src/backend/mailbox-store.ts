@@ -3617,10 +3617,14 @@ function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outco
   delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
 }
 
-/** A message the person wrote in the agent's chat or a task, not one of a channel or a messaging app. */
+/**
+ * A message the person wrote in the agent's chat or a task, not one of a channel or a messaging app.
+ * A new agent's setup message is not: it runs alone, so its rules do not reach the person's message.
+ */
 function isChatMessageFromPerson(message: StoredMessage): boolean {
   return (
     message.sender.kind === "user" &&
+    message.welcome !== true &&
     message.channelId === undefined &&
     message.messaging === undefined &&
     message.messagingReturn === undefined
