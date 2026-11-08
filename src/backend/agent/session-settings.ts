@@ -16,6 +16,7 @@ import type { ProviderRuntime } from "./provider-runtime";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
 export function sessionSettingsIdentity(agent: AgentSummary): string {
+  if (agent.provider === "hermes" && agent.hermesProfileId !== undefined) return `hermes:${agent.hermesProfileId}`;
   return agent.provider === "acp" ? `acp:${customAgentIdOfModel(agent.model) ?? ""}` : agent.provider;
 }
 

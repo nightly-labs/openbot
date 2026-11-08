@@ -1,4 +1,4 @@
-import { type AgentProviderRef, isAgentProviderRef } from "./agent-providers";
+import { type AgentProviderRef, isAgentProviderRef, isHermesProfileId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isAgentAdditionalFolders } from "./ipc-agent-folders";
 import {
@@ -332,6 +332,8 @@ export interface AgentSummary {
    * provider's own sign-in, `DEFAULT_PROVIDER_ACCOUNT_ID`.
    */
   providerAccountId?: string;
+  /** Local-only. Absent inherits Hermes environment and sticky profile. */
+  hermesProfileId?: string;
   /** Local-only, like `access`. Absent means the agent asks before it leaves a usage limit. */
   backupModels?: AgentBackupModels;
   /**
@@ -414,6 +416,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.busyMessageMode === undefined || isBusyMessageMode(value.busyMessageMode)) &&
     (value.taskLimit === undefined || isAgentTaskLimit(value.taskLimit)) &&
     (value.providerAccountId === undefined || isProviderAccountId(value.providerAccountId)) &&
+    (value.hermesProfileId === undefined || isHermesProfileId(value.hermesProfileId)) &&
     (value.backupModels === undefined || isAgentBackupModels(value.backupModels)) &&
     (value.usageLimitReturn === undefined || isAgentUsageLimitReturn(value.usageLimitReturn)) &&
     (value.pendingRuntime === undefined || isAgentPendingRuntime(value.pendingRuntime)) &&
@@ -453,6 +456,8 @@ export interface CreateAgentInput {
    * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
    */
   providerAccountId?: string;
+  /** Local-only. Absent inherits Hermes environment and sticky profile. */
+  hermesProfileId?: string;
 }
 
 export interface UpdateAgentInput {
@@ -477,6 +482,8 @@ export interface UpdateAgentInput {
   taskLimit?: number | null;
   /** `null` returns the agent to the provider's own sign-in. */
   providerAccountId?: string | null;
+  /** `null` removes the explicit Hermes profile. Other providers keep this setting dormant. */
+  hermesProfileId?: string | null;
   /** `null` returns the agent to the default: ask, with no saved order. */
   backupModels?: AgentBackupModels | null;
   /**

@@ -243,4 +243,11 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.browserProfile.manage": "Manage",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
+  "agentSettings.hermesProfile.label": "Hermes profile",
+  "agentSettings.hermesProfile.inherit": "Use Hermes environment and active profile",
+  "agentSettings.hermesProfile.default": "Default profile (explicit)",
+  "agentSettings.hermesProfile.loading": "Read Hermes profiles…",
+  "agentSettings.hermesProfile.unavailable": "Hermes profiles are unavailable. Your saved choice is kept.",
+  "agentSettings.hermesProfile.missing": "{profile} (unavailable)",
+  "agentSettings.hermesProfile.modelsUnavailable": "Models for this Hermes profile are unavailable. Try again.",
 });

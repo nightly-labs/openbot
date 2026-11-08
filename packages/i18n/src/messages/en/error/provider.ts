@@ -428,4 +428,9 @@ export const messages = defineMessages("error.provider", {
   "error.provider.hermesNeedsGitCurl": "Hermes Agent needs git and curl. Install them, then try again.",
   "error.provider.registryRemoveBusy":
     "Wait for the agent installation and active ACP work to finish before you remove it.",
+  "error.provider.hermesProfilesUnavailable":
+    "OpenBot could not list Hermes profiles. Check access to your Hermes folder and try again.",
+  "error.provider.hermesProfileInvalid": "The Hermes profile ID is not valid.",
+  "error.provider.hermesProfileMissing":
+    'Hermes profile "{profile}" is missing, deleted, or unavailable. Choose an existing profile.',
 });

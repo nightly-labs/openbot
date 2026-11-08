@@ -337,7 +337,7 @@ export class DrainScheduler {
     // rather than fail (#4326). The provider runtime schedules the drain again when it is signed in.
     if (
       agent &&
-      this.#providers.signInRequired(providerForAgent(agent)) &&
+      this.#providers.signInRequired(providerForAgent(agent), agent.hermesProfileId) &&
       this.#waitsForSignIn(this.#mailbox.nextQueued(agentId, taskId)?.delivery)
     )
       return "sign-in";
@@ -418,7 +418,7 @@ export class DrainScheduler {
     const key = laneKey(lane);
     if (this.#hooks.isStopping() || this.#scheduledDrains.has(key)) return false;
     const hold =
-      (!this.#providers.isReady() && "providers-not-ready") ||
+      (!this.#providerReady(lane.agentId) && "providers-not-ready") ||
       (this.#drainingLanes.has(key) && "drain-running") ||
       this.#heldBy(lane) ||
       (this.#heldByMachine(lane) && "machine");
@@ -505,12 +505,17 @@ export class DrainScheduler {
     return true;
   }
 
+  #providerReady(agentId: string): boolean {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    return this.#providers.isReady(agent ? { ...agent, provider: providerForAgent(agent) } : undefined);
+  }
+
   /** The checks of `drainAgent` other than the clauses: the service runs and the provider can start. */
   #mayStartNow(lane: Lane): boolean {
     return (
       !this.#hooks.isStopping() &&
       !this.#drainingLanes.has(laneKey(lane)) &&
-      this.#providers.isReady() &&
+      this.#providerReady(lane.agentId) &&
       !this.#deliveryProviders(lane.agentId).some((provider) => this.#providers.isReplacingCli(provider)) &&
       this.#heldBy(lane) === null
     );
@@ -528,7 +533,7 @@ export class DrainScheduler {
     const hold =
       (this.#drainingLanes.has(key) && "drain-running") ||
       this.#heldBy(lane) ||
-      (!this.#providers.isReady() && "providers-not-ready") ||
+      (!this.#providerReady(lane.agentId) && "providers-not-ready") ||
       // Before the try, so the delivery is not rescheduled in a loop while the CLI is replaced.
       // ProviderRuntime schedules this agent again once the new client is ready.
       (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)) &&
@@ -997,7 +1002,9 @@ export class DrainScheduler {
           const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
           if (
             error instanceof ProviderTurnActiveError ||
-            (recipient && this.#providers.signInRequired(providerForAgent(recipient)) && this.#waitsForSignIn(delivery))
+            (recipient &&
+              this.#providers.signInRequired(providerForAgent(recipient), recipient.hermesProfileId) &&
+              this.#waitsForSignIn(delivery))
           ) {
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);

@@ -4,7 +4,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
  * What the agents domain reaches in main: agent records, their models and read state, and the agent
  * event stream.
  */
-export interface AgentsPort {
+export interface AgentsPort extends Pick<OpenBotDesktopApi, "listHermesProfiles" | "listHermesModels"> {
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "createAgent"

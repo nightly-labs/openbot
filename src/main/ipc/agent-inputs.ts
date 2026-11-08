@@ -1,3 +1,4 @@
+import { isHermesProfileId } from "@openbot/contracts/agent-providers";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
@@ -256,6 +257,10 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   if (value.providerAccountId !== undefined) {
     if (!isProviderAccountId(value.providerAccountId)) throw new Error("Invalid provider account.");
     result.providerAccountId = value.providerAccountId;
+  }
+  if (value.hermesProfileId !== undefined) {
+    if (!isHermesProfileId(value.hermesProfileId)) throw new Error(sourceText("error.provider.hermesProfileInvalid"));
+    result.hermesProfileId = value.hermesProfileId;
   }
   return result;
 }
@@ -778,6 +783,11 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (value.providerAccountId !== null && !isProviderAccountId(value.providerAccountId))
       throw new Error("Invalid provider account.");
     result.providerAccountId = value.providerAccountId;
+  }
+  if (value.hermesProfileId !== undefined) {
+    if (value.hermesProfileId !== null && !isHermesProfileId(value.hermesProfileId))
+      throw new Error(sourceText("error.provider.hermesProfileInvalid"));
+    result.hermesProfileId = value.hermesProfileId;
   }
   if (value.busyMessageMode !== undefined) {
     if (value.busyMessageMode !== null && !isBusyMessageMode(value.busyMessageMode)) {

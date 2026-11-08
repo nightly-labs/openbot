@@ -16,6 +16,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { isHermesProfileId } from "@openbot/contracts/agent-providers";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentProfileDraft } from "@openbot/contracts/ipc";
@@ -113,6 +114,7 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   taskLimit?: number;
   // Absent means the provider's own sign-in, as for every agent stored before accounts existed.
   providerAccountId?: string;
+  hermesProfileId?: string;
   // Absent means the agent asks before it leaves a model at its usage limit.
   backupModels?: AgentBackupModels;
   // Present only while the agent works on a backup model for a usage limit.
@@ -364,6 +366,11 @@ export class AgentStore {
       if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
       if (input.avatarColor != null && !isAvatarColor(input.avatarColor)) throw new Error("Invalid avatar color.");
       const record = this.#createRecord(`agent-${randomUUID()}`, name, "", description);
+      if (input.hermesProfileId !== undefined) {
+        if (!isHermesProfileId(input.hermesProfileId))
+          throw new Error(sourceText("error.provider.hermesProfileInvalid"));
+        record.hermesProfileId = input.hermesProfileId;
+      }
       record.avatarSeed = input.avatarSeed;
       record.avatarHue = input.avatarHue;
       applyAvatarColor(record, input.avatarHue, input.avatarColor);
@@ -414,6 +421,7 @@ export class AgentStore {
       );
       record.notifications = source.notifications;
       record.provider = source.provider;
+      if (source.hermesProfileId !== undefined) record.hermesProfileId = source.hermesProfileId;
       record.model = source.model;
       record.reasoningEffort = source.reasoningEffort;
       if (source.sessionSettingOverrides)
@@ -802,6 +810,12 @@ export class AgentStore {
         if (!isProviderAccountId(input.providerAccountId)) throw new Error("Invalid provider account.");
         next.providerAccountId = input.providerAccountId;
       }
+      if (input.hermesProfileId === null) delete next.hermesProfileId;
+      else if (input.hermesProfileId !== undefined) {
+        if (!isHermesProfileId(input.hermesProfileId))
+          throw new Error(sourceText("error.provider.hermesProfileInvalid"));
+        next.hermesProfileId = input.hermesProfileId;
+      }
       if (input.busyMessageMode === null) delete next.busyMessageMode;
       else if (input.busyMessageMode !== undefined) {
         if (!isBusyMessageMode(input.busyMessageMode)) throw new Error("Invalid busy message mode.");
@@ -876,6 +890,7 @@ export class AgentStore {
       if (next.busyMessageMode === undefined) delete agent.busyMessageMode;
       if (next.taskLimit === undefined) delete agent.taskLimit;
       if (next.providerAccountId === undefined) delete agent.providerAccountId;
+      if (next.hermesProfileId === undefined) delete agent.hermesProfileId;
       if (next.backupModels === undefined) delete agent.backupModels;
       if (next.additionalFolders === undefined) delete agent.additionalFolders;
       if (next.excludedFolders === undefined) delete agent.excludedFolders;
@@ -894,6 +909,7 @@ export class AgentStore {
         if (previous.busyMessageMode === undefined) delete agent.busyMessageMode;
         if (previous.taskLimit === undefined) delete agent.taskLimit;
         if (previous.providerAccountId === undefined) delete agent.providerAccountId;
+        if (previous.hermesProfileId === undefined) delete agent.hermesProfileId;
         if (previous.backupModels === undefined) delete agent.backupModels;
         if (previous.additionalFolders === undefined) delete agent.additionalFolders;
         if (previous.excludedFolders === undefined) delete agent.excludedFolders;
@@ -1934,6 +1950,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.busyMessageMode === undefined || isBusyMessageMode(record.busyMessageMode)) &&
     (record.taskLimit === undefined || isAgentTaskLimit(record.taskLimit)) &&
     (record.providerAccountId === undefined || isProviderAccountId(record.providerAccountId)) &&
+    (record.hermesProfileId === undefined || isHermesProfileId(record.hermesProfileId)) &&
     (record.backupModels === undefined || isAgentBackupModels(record.backupModels)) &&
     (record.usageLimitReturn === undefined || isAgentUsageLimitReturn(record.usageLimitReturn)) &&
     (record.pendingRuntime === undefined || isAgentPendingRuntime(record.pendingRuntime)) &&
@@ -1960,12 +1977,13 @@ interface UnreadableStoredAgent {
 /**
  * A stored profile, with every field this build cannot read put back to a value it can.
  *
- * The three fields it refuses on instead are the ones no default can stand in for. `id` names the
+ * The fields it refuses are the ones no default can stand in for. `id` names the
  * avatar directory, the workspace under `~/OpenBot/Agents` and the agent every thread and receipt
  * points at; `workspacePath` is the directory the agent reads and writes, and a guessed one is either
  * another agent's files or an empty new directory beside the real one; `threadId` is the whole
  * conversation, and reading a broken one as `null` reports an empty history and mints a second thread
- * over the first. Everything else is a preference, a label or a drawn face: resetting one costs the
+ * over the first. An invalid explicit Hermes profile cannot fall back to another sign-in.
+ * Everything else is a preference, a label or a drawn face: resetting one costs the
  * user a setting they can see and set again, while refusing costs them the application.
  *
  * `avatarUrl` is absent from the repair list on purpose -- `normalizeStoredAgent` already drops a URL
@@ -2036,6 +2054,10 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.taskLimit === undefined || isAgentTaskLimit(value.taskLimit)
       ? value.taskLimit
       : reset("taskLimit", undefined);
+  // An invalid explicit selection must not run on another profile. Keep the saved roster unchanged.
+  if (value.hermesProfileId !== undefined && !isHermesProfileId(value.hermesProfileId))
+    return { unreadable: "hermesProfileId", id };
+  const hermesProfileId = value.hermesProfileId;
   const providerAccountId =
     value.providerAccountId === undefined || isProviderAccountId(value.providerAccountId)
       ? value.providerAccountId
@@ -2121,6 +2143,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(busyMessageMode === undefined ? {} : { busyMessageMode }),
     ...(taskLimit === undefined ? {} : { taskLimit }),
     ...(providerAccountId === undefined ? {} : { providerAccountId }),
+    ...(hermesProfileId === undefined ? {} : { hermesProfileId }),
     ...(backupModels === undefined ? {} : { backupModels }),
     ...(usageLimitReturn === undefined ? {} : { usageLimitReturn }),
     ...(pendingRuntime === undefined ? {} : { pendingRuntime }),

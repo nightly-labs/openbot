@@ -1111,6 +1111,18 @@ Docker); the server packages include `libatomic1`, which the Node.js of the Herm
 `scripts/hermes-server-e2e.ts` installs Hermes in the release image with `HermesInstaller` and runs a
 turn on a mock model.
 
+Agents on this computer can keep an optional `hermesProfileId`. An absent value keeps the Hermes
+environment and active-profile behavior. `default` explicitly selects the root profile; a named ID
+selects an existing live profile. Discovery reads bounded name and identity metadata only. It does
+not read profile config or credentials. Missing, deleted, or invalid explicit profiles fail before
+launch. OpenBot passes `--profile <id> acp` and the selected `HERMES_HOME` to chat and model probes.
+The selected home also controls managed settings and OS confinement. Each explicit selection uses
+an agent-owned client, a profile-keyed model catalog, and namespaced ACP session IDs. A profile
+change requires an idle agent and retires its continuation, while its conversation stays. Returning
+to a previous profile starts a fresh continuation. A restart with the same selection can resume it.
+The local selector is not sent through released Team API adapters. Hermes profiles are not security
+sandboxes. See the [Hermes profile guide](https://hermes-agent.nousresearch.com/docs/user-guide/profiles).
+
 Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
 question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
 input (`closeInput`). `parseCliCodePrompt` takes the `Open:` URL, not the `Portal:` URL that Hermes

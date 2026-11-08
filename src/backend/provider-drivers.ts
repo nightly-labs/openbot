@@ -63,6 +63,7 @@ import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
+import { type HermesRuntimeContext, resolveHermesRuntime } from "./hermes-profiles";
 import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
 import { readKimiUsage } from "./kimi-usage";
@@ -96,6 +97,7 @@ import {
   devinStatePaths,
   hermesHome,
   hermesStatePaths,
+  hermesStatePathsForHome,
   kimiStatePaths,
   mistralHomeDirectory,
   mistralStatePaths,
@@ -346,6 +348,60 @@ function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement
 /** `hermes acp` serves the Agent Client Protocol on stdio. */
 const HERMES_ARGV: readonly string[] = ["acp"];
 
+function hermesClient(
+  cli: AgentCliInfo,
+  timeout: number,
+  context: ProviderClientContext,
+  confinement?: ProcessConfinement,
+  profileGeneration = false,
+): AgentClient {
+  const profile =
+    context.hermesProfile ?? resolveHermesRuntime(undefined, { ...process.env, ...context.agentEnvironment?.() });
+  const selected = profile.profileId;
+  const environment = () => {
+    const agent = context.agentEnvironment?.() ?? {};
+    const inherited = { ...process.env, ...agent };
+    if (selected !== undefined) resolveHermesRuntime(selected, { ...inherited, HERMES_HOME: profile.home });
+    const home = selected === undefined ? hermesHome(inherited) : profile.home;
+    return {
+      ...hermesSettingsEnvironment(inherited, context.providerStateDirectory, home),
+      ...agent,
+      ...(selected === undefined ? {} : { HERMES_HOME: home }),
+    };
+  };
+  return new AcpAgentClient(cli, timeout, {
+    provider: "hermes",
+    flavor: HERMES_ACP_FLAVOR,
+    argv: selected === undefined ? HERMES_ARGV : ["--profile", selected, ...HERMES_ARGV],
+    env: {},
+    extraEnv: environment,
+    ...(selected === undefined ? {} : { sessionNamespace: `hermes:${profile.identity}:` }),
+    ...(profileGeneration ? { profileGeneration: true } : {}),
+    ...(confinement
+      ? {
+          confine: (target: SpawnTarget) => {
+            if (selected === undefined)
+              return confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() });
+            resolveHermesRuntime(selected, { ...process.env, HERMES_HOME: profile.home });
+            return confineSpawnTarget(target, confinement, hermesStatePathsForHome(profile.home));
+          },
+        }
+      : {}),
+    signInMessage: sourceText("error.provider.hermesSignIn"),
+    authenticate: requireHermesProvider,
+    servesModel: context.servesModel,
+    ...(profileGeneration
+      ? {}
+      : {
+          mcpServers: context.mcpServers,
+          reportMcpDrops: context.reportMcpDrops,
+          mcpToolRuntimes: context.mcpToolRuntimes,
+          mcpEndpoint: context.mcpEndpoint,
+          history: context.history?.("hermes"),
+        }),
+  });
+}
+
 /** The Nous Portal sign-in, which `hermes auth add` keeps beside the user's other Hermes sign-ins. */
 const HERMES_NOUS_SIGN_IN: readonly string[] = ["auth", "add", "nous", "--type", "oauth"];
 
@@ -456,6 +512,7 @@ const MISTRAL_ARGV: readonly string[] = [];
  * `customProviders` is a getter, because both are read inside a spawn.
  */
 export interface ProviderClientContext {
+  readonly hermesProfile?: HermesRuntimeContext;
   apiKey(provider: AgentProviderId): string | null;
   /** Durable provider-history ports, selected by the external provider id. */
   readonly history?: (provider: AgentProviderId) => AcpHistoryPersistence | undefined;
@@ -1428,48 +1485,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // API key goes in `.env`, and the provider choice in `config.yaml`.
     signInFiles: () => ["auth.json", ".env", "config.yaml"].map((name) => join(hermesHome(), name)),
     resolveCli: () => resolveHermesCli(),
-    createClient: (cli, timeout, context, confinement) =>
-      new AcpAgentClient(cli, timeout, {
-        provider: "hermes",
-        flavor: HERMES_ACP_FLAVOR,
-        argv: HERMES_ARGV,
-        env: {},
-        // The agent environment can name another `HERMES_HOME`, and the process gets it.
-        ...(confinement
-          ? {
-              confine: (target) =>
-                confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() }),
-            }
-          : {}),
-        // The OpenBot settings (`hermes-settings.ts`) for the Hermes folder that the process uses.
-        extraEnv: () => {
-          const agentEnvironment = context.agentEnvironment?.() ?? {};
-          return {
-            ...hermesSettingsEnvironment({ ...process.env, ...agentEnvironment }, context.providerStateDirectory),
-            ...agentEnvironment,
-          };
-        },
-        signInMessage: sourceText("error.provider.hermesSignIn"),
-        authenticate: requireHermesProvider,
-        servesModel: context.servesModel,
-        mcpServers: context.mcpServers,
-        reportMcpDrops: context.reportMcpDrops,
-        mcpToolRuntimes: context.mcpToolRuntimes,
-        mcpEndpoint: context.mcpEndpoint,
-        history: context.history?.("hermes"),
-      }),
-    createProfileClient: (cli, timeout, context) =>
-      new AcpAgentClient(cli, timeout, {
-        provider: "hermes",
-        flavor: HERMES_ACP_FLAVOR,
-        argv: HERMES_ARGV,
-        profileGeneration: true,
-        env: {},
-        extraEnv: () => hermesSettingsEnvironment(process.env, context.providerStateDirectory),
-        signInMessage: sourceText("error.provider.hermesSignIn"),
-        authenticate: requireHermesProvider,
-        servesModel: context.servesModel,
-      }),
+    createClient: (cli, timeout, context, confinement) => hermesClient(cli, timeout, context, confinement),
+    createProfileClient: (cli, timeout, context) => hermesClient(cli, timeout, context, undefined, true),
     authState: (account) => ({ kind: "hermes", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },

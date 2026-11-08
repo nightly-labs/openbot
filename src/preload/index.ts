@@ -108,6 +108,7 @@ import {
   decodeAgents,
   decodeAutomationRunCommand,
   decodeDuplicateAgentResultFromMain,
+  decodeHermesProfiles,
   decodeHiddenAgentsFromMain,
   decodeHostAnalyticsFromMain,
   decodeHostDefaultProviderFromMain,
@@ -780,6 +781,8 @@ const openbotApi: OpenBotDesktopApi = {
     quitShortcutHint: decodeQuitShortcutHint,
   }),
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
+    listHermesProfiles: decodeHermesProfiles,
+    listHermesModels: decodeAgentModels,
     connectProvider: decodeAgentStatusFromMain,
     connectProviderInMainlandChina: decodeAgentStatusFromMain,
     cancelProviderSignIn: decodeAgentStatusFromMain,

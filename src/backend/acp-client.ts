@@ -383,6 +383,8 @@ export const OPENBOT_ACP_CLIENT_CAPABILITIES = {
 export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", version: "0.1.0" } as const;
 
 export interface AcpProviderOptions {
+  /** Stable profile identity. Absent keeps released raw session IDs. */
+  sessionNamespace?: string;
   provider: AgentProvider;
   /** Durable history supplied by the database. ACP never owns a full conversation snapshot. */
   history?: AcpHistoryPersistence | undefined;
@@ -633,6 +635,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       provider: this.options.provider,
       cli: this.#cli,
       argv: this.options.argv,
+      sessionNamespace: this.options.sessionNamespace,
       env: this.options.env,
       extraEnv: this.options.extraEnv,
       confine: this.options.confine,
@@ -674,6 +677,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     request: ProviderHistoryRequest,
     consume: ProviderHistoryConsumer,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    if (this.options.sessionNamespace && !request.threadId.startsWith(this.options.sessionNamespace))
+      return yield* providerFailure(
+        new MissingAcpSessionError(`ACP session not found: ${request.threadId}`, "different profile"),
+      );
     const history = this.options.history;
     const reader = history?.read;
     const append = history?.append;
@@ -1023,6 +1030,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     timeoutMs?: number,
   ): Effect.fn.Return<T, ProviderClientOperationError> {
     const sessionId = getString(params, "threadId");
+    if (sessionId && this.options.sessionNamespace && !sessionId.startsWith(this.options.sessionNamespace))
+      return yield* providerFailure(
+        new MissingAcpSessionError(`ACP session not found: ${sessionId}`, "different profile"),
+      );
     // A session with a process of its own fails with how that process ended.
     const transport = (sessionId ? this.#threads.get(sessionId)?.transport : null) ?? this.#transport;
     const ended = transport.ended;

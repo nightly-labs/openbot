@@ -486,7 +486,7 @@ export class ContextCompaction {
       budget?.phase !== "requested" ||
       !client ||
       !compactsOnRequest(client.contextCompaction) ||
-      !this.#providers.isReady()
+      !this.#providers.isReady(agent)
     ) {
       if (budget?.phase === "requested") this.observeCompaction(threadId, "failed");
       this.#release(agentId, threadId);

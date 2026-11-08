@@ -1370,6 +1370,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
+    listHermesProfiles: async () => ["default", "work"],
+    listHermesModels: async () => clone(allModels().filter((model) => model.provider === "hermes")),
     refreshAgentProviders: async () => clone(agentStatus),
     // The preview runs no provider process, so a restart has nothing to wait for.
     setProviderOn: async ({ provider, on }) => {
@@ -2460,6 +2462,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.model === undefined ? {} : { model: input.model }),
           ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
         });
+        if (input.hermesProfileId !== undefined) agent.hermesProfileId = input.hermesProfileId;
         if (input.provider && input.model && input.providerAccountId) agent.providerAccountId = input.providerAccountId;
         agents = [...agents, agent];
         queues.set(agent.id, emptyQueue(agent.id));
@@ -2550,6 +2553,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           busyMessageMode,
           taskLimit,
           providerAccountId,
+          hermesProfileId,
           backupModels,
           leaveUsageLimit: _leaveUsageLimit,
           allowAutomation,
@@ -2566,6 +2570,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           if (flag === null) delete updated[key];
           else if (flag !== undefined) updated[key] = flag;
         }
+        if (hermesProfileId === null) delete updated.hermesProfileId;
+        else if (hermesProfileId !== undefined) updated.hermesProfileId = hermesProfileId;
         if (backupModels === null) delete updated.backupModels;
         else if (backupModels) updated.backupModels = backupModels;
         if (providerAccountId === null || (updates.provider && !providerAccountId)) delete updated.providerAccountId;

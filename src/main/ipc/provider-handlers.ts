@@ -7,6 +7,7 @@ import {
   agentProviderName,
   type DownloadableProviderId,
   isDownloadableProvider,
+  isHermesProfileId,
   isManagedRuntimeProvider,
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
@@ -69,6 +70,15 @@ export function providerIpcHandlers({
 
   return {
     providers: {
+      listHermesProfiles: handler(() => runCauseEffect(service.listHermesProfiles())),
+      listHermesModels: payloadHandler(
+        (value: unknown): { profileId?: string } => {
+          if (!isDynamicRecord(value) || (value.profileId !== undefined && !isHermesProfileId(value.profileId)))
+            throw new Error(sourceText("error.provider.hermesProfileInvalid"));
+          return value.profileId === undefined ? {} : { profileId: value.profileId };
+        },
+        ({ profileId }) => runCauseEffect(service.listHermesModels(profileId)),
+      ),
       setProviderOn: payloadHandler(parseProviderUseInput, ({ provider, on }) =>
         runCauseEffect(service.setProviderOn(provider, on)),
       ),

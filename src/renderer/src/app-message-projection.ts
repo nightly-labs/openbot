@@ -42,6 +42,7 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     model: stored.model,
     reasoningEffort: stored.reasoningEffort,
     ...(stored.providerAccountId === undefined ? {} : { providerAccountId: stored.providerAccountId }),
+    ...(stored.hermesProfileId === undefined ? {} : { hermesProfileId: stored.hermesProfileId }),
     ...(stored.access === undefined ? {} : { access: stored.access }),
     ...(stored.computerUse === undefined ? {} : { computerUse: stored.computerUse }),
     ...(stored.allowAutomation === undefined ? {} : { allowAutomation: stored.allowAutomation }),
@@ -236,6 +237,7 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.model === right.model &&
     left.reasoningEffort === right.reasoningEffort &&
     left.providerAccountId === right.providerAccountId &&
+    left.hermesProfileId === right.hermesProfileId &&
     JSON.stringify(left.backupModels) === JSON.stringify(right.backupModels) &&
     (left.additionalFolders ?? []).join("\n") === (right.additionalFolders ?? []).join("\n") &&
     (left.excludedFolders ?? []).join("\n") === (right.excludedFolders ?? []).join("\n") &&

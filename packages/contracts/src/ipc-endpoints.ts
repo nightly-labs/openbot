@@ -815,6 +815,8 @@ export const IPC_ENDPOINTS = {
     exportDiagnostics: request<undefined, ExportResult>()("maintenance:export-diagnostics"),
   },
   providers: {
+    listHermesProfiles: request<undefined, string[]>()("app:list-hermes-profiles"),
+    listHermesModels: request<{ profileId?: string }, ClientAgentModelOption[]>()("app:list-hermes-models"),
     setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
     /**

@@ -4,7 +4,7 @@ import { createAgentInitialMessage } from "./agent-initial-message";
 
 /** A new agent asked for from a short draft, such as the routine canvas's card. */
 export type NewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue" | "avatarColor"> &
-  Partial<Pick<FirstAgentDraft, "provider" | "model" | "reasoningEffort" | "providerAccountId">>;
+  Partial<Pick<FirstAgentDraft, "provider" | "model" | "reasoningEffort" | "providerAccountId" | "hermesProfileId">>;
 
 /**
  * The creation request for a draft. A draft without a provider leaves the backend to pick its
@@ -27,6 +27,7 @@ export function newAgentInput(draft: NewAgentDraft, createModelSupported: boolea
           model: draft.model,
           ...(draft.reasoningEffort ? { reasoningEffort: draft.reasoningEffort } : {}),
           ...(draft.providerAccountId ? { providerAccountId: draft.providerAccountId } : {}),
+          ...(draft.hermesProfileId === undefined ? {} : { hermesProfileId: draft.hermesProfileId }),
         }
       : {}),
     initialMessage: createAgentInitialMessage(draft),
