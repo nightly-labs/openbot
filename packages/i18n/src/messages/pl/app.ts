@@ -67,6 +67,7 @@ export const messages = {
   "app.help.changelog": "Pełna lista zmian",
   "app.help.guides": "Poradniki",
   "app.help.discord": "Dołącz do Discorda",
+  "app.help.reportProblem": "Zgłoś problem",
   "app.githubStar.title": "Podoba Ci się OpenBot?",
   "app.githubStar.description": "Gwiazdka na GitHubie pomaga innym znaleźć OpenBota.",
   "app.githubStar.star": "Daj gwiazdkę na GitHubie",

@@ -2,6 +2,7 @@ import { Effect } from "effect";
 // App identity, first-run setup, the analytics preference, external links and the data and
 // diagnostics exports.
 
+import { type BugReportPlatform, bugReportFormUrl } from "@openbot/contracts/bug-report";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -68,6 +69,24 @@ function draftPost(translate: AppTranslate): string {
   return encodeURIComponent(translate("app.socialFollow.draftPost", { site: "openbot.run" }));
 }
 
+const BUG_REPORT_PLATFORMS: Partial<Record<NodeJS.Platform, BugReportPlatform>> = {
+  darwin: "macOS",
+  win32: "Windows",
+  linux: "Linux",
+};
+
+/** The bug report form with this build's version and system, so the reporter does not look them up. */
+function reportProblemUrl(): string {
+  const platform = BUG_REPORT_PLATFORMS[process.platform] ?? "Linux";
+  return bugReportFormUrl({
+    platform,
+    // electron-vite starts a script, so Electron reports its own version in development.
+    version: app.isPackaged ? app.getVersion() : developmentVersion,
+    os: `${platform} ${process.getSystemVersion()} (${process.arch})`,
+    builtFromSource: !app.isPackaged,
+  });
+}
+
 /**
  * Every destination `openExternal` may reach, as a closed table.
  *
@@ -86,6 +105,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   "claude-install": "https://code.claude.com/docs",
   "hermes-install": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
+  "report-problem": reportProblemUrl,
   message: "https://x.com/norbertbodziony",
   changelog: "https://openbot.run/changelog",
   guides: "https://openbot.run/guides",

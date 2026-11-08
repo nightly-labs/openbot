@@ -337,7 +337,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   computer_use_action: { action: "permission_opened"; permission: "screen-recording" | "accessibility" };
-  help_link_opened: { destination: "discord" | "feedback" | "guides" | "changelog" };
+  help_link_opened: { destination: "discord" | "feedback" | "report-problem" | "guides" | "changelog" };
   channel_action: {
     action: "created" | "archived" | "member_added";
     result: AnalyticsResult;
@@ -684,7 +684,7 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden", "protonpass"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],
-  destination: ["discord", "feedback", "guides", "changelog"],
+  destination: ["discord", "feedback", "report-problem", "guides", "changelog"],
   range: ["7d", "30d", "90d", "1y"],
   from_provider: AGENT_PROVIDERS,
   to_provider: AGENT_PROVIDERS,

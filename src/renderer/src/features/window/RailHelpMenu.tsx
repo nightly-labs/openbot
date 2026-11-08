@@ -5,6 +5,8 @@ import { desktopAnalytics } from "../../analytics";
 import { compareReleaseVersions } from "../updates/whats-new-history";
 import { loadWhatsNewReleases } from "../updates/whats-new-releases";
 
+type HelpLink = "changelog" | "guides" | "discord" | "report-problem" | "feedback";
+
 /** The newest releases that the Help menu lists, one line each. */
 const HELP_NEWS_COUNT = 3;
 
@@ -16,10 +18,10 @@ const HELP_NEWS_COUNT = 3;
 export function RailHelpMenu(props: {
   version: string | null;
   onOpenWhatsNew: () => void;
-  onOpenLink: (destination: "changelog" | "guides" | "discord" | "feedback") => void;
+  onOpenLink: (destination: HelpLink) => void;
 }) {
   const [news, setNews] = createSignal<readonly HelpMenuNews[]>([]);
-  const openLink = (destination: "changelog" | "guides" | "discord" | "feedback") => {
+  const openLink = (destination: HelpLink) => {
     desktopAnalytics.track("help_link_opened", { destination });
     props.onOpenLink(destination);
   };
@@ -57,6 +59,7 @@ export function RailHelpMenu(props: {
       onOpenChangelog={() => openLink("changelog")}
       onOpenGuides={() => openLink("guides")}
       onOpenDiscord={() => openLink("discord")}
+      onReportProblem={() => openLink("report-problem")}
       onSendFeedback={() => openLink("feedback")}
     />
   );

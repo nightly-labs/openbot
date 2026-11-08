@@ -68,6 +68,7 @@ export const messages = {
   "app.help.changelog": "すべての変更履歴",
   "app.help.guides": "ガイド",
   "app.help.discord": "Discordに参加",
+  "app.help.reportProblem": "問題を報告",
   "app.githubStar.title": "OpenBot はいかがですか？",
   "app.githubStar.description": "GitHub でスターを付けると、より多くの人が OpenBot を見つけられます。",
   "app.githubStar.star": "GitHub でスター",

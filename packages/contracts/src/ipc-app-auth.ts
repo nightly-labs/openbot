@@ -580,6 +580,8 @@ export type ExternalDestination =
   | "claude-install"
   | "hermes-install"
   | "feedback"
+  // The GitHub bug report form, from the Help menu, with the version and the system filled in.
+  | "report-problem"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
   // The community card of the sidebar also opens Discord.

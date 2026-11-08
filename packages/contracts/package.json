@@ -8,6 +8,7 @@
     "./notification-relay": "./src/notification-relay.ts",
     "./agent-mention-rank": "./src/agent-mention-rank.ts",
     "./agent-providers": "./src/agent-providers.ts",
+    "./bug-report": "./src/bug-report.ts",
     "./development-defaults": "./src/development-defaults.ts",
     "./app-appearance": "./src/app-appearance.ts",
     "./app-language": "./src/app-language.ts",
