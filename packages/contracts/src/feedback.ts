@@ -214,9 +214,17 @@ export interface FeatureRequest extends SentFacts {
 
 export type Feedback = BugReport | FeatureRequest;
 
-/** The form option for an agent's provider; a provider that the form does not list is "Custom agent (ACP)". */
-export function bugReportProvider(provider: AgentProviderId): BugReportProvider {
-  return PROVIDER_OPTIONS[provider] ?? "Custom agent (ACP)";
+/**
+ * The form option and version line for an agent's provider. A provider that the form does not list is
+ * "Custom agent (ACP)", and its id starts the version line, so that triage knows the real provider.
+ */
+export function bugReportProviderFacts(
+  provider: AgentProviderId,
+  version: string,
+): { provider: BugReportProvider; providerVersion: string } {
+  const option = PROVIDER_OPTIONS[provider];
+  if (option) return { provider: option, providerVersion: version };
+  return { provider: "Custom agent (ACP)", providerVersion: `${provider} ${version}`.trim() };
 }
 
 /**

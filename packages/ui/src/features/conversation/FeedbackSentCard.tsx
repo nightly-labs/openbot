@@ -6,7 +6,13 @@ import { useText } from "../../text";
  * The chat card after the OpenBot team got the user's feedback: a thank-you, the title, and a link to
  * the public issue. It comes in where the offer card was, with a short entrance.
  */
-export function FeedbackSentCard(props: { title: string; number: number; url: string }) {
+export function FeedbackSentCard(props: {
+  title: string;
+  number: number;
+  url: string;
+  /** Opens the issue outside the app. Absent, the link opens a new browser tab. */
+  onOpenLink?: ((url: string) => void) | undefined;
+}) {
   const { t } = useText();
   return (
     <section
@@ -28,6 +34,11 @@ export function FeedbackSentCard(props: { title: string; number: number; url: st
           href={props.url}
           target="_blank"
           rel="noreferrer"
+          onClick={(event) => {
+            if (!props.onOpenLink) return;
+            event.preventDefault();
+            props.onOpenLink(props.url);
+          }}
           aria-label={t("chat.feedbackSent.openNamed", { number: String(props.number) })}
         >
           #{props.number}

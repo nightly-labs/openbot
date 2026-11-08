@@ -8,7 +8,7 @@ import {
   BUG_REPORT_SEVERITIES,
   bugReportFormUrl,
   bugReportPlatform,
-  bugReportProvider,
+  bugReportProviderFacts,
   FEATURE_REQUEST_TYPES,
   FEEDBACK_LIMITS,
   type Feedback,
@@ -969,7 +969,8 @@ export class OpenBotToolRouter {
       throw new Error("title and text must be strings.");
     const text = (value: unknown) =>
       isString(value) && value.trim() ? redactText(value.trim()).slice(0, FEEDBACK_LIMITS.text) : "";
-    const title = redactText(args.title.trim()).slice(0, FEEDBACK_LIMITS.title);
+    // The card shows the title on one line, and the issue title is one line.
+    const title = redactText(args.title.replace(/\s+/g, " ").trim()).slice(0, FEEDBACK_LIMITS.title);
     if (!title || !text(args.text)) return openBotToolFailure("title and text must not be empty.");
     const idea = args.kind === "idea";
     const { provider } = this.#requireAgent(senderAgentId);
@@ -1007,10 +1008,14 @@ export class OpenBotToolRouter {
       installSource: facts.builtFromSource ? "Built from source" : "Other",
       version: facts.version,
       os: facts.os,
-      provider: bugReportProvider(provider),
-      providerVersion,
+      ...bugReportProviderFacts(provider, providerVersion),
     });
     if (!feedback) return openBotToolFailure("title and text must not be empty.");
+    // A routine, a channel task, an external chat or another agent must not wait on the owner's card.
+    if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead.",
+      );
     const decision = yield* this.#attention.awaitToolApproval(
       client,
       request,
@@ -1029,6 +1034,11 @@ export class OpenBotToolRouter {
       // The text goes out with the owner's account, and Full access does not answer for a public post.
       { ownerOnly: true },
     );
+    if (decision === "cancel")
+      return openBotToolResult({
+        status: "cancelled",
+        next: "Nobody answered the card, so OpenBot did not send it. Do not send it another way.",
+      });
     if (decision !== "accept")
       return openBotToolResult({
         status: "declined",

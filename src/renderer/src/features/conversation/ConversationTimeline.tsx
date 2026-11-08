@@ -1004,6 +1004,7 @@ export function ConversationTimeline() {
                                                 onOpenRoutine={openRoutineSettings}
                                                 openRoutineThread={openRoutineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                onOpenLink={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
                                                 agentMessageText={agentMessageText}

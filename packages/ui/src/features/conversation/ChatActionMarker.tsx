@@ -53,6 +53,8 @@ interface ChatActionMarkerProps {
    */
   openRoutineThread?: ((routineId: string) => (() => void) | undefined) | undefined;
   onOpenHostedSite?: ((url: string) => void) | undefined;
+  /** Opens a web link outside the app, such as the issue of sent feedback. */
+  onOpenLink?: ((url: string) => void) | undefined;
   /** Opens or closes the messages of a run, or the runs of a group, whose marker sets `expanded`. */
   onToggleRoutineRun?: ((marker: RoutineRunToggleMarkerModel) => void) | undefined;
   /** Opens or closes the text of an agent message whose marker sets `expanded`, by its `messageId`. */
@@ -139,6 +141,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                       onOpenRoutine={props.onOpenRoutine}
                       openRoutineThread={props.openRoutineThread}
                       onOpenHostedSite={props.onOpenHostedSite}
+                      onOpenLink={props.onOpenLink}
                       onToggleRoutineRun={props.onToggleRoutineRun}
                       onToggleAgentMessage={props.onToggleAgentMessage}
                       agentMessageText={props.agentMessageText}
@@ -149,7 +152,14 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                 </Show>
               }
             >
-              {(sent) => <FeedbackSentCard title={sent().title} number={sent().number} url={sent().url} />}
+              {(sent) => (
+                <FeedbackSentCard
+                  title={sent().title}
+                  number={sent().number}
+                  url={sent().url}
+                  onOpenLink={props.onOpenLink}
+                />
+              )}
             </Show>
           }
         >

@@ -215,12 +215,13 @@ export class GitHubInstallationTokens {
       installationId = (yield* this.#get(`/repos/${repository}/installation`, APP, repositoryInstallationSchema)).id;
       this.#repositoryInstallations.set(repository, installationId);
     }
+    // A reinstalled app has a new installation ID, so a failed mint looks it up again next time.
     const minted = yield* this.#post(
       `/app/installations/${installationId}/access_tokens`,
       APP,
       { repositories: [name], permissions: { issues: "write" } },
       accessTokenSchema,
-    );
+    ).pipe(Effect.tapError(() => Effect.sync(() => this.#repositoryInstallations.delete(repository))));
     const opened = yield* this.#post(
       `/repos/${repository}/issues`,
       { kind: "installation", token: minted.token },
