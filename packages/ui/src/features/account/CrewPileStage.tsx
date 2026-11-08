@@ -1,6 +1,6 @@
 import type { BotExpression, ExpressionId } from "@norbert_bodziony/bloub";
 import { PLUSH_CHARACTER_BY_ID, PlushBot } from "@norbert_bodziony/bloub/plush";
-import { createEffect, createSignal, For, flush, onSettled, untrack } from "solid-js";
+import { createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 import type { CrewFace, CrewFilm, CrewMember, CrewPile } from "./crew-pile";
 
 /** The face of a crew plush at rest: its character's own face, as PlushBot shows without an expression. */
@@ -208,7 +208,29 @@ export function CrewPileStage(props: CrewPileStageProps) {
   const [crew, setCrew] = createSignal(pile.crew);
   const [pitSize, setPitSize] = createSignal(pile.pit);
   const [player, setPlayer] = createSignal<CrewPlayer>();
+  // The size of the screen now. The film is recorded for the size at the start, so when the window
+  // changes size, as when it goes full screen, the pit scales until it covers the screen again.
+  const [room, setRoom] = createSignal<{ width: number; height: number }>();
+  const pitScale = () => {
+    const pit = pitSize();
+    const current = room();
+    if (!current || current.width <= 0 || current.height <= 0) return pit.unit;
+    return Math.max(current.width / pit.width, current.height / pit.height);
+  };
   let frame: HTMLDivElement | undefined;
+
+  onSettled(() => {
+    // A test DOM has no ResizeObserver: the pit keeps the size of the start.
+    if (!frame || typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setRoom({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(frame);
+    return () => observer.disconnect();
+  });
+
+  // The pit fits the screen, and the crew of the fit have their elements: the film can play.
+  const [fitted, setFitted] = createSignal(false);
 
   onSettled(() => {
     if (frame && pile.fit({ width: frame.clientWidth, height: frame.clientHeight })) {
@@ -218,8 +240,14 @@ export function CrewPileStage(props: CrewPileStageProps) {
       faces.length = 0;
       setCrew(pile.crew);
       setPitSize(pile.pit);
-      flush();
     }
+    setFitted(true);
+  });
+
+  // An effect runs after the DOM shows the new crew. `flush()` cannot do this here: a screen that
+  // mounts during an update settles inside that flush, where `flush()` is not allowed.
+  createEffect(fitted, (ready) => {
+    if (!ready) return;
     const film = pile.film();
     const rigs = pile.crew.flatMap((_, index): CrewRig[] => {
       const plush = plushes[index];
@@ -254,7 +282,7 @@ export function CrewPileStage(props: CrewPileStageProps) {
     >
       <div
         class="app-loading-pit"
-        style={{ width: `${pitSize().width}px`, height: `${pitSize().height}px`, scale: `${pitSize().unit}` }}
+        style={{ width: `${pitSize().width}px`, height: `${pitSize().height}px`, scale: `${pitScale()}` }}
       >
         <For each={crew()}>
           {(member, position) => {
