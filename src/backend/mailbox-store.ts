@@ -2028,9 +2028,38 @@ export class MailboxStore {
     visited.add(messageId);
     const message = this.#state.messages.find((candidate) => candidate.id === messageId);
     if (message?.sender.kind !== "agent" || message.channelId) return [];
-    if (!isAnswer(message)) return [message];
-    const sent = this.#state.messages.find((candidate) => candidate.id === message.replyToMessageId);
-    const turnId = sent?.sender.kind === "agent" && sent.sender.agentId === agentId ? turnIds.get(sent.id) : undefined;
+    if (isAnswer(message)) {
+      const sent = this.#state.messages.find((candidate) => candidate.id === message.replyToMessageId);
+      return sent ? this.#continuedRequests(agentId, sent, turnIds, visited) : [];
+    }
+    // A teammate can report its part with no reply link. Then the message that its turn on the part
+    // request sent continues that request, as an answer does.
+    const teammateId = message.sender.agentId;
+    const turnId = turnIds.get(message.id);
+    const parts = turnId
+      ? this.#state.deliveries
+          .filter((delivery) => delivery.recipientAgentId === teammateId && deliveryTurnIds(delivery).includes(turnId))
+          .flatMap((delivery) => this.#state.messages.filter((candidate) => candidate.id === delivery.messageId))
+          .filter(
+            (part) =>
+              part.sender.kind === "agent" &&
+              part.sender.agentId === agentId &&
+              !part.channelId &&
+              part.expectsReply !== false &&
+              !this.hasReplyFrom(teammateId, part.id),
+          )
+      : [];
+    return [message, ...parts.flatMap((part) => this.#continuedRequests(agentId, part, turnIds, visited))];
+  }
+
+  /** The requests that the turn of `agentId` that sent `sent` works on. */
+  #continuedRequests(
+    agentId: string,
+    sent: StoredMessage,
+    turnIds: ReadonlyMap<string, string | undefined>,
+    visited: Set<string>,
+  ): StoredMessage[] {
+    const turnId = sent.sender.kind === "agent" && sent.sender.agentId === agentId ? turnIds.get(sent.id) : undefined;
     if (!turnId) return [];
     return this.#state.deliveries
       .filter((delivery) => delivery.recipientAgentId === agentId && deliveryTurnIds(delivery).includes(turnId))
@@ -2081,23 +2110,30 @@ export class MailboxStore {
         for (const delivery of this.#state.deliveries) {
           if (delivery.messageId !== sent.id || delivery.recipientAgentId === agentId) continue;
           const teammateId = delivery.recipientAgentId;
-          const answers = this.#state.messages.filter(
+          let answers = this.#state.messages.filter(
             (message) =>
               isAnswer(message) && message.sender.agentId === teammateId && message.replyToMessageId === sent.id,
           );
           if (answers.length === 0) {
             if (
-              isOpenDelivery(delivery) ||
+              isActiveDelivery(delivery) ||
               this.#hasOpenPartRequests(teammateId, sent.id, sentByTurn, messages, visited)
             )
               return true;
-            continue;
+            // With no reply link, the messages of the teammate's turn on the part answer it.
+            answers = deliveryTurnIds(delivery)
+              .flatMap((turnId) => sentByTurn.get(turnId) ?? [])
+              .flatMap((id) => messages.get(id) ?? [])
+              .filter(
+                (message) =>
+                  message.sender.kind === "agent" && message.sender.agentId === teammateId && !message.channelId,
+              );
           }
           for (const answer of answers) {
             const read = this.#state.deliveries.filter(
               (candidate) => candidate.messageId === answer.id && candidate.recipientAgentId === agentId,
             );
-            if (read.some(isOpenDelivery)) return true;
+            if (read.some(isActiveDelivery)) return true;
             toRead.push(answer.id);
           }
         }
@@ -3706,11 +3742,6 @@ function isChatMessageFromPerson(message: StoredMessage): boolean {
     message.messaging === undefined &&
     message.messagingReturn === undefined
   );
-}
-
-/** A delivery that its recipient has not finished. */
-function isOpenDelivery(delivery: StoredDelivery): boolean {
-  return delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running";
 }
 
 /** The turns that ran a delivery: its turn, and the earlier turns that a plan or a usage limit continued. */

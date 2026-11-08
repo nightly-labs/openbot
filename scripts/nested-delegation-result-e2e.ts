@@ -313,6 +313,33 @@ try {
     JSON.stringify(nestedReceived),
   );
 
+  // 1b. C reports its part to B with send_message, no reply link and no reply wanted.
+  control.steps = {
+    ua1: { send: { recipientAgentIds: [b.id], text: "STEP:ub1", expectsReply: true }, say: "A waits for B." },
+    ub1: {
+      send: { recipientAgentIds: [c.id], text: "STEP:uc1", expectsReply: true },
+      say: "B sent the work to C and waits for C's reply.",
+    },
+    uc1: { send: { recipientAgentIds: [b.id], text: "C found 9. STEP:ub2", expectsReply: false }, say: "C told B." },
+    ub2: { say: "B's final answer: 9." },
+  };
+  saveControl();
+  since = new Date().toISOString();
+  await runCauseEffect(agents.sendMessage({ agentId: a.id, text: "STEP:ua1" }, { id: "local", name: "Alex" }));
+  const unlinked = await waitFor("A's request to B", () => requestId(a.id, b.id, "STEP:ub1"));
+  await waitFor("the unlinked chain to end", () => settled(all) && received(a.id, unlinked, names, since).length > 0);
+  await waitFor("the unlinked chain to stay settled", () => settled(all));
+  const unlinkedReceived = received(a.id, unlinked, names, since);
+  report.scenarios.push({ name: "A -> B -> C, C reports with no reply link", received: unlinkedReceived });
+  pass(
+    "When C reports with no reply link, A gets B's final answer once, as the reply to its request",
+    unlinkedReceived.length === 1 &&
+      unlinkedReceived[0]?.from === "B" &&
+      unlinkedReceived[0].repliesToRequest &&
+      unlinkedReceived[0].text === "B's final answer: 9.",
+    JSON.stringify(unlinkedReceived),
+  );
+
   // 2. The same chain, but B's turn that reads C's answer fails.
   control.steps = {
     fa1: { send: { recipientAgentIds: [b.id], text: "STEP:fb1", expectsReply: true }, say: "A waits for B." },
