@@ -140,7 +140,11 @@ const ServerScope = createSimpleContext({
       recovery: { phase: "connecting", attempt: 0, remainingSeconds: 0 },
     });
     const selectedServer = () => servers().find((candidate) => candidate.id === activeServerId());
-    const transportReady = () => selectedServer()?.kind !== "remote" || selectedServer()?.state === "online";
+    // Main refuses a remote request until it knows the account. A load started before then fails, and
+    // the workspace shows that failure for a moment when the account comes.
+    const transportReady = () =>
+      selectedServer()?.kind !== "remote" ||
+      (selectedServer()?.state === "online" && centralAuth().status !== "loading");
     const loaded = () =>
       connection.hasContent &&
       !connection.loading &&

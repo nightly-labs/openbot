@@ -80,7 +80,10 @@ export function AppAccessGate() {
   const [workspaceReady, setWorkspaceReady] = createSignal(false);
   const workspaceShown = () =>
     !!auth.visibleSignedInAccount() && (setup.setupState()?.completed === true || !scope.connection.hasContent);
-  const splashReady = () => started() && (!workspaceShown() || workspaceReady());
+  // While main loads the account, the splash cannot know if the workspace follows. It holds: a splash
+  // that ended before the account came would rain again on the workspace's first load.
+  const splashReady = () =>
+    started() && auth.centralAuth().status !== "loading" && (!workspaceShown() || workspaceReady());
   const languageStep = createLanguageStep();
   // Only a settled sign-out: a code in flight or a retry keeps the sign-in screen it belongs to.
   // The language button reopens the wheel from an error too, so that state does not hide it.
