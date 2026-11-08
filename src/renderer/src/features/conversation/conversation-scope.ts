@@ -797,12 +797,16 @@ export function createConversationViewScope(props: ConversationProps) {
       : undefined;
   // The host id of each sent message, to the key of the row its pending copy drew. The row keeps
   // that key after the send settles, so it stays mounted while the host's message replaces it.
+  // A key goes to one message only: when a channel guess took the wrong message and the send's own
+  // id comes later, the second message gets its own row and two rows never share a key.
   const handedOverRowKeys = createMemo<ReadonlyMap<string, string>>((previous = new Map()) => {
+    const usedKeys = new Set(previous.values());
     const sent = currentPendingSends().flatMap((send) => {
       const messageId = sentMessageId(send);
-      return messageId && !previous.has(messageId)
-        ? [[messageId, `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`] as const]
-        : [];
+      const rowKey = `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`;
+      if (!messageId || previous.has(messageId) || usedKeys.has(rowKey)) return [];
+      usedKeys.add(rowKey);
+      return [[messageId, rowKey] as const];
     });
     return sent.length ? new Map([...previous, ...sent]) : previous;
   });
