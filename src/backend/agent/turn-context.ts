@@ -9,10 +9,10 @@ import {
 } from "./developer-instructions";
 
 /**
- * The essential memories, the section-mates, the saved-logins rule and the style reminder of each thread, for a client
- * that sends them with the user turns (`AgentClient.turnContext`). In the system prompt, each
- * memory change would change the prefix, and the provider would write the full conversation to its
- * cache again. With the turns, a change is one small block.
+ * The essential memories, the section-mates, the saved-logins rule and the style reminder of each
+ * thread, for a client that sends them with the user turns (`AgentClient.turnContext`). In the
+ * system prompt, each memory change would change the prefix, and the provider would write the full
+ * conversation to its cache again. With the turns, a change is one small block.
  *
  * Kept by thread, not by process: a restarted or reopened session resumes a conversation that
  * already holds the blocks it was sent.

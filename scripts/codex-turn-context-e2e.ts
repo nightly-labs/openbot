@@ -1,11 +1,11 @@
 // Runs the real `codex app-server` against a fake Responses server, to check that a Codex agent gets
 // its saved memories, section-mates and saved-logins rule with the user turns, and that a memory
 // change keeps the cached prompt prefix and the Codex session. A login saved after the session start
-// comes with that change, so the turn after it must carry the saved-logins rule. A local server stands in for the model and records
-// each request, so no account or key is used. The fake model reports no real token counts, so the
-// report estimates them from the request text (4 characters a token). The cacheable part of a
-// request is the part before its first difference from the request before it, with the same
-// `prompt_cache_key`.
+// comes with that change, so the turn after it must carry the saved-logins rule. A local server
+// stands in for the model and records each request, so no account or key is used. The fake model
+// reports no real token counts, so the report estimates them from the request text (4 characters a
+// token). The cacheable part of a request is the part before its first difference from the request
+// before it, with the same `prompt_cache_key`.
 //
 // Two variants, with the same agent, memories and turns:
 // - `before`: the memories and the section-mates are in the developer instructions, as before this
