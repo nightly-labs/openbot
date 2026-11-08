@@ -747,7 +747,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "report_problem",
     description:
-      "Report a problem in OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the report and approves it before it is sent.",
+      "Report a bug in OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the report and approves it before it is sent.",
     shape: {
       title: z.string().min(1).max(200).describe("A short summary of the problem in plain words, without a prefix."),
       description: z
