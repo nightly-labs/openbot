@@ -1452,13 +1452,18 @@ export class TurnLifecycle {
           !continuation &&
           !this.#conversation.isExecutionThread(snapshot.threadId) &&
           terminal === "completed" &&
-          latestAssistant
+          latestAssistant?.text.trim()
         ) {
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
-        if (!continuation && terminal === "failed") {
+        // A turn with no text sends no result either, so the agent that asked would wait with no end.
+        const silent =
+          terminal === "completed" &&
+          !latestAssistant?.text.trim() &&
+          !this.#conversation.isExecutionThread(snapshot.threadId);
+        if (!continuation && (terminal === "failed" || silent)) {
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
         }
         // The requester holds the answers of the other teammates until each request has ended, so
@@ -1780,8 +1785,12 @@ export class TurnLifecycle {
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
-          onSuccess: (requesterId) => {
-            if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+          onSuccess: (requesterIds) => {
+            for (const requesterId of requesterIds) {
+              this.#mailboxSync.emitQueue(requesterId);
+              // An answer for a request that a teammate's answer continued has its own requester.
+              this.#hooks.scheduleDrain(requesterId);
+            }
           },
         }),
       );
@@ -1795,17 +1804,32 @@ export class TurnLifecycle {
     text: string,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
-    const messageId = delivery.delivery.messageId;
+    // An answer to a request that this agent sent for a teammate's request continues that request.
+    for (const requestId of this.#mailbox.answeredRequestIds(agentId, delivery.delivery.messageId))
+      yield* this.#relayRequestResult(agentId, turnId, requestId, text);
+  }, Effect.uninterruptible);
+
+  readonly #relayRequestResult = Effect.fn("TurnLifecycle.relayRequestResult")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    messageId: string,
+    text: string,
+  ) {
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
-    const recipientAgentId = delivery.delivery.sender.agentId;
+    const recipientAgentId = this.#mailbox.senderAgentId(messageId);
     if (
       !originAgentId ||
+      !recipientAgentId ||
       originAgentId === agentId ||
       // The sender said it wants no answer, so the turn's result stays with this agent. Without
       // this the sender is woken for an echo of work it only wanted to know about.
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId)
+      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId) ||
+      // The agent sent parts of the request to teammates and waits for them, so this turn's text is
+      // a status, not the result. The turn that reads the last answer sends the result (#5631).
+      this.#mailbox.hasOpenPartRequests(agentId, messageId)
     )
       return;
 

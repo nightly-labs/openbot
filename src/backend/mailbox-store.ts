@@ -1990,6 +1990,12 @@ export class MailboxStore {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
   }
 
+  /** The agent that sent the message, or null for another sender. */
+  senderAgentId(messageId: string): string | null {
+    const sender = this.#state.messages.find((message) => message.id === messageId)?.sender;
+    return sender?.kind === "agent" ? sender.agentId : null;
+  }
+
   /** The person who wrote the user message; undefined for older messages and other senders. */
   senderMember(messageId: string): ConversationMessageSender | undefined {
     return this.#state.messages.find((message) => message.id === messageId)?.senderMember;
@@ -2003,47 +2009,205 @@ export class MailboxStore {
   }
 
   /**
+   * The teammate requests that a turn of `agentId` answers when it reads `messageId`. A request
+   * answers itself. An answer to a request that the agent sent continues the requests of the turn
+   * that sent it, so an agent that split a request among teammates answers it after their answers
+   * (#5631).
+   */
+  answeredRequestIds(agentId: string, messageId: string): string[] {
+    return this.#answeredRequests(agentId, messageId, this.#sourceTurnIds(), new Set()).map((request) => request.id);
+  }
+
+  #answeredRequests(
+    agentId: string,
+    messageId: string,
+    turnIds: ReadonlyMap<string, string | undefined>,
+    visited: Set<string>,
+  ): StoredMessage[] {
+    if (visited.has(messageId)) return [];
+    visited.add(messageId);
+    const message = this.#state.messages.find((candidate) => candidate.id === messageId);
+    if (message?.sender.kind !== "agent" || message.channelId) return [];
+    if (isAnswer(message)) {
+      const sent = this.#state.messages.find((candidate) => candidate.id === message.replyToMessageId);
+      return sent ? this.#continuedRequests(agentId, sent, turnIds, visited) : [];
+    }
+    // A teammate can report its part with no reply link. Then the message that its turn on the part
+    // request sent continues that request, as an answer does.
+    const teammateId = message.sender.agentId;
+    const turnId = turnIds.get(message.id);
+    const parts = turnId
+      ? this.#state.deliveries
+          .filter((delivery) => delivery.recipientAgentId === teammateId && deliveryTurnIds(delivery).includes(turnId))
+          .flatMap((delivery) => this.#state.messages.filter((candidate) => candidate.id === delivery.messageId))
+          .filter(
+            (part) =>
+              part.sender.kind === "agent" &&
+              part.sender.agentId === agentId &&
+              !part.channelId &&
+              part.expectsReply !== false &&
+              !this.hasReplyFrom(teammateId, part.id),
+          )
+      : [];
+    return [message, ...parts.flatMap((part) => this.#continuedRequests(agentId, part, turnIds, visited))];
+  }
+
+  /** The requests that the turn of `agentId` that sent `sent` works on. */
+  #continuedRequests(
+    agentId: string,
+    sent: StoredMessage,
+    turnIds: ReadonlyMap<string, string | undefined>,
+    visited: Set<string>,
+  ): StoredMessage[] {
+    const turnId = sent.sender.kind === "agent" && sent.sender.agentId === agentId ? turnIds.get(sent.id) : undefined;
+    if (!turnId) return [];
+    return this.#state.deliveries
+      .filter((delivery) => delivery.recipientAgentId === agentId && deliveryTurnIds(delivery).includes(turnId))
+      .flatMap((delivery) => this.#answeredRequests(agentId, delivery.messageId, turnIds, visited));
+  }
+
+  /**
+   * Whether a request that `agentId` sent to work on `requestId` still waits for its answer: a
+   * teammate has not finished it, has not finished its own part requests for it, or the agent has
+   * not read the answer yet. The result of `requestId` waits until then.
+   */
+  hasOpenPartRequests(agentId: string, requestId: string): boolean {
+    const sentByTurn = new Map<string, string[]>();
+    for (const [messageId, turnId] of this.#sourceTurnIds()) {
+      if (!turnId) continue;
+      const sent = sentByTurn.get(turnId);
+      if (sent) sent.push(messageId);
+      else sentByTurn.set(turnId, [messageId]);
+    }
+    return this.#hasOpenPartRequests(agentId, requestId, sentByTurn, this.#messagesById(), new Set());
+  }
+
+  #hasOpenPartRequests(
+    agentId: string,
+    requestId: string,
+    sentByTurn: ReadonlyMap<string, readonly string[]>,
+    messages: ReadonlyMap<string, StoredMessage>,
+    visited: Set<string>,
+  ): boolean {
+    // From the request, the turns of this agent that read it, the requests that those turns sent,
+    // and then the turns that read the answers to those requests.
+    const toRead = [requestId];
+    for (let readId = toRead.pop(); readId !== undefined; readId = toRead.pop()) {
+      if (visited.has(`${agentId}\n${readId}`)) continue;
+      visited.add(`${agentId}\n${readId}`);
+      const turnIds = this.#state.deliveries
+        .filter((delivery) => delivery.messageId === readId && delivery.recipientAgentId === agentId)
+        .flatMap(deliveryTurnIds);
+      for (const sentId of turnIds.flatMap((turnId) => sentByTurn.get(turnId) ?? [])) {
+        const sent = messages.get(sentId);
+        if (
+          sent?.sender.kind !== "agent" ||
+          sent.sender.agentId !== agentId ||
+          sent.channelId ||
+          sent.expectsReply === false
+        )
+          continue;
+        for (const delivery of this.#state.deliveries) {
+          if (delivery.messageId !== sent.id || delivery.recipientAgentId === agentId) continue;
+          const teammateId = delivery.recipientAgentId;
+          let answers = this.#state.messages.filter(
+            (message) =>
+              isAnswer(message) && message.sender.agentId === teammateId && message.replyToMessageId === sent.id,
+          );
+          if (answers.length === 0) {
+            if (
+              isActiveDelivery(delivery) ||
+              this.#hasOpenPartRequests(teammateId, sent.id, sentByTurn, messages, visited)
+            )
+              return true;
+            // With no reply link, the messages of the teammate's turn on the part answer it.
+            answers = deliveryTurnIds(delivery)
+              .flatMap((turnId) => sentByTurn.get(turnId) ?? [])
+              .flatMap((id) => messages.get(id) ?? [])
+              .filter(
+                (message) =>
+                  message.sender.kind === "agent" && message.sender.agentId === teammateId && !message.channelId,
+              );
+          }
+          for (const answer of answers) {
+            const read = this.#state.deliveries.filter(
+              (candidate) => candidate.messageId === answer.id && candidate.recipientAgentId === agentId,
+            );
+            if (read.some(isActiveDelivery)) return true;
+            toRead.push(answer.id);
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Answers a teammate request whose delivery failed, so the agent that asked does not wait for a
    * result that never comes (#5055). The note goes where a result would go, as a reply from the
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
-   * `markTerminal` redacted. Returns the agent to wake, or null when no note is due.
+   * `markTerminal` redacted. A failed answer from a teammate that helped with a request answers that
+   * request (#5631). A turn that completed with no text and sent the asker nothing gives no result
+   * either, so it gets a note too. Returns the agents to wake.
    */
   answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
     this: MailboxStore,
     deliveryId: string,
     taskOpen: (taskId: string) => boolean,
-  ): Effect.fn.Return<string | null, StoredStateFailure> {
+  ): Effect.fn.Return<string[], StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
-    if (delivery?.status !== "failed" || request?.sender.kind !== "agent" || request.channelId) return null;
+    const failed = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
+    const silent = delivery?.status === "completed";
+    if ((delivery?.status !== "failed" && !silent) || failed?.sender.kind !== "agent" || failed.channelId) return [];
     const teammateId = delivery.recipientAgentId;
-    const requesterId = request.sender.agentId;
-    const originAgentId = this.chainOriginAgentId(request.id);
-    if (
-      requesterId === teammateId ||
-      !originAgentId ||
-      originAgentId === teammateId ||
-      request.expectsReply === false ||
-      this.hasReplyFrom(teammateId, request.id)
-    )
-      return null;
-    const answerTaskId = this.answerTaskId(teammateId, request.id, [requesterId]);
-    const taskId = answerTaskId && taskOpen(answerTaskId) ? answerTaskId : undefined;
-    yield* this.enqueue({
-      sender: { kind: "agent", agentId: teammateId },
-      recipientAgentIds: [requesterId],
-      text: [
-        "Status: blocked",
-        `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
-        "Evidence: none",
-        "Unblock: The user must fix the cause, then ask for the request again.",
-      ].join("\n"),
-      replyToMessageId: request.id,
-      ...(taskId ? { taskId } : {}),
-      expectsReply: false,
-      idempotencyKey: `failed-request:${deliveryId}`,
-    });
-    return requesterId;
+    const requests = this.#answeredRequests(teammateId, failed.id, this.#sourceTurnIds(), new Set());
+    const requesterIds: string[] = [];
+    for (const request of requests) {
+      if (request.sender.kind !== "agent") continue;
+      const chained = request.id !== failed.id;
+      const requesterId = request.sender.agentId;
+      const originAgentId = this.chainOriginAgentId(request.id);
+      if (
+        requesterId === teammateId ||
+        !originAgentId ||
+        originAgentId === teammateId ||
+        request.expectsReply === false ||
+        this.hasReplyFrom(teammateId, request.id) ||
+        (silent &&
+          deliveryTurnIds(delivery).some((turnId) =>
+            this.hasAgentMessageFromTurnTo(teammateId, turnId, requesterId),
+          )) ||
+        ((chained || silent) && this.hasOpenPartRequests(teammateId, request.id))
+      )
+        continue;
+      const answerTaskId = this.answerTaskId(teammateId, request.id, [requesterId]);
+      const taskId = answerTaskId && taskOpen(answerTaskId) ? answerTaskId : undefined;
+      yield* this.enqueue({
+        sender: { kind: "agent", agentId: teammateId },
+        recipientAgentIds: [requesterId],
+        text: (silent
+          ? [
+              "Status: blocked",
+              "Result: OpenBot note, not written by this teammate: the teammate ended its turn with no answer.",
+              "Evidence: none",
+              "Unblock: Ask the teammate again, or do the work another way.",
+            ]
+          : [
+              "Status: blocked",
+              `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
+              "Evidence: none",
+              "Unblock: The user must fix the cause, then ask for the request again.",
+            ]
+        ).join("\n"),
+        replyToMessageId: request.id,
+        ...(taskId ? { taskId } : {}),
+        expectsReply: false,
+        // One key for each request. Without a colon, so the key names no turn (`#sourceTurnIds`).
+        idempotencyKey: chained ? `failed-request:${deliveryId}/${request.id}` : `failed-request:${deliveryId}`,
+      });
+      requesterIds.push(requesterId);
+    }
+    return requesterIds;
   }, Effect.uninterruptible).bind(this);
 
   hasAgentMessageFromTurnTo(agentId: string, turnId: string, recipientAgentId: string): boolean {
@@ -3590,6 +3754,15 @@ function isChatMessageFromPerson(message: StoredMessage): boolean {
     message.messaging === undefined &&
     message.messagingReturn === undefined
   );
+}
+
+/** The turns that ran a delivery: its turn, and the earlier turns that a plan or a usage limit continued. */
+function deliveryTurnIds(delivery: StoredDelivery): string[] {
+  return [
+    ...(delivery.turnId ? [delivery.turnId] : []),
+    ...(delivery.planContinuation?.turnIds ?? []),
+    ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? []),
+  ];
 }
 
 /** An agent's answer to a request. A linked message that asks for a reply is a new request. */

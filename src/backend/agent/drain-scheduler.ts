@@ -1097,8 +1097,12 @@ export class DrainScheduler {
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
-          onSuccess: (requesterId) => {
-            if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+          onSuccess: (requesterIds) => {
+            for (const requesterId of requesterIds) {
+              this.#mailboxSync.emitQueue(requesterId);
+              // An answer for a request that a teammate's answer continued has its own requester.
+              this.scheduleDrain(requesterId);
+            }
           },
         }),
       );
