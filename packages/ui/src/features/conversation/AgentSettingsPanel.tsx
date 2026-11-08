@@ -201,6 +201,11 @@ export interface AgentSettingsPanelProps {
   ) => Promise<boolean>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
   /**
+   * Shows a failed save that the panel cannot show, because it closed or shows a different agent
+   * before the save ended. Without it, that failure shows nowhere.
+   */
+  onUnshownSaveError?: ((message: string) => void) | undefined;
+  /**
    * Starts a new chat with the agent after the user confirms. The agent forgets the messages before
    * it and keeps its setup. Left out when the host cannot do it.
    */
@@ -575,11 +580,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       await props.onUpdateAgent(agentId, updates);
       return true;
     } catch (error) {
-      if (!disposed && props.agent.id === agentId) {
-        setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
-      }
+      reportSaveError(agentId, error);
       return false;
     }
+  }
+
+  /** Shows a failed save under the form, or outside the panel when the form shows something else now. */
+  function reportSaveError(agentId: string, error: unknown): void {
+    const message = errorMessage(error, t("agentSettings.saveFailed"));
+    if (!disposed && props.agent.id === agentId) setSaveError(message, error);
+    else props.onUnshownSaveError?.(message);
   }
 
   function textSaveRequest(
@@ -684,9 +694,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       if (!saved && props.agent.id === agentId) setSaveError(t("agentSettings.saveFailed"));
       return saved;
     } catch (error) {
-      if (props.agent.id === agentId) {
-        setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
-      }
+      reportSaveError(agentId, error);
       return false;
     }
   }

@@ -222,6 +222,7 @@ try {
   for (const [index, entry] of cases.entries()) {
     await writeFile(controlPath, JSON.stringify(entry));
     const firstLogLine = logLines.length;
+    const firstErrorEvent = errorEvents.length;
     const agent = await runCauseEffect(
       agents.createAgent({
         name: `Fallback ${index + 1}`,
@@ -263,7 +264,7 @@ try {
     );
     // The warning comes before OpenBot knows the thread's agent, so it was a toast with no agent.
     assert.ok(
-      errorEvents.every((event) => !event.message.includes("Under-development features")),
+      errorEvents.slice(firstErrorEvent).every((event) => !event.message.includes("Under-development features")),
       `${entry.name}: the under-development features warning reached a banner or a toast`,
     );
     assert.ok(
