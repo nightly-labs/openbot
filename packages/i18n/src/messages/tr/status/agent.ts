@@ -26,7 +26,7 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.reportProblem":
-    "Bu raporu GitHub'a herkese açık bir issue olarak gönder. Herkes okuyabilir. Adınız görünmez.",
+    "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",

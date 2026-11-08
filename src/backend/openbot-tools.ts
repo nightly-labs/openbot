@@ -747,17 +747,35 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "report_problem",
     description:
-      "Report a problem in OpenBot itself as a public GitHub issue, with the OpenBot version, the system and your provider added. The user reads the report and approves it before it is sent.",
+      "Report a problem in OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the report and approves it before it is sent.",
     shape: {
-      title: z.string().min(1).max(200).describe("A short summary of the problem, without a prefix."),
-      description: z.string().min(1).max(1000).describe("What happened, in a few sentences."),
-      steps: z.string().min(1).max(1000).describe("Numbered steps from a new launch of the app."),
-      expected: z.string().min(1).max(1000).describe("What the user expected."),
-      actual: z.string().min(1).max(1000).describe("What OpenBot did, with the exact error text."),
-      area: z.enum(BUG_REPORT_AREAS),
-      severity: z.enum(BUG_REPORT_SEVERITIES),
-      frequency: z.enum(BUG_REPORT_FREQUENCIES),
-      regression: z.enum(BUG_REPORT_REGRESSIONS).describe("Did this work in an earlier version?"),
+      title: z.string().min(1).max(200).describe("A short summary of the problem in plain words, without a prefix."),
+      description: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe(
+          "What went wrong and what the user expected, in one to three plain sentences, with the exact error text.",
+        ),
+      steps: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe("What the user did before the problem, as short numbered steps. Leave it out when you do not know.")
+        .optional(),
+      area: z
+        .enum(BUG_REPORT_AREAS)
+        .describe("Your choice from the chat. Leave it out when it is not clear.")
+        .optional(),
+      severity: z
+        .enum(BUG_REPORT_SEVERITIES)
+        .describe("Your choice from the chat. Leave it out when it is not clear.")
+        .optional(),
+      frequency: z.enum(BUG_REPORT_FREQUENCIES).describe("Only when the user said it.").optional(),
+      regression: z
+        .enum(BUG_REPORT_REGRESSIONS)
+        .describe("Did this work in an earlier version? Only when the user said it.")
+        .optional(),
     },
   },
   {

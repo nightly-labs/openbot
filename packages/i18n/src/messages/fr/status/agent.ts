@@ -26,7 +26,7 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "Capturer la zone de l’écran à {x}, {y}, {width} × {height} points et envoyer l’image au modèle de l’agent.",
   "status.agent.reportProblem":
-    "Envoyer ce rapport sur GitHub sous forme de ticket public. Tout le monde peut le lire. Votre nom n’y figure pas.",
+    "Ceci devient une issue GitHub publique, avec la version de l'app et ton système. Ton nom n'apparaît pas.",
   "status.agent.workflowDelete":
     "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",
   "status.agent.screenCaptureProgress": "Demande de capture d’écran…",

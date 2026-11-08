@@ -313,6 +313,15 @@
   overflow-wrap: anywhere;
 }
 
+.approval-report-text {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
 .approval-reason {
   margin: calc(-1 * var(--openbot-space-2)) 0 0;
   color: var(--openbot-text-muted);

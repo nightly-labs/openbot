@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.alwaysAllow": "常に許可",
   "prompt.approval.waiting": "待機中…",
   "prompt.approval.deny": "拒否",
+  "prompt.approval.report.dontSend": "送信しない",
+  "prompt.approval.report.send": "レポートを送信",
   "prompt.approval.title.command": "コマンドを実行",
   "prompt.approval.title.fileChange": "ファイルを変更",
   "prompt.approval.title.permissions": "権限を付与",

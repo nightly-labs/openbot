@@ -27,7 +27,7 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "Przechwyć obszar ekranu w punkcie {x}, {y} o rozmiarze {width} × {height} punktów i wyślij obraz do modelu agenta.",
   "status.agent.reportProblem":
-    "Wyślij to zgłoszenie do GitHub jako publiczne zgłoszenie. Każdy może je przeczytać. Nie zawiera Twojego imienia.",
+    "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji i Twoim systemem. Twoje imię nie jest widoczne.",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
   "status.agent.screenCaptureProgress": "Prośba o przechwycenie ekranu…",

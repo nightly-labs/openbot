@@ -6,6 +6,7 @@ import type {
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
+import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { classifyFailure } from "@openbot/telemetry";
 import {
   Badge,
@@ -141,6 +142,7 @@ export function ApprovalCard(props: {
   const [submitting, setSubmitting] = createSignal(false);
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
+  const report = createMemo(() => bugReport(props.approval));
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
@@ -177,7 +179,7 @@ export function ApprovalCard(props: {
       aria-busy={submitting() ? "true" : undefined}
     >
       <header class="approval-card-header conversation-interaction-header">
-        <strong>{t(approvalTitle(props.approval))}</strong>
+        <strong>{report()?.title ?? t(approvalTitle(props.approval))}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
           <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
           {t("prompt.approval.badge")}
@@ -185,7 +187,7 @@ export function ApprovalCard(props: {
       </header>
       <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{sourceText(reason())}</p>}</Show>
       <div class="approval-card-content">
-        <Show when={props.approval.command}>
+        <Show when={!report() && props.approval.command}>
           {(command) => (
             <div class="approval-command-block">
               <Show when={props.approval.cwd}>
@@ -201,7 +203,8 @@ export function ApprovalCard(props: {
             <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
           </div>
         </Show>
-        <Show when={props.approval.kind === "permissions"}>
+        <Show when={report()?.text}>{(text) => <p class="approval-report-text">{text()}</p>}</Show>
+        <Show when={!report() && props.approval.kind === "permissions"}>
           <PermissionDetails permissions={props.approval.permissions} />
         </Show>
       </div>
@@ -213,9 +216,9 @@ export function ApprovalCard(props: {
           disabled={submitting()}
           onClick={() => void submit("accept")}
         >
-          {submitting() ? t("common.sending") : t("prompt.approval.allow")}
+          {submitting() ? t("common.sending") : t(report() ? "prompt.approval.report.send" : "prompt.approval.allow")}
         </Button>
-        <Show when={props.onAlwaysAllow}>
+        <Show when={!report() && props.onAlwaysAllow}>
           <Button
             ref={alwaysAllowButton}
             variant="secondary"
@@ -236,7 +239,9 @@ export function ApprovalCard(props: {
           data-cuelume-emphasis="normal"
           onClick={() => void submit("decline")}
         >
-          {submitting() ? t("prompt.approval.waiting") : t("prompt.approval.deny")}
+          {submitting()
+            ? t("prompt.approval.waiting")
+            : t(report() ? "prompt.approval.report.dontSend" : "prompt.approval.deny")}
         </Button>
       </footer>
       <StandingApprovalConfirmation
@@ -507,6 +512,18 @@ function browserPageDetails(tab: BrowserTab | undefined, t: TextValue["t"]): { t
   } catch {
     return { title, host: tab.url };
   }
+}
+
+/**
+ * A report from `openbot.report_problem`, which reads as a message, not as a grant. Its fixed notice
+ * marks it on every client: the notice is a source text, and the Team API carries it unchanged. The
+ * first paragraph is the title.
+ */
+function bugReport(approval: AgentApproval): { title: string; text: string } | null {
+  if (approval.kind !== "permissions" || approval.permissions !== null || !approval.command) return null;
+  if (approval.reason !== englishSourceText("status.agent.reportProblem")) return null;
+  const [title = "", ...text] = approval.command.split("\n\n");
+  return { title, text: text.join("\n\n") };
 }
 
 function approvalTitle(approval: AgentApproval | undefined) {

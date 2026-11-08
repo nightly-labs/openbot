@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.alwaysAllow": "السماح دائمًا",
   "prompt.approval.waiting": "جارٍ الانتظار…",
   "prompt.approval.deny": "رفض",
+  "prompt.approval.report.dontSend": "عدم الإرسال",
+  "prompt.approval.report.send": "إرسال التقرير",
   "prompt.approval.title.command": "تشغيل أمر",
   "prompt.approval.title.fileChange": "تغيير ملفات",
   "prompt.approval.title.permissions": "منح الأذونات",

@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.alwaysAllow": "始终允许",
   "prompt.approval.waiting": "等待中…",
   "prompt.approval.deny": "拒绝",
+  "prompt.approval.report.dontSend": "不发送",
+  "prompt.approval.report.send": "发送报告",
   "prompt.approval.title.command": "运行命令",
   "prompt.approval.title.fileChange": "修改文件",
   "prompt.approval.title.permissions": "授予权限",

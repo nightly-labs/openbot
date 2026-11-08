@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.alwaysAllow": "Her zaman izin ver",
   "prompt.approval.waiting": "Bekleniyor…",
   "prompt.approval.deny": "Reddet",
+  "prompt.approval.report.dontSend": "Gönderme",
+  "prompt.approval.report.send": "Raporu gönder",
   "prompt.approval.title.command": "Bir komut çalıştır",
   "prompt.approval.title.fileChange": "Dosyaları değiştir",
   "prompt.approval.title.permissions": "İzinleri ver",

@@ -11,9 +11,8 @@ import {
   type BugReportDetails,
   type BugReportFacts,
   bugReportFormUrl,
-  bugReportIssueBody,
-  bugReportIssueTitle,
   bugReportPlatform,
+  bugReportPreview,
   bugReportProvider,
   parseBugReport,
 } from "@openbot/contracts/bug-report";
@@ -954,8 +953,9 @@ export class OpenBotToolRouter {
   }
 
   /**
-   * `report_problem`: the agent's report with the facts that OpenBot knows. The owner reads the exact
-   * issue text and approves it, and the account service opens it as a public issue. Where nothing can
+   * `report_problem`: the agent's report with the facts that OpenBot knows. The owner reads the report
+   * in plain words and approves it, and the account service opens it as a public issue. The approval
+   * names the facts that OpenBot adds, so the owner does not read them as a form. Where nothing can
    * send it, or the send fails, the result is the prefilled form, which the user submits in the
    * browser. The text is redacted, because it leaves the computer.
    */
@@ -978,8 +978,6 @@ export class OpenBotToolRouter {
       title: text(args.title, BUG_REPORT_LIMITS.title),
       description: text(args.description, BUG_REPORT_LIMITS.text),
       reproduction: text(args.steps, BUG_REPORT_LIMITS.text),
-      expected: text(args.expected, BUG_REPORT_LIMITS.text),
-      actual: text(args.actual, BUG_REPORT_LIMITS.text),
     };
     const choices = {
       ...(isOneOf(BUG_REPORT_AREAS, args.area) ? { area: args.area } : {}),
@@ -1008,10 +1006,7 @@ export class OpenBotToolRouter {
       provider: bugReportProvider(provider),
       providerVersion,
     });
-    if (!report)
-      return openBotToolFailure(
-        "The report is incomplete. Give title, description, steps, expected and actual, and set area, severity, frequency and regression to listed values. Ask the user for an answer that you do not know.",
-      );
+    if (!report) return openBotToolFailure("title and description must not be empty.");
     const decision = yield* this.#attention.awaitToolApproval(
       client,
       request,
@@ -1021,7 +1016,7 @@ export class OpenBotToolRouter {
         threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
         turnId: params.turnId,
         kind: "permissions",
-        command: `${bugReportIssueTitle(report)}\n\n${bugReportIssueBody(report)}`,
+        command: bugReportPreview(report),
         cwd: null,
         reason: sourceText("status.agent.reportProblem"),
         grantRoot: null,

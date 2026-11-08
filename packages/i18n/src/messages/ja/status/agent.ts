@@ -28,7 +28,7 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.reportProblem":
-    "このレポートを公開 Issue として GitHub に送信します。誰でも読めます。あなたの名前は表示されません。",
+    "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",

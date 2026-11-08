@@ -30,7 +30,7 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "Acquisizione dell'area dello schermo a {x}, {y}, {width} × {height} punti e invio dell'immagine al modello dell'agente.",
   "status.agent.reportProblem":
-    "Invia questa segnalazione a GitHub come issue pubblica. Chiunque può leggerla. Il tuo nome non compare.",
+    "Diventerà una issue pubblica su GitHub, con la versione dell'app e il tuo sistema. Il tuo nome non viene mostrato.",
   "status.agent.workflowDelete":
     "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",

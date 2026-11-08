@@ -107,8 +107,6 @@ export interface BugReportDetails {
   readonly title?: string;
   readonly description?: string;
   readonly reproduction?: string;
-  readonly expected?: string;
-  readonly actual?: string;
   readonly area?: BugReportArea;
   readonly severity?: BugReportSeverity;
   readonly frequency?: BugReportFrequency;
@@ -132,12 +130,16 @@ export function bugReportFormUrl(facts: BugReportFacts, details: BugReportDetail
   if (details.regression) query.set("regression", details.regression);
   if (details.description) query.set("description", details.description);
   if (details.reproduction) query.set("reproduction", details.reproduction);
-  if (details.expected) query.set("expected", details.expected);
-  if (details.actual) query.set("actual", details.actual);
   return `${BUG_REPORT_FORM}&${query.toString()}`;
 }
 
-/** A report that the app sends to the account Worker, which opens it as an issue as `openbotgit[bot]`. */
+/**
+ * A report that the app sends to the account Worker, which opens it as an issue as `openbotgit[bot]`.
+ *
+ * Most reporters are not developers, so the agent writes only the problem in the user's words and the
+ * steps that it saw. The app adds the facts. A choice that the chat does not show stays null, and the
+ * issue reads "No response" for it, as GitHub writes an empty form field.
+ */
 export interface BugReport {
   readonly title: string;
   readonly platform: BugReportPlatform;
@@ -146,14 +148,14 @@ export interface BugReport {
   readonly os: string;
   readonly provider: BugReportProvider;
   readonly providerVersion: string;
-  readonly area: BugReportArea;
-  readonly severity: BugReportSeverity;
-  readonly frequency: BugReportFrequency;
-  readonly regression: BugReportRegression;
+  readonly area: BugReportArea | null;
+  readonly severity: BugReportSeverity | null;
+  readonly frequency: BugReportFrequency | null;
+  readonly regression: BugReportRegression | null;
+  /** What went wrong and what the user expected. */
   readonly description: string;
+  /** Empty when the agent does not know the steps. */
   readonly reproduction: string;
-  readonly expected: string;
-  readonly actual: string;
 }
 
 /** The form option for an agent's provider; a provider that the form does not list is "Custom agent (ACP)". */
@@ -168,11 +170,10 @@ export function bugReportIssueTitle(report: BugReport): string {
 
 /**
  * The issue body, in the sections that GitHub writes for a form answer (`### Label`, then the answer),
- * so that triage reads a sent report as it reads a form. The app shows this text for approval, and
- * the Worker sends the same text.
+ * so that triage reads a sent report as it reads a form.
  */
 export function bugReportIssueBody(report: BugReport): string {
-  const sections: [string, string][] = [
+  const sections: [string, string | null][] = [
     ["Platform", report.platform],
     ["Installation source", report.installSource],
     ["OpenBot version", report.version],
@@ -185,10 +186,10 @@ export function bugReportIssueBody(report: BugReport): string {
     ["Did this work in an earlier version?", report.regression],
     ["What happened?", report.description],
     ["Steps to reproduce", report.reproduction],
-    ["Expected result", report.expected],
-    ["Actual result", report.actual],
   ];
-  const answers = sections.map(([label, value]) => `### ${label}\n\n${noMentions(value.trim()) || "_No response_"}`);
+  const answers = sections.map(
+    ([label, value]) => `### ${label}\n\n${noMentions(value?.trim() ?? "") || "_No response_"}`,
+  );
   return [
     ...answers,
     "---",
@@ -197,25 +198,38 @@ export function bugReportIssueBody(report: BugReport): string {
 }
 
 /**
+ * The text that the user approves: the title on the first line, then the problem and the steps, in
+ * plain words. The app version and the system go in the issue too; the approval says so.
+ */
+export function bugReportPreview(report: BugReport): string {
+  return [report.title, report.description, report.reproduction].filter((part) => part.trim()).join("\n\n");
+}
+
+/**
  * The report in a request body, or null when a field is missing, too long, or not a form option. The
- * fields that the form requires are required here too, because the form check does not check an
- * issue from `openbotgit[bot]`. The Worker trusts nothing else: it opens a public issue with this text.
+ * Worker trusts nothing else: it opens a public issue with this text.
  */
 export function parseBugReport(value: unknown): BugReport | null {
   if (!isDynamicRecord(value)) return null;
   const text = (field: unknown, limit: number, required: boolean): string | null => {
-    if (field === undefined && !required) return "";
+    if ((field === undefined || field === null) && !required) return "";
     if (!isString(field) || field.length > limit) return null;
     return required && !field.trim() ? null : field;
+  };
+  const choice = <const T extends readonly string[]>(options: T, field: unknown): T[number] | null | undefined => {
+    if (field === undefined || field === null) return null;
+    return isOneOf(options, field) ? field : undefined;
   };
   const title = text(value.title, BUG_REPORT_LIMITS.title, true);
   const version = text(value.version, BUG_REPORT_LIMITS.fact, true);
   const os = text(value.os, BUG_REPORT_LIMITS.fact, true);
   const providerVersion = text(value.providerVersion, BUG_REPORT_LIMITS.fact, false);
   const description = text(value.description, BUG_REPORT_LIMITS.text, true);
-  const reproduction = text(value.reproduction, BUG_REPORT_LIMITS.text, true);
-  const expected = text(value.expected, BUG_REPORT_LIMITS.text, true);
-  const actual = text(value.actual, BUG_REPORT_LIMITS.text, true);
+  const reproduction = text(value.reproduction, BUG_REPORT_LIMITS.text, false);
+  const area = choice(BUG_REPORT_AREAS, value.area);
+  const severity = choice(BUG_REPORT_SEVERITIES, value.severity);
+  const frequency = choice(BUG_REPORT_FREQUENCIES, value.frequency);
+  const regression = choice(BUG_REPORT_REGRESSIONS, value.regression);
   if (
     title === null ||
     version === null ||
@@ -223,15 +237,13 @@ export function parseBugReport(value: unknown): BugReport | null {
     providerVersion === null ||
     description === null ||
     reproduction === null ||
-    expected === null ||
-    actual === null ||
+    area === undefined ||
+    severity === undefined ||
+    frequency === undefined ||
+    regression === undefined ||
     !isOneOf(BUG_REPORT_PLATFORMS, value.platform) ||
     !isOneOf(BUG_REPORT_INSTALL_SOURCES, value.installSource) ||
-    !isOneOf(BUG_REPORT_PROVIDERS, value.provider) ||
-    !isOneOf(BUG_REPORT_AREAS, value.area) ||
-    !isOneOf(BUG_REPORT_SEVERITIES, value.severity) ||
-    !isOneOf(BUG_REPORT_FREQUENCIES, value.frequency) ||
-    !isOneOf(BUG_REPORT_REGRESSIONS, value.regression)
+    !isOneOf(BUG_REPORT_PROVIDERS, value.provider)
   )
     return null;
   return {
@@ -242,14 +254,12 @@ export function parseBugReport(value: unknown): BugReport | null {
     os,
     provider: value.provider,
     providerVersion,
-    area: value.area,
-    severity: value.severity,
-    frequency: value.frequency,
-    regression: value.regression,
+    area,
+    severity,
+    frequency,
+    regression,
     description,
     reproduction,
-    expected,
-    actual,
   };
 }
 

@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.alwaysAllow": "Sempre permitir",
   "prompt.approval.waiting": "Aguardando…",
   "prompt.approval.deny": "Negar",
+  "prompt.approval.report.dontSend": "Não enviar",
+  "prompt.approval.report.send": "Enviar relatório",
   "prompt.approval.title.command": "Executar um comando",
   "prompt.approval.title.fileChange": "Alterar arquivos",
   "prompt.approval.title.permissions": "Conceder permissões",
