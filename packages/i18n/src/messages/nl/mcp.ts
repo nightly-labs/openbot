@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Niet verbonden",
   "mcp.connect.close": "Verbinden met {name} sluiten",
   "mcp.connect.getKey": "Sleutel ophalen",
+  "mcp.connect.useKey": "Liever een API-sleutel",
+  "mcp.connect.useSignIn": "Liever inloggen",
   "mcp.connect.keyDescription":
     "Plak een inloggegeven van je {name}-account. OpenBot verbindt ermee en bewaart het op {host}.",
   "mcp.connect.thisComputer": "deze computer",

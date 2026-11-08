@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "未连接",
   "mcp.connect.close": "关闭连接 {name}",
   "mcp.connect.getKey": "获取密钥",
+  "mcp.connect.useKey": "改用 API 密钥",
+  "mcp.connect.useSignIn": "改为登录",
   "mcp.connect.keyDescription": "粘贴你 {name} 账号的凭据。OpenBot 会用它连接，并保存在 {host} 上。",
   "mcp.connect.thisComputer": "这台电脑",
   "mcp.connect.noCredentialDescription": "{name} 不需要凭据。OpenBot 会连接一次，看看它提供哪些工具。",

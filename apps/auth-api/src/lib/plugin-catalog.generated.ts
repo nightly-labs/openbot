@@ -206,9 +206,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "composio",
-      version: "1.1.0",
+      version: "1.2.0",
       featured: false,
-      detailSha256: "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f",
+      detailSha256: "34b804089b4039cba7d4d159af5358012f1fff32d98b155d104ecf7ec05239ef",
     },
     {
       slug: "clickup",
@@ -1469,13 +1469,13 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
   composio: {
     slug: "composio",
     name: "Composio",
-    tagline: "Many apps through your own Composio link",
+    tagline: "Gmail, Slack, GitHub and 1,000+ more apps",
     description:
-      "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",
+      "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
     category: "automation",
     creatorName: "Composio",
     iconUrl: "https://composio.dev/favicon.ico",
-    version: "1.1.0",
+    version: "1.2.0",
     prompts: [
       { id: "prompt-inbox", text: "Summarize my unread email and draft replies to the urgent ones." },
       { id: "prompt-handoff", text: "Post a summary of this pull request to our team channel." },
@@ -1485,25 +1485,20 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       {
         id: "app-composio-mcp",
         name: "Composio",
-        description: "The apps you add to your Composio MCP server, over the link from your Composio account.",
+        description:
+          "The apps you connect in your Composio account. An agent asks you to connect an app when it needs it.",
         iconUrl: "https://composio.dev/favicon.ico",
         server: {
           name: "composio",
           transport: "http",
-          url: "https://composio.dev/",
+          url: "https://connect.composio.dev/mcp",
           auth: [
+            { id: "composio-oauth", kind: "link", label: "Sign in" },
             {
-              id: "composio-link",
+              id: "composio-key",
               kind: "key",
-              label: "MCP link",
+              label: "API key",
               fields: [
-                {
-                  id: "url",
-                  label: "MCP URL",
-                  url: true,
-                  placeholder: "https://connect.composio.dev/mcp",
-                  hint: "The URL of an MCP server in your Composio account",
-                },
                 {
                   id: "api-key",
                   label: "API key",
@@ -1512,8 +1507,6 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
                   hint: "Find it in your Composio account, in Settings > Sessions & API Key.",
                 },
               ],
-              docsUrl: "https://docs.composio.dev/kb/guide/consumer-project-boundaries-and-auth-selection",
-              docsLabel: "Get a key",
             },
           ],
         },

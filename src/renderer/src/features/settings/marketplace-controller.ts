@@ -123,7 +123,8 @@ export interface MarketplaceControllerProps {
 /** The connect step of one app. `settle(null)` is a closed dialog. */
 export interface PendingConnect {
   subject: McpConnectSubject;
-  flow: McpConnectFlow;
+  /** The ways in that work here, in the listing's order. The dialog opens on the first. */
+  flows: readonly [McpConnectFlow, ...McpConnectFlow[]];
   settle: (config: McpServerConfig | null) => void;
 }
 
@@ -979,12 +980,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const [uninstalling, setUninstalling] = createSignal<MarketplacePluginDetail | null>(null);
 
   function connectStep(app: MarketplacePluginApp, config: McpServerConfig): Promise<McpServerConfig | null> {
-    const flow = (app.server.auth ?? [])[0];
-    if (!flow) return Promise.resolve(config);
+    const [first, ...rest] = flowsHere(app);
+    if (!first) return Promise.resolve(config);
     return new Promise((resolve) => {
       setConnecting({
         subject: { name: app.name, iconUrl: app.iconUrl, config },
-        flow,
+        flows: [first, ...rest],
         settle: (answer) => {
           // Each way out of the step that adds nothing also ends the sign-in that the step waits for.
           if (answer === null) cancelSignIn();
@@ -1082,12 +1083,19 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    * itself. A host that relays its sign-ins finishes a browser sign-in in this computer's browser
    * and keeps the grant itself. False, with the error shown, when one of `apps` cannot connect here.
    */
+  /**
+   * The ways into `app` that work from here. On a joined server a local server answers only on the
+   * host, and a browser sign-in needs a host that relays it; a key works from any computer.
+   */
+  function flowsHere(app: MarketplacePluginApp): McpConnectFlow[] {
+    const flows = app.server.auth ?? [];
+    if (!props.hostServerId) return flows;
+    return flows.filter((flow) => flow.kind === "key" || (flow.kind === "link" && Boolean(signInRelay())));
+  }
+
   function canConnectHere(plugin: MarketplacePluginDetail, apps: readonly MarketplacePluginApp[]): boolean {
-    const hostOnly = apps.find((app) => {
-      const kind = app.server.auth?.[0]?.kind ?? "";
-      return kind === "local" || (kind === "link" && !signInRelay());
-    });
-    if (!props.hostServerId || !hostOnly) return true;
+    const hostOnly = apps.find((app) => (app.server.auth ?? []).length > 0 && flowsHere(app).length === 0);
+    if (!hostOnly) return true;
     const key =
       hostOnly.server.auth?.[0]?.kind === "local"
         ? "marketplace.error.installLocalOnHost"

@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "غير متصل",
   "mcp.connect.close": "إغلاق ربط {name}",
   "mcp.connect.getKey": "الحصول على مفتاح",
+  "mcp.connect.useKey": "استخدام مفتاح API بدلًا من ذلك",
+  "mcp.connect.useSignIn": "تسجيل الدخول بدلًا من ذلك",
   "mcp.connect.keyDescription": "الصق بيانات اعتماد من حسابك في {name}. يتصل OpenBot بها ويحتفظ بها على {host}.",
   "mcp.connect.thisComputer": "هذا الحاسوب",
   "mcp.connect.noCredentialDescription":

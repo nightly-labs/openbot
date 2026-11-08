@@ -24,12 +24,20 @@ export type PluginConnectMethod =
   | { kind: "local" }
   | { kind: "relayUnsupported" };
 
-/** The flow the connect step opens on is the first the listing declares, as on the desktop. */
+/**
+ * The flow the connect step opens on is the first the listing declares, as on the desktop. A sign-in
+ * that the host cannot relay gives way to a key, when the listing also takes one.
+ */
 export function pluginConnectMethod(app: MobilePluginApp, canRelaySignIn: boolean): PluginConnectMethod {
-  const flow = app.server.auth?.[0];
+  const flows = app.server.auth ?? [];
+  const flow = flows[0];
   if (!flow) return { kind: "none" };
   if (flow.kind === "local") return { kind: "local" };
-  if (flow.kind === "link") return canRelaySignIn ? { kind: "link", flow } : { kind: "relayUnsupported" };
+  if (flow.kind === "link") {
+    if (canRelaySignIn) return { kind: "link", flow };
+    const key = flows.find((other): other is Extract<MobilePluginAuthFlow, { kind: "key" }> => other.kind === "key");
+    return key ? { kind: "key", flow: key } : { kind: "relayUnsupported" };
+  }
   return { kind: "key", flow };
 }
 

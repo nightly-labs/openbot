@@ -353,17 +353,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Отправьте черновик анонса запуска списку бета-тестеров.",
   "marketplace.plugin.resend.prompt.status": "Дошло ли письмо со счётом до клиента?",
   "marketplace.plugin.resend.prompt.template": "Составьте письмо для сброса пароля для нового сценария.",
-  "marketplace.plugin.composio.tagline": "Множество приложений по вашей ссылке Composio",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub и ещё более 1000 приложений",
   "marketplace.plugin.composio.description":
-    "Composio подключает агентов к Gmail, Slack, GitHub и сотням других приложений через один сервер MCP. Подключите нужные приложения в своём аккаунте Composio и вставьте сюда его URL MCP и ключ API.",
+    "Composio подключает ваших агентов к Gmail, Slack, GitHub и ещё более чем 1000 приложений через один сервер MCP. Войдите с аккаунтом Composio. Когда агенту нужно приложение, он попросит вас подключить его.",
   "marketplace.plugin.composio.app":
-    "Приложения, которые вы добавили на свой сервер MCP Composio, по ссылке из вашего аккаунта Composio.",
+    "Приложения, которые вы подключаете в аккаунте Composio. Агент попросит подключить приложение, когда оно ему понадобится.",
   "marketplace.plugin.composio.prompt.inbox":
     "Кратко перескажите мои непрочитанные письма и подготовьте ответы на срочные.",
   "marketplace.plugin.composio.prompt.handoff":
     "Опубликуйте краткое описание этого пул-реквеста в канале нашей команды.",
   "marketplace.plugin.composio.prompt.apps": "Какие приложения и действия доступны вам через Composio?",
-  "marketplace.plugin.composio.hint.url": "URL сервера MCP в вашем аккаунте Composio",
   "marketplace.plugin.composio.hint.apiKey":
     "Он находится в аккаунте Composio, в разделе Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Проекты, ветки и миграции Postgres",
@@ -476,7 +475,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "Найди датасет с временными рядами погоды и покажи его столбцы.",
   "marketplace.auth.apiKey": "API-ключ",
   "marketplace.auth.personalApiKey": "Личный API-ключ",
-  "marketplace.auth.mcpUrl": "URL MCP",
   "marketplace.auth.createKey": "Создать ключ",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Попробовать в {name}",

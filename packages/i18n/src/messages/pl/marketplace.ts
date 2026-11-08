@@ -345,15 +345,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Wyślij szkic ogłoszenia premiery do listy beta.",
   "marketplace.plugin.resend.prompt.status": "Czy e-mail z fakturą dotarł do klienta?",
   "marketplace.plugin.resend.prompt.template": "Napisz szkic e-maila resetu hasła dla nowego procesu.",
-  "marketplace.plugin.composio.tagline": "Wiele aplikacji przez twój link Composio",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub i ponad 1000 innych aplikacji",
   "marketplace.plugin.composio.description":
-    "Composio łączy agentów z Gmailem, Slackiem, GitHubem i setkami innych aplikacji przez jeden serwer MCP. Połącz wybrane aplikacje na swoim koncie Composio, a potem wklej tu jego adres URL MCP i klucz API.",
-  "marketplace.plugin.composio.app": "Aplikacje dodane do twojego serwera MCP Composio, przez link z konta Composio.",
+    "Composio łączy twoich agentów z Gmailem, Slackiem, GitHubem i ponad 1000 innych aplikacji przez jeden serwer MCP. Zaloguj się kontem Composio. Gdy agent potrzebuje aplikacji, poprosi cię o jej połączenie.",
+  "marketplace.plugin.composio.app":
+    "Aplikacje połączone na twoim koncie Composio. Agent poprosi cię o połączenie aplikacji, gdy będzie jej potrzebował.",
   "marketplace.plugin.composio.prompt.inbox":
     "Podsumuj moje nieprzeczytane e-maile i napisz szkice odpowiedzi na pilne.",
   "marketplace.plugin.composio.prompt.handoff": "Opublikuj podsumowanie tego pull requestu na kanale naszego zespołu.",
   "marketplace.plugin.composio.prompt.apps": "Jakich aplikacji i akcji możesz używać przez Composio?",
-  "marketplace.plugin.composio.hint.url": "Adres URL serwera MCP na twoim koncie Composio",
   "marketplace.plugin.composio.hint.apiKey": "Znajdziesz go na koncie Composio, w Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Projekty, gałęzie i migracje Postgres",
   "marketplace.plugin.neon.description":
@@ -471,7 +471,6 @@ export const messages = {
     "Znajdź zbiór danych z szeregami czasowymi pogody i pokaż jego kolumny.",
   "marketplace.auth.apiKey": "Klucz API",
   "marketplace.auth.personalApiKey": "Osobisty klucz API",
-  "marketplace.auth.mcpUrl": "Adres URL MCP",
   "marketplace.auth.createKey": "Utwórz klucz",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Wypróbuj w: {name}",
