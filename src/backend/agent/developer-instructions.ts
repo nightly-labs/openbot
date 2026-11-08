@@ -19,7 +19,7 @@ import {
   type ResponseStyle,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
-import { redactText } from "@openbot/logging";
+import { redactSecrets, redactText } from "@openbot/logging";
 import { automationRunCommand } from "../automation-command";
 import type { HomeSkill } from "../home-skills";
 import { PASSWORD_MANAGER_BRAND_NAMES } from "../password-vault";
@@ -235,7 +235,7 @@ export function memoryContext(
 ): MemoryContext {
   const promptMemories: MemoryContext["memories"] = [];
   for (const memory of memories) {
-    const safe = { id: memory.id, text: redactText(memory.text), origin: memory.origin };
+    const safe = { id: memory.id, text: redactSecrets(memory.text), origin: memory.origin };
     // Redaction can expand a short secret. Keep the final block bounded as well as stored selection.
     if (essentialMemoryBytes([...promptMemories, safe]) <= AGENT_MEMORY_CONTEXT_BUDGET_BYTES) promptMemories.push(safe);
   }

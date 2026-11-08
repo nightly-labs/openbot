@@ -249,6 +249,8 @@ export interface OpenBotToolRouterHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   /** Masks the MCP secret values and handoff values that `redactText` does not know. */
   redactMcp(text: string): string;
+  /** `redactMcp` for text that the agent reads back, such as its memories and history: emails stay. */
+  redactMcpForAgent(text: string): string;
   /** True while the provider runs a turn for this agent, a context compaction included. */
   runsTurn(agentId: string): boolean;
   /** `false` when the turn no longer runs or `mayStop` refuses, so no stop was sent. */
@@ -362,7 +364,7 @@ export class OpenBotToolRouter {
   constructor(options: OpenBotToolRouterOptions) {
     this.#history = new HistoryTools({
       store: options.store,
-      redact: options.hooks.redactMcp,
+      redact: options.hooks.redactMcpForAgent,
       capturedSteps: options.capturedSteps ?? (() => Effect.succeed(null)),
       recentThreads: (agentId, after, limit) => options.tasks.recent(agentId, after, limit),
     });
@@ -1558,7 +1560,7 @@ export class OpenBotToolRouter {
       );
     }
 
-    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcp);
+    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcpForAgent);
     if (memoryResult) return memoryResult;
 
     // A routine thread takes the runs that the agent's own chat took before, so its runs keep the

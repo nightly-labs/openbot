@@ -10,7 +10,7 @@ import type {
   QueueDelivery,
   RoutineRun,
 } from "@openbot/contracts/ipc";
-import { redactText } from "@openbot/logging";
+import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
@@ -337,7 +337,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   }
   if (context.resumeAfterUsageLimit) {
     const continuationState = context.resumeAfterUsageLimit;
-    const progress = redactText(
+    const progress = redactSecrets(
       snapshot.messages
         .filter(
           (message) =>

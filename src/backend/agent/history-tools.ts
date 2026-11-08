@@ -1,5 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentStore } from "../agent-store";
@@ -185,7 +185,7 @@ export class HistoryTools {
     if (input.after !== undefined && after === null) throw new Error(sourceText("error.agent.historyUnavailable"));
     const limit = input.limit ?? 8;
     const store = this.#options.store;
-    const redact = (text: string) => this.#options.redact(redactText(text));
+    const redact = (text: string) => this.#options.redact(redactSecrets(text));
     // Redact the whole message before the cut, so that a cut never splits a secret out of a match.
     const latest = (threadId: string, author: "user" | "assistant") =>
       store.database.readAgentHistory(agentId, threadId, { author, limit: 1 }).messages[0]?.message ?? null;
@@ -343,7 +343,7 @@ export class HistoryTools {
     const after = search?.after === undefined ? null : windowBound(search.after, Date.now());
     if (search?.after !== undefined && after === null) throw new Error(sourceText("error.agent.historyUnavailable"));
     const store = this.#options.store;
-    const redact = (text: string) => this.#options.redact(redactText(text));
+    const redact = (text: string) => this.#options.redact(redactSecrets(text));
     const query = search?.query;
     const limit = search?.limit ?? read?.limit ?? (search ? 5 : 10);
     const suppliedCursor = search?.cursor ?? read?.before;
