@@ -31,6 +31,7 @@ import {
   createProjection,
   createSignal,
   createStore,
+  flush,
   onCleanup,
   Show,
   untrack,
@@ -624,9 +625,16 @@ export function TasksView(props: TasksViewProps) {
         draft.focusRequests[taskId] = (draft.focusRequests[taskId] ?? 0) + 1;
       }),
     sendTask: async (taskId) => {
+      // The transcript was just appended; the send reads the draft, so apply that write first.
+      flush();
       if (state.selectedId !== taskId) return;
       const text = textOf(taskId).trim();
       if (text || filesOf(taskId).length > 0) await sendToTask(taskId, text);
+      // The locked message box did not take the earlier focus request.
+      if (state.selectedId === taskId)
+        setState((draft) => {
+          draft.focusRequests[taskId] = (draft.focusRequests[taskId] ?? 0) + 1;
+        });
     },
   };
   const voice = untrack(() => props.voice?.(voiceControls));
