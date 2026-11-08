@@ -331,18 +331,18 @@ async function measureMemory(flags: Flags, target: AutomationTarget): Promise<vo
 }
 
 // Resolves on the deadline or on the first SIGINT/SIGTERM, so an agent that
-// recorded in the background can stop when its demo ends.
+// recorded in the background can stop when its demo ends. The handlers stay
+// installed: a second signal while the encoder flushes must not kill the
+// process and truncate the file.
 function waitForStop(durationMs: number): Promise<void> {
   return new Promise((resolveStop) => {
     const finish = (): void => {
       clearTimeout(timer);
-      process.off("SIGINT", finish);
-      process.off("SIGTERM", finish);
       resolveStop();
     };
     const timer = setTimeout(finish, durationMs);
-    process.once("SIGINT", finish);
-    process.once("SIGTERM", finish);
+    process.on("SIGINT", finish);
+    process.on("SIGTERM", finish);
   });
 }
 
@@ -363,7 +363,7 @@ async function recordVideo(flags: Flags, target: AutomationTarget): Promise<void
     pageSelector: readPageSelector(flags),
     ownerPid: target.pid,
   });
-  const startedAt = Date.now();
+  let startedAt = 0;
   try {
     if (waitTarget) await waitForRole(session.page, waitTarget, readTimeout(flags), logger, flags.exact ?? false);
     // The VP8 encoder needs even dimensions. CSS pixels keep the file small.
@@ -373,6 +373,7 @@ async function recordVideo(flags: Flags, target: AutomationTarget): Promise<void
     }));
     mkdirSync(dirname(outPath), { recursive: true });
     await session.page.screencast.start({ path: outPath, size });
+    startedAt = Date.now();
     logger.info(
       `recording ${size.width}x${size.height} for up to ${durationMs} ms; stop with kill -INT ${process.pid}`,
     );

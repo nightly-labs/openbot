@@ -35,8 +35,11 @@ profile already has showcase data; use it. Do not run `dev:seed` for a demo.
 2. Start the recording with `run_in_background`:
 
    ```bash
-   bun run dev:automation record --out=<branch>-demo.webm --duration=90000 --wait-for=<role>,<name>
+   bun run dev:automation record --out=<name>.webm --duration=90000 --wait-for=<role>,<name>
    ```
+
+   - Use a `<name>` with no `/`, so that the file stays at
+     `.openbot-build/dev-automation/<name>.webm`.
 
    - `--page=<target-id|url-substring>` records another window or an
      embedded browser view. `--service=test-client` records the second
