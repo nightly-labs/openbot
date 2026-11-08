@@ -1,3 +1,4 @@
+import { documentColorScheme } from "@openbot/ui/document-color-scheme";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 
 /**
@@ -343,16 +344,22 @@ function onSource(input: string, result: string) {
   return merge;
 }
 
-/** One picture of three: red from `red`, green from `green`, and blue from `blue`. */
+/**
+ * One picture of three: red from `red`, green from `green`, and blue from `blue`. The three colors are
+ * added as opaque pictures, because added opacities would make a translucent pixel (glass) opaque.
+ * The sum then gets the opacity of the pictures as they are. A moved picture would cost its whole
+ * chain again, because Chromium computes a result again for each step that reads it.
+ */
 function splitChannels(red: string, green: string, blue: string, result: string) {
   const sum = (input: string, other: string, sumResult: string) =>
     svgElement("feComposite", { in: input, in2: other, operator: "arithmetic", k2: "1", k3: "1", result: sumResult });
   return [
-    colorMatrix(red, "1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0", `${result}Red`),
-    colorMatrix(green, "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0", `${result}Green`),
-    colorMatrix(blue, "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0", `${result}Blue`),
+    colorMatrix(red, "1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1", `${result}Red`),
+    colorMatrix(green, "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1", `${result}Green`),
+    colorMatrix(blue, "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1", `${result}Blue`),
     sum(`${result}Red`, `${result}Green`, `${result}RedGreen`),
-    sum(`${result}RedGreen`, `${result}Blue`, result),
+    sum(`${result}RedGreen`, `${result}Blue`, `${result}Opaque`),
+    svgElement("feComposite", { in: `${result}Opaque`, in2: "SourceGraphic", operator: "in", result }),
   ];
 }
 
@@ -583,7 +590,8 @@ const RING_PUSH = 44;
 const RING_IMAGE = 256;
 /**
  * Near the window's edges the page bends toward the edge as the ring goes through, as at the bevel of
- * a glass pane: the band's width and the move at the edge, in CSS pixels. The edge itself stays.
+ * a glass pane: the band's width and the move at the edge, in CSS pixels. The edge row shows the page
+ * from `EDGE_BEND` farther in, and the window itself does not move.
  */
 const EDGE_BAND = 64;
 const EDGE_BEND = 20;
@@ -597,6 +605,11 @@ const LINE_RUN = 10;
 const LINE_GAIN = 20;
 const LINE_FLOOR = 0.3;
 const LINE_ALPHA = 0.7;
+/**
+ * One half as a filter stores it in 8 bits, the map value that does not move the page. The steps
+ * that add maps use it, so the sum does not round to the next value and move the whole area by a pixel.
+ */
+const MAP_NEUTRAL = 128 / 255;
 
 type RingDirection = "in" | "out";
 
@@ -612,6 +625,9 @@ function ringReach(direction: RingDirection): number {
 function ringStill(direction: RingDirection): number {
   return 1 - (direction === "out" ? RIPPLE_BEHIND : RIPPLE_AHEAD) * RING_CREST;
 }
+
+/** The largest offset of a color's move, in CSS pixels, so the filter's region holds it. */
+const FILTER_PAD = Math.ceil(RING_PUSH * Math.max(ringReach("in"), ringReach("out")) * (1 + CHANNEL_SPREAD)) + 2;
 
 /** Where the crest lights the lines: this many crest widths ahead of it, where the page does not move yet. */
 const LINE_LEAD = 2.2;
@@ -715,9 +731,8 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
   const element = svgElement("svg", { class: "theme-sweep-ripple", "aria-hidden": "true", width: "0", height: "0" });
   const filter = svgElement("filter", {
     id: RING_RIPPLE_ID,
+    // `draw` sets the region.
     filterUnits: "userSpaceOnUse",
-    x: "0",
-    y: "0",
     "color-interpolation-filters": "sRGB",
   });
   // The steps that work only where the ripple is. `draw` sets their area.
@@ -733,7 +748,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     image(images[2], "blurBand"),
     image(images[3], "leadBand"),
   ];
-  // The window does not change size while the ring is on screen.
+  // The edge images are made for the window's size when the ring starts.
   const width = window.innerWidth;
   const height = window.innerHeight;
   const edgeAcross = image(edgeImage(false, width), "edgeAcrossStrip");
@@ -755,7 +770,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
         in: input,
         in2: "blurBand",
         operator: "arithmetic",
-        k4: "0.5",
+        k4: String(MAP_NEUTRAL),
         result: `${input}Bend`,
       }),
     ),
@@ -770,7 +785,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
         operator: "arithmetic",
         k2: "1",
         k3: "1",
-        k4: "-0.5",
+        k4: String(-MAP_NEUTRAL),
         result: `${result}Raw`,
       }),
     ),
@@ -778,35 +793,37 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
   ];
   // The page blurs after the crest before it moves, so the three colors do not each blur again.
   const blurred = step(svgElement("feGaussianBlur", { in: "SourceGraphic", result: "blurred" }));
-  // White moves the page half the scale on the other axis, and each offset puts it back. The red,
-  // green and blue pictures each move once down and once across.
+  // White moves the page half the scale on the other axis, so an offset first moves it the other way.
+  // The offset comes first, so each move reads its map at the pixel it draws, and the page at the
+  // window's edges is not lost. `draw` sets the offsets' areas, which reach past the ripple's area by
+  // the offset. The red, green and blue pictures each move once down and once across.
   const moves = ["movedRed", "moved", "movedBlue"].map((result) => {
+    const shiftDown = svgElement("feOffset", { in: "softSource", result: `${result}SourceShifted` });
     const movedDown = step(
       svgElement("feDisplacementMap", {
-        in: "softSource",
+        in: `${result}SourceShifted`,
         in2: "mapDown",
         xChannelSelector: "R",
         yChannelSelector: "A",
-        result: `${result}DownShifted`,
+        result: `${result}Down`,
       }),
     );
-    const backDown = step(svgElement("feOffset", { in: `${result}DownShifted`, result: `${result}Down` }));
+    const shiftAcross = svgElement("feOffset", { in: `${result}Down`, result: `${result}DownShifted` });
     const movedAcross = step(
       svgElement("feDisplacementMap", {
-        in: `${result}Down`,
+        in: `${result}DownShifted`,
         in2: "mapAcross",
         xChannelSelector: "A",
         yChannelSelector: "R",
-        result: `${result}Shifted`,
+        result,
       }),
     );
-    const backAcross = step(svgElement("feOffset", { in: `${result}Shifted`, result }));
-    return { movedDown, backDown, movedAcross, backAcross, page: step(onSource(result, `${result}Page`)) };
+    return { shiftDown, movedDown, shiftAcross, movedAcross, page: step(onSource(result, `${result}Page`)) };
   });
 
   // The lines, on the page as it is: just ahead of the crest the page does not move yet. The
   // brightness, then rows and columns that are lighter than their two sides (or darker).
-  const lighter = document.documentElement.dataset.openbotColorScheme !== "light";
+  const lighter = documentColorScheme() !== "light";
   const kernel = lighter ? "-1 2 -1" : "1 -2 1";
   const lines = (name: string, order: string, run: string) => [
     step(
@@ -847,11 +864,11 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     blurred,
     step(svgElement("feComposite", { in: "blurred", in2: "blurBand", operator: "in", result: "blurredRing" })),
     step(onSource("blurredRing", "softSource")),
-    ...moves.flatMap(({ movedDown, backDown, movedAcross, backAcross, page }) => [
+    ...moves.flatMap(({ shiftDown, movedDown, shiftAcross, movedAcross, page }) => [
+      shiftDown,
       movedDown,
-      backDown,
+      shiftAcross,
       movedAcross,
-      backAcross,
       page,
     ]),
     ...splitChannels("movedRedPage", "movedPage", "movedBluePage", "split").map(step),
@@ -886,8 +903,11 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
   return {
     element,
     draw(radius, progress) {
-      filter.setAttribute("width", String(width));
-      filter.setAttribute("height", String(height));
+      // The offsets move the page past the window's edges before the moves bring it back.
+      filter.setAttribute("x", String(-FILTER_PAD));
+      filter.setAttribute("y", String(-FILTER_PAD));
+      filter.setAttribute("width", String(window.innerWidth + 2 * FILTER_PAD));
+      filter.setAttribute("height", String(window.innerHeight + 2 * FILTER_PAD));
       // The ripple is strongest in the middle of the ring's path and fades at its start and end. The
       // axis distance is a part of the box, so the scale grows with `reach` to give RING_PUSH at the ring.
       const strength = Math.sin(Math.PI * Math.min(1, progress));
@@ -907,12 +927,23 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
         primitive.setAttribute("width", area.width.toFixed(1));
         primitive.setAttribute("height", area.height.toFixed(1));
       }
-      for (const [index, { movedDown, backDown, movedAcross, backAcross }] of moves.entries()) {
+      for (const [index, { shiftDown, movedDown, shiftAcross, movedAcross }] of moves.entries()) {
         const half = halves[index] ?? 0;
         movedDown.setAttribute("scale", String(2 * half));
         movedAcross.setAttribute("scale", String(2 * half));
-        backDown.setAttribute("dx", String(half));
-        backAcross.setAttribute("dy", String(half));
+        shiftDown.setAttribute("dx", String(half));
+        shiftAcross.setAttribute("dy", String(half));
+        // Each move reads its offset picture `half` away, so the offset's area reaches that far.
+        const left = area.left + Math.min(0, half);
+        const top = area.top + Math.min(0, half);
+        shiftDown.setAttribute("x", left.toFixed(1));
+        shiftDown.setAttribute("y", area.top.toFixed(1));
+        shiftDown.setAttribute("width", (area.width + Math.abs(half)).toFixed(1));
+        shiftDown.setAttribute("height", area.height.toFixed(1));
+        shiftAcross.setAttribute("x", area.left.toFixed(1));
+        shiftAcross.setAttribute("y", top.toFixed(1));
+        shiftAcross.setAttribute("width", area.width.toFixed(1));
+        shiftAcross.setAttribute("height", (area.height + Math.abs(half)).toFixed(1));
       }
       // The bend shares the green move's scale, so its map value is the bend over that scale.
       const greenHalf = halves[1];
