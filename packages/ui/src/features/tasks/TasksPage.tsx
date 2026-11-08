@@ -14,13 +14,16 @@ import {
   buttonVariants,
   Check,
   ChevronDown,
-  DropdownMenu,
+  Combobox,
   IconButton,
   LoaderCircle,
   Mic,
   PanelLeft,
+  Popover,
+  Search,
   X,
 } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SwapLabel, type SwapMotion } from "@openbot/ui/components/SwapLabel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -41,10 +44,22 @@ import {
   VoiceRecordingMorph,
   voiceButtonLabel,
 } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
+import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, createUniqueId, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  createUniqueId,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { TasksEmptyBoard, TasksEmptyPitch } from "./TasksEmpty";
 
 /** The microphone of the Tasks composer. The page shows it; the app records and transcribes. */
@@ -129,9 +144,59 @@ const AGENT_SWAP: SwapMotion = {
   leave: { duration: 180, easing: "ease" },
 };
 
+/** Lower case, no accents: "cafe" finds "Café Orders". */
+const foldName = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+/** Names that start with the query, or have a word that does, come before names that only contain it. */
+function matchAgents(agents: readonly AgentProfile[], query: string): AgentProfile[] {
+  const text = foldName(query.trim());
+  if (!text) return [...agents];
+  const rank = (agent: AgentProfile) => {
+    const name = foldName(agent.name);
+    if (name.startsWith(text)) return 0;
+    if (name.split(/[\s-]+/).some((word) => word.startsWith(text))) return 1;
+    return name.includes(text) ? 2 : -1;
+  };
+  return agents
+    .map((agent) => ({ agent, rank: rank(agent) }))
+    .filter((row) => row.rank >= 0)
+    .sort((a, b) => a.rank - b.rank)
+    .map((row) => row.agent);
+}
+
+/** The agent name with the matched part in bold, so the eye finds why a row is in the list. */
+function MatchedAgentName(props: { name: string; query: string }) {
+  const parts = () => {
+    const text = foldName(props.query.trim());
+    // Folding keeps the length of most names. When it does not, the name shows without bold.
+    const folded = foldName(props.name);
+    const at = text && folded.length === props.name.length ? folded.indexOf(text) : -1;
+    if (at < 0) return { before: props.name, match: "", after: "" };
+    return {
+      before: props.name.slice(0, at),
+      match: props.name.slice(at, at + text.length),
+      after: props.name.slice(at + text.length),
+    };
+  };
+  return (
+    <span class="tasks-page-agent-name">
+      {parts().before}
+      <Show when={parts().match}>
+        <b>{parts().match}</b>
+      </Show>
+      {parts().after}
+    </span>
+  );
+}
+
 /**
- * The agent of a task, as a menu with the agent's face. A task has one agent, so the menu marks only
- * the chosen agent, as the routine trigger menu does.
+ * The agent of a task, as a menu with the agent's face and a search field. A server can have many
+ * agents: typing filters the rows, the arrows move through them, and Enter takes the active row or
+ * the first match. A task has one agent, so the menu marks only the chosen agent.
  */
 function TaskAgentSelect(props: {
   agents: AgentProfile[];
@@ -143,9 +208,32 @@ function TaskAgentSelect(props: {
   const { t } = useText();
   const agent = () => agentOf(props.agents, props.agentId);
   let shownId = untrack(() => props.agentId);
+  const [open, setOpen] = createSignal(false);
+  const [query, setQuery] = createSignal("");
+  const matches = createMemo(() => matchAgents(props.agents, query()));
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  let input: HTMLInputElement | undefined;
+  let panel: HTMLElement | undefined;
+  let list: HTMLElement | undefined;
+  const choose = (option: AgentProfile) => {
+    setOpen(false);
+    if (option.id !== props.agentId) props.onChange(option.id);
+  };
   return (
-    <DropdownMenu.Root placement="bottom-start" gutter={4}>
-      <DropdownMenu.Trigger
+    <Popover.Root
+      open={open()}
+      onOpenChange={(next) => {
+        if (next) setQuery("");
+        setOpen(next);
+      }}
+      placement="bottom-start"
+      gutter={4}
+      // The list shrinks to the space under the trigger, so the field stays next to the trigger.
+      flip={false}
+      modal
+    >
+      <Popover.Trigger
         class={`${buttonVariants({ variant: "ghost", size: "sm" })} tasks-page-agent`}
         aria-label={
           props.title === undefined
@@ -167,25 +255,90 @@ function TaskAgentSelect(props: {
         </For>
         <SwapLabel text={agent()?.name ?? props.agentId} motion={AGENT_SWAP} />
         <ChevronDown class="tasks-page-agent-chevron" aria-hidden="true" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content class="tasks-page-agent-menu">
-          <DropdownMenu.RadioGroup value={props.agentId} onChange={(value) => props.onChange(value)}>
-            <For each={props.agents} keyed={(option) => option.id}>
-              {(option) => (
-                <DropdownMenu.RadioItem value={option().id} closeOnSelect class="tasks-page-agent-option">
-                  <AgentAvatar agent={option()} class="tasks-page-avatar" />
-                  <span>{option().name}</span>
-                  <Show when={props.agentId === option().id}>
-                    <Check aria-hidden="true" class="tasks-page-agent-check" />
-                  </Show>
-                </DropdownMenu.RadioItem>
-              )}
-            </For>
-          </DropdownMenu.RadioGroup>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          ref={(element: HTMLElement) => {
+            panel = element;
+          }}
+          class="ui-action-menu tasks-page-agent-menu"
+          aria-label={t("conversation.tasks.page.agents")}
+        >
+          <ContentExitMotion panel={() => panel} />
+          <Combobox.Root<AgentProfile>
+            class="tasks-page-agent-picker"
+            options={matches()}
+            optionValue="id"
+            optionTextValue="name"
+            optionLabel="name"
+            open={true}
+            modal={false}
+            triggerMode="manual"
+            allowsEmptyCollection={true}
+            shouldFocusWrap={true}
+            defaultFilter={() => true}
+            onInputChange={(value) => {
+              setQuery(value);
+              // A new search starts at the best match.
+              if (list) list.scrollTop = 0;
+            }}
+            onOpenChange={(next) => {
+              if (!next) setOpen(false);
+            }}
+            onChange={(option) => {
+              if (option) choose(option);
+            }}
+            itemComponent={(item) => (
+              <Combobox.Item item={item.item} class="tasks-page-agent-option">
+                <AgentAvatar agent={item.item.rawValue} class="tasks-page-avatar" />
+                <MatchedAgentName name={item.item.rawValue.name} query={query()} />
+                <Show when={item.item.rawValue.id === props.agentId}>
+                  <Check aria-hidden="true" class="tasks-page-agent-check" />
+                </Show>
+              </Combobox.Item>
+            )}
+          >
+            <Combobox.Control class="tasks-page-agent-search">
+              <Search aria-hidden="true" />
+              <Combobox.Input
+                ref={(element: HTMLInputElement) => {
+                  input = element;
+                }}
+                class="tasks-page-agent-search-input"
+                aria-label={t("conversation.tasks.page.searchAgents")}
+                placeholder={t("conversation.tasks.page.searchAgents")}
+                autocomplete="off"
+                spellcheck={false}
+                onKeyDown={(event: KeyboardEvent) => {
+                  // After typing, no row is active: then Enter takes the first match.
+                  if (event.key !== "Enter" || event.isComposing || !query().trim()) return;
+                  if (input?.getAttribute("aria-activedescendant")) return;
+                  const [first] = matches();
+                  if (!first) return;
+                  event.preventDefault();
+                  choose(first);
+                }}
+              />
+            </Combobox.Control>
+            <Combobox.Listbox
+              ref={(element: HTMLElement) => {
+                list = element;
+                fades.bind(element);
+              }}
+              class={["tasks-page-agent-list", fades.classes()]}
+              style={{ "--tasks-agent-rows": String(matches().length) }}
+              onScroll={fades.measure}
+              aria-label={t("conversation.tasks.page.agents")}
+            />
+            <Show when={matches().length === 0}>
+              <p class="tasks-page-agent-empty" role="status">
+                {t("conversation.tasks.page.noAgent", { query: query().trim() })}
+              </p>
+            </Show>
+          </Combobox.Root>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
