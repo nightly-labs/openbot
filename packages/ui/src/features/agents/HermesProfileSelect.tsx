@@ -37,7 +37,9 @@ export function HermesProfileSelect(props: {
         options={choices()}
         value={props.value ?? INHERIT}
         onChange={(id) => {
-          if (id !== null) props.onChange(id === INHERIT ? undefined : id);
+          if (id === null) return;
+          const profileId = id === INHERIT ? undefined : id;
+          if (profileId !== props.value) props.onChange(profileId);
         }}
         disabled={props.disabled || props.options.loading}
         itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}

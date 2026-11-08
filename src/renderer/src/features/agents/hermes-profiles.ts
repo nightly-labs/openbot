@@ -1,5 +1,6 @@
-import type { ClientAgentModelOption } from "@openbot/contracts/ipc";
+import type { AgentProviderId, AgentProviderStatus, AgentStatus, ClientAgentModelOption } from "@openbot/contracts/ipc";
 import type { HermesProfileOptions } from "@openbot/ui/features/agents/HermesProfileSelect";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, onCleanup } from "solid-js";
 import { agentsPort } from "./agents-port";
 
@@ -9,6 +10,9 @@ export function createHermesProfiles(
   profileId: () => string | undefined,
   catalog: () => ClientAgentModelOption[],
 ) {
+  const { t } = useText();
+  const isEnabled = createMemo(enabled);
+  const selectedProfileId = createMemo(profileId);
   const [revision, setRevision] = createSignal(0);
   const [state, setState] = createStore<{
     profiles: string[];
@@ -23,7 +27,7 @@ export function createHermesProfiles(
     generation += 1;
   });
   createEffect(
-    () => ({ enabled: enabled(), profileId: profileId(), revision: revision() }),
+    () => ({ enabled: isEnabled(), profileId: selectedProfileId(), revision: revision() }),
     (selection) => {
       const current = ++generation;
       if (!selection.enabled) return;
@@ -31,6 +35,8 @@ export function createHermesProfiles(
         draft.loading = true;
         draft.models = [];
         draft.key = selection.profileId;
+        draft.unavailable = false;
+        draft.modelsUnavailable = false;
       });
       const port = agentsPort();
       void Promise.allSettled([
@@ -41,7 +47,8 @@ export function createHermesProfiles(
         setState((draft) => {
           draft.loading = false;
           draft.unavailable = profiles.status === "rejected";
-          draft.modelsUnavailable = models.status === "rejected";
+          draft.modelsUnavailable =
+            models.status === "rejected" || (selection.profileId !== undefined && models.value.length === 0);
           if (profiles.status === "fulfilled") draft.profiles = profiles.value;
           draft.models = models.status === "fulfilled" ? models.value : [];
         });
@@ -49,6 +56,28 @@ export function createHermesProfiles(
     },
   );
   return {
+    pickerStatus(status: AgentStatus): AgentStatus {
+      if (!isEnabled() || selectedProfileId() === undefined) return status;
+      const host = status.providers?.find((provider) => provider.id === "hermes");
+      if (host?.off || host?.state === "not-installed" || host?.state === "outdated") return status;
+      const checking = state.loading || state.key !== selectedProfileId();
+      const failed = state.modelsUnavailable || state.models.length === 0;
+      const hermes: AgentProviderStatus = {
+        id: "hermes",
+        state: checking ? "checking" : failed ? "error" : "available",
+        version: host?.version ?? null,
+        message: !checking && failed ? t("agentSettings.hermesProfile.modelsUnavailable") : null,
+        ...(host?.off === undefined ? {} : { off: host.off }),
+        ...(host?.cliSource === undefined ? {} : { cliSource: host.cliSource }),
+      };
+      return {
+        ...status,
+        providers: [...(status.providers ?? []).filter((provider) => provider.id !== "hermes"), hermes],
+      };
+    },
+    canConnectProvider(provider: AgentProviderId): boolean {
+      return provider !== "hermes" || !isEnabled() || selectedProfileId() === undefined;
+    },
     options: createMemo(
       (): HermesProfileOptions => ({
         profiles: state.profiles,
@@ -59,10 +88,10 @@ export function createHermesProfiles(
       }),
     ),
     models: createMemo(() =>
-      enabled()
+      isEnabled()
         ? [
             ...catalog().filter((model) => model.provider !== "hermes"),
-            ...(state.key === profileId() ? state.models : []),
+            ...(state.key === selectedProfileId() ? state.models : []),
           ]
         : catalog(),
     ),

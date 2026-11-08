@@ -128,10 +128,13 @@ function profilesWithProxies(
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
   const hermesProfiles = createHermesProfiles(
-    () => props.localHost === true && props.runtimeSettings.provider === "hermes",
+    () =>
+      props.localHost === true &&
+      (props.runtimeSettings.provider === "hermes" || props.agent.hermesProfileId !== undefined),
     () => props.agent.hermesProfileId,
     () => props.modelOptions,
   );
+  const pickerStatus = createMemo(() => hermesProfiles.pickerStatus(props.agentStatus));
   const sessionSettings = createMemo((): AgentSessionSettingsApi | undefined => {
     if (!props.sessionSettingsEditable) return undefined;
     if (props.remoteClient) return props.adminCalls?.sessionSettings;
@@ -457,6 +460,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   return (
     <SharedAgentSettingsPanel
       {...props}
+      agentStatus={pickerStatus()}
+      canConnectProvider={(provider) =>
+        hermesProfiles.canConnectProvider(provider) && (props.canConnectProvider?.(provider) ?? true)
+      }
       hermesProfiles={props.localHost ? hermesProfiles.options() : undefined}
       modelOptions={hermesProfiles.models()}
       browserProfiles={browserProfileOptions()}

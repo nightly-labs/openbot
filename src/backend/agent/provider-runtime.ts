@@ -2650,6 +2650,14 @@ export class ProviderRuntime implements ProviderPort {
         toProviderOperationFailed,
         Effect.onError(() => client.stop().pipe(Effect.ignore)),
       );
+      if (disposals !== this.#disposals || this.#hooks.isStopping()) {
+        yield* client.stop().pipe(Effect.catch(() => Effect.void));
+        return yield* new ProviderOperationFailed({
+          cause: new Error(
+            sourceText("error.provider.stoppedBeforeAgentProcess", { provider: providerLabel(provider) }),
+          ),
+        });
+      }
       this.#hermesModels.set(own.hermesProfile.identity, models);
     }
     this.#confined.set(agentId, {

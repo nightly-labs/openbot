@@ -45,10 +45,13 @@ export function WorkspaceAgentSetup() {
   } = useProviders();
   const { openServerSettings } = useServerSettings();
   const hermesProfiles = createHermesProfiles(
-    () => activeServer()?.kind === "local" && agentSetupDraft().provider === "hermes",
+    () =>
+      activeServer()?.kind === "local" &&
+      (agentSetupDraft().provider === "hermes" || agentSetupDraft().hermesProfileId !== undefined),
     () => agentSetupDraft().hermesProfileId,
     modelOptions,
   );
+  const pickerStatus = createMemo(() => hermesProfiles.pickerStatus(agentStatus()));
   createEffect(
     () => ({ draft: agentSetupDraft(), options: hermesProfiles.models(), loading: hermesProfiles.options().loading }),
     ({ draft, options, loading }) => {
@@ -132,7 +135,7 @@ export function WorkspaceAgentSetup() {
       error={agentSetupError()}
       modelOptions={createModelSupported() ? hermesProfiles.models() : undefined}
       hermesProfiles={accountChoice() ? hermesProfiles.options() : undefined}
-      agentStatus={agentStatus()}
+      agentStatus={pickerStatus()}
       accountChoice={accountChoice()}
       accountUsage={accountChoice() ? auth.accountUsage() : undefined}
       runtimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
@@ -142,6 +145,7 @@ export function WorkspaceAgentSetup() {
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
+      canConnectProvider={hermesProfiles.canConnectProvider}
       onAddCustomProvider={manageProviders() ? openProviderSettings : undefined}
       onManageProviders={manageProviders() ? openProviderSettings : undefined}
       onChange={(next) => {

@@ -1113,13 +1113,18 @@ turn on a mock model.
 
 Agents on this computer can keep an optional `hermesProfileId`. An absent value keeps the Hermes
 environment and active-profile behavior. `default` explicitly selects the root profile; a named ID
-selects an existing live profile. Discovery reads bounded name and identity metadata only. It does
-not read profile config or credentials. Missing, deleted, or invalid explicit profiles fail before
-launch. OpenBot passes `--profile <id> acp` and the selected `HERMES_HOME` to chat and model probes.
+selects an existing live profile. Discovery reads bounded name and identity metadata only. It returns
+at most 4,096 IDs, including `default`, and excludes the reserved named IDs `hermes`, `test`, `tmp`,
+`root`, and `sudo`. It does not read profile config or credentials. Missing, deleted, invalid, or
+reserved explicit profiles fail before launch. OpenBot passes `--profile <id> acp` and the selected
+`HERMES_HOME` to chat and model probes.
 The selected home also controls managed settings and OS confinement. Each explicit selection uses
 an agent-owned client, a profile-keyed model catalog, and namespaced ACP session IDs. A profile
 change requires an idle agent and retires its continuation, while its conversation stays. Returning
 to a previous profile starts a fresh continuation. A restart with the same selection can resume it.
+The local picker uses the selected profile's catalog result for model and effort availability.
+It prepares a saved profile's catalog while another provider is active, without changing that provider.
+An explicit catalog failure keeps the selection and offers profile retry, without inherited sign-in.
 The local selector is not sent through released Team API adapters. Hermes profiles are not security
 sandboxes. See the [Hermes profile guide](https://hermes-agent.nousresearch.com/docs/user-guide/profiles).
 
