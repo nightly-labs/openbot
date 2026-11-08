@@ -232,7 +232,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "composio",
       version: "1.2.0",
       featured: false,
-      detailSha256: "34b804089b4039cba7d4d159af5358012f1fff32d98b155d104ecf7ec05239ef",
+      detailSha256: "26cdd485b5cf08c7ccc54d1bb110e27990cbb02544209c1816151a89c8f4c7b3",
     },
     {
       slug: "clickup",
@@ -270,7 +270,7 @@ export interface PluginCatalogApp {
 }
 
 export type PluginCatalogServer =
-  | { name: string; transport: "http"; url: string; auth?: unknown }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
 
 export interface PluginCatalogDetail {
@@ -1656,6 +1656,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
           name: "composio",
           transport: "http",
           url: "https://connect.composio.dev/mcp",
+          earlierUrls: ["https://composio.dev/"],
           auth: [
             { id: "composio-oauth", kind: "link", label: "Sign in" },
             {

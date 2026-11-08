@@ -1600,6 +1600,7 @@ const COMPOSIO: MarketplacePluginDetail = {
         name: "composio",
         transport: "http",
         url: "https://connect.composio.dev/mcp",
+        earlierUrls: ["https://composio.dev/"],
         auth: [
           { id: "composio-oauth", kind: "link", label: "Sign in" },
           {

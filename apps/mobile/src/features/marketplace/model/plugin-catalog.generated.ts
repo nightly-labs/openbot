@@ -44,7 +44,7 @@ export type MobilePluginAuthFlow =
     };
 
 type MobilePluginServer =
-  | { name: string; transport: "http"; url: string; auth?: MobilePluginAuthFlow[] }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
 
 export interface MobilePluginApp {
@@ -1367,6 +1367,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           name: "composio",
           transport: "http",
           url: "https://connect.composio.dev/mcp",
+          earlierUrls: ["https://composio.dev/"],
           auth: [
             { id: "composio-oauth", kind: "link", label: "Sign in" },
             {

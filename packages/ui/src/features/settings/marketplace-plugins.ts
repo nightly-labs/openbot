@@ -11,7 +11,7 @@
 
 import type { MacAutomationTarget, McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
 import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
-import { isListingUrl, type McpAuth, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
+import { isListingUrl, type McpAuth, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
 
 /** One of the example questions a plugin listing opens with. */
 export interface MarketplacePluginPrompt {
@@ -29,7 +29,12 @@ export interface MarketplacePluginPrompt {
  */
 export type MarketplacePluginServer = MarketplacePluginServerBase &
   (
-    | { transport: Extract<McpTransport, "http">; url: string }
+    | {
+        transport: Extract<McpTransport, "http">;
+        url: string;
+        /** The addresses that an earlier version of the listing saved rows on. */
+        earlierUrls?: readonly string[];
+      }
     | {
         transport: Extract<McpTransport, "stdio">;
         /**
@@ -59,10 +64,9 @@ interface MarketplacePluginServerBase {
  * The name alone cannot say so. `McpServerStore` keeps names unique, so a server the user wrote by
  * hand can own a catalog name while pointing somewhere else entirely; treating that row as the
  * plugin's would delete the user's own configuration on uninstall and forget the sign-in kept for
- * it. The address - or the command and its words - is compared as well. Of the headers, only the
- * name of the key header that the listing names counts: the connect step adds the credential the
- * user typed to the row that is saved, so header values, environment and enabled state all differ
- * legitimately from what the listing states.
+ * it. The address - or the command and its words - is compared as well, and nothing else: the
+ * connect step adds the credential the user typed to the row that is saved, so headers, environment
+ * and enabled state all differ legitimately from what the listing states.
  */
 export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): boolean {
   const server = app.server;
@@ -73,11 +77,11 @@ export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePlugi
     if (mcpAccountFragment(config.url) === null && config.name !== server.name) return false;
     const url = withoutMcpAccountFragment(config.url);
     if (url === server.url) return true;
-    // A listing that asks for the user's own link cannot know the address, only its host. A row
-    // that a key saved is also matched on the host: an earlier version of the listing can have
-    // saved the user's own link, as Composio 1.1.0 did.
+    // A listing that asks for the user's own link cannot know the address, only its host.
     const userLink = (server.auth ?? []).some((flow) => mcpFlowFields(flow).some((field) => field.url));
-    return isListingUrl(url, server.url) && (userLink || savedKeyFlow(server.auth, config) !== null);
+    if (userLink && isListingUrl(url, server.url)) return true;
+    // A row that an earlier version of the listing saved, such as a Composio link from before its sign-in.
+    return (server.earlierUrls ?? []).some((earlier) => isListingUrl(url, earlier));
   }
   if (config.name !== server.name) return false;
   return (

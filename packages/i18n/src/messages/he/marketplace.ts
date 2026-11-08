@@ -363,7 +363,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign": "נסח קמפיין לקולקציה החדשה, אבל אל תשלח אותו.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ועוד יותר מ-1,000 אפליקציות",
   "marketplace.plugin.composio.description":
-    "Composio מחבר סוכנים ל-Gmail, Slack, GitHub ולמאות אפליקציות אחרות דרך שרת MCP אחד. יש לחבר את האפליקציות הרצויות בחשבון Composio שלך, ואז להדביק כאן את כתובת ה-MCP שלו ואת מפתח ה-API.",
+    "Composio מחבר את הסוכנים שלך ל-Gmail, Slack, GitHub ולעוד יותר מ-1,000 אפליקציות אחרות דרך שרת MCP אחד. יש להתחבר עם חשבון Composio שלך. כשסוכן צריך אפליקציה, הוא מבקש ממך לחבר אותה.",
   "marketplace.plugin.composio.app":
     "האפליקציות שחיברת בחשבון Composio שלך. סוכן מבקש ממך לחבר אפליקציה כשהוא צריך אותה.",
   "marketplace.plugin.composio.prompt.inbox": "סכם את האימיילים שלא נקראו וצור טיוטות תשובה לדחופים.",
