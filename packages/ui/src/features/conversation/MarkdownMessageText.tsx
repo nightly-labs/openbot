@@ -1,5 +1,5 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
-import { attachmentReferences } from "@openbot/contracts/attachment-references";
+import { attachmentReferenceAt } from "@openbot/contracts/attachment-references";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -108,11 +108,8 @@ const markdown = new Marked({
       level: "inline",
       start: (source) => source.indexOf("@["),
       tokenizer(source): AttachmentTagToken | undefined {
-        if (!source.startsWith("@[")) return undefined;
-        // A marker has no line break, so only the first line is searched.
-        const lineEnd = source.search(/[\r\n]/u);
-        const reference = attachmentReferences(lineEnd < 0 ? source : source.slice(0, lineEnd))[0];
-        if (reference?.start !== 0) return undefined;
+        const reference = attachmentReferenceAt(source);
+        if (!reference) return undefined;
         return {
           type: "attachmentTag",
           raw: reference.marker,

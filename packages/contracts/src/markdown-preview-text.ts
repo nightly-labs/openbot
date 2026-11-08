@@ -1,5 +1,5 @@
 import { Marked, type Token, type Tokens } from "marked";
-import { attachmentReferences } from "./attachment-references";
+import { attachmentReferenceAt } from "./attachment-references";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "./chat-math";
 import { chatTagReferences, expandChatTagReferences } from "./chat-tag-references";
 
@@ -33,8 +33,8 @@ const markdown = new Marked({
       level: "inline",
       start: (source) => source.indexOf("@["),
       tokenizer(source) {
-        const file = attachmentReferences(source)[0];
-        if (file?.start === 0) return { type: "chatTag", raw: file.marker, text: file.name };
+        const file = attachmentReferenceAt(source);
+        if (file) return { type: "chatTag", raw: file.marker, text: file.name };
         const reference = chatTagReferences(source)[0];
         if (reference?.start !== 0) return undefined;
         const raw = source.slice(0, reference.end);
