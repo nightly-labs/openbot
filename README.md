@@ -265,7 +265,8 @@ Mistral uses a Mistral account or a Mistral API key. OpenBot downloads and pins 
 server (`vibe-acp`) when you select Download on the Mistral row in More providers. Sign in opens
 Mistral's sign-in page in your browser. Vibe saves an API key in the system keychain, or in
 `~/.vibe/.env` when there is no keychain. If `MISTRAL_API_KEY` is set for OpenBot, Vibe uses that key,
-and Disconnect cannot remove it. OpenBot turns off Vibe's telemetry. If you installed `vibe-acp`
+and Disconnect cannot remove it. OpenBot turns off Vibe's telemetry, and turns on Vibe's model
+catalogue, so the model picker shows the models of your Mistral account, not only Mistral Medium 3.5. If you installed `vibe-acp`
 yourself, OpenBot uses it until a download exists. Set `OPENBOT_MISTRAL_PATH` to select an executable
 yourself. When a Full access Mistral agent changes its model or thinking level, Vibe saves it as its
 default in `~/.vibe/config.toml`. Mistral agents run on this computer. Team members see them when

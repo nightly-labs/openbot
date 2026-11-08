@@ -73,6 +73,8 @@ export interface AcpFlavor {
    * discovery then resumes one probe session for each process rather than opening another.
    */
   closeKeepsSession?: true;
+  /** How long a model discovery session stays open after discovery read it. Absent: it closes at once. */
+  probeCloseDelayMs?: number;
   /**
    * Each session gets a process of its own, and an idle session is closed by ending that process.
    * For an agent with `closeKeepsSession`.
@@ -277,6 +279,9 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   // `config.toml`. In a confined process that file is protected, and the save fails with "Invalid
   // params" and "Layer 'user-toml': cannot write config file at <path>".
   configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
+  // Vibe 3.1.0 asks Mistral for the account's model catalogue when a session opens, and waits up to
+  // 5 s for it. A close stops that request, and then nothing saves the catalogue for later sessions.
+  probeCloseDelayMs: 5_000,
 };
 
 /**
