@@ -40,6 +40,7 @@ import type { RemoteNetworkRoutePreferenceStore } from "../remote-network-route-
 import type { RemoteSessionCache } from "../remote-session-cache";
 import type { RemoteSessionReusePreferenceStore } from "../remote-session-reuse-preference-store";
 import { readSetupState, writeSetupState } from "../setup-store";
+import { systemHourCycle } from "../system-hour-cycle";
 import type { UpdateService } from "../update-service";
 import {
   parseAgentDefaults,
@@ -208,6 +209,7 @@ export function appIpcHandlers({
         // composites on the CPU. This covers the GPU switch of `linux-gpu-mode.ts` and a GPU that
         // Chromium blocks, such as the llvmpipe driver of a server or a remote desktop.
         const softwareRendering = !app.getGPUFeatureStatus().gpu_compositing.startsWith("enabled");
+        const hourCycle = systemHourCycle();
         return {
           name: app.getName(),
           version,
@@ -216,6 +218,7 @@ export function appIpcHandlers({
           ...(analyticsCaptureUrl ? { analyticsCaptureUrl } : {}),
           ...(analyticsInstallId ? { analyticsInstallId } : {}),
           ...(softwareRendering ? { softwareRendering } : {}),
+          ...(hourCycle ? { hourCycle } : {}),
         };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),
