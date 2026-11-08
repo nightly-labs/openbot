@@ -21,7 +21,7 @@ import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
 import { causeHelpers } from "../effect-boundary";
-import { type HomeSkill, listHomeSkills, skillFolderNames } from "../home-skills";
+import { type HomeSkill, listHomeSkills, skillFolderNames, userSkillFolderNames } from "../home-skills";
 import type { MailboxStore } from "../mailbox-store";
 import type { McpOperationError } from "../mcp-effects";
 import {
@@ -1362,13 +1362,16 @@ export class ThreadLifecycle {
     return (yield* listHomeSkills()).filter((skill) => !read.has(skill.slug));
   });
 
-  /** The skill folders in a Codex agent's workspace, which Codex lists by short root names (#5810). */
+  /**
+   * The user's skills in a Codex agent's workspace, which Codex lists by short root names (#5810).
+   * The skills that OpenBot writes into each workspace are left out, so a new agent gets no new text.
+   */
   readonly #workspaceSkills = Effect.fn("ThreadLifecycle.workspaceSkills")(function* (
     agent: AgentSummary,
     client: AgentClient,
   ) {
     if (client.provider !== "codex") return [];
-    return [...(yield* skillFolderNames(join(agent.workspacePath, ".agents", "skills")))];
+    return yield* userSkillFolderNames(join(agent.workspacePath, ".agents", "skills"));
   });
 
   /**

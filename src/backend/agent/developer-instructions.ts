@@ -104,7 +104,7 @@ export interface DeveloperInstructionOptions {
    */
   homeSkills?: readonly HomeSkill[];
   /**
-   * The skill folders in the workspace's `.agents/skills`, for Codex. Codex lists a skill by a short
+   * The user's skill folders in the workspace's `.agents/skills`, for Codex. Codex lists a skill by a short
    * root name (`r9/...`), and the user's `~/.agents/skills` root ends in the same folders, so a model
    * read that folder and said that a workspace skill was missing (#5810). Only the folder in the
    * instructions did not help in real turns; the names did. Omitted or empty, the instructions name none.
