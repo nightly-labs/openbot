@@ -455,6 +455,7 @@ const TASK_STOP_WAIT_MS = 15_000;
 /**
  * How long after a list that lacks an agent's model a `catalog.partialListAtStart` provider is asked
  * again. Grok 1.0.70 has its whole catalogue about a second after it starts on an expired sign-in.
+ * Mistral Vibe 3.1.0 saves its account catalogue while its probe session is open (`probeCloseDelayMs`).
  */
 const PARTIAL_LIST_RECHECK_MS = 5_000;
 /**
@@ -913,9 +914,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             // before an agent leaves a model. A second list that is not fresh moves nobody, and
             // neither does one from a process that replaced this one: its own activation decides.
             let listConfirmed = true;
+            const catalog = requireProviderDriver(provider).catalog;
             if (
-              requireProviderDriver(provider).catalog?.partialListAtStart &&
-              this.#endpoints.hasAgentsOffList(provider)
+              catalog?.partialListAtStart &&
+              (catalog.relistAfterStart || this.#endpoints.hasAgentsOffList(provider))
             ) {
               const client = this.#providers.currentClient(provider);
               yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS);
