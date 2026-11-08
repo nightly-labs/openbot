@@ -8,6 +8,7 @@ import {
   taskTone,
 } from "@openbot/team-client/agent-tasks";
 import {
+  ActiveCurrentRow,
   ArrowLeft,
   ArrowUp,
   Button,
@@ -144,44 +145,69 @@ const AGENT_SWAP: SwapMotion = {
   leave: { duration: 180, easing: "ease" },
 };
 
-/** Lower case, no accents: "cafe" finds "Café Orders". */
-const foldName = (text: string) =>
-  text
+/** Lower case, no accents, and `_`, `/` and `-` as spaces: "cafe" finds "Café Orders". */
+const foldChar = (char: string) =>
+  char
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[\s_/-]/g, " ");
+
+/**
+ * The folded text, and for each of its code units the index of the character in `text` that made
+ * it. Folding can change the length, so this map finds the matched part in the original name.
+ */
+function foldName(text: string) {
+  let folded = "";
+  const source: number[] = [];
+  let index = 0;
+  for (const char of text) {
+    const part = foldChar(char);
+    folded += part;
+    for (let unit = 0; unit < part.length; unit++) source.push(index);
+    index += char.length;
+  }
+  return { folded, source };
+}
+
+/** Where `query` is in `name`, and its rank: 0 at the start, 1 at the start of a word, 2 in a word. */
+function findMatch(name: string, query: string): { at: number; rank: number } | undefined {
+  if (name.startsWith(query)) return { at: 0, rank: 0 };
+  const first = name.indexOf(query);
+  for (let at = first; at > 0; at = name.indexOf(query, at + 1)) {
+    if (name[at - 1] === " ") return { at, rank: 1 };
+  }
+  return first < 0 ? undefined : { at: first, rank: 2 };
+}
 
 /** Names that start with the query, or have a word that does, come before names that only contain it. */
 function matchAgents(agents: readonly AgentProfile[], query: string): AgentProfile[] {
-  const text = foldName(query.trim());
+  const text = foldName(query.trim()).folded;
   if (!text) return [...agents];
-  const rank = (agent: AgentProfile) => {
-    const name = foldName(agent.name);
-    if (name.startsWith(text)) return 0;
-    if (name.split(/[\s-]+/).some((word) => word.startsWith(text))) return 1;
-    return name.includes(text) ? 2 : -1;
-  };
   return agents
-    .map((agent) => ({ agent, rank: rank(agent) }))
-    .filter((row) => row.rank >= 0)
+    .flatMap((agent) => {
+      const match = findMatch(foldName(agent.name).folded, text);
+      return match ? [{ agent, rank: match.rank }] : [];
+    })
     .sort((a, b) => a.rank - b.rank)
     .map((row) => row.agent);
 }
 
 /** The agent name with the matched part in bold, so the eye finds why a row is in the list. */
 function MatchedAgentName(props: { name: string; query: string }) {
-  const parts = () => {
-    const text = foldName(props.query.trim());
-    // Folding keeps the length of most names. When it does not, the name shows without bold.
-    const folded = foldName(props.name);
-    const at = text && folded.length === props.name.length ? folded.indexOf(text) : -1;
-    if (at < 0) return { before: props.name, match: "", after: "" };
+  const parts = createMemo(() => {
+    const text = foldName(props.query.trim()).folded;
+    const name = foldName(props.name);
+    const match = text ? findMatch(name.folded, text) : undefined;
+    if (!match) return { before: props.name, match: "", after: "" };
+    const start = name.source[match.at] ?? 0;
+    const end = name.source[match.at + text.length] ?? props.name.length;
     return {
-      before: props.name.slice(0, at),
-      match: props.name.slice(at, at + text.length),
-      after: props.name.slice(at + text.length),
+      before: props.name.slice(0, start),
+      match: props.name.slice(start, end),
+      after: props.name.slice(end),
     };
-  };
+  });
   return (
     <span class="tasks-page-agent-name">
       {parts().before}
@@ -191,6 +217,22 @@ function MatchedAgentName(props: { name: string; query: string }) {
       {parts().after}
     </span>
   );
+}
+
+/**
+ * Kobalte finds a row with an unescaped `[data-key="…"]` selector, to scroll it into view and to
+ * name the active row. A key with `"`, `\` or U+0000 matches no row, so the key is encoded.
+ */
+const agentKey = (id: string) => encodeURIComponent(id);
+
+/**
+ * True when the window has space under the trigger for the search field and three rows. The menu
+ * opens down, and opens up only when it would show no row there.
+ */
+function roomBelow(trigger: HTMLElement | undefined): boolean {
+  if (!trigger) return true;
+  const row = Number.parseFloat(getComputedStyle(trigger).getPropertyValue("--openbot-control-md")) || 32;
+  return window.innerHeight - trigger.getBoundingClientRect().bottom >= 5 * row;
 }
 
 /**
@@ -212,7 +254,19 @@ function TaskAgentSelect(props: {
   const [query, setQuery] = createSignal("");
   const matches = createMemo(() => matchAgents(props.agents, query()));
   const fades = createScrollFades();
-  onCleanup(() => fades.stop());
+  // Kobalte scrolls the current row into view before the list has its final height. So when the
+  // list resizes, the active row comes back into view.
+  let resize: ResizeObserver | undefined;
+  const keepActiveRow = () => {
+    const id = input?.getAttribute("aria-activedescendant");
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" });
+  };
+  onCleanup(() => {
+    fades.stop();
+    resize?.disconnect();
+  });
+  const [placement, setPlacement] = createSignal<"bottom-start" | "top-start">("bottom-start");
+  let trigger: HTMLElement | undefined;
   let input: HTMLInputElement | undefined;
   let panel: HTMLElement | undefined;
   let list: HTMLElement | undefined;
@@ -220,26 +274,39 @@ function TaskAgentSelect(props: {
     setOpen(false);
     if (option.id !== props.agentId) props.onChange(option.id);
   };
+  const toggle = (next: boolean) => {
+    if (next) {
+      setQuery("");
+      setPlacement(roomBelow(trigger) ? "bottom-start" : "top-start");
+    }
+    setOpen(next);
+  };
   return (
     <Popover.Root
       open={open()}
-      onOpenChange={(next) => {
-        if (next) setQuery("");
-        setOpen(next);
-      }}
-      placement="bottom-start"
+      onOpenChange={toggle}
+      placement={placement()}
       gutter={4}
-      // The list shrinks to the space under the trigger, so the field stays next to the trigger.
+      // The list shrinks to the space next to the trigger, so it does not flip when a search adds rows.
       flip={false}
       modal
     >
       <Popover.Trigger
+        ref={(element: HTMLElement) => {
+          trigger = element;
+        }}
         class={`${buttonVariants({ variant: "ghost", size: "sm" })} tasks-page-agent`}
         aria-label={
           props.title === undefined
             ? t("conversation.tasks.page.agent", { name: agent()?.name ?? props.agentId })
             : t("conversation.tasks.page.reassign", { title: props.title, name: agent()?.name ?? props.agentId })
         }
+        onKeyDown={(event: KeyboardEvent) => {
+          // The arrow keys open the menu, as on a select.
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          toggle(true);
+        }}
       >
         {/* Keyed by agent, so the face of a newly chosen agent springs in, as the model mark does. */}
         <For each={[props.agentId]} keyed={(id) => id}>
@@ -268,7 +335,7 @@ function TaskAgentSelect(props: {
           <Combobox.Root<AgentProfile>
             class="tasks-page-agent-picker"
             options={matches()}
-            optionValue="id"
+            optionValue={(option) => agentKey(option.id)}
             optionTextValue="name"
             optionLabel="name"
             open={true}
@@ -320,10 +387,14 @@ function TaskAgentSelect(props: {
                 }}
               />
             </Combobox.Control>
+            <ActiveCurrentRow key={agentKey(props.agentId)} />
             <Combobox.Listbox
               ref={(element: HTMLElement) => {
                 list = element;
                 fades.bind(element);
+                resize?.disconnect();
+                resize = new ResizeObserver(keepActiveRow);
+                resize.observe(element);
               }}
               class={["tasks-page-agent-list", fades.classes()]}
               style={{ "--tasks-agent-rows": String(matches().length) }}
