@@ -532,4 +532,8 @@ export const messages = {
   "chat.reference.kind.thread": "Wątek",
   "chat.reference.open.tab": "Pokaż kartę przeglądarki {name}",
   "chat.reference.open.thread": "Otwórz wątek {name}",
+  "chat.feedbackSent.title": "Dziękujemy za opinię 🙏",
+  "chat.feedbackSent.badge": "Wysłano",
+  "chat.feedbackSent.body": "Zespół OpenBot przeczyta to i się tym zajmie 💜",
+  "chat.feedbackSent.openNamed": "Otwórz zgłoszenie #{number} na GitHubie",
 } as const satisfies PartialTranslation<typeof source>;

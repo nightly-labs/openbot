@@ -3,6 +3,21 @@ import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
+import {
+  BUG_REPORT_AREAS,
+  BUG_REPORT_SEVERITIES,
+  bugReportFormUrl,
+  bugReportPlatform,
+  bugReportProviderFacts,
+  FEATURE_REQUEST_TYPES,
+  FEEDBACK_LIMITS,
+  type Feedback,
+  type FeedbackFacts,
+  featureRequestFormUrl,
+  feedbackPreview,
+  feedbackSentItemType,
+  parseFeedback,
+} from "@openbot/contracts/feedback";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelChoice,
@@ -26,7 +41,7 @@ import {
   VAULT_CHANGE_ITEM_TYPE,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
-import { isString } from "@openbot/contracts/runtime-values";
+import { isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { isUiBlockId, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
@@ -177,6 +192,30 @@ function requestAborted(signal: AbortSignal | undefined) {
 
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
+/** GitHub and browsers refuse much longer addresses; the agent's text is most of it. */
+const FEEDBACK_URL_LIMIT = 8000;
+
+/** The result of sent feedback, or "signedOut" when no account can send it. */
+export type FeedbackSendResult =
+  | { readonly status: "sent"; readonly url: string; readonly number: number }
+  | { readonly status: "signedOut" };
+
+/** Sends approved feedback to the account service, which opens it as a public GitHub issue. */
+export interface AgentFeedback {
+  /** False when nobody is signed in to OpenBot, so a send cannot go out with an account. */
+  signedIn(): boolean;
+  send(feedback: Feedback): Effect.Effect<FeedbackSendResult, ToolOperationFailed>;
+}
+
+const FEEDBACK_SIGNED_OUT_NEXT =
+  "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
+
+/** The prefilled issue form, which the user submits in the browser. */
+function feedbackForm(url: string, next: string): OpenBotToolResponse {
+  if (url.length > FEEDBACK_URL_LIMIT)
+    return openBotToolFailure("The text is too long for a link. Make it shorter and call this again.");
+  return openBotToolResult({ status: "ready", url, next });
+}
 
 function listedDescription(description: string): string {
   const characters = Array.from(description);
@@ -229,6 +268,8 @@ export interface OpenBotToolRouterHooks {
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
   /** The answer of one web search for the agent, from a side turn whose only tool is web search. */
   searchWeb(agentId: string, query: string): Effect.Effect<string, ToolOperationFailed>;
+  /** The CLI version of a provider, as its settings row shows it; null when it is not known. */
+  providerVersion(provider: AgentProvider): string | null;
 }
 
 export interface OpenBotToolRouterOptions {
@@ -263,6 +304,10 @@ export interface OpenBotToolRouterOptions {
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
+  /** This build's version and system for `send_feedback`; null where this process does not know them. */
+  feedbackFacts?: FeedbackFacts | null | undefined;
+  /** Sends approved `send_feedback` text; null where this process has no account service. */
+  feedback?: AgentFeedback | null | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -305,6 +350,8 @@ export class OpenBotToolRouter {
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
+  readonly #feedbackFacts: FeedbackFacts | null;
+  readonly #feedback: AgentFeedback | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -345,6 +392,8 @@ export class OpenBotToolRouter {
     this.#screenCapture = options.screenCapture ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
+    this.#feedbackFacts = options.feedbackFacts ?? null;
+    this.#feedback = options.feedback ?? null;
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -906,6 +955,139 @@ export class OpenBotToolRouter {
     );
   }
 
+  /**
+   * `send_feedback`: the agent's bug report or feature idea, with the facts that OpenBot knows. The
+   * owner reads the text in plain words and approves it, and the account service opens it as a public
+   * issue. The approval names the facts that OpenBot adds, so the owner does not read them as a form.
+   * Where nothing can send it, or the send fails, the result is the prefilled form, which the user
+   * submits in the browser. The text is redacted, because it leaves the computer.
+   */
+  readonly #sendFeedback = Effect.fn("OpenBotToolRouter.sendFeedback")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const args = params.arguments;
+    if (!isRecord(args) || !isString(args.title) || !isString(args.text))
+      throw new Error("title and text must be strings.");
+    const text = (value: unknown) =>
+      isString(value) && value.trim() ? redactText(value.trim()).slice(0, FEEDBACK_LIMITS.text) : "";
+    // The card shows the title on one line, and the issue title is one line.
+    const title = redactText(args.title.replace(/\s+/g, " ").trim()).slice(0, FEEDBACK_LIMITS.title);
+    if (!title || !text(args.text)) return openBotToolFailure("title and text must not be empty.");
+    const idea = args.kind === "idea";
+    const { provider } = this.#requireAgent(senderAgentId);
+    const providerVersion = this.#hooks.providerVersion(provider) ?? "";
+    const facts = this.#feedbackFacts ?? { platform: bugReportPlatform(process.platform) };
+    // A bug's details are its description and steps; an idea's are what the user wants and why.
+    const bug = {
+      title,
+      description: text(args.text),
+      reproduction: text(args.details),
+      ...(isOneOf(BUG_REPORT_AREAS, args.area) ? { area: args.area } : {}),
+      ...(isOneOf(BUG_REPORT_SEVERITIES, args.severity) ? { severity: args.severity } : {}),
+    };
+    const feature = {
+      title,
+      proposal: text(args.text),
+      problem: text(args.details),
+      ...(isOneOf(FEATURE_REQUEST_TYPES, args.type) ? { type: args.type } : {}),
+    };
+    const form = (next: string) =>
+      feedbackForm(
+        idea
+          ? featureRequestFormUrl(feature)
+          : bugReportFormUrl(facts, { ...bug, provider, ...(providerVersion ? { providerVersion } : {}) }),
+        next,
+      );
+    const sender = this.#feedback;
+    if (!sender || !facts.version || !facts.os)
+      return form(
+        "Give the user this link. Tell them to check the text, complete the empty fields, tick the checklist, and submit. Do not open or submit it for them.",
+      );
+    const feedback = parseFeedback({
+      ...(idea ? { kind: "idea", ...feature } : { kind: "bug", ...bug }),
+      platform: facts.platform,
+      installSource: facts.builtFromSource ? "Built from source" : "Other",
+      version: facts.version,
+      os: facts.os,
+      ...bugReportProviderFacts(provider, providerVersion),
+    });
+    if (!feedback) return openBotToolFailure("title and text must not be empty.");
+    // A routine, a channel task, an external chat or another agent must not wait on the owner's card.
+    if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead.",
+      );
+    // The card offers a send, so a user who is not signed in gets the form link at once.
+    if (!sender.signedIn()) return form(FEEDBACK_SIGNED_OUT_NEXT);
+    const decision = yield* this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: feedbackPreview(feedback),
+        cwd: null,
+        reason: sourceText(idea ? "status.agent.sendIdea" : "status.agent.reportProblem"),
+        grantRoot: null,
+        permissions: null,
+      },
+      // The text goes out with the owner's account, and Full access does not answer for a public post.
+      { ownerOnly: true },
+    );
+    if (decision === "cancel")
+      return openBotToolResult({
+        status: "cancelled",
+        next: "Nobody answered the card, so OpenBot did not send it. Do not send it another way.",
+      });
+    if (decision !== "accept")
+      return openBotToolResult({
+        status: "declined",
+        next: "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
+      });
+    const sent = yield* Effect.result(sender.send(feedback));
+    if (Result.isFailure(sent)) {
+      logger.warn("Feedback could not be sent.", { error: toLogValue(sent.failure.cause) });
+      return form(
+        "OpenBot could not send it. Give the user this link to the same text on GitHub, to check and submit.",
+      );
+    }
+    if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT);
+    const issue = sent.success;
+    // The thank-you card in the chat links the issue. The issue is open also when the card fails.
+    const card = yield* Effect.result(
+      toolStep(() =>
+        this.#postSystemCard(
+          senderAgentId,
+          this.#conversation.publicThreadId(senderAgentId, params.threadId),
+          params.turnId,
+          {
+            itemType: feedbackSentItemType(issue.number),
+            text: sourceText("status.agent.feedbackSent", { title: feedback.title }),
+            eventType: "feedback.sent",
+            detail: {},
+          },
+        ),
+      ),
+    );
+    if (Result.isFailure(card))
+      logger.warn("The feedback card could not be added.", { error: toLogValue(card.failure.cause) });
+    return openBotToolResult({
+      status: "sent",
+      url: issue.url,
+      number: issue.number,
+      next: Result.isFailure(card)
+        ? "The issue is open on GitHub. Give the user this link."
+        : "The issue is open on GitHub. A card in the chat thanks the user and links the issue, so do not repeat the link: thank the user in one short sentence.",
+    });
+  });
+
   #requireAgent(agentId: string): AgentSummary {
     const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
@@ -1429,6 +1611,8 @@ export class OpenBotToolRouter {
             : "The card is in the chat. End your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly. You have no tools for it until then.",
       });
     }
+
+    if (params.tool === "send_feedback") return yield* this.#sendFeedback(client, request, params, senderAgentId);
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 

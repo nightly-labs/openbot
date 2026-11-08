@@ -35,6 +35,7 @@ import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 import { formatChatTimestamp } from "./chat-timestamp";
+import { FeedbackSentCard } from "./FeedbackSentCard";
 import { InstructionsChangeActions } from "./InstructionsChangeActions";
 import { MAIN_THREAD_ID } from "./threads/thread-types";
 
@@ -52,6 +53,8 @@ interface ChatActionMarkerProps {
    */
   openRoutineThread?: ((routineId: string) => (() => void) | undefined) | undefined;
   onOpenHostedSite?: ((url: string) => void) | undefined;
+  /** Opens a web link outside the app, such as the issue of sent feedback. */
+  onOpenLink?: ((url: string) => void) | undefined;
   /** Opens or closes the messages of a run, or the runs of a group, whose marker sets `expanded`. */
   onToggleRoutineRun?: ((marker: RoutineRunToggleMarkerModel) => void) | undefined;
   /** Opens or closes the text of an agent message whose marker sets `expanded`, by its `messageId`. */
@@ -81,8 +84,9 @@ const STATUS_LABELS = {
 
 type SingleChatActionMarkerModel = Exclude<
   ChatActionMarkerModel,
-  { kind: "agent-message-group" } | { kind: "routine-run-group" }
+  { kind: "agent-message-group" } | { kind: "routine-run-group" } | { kind: "feedback-sent" }
 >;
+type FeedbackSentMarkerModel = Extract<ChatActionMarkerModel, { kind: "feedback-sent" }>;
 type AgentMessageGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "agent-message-group" }>;
 type RoutineRunGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "routine-run-group" }>;
 export type RoutineRunToggleMarkerModel = Extract<ChatActionMarkerModel, { kind: "routine-run" | "routine-run-group" }>;
@@ -95,8 +99,14 @@ function routineRunGroup(marker: ChatActionMarkerModel): RoutineRunGroupMarkerMo
   return marker.kind === "routine-run-group" ? marker : undefined;
 }
 
+function feedbackSent(marker: ChatActionMarkerModel): FeedbackSentMarkerModel | undefined {
+  return marker.kind === "feedback-sent" ? marker : undefined;
+}
+
 function singleMarker(marker: ChatActionMarkerModel): SingleChatActionMarkerModel | undefined {
-  return marker.kind === "agent-message-group" || marker.kind === "routine-run-group" ? undefined : marker;
+  return marker.kind === "agent-message-group" || marker.kind === "routine-run-group" || marker.kind === "feedback-sent"
+    ? undefined
+    : marker;
 }
 
 export function ChatActionMarker(props: ChatActionMarkerProps) {
@@ -116,23 +126,38 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
         <Show
           when={routineRunGroup(props.marker)}
           fallback={
-            <Show when={singleMarker(props.marker)}>
-              {(marker) => (
-                <SingleChatActionMarker
-                  marker={marker()}
-                  agents={props.agents}
-                  announce={props.announce}
-                  onOpenSkill={props.onOpenSkill}
-                  routineAvailable={props.routineAvailable}
-                  onSelectAgent={props.onSelectAgent}
-                  onOpenRoutine={props.onOpenRoutine}
-                  openRoutineThread={props.openRoutineThread}
-                  onOpenHostedSite={props.onOpenHostedSite}
-                  onToggleRoutineRun={props.onToggleRoutineRun}
-                  onToggleAgentMessage={props.onToggleAgentMessage}
-                  agentMessageText={props.agentMessageText}
-                  instructions={props.instructions}
-                  onOpenInstructions={props.onOpenInstructions}
+            <Show
+              when={feedbackSent(props.marker)}
+              fallback={
+                <Show when={singleMarker(props.marker)}>
+                  {(marker) => (
+                    <SingleChatActionMarker
+                      marker={marker()}
+                      agents={props.agents}
+                      announce={props.announce}
+                      onOpenSkill={props.onOpenSkill}
+                      routineAvailable={props.routineAvailable}
+                      onSelectAgent={props.onSelectAgent}
+                      onOpenRoutine={props.onOpenRoutine}
+                      openRoutineThread={props.openRoutineThread}
+                      onOpenHostedSite={props.onOpenHostedSite}
+                      onOpenLink={props.onOpenLink}
+                      onToggleRoutineRun={props.onToggleRoutineRun}
+                      onToggleAgentMessage={props.onToggleAgentMessage}
+                      agentMessageText={props.agentMessageText}
+                      instructions={props.instructions}
+                      onOpenInstructions={props.onOpenInstructions}
+                    />
+                  )}
+                </Show>
+              }
+            >
+              {(sent) => (
+                <FeedbackSentCard
+                  title={sent().title}
+                  number={sent().number}
+                  url={sent().url}
+                  onOpenLink={props.onOpenLink}
                 />
               )}
             </Show>

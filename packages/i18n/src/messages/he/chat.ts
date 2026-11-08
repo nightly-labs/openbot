@@ -446,4 +446,8 @@ export const messages = {
   "chat.reference.kind.thread": "שרשור",
   "chat.reference.open.tab": "הצגת לשונית הדפדפן {name}",
   "chat.reference.open.thread": "פתיחת השרשור {name}",
+  "chat.feedbackSent.title": "תודה על המשוב 🙏",
+  "chat.feedbackSent.badge": "נשלח",
+  "chat.feedbackSent.body": "צוות OpenBot יקרא ויטפל בזה 💜",
+  "chat.feedbackSent.openNamed": "פתיחת issue #{number} ב-GitHub",
 } as const satisfies PartialTranslation<typeof source>;

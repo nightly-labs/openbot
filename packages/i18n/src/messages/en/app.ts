@@ -68,6 +68,7 @@ export const messages = defineMessages("app", {
   "app.help.changelog": "Full changelog",
   "app.help.guides": "Guides",
   "app.help.discord": "Join the Discord",
+  "app.help.reportProblem": "Report a problem",
   "app.githubStar.title": "Like OpenBot so far?",
   "app.githubStar.description": "A star on GitHub helps more people find OpenBot.",
   "app.githubStar.star": "Star on GitHub",
