@@ -72,6 +72,8 @@ export const skillFolderNames = Effect.fn("HomeSkills.folderNames")(function* (d
 export const userSkillFolderNames = Effect.fn("HomeSkills.userFolderNames")(function* (directory: string) {
   const names: string[] = [];
   for (const name of yield* skillFolderNames(directory)) {
+    // `.openbot-stage-` and `.openbot-backup-` folders are an install in progress.
+    if (name.includes(".openbot-")) continue;
     const marker = yield* optionalRead(() => stat(join(directory, name, SKILL_OWNERSHIP_MARKER)));
     if (Option.isNone(marker)) names.push(name);
   }
