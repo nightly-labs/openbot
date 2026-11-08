@@ -20,6 +20,12 @@ export const CHANNEL_TASK_CANCEL_CAPABILITY = "channel-task-cancel-v1";
 export const SIGNED_OUT_CHANNEL_MEMBER_ID = "local";
 export const CHANNEL_PARALLEL_LIMIT = 2;
 export const CHANNEL_ASSIGNMENT_LIMIT = 8;
+/**
+ * The reason a run stops at `CHANNEL_ASSIGNMENT_LIMIT`. Saved tasks and every host version carry this
+ * exact English, so a screen compares it to show its own text. Do not change it.
+ */
+export const CHANNEL_ASSIGNMENT_LIMIT_ERROR =
+  "The automatic assignment limit was reached. Continue or reassign this task.";
 
 export interface ChannelMember {
   agentId: string;

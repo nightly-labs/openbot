@@ -10,8 +10,27 @@
   flex: 0 0 auto;
   align-items: center;
 }
+.channel-activity-faces .agent-activity-avatar {
+  transition:
+    transform var(--openbot-duration-overlay) var(--openbot-ease-out),
+    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
+    margin-inline-end var(--openbot-duration-overlay) var(--openbot-ease-in-out);
+}
 .channel-activity-faces .agent-activity-avatar + .agent-activity-avatar {
   margin-inline-start: calc(-1 * var(--openbot-space-2));
+}
+/* A member that stops while others work: its face shrinks to its lower edge, as the whole line's face
+   does on exit, and its stacked width (32px less the 8px overlap) closes, so the faces after it slide
+   into its place. */
+.channel-activity-faces .channel-activity-face-leaving {
+  margin-inline-end: calc(-1 * var(--openbot-space-6));
+  opacity: 0;
+  transform: translateY(4px) scale(0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .channel-activity-faces .agent-activity-avatar {
+    transition: none;
+  }
 }
 
 /* Who works, before what the work is. Each name takes its agent's message colour. */
@@ -69,9 +88,18 @@
 .channel-paused-task + .channel-paused-task {
   border-top: 1px solid var(--openbot-accent-soft);
 }
-.channel-paused-task-reason {
+.channel-paused-task-text {
   min-width: 0;
   flex: 1 1 24ch;
+}
+.channel-paused-task-subject {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-paused-task-reason {
   margin: 0;
   overflow-wrap: anywhere;
   font-size: var(--openbot-text-sm);

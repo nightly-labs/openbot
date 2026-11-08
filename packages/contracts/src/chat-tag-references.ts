@@ -122,9 +122,11 @@ const ADDRESS_SEPARATORS = /^(?:[\s,]|and\b|&|@everyone(?![\p{L}\p{N}_'’-]))*/
 /**
  * Whom a message opens by addressing, as a reader addresses several people: "@A @B, @C what do
  * you think?" or "@everyone ideas?". Spaces, commas and "and" may separate them. A tag after the
- * first other word is a reference in the text, not an address.
+ * first other word is a reference in the text, not an address. A quote is not a word: the composer
+ * puts a quote where the caret is, often before the mention, so "<quote> @A why?" still asks A.
+ * `end` is where the address and the quotes in it stop.
  */
-export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean } {
+export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean; end: number } {
   const mentions: ChatTagReference[] = [];
   let end = 0;
   let everyone = false;
@@ -132,11 +134,11 @@ export function leadingAddress(value: string): { mentions: ChatTagReference[]; e
     const gap = value.slice(end, reference?.start);
     const separators = ADDRESS_SEPARATORS.exec(gap)?.[0] ?? "";
     everyone ||= separators.toLowerCase().includes(EVERYONE_MENTION);
-    if (reference?.kind !== "agent" || separators.length !== gap.length) break;
-    mentions.push(reference);
+    if ((reference?.kind !== "agent" && reference?.kind !== "quote") || separators.length !== gap.length) break;
+    if (reference.kind === "agent") mentions.push(reference);
     end = reference.end;
   }
-  return { mentions, everyone };
+  return { mentions, everyone, end };
 }
 
 function chatTagKind(value: string | undefined): ChatTagKind {

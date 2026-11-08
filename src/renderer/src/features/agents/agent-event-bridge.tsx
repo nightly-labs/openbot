@@ -469,7 +469,7 @@ export function AgentEventBridge() {
     if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
-        void channels.refresh();
+        void channels.changed(event.channelId);
         return;
       }
       flush(() => handleAgentEvent(event));

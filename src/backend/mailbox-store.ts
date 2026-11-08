@@ -253,6 +253,21 @@ export interface CommittedChannelAttachments {
 /** The most completed messages that one `conversationMessages` read returns. */
 export const MAILBOX_CONVERSATION_MESSAGE_LIMIT = 100;
 
+/**
+ * A lane id for the channel thread of one channel. A task id never starts with this control
+ * character, so a lane id names a task or a channel without a second field.
+ */
+const CHANNEL_LANE_PREFIX = "\u0001channel:";
+
+export function channelLane(channelId: string): string {
+  return `${CHANNEL_LANE_PREFIX}${channelId}`;
+}
+
+/** The channel of a channel lane, or null for a task lane or the agent's own chat. */
+export function laneChannelId(lane: string | null): string | null {
+  return lane?.startsWith(CHANNEL_LANE_PREFIX) ? lane.slice(CHANNEL_LANE_PREFIX.length) : null;
+}
+
 export class MailboxStore {
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
@@ -866,6 +881,42 @@ export class MailboxStore {
   }
 
   /**
+   * The lane a delivery runs in: its task, the channel thread of its channel, or null for the
+   * agent's own chat. Each lane runs one turn at a time, beside the other lanes.
+   */
+  #laneOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
+    const message = messages
+      ? messages.get(delivery.messageId)
+      : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    return message?.taskId ?? (message?.channelId ? channelLane(message.channelId) : null);
+  }
+
+  /** The lane a delivery runs in, as {@link nextQueued} takes it. */
+  laneIdForDelivery(deliveryId: string): string | null {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    return delivery ? this.#laneOf(delivery) : null;
+  }
+
+  /**
+   * The channel lanes of this agent that have work, in queue order of their first delivery. With
+   * `queuedOnly`, only the lanes with a queued delivery.
+   */
+  channelLanes(agentId: string, queuedOnly = false): string[] {
+    const messages = this.#messagesById();
+    const lanes = new Set<string>();
+    const deliveries = queuedOnly
+      ? this.#queuedFor(agentId)
+      : this.#state.deliveries.filter(
+          (delivery) => delivery.recipientAgentId === agentId && isActiveDelivery(delivery),
+        );
+    for (const delivery of deliveries) {
+      const lane = this.#laneOf(delivery, messages);
+      if (lane !== null && laneChannelId(lane) !== null) lanes.add(lane);
+    }
+    return [...lanes];
+  }
+
+  /**
    * Indexes the positions and messages once, so a list of contexts does not sort or scan for each one.
    * Only a queued delivery has a position, so a list of started deliveries does not sort the queue.
    */
@@ -929,7 +980,7 @@ export class MailboxStore {
       (delivery) =>
         delivery.recipientAgentId === agentId &&
         (delivery.status === "starting" || delivery.status === "running") &&
-        this.#taskIdOf(delivery) === taskId,
+        this.#laneOf(delivery) === taskId,
     );
   }
 
@@ -937,7 +988,7 @@ export class MailboxStore {
   laneQueuedIds(agentId: string, taskId: string | null): string[] {
     const messages = this.#messagesById();
     return this.#queuedFor(agentId)
-      .filter((delivery) => !waitsForPlanContinuation(delivery) && this.#taskIdOf(delivery, messages) === taskId)
+      .filter((delivery) => !waitsForPlanContinuation(delivery) && this.#laneOf(delivery, messages) === taskId)
       .map((delivery) => delivery.id);
   }
 
@@ -1595,7 +1646,7 @@ export class MailboxStore {
     if (this.laneActive(agentId, taskId)) return null;
     const messages = this.#messagesById();
     const delivery = this.#queuedFor(agentId).find(
-      (candidate) => this.#taskIdOf(candidate, messages) === taskId && !this.#isHeldReply(candidate),
+      (candidate) => this.#laneOf(candidate, messages) === taskId && !this.#isHeldReply(candidate),
     );
     return delivery && this.#mayStart(delivery) ? this.#context(delivery, undefined, messages) : null;
   }
@@ -1612,11 +1663,11 @@ export class MailboxStore {
     const requestId = isAnswer(message) ? message.replyToMessageId : null;
     if (message.sender.kind !== "user" && !requestId) return [];
     // One turn runs in one lane: the agent's own chat, or the side thread that sent the request.
-    const lane = message.taskId ?? null;
     const messages = this.#messagesById();
+    const lane = this.#laneOf(next, messages);
     return this.#contexts(
       this.#queuedFor(next.recipientAgentId).filter((candidate) => {
-        if (candidate.id === next.id || !this.#mayStart(candidate) || this.#taskIdOf(candidate, messages) !== lane)
+        if (candidate.id === next.id || !this.#mayStart(candidate) || this.#laneOf(candidate, messages) !== lane)
           return false;
         if (!requestId) return this.#isHeldReply(candidate);
         const reply = this.#requireMessage(candidate.messageId, messages);
@@ -1637,9 +1688,9 @@ export class MailboxStore {
     const messages = this.#messagesById();
     const first = this.#requireMessage(next.messageId, messages);
     if (!isChatMessageFromPerson(first)) return [];
-    const lane = first.taskId ?? null;
+    const lane = this.#laneOf(next, messages);
     const queued = this.#queuedFor(next.recipientAgentId).filter(
-      (candidate) => this.#taskIdOf(candidate, messages) === lane && !this.#isHeldReply(candidate),
+      (candidate) => this.#laneOf(candidate, messages) === lane && !this.#isHeldReply(candidate),
     );
     const start = queued.findIndex((candidate) => candidate.id === next.id);
     if (start < 0) return [];
@@ -1664,13 +1715,11 @@ export class MailboxStore {
     const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!next || !waitsForPlanContinuation(next)) return [];
     const messages = this.#messagesById();
-    const lane = this.#taskIdOf(next, messages);
+    const lane = this.#laneOf(next, messages);
     return this.#contexts(
       this.#queuedFor(next.recipientAgentId).filter(
         (candidate) =>
-          candidate.id !== next.id &&
-          waitsForPlanContinuation(candidate) &&
-          this.#taskIdOf(candidate, messages) === lane,
+          candidate.id !== next.id && waitsForPlanContinuation(candidate) && this.#laneOf(candidate, messages) === lane,
       ),
     );
   }
@@ -1831,7 +1880,7 @@ export class MailboxStore {
       delivery.recipientAgentId === agentId &&
       delivery.status === "starting" &&
       delivery.turnId === null &&
-      (taskId === undefined || this.#taskIdOf(delivery) === taskId)
+      (taskId === undefined || this.#laneOf(delivery) === taskId)
     );
   }
 
@@ -2625,7 +2674,7 @@ export class MailboxStore {
         if (
           delivery.recipientAgentId !== agentId ||
           !waitsForPlanContinuation(delivery) ||
-          (taskId !== undefined && this.#taskIdOf(delivery, messages) !== taskId)
+          (taskId !== undefined && this.#laneOf(delivery, messages) !== taskId)
         )
           continue;
         const turnIds = delivery.planContinuation?.turnIds ?? [];
@@ -2667,7 +2716,7 @@ export class MailboxStore {
       (delivery) =>
         delivery.recipientAgentId === agentId &&
         isActiveDelivery(delivery) &&
-        this.#taskIdOf(delivery, messages) === null,
+        this.#laneOf(delivery, messages) === null,
     );
   }
 

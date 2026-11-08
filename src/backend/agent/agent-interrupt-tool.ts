@@ -140,7 +140,9 @@ export class AgentInterruptTool {
         .unresolvedDeliveries()
         .find(
           ({ delivery }) =>
-            delivery.recipientAgentId === agentId && delivery.turnId && !this.#mailbox.taskIdForDelivery(delivery.id),
+            delivery.recipientAgentId === agentId &&
+            delivery.turnId &&
+            this.#mailbox.laneIdForDelivery(delivery.id) === null,
         )?.delivery.turnId ?? null
     );
   }

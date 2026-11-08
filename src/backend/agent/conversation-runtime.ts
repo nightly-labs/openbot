@@ -210,6 +210,11 @@ export class ConversationRuntime {
   /** The execution threads that are tasks: they run beside the agent's own chat, not after it. */
   readonly #taskThreads = new Set<string>();
   /**
+   * The execution threads of channels, with their channel. A channel turn runs beside the agent's
+   * own chat and its tasks, as a task does, unless the provider runs one turn at a time.
+   */
+  readonly #channelThreads = new Map<string, string>();
+  /**
    * The open provider sessions of routine runs, with their agent. A routine run has its own session,
    * which closes when the run ends, so the agent's long chat session does not grow with it.
    */
@@ -506,12 +511,17 @@ export class ConversationRuntime {
   }
 
   /**
-   * The running turn of the agent's own chat, or of a channel or messaging thread it serves. A task
-   * runs beside these, so its turns are not here: see `anyWorkingSnapshot` and `workingTaskSnapshots`.
+   * The running turn of the agent's own chat, or of a messaging thread it serves. A task and a
+   * channel run beside these, so their turns are not here: see `anyWorkingSnapshot`,
+   * `workingTaskSnapshots` and `workingChannelSnapshots`.
    */
   workingSnapshot(agentId: string): ConversationSnapshot | undefined {
     return [...this.activeSnapshots()].find(
-      ([id, snapshot]) => id === agentId && snapshot.activeTurnId && !this.isTaskThread(snapshot.threadId),
+      ([id, snapshot]) =>
+        id === agentId &&
+        snapshot.activeTurnId &&
+        !this.isTaskThread(snapshot.threadId) &&
+        this.channelForThread(snapshot.threadId) === null,
     )?.[1];
   }
 
@@ -532,6 +542,31 @@ export class ConversationRuntime {
     return [...this.activeSnapshots()].find(
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];
+  }
+
+  /** The channel threads of this agent that run a turn now. */
+  workingChannelSnapshots(agentId: string): ConversationSnapshot[] {
+    return [...this.#executionSnapshots.values()].filter(
+      (snapshot) =>
+        snapshot.agentId === agentId && snapshot.activeTurnId && this.channelForThread(snapshot.threadId) !== null,
+    );
+  }
+
+  /** Records the execution thread of one channel, so its turns run in the channel's own lane. */
+  registerChannelThread(agentId: string, threadId: string, channelId: string): void {
+    if (this.#forgottenExecutionThreads.has(threadId) || this.#store.ownsThread(threadId)) return;
+    this.#channelThreads.set(threadId, channelId);
+    this.registerExecutionThread(agentId, threadId);
+  }
+
+  /** The channel whose execution thread this is, or null. */
+  channelForThread(threadId: string | null): string | null {
+    return threadId === null ? null : (this.#channelThreads.get(threadId) ?? null);
+  }
+
+  /** Whether this thread runs beside the agent's own chat: a task or a channel thread. */
+  isSideThread(threadId: string | null): boolean {
+    return this.isTaskThread(threadId) || this.channelForThread(threadId) !== null;
   }
 
   registerTaskThread(agentId: string, threadId: string): void {
@@ -888,6 +923,7 @@ export class ConversationRuntime {
   forgetExecutionThread(threadId: string): void {
     this.#forgottenExecutionThreads.add(threadId);
     this.#taskThreads.delete(threadId);
+    this.#channelThreads.delete(threadId);
     this.#executionSnapshots.delete(threadId);
     this.#dropCachedExecutionSnapshot(threadId);
     this.#conversationSignatures.delete(threadId);
@@ -966,6 +1002,7 @@ export class ConversationRuntime {
     for (const [id, snapshot] of this.#executionSnapshots) {
       if (snapshot.agentId !== agentId) continue;
       this.#taskThreads.delete(id);
+      this.#channelThreads.delete(id);
       this.#executionSnapshots.delete(id);
       this.#dropCachedExecutionSnapshot(id);
       this.#conversationSignatures.delete(id);

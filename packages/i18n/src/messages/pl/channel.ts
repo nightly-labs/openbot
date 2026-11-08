@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Przydziel ponownie zatrzymane zadanie: {name}",
   "channel.stoppedTask.reassign": "Przekaż",
   "channel.stoppedTask.cancel": "Anuluj zadanie",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} przekazywali sobie to zadanie zbyt wiele razy. Zatrzymano je, aby uniknąć pętli.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Członkowie przekazywali sobie to zadanie zbyt wiele razy. Zatrzymano je, aby uniknąć pętli.",
   "channel.conversation.noMembers": "Dodaj agentów w ustawieniach kanału, aby rozpocząć pracę.",
   "channel.conversation.archivedNotice": "Usunięty kanał. Tylko podgląd.",
   "channel.composer.label": "Wiadomość do kanału",

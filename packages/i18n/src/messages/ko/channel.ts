@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name}의 중단된 작업 다시 배정",
   "channel.stoppedTask.reassign": "다시 배정",
   "channel.stoppedTask.cancel": "작업 취소",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} 사이에서 이 작업이 너무 많이 넘겨졌습니다. 반복을 막기 위해 중단했습니다.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "멤버들이 이 작업을 서로 너무 많이 넘겼습니다. 반복을 막기 위해 중단했습니다.",
   "channel.conversation.noMembers": "채널 설정에서 에이전트를 추가하면 작업을 시작할 수 있어요.",
   "channel.conversation.archivedNotice": "삭제된 채널이에요. 미리보기만 가능해요.",
   "channel.composer.label": "채널에 메시지 보내기",

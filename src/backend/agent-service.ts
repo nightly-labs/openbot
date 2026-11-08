@@ -1112,8 +1112,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        // Read late: `channels` is built after this.
-        queueHold: (agentId) => this.channels.queueHold(agentId),
+        // Read late: `channels` is built after this. A channel turn runs beside the agent's own chat,
+        // so it holds the chat's queue only on a provider that runs one turn at a time.
+        queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
       },
     });
     this.#reader = new ConversationReader({
@@ -1290,15 +1291,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
       loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
       // A held agent gets no channel assignment: one that waited for the reset would hold its
-      // resources. A channel turn runs beside the agent's tasks, unless its provider runs one turn
-      // of the agent at a time. A delivery of its own chat that starts has no turn ID yet, and it
-      // makes the agent busy too: otherwise the assignment waits as "starting" for that turn (#4761).
+      // resources. A channel turn runs in its own lane, beside the agent's own chat and its tasks,
+      // and the agent runs one channel turn at a time. A provider that runs one turn of the agent at
+      // a time waits for the own chat and the tasks too. A delivery of its own chat that starts has
+      // no turn ID yet, and it makes such an agent busy: otherwise the assignment waits as
+      // "starting" for that turn (#4761).
       busy: (agentId) =>
-        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
-        this.#mailbox.laneActive(agentId, null) ||
+        !this.#usageLimits.mayDrain(agentId) ||
+        this.#mailbox.channelLanes(agentId).length > 0 ||
+        this.#conversation.workingChannelSnapshots(agentId).length > 0 ||
         (this.#tasks.oneTurnAtATime(agentId) &&
-          this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId)) ||
-        !this.#usageLimits.mayDrain(agentId),
+          (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
+            this.#mailbox.laneActive(agentId, null) ||
+            this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
       usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
@@ -3404,7 +3409,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
     if (!limited && !failed) return null;
     const taskWork = () =>
-      this.#mailbox.queuedTaskIds(agentId).some((taskId) => this.#mailbox.nextQueued(agentId, taskId));
+      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some((laneId) =>
+        this.#mailbox.nextQueued(agentId, laneId),
+      );
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#mailbox.nextQueued(agentId) && !taskWork() && !this.channels.ownsWaitingWork(agentId)) return null;
     const next = this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId));
@@ -3428,9 +3435,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
-  /** Whether the next queued work of the agent, in its chat or a task, continues work that a limit stopped. */
+  /**
+   * Whether the next queued work of the agent, in its chat, a task or a channel, continues work that
+   * a limit stopped.
+   */
   #queuedContinuation(agentId: string): boolean {
-    return [null, ...this.#mailbox.queuedTaskIds(agentId)].some(
+    return [null, ...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some(
       (taskId) => this.#mailbox.nextQueued(agentId, taskId)?.resumeAfterUsageLimit !== undefined,
     );
   }

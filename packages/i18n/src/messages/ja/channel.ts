@@ -9,6 +9,9 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name} の停止したタスクを再割り当てします",
   "channel.stoppedTask.reassign": "再割り当て",
   "channel.stoppedTask.cancel": "タスクを中止",
+  "channel.stoppedTask.assignmentLoop": "{names} がこのタスクを何度も受け渡しました。ループを防ぐために停止しました。",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "メンバーがこのタスクを何度も受け渡しました。ループを防ぐために停止しました。",
   "channel.conversation.noMembers": "作業を始めるには、チャンネル設定でエージェントを追加してください。",
   "channel.conversation.archivedNotice": "削除済みのチャンネルです。プレビューのみです。",
   "channel.composer.label": "チャンネルへのメッセージ",

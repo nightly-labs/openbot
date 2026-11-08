@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Riassegna l'attività interrotta di {name}",
   "channel.stoppedTask.reassign": "Riassegna",
   "channel.stoppedTask.cancel": "Annulla attività",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} si sono passati questa attività troppe volte. È stata interrotta per evitare un ciclo.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "I membri si sono passati questa attività troppe volte. È stata interrotta per evitare un ciclo.",
   "channel.conversation.noMembers": "Aggiungi agenti nelle impostazioni del canale per iniziare a lavorare.",
   "channel.conversation.archivedNotice": "Canale eliminato. Solo anteprima.",
   "channel.composer.label": "Messaggio al canale",

@@ -1468,7 +1468,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+      if (event.type === "channels-changed") void channels.changed(event.channelId);
+      else if (event.type === "runtime-snapshot") void channels.refresh();
     }),
   );
   // The user changed their levels on another device: the matrix and the notifications follow at once.
