@@ -370,6 +370,36 @@ try {
     JSON.stringify(failedReceived),
   );
 
+  // 2b. C reports with no reply link, and B's turn that reads it fails.
+  control.steps = {
+    ga1: { send: { recipientAgentIds: [b.id], text: "STEP:gb1", expectsReply: true }, say: "A waits for B." },
+    gb1: {
+      send: { recipientAgentIds: [c.id], text: "STEP:gc1", expectsReply: true },
+      say: "B sent the work to C and waits for C's reply.",
+    },
+    gc1: { send: { recipientAgentIds: [b.id], text: "C found 5. STEP:gb2", expectsReply: false }, say: "C told B." },
+    gb2: { fail: true, say: "" },
+  };
+  saveControl();
+  since = new Date().toISOString();
+  await runCauseEffect(agents.sendMessage({ agentId: a.id, text: "STEP:ga1" }, { id: "local", name: "Alex" }));
+  const unlinkedFailed = await waitFor("A's request to B", () => requestId(a.id, b.id, "STEP:gb1"));
+  await waitFor(
+    "the unlinked failed chain to end",
+    () => settled(all) && received(a.id, unlinkedFailed, names, since).length > 0,
+  );
+  await waitFor("the unlinked failed chain to stay settled", () => settled(all));
+  const unlinkedFailedReceived = received(a.id, unlinkedFailed, names, since);
+  report.scenarios.push({ name: "A -> B -> C, no reply link, B fails", received: unlinkedFailedReceived });
+  pass(
+    "When C reports with no reply link and B's later turn fails, A gets the failure note",
+    unlinkedFailedReceived.length === 1 &&
+      unlinkedFailedReceived[0]?.from === "B" &&
+      unlinkedFailedReceived[0].repliesToRequest &&
+      unlinkedFailedReceived[0].text.startsWith("Status: blocked"),
+    JSON.stringify(unlinkedFailedReceived),
+  );
+
   // 3. A -> C, one step: the result comes as before.
   control.steps = {
     sa1: { send: { recipientAgentIds: [c.id], text: "STEP:sc1", expectsReply: true }, say: "A waits for C." },

@@ -2158,13 +2158,11 @@ export class MailboxStore {
     const failed = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
     if (delivery?.status !== "failed" || failed?.sender.kind !== "agent" || failed.channelId) return [];
     const teammateId = delivery.recipientAgentId;
-    const chained = isAnswer(failed);
-    const requests = chained
-      ? this.#answeredRequests(teammateId, failed.id, this.#sourceTurnIds(), new Set())
-      : [failed];
+    const requests = this.#answeredRequests(teammateId, failed.id, this.#sourceTurnIds(), new Set());
     const requesterIds: string[] = [];
     for (const request of requests) {
       if (request.sender.kind !== "agent") continue;
+      const chained = request.id !== failed.id;
       const requesterId = request.sender.agentId;
       const originAgentId = this.chainOriginAgentId(request.id);
       if (
