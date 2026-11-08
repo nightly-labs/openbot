@@ -4,14 +4,15 @@ import {
   memoryContextUpdate,
   NATURAL_TURN_REMINDER,
   type SectionTeammates,
+  savedLoginsUpdate,
   sectionTeammatesUpdate,
 } from "./developer-instructions";
 
 /**
- * The essential memories, the section-mates and the style reminder of each thread, for a client
- * that sends them with the user turns (`AgentClient.turnContext`). In the system prompt, each
- * memory change would change the prefix, and the provider would write the full conversation to its
- * cache again. With the turns, a change is one small block.
+ * The essential memories, the section-mates, the saved-logins rule and the style reminder of each
+ * thread, for a client that sends them with the user turns (`AgentClient.turnContext`). In the
+ * system prompt, each memory change would change the prefix, and the provider would write the full
+ * conversation to its cache again. With the turns, a change is one small block.
  *
  * Kept by thread, not by process: a restarted or reopened session resumes a conversation that
  * already holds the blocks it was sent.
@@ -24,6 +25,8 @@ export class TurnContext {
     string,
     { current: SectionTeammates | null; delivered: SectionTeammates | null | undefined }
   >();
+  /** The same for the saved-logins rule. `undefined` as `delivered`: the context can hold any earlier block. */
+  readonly #savedLogins = new Map<string, { current: boolean; delivered: boolean | undefined }>();
   /** The threads whose turns repeat the natural style's first-line rule (`NATURAL_TURN_REMINDER`). */
   readonly #styleReminders = new Set<string>();
 
@@ -36,6 +39,12 @@ export class TurnContext {
       const memory = this.#memories.get(threadId);
       if (memory) memory.current = current;
       else this.#memories.set(threadId, { current, delivered: null });
+    }
+    if (isDynamicRecord(params) && typeof params.savedLogins === "boolean") {
+      const logins = this.#savedLogins.get(threadId);
+      if (logins) logins.current = params.savedLogins;
+      // A new conversation holds no block, as if logins were not shared.
+      else this.#savedLogins.set(threadId, { current: params.savedLogins, delivered: resume ? undefined : false });
     }
     if (!isDynamicRecord(params) || !("sectionTeammates" in params)) return;
     const section = readSectionTeammates(params.sectionTeammates);
@@ -53,15 +62,18 @@ export class TurnContext {
   take(threadId: string, command = false): string[] {
     const memory = this.#memories.get(threadId);
     const teammates = this.#teammates.get(threadId);
+    const logins = this.#savedLogins.get(threadId);
     const blocks = command
       ? []
       : [
           memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
           teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
+          logins ? savedLoginsUpdate(logins.delivered, logins.current) : null,
           this.#styleReminders.has(threadId) ? NATURAL_TURN_REMINDER : null,
         ].filter((block): block is string => block !== null);
     if (memory) memory.delivered = command ? null : memory.current;
     if (teammates) teammates.delivered = command ? undefined : teammates.current;
+    if (logins) logins.delivered = command ? undefined : logins.current;
     return blocks;
   }
 
@@ -74,11 +86,14 @@ export class TurnContext {
     if (memory) memory.delivered = null;
     const teammates = this.#teammates.get(threadId);
     if (teammates) teammates.delivered = undefined;
+    const logins = this.#savedLogins.get(threadId);
+    if (logins) logins.delivered = undefined;
   }
 
   forget(threadId: string): void {
     this.#memories.delete(threadId);
     this.#teammates.delete(threadId);
+    this.#savedLogins.delete(threadId);
     this.#styleReminders.delete(threadId);
   }
 }

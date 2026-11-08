@@ -605,7 +605,13 @@ interface HistoryItemPage {
 /** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
 function withoutTurnContextParams(params: unknown): DynamicRecord {
   if (!isRecord(params)) return {};
-  const { memoryContext: _memories, sectionTeammates: _section, turnStyleReminder: _style, ...rest } = params;
+  const {
+    memoryContext: _memories,
+    sectionTeammates: _section,
+    savedLogins: _logins,
+    turnStyleReminder: _style,
+    ...rest
+  } = params;
   return rest;
 }
 
