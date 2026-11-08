@@ -2,7 +2,13 @@ import { type SpawnedMspConnection, spawnMspConnection } from "@muse-code/sdk";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Option, Schema } from "effect";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "../cli";
-import { providerCall, providerFailure, providerSync } from "../provider-client-effects";
+import {
+  ProviderSignInError,
+  providerCall,
+  providerFailure,
+  providerSync,
+  signInReason,
+} from "../provider-client-effects";
 import { CliCodeLoginFailed, type CliCodePrompt } from "./cli-code-login";
 import type { CliLoginProcess } from "./cli-login-flow";
 
@@ -13,7 +19,10 @@ const LOGIN_START_TIMEOUT_MS = 30_000;
 const CANCEL_TIMEOUT_MS = 15_000;
 
 const LoginStartResult = Schema.Struct({ verificationUrl: Schema.String, userCode: Schema.String });
-const LoginCompleted = Schema.Struct({ outcome: Schema.String });
+const LoginCompleted = Schema.Struct({
+  outcome: Schema.String,
+  message: Schema.optional(Schema.NullOr(Schema.String)),
+});
 
 /**
  * Starts a Muse device-code sign-in: a `muse serve` host that asks Meta for a code, and that saves
@@ -167,24 +176,33 @@ export const readMuseAccount = Effect.fn("MuseLogin.readAccount")(
   Effect.scoped,
 );
 
-/** Settles on Meta's answer: success only when the user granted the code. */
+/**
+ * Settles on Meta's answer: success only when the user granted the code. A refusal shows Muse's own
+ * reason, such as an account that has no payment method (#5544).
+ */
 function waitForLoginCompleted(host: SpawnedMspConnection, timeoutMs: number, onAnswer: () => void) {
-  const outcome = new Promise<string>((resolve, reject) => {
+  const outcome = new Promise<typeof LoginCompleted.Type>((resolve, reject) => {
     host.connection.onNotification((notification) => {
       if (notification.method !== "account/loginCompleted") return;
       onAnswer();
-      resolve(Schema.is(LoginCompleted)(notification.params) ? notification.params.outcome : "failed");
+      resolve(Schema.is(LoginCompleted)(notification.params) ? notification.params : { outcome: "failed" });
     });
     void host.exited.then(() => reject(new Error(sourceText("error.provider.acpSignInFailed"))));
   });
   // A rejection before `done` runs must not be reported as unhandled.
   outcome.catch(() => undefined);
   return Effect.tryPromise({ try: () => outcome, catch: (cause) => new CliCodeLoginFailed({ cause }) }).pipe(
-    Effect.flatMap((result) =>
-      result === "granted"
-        ? Effect.void
-        : Effect.fail(new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.acpSignInFailed")) })),
-    ),
+    Effect.flatMap((result) => {
+      if (result.outcome === "granted") return Effect.void;
+      const reason = signInReason(result.message);
+      return Effect.fail(
+        new CliCodeLoginFailed({
+          cause: reason
+            ? new ProviderSignInError({ message: sourceText("error.provider.acpSignInFailedReason", { reason }) })
+            : new Error(sourceText("error.provider.acpSignInFailed")),
+        }),
+      );
+    }),
     Effect.timeoutOrElse({
       duration: timeoutMs,
       orElse: () =>
