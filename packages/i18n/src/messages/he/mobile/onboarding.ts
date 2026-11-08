@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "יוצר…",
   "mobile.onboarding.task.withoutTask": "יצירה ללא משימה",
   "mobile.onboarding.task.failed": "לא ניתן היה ליצור את הסוכן. יש לנסות שוב.",
+  "mobile.onboarding.task.sendFailed": "המשימה הראשונה לא נשלחה. יש לשלוח אותה בצ׳אט.",
   "mobile.onboarding.idea.builder1": "בנה אפליקציית אינטרנט קטנה לרשימת משימות.",
   "mobile.onboarding.idea.builder2": "הסבר איך עובדים ענפים ב-Git, עם דוגמאות.",
   "mobile.onboarding.idea.builder3": "כתוב סקריפט שממיין את התמונות שלי לפי תאריך.",

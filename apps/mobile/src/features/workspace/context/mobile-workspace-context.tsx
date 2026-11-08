@@ -1991,19 +1991,33 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           );
         }
         // The host hides the setup message, so the first task goes as the user's own message after it.
+        // The agent exists now, so a failure does not fail the create: the user sends the task again.
         if (welcome && firstTask)
           await request(
             "POST",
             TEAM_API_ROUTES.agent.messages(created.id),
-            ignoreResponse,
+            (value) => {
+              if (!isQueuedMessageReceipt(value)) throw new Error("The host returned an invalid message receipt.");
+              return value;
+            },
             {
               text: firstTask,
               attachmentDraftIds: [],
               replyToMessageId: null,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              clientMessageId: Crypto.randomUUID(),
             },
             serverId,
-          ).catch(() => supportLog.add("warn", "app", "The new agent's first task was not sent."));
+          ).catch((error: unknown) => {
+            supportLog.add("warn", "app", "The new agent's first task was not sent.");
+            const text = currentText();
+            showFailureAlert(
+              error,
+              "agent",
+              text.t("mobile.chat.outbox.failed"),
+              text.errorMessage(error, text.t("mobile.onboarding.task.sendFailed")),
+            );
+          });
         return created.id;
       },
       updateAgent: async (input: UpdateAgentInput, serverId = activeServerIdRef.current ?? undefined) => {

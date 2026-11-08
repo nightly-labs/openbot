@@ -343,8 +343,10 @@ The optional `agent-welcome-v1` capability (protocol 9 only) changes no route sh
 sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The
 host stores that message with `welcome: true` in its mailbox JSON and the item type `agent_welcome`.
 No conversation page, live snapshot, read state, search result, queue, runtime `work` item or preview
-shows it, for any member. While it waits or runs, the queue snapshot has `welcome: true` instead, so a client shows that
-the agent works and not the empty chat. The agent answers it, and that answer shows as usual. A client sends a setup message only to
+shows it, for any member. While it waits or runs, the host's local queue snapshot has `welcome: true`, so
+the host's own window shows that the agent works and not the empty chat. `GET /v1/agents/:id/queue`
+keeps its released keys and does not send the flag: a remote member sees the empty chat until the
+welcome turn starts. The agent answers it, and that answer shows as usual. A client sends a setup message only to
 a host that advertises the capability; an older host still gets the released role text, which stays
 a visible user message there.
 
