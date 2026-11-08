@@ -16,8 +16,6 @@
 // server that answers late. The client then reports a failed connection and retries.
 // `--pause-host-online=<seconds>` stops the dev host for that time when the client starts to load the
 // workspace over the online link. The first reads then fail at their deadline, and the client tries again.
-// `--pause-account=<seconds>` stops this worktree's account service for that time when the client starts again,
-// as a slow link to it. The client then waits for its signed-in account.
 // - `account`: the account service stops, main loads the account again (`auth.retry()`), and the
 //   window reloads while the account state is `loading`, as at a start with a slow link to the
 //   account service. The service continues after `--account-wait=<seconds>` (default 6). The start
@@ -45,8 +43,6 @@ const pauseOnlineS = Number(argument("pause-host-online") ?? "0");
 assert.ok(Number.isFinite(pauseOnlineS) && pauseOnlineS >= 0, "--pause-host-online takes a number of seconds.");
 const accountWaitS = Number(argument("account-wait") ?? "6");
 assert.ok(Number.isFinite(accountWaitS) && accountWaitS > 0, "--account-wait takes a number of seconds.");
-const pauseAccountS = Number(argument("pause-account") ?? "0");
-assert.ok(Number.isFinite(pauseAccountS) && pauseAccountS >= 0, "--pause-account takes a number of seconds.");
 assert.match(label, /^\w[\w.-]*$/, "--label takes a folder name, not a path.");
 const OUT = resolve(ROOT, ".openbot-build", NAME, label);
 const logger = createOpenBotLogger(NAME);
@@ -194,9 +190,14 @@ function hostMainPid(): number {
   assert.equal(hosts.length, 1, "Start the dev host of this worktree with `bun run dev:test-client`.");
   const [host] = hosts;
   assert.ok(host);
-  const children = execFileSync("pgrep", ["-P", String(host.pid)], { encoding: "utf8" })
-    .split("\n")
-    .filter(Boolean);
+  let children: string[] = [];
+  try {
+    children = execFileSync("pgrep", ["-P", String(host.pid)], { encoding: "utf8" })
+      .split("\n")
+      .filter(Boolean);
+  } catch {
+    // `pgrep` exits with 1 when the process has no children.
+  }
   const main = children.find((pid) =>
     execFileSync("ps", ["-o", "command=", "-p", pid], { encoding: "utf8" }).includes("/MacOS/Electron "),
   );
@@ -217,6 +218,9 @@ function accountServiceGroup(): number {
   assert.ok(api, "This worktree's stack has no account service.");
   return api.pid;
 }
+
+// Ctrl-C ends the script through `exit`, so that each stopped process continues.
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => process.exit(130));
 
 /**
  * Stops a process (a positive id) or a process group (a negative id) for `seconds`. It does not answer
@@ -264,12 +268,21 @@ async function selectRemoteServer(instance: DevInstanceRecord): Promise<void> {
   }
 }
 
-/** The window shows the workspace, and no loading screen covers it any more. */
-async function workspaceShown(page: Page): Promise<boolean> {
-  return await page.evaluate<boolean>(`
-    performance.getEntriesByName("openbot:remote-workspace-ready").length > 0 &&
-    document.querySelector(".app-loading") === null
-  `);
+/** Waits until the window shows the workspace, and no loading screen covers it any more. */
+async function waitForWorkspace(page: Page, what: string): Promise<void> {
+  // A hidden dev window gets no animation frames, so the page checks the state at an interval.
+  await page
+    .waitForFunction(
+      // A function, not a string: the window's CSP refuses `eval`.
+      () =>
+        performance.getEntriesByName("openbot:remote-workspace-ready").length > 0 &&
+        document.querySelector(".app-loading") === null,
+      undefined,
+      { polling: POLL_MS, timeout: WAIT_MS },
+    )
+    .catch((error: unknown) => {
+      throw new Error(`Timed out: ${what}.`, { cause: error });
+    });
 }
 
 async function measureCover(page: Page): Promise<Cover> {
@@ -319,14 +332,14 @@ async function run(previous: DevInstanceRecord): Promise<RunReport | null> {
     restart.once("error", fail);
     restart.once("exit", (code) => (code === 0 ? done() : fail(new Error(`restart-client exited with ${code}.`))));
   });
+  // A failure before the wait below must not leave this rejection unhandled. The wait still gets it.
+  restarted.catch(() => undefined);
   const resumes: (() => void)[] = [];
   try {
     const instance = await poll("the test client starts again", async () => {
       const next = testClient();
       return next.pid !== previous.pid ? next : null;
     });
-    // The new main process asks the account service for the account as it starts.
-    if (pauseAccountS > 0) resumes.push(pause("The account service", -accountServiceGroup(), pauseAccountS));
     if (pauseHostS > 0) resumes.push(pause("The dev host", hostMainPid(), pauseHostS));
     const report = await recordStart(instance, resumes);
     await restarted;
@@ -372,11 +385,7 @@ async function checkAccountWait(instance: DevInstanceRecord): Promise<RunReport>
       (await page.evaluate("window.openbot.auth.getState().then((state) => state.status)")) === "loading" ? true : null,
     );
     await page.reload({ waitUntil: "commit" });
-    const deadline = Date.now() + WAIT_MS;
-    while (!(await workspaceShown(page))) {
-      if (Date.now() > deadline) throw new Error("Timed out: the workspace shows after the account loads.");
-      await page.waitForTimeout(POLL_MS);
-    }
+    await waitForWorkspace(page, "the workspace shows after the account loads");
     const report = await readReport(page);
     assert.ok(report, "The reloaded window showed no loading screen.");
     logger.info("account", JSON.stringify(report));
@@ -404,11 +413,7 @@ async function recordStart(instance: DevInstanceRecord, resumes: (() => void)[])
       })`);
       resumes.push(pause("The dev host", hostMainPid(), pauseOnlineS));
     }
-    const deadline = Date.now() + WAIT_MS;
-    while (!(await workspaceShown(page))) {
-      if (Date.now() > deadline) throw new Error("Timed out: the workspace shows.");
-      await page.waitForTimeout(POLL_MS);
-    }
+    await waitForWorkspace(page, "the workspace shows");
     return await readReport(page);
   } finally {
     await session.close();
@@ -448,7 +453,7 @@ const failures = [
 ];
 writeFileSync(
   resolve(OUT, "report.json"),
-  `${JSON.stringify({ label, pauseHostS, pauseOnlineS, pauseAccountS, accountWaitS, cover, account, runs: reports, missed, failures }, null, 2)}\n`,
+  `${JSON.stringify({ label, pauseHostS, pauseOnlineS, accountWaitS, cover, account, runs: reports, missed, failures }, null, 2)}\n`,
 );
 logger.info(`report: ${resolve(OUT, "report.json")}`);
 assert.deepEqual(failures, [], failures.join("; "));

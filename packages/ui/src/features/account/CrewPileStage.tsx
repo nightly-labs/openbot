@@ -208,14 +208,15 @@ export function CrewPileStage(props: CrewPileStageProps) {
   const [crew, setCrew] = createSignal(pile.crew);
   const [pitSize, setPitSize] = createSignal(pile.pit);
   const [player, setPlayer] = createSignal<CrewPlayer>();
-  // The size of the screen now. The film is recorded for the size at the start, so when the window
-  // changes size, as when it goes full screen, the pit scales until it covers the screen again.
+  // The size of the screen now. The film is recorded for the size at the start, so when the screen
+  // grows, as when the window goes full screen, the pit scales until it covers the screen again. On a
+  // smaller screen, the plushes keep their size.
   const [room, setRoom] = createSignal<{ width: number; height: number }>();
   const pitScale = () => {
     const pit = pitSize();
     const current = room();
-    if (!current || current.width <= 0 || current.height <= 0) return pit.unit;
-    return Math.max(current.width / pit.width, current.height / pit.height);
+    if (!current) return pit.unit;
+    return Math.max(pit.unit, current.width / pit.width, current.height / pit.height);
   };
   let frame: HTMLDivElement | undefined;
 
@@ -229,8 +230,8 @@ export function CrewPileStage(props: CrewPileStageProps) {
     return () => observer.disconnect();
   });
 
-  // The pit fits the screen, and the crew of the fit have their elements: the film can play.
-  const [fitted, setFitted] = createSignal(false);
+  // The film of the fitted pile. When the crew of the fit have their elements, the film can play.
+  const [film, setFilm] = createSignal<CrewFilm>();
 
   onSettled(() => {
     if (frame && pile.fit({ width: frame.clientWidth, height: frame.clientHeight })) {
@@ -241,14 +242,14 @@ export function CrewPileStage(props: CrewPileStageProps) {
       setCrew(pile.crew);
       setPitSize(pile.pit);
     }
-    setFitted(true);
+    // The film locks the pile at once, so another screen of this pile cannot fit it again.
+    setFilm(pile.film());
   });
 
   // An effect runs after the DOM shows the new crew. `flush()` cannot do this here: a screen that
   // mounts during an update settles inside that flush, where `flush()` is not allowed.
-  createEffect(fitted, (ready) => {
-    if (!ready) return;
-    const film = pile.film();
+  createEffect(film, (recorded) => {
+    if (!recorded) return;
     const rigs = pile.crew.flatMap((_, index): CrewRig[] => {
       const plush = plushes[index];
       const squash = squashes[index];
@@ -256,11 +257,11 @@ export function CrewPileStage(props: CrewPileStageProps) {
     });
     // A test DOM has no Web Animations: the pile stays still, and a hop ends at once.
     if (pile.reduced || typeof Element.prototype.animate !== "function") {
-      showRest(film, rigs);
+      showRest(recorded, rigs);
       setPlayer({ hopOut: () => ({ delay: 0, length: 0 }), stop: () => {} });
       return;
     }
-    const playing = playFilm(film, rigs, props.start, (index, face) => faces[index]?.(face));
+    const playing = playFilm(recorded, rigs, props.start, (index, face) => faces[index]?.(face));
     setPlayer(playing);
     return () => playing.stop();
   });
