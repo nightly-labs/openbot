@@ -1465,8 +1465,9 @@ export class TurnLifecycle {
           terminal === "completed" &&
           latestAssistant
         ) {
+          const requestIds = new Set(deliveries.map(({ delivery }) => delivery.messageId));
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
+            yield* this.#relayAgentResult(agentId, turnId, delivery, requestIds, latestAssistant.text);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
         if (!continuation && terminal === "failed") {
@@ -1803,6 +1804,7 @@ export class TurnLifecycle {
     agentId: string,
     turnId: string,
     delivery: DeliveryContext,
+    requestIds: ReadonlySet<string>,
     text: string,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
@@ -1816,7 +1818,7 @@ export class TurnLifecycle {
       // this the sender is woken for an echo of work it only wanted to know about.
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId)
+      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds)
     )
       return;
 
