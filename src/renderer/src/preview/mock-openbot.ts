@@ -13,6 +13,7 @@ import {
   AGENT_DEFAULT_KEYS,
   AGENT_FOLDER_LIMIT,
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+  AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessChange,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -2466,6 +2467,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         try {
           await api.agent.sendMessage({ agentId: agent.id, text: input.initialMessage, attachmentDraftIds: [] });
+          // As on a host: the renderer sends a setup message, which the chat does not show.
+          updateSnapshot(agent.id, (snapshot) => {
+            snapshot.messages = snapshot.messages.map((message) =>
+              message.author === "user" ? { ...message, itemType: AGENT_WELCOME_ITEM_TYPE } : message,
+            );
+          });
           return clone(agent);
         } catch (error) {
           agents = agents.filter((candidate) => candidate.id !== agent.id);
