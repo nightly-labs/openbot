@@ -114,7 +114,8 @@ const callSchema = z.strictObject(callShape).refine((input) => input.name !== un
  * branch; the call still decodes with `callSchema`, which accepts any value.
  */
 const KIMI_ARGUMENT_VALUE = { anyOf: ["string", "number", "boolean", "object", "array"].map((type) => ({ type })) };
-// On the value schema, Zod writes this `anyOf` as a `type` array, which Moonshot also refuses.
+// On the value schema, Zod writes this `anyOf` as a `type` array. Moonshot takes only one type, or one
+// type and `null`, in a `type` array.
 const kimiCallShape = {
   ...callShape,
   arguments: callShape.arguments.meta({ additionalProperties: KIMI_ARGUMENT_VALUE }),
@@ -164,7 +165,7 @@ const OWN_WEB_SEARCH_TOOL_DEFINITIONS = toolDefinitions(OWN_WEB_SEARCH_CATALOG);
 const ALL_DYNAMIC_TOOLS = dynamicTools(ALL_TOOL_DEFINITIONS);
 const OWN_WEB_SEARCH_DYNAMIC_TOOLS = dynamicTools(OWN_WEB_SEARCH_TOOL_DEFINITIONS);
 const KIMI_DYNAMIC_TOOLS = dynamicTools(
-  OWN_WEB_SEARCH_TOOL_DEFINITIONS.map((definition) =>
+  visibleToolDefinitions("kimi").map((definition) =>
     definition.name === "tool_call" ? { ...definition, shape: kimiCallShape } : definition,
   ),
 );
