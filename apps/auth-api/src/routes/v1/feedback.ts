@@ -10,6 +10,7 @@ import {
   json,
   requestGitHubInstallationTokens,
   requestUser,
+  uncountFeedback,
 } from "../../server/request-auth";
 
 /**
@@ -27,11 +28,11 @@ export const Route = createFileRoute("/v1/feedback")({
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
             const feedback = parseFeedback(yield* readJsonObject(request));
             if (!feedback) return apiError(400, "invalid_feedback", "The feedback is invalid.");
-            yield* enforceFeedbackRateLimit(user.id);
-            const issue = yield* requestGitHubInstallationTokens().openIssue(
-              FEEDBACK_REPOSITORY,
-              feedbackIssue(feedback),
-            );
+            const github = requestGitHubInstallationTokens();
+            const day = yield* enforceFeedbackRateLimit(user.id);
+            const issue = yield* github
+              .openIssue(FEEDBACK_REPOSITORY, feedbackIssue(feedback))
+              .pipe(Effect.tapError(() => uncountFeedback(user.id, day)));
             return json({ url: issue.url, number: issue.number });
           }),
           githubInstallationTokensErrorResponse,

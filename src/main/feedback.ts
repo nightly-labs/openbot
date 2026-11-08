@@ -35,6 +35,7 @@ interface FeedbackAuth {
  */
 export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
   return {
+    signedIn: () => auth.getState().status === "signed_in",
     send: (feedback) =>
       Effect.suspend((): Effect.Effect<FeedbackSendResult, ToolOperationFailed> => {
         if (auth.getState().status !== "signed_in") return Effect.succeed({ status: "signedOut" } as const);

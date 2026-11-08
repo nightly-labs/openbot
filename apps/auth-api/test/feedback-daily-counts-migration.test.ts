@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { COUNT_FEEDBACK, UNCOUNT_FEEDBACK } from "../src/server/feedback-daily-counts";
 import { migratedDatabase, migration } from "./sqlite-d1";
 
 const databases: DatabaseSync[] = [];
@@ -9,10 +10,6 @@ afterEach(() => {
 });
 
 const MIGRATION = "0051_feedback_daily_counts.sql";
-// The statement of `enforceFeedbackRateLimit` in `src/server/request-auth.ts`, with a limit of 2.
-const COUNT = `INSERT INTO feedback_daily_counts(user_id, day, count) VALUES (?, ?, 1)
-  ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 WHERE count < 2
-  RETURNING count`;
 
 function beforeMigration(): DatabaseSync {
   const database = migratedDatabase("0050_hosted_server_start_requested_at.sql");
@@ -54,16 +51,20 @@ describe("feedback daily counts migration", () => {
     expect(users(database).map((row) => row.id)).toEqual(["new", "owner"]);
   });
 
-  it("counts each account's day up to the limit, and deletes the counts with the account", () => {
+  it("counts each account's day up to the limit, gives back a failed send, and deletes the counts with the account", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    const count = database.prepare(COUNT);
+    const statement = database.prepare(COUNT_FEEDBACK);
+    const count = (userId: string, day: string) => statement.all(userId, day, 2);
 
-    expect(count.all("owner", "2026-11-08")).toEqual([{ count: 1 }]);
-    expect(count.all("owner", "2026-11-08")).toEqual([{ count: 2 }]);
-    expect(count.all("owner", "2026-11-08")).toEqual([]);
-    expect(count.all("owner", "2026-11-09")).toEqual([{ count: 1 }]);
-    expect(count.all("other", "2026-11-08")).toEqual([{ count: 1 }]);
+    expect(count("owner", "2026-11-08")).toEqual([{ count: 1 }]);
+    expect(count("owner", "2026-11-08")).toEqual([{ count: 2 }]);
+    expect(count("owner", "2026-11-08")).toEqual([]);
+    // A send that GitHub refused gives its count back.
+    database.prepare(UNCOUNT_FEEDBACK).run("owner", "2026-11-08");
+    expect(count("owner", "2026-11-08")).toEqual([{ count: 2 }]);
+    expect(count("owner", "2026-11-09")).toEqual([{ count: 1 }]);
+    expect(count("other", "2026-11-08")).toEqual([{ count: 1 }]);
 
     database.exec("DELETE FROM users WHERE id = 'owner'");
     expect(database.prepare("SELECT user_id, day, count FROM feedback_daily_counts").all()).toEqual([

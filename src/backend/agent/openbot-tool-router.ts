@@ -202,8 +202,13 @@ export type FeedbackSendResult =
 
 /** Sends approved feedback to the account service, which opens it as a public GitHub issue. */
 export interface AgentFeedback {
+  /** False when nobody is signed in to OpenBot, so a send cannot go out with an account. */
+  signedIn(): boolean;
   send(feedback: Feedback): Effect.Effect<FeedbackSendResult, ToolOperationFailed>;
 }
+
+const FEEDBACK_SIGNED_OUT_NEXT =
+  "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
 
 /** The prefilled issue form, which the user submits in the browser. */
 function feedbackForm(url: string, next: string): OpenBotToolResponse {
@@ -1016,6 +1021,8 @@ export class OpenBotToolRouter {
       return openBotToolFailure(
         "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead.",
       );
+    // The card offers a send, so a user who is not signed in gets the form link at once.
+    if (!sender.signedIn()) return form(FEEDBACK_SIGNED_OUT_NEXT);
     const decision = yield* this.#attention.awaitToolApproval(
       client,
       request,
@@ -1051,10 +1058,7 @@ export class OpenBotToolRouter {
         "OpenBot could not send it. Give the user this link to the same text on GitHub, to check and submit.",
       );
     }
-    if (sent.success.status === "signedOut")
-      return form(
-        "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.",
-      );
+    if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT);
     const issue = sent.success;
     // The thank-you card in the chat links the issue. The issue is open also when the card fails.
     const card = yield* Effect.result(

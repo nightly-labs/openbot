@@ -16,6 +16,12 @@ import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
 import { createContactMessageDelivery, createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import {
+  COUNT_FEEDBACK,
+  DELETE_EARLIER_FEEDBACK_DAYS,
+  FEEDBACK_DAILY_LIMIT,
+  UNCOUNT_FEEDBACK,
+} from "./feedback-daily-counts";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
@@ -200,12 +206,10 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
   }
 });
 
-/** The feedback issues that one account can open in a UTC day. */
-const FEEDBACK_DAILY_LIMIT = 10;
-
 /**
  * A few feedback issues for each account and minute, and 10 each day: each one is a public issue
- * that a person reads. The daily count is the only feedback data that D1 keeps.
+ * that a person reads. The daily count is the only feedback data that D1 keeps. It returns the UTC day
+ * that it counted, for `uncountFeedback`.
  */
 export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLimit")(function* (userId: string) {
   const bindings = requireWorkerBindings(env);
@@ -218,16 +222,11 @@ export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLim
     return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too much feedback. Try again later.");
   }
   const day = new Date().toISOString().slice(0, 10);
-  // One statement counts and checks, so two requests at the same time cannot both pass the limit.
   const [, counted] = yield* Effect.tryPromise({
     try: () =>
       bindings.DB.batch([
-        bindings.DB.prepare("DELETE FROM feedback_daily_counts WHERE user_id = ? AND day < ?").bind(userId, day),
-        bindings.DB.prepare(
-          `INSERT INTO feedback_daily_counts(user_id, day, count) VALUES (?, ?, 1)
-           ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 WHERE count < ?
-           RETURNING count`,
-        ).bind(userId, day, FEEDBACK_DAILY_LIMIT),
+        bindings.DB.prepare(DELETE_EARLIER_FEEDBACK_DAYS).bind(userId, day),
+        bindings.DB.prepare(COUNT_FEEDBACK).bind(userId, day, FEEDBACK_DAILY_LIMIT),
       ]),
     catch: unavailable,
   });
@@ -238,6 +237,16 @@ export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLim
       "Too much feedback today. Try again tomorrow.",
     );
   }
+  return day;
+});
+
+/**
+ * Takes back the daily count of an issue that GitHub did not open, so a failed send does not use up the
+ * limit. A failure here keeps the count: the error of the send goes to the user.
+ */
+export const uncountFeedback = Effect.fn("GitHub.uncountFeedback")(function* (userId: string, day: string) {
+  const bindings = requireWorkerBindings(env);
+  yield* Effect.tryPromise(() => bindings.DB.prepare(UNCOUNT_FEEDBACK).bind(userId, day).run()).pipe(Effect.ignore);
 });
 
 /** The seconds to the next UTC day, when the daily feedback limit starts again. */
