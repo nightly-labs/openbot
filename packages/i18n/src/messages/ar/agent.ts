@@ -79,7 +79,6 @@ export const messages = {
   "agent.error.restoreFailed": "تعذّرت استعادة الوكيل",
   "agent.error.hiddenFailed": "لم يُحفَظ التغيير. أعد المحاولة.",
   "agent.error.settingsFailed": "تعذّر حفظ إعدادات الوكيل",
-  "agent.error.avatarFailed": "تعذّر تحديث الصورة الرمزية",
   "agent.error.adminOnly": "لا يغيّر إعدادات الوكيل إلا مسؤول الخادم.",
   "agent.error.continueFailed": "تعذّر على الوكيل المتابعة. أعد المحاولة.",
   "agent.error.mcpNotStarted": "لم يبدأ خادم MCP",

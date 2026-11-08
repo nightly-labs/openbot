@@ -75,7 +75,6 @@ export const messages = {
   "agent.error.restoreFailed": "לא ניתן לשחזר את הסוכן",
   "agent.error.hiddenFailed": "השינוי לא נשמר. יש לנסות שוב.",
   "agent.error.settingsFailed": "לא ניתן לשמור את הגדרות הסוכן",
-  "agent.error.avatarFailed": "לא ניתן לעדכן את תמונת הפרופיל",
   "agent.error.adminOnly": "רק מנהל של השרת יכול לשנות את הגדרות הסוכן.",
   "agent.error.continueFailed": "הסוכן לא הצליח להמשיך. יש לנסות שוב.",
   "agent.error.mcpNotStarted": "שרת MCP לא הופעל",
