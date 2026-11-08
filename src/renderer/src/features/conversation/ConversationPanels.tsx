@@ -632,6 +632,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               routineRunPlace={
                 props.server?.kind === "remote" && serverSupportsCapability(props.server, "routine-run-place-v1")
               }
+              routineStatus={
+                props.server?.kind === "remote" && serverSupportsCapability(props.server, "routine-status-v1")
+              }
               folders={folderCalls()}
               instructionsFile={instructionsCalls()}
               sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}

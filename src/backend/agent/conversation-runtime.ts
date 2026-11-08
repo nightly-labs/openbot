@@ -14,6 +14,7 @@ import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { visibleRoutineStatusSnapshot } from "../routine-status-visibility";
 import { conversationContentSignature } from "./delivery-content";
 
 interface TransactionScope {
@@ -802,7 +803,7 @@ export class ConversationRuntime {
     if (this.#dropDeletedMessages(snapshot) || signature === undefined)
       signature = conversationContentSignature(snapshot);
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
-    this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+    this.#emit({ type: "conversation", snapshot: structuredClone(visibleRoutineStatusSnapshot(snapshot)) });
   }
 
   rememberConversationSignature(snapshot: ConversationSnapshot): void {

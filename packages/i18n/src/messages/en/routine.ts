@@ -346,6 +346,10 @@ export const messages = defineMessages("routine", {
   "routine.settings.missedPolicy.skip": "Skip this run",
   "routine.settings.missedPolicy.runOnce": "Run once when OpenBot opens",
   "routine.settings.runInThread": "Run in a separate thread",
+  "routine.settings.silent": "Silent routine",
+  "routine.settings.silentHint":
+    "Hide status updates for new automatic runs in chat. Messages, files, questions, and alerts stay visible. Test runs stay visible.",
+  "routine.settings.silentSaveFailed": "The routine is saved, but its silent setting is not. Try again.",
   "routine.settings.runInSaveFailed": "The routine is saved, but its separate thread setting is not. Try again.",
   "routine.settings.resultDestination": "Send answers to",
   "routine.settings.resultDestination.none": "Only this chat",

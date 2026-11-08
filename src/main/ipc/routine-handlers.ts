@@ -20,10 +20,17 @@ import {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
-import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import {
+  readRoutineStatuses,
+  saveRoutineStatus,
+  type TeamApiRequest,
+  teamAgentRoutinesApi,
+  withRoutineRunPlaces,
+} from "@openbot/team-client/team-api-requests";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { localRoutineCalendarSource } from "../local-routine-calendar";
@@ -59,6 +66,10 @@ export function routineIpcHandlers({
   service,
   remoteServers,
 }: RoutineIpcDependencies): Pick<IpcGroupHandlers, "agentRoutines"> {
+  const statusRequest =
+    (serverId: string): TeamApiRequest =>
+    (method, path, decode, body) =>
+      runCauseEffect(remoteServers.request(serverId, path, decode, { method, body }));
   return {
     agentRoutines: {
       listRoutines: scopedHandler(parseAgentId, {
@@ -80,11 +91,18 @@ export function routineIpcHandlers({
               );
               return withRoutineRunPlaces(list, places);
             }),
+          ).then((routines) =>
+            readRoutineStatuses(
+              statusRequest(serverId),
+              { kind: "agent", id: agentId },
+              routines,
+              remoteServers.supportsCapability(serverId, ROUTINE_STATUS_CAPABILITY),
+            ),
           ),
       }),
       createRoutine: scopedHandler(parseCreateRoutine, {
         local: (parsed) => service.createRoutine(parsed),
-        remote: ({ runIn, ...parsed }, serverId) =>
+        remote: ({ runIn, silent, ...parsed }, serverId) =>
           runCauseEffect(
             remoteServers
               .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
@@ -92,19 +110,25 @@ export function routineIpcHandlers({
                 body: parsed,
               })
               .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn, true))),
+          ).then((routine) =>
+            saveRoutineStatus(
+              statusRequest(serverId),
+              { kind: "agent", id: parsed.agentId },
+              routine,
+              silent,
+              remoteServers.supportsCapability(serverId, ROUTINE_STATUS_CAPABILITY),
+              true,
+            ),
           ),
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
-        remote: ({ runIn, ...parsed }, serverId) =>
-          runCauseEffect(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
-                method: "PATCH",
-                body: parsed,
-              })
-              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn))),
-          ),
+        remote: (parsed, serverId) =>
+          teamAgentRoutinesApi(
+            statusRequest(serverId),
+            () => remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY),
+            () => remoteServers.supportsCapability(serverId, ROUTINE_STATUS_CAPABILITY),
+          ).updateRoutine(parsed),
       }),
       deleteRoutine: scopedHandler(parseDeleteRoutine, {
         local: (parsed) => runCauseEffect(service.deleteRoutine(parsed)),

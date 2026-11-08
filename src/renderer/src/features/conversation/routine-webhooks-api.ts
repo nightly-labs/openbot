@@ -116,6 +116,7 @@ export function webEventRoutinesApi(
   tests: () => boolean = () => false,
   senderSecret: () => boolean = () => false,
   runPlaces: () => boolean = () => false,
+  routineStatus: () => boolean = () => false,
 ): EventRoutinesApi {
   const run = <A>(effect: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> =>
     runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
@@ -133,8 +134,8 @@ export function webEventRoutinesApi(
       return senderSecret() ? setSecret : undefined;
     },
     getStatus: () => run(getEventStatus(request)),
-    listRoutines: (input) => run(listEventRoutines(request, input, recovery(), runPlaces())),
-    saveRoutine: (input) => run(saveEventRoutine(request, input, recovery(), runPlaces())),
+    listRoutines: (input) => run(listEventRoutines(request, input, recovery(), runPlaces(), routineStatus())),
+    saveRoutine: (input) => run(saveEventRoutine(request, input, recovery(), runPlaces(), routineStatus())),
     deleteRoutine: (input) => run(deleteEventRoutine(request, input)),
     testRoutine: (input) => run(testEventRoutine(request, input)),
     rotateSecret: (input) => run(rotateEventRoutineSecret(request, input)),

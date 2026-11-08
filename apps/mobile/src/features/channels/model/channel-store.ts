@@ -17,9 +17,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { readRoutineStatuses } from "@openbot/team-client/team-api-requests";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
 
@@ -71,6 +73,7 @@ export class ChannelHistoryRefreshError extends Error {}
 
 /** Channel events are invalidations. Keep one read in flight and one trailing read per host. */
 export class MobileChannelStore {
+  private routineStatusHosts = new Set<string>();
   private entries = new Map<string, Entry>();
   private listeners = new Map<string, Set<() => void>>();
   private active = true;
@@ -154,6 +157,8 @@ export class MobileChannelStore {
     for (const listener of entry.listeners) listener();
   }
   configure(serverId: string, capabilities: string[]) {
+    if (capabilities.includes(ROUTINE_STATUS_CAPABILITY)) this.routineStatusHosts.add(serverId);
+    else this.routineStatusHosts.delete(serverId);
     const entry = this.entry(serverId);
     const supported = capabilities.includes(CHANNEL_CHATS_CAPABILITY);
     this.publish(entry, {
@@ -195,6 +200,7 @@ export class MobileChannelStore {
     };
   }
   remove(serverId: string) {
+    this.routineStatusHosts.delete(serverId);
     const entry = this.entries.get(serverId);
     if (!entry) return;
     this.publish(entry, EMPTY);
@@ -512,8 +518,13 @@ export class MobileChannelStore {
   memories(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }, serverId);
   }
-  routines(serverId: string, channelId: string) {
-    return this.request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }, serverId);
+  async routines(serverId: string, channelId: string) {
+    return readRoutineStatuses(
+      (method, path, decode, body) => this.request(method, path, decode, body, serverId),
+      { kind: "channel", id: channelId },
+      await this.request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }, serverId),
+      this.routineStatusHosts.has(serverId),
+    );
   }
   async saveMemory(serverId: string, channelId: string, text: string, memoryId?: string) {
     await this.request(

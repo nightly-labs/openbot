@@ -180,6 +180,8 @@ export interface RoutineFields {
    * A channel routine and the released Team API routes leave it out.
    */
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -200,6 +202,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.silent === undefined || isBoolean(value.silent)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -239,6 +242,8 @@ export type RoutineRunSource = (typeof ROUTINE_RUN_SOURCES)[number];
 
 /** A run without its owner and without the handle that names the work it started. */
 export interface RoutineRunFields {
+  /** Visibility saved when the run starts. Test runs are never silent. */
+  silent?: boolean;
   id: string;
   routineId: string;
   triggerId: string | null;
@@ -264,6 +269,7 @@ export interface RoutineRun extends RoutineRunFields {
 export function isRoutineRunFields(value: unknown): value is RoutineRunFields {
   return (
     isDynamicRecord(value) &&
+    (value.silent === undefined || isBoolean(value.silent)) &&
     isString(value.id) &&
     isString(value.routineId) &&
     (value.triggerId === null || isString(value.triggerId)) &&
@@ -314,6 +320,8 @@ export interface CreateRoutineInput {
   missedPolicy?: RoutineMissedPolicy;
   /** `chat` when absent. */
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
 }
 
 export interface UpdateRoutineInput {
@@ -326,6 +334,8 @@ export interface UpdateRoutineInput {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
 }
 
 export interface DeleteRoutineInput {

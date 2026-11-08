@@ -47,6 +47,7 @@ const Routine = Schema.Struct({
   limitPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_LIMIT_POLICIES)),
   missedPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_MISSED_POLICIES)),
   runIn: Schema.optionalKey(Schema.Literals(ROUTINE_RUN_PLACES)),
+  silent: Schema.optionalKey(Schema.Boolean),
 });
 
 const Memory = Schema.Struct({

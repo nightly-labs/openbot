@@ -21,6 +21,7 @@ import {
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { VISIBLE_ROUTINE_STATUS_SQL } from "../routine-status-visibility";
 import { COLLAPSE_WHITESPACE_FUNCTION, type DatabaseCore, LOWERCASE_FUNCTION } from "./database-core";
 import {
   databaseRow,
@@ -695,7 +696,7 @@ export class ConversationQueries {
  * thread id.
  */
 export const ORDERED_THREAD_MESSAGES = `WITH ordered AS (
-  SELECT created_at, ordinal, message_id, author, item_type, group_start, group_first, group_id, turn_rank
+  SELECT created_at, ordinal, message_id, author, item_type, message_json, group_start, group_first, group_id, turn_rank
   FROM projection_thread_messages WHERE thread_id = ?
 )`;
 export const ORDER_KEY_COLUMNS = "group_start, group_first, group_id, turn_rank, created_at, ordinal, message_id";
@@ -778,6 +779,7 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
 /** A new agent's setup message (`agent-welcome-v1`) is for the agent only, so no page or read state has it. */
 function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
+    `AND ${VISIBLE_ROUTINE_STATUS_SQL}`,
     `AND COALESCE(item_type, '') != '${AGENT_WELCOME_ITEM_TYPE}'`,
     exclusions.excludeRoutineEvents
       ? `AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'`

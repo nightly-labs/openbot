@@ -3,7 +3,7 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { basename, isAbsolute } from "node:path";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { Deferred, Effect, Result } from "effect";
 import {
   type AttachmentOperationError,
@@ -18,7 +18,6 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
 
 export interface AttachmentGatewayHooks {
-  emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -255,7 +254,7 @@ export class AttachmentGateway {
             return yield* attachmentFailure(error);
           }
           try {
-            this.#hooks.emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+            this.#conversation.publishConversation(snapshot);
           } catch (error) {
             try {
               this.#hooks.emitError("conversation_publication_failed", error, senderAgentId);

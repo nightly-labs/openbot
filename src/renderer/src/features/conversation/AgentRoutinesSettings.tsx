@@ -101,6 +101,7 @@ interface RoutineDraft {
   limitPolicy: RoutineLimitPolicy;
   missedPolicy: RoutineMissedPolicy;
   runIn: RoutineRunPlace;
+  silent: boolean;
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
@@ -347,6 +348,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
             ? (routine.missedPolicy ?? "skip")
             : current.missedPolicy,
         runIn: current.runIn === (base.runIn ?? "chat") ? (routine.runIn ?? "chat") : current.runIn,
+        silent: current.silent === (base.silent ?? false) ? (routine.silent ?? false) : current.silent,
         ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
@@ -366,6 +368,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       limitPolicy: routine.limitPolicy ?? "wait",
       missedPolicy: routine.missedPolicy ?? "skip",
       runIn: routine.runIn ?? "chat",
+      silent: routine.silent ?? false,
       ...triggerDraftOf(routine),
       destination: undefined,
     });
@@ -394,6 +397,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       limitPolicy: "wait",
       missedPolicy: "skip",
       runIn: "chat",
+      silent: false,
       triggerKind: "schedule",
       eventType: "",
       eventFilters: [],
@@ -531,6 +535,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
+        ...(props.port.silent && current.silent !== ((current.id ? draftBase?.silent : undefined) ?? false)
+          ? { silent: current.silent }
+          : {}),
         // Only a changed place goes: a remote host sends it on a route of its own, after the save.
         ...(props.port.runIn && current.runIn !== ((current.id ? draftBase?.runIn : undefined) ?? "chat")
           ? { runIn: current.runIn }
@@ -548,14 +555,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         props.onCountChange(next.length);
         return next;
       });
-      setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
       if (draft()?.id === current.id) draftBase = saved;
+      setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
       const destinationSaved = await saveDestination(saved.id, current.destination);
       // A remote host can keep the new routine but not its place. The editor keeps the change, so Save
       // tries again.
       const placeSaved = !props.port.runIn || saved.runIn === current.runIn;
+      const statusSaved = !props.port.silent || (saved.silent ?? false) === current.silent;
+      if (!statusSaved) setError(t("routine.settings.silentSaveFailed"));
       if (!placeSaved) setError(t("routine.settings.runInSaveFailed"));
-      if (draftRevision === savingRevision && destinationSaved && placeSaved) setDirty(false);
+      if (draftRevision === savingRevision && destinationSaved && placeSaved && statusSaved) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
       if (result.secret && draft()?.id === saved.id) {
         const secret = result.secret;
@@ -1147,6 +1156,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     </SelectTrigger>
                     <SelectContent />
                   </Select>
+                </div>
+              </Show>
+
+              <Show when={props.port.silent}>
+                <div class="settings-field">
+                  <SwitchField
+                    label={t("routine.settings.silent")}
+                    description={t("routine.settings.silentHint")}
+                    checked={current().silent}
+                    onChange={(silent) => changeDraft((value) => ({ ...value, silent }))}
+                  />
                 </div>
               </Show>
 

@@ -282,6 +282,7 @@ export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAg
 
 /** `routine-run-place-v1`: the routine records of each agent, of every trigger kind. */
 export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
+export type TeamApiRoutineStatus = Pick<AgentService["routineRecords"], "ownerExists" | "list" | "get" | "save">;
 
 /**
  * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
@@ -654,6 +655,7 @@ export interface TeamApiOptions {
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
   routineRunPlaces?: TeamApiRoutineRunPlaces;
+  routineStatus?: TeamApiRoutineStatus;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
   sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */

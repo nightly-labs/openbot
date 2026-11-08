@@ -19,6 +19,7 @@ import {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_ROUTES,
@@ -26,7 +27,12 @@ import {
 import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import {
+  readRoutineStatuses,
+  saveRoutineStatus,
+  type TeamApiRequest,
+  withRoutineRunPlaces,
+} from "@openbot/team-client/team-api-requests";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostEventsApi } from "../host-events-api";
@@ -53,6 +59,7 @@ interface EventsRemoteServers {
       | typeof EVENTS_CAPABILITY
       | typeof ROUTINE_RECOVERY_CAPABILITY
       | typeof ROUTINE_RUN_PLACE_CAPABILITY
+      | typeof ROUTINE_STATUS_CAPABILITY
       | typeof WEBHOOK_TESTS_CAPABILITY
       | typeof WEBHOOK_SENDER_SECRET_CAPABILITY,
   ): boolean;
@@ -70,6 +77,10 @@ interface EventsIpcDependencies {
 }
 
 export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependencies): Pick<IpcGroupHandlers, "events"> {
+  const statusRequest =
+    (serverId: string): TeamApiRequest =>
+    (method, path, decode, body) =>
+      runCauseEffect(remoteServers.request(serverId, path, decode, { method, body }));
   function remote<T>(serverId: string, path: string, decoder: (value: unknown) => T, body: unknown = {}): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, EVENTS_CAPABILITY))
       throw new Error(sourceText("error.backend.eventsUnavailable"));
@@ -104,12 +115,23 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
             input,
           );
           const agentId = runPlaceAgent(serverId, input.owner);
-          if (agentId === null) return routines;
+          if (agentId === null)
+            return readRoutineStatuses(
+              statusRequest(serverId),
+              input.owner,
+              await routines,
+              remoteServers.supportsCapability(serverId, ROUTINE_STATUS_CAPABILITY),
+            );
           const [list, places] = await Promise.all([
             routines,
             remote(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
           ]);
-          return withRoutineRunPlaces(list, places);
+          return readRoutineStatuses(
+            statusRequest(serverId),
+            input.owner,
+            withRoutineRunPlaces(list, places),
+            remoteServers.supportsCapability(serverId, ROUTINE_STATUS_CAPABILITY),
+          );
         },
       }),
       saveRoutine: scopedHandler(parseSaveEventRoutine, {
@@ -122,24 +144,37 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
             input,
           );
           const agentId = runPlaceAgent(serverId, input.owner);
-          if (agentId === null || input.runIn === undefined) return saved;
-          const placed = remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
-            agentId,
-            routineId: saved.routine.id,
-            runIn: input.runIn,
-          });
-          // The new routine exists, so a failed place does not fail the create: it runs in the chat,
-          // and a second save does not make a second routine.
-          const place =
-            input.id === undefined
-              ? await placed.catch(() => {
-                  runPlaceLogger.warn(
-                    "The run place of a new remote routine was not set. The routine runs in the chat.",
-                  );
-                  return { runIn: "chat" as const };
-                })
-              : await placed;
-          return { ...saved, routine: { ...saved.routine, runIn: place.runIn } };
+          let result = saved;
+          if (agentId !== null && input.runIn !== undefined) {
+            const placed = remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+              agentId,
+              routineId: saved.routine.id,
+              runIn: input.runIn,
+            });
+            // The new routine exists, so a failed place does not fail the create: it runs in the chat,
+            // and a second save does not make a second routine.
+            const place =
+              input.id === undefined
+                ? await placed.catch(() => {
+                    runPlaceLogger.warn(
+                      "The run place of a new remote routine was not set. The routine runs in the chat.",
+                    );
+                    return { runIn: "chat" as const };
+                  })
+                : await placed;
+            result = { ...saved, routine: { ...saved.routine, runIn: place.runIn } };
+          }
+          return {
+            ...result,
+            routine: await saveRoutineStatus(
+              statusRequest(serverId),
+              input.owner,
+              result.routine,
+              input.silent,
+              remoteServers.supportsCapability(serverId, ROUTINE_STATUS_CAPABILITY),
+              input.id === undefined,
+            ),
+          };
         },
       }),
       deleteRoutine: scopedHandler(parseEventRoutineRef, {

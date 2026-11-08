@@ -362,6 +362,7 @@ export function createMockChannels(
         timezone: input.timezone,
         limitPolicy: input.limitPolicy ?? "wait",
         missedPolicy: input.missedPolicy ?? "skip",
+        silent: input.silent ?? false,
         trigger: nextTrigger(id, input.schedule, now),
         createdAt: now,
         updatedAt: now,
@@ -381,6 +382,7 @@ export function createMockChannels(
         ...(input.active === undefined ? {} : { active: input.active }),
         ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
         ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+        ...(input.silent === undefined ? {} : { silent: input.silent }),
         ...(input.schedule === undefined ? {} : { trigger: nextTrigger(current.id, input.schedule, now) }),
         updatedAt: now,
       };

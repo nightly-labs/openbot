@@ -1,3 +1,10 @@
+import type { EventRoutineOwner } from "@openbot/contracts/ipc-events";
+import {
+  decodeRoutineStatus,
+  decodeRoutineStatuses,
+  ROUTINE_STATUS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-status-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 // Team API requests that the web client and the mobile app send in the same way.
 //
@@ -70,7 +77,9 @@ import {
   type SetAgentMemoryInclusionInput,
   type StartAgentTaskInput,
   type SteerQueuedMessageInput,
+  type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
+  type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -547,7 +556,7 @@ export type TeamChannelsApi = Pick<
 >;
 
 /** Every channel route is a POST with the channel in the body, except the list. */
-export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
+export function teamChannelsApi(request: TeamApiRequest, routineStatus: () => boolean = () => false): TeamChannelsApi {
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
   return {
@@ -559,9 +568,32 @@ export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),
     deleteChannelMemory: (input) => post(CHANNEL_ROUTES.memoryDelete, ignoreResponse, input),
     clearChannelMemories: (channelId) => post(CHANNEL_ROUTES.memoryClear, ignoreResponse, { channelId }),
-    listChannelRoutines: (channelId) => post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }),
-    createChannelRoutine: (input) => post(CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, input),
-    updateChannelRoutine: (input) => post(CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, input),
+    listChannelRoutines: async (channelId) =>
+      readRoutineStatuses(
+        request,
+        { kind: "channel", id: channelId },
+        await post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }),
+        routineStatus(),
+      ),
+    createChannelRoutine: async ({ silent, ...input }) =>
+      saveRoutineStatus(
+        request,
+        { kind: "channel", id: input.channelId },
+        await post(CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, input),
+        silent,
+        routineStatus(),
+        true,
+      ),
+    updateChannelRoutine: async ({ silent, ...input }) => {
+      const routine =
+        silent !== undefined && !hasRoutineFieldUpdate(input)
+          ? (await post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId: input.channelId })).find(
+              (routine) => routine.id === input.routineId,
+            )
+          : await post(CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, input);
+      if (!routine) throw new Error(sourceText("error.backend.routineGone"));
+      return saveRoutineStatus(request, { kind: "channel", id: input.channelId }, routine, silent, routineStatus());
+    },
     deleteChannelRoutine: (input) => post(CHANNEL_ROUTES.routineDelete, ignoreResponse, input),
     testChannelRoutine: (input) => post(CHANNEL_ROUTES.routineTest, decodeChannelRoutineRun, input),
     listChannelRoutineRuns: (input) => post(CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, input),
@@ -569,6 +601,16 @@ export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
 }
 
 const decodeRoutine = guardedDecoder(isRoutine, "routine");
+function hasRoutineFieldUpdate(input: UpdateRoutineInput | UpdateChannelRoutineInput): boolean {
+  return (
+    input.name !== undefined ||
+    input.instruction !== undefined ||
+    input.active !== undefined ||
+    input.schedule !== undefined ||
+    input.limitPolicy !== undefined ||
+    input.missedPolicy !== undefined
+  );
+}
 const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run");
 const decodeRoutines = guardedListDecoder(isRoutine, "routine list");
 const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine run list");
@@ -591,6 +633,42 @@ export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunP
   });
 }
 
+/** The released codecs omit this preference. Read it only from a host with routine-status-v1. */
+export async function readRoutineStatuses<R extends { id: string; silent?: boolean }>(
+  request: TeamApiRequest,
+  owner: EventRoutineOwner,
+  routines: R[],
+  enabled: boolean,
+): Promise<(R & { silent?: boolean })[]> {
+  if (!enabled) return routines;
+  const entries = await request("POST", ROUTINE_STATUS_ROUTES.list, decodeRoutineStatuses, { owner });
+  const silentOf = new Map(entries.map((entry) => [entry.routineId, entry.silent]));
+  return routines.map((routine) => ({ ...routine, silent: silentOf.get(routine.id) ?? false }));
+}
+
+/** Keep the new record on a failed preference save, so a retry cannot create a duplicate. */
+export async function saveRoutineStatus<R extends { id: string; silent?: boolean }>(
+  request: TeamApiRequest,
+  owner: EventRoutineOwner,
+  routine: R,
+  silent: boolean | undefined,
+  enabled: boolean,
+  created = false,
+): Promise<R & { silent?: boolean }> {
+  if (!enabled) return routine;
+  if (silent === undefined) {
+    const read = readRoutineStatuses(request, owner, [routine], true).then((routines) => routines[0] ?? routine);
+    return created ? read.catch(() => ({ ...routine, silent: false })) : read;
+  }
+  const saved = request("POST", ROUTINE_STATUS_ROUTES.set, decodeRoutineStatus, {
+    owner,
+    routineId: routine.id,
+    silent,
+  });
+  const entry = created ? await saved.catch(() => ({ silent: false })) : await saved;
+  return { ...routine, silent: entry.silent };
+}
+
 /**
  * The frozen v1 agent routine routes. Every host serves them. They leave out where a routine runs, so
  * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes.
@@ -598,6 +676,7 @@ export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunP
 export function teamAgentRoutinesApi(
   request: TeamApiRequest,
   runPlaces: () => boolean = () => false,
+  routineStatus: () => boolean = () => false,
 ): TeamAgentRoutinesApi {
   // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
   // and a second save does not make a second routine.
@@ -618,34 +697,58 @@ export function teamAgentRoutinesApi(
   return {
     listRoutines: async (agentId) => {
       const routines = request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-      if (!runPlaces()) return routines;
+      if (!runPlaces())
+        return readRoutineStatuses(request, { kind: "agent", id: agentId }, await routines, routineStatus());
       const [list, places] = await Promise.all([
         routines,
         request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
       ]);
-      return withRoutineRunPlaces(list, places);
+      return readRoutineStatuses(
+        request,
+        { kind: "agent", id: agentId },
+        withRoutineRunPlaces(list, places),
+        routineStatus(),
+      );
     },
-    createRoutine: async ({ runIn, ...input }) =>
-      withRunPlace(
-        await request(
-          "POST",
-          TEAM_API_ROUTES.agent.routines(input.agentId),
-          decodeRoutine,
-          decodeTeamProtocolV2Json(input),
+    createRoutine: async ({ runIn, silent, ...input }) =>
+      saveRoutineStatus(
+        request,
+        { kind: "agent", id: input.agentId },
+        await withRunPlace(
+          await request(
+            "POST",
+            TEAM_API_ROUTES.agent.routines(input.agentId),
+            decodeRoutine,
+            decodeTeamProtocolV2Json(input),
+          ),
+          runIn,
+          true,
         ),
-        runIn,
+        silent,
+        routineStatus(),
         true,
       ),
-    updateRoutine: async ({ runIn, ...input }) =>
-      withRunPlace(
-        await request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          decodeRoutine,
-          decodeTeamProtocolV2Json(input),
-        ),
-        runIn,
-      ),
+    updateRoutine: async ({ runIn, silent, ...input }) => {
+      const routine =
+        silent !== undefined && !hasRoutineFieldUpdate(input)
+          ? (await request("GET", TEAM_API_ROUTES.agent.routines(input.agentId), decodeRoutines)).find(
+              (routine) => routine.id === input.routineId,
+            )
+          : await request(
+              "PATCH",
+              TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+              decodeRoutine,
+              decodeTeamProtocolV2Json(input),
+            );
+      if (!routine) throw new Error(sourceText("error.backend.routineGone"));
+      return saveRoutineStatus(
+        request,
+        { kind: "agent", id: input.agentId },
+        await withRunPlace(routine, runIn),
+        silent,
+        routineStatus(),
+      );
+    },
     deleteRoutine: ({ agentId, routineId }) =>
       request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse),
     testRoutine: ({ agentId, routineId }) =>

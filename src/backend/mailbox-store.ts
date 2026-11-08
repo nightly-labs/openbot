@@ -50,6 +50,7 @@ import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
 import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
+import { databaseRows, requiredStringColumn } from "./database/database-rows";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
@@ -1474,6 +1475,20 @@ export class MailboxStore {
       if (!active) completedCount += 1;
     }
     selectedStoredMessages.reverse();
+    const routineRunIds = selectedStoredMessages.flatMap((message) =>
+      message.sender.kind === "routine" ? [message.sender.runId] : [],
+    );
+    const silentRuns = new Set(
+      routineRunIds.length === 0
+        ? []
+        : databaseRows(
+            this.#database.connection
+              .prepare(
+                "SELECT run_id FROM projection_routine_runs WHERE run_id IN (SELECT value FROM json_each(?)) AND agent_id = ? AND silent = 1",
+              )
+              .all(JSON.stringify(routineRunIds), agentId),
+          ).map((row) => requiredStringColumn(row, "run_id")),
+    );
     const messages: ConversationMessage[] = [];
     const positions = this.#queuedPositions();
     const turnIds = this.#sourceTurnIds();
@@ -1556,6 +1571,16 @@ export class MailboxStore {
                   }),
                 }
               : undefined,
+          ...(message.sender.kind === "routine"
+            ? {
+                silentRoutineStatus:
+                  silentRuns.has(message.sender.runId) &&
+                  delivery.error === null &&
+                  delivery.status !== "failed" &&
+                  delivery.status !== "interrupted" &&
+                  delivery.status !== "cancelled",
+              }
+            : {}),
           routine:
             message.sender.kind === "routine"
               ? {

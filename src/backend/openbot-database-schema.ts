@@ -580,6 +580,8 @@ const ANALYTICS_DATE_INDEX_SQL = `
   CREATE INDEX IF NOT EXISTS agent_usage_activity_occurred ON agent_usage_activity(occurred_at);
 `;
 
+const V59_ROUTINE_SILENT_COLUMN_SQL = "silent INTEGER NOT NULL DEFAULT 0 CHECK(silent IN (0, 1))";
+
 const LATEST_SCHEMA_SQL =
   substituteOnce(
     substituteOnce(
@@ -645,15 +647,15 @@ function withThreadMessageOrderColumns(tableEnd: string): string {
 function withRoutinePolicies(tableEnd: string): string {
   return tableEnd.replace(
     "last_event_sequence INTEGER NOT NULL\n",
-    `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL},\n    ${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
+    `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL},\n    ${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL},\n    ${V59_ROUTINE_SILENT_COLUMN_SQL}\n`,
   );
 }
 
 /** The end of the agent routine table with the migration 57 column after the migration 33 one. */
 function withAgentRoutineRunPlace(tableEnd: string): string {
   return tableEnd.replace(
-    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
-    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL},\n    ${V57_AGENT_ROUTINE_RUN_IN_COLUMN_SQL}\n`,
+    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL},\n`,
+    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL},\n    ${V57_AGENT_ROUTINE_RUN_IN_COLUMN_SQL},\n`,
   );
 }
 
@@ -661,7 +663,7 @@ function withAgentRoutineRunPlace(tableEnd: string): string {
 function withRunAddedColumns(tableEnd: string): string {
   return tableEnd.replace(
     "last_event_sequence INTEGER NOT NULL,\n",
-    `last_event_sequence INTEGER NOT NULL,\n${[...V33_ROUTINE_RUN_MISSED_COLUMNS_SQL, V35_ROUTINE_RUN_SOURCE_COLUMN_SQL].map((column) => `    ${column},\n`).join("")}`,
+    `last_event_sequence INTEGER NOT NULL,\n${[...V33_ROUTINE_RUN_MISSED_COLUMNS_SQL, V35_ROUTINE_RUN_SOURCE_COLUMN_SQL, V59_ROUTINE_SILENT_COLUMN_SQL].map((column) => `    ${column},\n`).join("")}`,
   );
 }
 
@@ -979,6 +981,10 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No skill load was
     // recorded before it, so the table starts empty and no usage row changes.
     up: (db) => db.exec(AGENT_SKILL_LOADS_SCHEMA_SQL),
+  },
+  {
+    version: 59,
+    up: addRoutineSilentStatus,
   },
 ];
 
@@ -1386,6 +1392,20 @@ function addAgentThreadRoutine(db: DatabaseSync): void {
   if (!columns.some((existing) => isDynamicRecord(existing) && existing.name === "routine_id"))
     db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${V54_AGENT_THREAD_ROUTINE_COLUMN_SQL}`);
   db.exec(V54_AGENT_THREAD_ROUTINE_INDEX_SQL);
+}
+
+// Migration 59 keeps the preference and a prospective snapshot on each run.
+function addRoutineSilentStatus(db: DatabaseSync): void {
+  for (const table of [
+    "projection_agent_routines",
+    "projection_channel_routines",
+    "projection_routine_runs",
+    "projection_channel_routine_runs",
+  ]) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (columns.some((column) => isDynamicRecord(column) && column.name === "silent")) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${V59_ROUTINE_SILENT_COLUMN_SQL}`);
+  }
 }
 
 // Migration 57 adds where the runs of an agent routine run.

@@ -168,6 +168,7 @@ import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -320,6 +321,7 @@ import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
 import { routeRoutineRunPlace } from "./team-api/route-routine-run-place";
+import { routeRoutineStatus } from "./team-api/route-routine-status";
 import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
@@ -1108,6 +1110,8 @@ export class TeamApiServer {
         (await routeRoutineRunPlace(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
         "handled"
       )
+        return;
+      if ((await routeRoutineStatus(context, this.#options.agents, this.#options.routineStatus, hidden)) === "handled")
         return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
@@ -2461,6 +2465,7 @@ export class TeamApiServer {
           if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
           if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
+          if (capability === ROUTINE_STATUS_CAPABILITY) return this.#options.routineStatus !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;

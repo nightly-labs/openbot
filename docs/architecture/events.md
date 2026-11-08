@@ -9,6 +9,12 @@ shared, host-level event source. The [user guide](../webhooks.md) has the reques
 
 The flow is: signed request → route → routine → run.
 
+Schedule and webhook routines share the optional `silent` status preference. New agent runs save
+the preference before they queue. It changes chat status visibility only; webhook receipts, run
+history, failures, and substantive output remain. Channel routines save the same preference, but
+their requests and task controls are substantive content and stay visible. See
+[routine status visibility](agents.md#quiet-routine-runs).
+
 ## Ownership
 
 | Data | Owner | Where |

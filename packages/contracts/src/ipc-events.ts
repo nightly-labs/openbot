@@ -72,6 +72,8 @@ export interface EventRoutine {
   missedPolicy?: RoutineMissedPolicy;
   /** Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`. */
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -91,6 +93,8 @@ export interface SaveEventRoutineInput {
    * `routine-run-place-v1`. Left out, a save keeps the saved place.
    */
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
 }
 
 /** `secret` is set only when this save made a new webhook trigger. The host does not show it again. */
@@ -260,6 +264,7 @@ export function isEventRoutineTrigger(value: unknown): value is EventRoutineTrig
 function isEventRoutine(value: unknown): value is EventRoutine {
   return (
     isDynamicRecord(value) &&
+    (value.silent === undefined || typeof value.silent === "boolean") &&
     isString(value.id) &&
     isEventRoutineOwner(value.owner) &&
     isString(value.name) &&

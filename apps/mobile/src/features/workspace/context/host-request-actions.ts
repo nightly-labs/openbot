@@ -129,6 +129,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -274,6 +275,7 @@ import {
   readAgentMemories,
   readAgentMemorySelection,
   readAgentTask,
+  readRoutineStatuses,
   renameAgentThread,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
@@ -893,9 +895,25 @@ export function createHostRequestActions({
     resetAgentSessionSetting: async (input, serverId) =>
       runTeamRequest(resetAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     listEventRoutines: (owner, serverId) =>
-      runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
+      runTeamRequest(
+        listEventRoutines(
+          eventsAdmin(serverId),
+          { owner },
+          recovery(serverId),
+          false,
+          has(serverId, ROUTINE_STATUS_CAPABILITY),
+        ),
+      ),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(
+        saveEventRoutine(
+          eventsAdmin(serverId),
+          input,
+          recovery(serverId),
+          false,
+          has(serverId, ROUTINE_STATUS_CAPABILITY),
+        ),
+      ),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -1015,17 +1033,26 @@ export function createHostRequestActions({
     },
     loadAgentMemories: (agentId, serverId) =>
       runTeamRequest(readAgentMemories(memoryRequest(serverId), agentId, has(serverId, AGENT_MEMORIES_CAPABILITY))),
-    loadAgentRoutines: (agentId, serverId) =>
-      request(
-        "GET",
-        TEAM_API_ROUTES.agent.routines(agentId),
-        (value) => {
-          if (!Array.isArray(value) || !value.every(isRoutine) || value.some((routine) => routine.agentId !== agentId))
-            throw new Error("The host returned invalid routines.");
-          return value;
-        },
-        undefined,
-        serverId,
+    loadAgentRoutines: async (agentId, serverId) =>
+      readRoutineStatuses(
+        teamApi(serverId),
+        { kind: "agent", id: agentId },
+        await request(
+          "GET",
+          TEAM_API_ROUTES.agent.routines(agentId),
+          (value) => {
+            if (
+              !Array.isArray(value) ||
+              !value.every(isRoutine) ||
+              value.some((routine) => routine.agentId !== agentId)
+            )
+              throw new Error("The host returned invalid routines.");
+            return value;
+          },
+          undefined,
+          serverId,
+        ),
+        has(serverId, ROUTINE_STATUS_CAPABILITY),
       ),
     loadRoutineCalendar: (input, serverId, owners) =>
       runTeamRequest(

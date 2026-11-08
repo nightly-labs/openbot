@@ -710,6 +710,7 @@ export interface MobileWorkspaceContextValue {
    * what a scheduled routine does with the runs that came due while the host was off.
    */
   canManageMissedRuns: (serverId: string) => boolean;
+  canManageRoutineStatus: (serverId: string) => boolean;
   /** An owner or admin of a host with `routine-results-v1`: an agent routine can send its answers on. */
   canManageRoutineResults: (serverId: string) => boolean;
   /** The host's enabled messaging connections, with the places that each one can post in. */
@@ -1151,6 +1152,7 @@ type MobileWorkspaceStateKey =
   | "canSendNotifications"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "canManageRoutineStatus"
   | "canManageRoutineResults"
   | "canManageAgentSkills"
   | "canManageAgentAccess"

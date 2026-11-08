@@ -29,6 +29,7 @@ export interface ChannelRoutineHost {
   eventsServerId: () => string | undefined;
   /** Whether the `eventsServerId` host has `routine-recovery-v1`. */
   routineRecovery: () => boolean;
+  routineStatus?: () => boolean;
   /** Whether the `eventsServerId` host sends a test event to a webhook routine. */
   webhookTests: () => boolean;
   webhookSenderSecret: () => boolean;
@@ -195,7 +196,12 @@ export function ChannelSettingsPane(
   // subscription each time a message arrives.
   const memoriesPort = createMemo(() => channelMemoriesPort(props.channelId, channelName(), runtime().agent));
   const routinesPort = createMemo(() => {
-    const legacy = channelRoutinesPort(props.channelId, runtime().agent, props.routines.localHost());
+    const legacy = channelRoutinesPort(
+      props.channelId,
+      runtime().agent,
+      props.routines.localHost(),
+      props.routines.localHost() || props.routines.routineStatus?.() === true,
+    );
     const serverId = props.routines.eventsServerId();
     const eventApi =
       runtime().eventRoutines ??

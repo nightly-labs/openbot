@@ -2848,6 +2848,7 @@ export async function createApplicationServices({
     hiddenAgents: service,
     // Present, so the host advertises `routine-run-place-v1`. Any member reads the places; a change needs manage access.
     routineRunPlaces: service.routineRecords,
+    routineStatus: service.routineRecords,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
     agentNotificationLevels,
     // Present, so the host advertises `sidebar-pins-v1`. Each member saves their own pins.

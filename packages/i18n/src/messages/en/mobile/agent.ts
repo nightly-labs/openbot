@@ -272,6 +272,10 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.record.resultDestinationUnsupported":
     "This host cannot send routine answers to a messaging place. Update OpenBot on the host.",
   "mobile.agent.record.enabled": "Enabled",
+  "mobile.agent.record.silent": "Silent routine",
+  "mobile.agent.record.silentHint":
+    "Hide status updates for new automatic runs in chat. Messages, files, questions, and alerts stay visible. Test runs stay visible.",
+  "mobile.agent.record.silentSaveFailed": "The routine is saved, but its silent setting is not. Open it and try again.",
   "mobile.agent.record.routine": "Routine",
   "mobile.agent.record.testStarting": "Starting…",
   "mobile.agent.record.testRun": "Test run",

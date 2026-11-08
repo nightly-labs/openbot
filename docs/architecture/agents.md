@@ -48,14 +48,28 @@ the trigger advances or completes, so restart recovery keeps the same run and ma
 
 ## Quiet routine runs
 
+The optional **Silent routine** setting hides informational status rows for new automatic runs in
+the main chat. It defaults to false. The routine and each new scheduled, script, or webhook run
+store `silent`; an edit does not change the value of an existing run. Migration 59 adds the four
+default-false columns for agent and channel routines and runs. An omitted update keeps the saved
+value, explicit false clears it, and null is invalid.
+
+The host marks only informational routine instructions, running and completed transitions, and
+answers already classified as quiet with `silentRoutineStatus`. The conversation reader, paged
+queries, read state, and live publisher omit those rows from the display. The durable messages,
+internal snapshots, and run records remain. Failures, needs-attention, interruption, cancellation,
+and explicit Test results stay visible. Messages, files, questions, approvals, and routine settings
+cards stay visible. The setting does not change execution, schedules, permissions, or notification
+policy. The phone and browser receive the same host projection as desktop.
+
 A scheduled, script or webhook run of an agent routine can end without news, in two ways. No person
 waits for the answer of such a run (`quietRoutineRun`). The run history stores what started a manual
 run in `run_source` (`test`, `script` or `webhook`); a manual run from before migration 35 has none
 and is read as a Test run. The agent calls the
 `routine_no_update` tool, which the run prompt names, or the user asks in the routine task
 for an answer of only `[[no-update]]`. Models often write a short sentence instead of an exact
-token, so the tool is the main path. There is no setting. The tool and the marker do not
-depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). The tool call is
+token, so the tool is the main path. This output policy is separate from Silent routine. The tool and
+the marker do not depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). The tool call is
 held in memory until the turn completes; the history import finds it again by the tool name, as
 it finds the marker by its text. When a turn that ran only quiet routine runs completes and every
 answer is the marker, or the agent called the tool and the turn gave no file, image or question, the

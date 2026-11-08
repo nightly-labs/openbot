@@ -1138,7 +1138,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       sharedRoot: store.sharedRoot,
       hooks: {
-        emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       },
     });
@@ -1640,6 +1639,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
+        silentRoutineDelivery: (deliveryId) => this.#routines.silentRunForDelivery(deliveryId),
         takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
         closeRoutineSession: (externalThreadId) => this.#threads.closeRoutineThread(externalThreadId),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>

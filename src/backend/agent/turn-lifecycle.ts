@@ -202,6 +202,7 @@ export interface TurnHooks {
    * agent answers only the no-update marker or calls the no-update tool.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  silentRoutineDelivery?(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
   /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
@@ -1400,7 +1401,12 @@ export class TurnLifecycle {
         outcome === "completed" &&
         reportedFailure === undefined &&
         this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries) &&
-        settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled);
+        settleQuietRoutineTurn(
+          snapshot,
+          turnId,
+          noUpdateCalled,
+          deliveries.every(({ delivery }) => this.#hooks.silentRoutineDelivery?.(delivery.id) === true),
+        );
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
       // A routine run that answered only the no-update marker, also a Test run that shows it in the
       // chat, does not put the marker in the preview.
