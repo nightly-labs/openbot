@@ -107,6 +107,20 @@ const describeSchema = z
   .refine((input) => input.names !== undefined || input.name !== undefined);
 const callSchema = z.strictObject(callShape).refine((input) => input.name !== undefined || input.tool !== undefined);
 
+/**
+ * Kimi Code CLI gives each schema without a `type` the type `string` before its model reads it, so its
+ * model sent numbers and arrays in `arguments` as strings, and the target tool refused them (#5742). It
+ * leaves an `anyOf` as it is. Moonshot refuses a `type` next to `anyOf` and, as Hermes found, a `null`
+ * branch; the call still decodes with `callSchema`, which accepts any value.
+ */
+const KIMI_ARGUMENT_VALUE = { anyOf: ["string", "number", "boolean", "object", "array"].map((type) => ({ type })) };
+// On the value schema, Zod writes this `anyOf` as a `type` array. Moonshot takes only one type, or one
+// type and `null`, in a `type` array.
+const kimiCallShape = {
+  ...callShape,
+  arguments: callShape.arguments.meta({ additionalProperties: KIMI_ARGUMENT_VALUE }),
+};
+
 function toolDefinitions(catalog: typeof BUILTIN_TOOL_CATALOG) {
   const names = catalogNames(catalog);
   return [
@@ -150,6 +164,11 @@ const ALL_TOOL_DEFINITIONS = toolDefinitions(BUILTIN_TOOL_CATALOG);
 const OWN_WEB_SEARCH_TOOL_DEFINITIONS = toolDefinitions(OWN_WEB_SEARCH_CATALOG);
 const ALL_DYNAMIC_TOOLS = dynamicTools(ALL_TOOL_DEFINITIONS);
 const OWN_WEB_SEARCH_DYNAMIC_TOOLS = dynamicTools(OWN_WEB_SEARCH_TOOL_DEFINITIONS);
+const KIMI_DYNAMIC_TOOLS = dynamicTools(
+  visibleToolDefinitions("kimi").map((definition) =>
+    definition.name === "tool_call" ? { ...definition, shape: kimiCallShape } : definition,
+  ),
+);
 
 /** The direct OpenBot tools of an agent on `provider`, as an MCP server declares them. */
 export function visibleToolDefinitions(provider: AgentProviderId) {
@@ -158,6 +177,7 @@ export function visibleToolDefinitions(provider: AgentProviderId) {
 
 /** The direct OpenBot tools of an agent on `provider`, as the dynamic tools of a thread. */
 export function visibleDynamicTools(provider: AgentProviderId) {
+  if (provider === "kimi") return KIMI_DYNAMIC_TOOLS;
   return OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_DYNAMIC_TOOLS : ALL_DYNAMIC_TOOLS;
 }
 
