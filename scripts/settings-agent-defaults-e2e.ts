@@ -5,7 +5,7 @@
 // its options change. When the page saved that value as a new settings object, the settings and the
 // Select updated each other with no end, and the window froze in a release build. The dev build
 // stops such a loop with "Potential Infinite Loop Detected", so the check fails on that error, on
-// any page error, and when the window does not paint a frame in time after a change.
+// any page error, and when the renderer does not answer in time after a change.
 // Run it on the host app and on the test client of `bun run dev:test-client`, which is the
 // computer that uses a remote server. Restores the saved defaults at the end. Writes
 // .openbot-build/settings-agent-defaults/report-<port>.json. Needs `--port=<debugging port>` and
@@ -28,8 +28,8 @@ declare global {
 }
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/settings-agent-defaults");
-/** A frame that takes longer than this after a change means that the renderer is busy. */
-const FRAME_DEADLINE_MS = 2_000;
+/** An answer that takes longer than this after a change means that the renderer is busy. */
+const RESPONSE_DEADLINE_MS = 2_000;
 
 const SETTINGS = [
   { key: "allowAutomation", title: "agentSettings.automation.title" },
@@ -63,12 +63,19 @@ page.on("console", (message) => {
   if (/Potential Infinite Loop|REACTIVITY_HALTED/.test(message.text())) pageErrors.push(message.text());
 });
 
-/** Fails when the window does not paint a frame before the deadline. */
-async function framePaints(): Promise<number> {
+/**
+ * Fails when the renderer does not answer before the deadline. A loop keeps the renderer thread busy,
+ * so a script cannot run. This does not use a frame: a window that another window covers paints none.
+ */
+async function rendererAnswers(): Promise<number> {
   const started = Date.now();
-  const painted = page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
-  const late = new Promise<"late">((done) => setTimeout(() => done("late"), FRAME_DEADLINE_MS));
-  assert.notEqual(await Promise.race([painted, late]), "late", "The window did not paint a frame after a change.");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<"late">((done) => {
+    timer = setTimeout(() => done("late"), RESPONSE_DEADLINE_MS);
+  });
+  const answer = await Promise.race([page.evaluate(() => "answered" as const), late]);
+  clearTimeout(timer);
+  assert.notEqual(answer, "late", "The renderer did not answer after a change.");
   return Date.now() - started;
 }
 
@@ -140,7 +147,7 @@ async function chooseOtherOption(trigger: ReturnType<Page["getByRole"]>): Promis
 mkdirSync(OUT, { recursive: true });
 const originalDefaults = await savedDefaults();
 const originalSteer = await savedOn("busyMessageMode");
-const steps: Array<{ setting: string; action: string; frameMs: number }> = [];
+const steps: Array<{ setting: string; action: string; responseMs: number }> = [];
 try {
   await closeWhatsNew();
   await openAgentsTab();
@@ -158,7 +165,11 @@ try {
       await toggle.click({ force: true });
       await waitForSaved(setting.key, next);
       assert.equal(await toggle.isChecked(), next, `${t(setting.title)} does not show the saved value.`);
-      steps.push({ setting: setting.key, action: `switch ${next ? "on" : "off"}`, frameMs: await framePaints() });
+      steps.push({
+        setting: setting.key,
+        action: `switch ${next ? "on" : "off"}`,
+        responseMs: await rendererAnswers(),
+      });
     }
     if (setting.key === "allowAutomation") {
       const limit = agentsPanel().getByRole("button", { name: t("settings.automationLimit.title") });
@@ -168,11 +179,11 @@ try {
         async (previous) => (await window.openbot.getAgentDefaults()).automationRunsPerHour !== previous,
         before,
       );
-      steps.push({ setting: setting.key, action: `limit ${label}`, frameMs: await framePaints() });
+      steps.push({ setting: setting.key, action: `limit ${label}`, responseMs: await rendererAnswers() });
       // A switch after a new limit is the reported way to freeze the window.
       await toggle.click({ force: true });
       await waitForSaved(setting.key, !start);
-      steps.push({ setting: setting.key, action: "switch after limit", frameMs: await framePaints() });
+      steps.push({ setting: setting.key, action: "switch after limit", responseMs: await rendererAnswers() });
       await toggle.click({ force: true });
       await waitForSaved(setting.key, start);
     }
@@ -184,7 +195,7 @@ try {
         async (previous) => (await window.openbot.getAgentDefaults()).planStartAfterMs !== previous,
         before,
       );
-      steps.push({ setting: setting.key, action: `plan start ${label}`, frameMs: await framePaints() });
+      steps.push({ setting: setting.key, action: `plan start ${label}`, responseMs: await rendererAnswers() });
     }
     await backToList().click();
     await open.waitFor();
@@ -196,6 +207,10 @@ try {
     (steer) => window.openbot.setBusyMessageModePreference({ mode: steer ? "steer" : "queue" }),
     originalSteer,
   );
+  // The settings of the window still hold the values that the test chose, and the next change in
+  // Settings would save them again. A reload reads the restored values from main.
+  await page.reload();
+  await page.getByRole("navigation", { name: t("app.rail.label"), exact: true }).waitFor();
   const report = { port, instance: instance.service, originalDefaults, originalSteer, steps, pageErrors };
   writeFileSync(resolve(OUT, `report-${port}.json`), `${JSON.stringify(report, null, 2)}\n`);
   await session.close();
