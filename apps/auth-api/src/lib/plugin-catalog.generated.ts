@@ -223,6 +223,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24",
     },
     {
+      slug: "chatwork",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "f3aede5534a5057f25d550b23ef23a4ef273561e5dfc0d1cc933f446a7e71428",
+    },
+    {
       slug: "omnisend",
       version: "1.0.0",
       featured: false,
@@ -1593,6 +1599,59 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://resend.com",
     privacyPolicyUrl: "https://resend.com/legal/privacy-policy",
     termsUrl: "https://resend.com/legal/terms",
+    skills: [],
+  },
+  chatwork: {
+    slug: "chatwork",
+    name: "Chatwork",
+    tagline: "Business chat: rooms, messages and tasks",
+    description:
+      "Chatwork lets agents read and post messages in the chat rooms you belong to, and create and complete tasks. Agents can also list rooms, members, files and contacts, and manage room invitation links. An API token from your Chatwork account is passed to the local server as one environment variable, so the agent acts as you. Chatwork says the token has no expiry and gives full access to its features.",
+    category: "productivity",
+    creatorName: "kubell",
+    iconUrl: "https://www.chatwork.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-unread", text: "Summarize the unread messages in my Chatwork rooms." },
+      { id: "prompt-tasks", text: "Which Chatwork tasks are assigned to me?" },
+      { id: "prompt-post", text: "Draft a status update for the project room in Chatwork." },
+    ],
+    apps: [
+      {
+        id: "app-chatwork-mcp",
+        name: "Chatwork",
+        description:
+          "Rooms, messages, tasks and files, over Chatwork's official local MCP server with a Chatwork API token.",
+        iconUrl: "https://www.chatwork.com/favicon.ico",
+        server: {
+          name: "chatwork",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@chatwork/mcp-server@1.0.0"],
+          auth: [
+            {
+              id: "chatwork-key",
+              kind: "key",
+              label: "API token",
+              fields: [
+                {
+                  id: "token",
+                  label: "API token",
+                  env: "CHATWORK_API_TOKEN",
+                  prefix: "",
+                  hint: "Chatwork → your name → Service integration → API token",
+                },
+              ],
+              docsUrl: "https://developer.chatwork.com/docs/getting-started",
+              docsLabel: "Get a token",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://go.chatwork.com/ja/",
+    privacyPolicyUrl: "https://www.kubell.com/privacy/",
+    termsUrl: "https://go.chatwork.com/ja/terms/",
     skills: [],
   },
   omnisend: {

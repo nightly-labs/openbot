@@ -1307,6 +1307,57 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "chatwork",
+    name: "Chatwork",
+    tagline: "Business chat: rooms, messages and tasks",
+    description:
+      "Chatwork lets agents read and post messages in the chat rooms you belong to, and create and complete tasks. Agents can also list rooms, members, files and contacts, and manage room invitation links. An API token from your Chatwork account is passed to the local server as one environment variable, so the agent acts as you. Chatwork says the token has no expiry and gives full access to its features.",
+    category: "productivity",
+    creatorName: "kubell",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-unread", text: "Summarize the unread messages in my Chatwork rooms." },
+      { id: "prompt-tasks", text: "Which Chatwork tasks are assigned to me?" },
+      { id: "prompt-post", text: "Draft a status update for the project room in Chatwork." },
+    ],
+    websiteUrl: "https://go.chatwork.com/ja/",
+    privacyPolicyUrl: "https://www.kubell.com/privacy/",
+    termsUrl: "https://go.chatwork.com/ja/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-chatwork-mcp",
+        name: "Chatwork",
+        description:
+          "Rooms, messages, tasks and files, over Chatwork's official local MCP server with a Chatwork API token.",
+        server: {
+          name: "chatwork",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@chatwork/mcp-server@1.0.0"],
+          auth: [
+            {
+              id: "chatwork-key",
+              kind: "key",
+              label: "API token",
+              fields: [
+                {
+                  id: "token",
+                  label: "API token",
+                  env: "CHATWORK_API_TOKEN",
+                  prefix: "",
+                  hint: "Chatwork → your name → Service integration → API token",
+                },
+              ],
+              docsUrl: "https://developer.chatwork.com/docs/getting-started",
+              docsLabel: "Get a token",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "omnisend",
     name: "Omnisend",
     tagline: "Email and SMS marketing",
