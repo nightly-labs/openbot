@@ -1,5 +1,7 @@
+import type { TranslatedLocale } from "@openbot/i18n";
 import { summarizeWhatsNew, type WhatsNewNotes, type WhatsNewRelease } from "@openbot/ui/features/updates/whats-new";
 import { createEffect, createStore, onSettled } from "solid-js";
+import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import {
@@ -13,8 +15,11 @@ import { loadWhatsNewReleases } from "./whats-new-releases";
 
 const WhatsNew = createSimpleContext({
   name: "WhatsNew",
-  init: (props: { loadReleases?: (signal: AbortSignal) => Promise<readonly WhatsNewRelease[]> }) => {
+  init: (props: {
+    loadReleases?: (signal: AbortSignal, locale: TranslatedLocale) => Promise<readonly WhatsNewRelease[]>;
+  }) => {
     const platform = usePlatform();
+    const i18n = useI18n();
     // Capture the old analytics value before Settings writes this launch's version.
     const storage = {
       getItem: (key: string) => window.localStorage.getItem(key),
@@ -50,6 +55,7 @@ const WhatsNew = createSimpleContext({
       try {
         const whatsNewReleases = await (props.loadReleases ?? loadWhatsNewReleases)(
           AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+          i18n.locale(),
         );
         notes = { status: "ready", releases: selectWhatsNewReleases(whatsNewReleases, version, from) };
       } catch {

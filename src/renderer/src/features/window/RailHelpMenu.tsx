@@ -2,6 +2,7 @@ import { HelpMenu, type HelpMenuNews } from "@openbot/ui/features/updates/HelpMe
 import { whatsNewEntry } from "@openbot/ui/features/updates/whats-new";
 import { createSignal } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { useI18n } from "../../i18n-context";
 import { compareReleaseVersions } from "../updates/whats-new-history";
 import { loadWhatsNewReleases } from "../updates/whats-new-releases";
 
@@ -18,7 +19,10 @@ export function RailHelpMenu(props: {
   onOpenWhatsNew: () => void;
   onOpenLink: (destination: "changelog" | "guides" | "discord" | "feedback") => void;
 }) {
+  const i18n = useI18n();
   const [news, setNews] = createSignal<readonly HelpMenuNews[]>([]);
+  // The list is read again after a language change, so it never stays in the previous language.
+  let newsLocale: string | null = null;
   const openLink = (destination: "changelog" | "guides" | "discord" | "feedback") => {
     desktopAnalytics.track("help_link_opened", { destination });
     props.onOpenLink(destination);
@@ -26,11 +30,12 @@ export function RailHelpMenu(props: {
   let loading = false;
 
   async function loadNews() {
-    if (loading || news().length > 0) return;
+    const locale = i18n.locale();
+    if (loading || (news().length > 0 && newsLocale === locale)) return;
     loading = true;
     try {
       const version = props.version;
-      const releases = await loadWhatsNewReleases(AbortSignal.timeout(10_000));
+      const releases = await loadWhatsNewReleases(AbortSignal.timeout(10_000), locale);
       setNews(
         releases
           .filter((release) => !version || compareReleaseVersions(release.version, version) <= 0)
@@ -41,6 +46,7 @@ export function RailHelpMenu(props: {
           })
           .slice(0, HELP_NEWS_COUNT),
       );
+      newsLocale = locale;
     } catch {
       // The menu shows its links without the list. The next opening tries again.
     } finally {
