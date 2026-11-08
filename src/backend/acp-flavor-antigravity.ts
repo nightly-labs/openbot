@@ -64,13 +64,14 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
  * status left the user unsure whether waiting or another model helps (#1676). The patterns follow
  * Google's API status names, matched in capitals, and a status number only after `status`, `code`
  * or `HTTP`: a bare 404 or "unavailable" can be an MCP server or a tool. Antigravity does not
- * document its failure texts.
+ * document its failure texts. A proxy's answer in the stream comes as a raw status line with the
+ * HTTP version, such as `HTTP/1.0 502 Bad Gateway` (#5752).
  */
 const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
   [
     "error.provider.antigravityRateLimited",
-    /\b(?:status|code|HTTP)\W{0,4}429\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b.{0,40}\b(?:exceeded|exhausted)\b/iu,
+    /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}429\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b.{0,40}\b(?:exceeded|exhausted)\b/iu,
   ],
   [
     "error.provider.antigravityModelUnavailable",
@@ -79,7 +80,7 @@ const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
   [
     "error.provider.antigravityServiceFailure",
-    /\b(?:status|code|HTTP)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
+    /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
