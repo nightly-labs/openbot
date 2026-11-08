@@ -12,6 +12,7 @@ import { Deferred, Effect, Result, Schema } from "effect";
 import { type AgentProvider, ProviderTurnActiveError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
+import { incomingAgentExchange } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
 import { channelLane, type DeliveryContext, laneChannelId, type MailboxStore } from "../mailbox-store";
 import type { MessagingThreads } from "../messaging/messaging-threads";
@@ -907,9 +908,9 @@ export class DrainScheduler {
           createdAt: item.createdAt,
           status: "completed",
           // Marked as the mailbox marks it, so no client shows the setup message, and a message
-          // between agents does not make a side thread unread (#5794).
+          // between agents does not make a side thread unread (#5794) and shows as one (#5812).
           ...(item.sender.kind === "agent"
-            ? { itemType: AGENT_EXCHANGE_ITEM_TYPE }
+            ? { itemType: AGENT_EXCHANGE_ITEM_TYPE, exchange: incomingAgentExchange(item, item.sender.agentId) }
             : this.#mailbox.isWelcomeDelivery(item.id)
               ? { itemType: AGENT_WELCOME_ITEM_TYPE }
               : {}),
