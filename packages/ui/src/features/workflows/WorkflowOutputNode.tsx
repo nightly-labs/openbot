@@ -90,7 +90,9 @@ export function OutputNode(props: {
   const chooseTarget = (value: OutputTarget) => {
     if (value === "channel" && isChannel()) return;
     // With no messaging place, Channel goes back to the OpenBot channel of the card, or starts on the first one.
-    const channel = board.field(props.id, "channelId") ?? board.catalogs().channels?.[0]?.id;
+    const channels = board.catalogs().channels ?? [];
+    const stored = board.field(props.id, "channelId");
+    const channel = channels.some((entry) => entry.id === stored) ? stored : channels[0]?.id;
     if (value === "channel" && board.catalogs().places.length === 0 && channel !== undefined)
       return board.setFields(props.id, { target: "chat-channel", channelId: channel });
     const defaults = TARGET_DEFAULTS[value];
