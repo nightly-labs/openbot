@@ -1,5 +1,5 @@
 import { currentText } from "@openbot/ui/text";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
@@ -173,6 +173,14 @@ function createTasksVoice(controls: TasksVoiceControls): TasksVoiceAdapter {
       reportLimit: () => actionToast.warning(currentText().t("composer.voice.limitReached")),
     },
   });
+  // A task recording ends when its panel closes or another task opens: its text then stays in the
+  // draft of its task. The Tasks composer stays shown, so its recording goes on.
+  createEffect(
+    () => ({ open: controls.openTaskId(), owner: taskId(), recording: phase() === "recording" }),
+    ({ open, owner, recording }) => {
+      if (recording && owner !== undefined && owner !== open) store.stopVoiceRecording();
+    },
+  );
 
   onCleanup(() => {
     mounted = false;
