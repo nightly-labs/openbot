@@ -21,6 +21,7 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "Deze aanbieder kan een lopende beurt niet bijsturen, dus het bericht wacht in de wachtrij.",
   "queue.item.steerFallback.steerFailed": "Bijsturen is niet gelukt, dus het bericht wacht in de wachtrij.",
+  "queue.item.steerFallback.routineRun": "Er draait nu een routine, dus het bericht wacht in de wachtrij.",
   "queue.item.runAsTask": "Uitvoeren in nieuwe thread",
   "queue.item.runAsTaskLabel": "Bericht in wachtrij {position} uitvoeren in een nieuwe thread",
   "queue.item.deleteLabel": "Bericht in wachtrij {position} verwijderen",

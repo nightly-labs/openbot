@@ -20,6 +20,7 @@ export const messages = {
   "queue.item.notSteered": "לא הוכוונה",
   "queue.item.steerFallback.providerUnsupported": "הספק הזה לא יכול להכווין פעולה שרצה כרגע, ולכן ההודעה ממתינה בתור.",
   "queue.item.steerFallback.steerFailed": "ההכוונה לא הצליחה, ולכן ההודעה ממתינה בתור.",
+  "queue.item.steerFallback.routineRun": "שגרה רצה כעת, ולכן ההודעה ממתינה בתור.",
   "queue.item.runAsTask": "הרצה בשרשור חדש",
   "queue.item.runAsTaskLabel": "הרצת הודעה בתור {position} בשרשור חדש",
   "queue.item.deleteLabel": "מחיקת הודעה בתור {position}",
