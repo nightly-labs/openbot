@@ -353,7 +353,8 @@ export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home 
  * in its home folder. Its settings and MCP servers (`config.toml`), the saved API key (`.env`), the
  * trusted folders, hooks, instructions, tools, skills, agents, prompts and plugins are in that folder
  * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache and
- * the model catalogue cache are settings layers, so they stay read-only too. On macOS the CLI reads the API key of a sign-in from the
+ * the model catalogue cache are settings layers, so they stay read-only too: the provider's shared
+ * process saves the catalogue, and a confined process reads it. Vibe 3.1.0 only logs a failed save. On macOS the CLI reads the API key of a sign-in from the
  * login Keychain with `security` (`keychainLockFiles`).
  */
 export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
