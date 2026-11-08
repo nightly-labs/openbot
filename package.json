@@ -355,6 +355,7 @@
     "test:grok-live": "bun scripts/provider-storage-smoke.ts --grok-only",
     "test:team-live": "electron scripts/team-webrtc-live-smoke-app",
     "test:speech-voice-select": "bun scripts/speech-voice-select-e2e.ts --allow-mutations",
+    "test:messaging-voice-transcription": "bun scripts/messaging-voice-transcription-e2e.ts",
     "test:voice-speech": "bun scripts/voice-speech-smoke.ts",
     "test:voice-transcription": "bun scripts/voice-transcription-smoke.ts",
     "test:remote-desktop-runtime": "bun scripts/remote-desktop-runtime-smoke.ts",

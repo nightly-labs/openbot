@@ -390,6 +390,7 @@ import { VaultService } from "./vault-service";
 import { VaultStore } from "./vault-store";
 import { VoiceApiKeyStore } from "./voice-api-key-store";
 import { openScribeSocket } from "./voice-cloud-stream";
+import { transcribeVoiceMessage, type VoiceMessageVoice } from "./voice-message-transcription";
 import {
   BARK_PLUS_MODEL_DIRECTORY,
   COHERE_TRANSCRIBE_MODEL_DIRECTORY,
@@ -781,6 +782,8 @@ interface MessagingServicesContext {
   sidebarLayout: SidebarLayoutStore;
   /** Read on each call: the team store that names this host is built after messaging. */
   readHostId: () => string | null;
+  /** Read on each call: the voice service is built after messaging. */
+  readVoice: () => VoiceMessageVoice | null;
   /** The GitHub route ticket of the ingress socket; the GitHub relay holds the repository list. */
   issueGitHubRoute: (hostId: string) => Effect.Effect<string, RemoteWorkflowError>;
   openLink: (url: string) => Promise<void>;
@@ -797,6 +800,7 @@ async function createMessagingServices({
   service,
   sidebarLayout,
   readHostId,
+  readVoice,
   issueGitHubRoute,
   openLink,
 }: MessagingServicesContext): Promise<{ messaging: MessagingService; signalIngress: SignalIngress }> {
@@ -869,6 +873,7 @@ async function createMessagingServices({
       whatsAppDriver({ runtime: whatsapp }),
     ],
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
+    transcribeAudio: transcribeVoiceMessage(readVoice),
     statusPath: join(app.getPath("userData"), "openbot-messaging-status-v1.json"),
     ingress: signalIngress,
     whatsapp,
@@ -2273,6 +2278,7 @@ export async function createApplicationServices({
   // The host id is read when the Signal socket opens, and the team store is built further down, so
   // it starts as "no name yet".
   let ingressHostId: () => string | null = () => null;
+  let messagingVoice: VoiceMessageVoice | null = null;
   performance.mark("openbot:services.routines");
   // The repositories that the saved GitHub triggers watch. It holds the GitHub route of the ingress
   // socket, which is made next.
@@ -2288,6 +2294,7 @@ export async function createApplicationServices({
     service,
     sidebarLayout,
     readHostId: () => ingressHostId(),
+    readVoice: () => messagingVoice,
     issueGitHubRoute: (hostId) => githubRelay.issueRoute(hostId),
     openLink,
   });
@@ -3561,6 +3568,7 @@ export async function createApplicationServices({
     );
   }
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
+  messagingVoice = voice;
   voice.on("modelStatus", forwardVoiceModelStatus);
   voice.on("streamTranscript", forwardVoiceStreamTranscript);
   const speechPreferences = new SpeechPreferenceStore(join(app.getPath("userData"), "speech-preference.json"));

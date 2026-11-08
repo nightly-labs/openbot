@@ -125,6 +125,8 @@ export interface MessagingServiceOptions {
   drivers: readonly MessagingDriver[];
   /** A private folder for files that arrive, until the mailbox has copied them. */
   downloadsRoot: string;
+  /** The words of an audio file, or null when they cannot be had now. The agent then gets the file alone. */
+  transcribeAudio?: (path: string) => Effect.Effect<string | null>;
   /**
    * The Signal relay of the OpenBot Slack and Discord apps. Without it and `slackApp` or
    * `discordApp`, no workspace of that platform can connect.
@@ -211,6 +213,7 @@ export class MessagingService {
   readonly #credentials: MessagingCredentials;
   readonly #drivers: ReadonlyMap<MessagingPlatform, MessagingDriver>;
   readonly #downloadsRoot: string;
+  readonly #transcribeAudio: MessagingServiceOptions["transcribeAudio"];
   readonly #live = new Map<string, LiveConnection>();
   /** The deliveries that Signal kept, each waiting for the transport of its connection. */
   readonly #transportWaiters = new Map<string, Set<() => void>>();
@@ -258,6 +261,7 @@ export class MessagingService {
     this.#credentials = options.credentials;
     this.#drivers = new Map(options.drivers.map((driver) => [driver.platform, driver]));
     this.#downloadsRoot = options.downloadsRoot;
+    this.#transcribeAudio = options.transcribeAudio;
     this.#ingress = options.ingress ?? null;
     this.#connect = options.ingress && options.slackApp ? new SlackConnect(options.slackApp) : null;
     this.#discordConnect = options.ingress && options.discordApp ? new DiscordConnect(options.discordApp) : null;
@@ -1521,10 +1525,15 @@ export class MessagingService {
           const given = earlierFiles.filter((item) => !skipped.includes(item.file)).map((item) => item.label);
           const notGiven = earlierFiles.filter((item) => skipped.includes(item.file)).map((item) => item.label);
           const missing = skipped.filter((file) => message.files.includes(file));
+          const transcripts = yield* this.#transcripts(
+            message.files.filter((file) => !skipped.includes(file)),
+            paths,
+          );
           const notes = [
             given.length ? `(Files of earlier messages, given with this one: ${given.join(", ")})` : "",
             notGiven.length ? `(Files of earlier messages that were not given: ${notGiven.join(", ")})` : "",
             missing.length ? `(Files that did not arrive: ${missing.map((file) => file.name).join(", ")})` : "",
+            ...transcripts,
           ].filter(Boolean);
           const text = notes.length ? `${named}\n\n${notes.join("\n")}` : named;
           const result = yield* this.#threads
@@ -1635,6 +1644,24 @@ export class MessagingService {
       }
     }
     return { paths, skipped };
+  });
+
+  /** One note for each audio file of the message that arrived and has words. `paths` follows `files`. */
+  readonly #transcripts = Effect.fn("MessagingService.transcripts")(function* (
+    this: MessagingService,
+    files: readonly InboundFile[],
+    paths: readonly string[],
+  ) {
+    const notes: string[] = [];
+    const transcribe = this.#transcribeAudio;
+    if (!transcribe) return notes;
+    for (const [index, file] of files.entries()) {
+      const path = paths[index];
+      if (!path || !file.mimeType.startsWith("audio/")) continue;
+      const text = yield* transcribe(path);
+      if (text) notes.push(`(Transcript of ${file.name}: ${text})`);
+    }
+    return notes;
   });
 
   readonly #promptContext = Effect.fn("MessagingService.promptContext")(function* (
