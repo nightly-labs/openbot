@@ -91,6 +91,20 @@ export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePlugi
   );
 }
 
+/**
+ * The row to connect again. A row that an earlier version of the listing saved moves to the address
+ * the listing names now, so the new sign-in or key goes to the current server. Its headers stay
+ * behind: they are the credentials of the old address. An account fragment stays with the row.
+ */
+export function currentPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): McpServerConfig {
+  const server = app.server;
+  if (server.transport !== "http" || config.transport !== "http") return config;
+  const url = withoutMcpAccountFragment(config.url);
+  if (url === server.url || isListingUrl(url, server.url)) return config;
+  if (!(server.earlierUrls ?? []).some((earlier) => isListingUrl(url, earlier))) return config;
+  return { ...config, url: `${server.url}${mcpAccountFragment(config.url) ?? ""}`, headers: [] };
+}
+
 /** An MCP server the plugin publishes. The listing calls it an app, because that is what it is to the user. */
 export interface MarketplacePluginApp {
   id: string;
