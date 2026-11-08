@@ -194,6 +194,7 @@ function teammateMessage(
     },
     text: teammate.text,
     status: "completed",
+    itemType: AGENT_EXCHANGE_ITEM_TYPE,
   };
 }
 
