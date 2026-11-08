@@ -343,6 +343,38 @@ export class ChannelService {
     );
   });
 
+  /**
+   * Posts a note into a channel, such as the result of a workflow. No task starts and no member
+   * answers it; the members read it later as channel history. A second post with the same operation
+   * id changes nothing, so a restart does not post it twice.
+   */
+  readonly postNote = Effect.fn("ChannelService.postNote")(function* (
+    this: ChannelService,
+    input: { operationId: string; channelId: string; author: { id: string; name: string }; text: string },
+  ) {
+    let result: "posted" | "missing" | "archived" = "posted";
+    yield* this.#serialize(
+      input.channelId,
+      channelSync(() => {
+        const operationId = `note:${input.author.id}:${input.operationId}`;
+        if (this.store.database.commandResult(`channels:${operationId}`) !== undefined) return;
+        if (!this.store.exists(input.channelId)) {
+          result = "missing";
+          return;
+        }
+        const channel = this.store.get(input.channelId);
+        if (channel.archived) {
+          result = "archived";
+          return;
+        }
+        const author = { kind: "coordinator" as const, ...input.author };
+        this.store.update(channel, { messages: [this.message(channel.id, null, author, input.text)] }, operationId);
+        this.publish(channel.id);
+      }),
+    );
+    return result;
+  });
+
   readonly #serialize = Effect.fn("ChannelService.serialize")(
     <A extends Channel | void, E extends ChannelOperationError | MessageDeleteRefused = ChannelOperationError>(
       channelId: string,
@@ -3703,7 +3735,7 @@ export class ChannelService {
 
   private message(
     channelId: string,
-    taskId: string,
+    taskId: string | null,
     author: ChannelMessage["author"],
     text: string,
     id: string = randomUUID(),

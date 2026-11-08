@@ -169,6 +169,10 @@ export const messages = {
 
   "workflow.output.title": "Вывод",
   "workflow.output.name": "вывод",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "Поиск каналов",
+  "workflow.output.postsAs": "Публикуется как",
+  "workflow.output.postsAsNote": "Заметка; задача не начинается",
   "workflow.output.target.file": "Файл",
   "workflow.output.target.notify": "Уведомление",
   "workflow.output.path": "Путь к файлу",

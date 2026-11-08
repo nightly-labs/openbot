@@ -150,6 +150,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
       return () => listeners.delete(changed);
     },
     places: async () => [...STORY_CATALOGS.places],
+    channels: async () => [...(STORY_CATALOGS.channels ?? [])],
     discordServers: async () => [],
     telegramChats: async () => [],
     slackWorkspaces: async () => [],
