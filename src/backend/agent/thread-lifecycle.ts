@@ -621,7 +621,7 @@ export class ThreadLifecycle {
     reason?: "configuration-change" | "missing-session",
   ) {
     return yield* Effect.acquireUseRelease(
-      Effect.sync(() => this.holdRuntimeRefresh(agent.id, this.#conversation.isTaskThread(publicThreadId))),
+      Effect.sync(() => this.holdRuntimeRefresh(agent.id, this.#conversation.isSideThread(publicThreadId))),
       () => this.#startProviderThread(agent, client, publicThreadId, reason),
       (release) => Effect.sync(release),
     );
@@ -769,7 +769,7 @@ export class ThreadLifecycle {
         section,
         this.#computerUseInOwnChat(owner, publicThreadId),
         yield* this.#homeSkills(agent, client),
-        this.#conversation.isTaskThread(publicThreadId),
+        this.#runsBesideOwnChat(owner, publicThreadId),
         mcpServers,
         instructionsFile,
       ),
@@ -1177,9 +1177,21 @@ export class ThreadLifecycle {
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
-      this.#conversation.isTaskThread(publicThreadId) &&
+      this.#runsBesideOwnChat(agent, publicThreadId) &&
       !this.#routineThread(publicThreadId) &&
       agentComputerUseEnabled(agent)
+    );
+  }
+
+  /**
+   * Whether turns of this thread can run at the same time as the agent's own chat: a task, or a
+   * channel thread on a provider that runs several turns at once.
+   */
+  #runsBesideOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
+    if (this.#conversation.isTaskThread(publicThreadId)) return true;
+    return (
+      this.#conversation.channelForThread(publicThreadId) !== null &&
+      agentProviderDescriptor(agent.provider).concurrentTurns
     );
   }
 
@@ -1402,7 +1414,7 @@ export class ThreadLifecycle {
         this.#sectionTeammates(agent.id),
         computerUseInOwnChat,
         yield* this.#homeSkills(agent, client),
-        this.#conversation.isTaskThread(publicThreadId),
+        this.#runsBesideOwnChat(agent, publicThreadId),
         configs,
         yield* this.#instructionsFile(agent, client),
       ),
@@ -1602,8 +1614,8 @@ export class ThreadLifecycle {
   }
 
   /**
-   * As `providerContextBusy`, for the agent's own chat alone: a side thread that starts a turn or
-   * compacts its own session does not hold a change to the chat's context.
+   * As `providerContextBusy`, for the agent's own chat alone: a task or channel thread that starts a
+   * turn or compacts its own session does not hold a change to the chat's context.
    */
   mainContextBusy(agent: AgentSummary): boolean {
     if (this.#pendingMainStarts.has(agent.id)) return true;
@@ -1611,7 +1623,7 @@ export class ThreadLifecycle {
       .heldThreads(agent.id)
       .some(
         (externalThreadId) =>
-          !this.#conversation.isTaskThread(this.#conversation.publicThreadId(agent.id, externalThreadId)),
+          !this.#conversation.isSideThread(this.#conversation.publicThreadId(agent.id, externalThreadId)),
       );
     if (mainCompacts || this.#mailbox.startingDeliveriesForAgent(agent.id, null).length > 0) return true;
     return agent.threadId !== null && this.#activeTurnOf(agent.id, agent.threadId) !== null;

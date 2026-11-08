@@ -62,7 +62,7 @@ import { conversationOwnerId, createComposerStore, currentConversationTarget } f
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createPanelsStore } from "./stores/panels-store";
-import { PENDING_SEND_ID_PREFIX, pendingSendMessage } from "./stores/pending-send-store";
+import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
 import { createReplyJumpStore } from "./stores/reply-jump-store";
 import { createScrollStore } from "./stores/scroll-store";
@@ -728,10 +728,47 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   const viewIsMounted = createScopeGuard();
   let attachmentPicker: HTMLInputElement | undefined;
+  /*
+   * A channel stores the message and shows it in the transcript before the send answers with its id.
+   * Until then the pending copy and the stored message would stand together, so the reader saw the
+   * message twice for a moment. Here a send takes the first own message that came after it and has
+   * its text, or, while it is the only one in flight, the first own message after it. The own
+   * messages that were already on screen when the send started do not count, so an earlier message
+   * with the same text is not taken.
+   */
+  const ownMessagesBefore = new Map<string, ReadonlySet<string>>();
+  const channelSentIds = createMemo((): ReadonlyMap<string, string> => {
+    const found = new Map<string, string>();
+    if (!channel) return found;
+    const sends = currentPendingSends();
+    const waiting = sends.filter((send) => send.state === "sending" && !send.messageId);
+    for (const id of ownMessagesBefore.keys())
+      if (!waiting.some((send) => send.clientMessageId === id)) ownMessagesBefore.delete(id);
+    if (waiting.length === 0) return found;
+    const own = props.messages.filter((message) => channel.ownMessage(message));
+    const taken = new Set(sends.flatMap((send) => (send.messageId ? [send.messageId] : [])));
+    for (const send of waiting) {
+      const before = ownMessagesBefore.get(send.clientMessageId);
+      if (!before) {
+        ownMessagesBefore.set(send.clientMessageId, new Set(own.map((message) => message.id)));
+        continue;
+      }
+      const after = own.filter((message) => !before.has(message.id) && !taken.has(message.id));
+      const match =
+        after.find((message) => message.body.trim() === send.text.trim()) ??
+        (waiting.length === 1 ? after[0] : undefined);
+      if (!match) continue;
+      found.set(send.clientMessageId, match.id);
+      taken.add(match.id);
+    }
+    return found;
+  });
+  /** The host's id of a sent message: its answer, or in a channel the stored message that came first. */
+  const sentMessageId = (send: PendingSend) => send.messageId ?? channelSentIds().get(send.clientMessageId) ?? null;
   // The host rows on screen: a sent message hands over to its row in the transcript or the queue.
   // Built only while a send waits for its row, so a streaming reply does not rebuild it for nothing.
   const drawnHostIds = createMemo(() =>
-    currentPendingSends().some((send) => send.messageId)
+    currentPendingSends().some((send) => sentMessageId(send))
       ? new Set([
           ...props.messages.map((message) => message.id),
           ...presentedQueueDeliveries().map((delivery) => delivery.id),
@@ -746,7 +783,10 @@ export function createConversationViewScope(props: ConversationProps) {
     const sends = currentPendingSends();
     const firstFailed = sends.findIndex((send) => send.state === "failed");
     return sends
-      .filter((send) => !(send.messageId && drawnHostIds().has(send.messageId)))
+      .filter((send) => {
+        const messageId = sentMessageId(send);
+        return !(messageId && drawnHostIds().has(messageId));
+      })
       .filter((send) => !send.queued || (firstFailed !== -1 && sends.indexOf(send) >= firstFailed))
       .map(pendingSendMessage);
   });
@@ -757,12 +797,17 @@ export function createConversationViewScope(props: ConversationProps) {
       : undefined;
   // The host id of each sent message, to the key of the row its pending copy drew. The row keeps
   // that key after the send settles, so it stays mounted while the host's message replaces it.
+  // A key goes to one message only: when a channel guess took the wrong message and the send's own
+  // id comes later, the second message gets its own row and two rows never share a key.
   const handedOverRowKeys = createMemo<ReadonlyMap<string, string>>((previous = new Map()) => {
-    const sent = currentPendingSends().flatMap((send) =>
-      send.messageId && !previous.has(send.messageId)
-        ? [[send.messageId, `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`] as const]
-        : [],
-    );
+    const usedKeys = new Set(previous.values());
+    const sent = currentPendingSends().flatMap((send) => {
+      const messageId = sentMessageId(send);
+      const rowKey = `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`;
+      if (!messageId || previous.has(messageId) || usedKeys.has(rowKey)) return [];
+      usedKeys.add(rowKey);
+      return [[messageId, rowKey] as const];
+    });
     return sent.length ? new Map([...previous, ...sent]) : previous;
   });
   createEffect(
@@ -1274,7 +1319,7 @@ export function createConversationViewScope(props: ConversationProps) {
    */
   function pushConversationBottom(element: HTMLDivElement): boolean {
     const list = virtualRoot;
-    if (channel || props.responseStyle !== "natural" || !list) return false;
+    if (props.responseStyle !== "natural" || !list) return false;
     if (!agentActivitySlot?.querySelector(".agent-activity-entry")) return false;
     const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
     if (

@@ -1132,6 +1132,28 @@ button.chat-action-target:active,
   color: var(--openbot-text-muted);
 }
 
+/* The members of a routing row, as one list: each name keeps its pill, and the list's own words sit
+   between them. In a narrow pane the list wraps at a separator rather than cutting a name. */
+.chat-action-routing-targets {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The pill's own padding stands after each name, so the separator moves back by that padding: the
+   comma then follows the name as it does in text. */
+.chat-action-routing-separator {
+  margin-inline-start: calc(-1 * var(--openbot-space-1-5));
+  white-space: pre;
+}
+
+.chat-action-target-entering {
+  transform-origin: left center;
+  animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+
 /* Markers without a target pill keep the same optical label-to-time rhythm. */
 .chat-action-marker-unavailable .chat-action-marker-label,
 .chat-action-marker-context-reset .chat-action-marker-label,

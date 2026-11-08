@@ -4,11 +4,16 @@ import type { AgentApproval, ConversationMessageSender, MessageReaction } from "
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
-import { ChannelActivityIndicator } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
-import { AgentStepsDisclosure, type AgentStepsTrace } from "@openbot/ui/features/conversation/AgentSteps";
+import {
+  type AgentStep,
+  AgentStepsDisclosure,
+  type AgentStepsTrace,
+} from "@openbot/ui/features/conversation/AgentSteps";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import { agentActivityExitDelay, agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { UsageLimitAskCard } from "@openbot/ui/features/conversation/BackupModels";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -38,7 +43,7 @@ import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/feature
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
@@ -657,6 +662,43 @@ export function ConversationTimeline() {
   /** The Natural style shows the plain activity line: what the agent does now, and nothing more. */
   const plainActivity = () => !channel && props.responseStyle === "natural";
   const channelWorkingSteps = createMemo(() => (channel ? turnSteps.workingSteps(channel.workingTurns()) : []));
+  /*
+   * The channel's activity line leaves as the agent chat's line does: it waits a moment for the next
+   * member, then folds away with the workers and steps it last showed. When it went at once, the chat
+   * above it jumped down.
+   */
+  const [channelActivity, setChannelActivity] = createSignal<{
+    workers: ChannelWorker[];
+    steps: readonly AgentStep[];
+    phase: "active" | "exiting";
+  } | null>(null);
+  createEffect(
+    (): ChannelWorker[] => channel?.workers() ?? [],
+    (workers) => {
+      if (workers.length > 0) {
+        setChannelActivity({
+          workers,
+          steps: untrack(channelWorkingSteps),
+          phase: "active",
+        });
+        return;
+      }
+      if (!untrack(channelActivity)) return;
+      let exitTimer: number | undefined;
+      const delayTimer = window.setTimeout(() => {
+        setChannelActivity((latest) => latest && { ...latest, phase: "exiting" });
+        exitTimer = window.setTimeout(() => setChannelActivity(null), agentActivityExitDuration());
+      }, agentActivityExitDelay());
+      return () => {
+        window.clearTimeout(delayTimer);
+        window.clearTimeout(exitTimer);
+      };
+    },
+  );
+  createEffect(channelWorkingSteps, (steps) => {
+    if (untrack(channelActivity)?.phase === "active" && untrack(() => channel?.workers().length))
+      setChannelActivity((latest) => latest && { ...latest, steps });
+  });
   /**
    * A direct chat with no message yet, and no turn, queued send, welcome or question. A queued send leaves the
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
@@ -1448,9 +1490,10 @@ export function ConversationTimeline() {
                             steps={stepsInRow() ? stepsDisclosure() : undefined}
                             actionsBeside={actionsBeside()}
                             animate={animateEntrance}
-                            // Natural shows a message once it is complete. Its bubble enters with all of its
-                            // text, so the height does not grow while the words fade in.
-                            textAtOnce={plainActivity()}
+                            // Natural shows a message once it is complete, in an agent chat and in a channel.
+                            // Its bubble enters with all of its text, so the height does not grow while the
+                            // words fade in, and a complete answer does not look as if it still arrives.
+                            textAtOnce={props.responseStyle === "natural"}
                             agents={props.agents}
                             skills={installedSkills()}
                             referencedMessage={referencedMessage()}
@@ -1668,12 +1711,15 @@ export function ConversationTimeline() {
               <Show
                 when={!channel}
                 fallback={
-                  <Show when={channel && channel.workers().length > 0}>
-                    <ChannelActivityIndicator
-                      workers={channel?.workers() ?? []}
-                      steps={channelWorkingSteps()}
-                      stepsOpenByDefault={showAgentSteps()}
-                    />
+                  <Show when={channelActivity()}>
+                    {(activity) => (
+                      <ChannelActivityIndicator
+                        workers={activity().workers}
+                        steps={activity().steps}
+                        phase={activity().phase}
+                        stepsOpenByDefault={showAgentSteps()}
+                      />
+                    )}
                   </Show>
                 }
               >

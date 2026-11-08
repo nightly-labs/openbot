@@ -1363,7 +1363,12 @@ export class OpenBotToolRouter {
           const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
           const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
           const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
-          const activeTurnId = this.#conversation.workingSnapshot(agent.id)?.activeTurnId ?? null;
+          // A channel turn runs beside the agent's own chat, so it counts when the chat is idle.
+          const activeTurnId =
+            this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
+            this.#conversation.workingChannelSnapshots(agent.id).find((snapshot) => snapshot.activeTurnId)
+              ?.activeTurnId ??
+            null;
           const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
           // A restart loses the provider clock, so the newest message for the agent stands in for it.
           const lastActivity = deliveries.reduce(

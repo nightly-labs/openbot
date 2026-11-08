@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Reasignar la tarea detenida de {name}",
   "channel.stoppedTask.reassign": "Reasignar",
   "channel.stoppedTask.cancel": "Cancelar tarea",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} se pasaron esta tarea demasiadas veces. Se detuvo para evitar un bucle.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Los miembros se pasaron esta tarea demasiadas veces. Se detuvo para evitar un bucle.",
   "channel.conversation.noMembers": "Añade agentes en los ajustes del canal para empezar a trabajar.",
   "channel.conversation.archivedNotice": "Canal eliminado. Solo vista previa.",
   "channel.composer.label": "Mensaje al canal",
