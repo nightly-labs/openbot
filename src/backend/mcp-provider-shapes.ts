@@ -569,8 +569,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * and gave a Codex agent no tools. Two names that become the same key keep the first; the second is
  * reported as a drop.
  *
- * **A key Codex's own files use with the other transport travels as `openbot_<key>`.** See
- * `codexMcpServerKey`.
+ * **A key Codex's own files already use travels as `openbot_<key>`.** See `codexMcpServerKey`.
  */
 export type CodexMcpServer =
   | {
@@ -642,18 +641,18 @@ export function providerMcpServerName(name: string): string {
 
 /**
  * The key one server travels under to Codex. Codex merges a thread entry with the entry of the same
- * key in its own files. A stdio `command` and an http `url` under one key stop Codex from loading
- * its configuration at all, and the chat cannot start. The server then travels as `openbot_<key>`,
- * and the user's own entry stays as written, turned off. A clash with the same transport keeps the
- * key.
+ * key in its own files, field by field, and a thread entry cannot remove a field. A stdio `command`
+ * and an http `url` under one key stop Codex from loading its configuration at all, and the chat
+ * cannot start (#2851). With the same transport, the user's `enabled_tools` and other fields stay on
+ * OpenBot's server: an `enabled_tools` list from another server hid all of its tools (#5786). So a
+ * key that Codex's own files use travels as `openbot_<key>`, and the user's own entry stays as
+ * written, turned off. OpenBot's placeholders are not the user's entries and keep the key.
  *
  * Computer Use keeps its key: its tool consent and its instructions are found by that name.
  */
 export function codexMcpServerKey(config: McpServerConfig, own: CodexOwnTransports = {}): string {
   const name = providerMcpServerName(config.name);
-  return config.id !== COMPUTER_USE_MCP_SERVER_ID && Object.hasOwn(own, name) && own[name] !== config.transport
-    ? `openbot_${name}`
-    : name;
+  return config.id !== COMPUTER_USE_MCP_SERVER_ID && Object.hasOwn(own, name) ? `openbot_${name}` : name;
 }
 
 /** Whether a key from `codexMcpServerKey` is taken by another server, or a renamed key by OpenBot's own tools. */
