@@ -26,6 +26,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  AGENT_WELCOME_ITEM_TYPE,
   isConversationMessageSender,
   isMessageReaction,
   QUEUE_STEER_FALLBACKS,
@@ -59,6 +60,8 @@ import { recordRestartActivity } from "./restart-activity";
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 /** How much of a delivery's error the note for a failed request quotes. */
 const FAILED_REQUEST_REASON_LIMIT = 2_000;
+/** A welcome in these states is still to come, so the queue reports it (`QueueSnapshot.welcome`). */
+const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 /**
  * The external conversation a message came from. Such a message runs in the execution thread of
  * that conversation, so the queue and the public chat do not show it, like channel work.
@@ -113,6 +116,11 @@ interface StoredMessage {
    * what every message stored before this field existed meant.
    */
   expectsReply?: false;
+  /**
+   * The setup message that a client sent to a new agent (`agent-welcome-v1`). The agent answers it,
+   * but no chat, queue or preview shows it. Absent on every other message.
+   */
+  welcome?: true;
   createdAt: string;
 }
 
@@ -200,6 +208,8 @@ interface EnqueueInput {
   replyToMessageId?: string | null;
   /** False marks information the recipient must not answer. Defaults to an expected answer. */
   expectsReply?: boolean | undefined;
+  /** The setup message of a new agent, which the user does not see. */
+  welcome?: boolean;
   draftIds?: string[];
   /** An audio draft of what the user said. Kept with the message, not sent to the recipient. */
   voiceRecordingDraftId?: string;
@@ -636,6 +646,7 @@ export class MailboxStore {
         ...(voiceRecording ? { voiceRecording } : {}),
         replyToMessageId: input.replyToMessageId ?? null,
         ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
+        ...(input.welcome ? { welcome: true as const } : {}),
         createdAt,
       };
       const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
@@ -805,8 +816,15 @@ export class MailboxStore {
     const executionMessageIds = this.#executionMessageIds();
     const positions = this.#queuedPositions();
     const messages = this.#messagesById();
+    const welcome = this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        WELCOME_PENDING_STATUSES.has(delivery.status) &&
+        messages.get(delivery.messageId)?.welcome === true,
+    );
     return {
       agentId,
+      ...(welcome ? { welcome: true as const } : {}),
       // Queue order, not storage order: a restart reads the deliveries back sorted by their
       // creation time and identity, which would otherwise reorder rows a client already saw.
       deliveries: [...this.#state.deliveries]
@@ -819,7 +837,7 @@ export class MailboxStore {
   }
 
   /**
-   * The queued channel, messaging and task work of this agent, in queue order. `listQueue` hides it, so a
+   * The queued channel, messaging, task and welcome work of this agent, in queue order. `listQueue` hides it, so a
    * caller that reorders the queue the user sees has to put these ids back before the mailbox reads
    * the order.
    */
@@ -858,7 +876,7 @@ export class MailboxStore {
   #executionMessageIds(): Set<string> {
     const ids = new Set<string>();
     for (const message of this.#state.messages)
-      if (message.channelId || message.messaging || message.taskId) ids.add(message.id);
+      if (message.channelId || message.messaging || message.taskId || message.welcome) ids.add(message.id);
     return ids;
   }
 
@@ -871,6 +889,14 @@ export class MailboxStore {
   taskIdForDelivery(deliveryId: string): string | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     return delivery ? this.#taskIdOf(delivery) : null;
+  }
+
+  /** Whether the delivery carries a new agent's setup message (`agent-welcome-v1`). */
+  isWelcomeDelivery(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    return delivery
+      ? this.#state.messages.some((message) => message.id === delivery.messageId && message.welcome === true)
+      : false;
   }
 
   #taskIdOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
@@ -1358,8 +1384,14 @@ export class MailboxStore {
     const failed: StoredDelivery[] = [];
     const workingAgentIds = new Set<string>();
     const failedAgentIds = new Set<string>();
+    // The welcome's setup message is not for the user. A client shows a work item as the user's
+    // message, so the welcome turn reports its work through `QueueSnapshot.welcome` only.
+    const welcomeMessageIds = new Set(
+      this.#state.messages.filter((message) => message.welcome).map((message) => message.id),
+    );
     for (const delivery of this.#state.deliveries) {
       if (!targetAgentIds.has(delivery.recipientAgentId)) continue;
+      if (welcomeMessageIds.has(delivery.messageId)) continue;
       const isWorking = delivery.status === "starting" || delivery.status === "running";
       const isCurrentFailure =
         delivery.status === "failed" && delivery.turnId === failedTurns.get(delivery.recipientAgentId);
@@ -1540,7 +1572,9 @@ export class MailboxStore {
               ? AGENT_EXCHANGE_ITEM_TYPE
               : message.sender.kind === "routine"
                 ? "routine"
-                : undefined,
+                : message.welcome
+                  ? AGENT_WELCOME_ITEM_TYPE
+                  : undefined,
         });
       }
     }
@@ -3536,6 +3570,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     (value.voiceRecording === undefined || isStoredAttachment(value.voiceRecording)) &&
     (isString(value.replyToMessageId) || value.replyToMessageId === null) &&
     (value.expectsReply === undefined || value.expectsReply === false) &&
+    (value.welcome === undefined || value.welcome === true) &&
     isString(value.createdAt)
   );
 }
@@ -3636,10 +3671,14 @@ function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outco
   delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
 }
 
-/** A message the person wrote in the agent's chat or a task, not one of a channel or a messaging app. */
+/**
+ * A message the person wrote in the agent's chat or a task, not one of a channel or a messaging app.
+ * A new agent's setup message is not: it runs alone, so its rules do not reach the person's message.
+ */
 function isChatMessageFromPerson(message: StoredMessage): boolean {
   return (
     message.sender.kind === "user" &&
+    message.welcome !== true &&
     message.channelId === undefined &&
     message.messaging === undefined &&
     message.messagingReturn === undefined

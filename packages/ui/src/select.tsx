@@ -140,10 +140,10 @@ const searchText = (text: string) =>
     .trim();
 
 /**
- * Makes the current value the active row when the list opens, as `Select` does: it scrolls into
- * view, the arrow keys move from it, and Enter keeps it.
+ * Makes the current value the active row when a combobox list opens, as `Select` does: it scrolls
+ * into view, the arrow keys move from it, and Enter keeps it. Put it inside `Combobox.Root`.
  */
-function ActiveCurrentRow(props: { key: string }) {
+export function ActiveCurrentRow(props: { key: string }) {
   const context = useComboboxContext();
   onSettled(() => context.listState().selectionManager().setFocusedKey(props.key));
   return null;

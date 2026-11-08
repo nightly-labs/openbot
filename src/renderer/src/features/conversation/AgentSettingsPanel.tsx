@@ -456,6 +456,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
+      onUnshownSaveError={(message) =>
+        actionToast.error(message, {
+          id: "agent-settings-save-failed",
+          report: { operation: "settings", source: "action", cause_code: "unknown" },
+        })
+      }
       detailOpen={draft.routines.open || draft.files.open || draft.memories.open || draft.instructions.open}
       links={
         <>

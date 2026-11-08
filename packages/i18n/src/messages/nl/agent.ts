@@ -77,7 +77,6 @@ export const messages = {
   "agent.error.restoreFailed": "Kan agent niet herstellen",
   "agent.error.hiddenFailed": "De wijziging is niet opgeslagen. Probeer het opnieuw.",
   "agent.error.settingsFailed": "Kan agentinstellingen niet opslaan",
-  "agent.error.avatarFailed": "Kan de avatar niet bijwerken",
   "agent.error.adminOnly": "Alleen een serverbeheerder kan agentinstellingen wijzigen.",
   "agent.error.continueFailed": "De agent kan niet doorgaan. Probeer het opnieuw.",
   "agent.error.mcpNotStarted": "MCP-server niet gestart",

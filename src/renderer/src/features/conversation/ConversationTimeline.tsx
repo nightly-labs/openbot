@@ -675,7 +675,7 @@ export function ConversationTimeline() {
       setChannelActivity((latest) => latest && { ...latest, steps });
   });
   /**
-   * A direct chat with no message yet, and no turn, queued send or question. A queued send leaves the
+   * A direct chat with no message yet, and no turn, queued send, welcome or question. A queued send leaves the
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
    * Its empty state plays a faint turn from the agent's own routine and skill.
    */
@@ -685,6 +685,7 @@ export function ConversationTimeline() {
     !props.hasOlder &&
     !props.activeTurnId &&
     presentedQueueDeliveries().length === 0 &&
+    !(props.queue?.welcome && props.queue.agentId === props.agent?.id) &&
     !renderedAgentActivity() &&
     !props.prompt
       ? props.agent
@@ -1639,6 +1640,42 @@ export function ConversationTimeline() {
             <Show when={!compactionBefore()}>
               <CompactionMarker />
             </Show>
+            {/* Under an open side thread, the thread draws the card of its own question. */}
+            <Show when={!sideThreadOpen()}>
+              <ConversationQuestionPrompt
+                elementRef={setRequiredInteractionElement}
+                registerComposerAnswer={registerPromptComposerAnswer}
+              />
+            </Show>
+            <Show keyed when={props.approval}>
+              {(approval) => (
+                <Loading>
+                  <ApprovalCard
+                    approval={approval}
+                    agentName={interactionAgentName()}
+                    onApprove={() => props.onRespondToApproval("accept")}
+                    onReject={() => props.onRespondToApproval("decline")}
+                    onAlwaysAllow={props.onAlwaysAllowApproval}
+                  />
+                </Loading>
+              )}
+            </Show>
+            <Show when={props.usageLimitAsk}>
+              {(ask) => (
+                <UsageLimitAskCard
+                  provider={ask().provider}
+                  resetsAt={ask().resetsAt}
+                  options={ask().options}
+                  onSend={ask().onSend}
+                  onWait={ask().onWait}
+                />
+              )}
+            </Show>
+            {/* Under an open side thread, the thread draws the card of its own request. */}
+            <Show when={!sideThreadOpen()}>
+              <ConversationBrowserTakeover />
+            </Show>
+            {/* The working line goes under an open card, as the steps line goes under an agent message. */}
             <div
               class="agent-activity-slot"
               data-reserved={agentActivitySpaceReserved() ? "true" : "false"}
@@ -1677,41 +1714,6 @@ export function ConversationTimeline() {
                 </Show>
               </Show>
             </div>
-            {/* Under an open side thread, the thread draws the card of its own question. */}
-            <Show when={!sideThreadOpen()}>
-              <ConversationQuestionPrompt
-                elementRef={setRequiredInteractionElement}
-                registerComposerAnswer={registerPromptComposerAnswer}
-              />
-            </Show>
-            <Show keyed when={props.approval}>
-              {(approval) => (
-                <Loading>
-                  <ApprovalCard
-                    approval={approval}
-                    agentName={interactionAgentName()}
-                    onApprove={() => props.onRespondToApproval("accept")}
-                    onReject={() => props.onRespondToApproval("decline")}
-                    onAlwaysAllow={props.onAlwaysAllowApproval}
-                  />
-                </Loading>
-              )}
-            </Show>
-            <Show when={props.usageLimitAsk}>
-              {(ask) => (
-                <UsageLimitAskCard
-                  provider={ask().provider}
-                  resetsAt={ask().resetsAt}
-                  options={ask().options}
-                  onSend={ask().onSend}
-                  onWait={ask().onWait}
-                />
-              )}
-            </Show>
-            {/* Under an open side thread, the thread draws the card of its own request. */}
-            <Show when={!sideThreadOpen()}>
-              <ConversationBrowserTakeover />
-            </Show>
           </div>
         </Show>
       </div>

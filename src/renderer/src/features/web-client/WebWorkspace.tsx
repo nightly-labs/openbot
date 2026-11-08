@@ -40,7 +40,11 @@ import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/bro
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
-import { AGENT_HIDDEN_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -1615,7 +1619,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   async function createCanvasAgent(draft: NewAgentDraft): Promise<{ id: string }> {
     const created = await workspace.runtime.createAgent(
-      newAgentInput(draft, workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)),
+      newAgentInput(
+        draft,
+        workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+        workspace.state.capabilities.includes(AGENT_WELCOME_CAPABILITY),
+      ),
     );
     await workspace.refresh();
     return created;

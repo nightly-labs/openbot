@@ -74,7 +74,6 @@ export const messages = defineMessages("agent", {
   "agent.error.restoreFailed": "Could not restore agent",
   "agent.error.hiddenFailed": "The change was not saved. Try again.",
   "agent.error.settingsFailed": "Could not save agent settings",
-  "agent.error.avatarFailed": "Could not update the avatar",
   "agent.error.adminOnly": "Agent settings can only be changed by a server administrator.",
   "agent.error.continueFailed": "The agent could not continue. Try again.",
   "agent.error.mcpNotStarted": "MCP server not started",

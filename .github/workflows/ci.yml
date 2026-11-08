@@ -150,6 +150,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun run check:agent-context
 
+          - name: Check translated What's new notes
+            if: env.CODE == 'true'
+            run: bun scripts/whats-new-translations.ts
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where
@@ -589,6 +593,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-slack
 
+      - name: Run the workflow channel output E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-channel-output
+
       - name: Run the workflow agent tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-agent-tools
@@ -701,6 +709,7 @@ jobs:
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
+            .openbot-build/workflow-channel-output-e2e/
             .openbot-build/workflow-agent-tools-e2e/
             .openbot-build/workflow-join-e2e/
             .openbot-build/discord-github-files-e2e/

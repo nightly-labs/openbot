@@ -199,6 +199,8 @@ function outputText(node: WorkflowNode, t: MobileTranslate): string {
   switch (text(node, "target")) {
     case "channel":
       return t("mobile.workflow.output.channel");
+    case "chat-channel":
+      return t("mobile.workflow.output.chatChannel");
     case "file":
       return t("mobile.workflow.output.file");
     case "github": {

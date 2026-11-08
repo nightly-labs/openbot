@@ -3,6 +3,7 @@ import type {
   AcpRegistryEntry,
   AgentProviderRef,
   AgentSessionSettings,
+  CreateAgentInput,
   HiddenAgentsSnapshot,
   McpSignInApp,
   McpSignInAppState,
@@ -13,6 +14,7 @@ import {
   AGENT_DEFAULT_KEYS,
   AGENT_FOLDER_LIMIT,
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+  AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessChange,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -1176,6 +1178,40 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       : mockChannels.listChannelRoutineRuns({ channelId: owner.id, routineId, limit }),
   );
   const billingPlans = previewBillingServers();
+
+  async function createMockAgent(input: CreateAgentInput, welcome: boolean): Promise<ClientAgentSummary> {
+    const agent = createAgentSummary({
+      name: input.name,
+      title: "",
+      description: input.description,
+      avatarSeed: input.avatarSeed,
+      avatarHue: input.avatarHue,
+      ...(input.provider === undefined ? {} : { provider: input.provider }),
+      ...(input.model === undefined ? {} : { model: input.model }),
+      ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
+    });
+    if (input.provider && input.model && input.providerAccountId) agent.providerAccountId = input.providerAccountId;
+    agents = [...agents, agent];
+    queues.set(agent.id, emptyQueue(agent.id));
+    emitAgentEvent({ type: "agents-changed", agents });
+    try {
+      await api.agent.sendMessage({ agentId: agent.id, text: input.initialMessage, attachmentDraftIds: [] });
+      // As on a host: the renderer sends a setup message, which the chat does not show.
+      if (welcome)
+        updateSnapshot(agent.id, (snapshot) => {
+          snapshot.messages = snapshot.messages.map((message) =>
+            message.author === "user" ? { ...message, itemType: AGENT_WELCOME_ITEM_TYPE } : message,
+          );
+        });
+      return clone(agent);
+    } catch (error) {
+      agents = agents.filter((candidate) => candidate.id !== agent.id);
+      queues.delete(agent.id);
+      delete snapshots[agent.id];
+      emitAgentEvent({ type: "agents-changed", agents });
+      throw error;
+    }
+  }
 
   const api: OpenBotDesktopApi = {
     getAppInfo: async () => clone(appInfo),
@@ -2437,7 +2473,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       saveProfile: async (input) => {
         const agent = input.agentId
           ? await api.agent.updateAgent({ agentId: input.agentId, ...input.draft })
-          : await api.agent.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "Hello" });
+          : await createMockAgent({ ...input.draft, initialMessage: input.initialMessage ?? "Hello" }, false);
         const updated = await api.agent.updateAgent({ agentId: agent.id, ...input.draft });
         await api.agent.setAvatar({ agentId: agent.id, image: null });
         const layout = await api.agent.mutateSidebarLayout({
@@ -2449,32 +2485,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isAgentSummary(updated)) throw new Error("Mock profile agent has an unknown provider.");
         return { agent: { ...updated, avatarUrl: null }, layout };
       },
-      createAgent: async (input) => {
-        const agent = createAgentSummary({
-          name: input.name,
-          title: "",
-          description: input.description,
-          avatarSeed: input.avatarSeed,
-          avatarHue: input.avatarHue,
-          ...(input.provider === undefined ? {} : { provider: input.provider }),
-          ...(input.model === undefined ? {} : { model: input.model }),
-          ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
-        });
-        if (input.provider && input.model && input.providerAccountId) agent.providerAccountId = input.providerAccountId;
-        agents = [...agents, agent];
-        queues.set(agent.id, emptyQueue(agent.id));
-        emitAgentEvent({ type: "agents-changed", agents });
-        try {
-          await api.agent.sendMessage({ agentId: agent.id, text: input.initialMessage, attachmentDraftIds: [] });
-          return clone(agent);
-        } catch (error) {
-          agents = agents.filter((candidate) => candidate.id !== agent.id);
-          queues.delete(agent.id);
-          delete snapshots[agent.id];
-          emitAgentEvent({ type: "agents-changed", agents });
-          throw error;
-        }
-      },
+      // The renderer's create sends a setup message; a saved profile sends a visible first message.
+      createAgent: (input) => createMockAgent(input, true),
       duplicateAgent: async (agentId) => {
         const source = agents.find((agent) => agent.id === agentId);
         if (!source) throw new Error("Agent not found");

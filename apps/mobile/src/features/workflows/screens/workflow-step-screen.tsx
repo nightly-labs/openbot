@@ -206,6 +206,7 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
 
 const SHOWN_TARGET_LABEL = {
   channel: "mobile.workflow.output.channel",
+  "chat-channel": "mobile.workflow.output.chatChannel",
   file: "mobile.workflow.output.file",
   discord: "mobile.workflow.output.discord",
 } as const satisfies Record<string, MobileTextKey>;
@@ -219,9 +220,10 @@ const TARGET_DEFAULTS = {
 } as const;
 
 /**
- * Where an output sends its result. The phone does not choose a messaging place or a Discord server:
- * only the computer that runs OpenBot has them. An owner or admin adds a GitHub output on a host that runs
- * it, and a Telegram or Slack output on a host that has a linked chat or workspace, as on desktop.
+ * Where an output sends its result. The phone does not choose a messaging place, an OpenBot channel or a
+ * Discord server: only the computer that runs OpenBot chooses them. An owner or admin adds a GitHub
+ * output on a host that runs it, and a Telegram or Slack output on a host that has a linked chat or
+ * workspace, as on desktop.
  */
 function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
@@ -233,7 +235,8 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   const githubSupported = useWorkflowGitHubSupported(draft.serverId);
   const chats = useChatAccess(draft);
   const target = text(node, "target");
-  const shown = target === "channel" || target === "file" || target === "discord" ? target : null;
+  const shown =
+    target === "channel" || target === "chat-channel" || target === "file" || target === "discord" ? target : null;
   const notify = shown === null && target !== "github" && target !== "telegram" && target !== "slack";
   const telegramOffered = chats.editable && telegramChats(chats.options ?? []).length > 0;
   const slackOffered = chats.editable && slackWorkspaces(chats.options ?? []).length > 0;
@@ -268,7 +271,13 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   return (
     <SettingsSection
       title={t("mobile.workflow.step.sendTo")}
-      footer={target === "channel" ? t("mobile.workflow.step.channelHint") : undefined}
+      footer={
+        target === "channel"
+          ? t("mobile.workflow.step.channelHint")
+          : target === "chat-channel"
+            ? t("mobile.workflow.step.chatChannelHint")
+            : undefined
+      }
     >
       <SettingsRow checked={notify} disclosure={false} trailing={check(notify)} onPress={() => choose("notify")}>
         <Typography.Paragraph>{t("mobile.workflow.output.notify")}</Typography.Paragraph>

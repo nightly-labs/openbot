@@ -242,6 +242,14 @@ message. Inside a channel task, `send_to_channel` is refused; use `channel_assig
 `channel_transfer`. On desktop, a person can do the same by hand: "Send to channel" on a message of
 an agent chat opens the channel with the message text in its composer. Attachments stay behind.
 
+A workflow output with the target `chat-channel` posts its result as a note (`ChannelService.postNote`).
+The note has the author kind `coordinator`, the id `workflow:<workflowId>`, the workflow title as its
+name, and no task. It starts no task and no member answers it; the members read it later as channel
+history. The released channel codecs already accept that author kind, so a joined client and a phone
+decode the note. The step id gives the operation id, so a step that a restart resumes posts no second
+note. A missing or an archived channel fails the step. Only this computer offers the target, and over
+the Team API only an owner or admin can add or change one (`adminNodes` in `route-workflows.ts`).
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
