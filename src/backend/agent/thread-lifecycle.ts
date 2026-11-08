@@ -772,6 +772,7 @@ export class ThreadLifecycle {
         this.#runsBesideOwnChat(owner, publicThreadId),
         mcpServers,
         instructionsFile,
+        yield* this.#workspaceSkills(agent, client),
       ),
       serviceName: "openbot",
       dynamicTools: visibleDynamicTools(client.provider),
@@ -1304,6 +1305,7 @@ export class ThreadLifecycle {
     sideThread = false,
     mcpServers: readonly McpServerConfig[],
     instructionsFile: InstructionsFileInPrompt,
+    workspaceSkills: readonly string[] = [],
   ): DynamicRecord {
     const memories = this.#memories.essentialFor(agent.id);
     const options = {
@@ -1320,6 +1322,7 @@ export class ThreadLifecycle {
       savedLoginsInTurns: client.turnContext === true,
       sectionTeammates: section,
       homeSkills,
+      workspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
       deferredMcpServers:
         client.provider === "codex" ? codexDeferredMcpServers(mcpServers).map((config) => config.name) : [],
@@ -1357,6 +1360,15 @@ export class ThreadLifecycle {
     for (const folder of descriptor.skillFolders)
       for (const name of yield* skillFolderNames(join(agent.workspacePath, folder))) read.add(name);
     return (yield* listHomeSkills()).filter((skill) => !read.has(skill.slug));
+  });
+
+  /** The skill folders in a Codex agent's workspace, which Codex lists by short root names (#5810). */
+  readonly #workspaceSkills = Effect.fn("ThreadLifecycle.workspaceSkills")(function* (
+    agent: AgentSummary,
+    client: AgentClient,
+  ) {
+    if (client.provider !== "codex") return [];
+    return [...(yield* skillFolderNames(join(agent.workspacePath, ".agents", "skills")))];
   });
 
   /**
@@ -1417,6 +1429,7 @@ export class ThreadLifecycle {
         this.#runsBesideOwnChat(agent, publicThreadId),
         configs,
         yield* this.#instructionsFile(agent, client),
+        yield* this.#workspaceSkills(agent, client),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),
       ...(yield* this.codexConfigEffect(
