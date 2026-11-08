@@ -150,6 +150,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun run check:agent-context
 
+          - name: Check translated What's new notes
+            if: env.CODE == 'true'
+            run: bun scripts/whats-new-translations.ts
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where
