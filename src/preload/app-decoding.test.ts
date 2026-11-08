@@ -164,6 +164,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       softwareRendering: true,
     } satisfies AppInfo,
   ],
+  [
+    "app info on a Mac set to a 24-hour clock",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "darwin",
+      variant: "production",
+      hourCycle: "h23",
+    } satisfies AppInfo,
+  ],
   ["sent message stats", decodeSentMessageStats, { firstSentAt: "2026-11-01T09:30:00.000Z", sentCount: 12 }],
   ["sent message stats before the first message", decodeSentMessageStats, { firstSentAt: null, sentCount: 0 }],
   [
@@ -348,6 +359,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     "app info with a software rendering flag that is not a boolean",
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", softwareRendering: "yes" },
+  ],
+  [
+    "app info with an unknown hour cycle",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", hourCycle: "h24" },
   ],
   // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],

@@ -11,7 +11,7 @@ import {
   IPC_ENDPOINTS,
   type QuitGuard,
 } from "@openbot/contracts/ipc";
-import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, localeDirection, resolveLocale, translateFor, withHourCycle } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -149,6 +149,7 @@ import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
+import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
@@ -507,7 +508,10 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
-  getFormat: () => createFormat(services?.language.locale ?? "en"),
+  getFormat: () => {
+    const locale = services?.language.locale ?? "en";
+    return createFormat(locale, withHourCycle(locale, systemHourCycle()));
+  },
   // The desktop app shows the notifications of a local server, as it does for every joined server.
   desktopNotificationsEnabled: () =>
     !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),

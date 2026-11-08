@@ -1,4 +1,5 @@
 import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
+import type { HourCycle } from "@openbot/contracts/ipc";
 import {
   type AppTranslate,
   formatLocale,
@@ -28,6 +29,8 @@ export interface I18nValue {
   locale: () => TranslatedLocale;
   t: AppTranslate;
   changeLanguage: (next: AppLanguage) => void;
+  /** The clock of the computer's own setting (`AppInfo.hourCycle`), or undefined for the language's own. */
+  hourCycle: () => HourCycle | undefined;
   /** False until the saved language is read and its catalogs are loaded. The startup splash waits for it. */
   ready: () => boolean;
 }
@@ -77,6 +80,9 @@ function createLoadedLocale(requested: () => TranslatedLocale): LoadedLocale {
  */
 function createI18nValue(): I18nValue {
   const [language, setLanguage] = createSignal<AppLanguage>(DEFAULT_APP_LANGUAGE);
+  const [hourCycle, setHourCycle] = createSignal<HourCycle | undefined>(undefined);
+  // The first frame waits for the clock too, so a time never turns from "2:30 PM" to "14:30".
+  const [hourCycleRead, setHourCycleRead] = createSignal(false);
   // Until main answers, `language` is the default, not the saved choice: a wait for the language
   // must not end on the system language's catalogs alone.
   const [preferenceRead, setPreferenceRead] = createSignal(false);
@@ -141,12 +147,24 @@ function createI18nValue(): I18nValue {
         confirm(preference.language);
       })
       .catch(() => setPreferenceRead(true));
+    void appPort()
+      .getAppInfo()
+      .then((info) => setHourCycle(info.hourCycle))
+      .catch(() => undefined)
+      .finally(() => setHourCycleRead(true));
     // The main process is the owner, so what it sends is confirmed by definition - including the
     // echo of a change made in this window.
     return appPort().onAppLanguagePreference((preference) => confirm(preference.language));
   });
 
-  return { language, locale, t, changeLanguage, ready: () => preferenceRead() && loaded.ready() };
+  return {
+    language,
+    locale,
+    t,
+    changeLanguage,
+    hourCycle,
+    ready: () => preferenceRead() && hourCycleRead() && loaded.ready(),
+  };
 }
 
 /**
@@ -168,6 +186,7 @@ const FALLBACK: I18nValue = {
   locale: () => resolveLocale(DEFAULT_APP_LANGUAGE, navigator.language),
   t: translateFor(resolveLocale(DEFAULT_APP_LANGUAGE, navigator.language)),
   changeLanguage: () => undefined,
+  hourCycle: () => undefined,
   ready: () => true,
 };
 
@@ -188,7 +207,10 @@ export function I18nProvider(props: ParentProps<{ waitForLanguage?: boolean }>):
   const started = createMemo<boolean>((was) => was === true || !props.waitForLanguage || value.ready());
   return (
     <I18nContext value={value}>
-      <TextProvider locale={value.locale()} formatLocale={formatLocale(value.language(), navigator.language)}>
+      <TextProvider
+        locale={value.locale()}
+        formatLocale={formatLocale(value.language(), navigator.language, value.hourCycle())}
+      >
         <Show when={started()}>{props.children}</Show>
       </TextProvider>
     </I18nContext>
@@ -209,6 +231,7 @@ export function StaticI18nProvider(
     locale,
     t: (key, ...params) => translateFor(locale())(key, ...params),
     changeLanguage: () => undefined,
+    hourCycle: () => undefined,
     ready: loaded.ready,
   };
   // As in `I18nProvider`. The page can outlive this provider (the web client is one route of an
