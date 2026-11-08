@@ -186,6 +186,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "Paneli kapat",
   "conversation.tasks.panel.label": "Görev {title}",
   "conversation.tasks.panel.openInChat": "Sohbette aç",
+  "conversation.tasks.panel.resize": "Görev panelini yeniden boyutlandır",
   "conversation.tasks.section.needsYou": "Seni bekliyor",
   "conversation.tasks.section.waiting": "Bekliyor",
   "conversation.tasks.section.unread": "Okunmamış",

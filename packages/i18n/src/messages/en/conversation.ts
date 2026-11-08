@@ -183,6 +183,7 @@ export const messages = defineMessages("conversation", {
   "conversation.tasks.panel.closePanel": "Close panel",
   "conversation.tasks.panel.label": "Task {title}",
   "conversation.tasks.panel.openInChat": "Open in chat",
+  "conversation.tasks.panel.resize": "Resize task panel",
   "conversation.tasks.section.needsYou": "Needs you",
   "conversation.tasks.section.waiting": "Waiting",
   "conversation.tasks.section.unread": "Unread",

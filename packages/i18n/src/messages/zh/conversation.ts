@@ -181,6 +181,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "关闭面板",
   "conversation.tasks.panel.label": "任务 {title}",
   "conversation.tasks.panel.openInChat": "在聊天中打开",
+  "conversation.tasks.panel.resize": "调整任务面板大小",
   "conversation.tasks.section.needsYou": "需要你",
   "conversation.tasks.section.waiting": "等待中",
   "conversation.tasks.section.unread": "未读",

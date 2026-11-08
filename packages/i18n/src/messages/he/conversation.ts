@@ -185,6 +185,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "סגירת הפאנל",
   "conversation.tasks.panel.label": "משימה {title}",
   "conversation.tasks.panel.openInChat": "פתיחה בצ'אט",
+  "conversation.tasks.panel.resize": "שינוי גודל לוח המשימה",
   "conversation.tasks.section.needsYou": "דורש את תשומת לבך",
   "conversation.tasks.section.waiting": "ממתין",
   "conversation.tasks.section.unread": "לא נקראו",

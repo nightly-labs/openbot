@@ -188,6 +188,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "إغلاق اللوحة",
   "conversation.tasks.panel.label": "المهمة {title}",
   "conversation.tasks.panel.openInChat": "فتح في الدردشة",
+  "conversation.tasks.panel.resize": "تغيير حجم لوحة المهمة",
   "conversation.tasks.section.needsYou": "تحتاج إليك",
   "conversation.tasks.section.waiting": "قيد الانتظار",
   "conversation.tasks.section.unread": "غير مقروءة",

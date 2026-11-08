@@ -183,6 +183,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "パネルを閉じる",
   "conversation.tasks.panel.label": "タスク {title}",
   "conversation.tasks.panel.openInChat": "チャットで開く",
+  "conversation.tasks.panel.resize": "タスクパネルのサイズを変更",
   "conversation.tasks.section.needsYou": "要対応",
   "conversation.tasks.section.waiting": "待機中",
   "conversation.tasks.section.unread": "未読",
