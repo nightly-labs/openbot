@@ -1,16 +1,11 @@
 import {
-  BUG_REPORT_AREAS,
-  BUG_REPORT_FREQUENCIES,
-  BUG_REPORT_REGRESSIONS,
-  BUG_REPORT_SEVERITIES,
-} from "@openbot/contracts/bug-report";
-import {
   CHAT_VISUAL_CONTEXT_LIMIT,
   CHAT_VISUAL_HTML_LIMIT,
   CHAT_VISUAL_MAX_HEIGHT,
   CHAT_VISUAL_MIN_HEIGHT,
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
+import { BUG_REPORT_AREAS, BUG_REPORT_SEVERITIES, FEATURE_REQUEST_TYPES } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
@@ -745,36 +740,39 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     },
   },
   {
-    name: "report_problem",
+    name: "send_feedback",
     description:
-      "Report a bug in OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the report and approves it before it is sent.",
+      "Send a bug report or a feature idea for OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the text and approves it before it is sent.",
     shape: {
-      title: z.string().min(1).max(200).describe("A short summary of the problem in plain words, without a prefix."),
-      description: z
+      kind: z
+        .enum(["bug", "idea"])
+        .describe(
+          "bug: something in OpenBot does not work. idea: a feature request or another change that the user wants.",
+        ),
+      title: z.string().min(1).max(200).describe("A short summary in plain words, without a prefix."),
+      text: z
         .string()
         .min(1)
         .max(1000)
         .describe(
-          "What went wrong and what the user expected, in one to three plain sentences, with the exact error text.",
+          "In one to three plain sentences. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
         ),
-      steps: z
+      details: z
         .string()
         .min(1)
         .max(1000)
-        .describe("What the user did before the problem, as short numbered steps. Leave it out when you do not know.")
+        .describe(
+          "For a bug: what the user did before it, as short numbered steps. For an idea: the problem that it solves. Leave it out when you do not know.",
+        )
         .optional(),
+      type: z.enum(FEATURE_REQUEST_TYPES).describe("Ideas only. Your choice from the chat.").optional(),
       area: z
         .enum(BUG_REPORT_AREAS)
-        .describe("Your choice from the chat. Leave it out when it is not clear.")
+        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
         .optional(),
       severity: z
         .enum(BUG_REPORT_SEVERITIES)
-        .describe("Your choice from the chat. Leave it out when it is not clear.")
-        .optional(),
-      frequency: z.enum(BUG_REPORT_FREQUENCIES).describe("Only when the user said it.").optional(),
-      regression: z
-        .enum(BUG_REPORT_REGRESSIONS)
-        .describe("Did this work in an earlier version? Only when the user said it.")
+        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
         .optional(),
     },
   },

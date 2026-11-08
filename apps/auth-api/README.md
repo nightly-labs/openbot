@@ -189,8 +189,8 @@ before remote changes. Test deployments do not send account analytics.
 `GITHUB_APP_PRIVATE_KEY` is the OpenBot GitHub App's private key as a PKCS #8 PEM. GitHub gives a
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
-agent's work. The key also lets `POST /v1/bug-reports` open an approved bug report from the app as
-an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`BUG_REPORT_RATE_LIMITER`). The Worker does not store or log the report. With no key, the route answers 503, the app
+agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`). The Worker does not store or log the text. With no key, the route answers 503, the app
 gives the GitHub form link instead, and the desktop acts as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker

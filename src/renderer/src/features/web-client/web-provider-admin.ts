@@ -1,5 +1,5 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { bugReportFormUrl } from "@openbot/contracts/bug-report";
+import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import type {
   AgentProviderId,
   AgentStatus,

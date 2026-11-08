@@ -32,7 +32,7 @@ export const messages = {
   "prompt.approval.waiting": "대기 중…",
   "prompt.approval.deny": "거부",
   "prompt.approval.report.dontSend": "보내지 않기",
-  "prompt.approval.report.send": "보고서 보내기",
+  "prompt.approval.report.send": "보내기",
   "prompt.approval.title.command": "명령 실행",
   "prompt.approval.title.fileChange": "파일 변경",
   "prompt.approval.title.permissions": "권한 부여",

@@ -31,7 +31,7 @@ export const messages = defineMessages("prompt", {
   "prompt.approval.waiting": "Waiting…",
   "prompt.approval.deny": "Deny",
   "prompt.approval.report.dontSend": "Don't send",
-  "prompt.approval.report.send": "Send report",
+  "prompt.approval.report.send": "Send",
   "prompt.approval.title.command": "Run a command",
   "prompt.approval.title.fileChange": "Change files",
   "prompt.approval.title.permissions": "Grant permissions",

@@ -142,7 +142,7 @@ export function ApprovalCard(props: {
   const [submitting, setSubmitting] = createSignal(false);
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
-  const report = createMemo(() => bugReport(props.approval));
+  const report = createMemo(() => feedback(props.approval));
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
@@ -515,11 +515,11 @@ function browserPageDetails(tab: BrowserTab | undefined, t: TextValue["t"]): { t
 }
 
 /**
- * A report from `openbot.report_problem`, which reads as a message, not as a grant. Its fixed notice
- * marks it on every client: the notice is a source text, and the Team API carries it unchanged. The
- * first paragraph is the title.
+ * A bug report or an idea from `openbot.send_feedback`, which reads as a message, not as a grant. Its
+ * fixed notice marks it on every client: the notice is a source text, and the Team API carries it
+ * unchanged. The first paragraph is the title.
  */
-function bugReport(approval: AgentApproval): { title: string; text: string } | null {
+function feedback(approval: AgentApproval): { title: string; text: string } | null {
   if (approval.kind !== "permissions" || approval.permissions !== null || !approval.command) return null;
   if (approval.reason !== englishSourceText("status.agent.reportProblem")) return null;
   const [title = "", ...text] = approval.command.split("\n\n");

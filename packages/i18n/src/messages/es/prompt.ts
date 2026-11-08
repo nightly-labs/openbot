@@ -32,7 +32,7 @@ export const messages = {
   "prompt.approval.waiting": "Esperando…",
   "prompt.approval.deny": "Rechazar",
   "prompt.approval.report.dontSend": "No enviar",
-  "prompt.approval.report.send": "Enviar informe",
+  "prompt.approval.report.send": "Enviar",
   "prompt.approval.title.command": "Ejecutar un comando",
   "prompt.approval.title.fileChange": "Cambiar archivos",
   "prompt.approval.title.permissions": "Conceder permisos",

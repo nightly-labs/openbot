@@ -1,4 +1,4 @@
-import { type BugReport, bugReportPreview } from "@openbot/contracts/bug-report";
+import { type BugReport, type FeatureRequest, feedbackPreview } from "@openbot/contracts/feedback";
 import type { AgentApproval } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -93,14 +93,18 @@ export const AlwaysAllow: Story = {
 /** The same card without that option, which is what a remote agent and a permissions request both show. */
 export const WithoutAlwaysAllow: Story = { args: { agentName: "Chief" } };
 
-const bugReport: BugReport = {
-  title: "The chat stops scrolling after a long reply",
+const sentFacts = {
   platform: "macOS",
   installSource: "Other",
   version: "0.65.0",
   os: "macOS 26.1 (arm64)",
   provider: "Claude (Claude Code)",
   providerVersion: "2.3.1",
+} as const;
+const bugReport: BugReport = {
+  kind: "bug",
+  ...sentFacts,
+  title: "The chat stops scrolling after a long reply",
   area: "Conversations and messages",
   severity: "Works, but incorrectly or slowly",
   frequency: null,
@@ -109,16 +113,26 @@ const bugReport: BugReport = {
     "After a long reply, the chat stops moving down with new text. I expected to see the newest message without scrolling.",
   reproduction: "1. Ask for a long answer.\n2. Send a second message while the answer is still coming.",
 };
-/** `openbot.report_problem`: the owner reads the report in plain words before OpenBot sends it. */
+const featureRequest: FeatureRequest = {
+  kind: "idea",
+  ...sentFacts,
+  title: "Save a chat as a PDF",
+  type: "New feature",
+  proposal: "Let me save a whole chat as a PDF file, with the pictures in it.",
+  problem: "I send the plans that my agent writes to my team, and I copy them by hand now.",
+};
+const feedbackApproval = (text: string): AgentApproval => ({
+  ...approval,
+  kind: "permissions",
+  command: text,
+  cwd: null,
+  reason: sourceText("status.agent.reportProblem"),
+});
+/** `openbot.send_feedback` with a bug: the owner reads it in plain words before OpenBot sends it. */
 export const ReportProblem: Story = {
-  args: {
-    agentName: "Chief",
-    approval: {
-      ...approval,
-      kind: "permissions",
-      command: bugReportPreview(bugReport),
-      cwd: null,
-      reason: sourceText("status.agent.reportProblem"),
-    },
-  },
+  args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(bugReport)) },
+};
+/** `openbot.send_feedback` with a feature idea: the same card, with what the user wants and why. */
+export const SendIdea: Story = {
+  args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(featureRequest)) },
 };

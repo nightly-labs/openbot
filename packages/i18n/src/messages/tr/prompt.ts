@@ -32,7 +32,7 @@ export const messages = {
   "prompt.approval.waiting": "Bekleniyor…",
   "prompt.approval.deny": "Reddet",
   "prompt.approval.report.dontSend": "Gönderme",
-  "prompt.approval.report.send": "Raporu gönder",
+  "prompt.approval.report.send": "Gönder",
   "prompt.approval.title.command": "Bir komut çalıştır",
   "prompt.approval.title.fileChange": "Dosyaları değiştir",
   "prompt.approval.title.permissions": "İzinleri ver",

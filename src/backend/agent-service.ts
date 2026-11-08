@@ -2,9 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import { agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
-import type { BugReportFacts } from "@openbot/contracts/bug-report";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
+import type { FeedbackFacts } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentAccessLevel,
@@ -196,7 +196,7 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { type AgentBugReports, OpenBotToolRouter } from "./agent/openbot-tool-router";
+import { type AgentFeedback, OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -343,10 +343,10 @@ export interface AgentServiceOptions {
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   /** The saved server that a Marketplace app installs, for an agent that suggests the app. */
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
-  /** This build's version and system, which `report_problem` puts in the bug report form. */
-  bugReportFacts?: BugReportFacts | null;
-  /** Sends an approved `report_problem` report to the account service. */
-  bugReports?: AgentBugReports | null;
+  /** This build's version and system, which `send_feedback` adds to a bug report or an idea. */
+  feedbackFacts?: FeedbackFacts | null;
+  /** Sends approved `send_feedback` text to the account service. */
+  feedback?: AgentFeedback | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -1736,8 +1736,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
-      bugReportFacts: options.bugReportFacts ?? null,
-      bugReports: options.bugReports ?? null,
+      feedbackFacts: options.feedbackFacts ?? null,
+      feedback: options.feedback ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       hooks: {

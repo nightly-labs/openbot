@@ -200,18 +200,18 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
   }
 });
 
-/** A few reports for each account and minute: each one is a public issue that a person reads. */
-export const enforceBugReportRateLimit = Effect.fn("GitHub.enforceBugReportRateLimit")(function* (userId: string) {
-  const limiter = requireWorkerBindings(env).BUG_REPORT_RATE_LIMITER;
+/** A few feedback issues for each account and minute: each one is a public issue that a person reads. */
+export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLimit")(function* (userId: string) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
   if (!limiter) {
-    return yield* new GitHubInstallationTokensError(503, "bug_reports_unavailable", "Bug reports are not available.");
+    return yield* new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
   }
   const result = yield* Effect.tryPromise({
     try: () => limiter.limit({ key: `user:${userId}` }),
-    catch: () => new GitHubInstallationTokensError(503, "bug_reports_unavailable", "Bug reports are not available."),
+    catch: () => new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available."),
   });
   if (!result.success) {
-    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many bug reports. Try again later.");
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too much feedback. Try again later.");
   }
 });
 
