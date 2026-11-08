@@ -49,7 +49,7 @@ export interface SettingsStoreDeps {
 /** The result of a runtime save. `refusal` holds the error of a refused save, for the reason. */
 interface RuntimeSettingsSave {
   saved: boolean;
-  refusal?: { error: unknown };
+  refusal?: { error: unknown } | undefined;
 }
 
 export function createSettingsStore(deps: SettingsStoreDeps) {
