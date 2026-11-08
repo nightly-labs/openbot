@@ -392,6 +392,20 @@ try {
     },
   );
 
+  await step(
+    "same transport onto OpenBot's browser tools: the row keeps the browser key",
+    {
+      name: "reserved-same-transport",
+      user: `[mcp_servers.browser]${NL}command = "node"${NL}args = ["${script}"]${NL}enabled = true${NL}`,
+      rows: [row("browser", { command: "node", args: [script] })],
+    },
+    (o) => {
+      assert.equal(o.started, true, o.error ?? "");
+      assert.deepEqual(o.keys, ["browser"]);
+      assert.ok(o.offered.includes("mcp__browser"), `offered ${o.offered.join(", ")}`);
+      assert.deepEqual(table(o.file, "openbot_browser"), []);
+    },
+  );
   await writeFile(
     join(OUT, "report.json"),
     `${JSON.stringify({ ok: true, codex: { version: cli.version }, steps }, null, 2)}${NL}`,
