@@ -391,16 +391,15 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.omnisend.prompt.segment":
     "How many contacts are in the VIP segment, and how did it change this month?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
-  "marketplace.plugin.composio.tagline": "Many apps through your own Composio link",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
-    "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",
+    "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
   "marketplace.plugin.composio.app":
-    "The apps you add to your Composio MCP server, over the link from your Composio account.",
+    "The apps you connect in your Composio account. An agent asks you to connect an app when it needs it.",
   "marketplace.plugin.composio.prompt.inbox": "Summarize my unread email and draft replies to the urgent ones.",
   "marketplace.plugin.composio.prompt.handoff": "Post a summary of this pull request to our team channel.",
   "marketplace.plugin.composio.prompt.apps": "Which apps and actions can you use through Composio?",
   // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
-  "marketplace.plugin.composio.hint.url": "The URL of an MCP server in your Composio account",
   "marketplace.plugin.composio.hint.apiKey": "Find it in your Composio account, in Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres projects, branches and migrations",
   "marketplace.plugin.neon.description":
@@ -510,7 +509,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.huggingface.prompt.dataset": "Find a dataset of weather time series and show its columns.",
   "marketplace.auth.apiKey": "API key",
   "marketplace.auth.personalApiKey": "Personal API key",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "Create a key",
 
   // Skills.

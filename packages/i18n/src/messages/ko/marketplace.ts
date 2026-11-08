@@ -338,14 +338,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
-  "marketplace.plugin.composio.tagline": "내 Composio 링크로 연결하는 다양한 앱",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub 외 1,000개 이상의 앱",
   "marketplace.plugin.composio.description":
-    "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 수백 개의 앱에 연결해요. Composio 계정에서 원하는 앱을 연결한 다음, 해당 MCP URL과 API 키를 여기에 붙여넣어 주세요.",
-  "marketplace.plugin.composio.app": "Composio 계정의 링크를 통해 Composio MCP 서버에 추가한 앱을 사용해요.",
+    "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 1,000개 이상의 앱에 연결해요. Composio 계정으로 로그인하세요. 에이전트에게 앱이 필요하면 그 앱을 연결해 달라고 요청해요.",
+  "marketplace.plugin.composio.app":
+    "Composio 계정에서 연결한 앱이에요. 에이전트는 앱이 필요할 때 연결해 달라고 요청해요.",
   "marketplace.plugin.composio.prompt.inbox": "읽지 않은 이메일을 요약하고 급한 메일에는 답장 초안을 작성해 줘.",
   "marketplace.plugin.composio.prompt.handoff": "이 풀 리퀘스트의 요약을 우리 팀 채널에 올려 줘.",
   "marketplace.plugin.composio.prompt.apps": "Composio로 어떤 앱과 작업을 사용할 수 있어?",
-  "marketplace.plugin.composio.hint.url": "Composio 계정에 있는 MCP 서버의 URL",
   "marketplace.plugin.composio.hint.apiKey": "Composio 계정의 Settings > Sessions & API Key에서 찾을 수 있어요.",
   "marketplace.plugin.neon.tagline": "Postgres 프로젝트, 브랜치, 마이그레이션",
   "marketplace.plugin.neon.description":
@@ -452,7 +452,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "날씨 시계열 데이터셋을 찾아서 열을 보여 줘.",
   "marketplace.auth.apiKey": "API 키",
   "marketplace.auth.personalApiKey": "개인 API 키",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "키 만들기",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "{name}에서 체험",

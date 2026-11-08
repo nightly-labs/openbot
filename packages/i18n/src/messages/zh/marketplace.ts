@@ -338,16 +338,15 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
-  "marketplace.plugin.composio.tagline": "通过你自己的 Composio 链接连接大量应用",
+  "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
-    "Composio 通过一个 MCP 服务器把助手连接到 Gmail、Slack、GitHub 以及数百个其他应用。在你的 Composio 账号中连接想要的应用，然后把它的 MCP URL 和 API 密钥粘贴到这里。",
-  "marketplace.plugin.composio.app": "通过你 Composio 账号中的链接，使用你添加到 Composio MCP 服务器的应用。",
+    "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",
+  "marketplace.plugin.composio.app": "你在 Composio 账号中连接的应用。助手需要某个应用时，会请你连接它。",
   "marketplace.plugin.composio.prompt.inbox": "总结我的未读邮件，并为紧急的几封起草回复。",
   "marketplace.plugin.composio.prompt.handoff": "把这个拉取请求的摘要发到我们的团队频道。",
   "marketplace.plugin.composio.prompt.apps": "通过 Composio 你能使用哪些应用和操作？",
 
   // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
-  "marketplace.plugin.composio.hint.url": "你的 Composio 账号中某个 MCP 服务器的链接",
   "marketplace.plugin.composio.hint.apiKey": "可在你的 Composio 账号的 Settings > Sessions & API Key 中找到。",
   "marketplace.plugin.neon.tagline": "Postgres 项目、分支与迁移",
   "marketplace.plugin.neon.description":
@@ -443,7 +442,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "找一个天气时间序列数据集，并显示它的列。",
   "marketplace.auth.apiKey": "API 密钥",
   "marketplace.auth.personalApiKey": "个人 API 密钥",
-  "marketplace.auth.mcpUrl": "MCP 链接",
   "marketplace.auth.createKey": "创建密钥",
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",

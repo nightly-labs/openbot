@@ -71,6 +71,9 @@ export const PluginAccounts = at(plugin("notion"), {
   },
 });
 
+/** A listing with two ways in: sign-in first, and an API key as the other choice in the dialog. */
+export const PluginComposio = at(plugin("composio"), { catalog: ["composio"], held: {} });
+
 /** A desktop app: the server runs in an app on this computer, at a local address. */
 export const PluginDesktop = at(plugin("figma"), { held: { figma: "connected" } });
 

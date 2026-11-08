@@ -388,16 +388,15 @@ export const messages = {
     "Wie viele Kontakte sind im VIP-Segment, und wie hat es sich diesen Monat verändert?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Entwirf eine Kampagne für die neue Kollektion, aber sende sie nicht.",
-  "marketplace.plugin.composio.tagline": "Viele Apps über deinen eigenen Composio-Link",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub und über 1.000 weitere Apps",
   "marketplace.plugin.composio.description":
-    "Composio verbindet Agenten über einen MCP-Server mit Gmail, Slack, GitHub und Hunderten weiterer Apps. Verbinde die gewünschten Apps in deinem Composio-Konto und füge dann hier seine MCP-URL und seinen API-Schlüssel ein.",
+    "Composio verbindet deine Agenten über einen MCP-Server mit Gmail, Slack, GitHub und über 1.000 weiteren Apps. Melde dich mit deinem Composio-Konto an. Wenn ein Agent eine App braucht, bittet er dich, diese App zu verbinden.",
   "marketplace.plugin.composio.app":
-    "Die Apps, die du deinem Composio-MCP-Server hinzufügst, über den Link aus deinem Composio-Konto.",
+    "Die Apps, die du in deinem Composio-Konto verbindest. Ein Agent bittet dich, eine App zu verbinden, wenn er sie braucht.",
   "marketplace.plugin.composio.prompt.inbox":
     "Fasse meine ungelesenen E-Mails zusammen und entwirf Antworten auf die dringenden.",
   "marketplace.plugin.composio.prompt.handoff": "Poste eine Zusammenfassung dieses Pull Requests in unseren Teamkanal.",
   "marketplace.plugin.composio.prompt.apps": "Welche Apps und Aktionen kannst du über Composio nutzen?",
-  "marketplace.plugin.composio.hint.url": "Die URL eines MCP-Servers in deinem Composio-Konto",
   "marketplace.plugin.composio.hint.apiKey":
     "Du findest ihn in deinem Composio-Konto unter Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres-Projekte, Branches und Migrationen",
@@ -519,7 +518,6 @@ export const messages = {
     "Finde einen Datensatz mit Wetter-Zeitreihen und zeig seine Spalten.",
   "marketplace.auth.apiKey": "API-Schlüssel",
   "marketplace.auth.personalApiKey": "Persönlicher API-Schlüssel",
-  "marketplace.auth.mcpUrl": "MCP-URL",
   "marketplace.auth.createKey": "Schlüssel erstellen",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "In {name} ausprobieren",
