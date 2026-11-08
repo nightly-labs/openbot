@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { type BugReportFacts, bugReportFormUrl, bugReportPlatform } from "@openbot/contracts/bug-report";
 import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -177,6 +178,8 @@ function requestAborted(signal: AbortSignal | undefined) {
 
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
+/** GitHub and browsers refuse much longer addresses; the agent's text is most of it. */
+const BUG_REPORT_URL_LIMIT = 8000;
 
 function listedDescription(description: string): string {
   const characters = Array.from(description);
@@ -229,6 +232,8 @@ export interface OpenBotToolRouterHooks {
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
   /** The answer of one web search for the agent, from a side turn whose only tool is web search. */
   searchWeb(agentId: string, query: string): Effect.Effect<string, ToolOperationFailed>;
+  /** The CLI version of a provider, as its settings row shows it; null when it is not known. */
+  providerVersion(provider: AgentProvider): string | null;
 }
 
 export interface OpenBotToolRouterOptions {
@@ -263,6 +268,8 @@ export interface OpenBotToolRouterOptions {
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
+  /** This build's version and system for `report_problem`; null where this process does not know them. */
+  bugReportFacts?: BugReportFacts | null | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -305,6 +312,7 @@ export class OpenBotToolRouter {
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
+  readonly #bugReportFacts: BugReportFacts | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -345,6 +353,7 @@ export class OpenBotToolRouter {
     this.#screenCapture = options.screenCapture ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
+    this.#bugReportFacts = options.bugReportFacts ?? null;
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -906,6 +915,35 @@ export class OpenBotToolRouter {
     );
   }
 
+  /**
+   * `report_problem`: the bug report form with the agent's text and the facts that OpenBot knows. The
+   * user reads it and submits it in the browser; nothing goes to GitHub from here. The text is redacted,
+   * because it leaves the computer in the address.
+   */
+  #reportProblem(args: unknown, senderAgentId: string): OpenBotToolResponse {
+    if (!isRecord(args) || !isString(args.title) || !isString(args.description))
+      throw new Error("title and description must be strings.");
+    const text = (value: unknown) => (isString(value) && value.trim() ? redactText(value.trim()) : undefined);
+    const { provider } = this.#requireAgent(senderAgentId);
+    const providerVersion = this.#hooks.providerVersion(provider);
+    const url = bugReportFormUrl(this.#bugReportFacts ?? { platform: bugReportPlatform(process.platform) }, {
+      title: text(args.title),
+      description: text(args.description),
+      reproduction: text(args.steps),
+      expected: text(args.expected),
+      actual: text(args.actual),
+      provider,
+      ...(providerVersion ? { providerVersion } : {}),
+    });
+    if (url.length > BUG_REPORT_URL_LIMIT)
+      return openBotToolFailure("The report is too long for a link. Make the text shorter and call this again.");
+    return openBotToolResult({
+      status: "ready",
+      url,
+      next: "Give the user this link. Tell them to check the text, select Area, Severity and Frequency, tick the checklist, and submit. Do not open or submit it for them.",
+    });
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
@@ -1424,6 +1462,8 @@ export class OpenBotToolRouter {
             : "The card is in the chat. End your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly. You have no tools for it until then.",
       });
     }
+
+    if (params.tool === "report_problem") return this.#reportProblem(params.arguments, senderAgentId);
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 

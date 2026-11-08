@@ -35,6 +35,7 @@ import {
   browserProxyConnection,
   createBrowserProfileService,
 } from "./browser-profile-service";
+import { bugReportFacts } from "./bug-report-facts";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -1935,6 +1936,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    bugReportFacts: bugReportFacts(),
     marketplaceAppServer: (appId) => {
       const listed = catalogPluginServers.filter((server) => server.slug === appId);
       const [server] = listed;

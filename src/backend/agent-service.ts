@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import { agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import type { BugReportFacts } from "@openbot/contracts/bug-report";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -342,6 +343,8 @@ export interface AgentServiceOptions {
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   /** The saved server that a Marketplace app installs, for an agent that suggests the app. */
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
+  /** This build's version and system, which `report_problem` puts in the bug report form. */
+  bugReportFacts?: BugReportFacts | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -1731,6 +1734,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
+      bugReportFacts: options.bugReportFacts ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       hooks: {
@@ -1771,6 +1775,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         steerAgentMessage: (recipientAgentId, deliveryId) => this.#steerAgentMessage(recipientAgentId, deliveryId),
         searchWeb: (agentId, query) => this.#searchWeb(agentId, query),
+        providerVersion: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.version ?? null,
       },
     });
   }

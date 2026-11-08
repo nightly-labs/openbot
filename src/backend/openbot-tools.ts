@@ -739,6 +739,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     },
   },
   {
+    name: "report_problem",
+    description:
+      "Make a link to the OpenBot bug report form on GitHub for a problem in OpenBot itself, with the OpenBot version, the system and your provider filled in. Only the user submits it.",
+    shape: {
+      title: z.string().min(1).max(200).describe("A short summary of the problem, without a prefix."),
+      description: z.string().min(1).max(1000).describe("What happened, in a few sentences."),
+      steps: z.string().max(1000).describe("Numbered steps from a new launch of the app.").optional(),
+      expected: z.string().max(1000).describe("What the user expected.").optional(),
+      actual: z.string().max(1000).describe("What OpenBot did, with the exact error text.").optional(),
+    },
+  },
+  {
     name: "react_to_user_message",
     description:
       "Add one emoji reaction to the current user message for a clear emotional moment, such as a win, affection, gratitude, humor, sadness, disappointment or frustration. An emoji in the written answer is not a reaction.",
