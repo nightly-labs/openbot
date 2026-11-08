@@ -982,10 +982,18 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   /** The listing the user asked to disconnect, held while the confirmation is on screen. */
   const [uninstalling, setUninstalling] = createSignal<MarketplacePluginDetail | null>(null);
 
-  function connectStep(app: MarketplacePluginApp, config: McpServerConfig): Promise<McpServerConfig | null> {
+  /**
+   * `row` is the row as the host holds it, when `config` connects it again. A row that moved to the
+   * listing's current address left its headers behind, so only the held row says which flow saved it.
+   */
+  function connectStep(
+    app: MarketplacePluginApp,
+    config: McpServerConfig,
+    row: McpServerConfig = config,
+  ): Promise<McpServerConfig | null> {
     // A row that a key saved opens on the key again, so a new key does not start with a sign-in.
     const here = flowsHere(app);
-    const saved = savedKeyFlow(here, config);
+    const saved = savedKeyFlow(here, row);
     const [first, ...rest] = saved ? [saved, ...here.filter((flow) => flow !== saved)] : here;
     if (!first) return Promise.resolve(config);
     return new Promise((resolve) => {
@@ -1279,7 +1287,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, true);
     const analytics = desktopAnalytics.scope();
     const saved = await run(async () => {
-      const connected = await connectStep(app, currentPluginAppConfig(row, app));
+      const connected = await connectStep(app, currentPluginAppConfig(row, app), row);
       if (!connected) return false;
       setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
       return true;
