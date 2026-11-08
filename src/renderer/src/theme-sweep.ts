@@ -850,8 +850,10 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     }),
   );
 
+  // The split has the page's opacity, so it must not go over the page: glass would get less translucent.
+  // The page shows as it is only outside the area.
   const merge = svgElement("feMerge", {});
-  merge.append(...["SourceGraphic", "split", "lineLight"].map((input) => svgElement("feMergeNode", { in: input })));
+  merge.append(...["outside", "split", "lineLight"].map((input) => svgElement("feMergeNode", { in: input })));
   filter.append(
     ...round,
     edgeAcross,
@@ -894,6 +896,8 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     step(svgElement("feComposite", { in: "lines", in2: "leadBand", operator: "in", result: "leadLines" })),
     light,
     step(svgElement("feComposite", { in: "lightColor", in2: "leadLines", operator: "in", result: "lineLight" })),
+    step(svgElement("feFlood", { "flood-opacity": "1", result: "area" })),
+    svgElement("feComposite", { in: "SourceGraphic", in2: "area", operator: "out", result: "outside" }),
     merge,
   );
   element.append(filter);
