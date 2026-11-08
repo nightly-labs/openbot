@@ -768,12 +768,22 @@ export function agentIpcHandlers({
           const update = colors && avatarColor ? rest : fields;
           if (colors && avatarColor !== undefined)
             await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
-          const patched = await runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
-              method: "PATCH",
-              body: update,
-            }),
+          // The released agent route refuses a change without a profile field. When only the colours
+          // changed, they went on their own routes above, so the agent is read again instead (#5708).
+          const profileChanged = Object.entries(update).some(
+            ([key, value]) => key !== "agentId" && value !== undefined,
           );
+          const patched = profileChanged
+            ? await runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+                  method: "PATCH",
+                  body: update,
+                }),
+              )
+            : (
+                await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+              ).find((agent) => agent.id === input.agentId);
+          if (!patched) throw new Error(sourceText("error.team.agentNotFound"));
           // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
           if (colors && avatarColor === undefined && avatarHue !== undefined)
             await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
