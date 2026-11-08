@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  AGENT_EXCHANGE_ITEM_TYPE,
   AGENT_PROVIDERS,
   AGENT_WELCOME_ITEM_TYPE,
   type AgentModelOption,
@@ -905,8 +906,13 @@ export class DrainScheduler {
           text: item.text,
           createdAt: item.createdAt,
           status: "completed",
-          // Marked as the mailbox marks it, so no client shows the setup message.
-          ...(this.#mailbox.isWelcomeDelivery(item.id) ? { itemType: AGENT_WELCOME_ITEM_TYPE } : {}),
+          // Marked as the mailbox marks it, so no client shows the setup message, and a message
+          // between agents does not make a side thread unread (#5794).
+          ...(item.sender.kind === "agent"
+            ? { itemType: AGENT_EXCHANGE_ITEM_TYPE }
+            : this.#mailbox.isWelcomeDelivery(item.id)
+              ? { itemType: AGENT_WELCOME_ITEM_TYPE }
+              : {}),
         });
       }
       this.#conversation.emitConversation(snapshot);
