@@ -665,6 +665,8 @@ jobs:
             .openbot-build/routine-silent-status-e2e/
             .openbot-build/routine-silent-status-api-e2e/
             .openbot-build/routine-silent-status-dom-e2e/
+            .openbot-build/routine-silent-mobile-e2e/
+            .openbot-build/routine-silent-thread-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/

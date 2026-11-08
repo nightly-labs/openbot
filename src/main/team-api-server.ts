@@ -1111,7 +1111,15 @@ export class TeamApiServer {
         "handled"
       )
         return;
-      if ((await routeRoutineStatus(context, this.#options.agents, this.#options.routineStatus, hidden)) === "handled")
+      if (
+        (await routeRoutineStatus(
+          context,
+          this.#options.agents,
+          this.#options.routineStatus,
+          hidden,
+          this.#options.channels,
+        )) === "handled"
+      )
         return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;

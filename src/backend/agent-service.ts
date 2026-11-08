@@ -267,6 +267,7 @@ import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineFlowTools } from "./routine-flows/routine-flow-tools";
 import { RoutineRecords } from "./routine-records";
+import { visibleRoutineStatusSnapshot } from "./routine-status-visibility";
 import type { RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
@@ -5017,7 +5018,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
-    return structuredClone(this.#tasks.read(agentId, taskId));
+    return structuredClone(visibleRoutineStatusSnapshot(this.#tasks.read(agentId, taskId)));
   }
 
   /**

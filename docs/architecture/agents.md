@@ -49,7 +49,7 @@ the trigger advances or completes, so restart recovery keeps the same run and ma
 ## Quiet routine runs
 
 The optional **Silent routine** setting hides informational status rows for new automatic runs in
-the main chat. It defaults to false. The routine and each new scheduled, script, or webhook run
+the chat and the routine's side thread. It defaults to false. The routine and each new scheduled, script, or webhook run
 store `silent`; an edit does not change the value of an existing run. Migration 59 adds the four
 default-false columns for agent and channel routines and runs. An omitted update keeps the saved
 value, explicit false clears it, and null is invalid.

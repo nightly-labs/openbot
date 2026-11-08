@@ -3,10 +3,6 @@ import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; an old agent routine runs in a thread; a
-// channel routine gets the column; a failed upgrade leaves the column or the marker; a retry adds the column
-// twice or drops a development value; a newer or incomplete history is accepted; the CHECK accepts a place
-// that the app cannot read. Sources 8 to 34 reach version 59 in `routine-run-columns-migration.test.ts`.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -171,7 +167,6 @@ describe("agent routine run place migration", () => {
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    // A future version 60 must be refused before any row changes.
     db.exec("INSERT INTO schema_migrations VALUES(60,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);

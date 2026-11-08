@@ -1,5 +1,3 @@
-// The production editor, rendered without Electron or a browser process.
-
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { toAgentMessages } from "../src/renderer/src/app-message-projection";

@@ -9,7 +9,6 @@ import {
   decodeChannel,
   decodeChannelMemories,
   decodeChannelPage,
-  decodeChannelRoutines,
   decodeChannelSummaries,
   isAttachmentSummary,
   type RespondToPromptInput,
@@ -21,7 +20,7 @@ import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/rout
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { readRoutineStatuses } from "@openbot/team-client/team-api-requests";
+import { teamChannelsApi } from "@openbot/team-client/team-api-requests";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
 
@@ -518,13 +517,14 @@ export class MobileChannelStore {
   memories(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }, serverId);
   }
-  async routines(serverId: string, channelId: string) {
-    return readRoutineStatuses(
+  private routineApi(serverId: string) {
+    return teamChannelsApi(
       (method, path, decode, body) => this.request(method, path, decode, body, serverId),
-      { kind: "channel", id: channelId },
-      await this.request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }, serverId),
-      this.routineStatusHosts.has(serverId),
+      () => this.routineStatusHosts.has(serverId),
     );
+  }
+  routines(serverId: string, channelId: string) {
+    return this.routineApi(serverId).listChannelRoutines(channelId);
   }
   async saveMemory(serverId: string, channelId: string, text: string, memoryId?: string) {
     await this.request(
@@ -539,22 +539,10 @@ export class MobileChannelStore {
     await this.request("POST", CHANNEL_ROUTES.memoryDelete, () => undefined, { channelId, memoryId }, serverId);
   }
   async createRoutine(serverId: string, input: CreateChannelRoutineInput) {
-    await this.request(
-      "POST",
-      CHANNEL_ROUTES.routineCreate,
-      () => undefined,
-      decodeTeamProtocolV2Json(input),
-      serverId,
-    );
+    return this.routineApi(serverId).createChannelRoutine(input);
   }
   async updateRoutine(serverId: string, input: UpdateChannelRoutineInput) {
-    await this.request(
-      "POST",
-      CHANNEL_ROUTES.routineUpdate,
-      () => undefined,
-      decodeTeamProtocolV2Json(input),
-      serverId,
-    );
+    return this.routineApi(serverId).updateChannelRoutine(input);
   }
   async deleteRoutine(serverId: string, channelId: string, routineId: string) {
     await this.request("POST", CHANNEL_ROUTES.routineDelete, () => undefined, { channelId, routineId }, serverId);

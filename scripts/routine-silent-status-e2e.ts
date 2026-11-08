@@ -1,5 +1,3 @@
-// Runs the production scheduler, mailbox, SQLite and conversation reader on a temporary profile.
-// No provider or network process starts. Writes .openbot-build/routine-silent-status-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";

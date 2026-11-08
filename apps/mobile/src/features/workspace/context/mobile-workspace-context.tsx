@@ -2422,8 +2422,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageEvents: (serverId) => administers(serverId, EVENTS_CAPABILITY),
       canManageMissedRuns: (serverId) =>
         administers(serverId, EVENTS_CAPABILITY) && administers(serverId, ROUTINE_RECOVERY_CAPABILITY),
-      canManageRoutineStatus: (serverId) =>
-        administers(serverId, EVENTS_CAPABILITY) && administers(serverId, ROUTINE_STATUS_CAPABILITY),
+      supportsRoutineStatus: (serverId) =>
+        servers.some((server) => server.id === serverId && showsOnline(server)) &&
+        hasCapability(serverCapabilities.current, serverId, ROUTINE_STATUS_CAPABILITY),
       canManageRoutineResults: (serverId) => administers(serverId, ROUTINE_RESULTS_CAPABILITY),
       canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),

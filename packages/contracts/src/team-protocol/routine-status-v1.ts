@@ -1,7 +1,3 @@
-// Frozen optional routine-status-v1 wire contract. Do not import mutable IPC types or limits.
-// Members read and set schedule routine preferences with the released agent manage permission.
-// Channel and webhook preferences require server administration. Only new automatic runs use a
-// changed value. Failures, cancellation, interruption, and substantive output remain visible.
 import { isDynamicRecord } from "../runtime-values";
 import { adminRoute, boolean, fields, identifier, list, type OptionalRouteCodec, oneOf } from "./admin-wire";
 

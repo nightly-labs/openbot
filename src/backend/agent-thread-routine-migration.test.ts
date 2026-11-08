@@ -3,10 +3,6 @@ import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; an old thread reads as the thread of a
-// routine; a failed upgrade leaves the column, the index or the marker; a retry adds the column twice; a
-// newer or incomplete history is accepted; a routine gets two threads. Sources 8 to 46 reach version 59
-// in `agent-thread-migration.test.ts`; these fixtures cover every released source that has the table.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -177,7 +173,6 @@ describe("agent thread routine migration", () => {
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    // A future version 60 must be refused before any row changes.
     db.exec("INSERT INTO schema_migrations VALUES(60,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);

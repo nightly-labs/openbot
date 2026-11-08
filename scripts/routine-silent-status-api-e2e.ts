@@ -1,13 +1,15 @@
-// Runs the production optional HTTP route and shared remote adapters with isolated SQLite.
-// Authentication is supplied by the fixture. No live host or account is used.
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentAccessLevel, EventRoutineOwner, TeamRole } from "@openbot/contracts/ipc";
-import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import {
+  type AgentAccessLevel,
+  CHANNEL_CHATS_CAPABILITY,
+  type EventRoutineOwner,
+  type TeamRole,
+} from "@openbot/contracts/ipc";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
@@ -27,12 +29,16 @@ import {
 import { Effect } from "effect";
 import { AgentRoutineStore } from "../src/backend/agent-routine-store";
 import { AgentStore } from "../src/backend/agent-store";
+import { ChannelImages } from "../src/backend/channel-images";
 import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
+import { ChannelService } from "../src/backend/channel-service";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { HttpError } from "../src/main/team-api/http-error";
 import type { TeamApiRequestContext } from "../src/main/team-api/request-context";
 import { routeAgentRoutines } from "../src/main/team-api/route-agent-routines";
+import { routeChannels } from "../src/main/team-api/route-channels";
 import { routeRoutineStatus } from "../src/main/team-api/route-routine-status";
 
 const out = resolve(import.meta.dirname, "../.openbot-build/routine-silent-status-api-e2e");
@@ -41,6 +47,24 @@ const database = new OpenBotDatabase(join(root, "state"));
 const agents = new AgentStore(join(root, "state"), join(root, "home"), database);
 const routines = new AgentRoutineStore(database);
 const channels = new ChannelRoutineStore(database);
+const unused = () => Effect.die("This operation is outside the fixture.");
+const unusedSync = () => {
+  throw new Error("This operation is outside the fixture.");
+};
+const channelService = new ChannelService(
+  database,
+  new MailboxStore(join(root, "state"), agents.sharedRoot, database),
+  new ChannelImages(join(root, "images")),
+  {
+    agents: () => agents.list(),
+    generate: unused,
+    schedule: () => {},
+    interrupt: unused,
+    busy: () => false,
+    changed: () => {},
+    error: unusedSync,
+  },
+);
 const checks: string[] = [];
 let passed = false;
 let role: TeamRole = "member";
@@ -56,7 +80,7 @@ const server = createServer(async (request, response) => {
     url,
     method: request.method ?? "GET",
     protocol: 9,
-    capabilities: new Set(enabled ? [ROUTINE_STATUS_CAPABILITY] : []),
+    capabilities: new Set([CHANNEL_CHATS_CAPABILITY, ...(enabled ? [ROUTINE_STATUS_CAPABILITY] : [])]),
     member: {
       id: "fixture",
       username: "fixture",
@@ -101,6 +125,7 @@ const server = createServer(async (request, response) => {
         save: (owner, id, input) => ownerStore(owner).saveRecord(owner.id, id, input),
       },
       hidden,
+      channelService,
     );
     if (result === "handled") return;
     const target = url.pathname.match(/^\/v1\/agents\/([^/]+)\/(routines.*)$/u);
@@ -121,10 +146,27 @@ const server = createServer(async (request, response) => {
       );
       if (routed === "handled") return;
     }
-    if (url.pathname === CHANNEL_ROUTES.routines) {
-      context.json(200, channels.list("channel-fixture"));
+    if (
+      (await routeChannels(
+        context,
+        channelService,
+        {
+          listChannelMemories: unusedSync,
+          createChannelMemory: unusedSync,
+          updateChannelMemory: unusedSync,
+          deleteChannelMemory: unusedSync,
+          clearChannelMemories: unusedSync,
+          listChannelRoutines: (id) => channels.list(id),
+          createChannelRoutine: (input) => channels.create(input),
+          updateChannelRoutine: (input) => channels.update(input),
+          deleteChannelRoutine: unusedSync,
+          testChannelRoutine: unused,
+          listChannelRoutineRuns: (input) => channels.listRuns(input.channelId, input.routineId),
+        },
+        hidden,
+      )) === "handled"
+    )
       return;
-    }
     response.writeHead(404).end();
   } catch (error) {
     response.writeHead(error instanceof HttpError ? error.status : 500, { "Content-Type": "application/json" });
@@ -141,9 +183,18 @@ try {
       avatarHue: null,
     }),
   );
-  database.connection
-    .prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)")
-    .run("channel-fixture", "{}");
+  database.connection.prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)").run(
+    "channel-fixture",
+    JSON.stringify(
+      channelService.store.create("channel-fixture", {
+        name: "Fixture channel",
+        title: "",
+        instructions: "",
+        members: [{ agentId: agent.id }],
+        leadAgentId: agent.id,
+      }),
+    ),
+  );
   const input = {
     name: "Fixture",
     instruction: "Keep the report.",
@@ -220,16 +271,57 @@ try {
   level = "chat";
   assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner })).status, 200);
   assert.equal((await post(ROUTINE_STATUS_ROUTES.set, { owner, routineId: routine.id, silent: true })).status, 403);
+  assert.equal((await post(ROUTINE_STATUS_ROUTES.set, { owner, routineId: " ", silent: true })).status, 403);
   level = "none";
   assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner })).status, 404);
   level = "manage";
+  assert.equal((await post(ROUTINE_STATUS_ROUTES.set, { owner, routineId: " ", silent: true })).status, 400);
   hidden.add(agent.id);
   assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner })).status, 404);
   hidden.clear();
   assert.equal((await post(ROUTINE_STATUS_ROUTES.set, { owner, routineId: "deleted", silent: true })).status, 404);
+  assert.equal(
+    (await post(ROUTINE_STATUS_ROUTES.set, { owner: { kind: "channel", id: "missing" }, routineId: " ", silent: true }))
+      .status,
+    404,
+  );
+  assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner: { kind: "invalid", id: agent.id } })).status, 400);
+  assert.equal((await fetch(base + ROUTINE_STATUS_ROUTES.list)).status, 404);
+  checks.push(
+    "Authorization and missing-owner checks keep their order before set-only whitespace validation. Malformed owners and unsupported methods remain rejected.",
+  );
   checks.push("Read/manage permissions, hidden agents, and deleted routines keep their existing boundaries.");
-  assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner: channelOwner })).status, 403);
+  assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner: channelOwner })).status, 200);
+  const memberChannels = teamChannelsApi(request, () => true);
+  assert.equal((await memberChannels.listChannelRoutines(channel.channelId)).length, 1);
+  assert.equal(
+    (await memberChannels.updateChannelRoutine({ channelId: channel.channelId, routineId: channel.id, silent: true }))
+      .silent,
+    true,
+  );
+  assert.equal(
+    (
+      await memberChannels.updateChannelRoutine({
+        channelId: channel.channelId,
+        routineId: channel.id,
+        name: "Member edit",
+      })
+    ).silent,
+    true,
+  );
+  assert.equal(
+    (await memberChannels.updateChannelRoutine({ channelId: channel.channelId, routineId: channel.id, silent: false }))
+      .silent,
+    false,
+  );
+  hidden.add(agent.id);
+  assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner: channelOwner })).status, 404);
   role = "admin";
+  assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner: channelOwner })).status, 200);
+  hidden.clear();
+  checks.push(
+    "A member lists and edits a visible channel schedule through the combined client. Hidden channels return 404, while admins retain visibility.",
+  );
   assert.equal(
     (
       await teamChannelsApi(request, () => true).updateChannelRoutine({
@@ -254,6 +346,10 @@ try {
     )
     .get(webhook.id);
   assert.equal((await saveRoutineStatus(request, owner, webhook, false, true)).silent, false);
+  const savedWebhook = routines.getRecord(agent.id, webhook.id);
+  assert.ok(savedWebhook);
+  assert.equal((await saveRoutineStatus(request, owner, webhook, false, true)).silent, false);
+  assert.equal(routines.getRecord(agent.id, webhook.id)?.updatedAt, savedWebhook.updatedAt);
   assert.deepEqual(
     database.connection
       .prepare(
@@ -263,15 +359,30 @@ try {
     before,
   );
   role = "member";
+  const channelWebhook = channels.saveRecord(channel.channelId, undefined, {
+    ...input,
+    trigger: { kind: "webhook", eventType: null, filters: [], secretCiphertext: "channel-fixture-ciphertext" },
+    silent: true,
+  });
+  const channelStatuses = await request("POST", ROUTINE_STATUS_ROUTES.list, decodeRoutineStatuses, {
+    owner: channelOwner,
+  });
+  assert.equal(
+    channelStatuses.some((entry) => entry.routineId === channelWebhook.id),
+    false,
+  );
+  assert.equal(
+    (await post(ROUTINE_STATUS_ROUTES.set, { owner: channelOwner, routineId: channelWebhook.id, silent: false }))
+      .status,
+    404,
+  );
   const list = await request("POST", ROUTINE_STATUS_ROUTES.list, decodeRoutineStatuses, { owner });
   assert.equal(
     list.some((entry) => entry.routineId === webhook.id),
     false,
   );
   assert.equal((await post(ROUTINE_STATUS_ROUTES.set, { owner, routineId: webhook.id, silent: true })).status, 404);
-  checks.push(
-    "Channel preferences require administration; webhook route identity and secret stay unchanged and members cannot access them.",
-  );
+  checks.push("Webhook route identity and secret stay unchanged and members cannot access webhook preferences.");
   enabled = false;
   assert.equal((await post(ROUTINE_STATUS_ROUTES.list, { owner })).status, 400);
   assert.equal((await saveRoutineStatus(request, owner, routine, true, true, true)).silent, false);

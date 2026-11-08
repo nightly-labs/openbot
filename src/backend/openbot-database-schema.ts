@@ -1394,7 +1394,6 @@ function addAgentThreadRoutine(db: DatabaseSync): void {
   db.exec(V54_AGENT_THREAD_ROUTINE_INDEX_SQL);
 }
 
-// Migration 59 keeps the preference and a prospective snapshot on each run.
 function addRoutineSilentStatus(db: DatabaseSync): void {
   for (const table of [
     "projection_agent_routines",

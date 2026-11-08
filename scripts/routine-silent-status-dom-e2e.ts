@@ -1,4 +1,3 @@
-// Builds only the production routine editor's DOM harness. No browser, GUI, provider or live host.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -106,7 +105,6 @@ try {
       silentRunId: report.silentRunId,
     },
   });
-  // Network is outside this fixture. Any attempted request fails the test.
   Object.defineProperty(dom.window, "fetch", {
     value: () => {
       throw new Error("Network is disabled in this fixture.");
