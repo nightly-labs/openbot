@@ -155,7 +155,7 @@ function openbotGuidance(namespace: string, tool: string): string {
         "openbot.save_mcp_server connects to the server before it saves it. On ready, give the user the tool names. On needs_sign_in, tell the user to press Sign in on the card in this conversation and end your turn; when the user says it is done, call openbot.test_mcp_server. On needs_key, tell the user to enter the key in Server settings, MCP, then test again; never put a key in a URL or an argument. On error, report it and what to change. The new tools reach the agents from the next turn.",
       ].join("\n");
     case "report_problem":
-      return "Use it when the user wants to report a problem in OpenBot itself, not in their own project. Write only what the user told you or what you saw in this chat. Do not include secrets, tokens, private paths, or other chat contents: the report is public. Give the user the link; they check it and submit it. Do not open or submit it with the browser or gh.";
+      return "Use it when the user wants to report a problem in OpenBot itself, not in their own project. Write only what the user told you or what you saw in this chat. Do not include secrets, tokens, private paths, or other chat contents: the report is public. Ask the user for an answer that you do not know; do not guess the severity or the steps. OpenBot shows the user the report to approve. Then give the issue link from the result, or the form link when the result has no issue. Do not open an issue with the browser or gh.";
     case "suggest_marketplace_app":
       return "Use the next field of its result for the end of your answer. When no plugin applies, give the needed sign-in or Computer Use setting.";
     case "messaging_remember":

@@ -26,6 +26,8 @@ export const messages = defineMessages("status.agent", {
     "Capture the screen area at {x}, {y}, {width} × {height} points and send the image to the agent's model.",
   "status.agent.vaultCardFill":
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
+  "status.agent.reportProblem":
+    "Send this report to GitHub as a public issue. Anyone can read it. It does not show your name.",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":

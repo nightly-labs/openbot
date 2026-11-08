@@ -30,6 +30,8 @@ export const messages = {
     "Het schermgebied op {x}, {y}, {width} × {height} punten vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.vaultCardFill":
     "De opgeslagen kaart {card} invullen op {site}. Na je goedkeuring kunnen agents deze kaart op deze site invullen zonder goedkeuring. Verwijder de site in Serverinstellingen > Kluis.",
+  "status.agent.reportProblem":
+    "Stuur dit rapport als openbaar issue naar GitHub. Iedereen kan het lezen. Je naam staat er niet in.",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",

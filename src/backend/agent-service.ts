@@ -196,7 +196,7 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { OpenBotToolRouter } from "./agent/openbot-tool-router";
+import { type AgentBugReports, OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -345,6 +345,8 @@ export interface AgentServiceOptions {
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
   /** This build's version and system, which `report_problem` puts in the bug report form. */
   bugReportFacts?: BugReportFacts | null;
+  /** Sends an approved `report_problem` report to the account service. */
+  bugReports?: AgentBugReports | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -1735,6 +1737,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       bugReportFacts: options.bugReportFacts ?? null,
+      bugReports: options.bugReports ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       hooks: {

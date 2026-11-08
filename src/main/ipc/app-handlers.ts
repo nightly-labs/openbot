@@ -29,7 +29,7 @@ import type { AnalyticsPreferenceService } from "../analytics-preference-service
 import type { AppBehaviorService } from "../app-behavior-service";
 import type { AppearanceService } from "../appearance-service";
 import type { ApprovalAutomation } from "../approval-automation-store";
-import { bugReportFacts } from "../bug-report-facts";
+import { bugReportFacts } from "../bug-reports";
 import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
 import type { ExternalLinkOpener, ExternalLinkPreferenceStore } from "../external-link-opener";
 import type { InterfaceSizeService } from "../interface-size-service";

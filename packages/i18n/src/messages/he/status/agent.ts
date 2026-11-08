@@ -25,6 +25,7 @@ export const messages = {
     "צילום אזור המסך ב-{x}, {y}, {width} × {height} נקודות ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.vaultCardFill":
     "מילוי הכרטיס השמור {card} ב-{site}. אחרי האישור שלך, סוכנים יוכלו למלא את הכרטיס הזה באתר הזה בלי אישור. אפשר להסיר את האתר בהגדרות שרת > כספת.",
+  "status.agent.reportProblem": "שליחת הדיווח הזה ל-GitHub כבעיה ציבורית. כל אחד יכול לקרוא אותו. השם שלך לא מופיע בו.",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",
   "status.agent.linkCardFill": "מילוי כרטיס Link חד-פעמי {card} ב-{site}. אישרת את התשלום הזה ב-Link עבור {merchant}.",

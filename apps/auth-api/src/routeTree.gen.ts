@@ -65,6 +65,7 @@ import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
 import { Route as ProvidersSlugRouteImport } from './routes/providers/$slug'
 import { Route as ProvidersRssDotxmlRouteImport } from './routes/providers/rss[.]xml'
 import { Route as SlackConnectRouteImport } from './routes/slack/connect'
+import { Route as V1BugReportsRouteImport } from './routes/v1/bug-reports'
 import { Route as V1ContactRouteImport } from './routes/v1/contact'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as ContactPlContactRouteImport } from './routes/_contact/pl/contact'
@@ -487,6 +488,11 @@ const ProvidersRssDotxmlRoute = ProvidersRssDotxmlRouteImport.update({
 const SlackConnectRoute = SlackConnectRouteImport.update({
   id: '/slack/connect',
   path: '/slack/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1BugReportsRoute = V1BugReportsRouteImport.update({
+  id: '/v1/bug-reports',
+  path: '/v1/bug-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1ContactRoute = V1ContactRouteImport.update({
@@ -1330,6 +1336,7 @@ export interface FileRoutesByFullPath {
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
+  '/v1/bug-reports': typeof V1BugReportsRoute
   '/v1/contact': typeof V1ContactRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/brand/': typeof BrandIndexRoute
@@ -1530,6 +1537,7 @@ export interface FileRoutesByTo {
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
+  '/v1/bug-reports': typeof V1BugReportsRoute
   '/v1/contact': typeof V1ContactRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/brand': typeof BrandIndexRoute
@@ -1734,6 +1742,7 @@ export interface FileRoutesById {
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
+  '/v1/bug-reports': typeof V1BugReportsRoute
   '/v1/contact': typeof V1ContactRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/_home/': typeof HomeIndexRoute
@@ -1937,6 +1946,7 @@ export interface FileRouteTypes {
     | '/providers/$slug'
     | '/providers/rss.xml'
     | '/slack/connect'
+    | '/v1/bug-reports'
     | '/v1/contact'
     | '/v1/me'
     | '/brand/'
@@ -2137,6 +2147,7 @@ export interface FileRouteTypes {
     | '/providers/$slug'
     | '/providers/rss.xml'
     | '/slack/connect'
+    | '/v1/bug-reports'
     | '/v1/contact'
     | '/v1/me'
     | '/brand'
@@ -2340,6 +2351,7 @@ export interface FileRouteTypes {
     | '/providers/$slug'
     | '/providers/rss.xml'
     | '/slack/connect'
+    | '/v1/bug-reports'
     | '/v1/contact'
     | '/v1/me'
     | '/_home/'
@@ -2540,6 +2552,7 @@ export interface RootRouteChildren {
   ProvidersSlugRoute: typeof ProvidersSlugRoute
   ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
   SlackConnectRoute: typeof SlackConnectRoute
+  V1BugReportsRoute: typeof V1BugReportsRoute
   V1ContactRoute: typeof V1ContactRoute
   V1MeRoute: typeof V1MeRouteWithChildren
   BrandIndexRoute: typeof BrandIndexRoute
@@ -3056,6 +3069,13 @@ declare module '@tanstack/solid-router' {
       path: '/slack/connect'
       fullPath: '/slack/connect'
       preLoaderRoute: typeof SlackConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/bug-reports': {
+      id: '/v1/bug-reports'
+      path: '/v1/bug-reports'
+      fullPath: '/v1/bug-reports'
+      preLoaderRoute: typeof V1BugReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/contact': {
@@ -4332,6 +4352,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProvidersSlugRoute: ProvidersSlugRoute,
   ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,
   SlackConnectRoute: SlackConnectRoute,
+  V1BugReportsRoute: V1BugReportsRoute,
   V1ContactRoute: V1ContactRoute,
   V1MeRoute: V1MeRouteWithChildren,
   BrandIndexRoute: BrandIndexRoute,

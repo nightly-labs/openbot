@@ -1,4 +1,10 @@
 import {
+  BUG_REPORT_AREAS,
+  BUG_REPORT_FREQUENCIES,
+  BUG_REPORT_REGRESSIONS,
+  BUG_REPORT_SEVERITIES,
+} from "@openbot/contracts/bug-report";
+import {
   CHAT_VISUAL_CONTEXT_LIMIT,
   CHAT_VISUAL_HTML_LIMIT,
   CHAT_VISUAL_MAX_HEIGHT,
@@ -741,13 +747,17 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "report_problem",
     description:
-      "Make a link to the OpenBot bug report form on GitHub for a problem in OpenBot itself, with the OpenBot version, the system and your provider filled in. Only the user submits it.",
+      "Report a problem in OpenBot itself as a public GitHub issue, with the OpenBot version, the system and your provider added. The user reads the report and approves it before it is sent.",
     shape: {
       title: z.string().min(1).max(200).describe("A short summary of the problem, without a prefix."),
       description: z.string().min(1).max(1000).describe("What happened, in a few sentences."),
-      steps: z.string().max(1000).describe("Numbered steps from a new launch of the app.").optional(),
-      expected: z.string().max(1000).describe("What the user expected.").optional(),
-      actual: z.string().max(1000).describe("What OpenBot did, with the exact error text.").optional(),
+      steps: z.string().min(1).max(1000).describe("Numbered steps from a new launch of the app."),
+      expected: z.string().min(1).max(1000).describe("What the user expected."),
+      actual: z.string().min(1).max(1000).describe("What OpenBot did, with the exact error text."),
+      area: z.enum(BUG_REPORT_AREAS),
+      severity: z.enum(BUG_REPORT_SEVERITIES),
+      frequency: z.enum(BUG_REPORT_FREQUENCIES),
+      regression: z.enum(BUG_REPORT_REGRESSIONS).describe("Did this work in an earlier version?"),
     },
   },
   {

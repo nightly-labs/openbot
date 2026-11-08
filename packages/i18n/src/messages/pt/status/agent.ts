@@ -25,6 +25,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Capturar a janela {name} e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureRegion":
     "Capturar a área da tela em {x}, {y}, {width} × {height} pontos e enviar a imagem ao modelo do agente.",
+  "status.agent.reportProblem":
+    "Enviar este relatório ao GitHub como uma issue pública. Qualquer pessoa pode lê-lo. Seu nome não aparece.",
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",
   "status.agent.screenCaptureProgress": "Pedindo para capturar a tela…",

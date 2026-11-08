@@ -1116,6 +1116,16 @@ Network traffic can also occur when:
   tokens for those repositories. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
+- the user approves a bug report that an agent wrote. OpenBot shows the full report first. It then
+  sends the report to the central account service (`api.openbot.run`) with the account session: the
+  title, what happened, the steps, the expected and actual results, the answers to the form's
+  choices, the OpenBot version, the operating system and processor architecture, and the agent's
+  provider and CLI version. OpenBot removes known secrets from the text before it shows it. The
+  service opens the report as a public issue in the `nightly-labs/openbot` repository on GitHub, as
+  the OpenBot GitHub App, so the issue does not show the account. The service does not store or log
+  the report; it counts the reports of each account for a rate limit. When the user is not signed in
+  or the send fails, OpenBot gives a link to the GitHub form with the same text instead, and nothing
+  goes to the account service;
 - the user connects Link in Server settings › Vault. OpenBot asks `login.link.com` for a sign-in
   code and a token, with the label "OpenBot on" and this computer's name, which Link shows in its list
   of connected apps. OpenBot renews and revokes the token there, and reads the account email from

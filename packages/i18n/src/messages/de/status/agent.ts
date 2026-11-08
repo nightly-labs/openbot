@@ -27,6 +27,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Das Fenster {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureRegion":
     "Den Bildschirmbereich bei {x}, {y}, {width} × {height} Punkten aufnehmen und das Bild an das Modell des Agenten senden.",
+  "status.agent.reportProblem":
+    "Diesen Bericht als öffentliches Issue an GitHub senden. Alle können ihn lesen. Ihr Name wird nicht angezeigt.",
   "status.agent.workflowDelete":
     "Den Workflow {title} mit seinen Ausführungen und Versionen löschen. Seine offenen Schritte werden beendet.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
