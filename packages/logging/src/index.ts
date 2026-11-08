@@ -172,7 +172,8 @@ export function redactText(value: string): string {
 /**
  * `redactText` without the email rule, for text that goes back to the agent that the user gave it
  * to: its memories and its own chat history. An address there is user data that the agent needs to
- * do its task, not a secret. Logs, diagnostics and every path that leaves the computer keep `redactText`.
+ * do its task, not a secret, and the provider already received it with the original message. Logs,
+ * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
  */
 export function redactSecrets(value: string): string {
   return redact(value, false);

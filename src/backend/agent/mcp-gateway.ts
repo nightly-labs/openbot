@@ -569,12 +569,16 @@ export class McpGateway {
    * `redactText`, which covers the patterns shared across the app.
    */
   redact(text: string): string {
-    return redactMcpValues(text, [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()]);
+    return redactMcpValues(text, this.#secretValues());
   }
 
   /** `redact` for text that the agent reads back, such as its memories and history: emails stay. */
   redactForAgent(text: string): string {
-    return redactMcpValues(text, [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()], redactSecrets);
+    return redactMcpValues(text, this.#secretValues(), redactSecrets);
+  }
+
+  #secretValues(): string[] {
+    return [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()];
   }
 }
 
