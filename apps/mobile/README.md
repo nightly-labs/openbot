@@ -421,14 +421,39 @@ version in `app.json`, `package.json` and `bun.lock`. Merge that change to `main
 
 The new section is `## [x.y.z] - In review`, and `/changelog` does not show it. Apple and Google
 review a build on their own, and each can take days. When testers can install the build from one
-store, run `bun run mobile:release:published ios` or `bun run mobile:release:published android`.
-It writes today's date for that store, for example `## [x.y.z] - 2026-10-14 (Android)`. Merge that
-change to `main`, and the site shows the version with that store, and the other store as "In review".
-When the other store makes the build available, run the command again with that store. The heading
-becomes `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, or `## [x.y.z] - 2026-10-14` when
-both dates are the same. Use `both` when the two stores make the build available on the same day.
+store, run `bun run mobile:release` and select 3, or `bun run mobile:release:published ios` (or
+`android`). It writes today's date for that store, for example `## [x.y.z] - 2026-10-14 (Android)`,
+and raises that store's `cloudServers` and `browser` flags and newest version in
+`apps/auth-api/src/server/mobile-features-config.ts`. Merge that change to `main`. After the Worker
+deploy, the site shows the version with that store, the other store as "In review", and Discord gets
+the post of that store. When the other store makes the build available, do the same for that store.
+The heading becomes `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, or `## [x.y.z] - 2026-10-14`
+when both dates are the same. Use `both` when the two stores make the build available on the same day.
 For an older version, add `--version x.y.z`. A new `mobile:release:*` stops while no store has the
 current version.
+
+A store that will never ship a version, because a newer one replaced it, is skipped:
+`## [x.y.z] - 2026-11-01 (iOS), Skipped (Android)`. `/changelog` shows it as skipped, and Discord gets
+no post. When you mark a newer version as available, the menu asks to mark the older versions that
+the store still reviews as skipped (`--skip-older` on the command). Menu step 4 marks a version as
+skipped by hand, or as in review again.
+
+### Release menu
+
+`bun run mobile:release` shows the state of the newest versions on each store and their posts, and
+one menu for each step. Press a digit; Enter selects the first choice, and 0 goes back.
+
+1. Prepare a new version (`prepare-release.ts --mobile`).
+2. Build and send to TestFlight or Google Play (dispatches `release-ios.yml` or `release-android.yml` on `main`).
+3. Mark a version as available in a store, with its flags and the skip of older versions.
+4. Mark a version as skipped, or in review again.
+5. Write the Discord highlights.
+6. Show the live state: the flags and `/changelog` of production, and the posts that are due or wait.
+
+A step that changes files needs a clean working tree. It makes a branch from the `main` of GitHub,
+commits (the pre-commit hook runs), pushes, opens the pull request with the release title and body,
+and goes back to your branch. It can also turn on auto-merge. The menu never merges by itself.
+
 The signed `.ipa` is saved as a GitHub Actions artifact for seven days before upload. If upload
 fails, download that artifact and retry with Transporter to avoid rebuilding. Re-running the full
 workflow creates a new build number.
@@ -499,30 +524,50 @@ See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_
 
 ### Discord announcement
 
-Each mobile version gets one post in the OpenBot Discord, when the second store has it. Android is
-often available hours or days before iOS, so the post waits for both. The source is
-`apps/mobile/CHANGELOG.md`, not the stores. The `Announce mobile release on Discord` workflow
-(`mobile-release-announcement.yml`) runs on each push to `main` that changes the file. When the
-push gives a version its second store date, for example
-`## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, it posts the message. The desktop release
+Each store gets its own post in the OpenBot Discord when users of that store can see the version.
+The source is `apps/mobile/CHANGELOG.md`; the gate is production. The `Announce mobile release on
+Discord` workflow (`mobile-release-announcement.yml`) runs after each CI run on `main`, at minutes
+17 and 47 of each hour, and on a manual dispatch. It posts a version for a store only when the
+account Worker lists the version in `/v1/mobile/changelog?platform=<store>` and gives it the newest
+version and the flags of `apps/auth-api/src/server/mobile-features-config.ts` in
+`/v1/mobile/features`. Thus the post never comes before the deploy of the flags, the browser and
+`/changelog`. A newer push to `main` cancels an older CI run, and that does not lose a post: the next
+deploy or the schedule sends it.
+
+A tag `mobile-announced/v<version>/<store>` records each post. The workflow creates the tag, then
+posts; a failed post removes the tag, so the next run tries again. A version with a tag gets no post
+again. Only the newest dated version of each store gets a post, from 1.4.7 on. The desktop release
 has its own post and its own workflow (`docs/RELEASING.md#discord-announcement`).
 
-Before the second store has the build, select the 3 to 5 changes in the version section that have
+| Event | Title | Line under the title |
+| --- | --- | --- |
+| The first store | `OpenBot vx.y.z is out on iOS` | `The Android version comes out later.` |
+| The second store | `OpenBot vx.y.z is out on Android` | `It is already out on iOS.` |
+| Both stores in the same run | `OpenBot vx.y.z is out on iOS and Android` | none |
+| The other store skipped the version | `OpenBot vx.y.z is out on iOS` | none |
+
+The message mentions the `Mobile Release Pings` role, then has the title, the highlights, and one
+line of links to each store that has the version and to `Full Changelog`, the version on the Mobile
+tab of `/changelog`. It notifies only that role.
+
+Before the first store has the build, select the 3 to 5 changes in the version section that have
 the largest effect on users, and write them with the version in `apps/mobile/release-announcement.json`:
 
 ```json
 { "version": "x.y.z", "highlights": ["...", "...", "..."] }
 ```
 
-Use the highlight rules of the desktop announcement. Replace the highlights of the previous version;
-the file holds only one version. Run `bun scripts/discord-mobile-release-announcement.ts check x.y.z`
-to see the message. `bun run mobile:release:published` stops when it gives the version its second
-store and the file is not ready, and the Changelog workflow stops such a pull request.
+Use the highlight rules of the desktop announcement. Both posts of a version use the same file.
+Replace the highlights of the previous version; the file holds only one version. Run
+`bun scripts/discord-mobile-release-announcement.ts check x.y.z` to see the posts.
+`bun run mobile:release` and `bun run mobile:release:published` stop while the file is not ready,
+and the Changelog workflow stops a pull request that adds a store date before the file is ready.
 
-The message mentions the `Mobile Release Pings` role, then has the title
-`OpenBot vx.y.z is out on iOS and Android`, the highlights, and one line of links:
-`iOS · Android · Full Changelog`. The last link opens the version on the Mobile tab of
-`/changelog`. It notifies only that role.
+`bun scripts/discord-mobile-release-announcement.ts plan` shows the posts that are due and why the
+others wait. To post a version again, or an older one, run
+`gh workflow run mobile-release-announcement.yml --ref main -f version=x.y.z -f stores=ios -f again=true`.
+For a post that you sent by hand, run
+`bun scripts/discord-mobile-release-announcement.ts mark-posted x.y.z ios`, so the workflow does not send it again.
 
 One-time setup:
 
@@ -533,11 +578,7 @@ One-time setup:
    `DISCORD_MOBILE_RELEASE_WEBHOOK_URL`. It can be the same channel as the desktop post.
 3. In Discord, turn on Developer Mode, open Server Settings > Roles, right-click `Mobile Release Pings`
    and select Copy Role ID. Add the ID as the environment variable `DISCORD_MOBILE_RELEASE_ROLE_ID`.
-
-A failed post does not change the release: re-run the `Post on Discord` job. A re-run after a
-successful post posts the message again. To post a version again, or one that a push did not post,
-run `gh workflow run mobile-release-announcement.yml --ref main -f version=x.y.z`. Both stores must
-have the version in `apps/mobile/CHANGELOG.md`, and the file must be for that version.
+4. A tag ruleset must let GitHub Actions create and delete tags that start with `mobile-announced/`.
 
 ## OpenPanel product analytics
 

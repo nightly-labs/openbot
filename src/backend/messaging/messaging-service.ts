@@ -48,6 +48,7 @@ import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store
 import {
   MESSAGING_NOT_RUNNING,
   type MessagingActivity,
+  type MessagingAnswerFile,
   type MessagingDiscordSend,
   type MessagingHistory,
   type MessagingHistoryScope,
@@ -173,6 +174,8 @@ interface PendingApproval {
 
 const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "removed"]);
 const APPROVAL_TEXT_LIMIT = 2_500;
+/** A progress line is one or two sentences; a longer one is cut, so every platform takes the edit. */
+const PROGRESS_TEXT_LIMIT = 1_000;
 const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 /** The states in which a connection can still get a transport that takes deliveries. */
@@ -306,7 +309,7 @@ export class MessagingService {
     this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
-      post: (connectionId, target, markdown) => this.#outboundPost(connectionId, target, markdown),
+      post: (connectionId, target, markdown, files) => this.#outboundPost(connectionId, target, markdown, files),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
       slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
@@ -1688,6 +1691,7 @@ export class MessagingService {
     connectionId: string,
     target: MessageTarget,
     markdown: string,
+    files: MessagingAnswerFile[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
@@ -1700,7 +1704,7 @@ export class MessagingService {
     // A Discord workspace id is the guild id, which a link to the post needs.
     const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
     // The place is outside this computer, so a secret in the text must not reach it.
-    return yield* live.adapter.postAnswer(target, redactText(markdown), null).pipe(
+    const posted = yield* live.adapter.postAnswer(target, redactText(markdown), null).pipe(
       Effect.map((messageId) => ({
         posted: true as const,
         messageId,
@@ -1713,6 +1717,17 @@ export class MessagingService {
         }),
       ),
     );
+    if (!("posted" in posted) || !files.length) return posted;
+    // The text is in the place already, so a failed upload names the files and does not fail the post.
+    const skippedFiles = yield* live.adapter.upload(target, files).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          this.#warn(failure.cause);
+          return files.map((file) => file.name);
+        }),
+      ),
+    );
+    return skippedFiles.length ? { ...posted, skippedFiles } : posted;
   });
 
   /** A reply, post or reaction of a workflow's Discord output. */
@@ -1814,6 +1829,20 @@ export class MessagingService {
     const key = `${activity.link.linkId}:${origin.platformMessageId}`;
     const target = this.#targets.get(key) ?? linkTarget(activity.link);
     const post = this.#posts.get(key);
+    if (activity.type === "progress") {
+      // The agent's newest progress line takes the place of "Working"; the Stop button stays. A
+      // request that already ended, or whose status post failed, gets no edit.
+      if (!live || !post?.messageId || !post.stopToken || post.final) return;
+      // Only the host makes a platform mention, so the mention markers go.
+      const text = redactText(activity.text).replace(MENTION_MARKERS, "");
+      yield* live.adapter
+        .edit(target, post.messageId, {
+          text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
+          buttons: [{ action: "stop" as const, label: sourceText("status.messaging.stop"), token: post.stopToken }],
+        })
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+      return;
+    }
     if (activity.type === "started") {
       if (!live) return;
       const stopToken = token();
@@ -2286,7 +2315,10 @@ function token(): string {
 }
 
 /** The last post of a request and the reaction on the person's message, from how its turn ended. */
-function finalPost(activity: Exclude<MessagingActivity, { type: "started" }>, awaitsTeammate: boolean): PendingFinal {
+function finalPost(
+  activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
+  awaitsTeammate: boolean,
+): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
   if (activity.type === "cancelled" || activity.status === "interrupted")

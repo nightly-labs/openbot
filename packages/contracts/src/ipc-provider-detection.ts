@@ -8,7 +8,15 @@
 
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString } from "./ipc-bounded-values";
-import { CUSTOM_PROVIDER_LIMITS, type CustomProviderHeader, isNewCustomProviderId } from "./ipc-custom-providers";
+import {
+  CUSTOM_PROVIDER_LIMITS,
+  type CustomProviderHeader,
+  type CustomProviderInputKind,
+  isCustomProviderContextWindow,
+  isCustomProviderInputs,
+  isCustomProviderMaxOutput,
+  isNewCustomProviderId,
+} from "./ipc-custom-providers";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
 
 export const PROVIDER_DETECTION_LIMITS = {
@@ -47,8 +55,17 @@ export const DEFAULT_PROVIDER_DETECTION_SETTINGS: ProviderDetectionSettings = {
   hiddenIds: [],
 };
 
+/**
+ * One model that a server lists. The other fields are what the list says about the model, so the
+ * form can fill them in (#3946). Each is absent when the list does not say it.
+ */
 export interface DetectedModel {
   id: string;
+  /** What the model reads beside text. Empty: text only. */
+  inputs?: CustomProviderInputKind[];
+  contextWindow?: number;
+  /** Only with `contextWindow`, as the form takes it. */
+  maxOutput?: number;
 }
 
 /** One server that answered `GET {baseUrl}/models` with no key. */
@@ -79,7 +96,14 @@ export interface DiscoverModelsResult {
 }
 
 function isDetectedModel(value: unknown): value is DetectedModel {
-  return isDynamicRecord(value) && isBoundedString(value.id, INPUT_LIMITS.identifier) && value.id.length > 0;
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.id, INPUT_LIMITS.identifier) &&
+    value.id.length > 0 &&
+    (value.inputs === undefined || isCustomProviderInputs(value.inputs)) &&
+    (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
+    (value.maxOutput === undefined || (value.contextWindow !== undefined && isCustomProviderMaxOutput(value.maxOutput)))
+  );
 }
 
 function isDetectedModels(value: unknown): value is DetectedModel[] {

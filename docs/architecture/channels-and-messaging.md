@@ -179,8 +179,9 @@ available member. These selections use no model. Other requests use
 the lead's provider, model, and reasoning setting in a separate session with no work tools. The
 request supplies the accepted result schema and the channel summary in place of the transcript.
 Routing selects each member whose role or area the request touches, and only those (`agentIds`). A
-request in the area of one member, or in the area of no member, goes to the one member best able to
-answer it. A request for opinions or feedback on shared work goes to each member whose area gives a
+request in the area of one member goes to that member. A greeting, a question about the channel, an
+unclear request, or a request in the area of no member goes to the lead only (the prompt names the
+lead), and the lead can ask the person in its own reply. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
 gets the request's attachments; its packet names the other members that answer, but does not carry
 their replies to that request, so each member gives its own view. This stays true after a typed
@@ -188,7 +189,11 @@ their replies to that request, so each member gives its own view. This stays tru
 the member wrote its own complete reply or result (not commentary), a follow-up gets the other replies, so it can ask about them. The packet cursor stops before the
 first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
-request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
+request. Routing can select an existing task or indicate that a message needs no answer. It cannot
+ask a question: the routing model used that outcome to answer the person as Coordinator (#4401). A
+model that still returns the old `question` outcome routes to the lead, so the coordinator posts only
+routing failures. A message that mentions a member that can take work is never idle: routing that
+returns idle gives it to the mentioned members, as a person who is named in a group chat answers.
 An existing task that routing selects keeps its instruction, and the new message is its follow-up.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
 visible and the user can correct it. Deterministic selection adds no message, and a lead that selects
@@ -197,12 +202,13 @@ task with `channelRoutingUnreadable` and offers Reassign. The log gets the answe
 field names only, not its text.
 
 A message that opens with agent mentions ("@A @B what do you think?") goes to each mentioned member
-that can take work, with no routing turn. A message that opens with `@everyone` goes to each member
+that can take work, with no routing turn. A quote tag before or between the mentions does not end
+the address, because the composer puts a quote where the caret is. A message that opens with `@everyone` goes to each member
 that can take work. `@everyone` is plain text, not a tag; the channel composer's mention picker
 offers it. The host reads the address from the text (`leadingAddress`), so a client that sends only
 the first mention in `recipientAgentId` reaches all of them, and the Team API wire does not change.
-A message that opens with a typed "@Name" and no tag goes to the member with that exact name
-(case-insensitive, the longest name wins), also with no routing turn. The host reads it; the contract
+A message that opens with typed "@Name"s and no tag ("@Ana @Ben, ideas?") goes to each member with
+that exact name (case-insensitive, the longest name wins), also with no routing turn. The host reads it; the contract
 parser does not change. A routine run reads its text in the same way. A request to more than one
 member does not continue the task of the message it replies to. "continue" (or "resume", "go on",
 "keep going") continues each stopped root task of the newest request that has one. A failed root
@@ -236,6 +242,14 @@ message. Inside a channel task, `send_to_channel` is refused; use `channel_assig
 `channel_transfer`. On desktop, a person can do the same by hand: "Send to channel" on a message of
 an agent chat opens the channel with the message text in its composer. Attachments stay behind.
 
+A workflow output with the target `chat-channel` posts its result as a note (`ChannelService.postNote`).
+The note has the author kind `coordinator`, the id `workflow:<workflowId>`, the workflow title as its
+name, and no task. It starts no task and no member answers it; the members read it later as channel
+history. The released channel codecs already accept that author kind, so a joined client and a phone
+decode the note. The step id gives the operation id, so a step that a restart resumes posts no second
+note. A missing or an archived channel fails the step. Only this computer offers the target, and over
+the Team API only an owner or admin can add or change one (`adminNodes` in `route-workflows.ts`).
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
@@ -267,6 +281,33 @@ channel controls still accepts only a stopped or failed run. On desktop, each ro
 waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
 subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
 
+Members can reply to each other (#4847). `channel_reply` takes the id of a message of another member
+and a short text (`CHANNEL_REPLY_CHARACTERS`). It posts the text in the shared chat as a reply to
+that message (`replyToMessageId`), and gives the author of that message one turn to answer: a child
+task of the caller's task, with the reply as its request and instruction. The caller waits for it
+as for `channel_assign`: the child is in `dependencies`, so the caller's turn ends `waiting` and the
+caller continues with the answer. Without the wait, a member that had to agree on something answered
+the person before the other member answered it. The answer of that turn shows as a reply to the
+reply message (`capture`, and `channel_result`). Text that the caller writes after its reply in the
+same turn folds into the steps of that turn, as text after `channel_result` does: models wrote "I
+will report back" there, and the note showed after the answer. `channel-replies.ts`
+finds a reply task by its request id prefix (`channel-reply-`), so the change adds no stored field,
+no migration and no Team API field. A person's message that resumes a reply task gives it a new
+request, so it becomes an ordinary task with the default expected result and answers that person. A
+request allows `CHANNEL_REPLY_LIMIT` (2) member replies, counted from the reply tasks of each root
+task of that request, whoever writes them: one message to two members shares one limit. A reply
+task that fails lets the caller continue without the answer (`settled`), because a short question
+must not hold the request until a person acts. `channel_result` is refused while a reply of the
+task waits for its answer. `channel_reply` refuses, with
+`accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
+a person or of the caller, to a streaming message, to a member that takes no work, and over the
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. The
+reply text is agent text that reaches another agent, so its assignment starts with a line that
+names the sender and says it is not the user, and a reply turn only answers: it cannot use
+`channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or
+the channel management tools. The commentary of a turn that posted a reply is left out of the
+transcript that models read, as for a turn that posted a result or wrote a completed answer.
+
 The channel controls stop and cancel a run with no message that a model reads, and a change note is
 not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
 recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
@@ -280,19 +321,25 @@ The change is a `save` through the command queue (`ChannelService.agentSave`), w
 from the stored channel when its turn comes, and the actor id `agent:<agentId>`. A new channel's id
 comes from the tool call id, so a retried call makes no second channel. Members must exist and not
 be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
-These changes write no `channel-change` note. Inside a channel task, both tools are refused, so only
-a person's request changes the channel there. They also need a turn of only this computer's user's
-messages, in the agent's own chat or in a side thread that the person opened or branched (no routine,
-messaging link or channel): an external chat, a routine run or an agent message can carry text from
-outside, and the Team API checks a team member's agent access. Webhook routines still need the
-agent's own chat.
+These changes write no `channel-change` note. Outside a channel, they need a turn of only this
+computer's user's messages, in the agent's own chat or in a side thread that the person opened or
+branched (no routine or messaging link): an external chat, a routine run or an agent message can
+carry text from outside, and the Team API checks a team member's agent access. Inside a channel task,
+they need a task whose request this computer's user wrote (`ChannelService.requestedByLocalPerson`):
+the same `channelRequester` check as the channel tools, which refuses a routine run, an agent's
+request and a member reply, and also a team member. There, `update_channel` does not change the
+task's own channel: the channel tools change it, write the note, and keep the caller's work from
+stopping. Webhook routines still need the agent's own chat.
 
-Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
-a channel delivery or a messaging delivery. While the agent has an active assignment,
-`ChannelService.mayDrain` holds its other main-lane requests. The work of other agents does not hold
-it. The tasks of the agent run beside the channel turn within the agent task limit, and a channel
-turn takes no task slot. When the provider of the agent runs one turn at a time (`concurrentTurns:
-false`), its task turns count as busy. Only declared `browser` and `workspace:<path>` resources are
+Channel work holds only the agent that does it. Each channel has its own mailbox lane
+(`channelLane(channelId)`, from `StoredMessage.channelId`), and its execution thread is a side thread
+in `ConversationRuntime`. So a channel turn runs beside the agent's own chat and its messaging
+deliveries, as a task turn does (#4761). It gets the side-thread guidance and no Computer Use. An
+agent runs one channel turn at a time over all channels: the scheduler holds the other channel lanes
+(`channel-turn`), and the channel `busy` hook starts no second assignment while one is active. The
+work of other agents does not hold it. A channel turn takes no task slot. When the provider of the
+agent runs one turn at a time (`concurrentTurns: false`), nothing runs in parallel: its chat and task
+turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment. Only declared `browser` and `workspace:<path>` resources are
 serialized: the same browser, or two workspaces where one path contains the other. An empty list,
 `none`, and `host` (from an earlier version) reserve nothing. An assignment keeps the resources it
 started with until it ends, and a task with an active assignment starts no second owner. An update
@@ -322,7 +369,11 @@ The provider acceptance cursor records context delivery. Context packets remain 
 provider replacement or compaction does not remove shared decisions. Unrelated server conversations
 are available through paginated retrieval and are not inserted automatically. Agent memories keep
 their existing meaning. A packet leaves out a member's thinking, and the commentary of a turn that
-posted a `channel_result`: the result is the answer of that turn.
+wrote a completed answer or posted a `channel_result` or a reply: the answer is what the turn says,
+and the reader sees that commentary only as folded steps above it (#5296). A turn with no completed
+answer keeps its commentary, because a turn that answers and then calls a tool has its answer there.
+The member packet and the `channel_assign` tool say to do the assignment alone, and to assign only when
+the person asks for another member or for help, or when a part clearly needs another member's role.
 
 ### How a channel keeps context
 
@@ -339,7 +390,8 @@ posted a `channel_result`: the result is the answer of that turn.
 | `channel_history` page | 24,000 characters (`HISTORY_PAGE_CHARACTERS`); a longer message is cut at 16,000 | `boundedHistoryPage` |
 | Handoff of an agent in the packet | 24,000 characters (`HANDOFF_INSTRUCTION_CHARACTERS`): 18,000 first and 6,000 last | `cutInstruction` |
 | Instruction of a task this task waits for | 500 characters (`DEPENDENCY_INSTRUCTION_CHARACTERS`) | `channel-history.ts` |
-| Compaction stops | after 2 compactions that leave 90% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
+| Compaction stops | after 2 compactions in a row that leave 70% or more; a `context_compaction_ineffective` notice. A session under 70% starts the count again | `ContextCompaction` |
+| Compaction stops after failures | after 2 compactions in a row that fail or time out; a `context_compaction_stopped` notice. A completed compaction or a session under 80% starts the count again | `ContextCompaction` |
 | Retry notice | at the 3rd provider retry; at 50% or more, a compaction before the next turn | `TurnLifecycle` |
 
 - The packet starts with the current assignment. A short assignment comes again at the end, because
@@ -412,7 +464,11 @@ effects do not have an exactly-once guarantee.
 Desktop IPC and remote desktop transports expose `channel-chats-v1` as an optional capability with
 separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
 the capability only when its channel service is connected. When a host does not advertise
-`channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. The account API and Signal service add no channel storage or routing.
+`channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. On desktop and in the web
+client, a `channels-changed` event of the open channel reads the list and the page; an event of
+another channel reads only the list. The six channels the reader left last keep their page, so a
+visit shows it at once while the read brings it up to date; a change in such a channel drops its page.
+A stopped-task card names the owner and the start of the request, so several cards differ (#5413). For a run that the assignment limit stopped, the card compares the reason with `CHANNEL_ASSIGNMENT_LIMIT_ERROR` and names the members that passed the work between them. Saved tasks and every host version keep that exact English. The mobile app still shows the English reason. The account API and Signal service add no channel storage or routing.
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
 with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
@@ -440,6 +496,11 @@ operation: the host stores a repeated operation once. The send then reads the hi
 channel, so the host's row replaces the phone's own; a failed read is not a failed send, and a closed
 channel reads its history when it opens. A channel message that an app before channels came back
 kept aside in `messages.unreadable-<time>.json` stays there.
+
+On a host with `channel-isolation-v1`, each channel record and the draft of a `save` carry `isolated`,
+the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
+server or the browser client shows the switch only when the host advertises the capability (#5380).
+A save without the field keeps the stored value, so a phone or an older client does not turn it off.
 
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does
@@ -644,8 +705,9 @@ the token and does the platform work for the hosts:
   (`discord-driver.ts`) sends typed operations (`DiscordApiRequest`: post, edit, delete, react, list
   messages, names, a private reply to a button press, upload) to `POST /v1/discord/api` with that
   bearer. Signal accepts an operation only for a guild routed to that socket, and only for a channel
-  of that guild, and makes the call with `@discordjs/rest`. Every post has no allowed mention, so it
-  pings nobody. Attachments are signed CDN addresses, which the host downloads directly.
+  of that guild, and makes the call with `@discordjs/rest`. A new text post allows only user mentions,
+  so it pings each user that it mentions, never a role or `@everyone`. Other posts and edits ping
+  nobody. Attachments are signed CDN addresses, which the host downloads directly.
 - **Conversations.** A conversation is a reply chain, keyed by its first message. Every OpenBot post
   replies to that message, so a reply to an OpenBot post names the conversation through the replied
   post's own reference. A direct message has no guild, so Signal answers it once with a fixed line.

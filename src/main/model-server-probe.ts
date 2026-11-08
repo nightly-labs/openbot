@@ -6,9 +6,14 @@
 // and the header values are credentials, so no message and no log line contains them.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CustomProviderHeader, DetectedModel } from "@openbot/contracts/ipc";
-import { PROVIDER_DETECTION_LIMITS } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { CustomProviderHeader, CustomProviderInputKind, DetectedModel } from "@openbot/contracts/ipc";
+import {
+  CUSTOM_PROVIDER_INPUT_KINDS,
+  isCustomProviderContextWindow,
+  isCustomProviderMaxOutput,
+  PROVIDER_DETECTION_LIMITS,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Schema } from "effect";
 import { readLimitedBody } from "../backend/limited-body";
@@ -151,7 +156,43 @@ function parseModelList(entries: readonly unknown[]): DetectedModel[] {
     const id = entry.id.trim();
     if (!id || id.length > INPUT_LIMITS.identifier || seen.has(id)) continue;
     seen.add(id);
-    models.push({ id });
+    models.push({ id, ...modelDetails(entry) });
   }
   return models;
+}
+
+/** The input kinds of a list, by their names there. OpenRouter calls a PDF input `file`. */
+const LISTED_INPUT_KINDS: ReadonlyMap<string, CustomProviderInputKind> = new Map([
+  ["image", "image"],
+  ["pdf", "pdf"],
+  ["file", "pdf"],
+]);
+
+/**
+ * What a list entry says about the model, in the shapes that servers publish: models.dev
+ * (`modalities.input`, `limit.context`, `limit.output`), OpenRouter (`architecture.input_modalities`,
+ * `context_length`, `top_provider.max_completion_tokens`) and vLLM (`max_model_len`). A missing or
+ * out-of-range value is left out.
+ */
+function modelDetails(entry: DynamicRecord): Omit<DetectedModel, "id"> {
+  const limit = isDynamicRecord(entry.limit) ? entry.limit : {};
+  const topProvider = isDynamicRecord(entry.top_provider) ? entry.top_provider : {};
+  const contextWindow = [limit.context, entry.context_length, entry.max_model_len].find(isCustomProviderContextWindow);
+  const maxOutput = [limit.output, topProvider.max_completion_tokens].find(isCustomProviderMaxOutput);
+  const listed = [
+    isDynamicRecord(entry.modalities) ? entry.modalities.input : undefined,
+    isDynamicRecord(entry.architecture) ? entry.architecture.input_modalities : undefined,
+  ].find(Array.isArray);
+  const inputs = Array.isArray(listed)
+    ? CUSTOM_PROVIDER_INPUT_KINDS.filter((kind) =>
+        listed.some((name) => isString(name) && LISTED_INPUT_KINDS.get(name) === kind),
+      )
+    : undefined;
+  return {
+    ...(inputs ? { inputs } : {}),
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    // The form takes a max output only with a context window. A cap as large as the window leaves no
+    // room for the prompt (OpenRouter often lists both as the same number), so the default stays.
+    ...(contextWindow !== undefined && maxOutput !== undefined && maxOutput < contextWindow ? { maxOutput } : {}),
+  };
 }

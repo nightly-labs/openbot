@@ -26,6 +26,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
@@ -164,24 +165,27 @@ export function attachmentIpcHandlers({
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_MP4_ATTACHMENTS_CAPABILITY);
         const supportsSvg =
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_SVG_ATTACHMENTS_CAPABILITY);
-        const options: OpenDialogOptions = {
-          properties: ["openFile", "multiSelections"],
-          filters:
-            filter === "images"
-              ? [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }]
-              : [
-                  {
-                    name: translate("dialog.filter.supportedFiles"),
-                    extensions: supportedAttachmentExtensions({
-                      eml: supportsEml,
-                      media: supportsMedia,
-                      zip: supportsZip,
-                      mp4: supportsMp4,
-                      svg: supportsSvg,
-                    }),
-                  },
-                ],
-        };
+        const supportsAnyFile =
+          serverId === LOCAL_SERVER_ID ||
+          remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY);
+        const options: OpenDialogOptions = { properties: ["openFile", "multiSelections"] };
+        // A host that takes any file gets no file filter, so the dialog shows every file.
+        if (filter === "images") {
+          options.filters = [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }];
+        } else if (!supportsAnyFile) {
+          options.filters = [
+            {
+              name: translate("dialog.filter.supportedFiles"),
+              extensions: supportedAttachmentExtensions({
+                eml: supportsEml,
+                media: supportsMedia,
+                zip: supportsZip,
+                mp4: supportsMp4,
+                svg: supportsSvg,
+              }),
+            },
+          ];
+        }
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)
           : await dialog.showOpenDialog(options);
@@ -296,7 +300,9 @@ export function attachmentIpcHandlers({
       previewWorkspaceFile: scopedHandler(parsePreviewWorkspaceFile, {
         local: async (parsed) => {
           const generation = filePreviewPages.generation;
-          const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
+          const workspaceFile = await runCauseEffect(
+            service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path, { exactPath: parsed.exactPath === true }),
+          );
           return runCauseEffect(
             localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size, generation, parsed.maxBytes),
           );
@@ -445,7 +451,6 @@ const uploadRemotePaths = Effect.fn("AttachmentIpc.uploadRemotePaths")(function*
       serverId,
       paths.map((path) => basename(path)),
     );
-    for (const path of paths) assertSupportedAttachmentName(basename(path));
   });
   const files = yield* Effect.forEach(
     paths,
@@ -500,7 +505,7 @@ const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(funct
 });
 
 /**
- * Checks the names and sizes, then uploads every file at once, as one import. With `requestId`, the
+ * Checks the sizes, then uploads every file at once, as one import. With `requestId`, the
  * import reports the bytes of a single file; several files at once would mix their progress.
  */
 function uploadRemoteFiles(
@@ -511,7 +516,6 @@ function uploadRemoteFiles(
 ) {
   const progressId = files.length === 1 ? requestId : undefined;
   return remoteDecode(() => {
-    for (const file of files) assertSupportedAttachmentName(file.name);
     if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
       throw new Error(sourceText("error.attachment.fileTooLarge"));
     }
@@ -529,11 +533,22 @@ function uploadRemoteFiles(
   );
 }
 
+/** A host without `any-file-attachments` refuses a name with no known type. */
+function assertRemoteAttachmentNames(
+  remoteServers: AttachmentIpcDependencies["remoteServers"],
+  serverId: string,
+  names: readonly string[],
+): void {
+  if (remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY)) return;
+  for (const name of names) assertSupportedAttachmentName(name);
+}
+
 function assertRemoteAttachmentSupport(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   names: readonly string[],
 ): void {
+  assertRemoteAttachmentNames(remoteServers, serverId, names);
   if (
     names.some((name) =>
       MEDIA_ATTACHMENT_EXTENSIONS.some((extension) => extension === attachmentFileExtension(name)),

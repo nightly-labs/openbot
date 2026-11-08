@@ -1054,7 +1054,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     }
   }
 
-  /** Opens the relayed sign-in page in this computer's browser, after the user checked its host name. */
+  /** Opens the relayed sign-in page in this computer's browser again. */
   async function openSignInRelay(): Promise<void> {
     const relay = signInRelay();
     const current = relayed();
@@ -1088,7 +1088,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    */
   function flowsHere(app: MarketplacePluginApp): McpConnectFlow[] {
     const flows = app.server.auth ?? [];
-    if (!props.hostServerId) return flows;
+    // `pluginHostName` names a joined server that this account connects apps on, a member's too.
+    if (!props.pluginHostName) return flows;
     return flows.filter((flow) => flow.kind === "key" || (flow.kind === "link" && Boolean(signInRelay())));
   }
 

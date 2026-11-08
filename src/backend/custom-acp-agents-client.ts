@@ -27,6 +27,7 @@ import type { AcpHistoryPersistence } from "./acp-client";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
+import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -141,6 +142,8 @@ function requiredCwd(params: unknown): string {
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "unsupported";
   readonly provider = "acp" as const;
+  /** Each child is an ACP client, which sends the memories and section-mates with the prompts. */
+  readonly turnContext = true;
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
@@ -723,8 +726,11 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 }
 
 /**
- * The agent's models under its id. An id that the contract refuses is dropped alone: the model list
- * decoders fail closed on the whole array. An agent with no list gets the one model `default`.
+ * The agent's models under its id. An agent with no list gets the one model `default`.
+ *
+ * ACP lets an agent report any string as a model value, so a value that the contract charset refuses
+ * is encoded (see `encodedModelId`), and `forChild` gives the agent its own value back. An id that is
+ * still refused, as one too long, is dropped alone.
  */
 function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): ModelEntry[] {
   if (data.length === 0) {
@@ -733,7 +739,7 @@ function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): M
   return data.flatMap((item) => {
     const model = item.model?.trim();
     if (!model) return [];
-    const id = `${config.id}/${model}`;
+    const id = encodedModelId(`${config.id}/`, model);
     // `<agent name>/<model name>`, as a custom endpoint's models are named: the picker groups by it.
     return isAgentModel(id) ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}` }] : [];
   });
@@ -743,7 +749,7 @@ function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): M
 function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   const record: DynamicRecord = isRecord(params) ? params : {};
   const { model, ...rest } = record;
-  const agentModel = typeof model === "string" ? model.slice(model.indexOf("/") + 1) : "";
+  const agentModel = typeof model === "string" ? providerModelValue(model.slice(model.indexOf("/") + 1)) : "";
   return {
     ...rest,
     ...(sessionId === null ? {} : { threadId: sessionId }),

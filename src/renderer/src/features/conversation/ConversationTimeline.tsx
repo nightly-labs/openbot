@@ -1,13 +1,19 @@
+import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
-import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
-import { ChannelActivityIndicator } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
-import { AgentStepsDisclosure, type AgentStepsTrace } from "@openbot/ui/features/conversation/AgentSteps";
+import {
+  type AgentStep,
+  AgentStepsDisclosure,
+  type AgentStepsTrace,
+} from "@openbot/ui/features/conversation/AgentSteps";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import { agentActivityExitDelay, agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { UsageLimitAskCard } from "@openbot/ui/features/conversation/BackupModels";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -18,20 +24,30 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { feedbackApproval } from "@openbot/ui/features/conversation/feedback-approval";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
-import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import {
+  DeleteMessageDialog,
+  MessageActions,
+  MessageMenu,
+  MessageMenuItems,
+  type MessageMenuItemsProps,
+} from "@openbot/ui/features/conversation/MessageRendering";
+import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
-import { currentDevicePlatform } from "../../send-shortcut-preference";
+import { useCompactMessageActions } from "../../compact-message-actions-preference";
+import { currentDevicePlatform, deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -49,6 +65,7 @@ import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
+import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { isIncomingAgentMessage } from "./conversation-read-state";
@@ -86,6 +103,9 @@ function frozenUiBlock(message: AgentMessage | undefined): ConversationUiBlock |
  * draw a card instead of a message row. None shows the header a run continues under, so none can
  * hold a run open.
  */
+/** In the agent chat, a separator with the time stands above a message that comes this long after the one before it. */
+const AGENT_CHAT_TIME_GAP_MS = 60 * 60 * 1000;
+
 function rowDrawsTime(message: AgentMessage): boolean {
   return (
     !markerOnlyMessage(message) &&
@@ -93,6 +113,7 @@ function rowDrawsTime(message: AgentMessage): boolean {
     message.kind !== "plan" &&
     message.kind !== "subagents" &&
     message.kind !== "memory-changes" &&
+    message.kind !== "thinking" &&
     chatVisualReply(message) === null
   );
 }
@@ -112,6 +133,9 @@ function routineMarkerAvailable(
   return availableRoutineIds?.includes(marker.routineId) === true;
 }
 
+/** The message kinds that can be the reply on a rail card. */
+const REPLY_KINDS: ReadonlySet<MessageKind> = new Set(["text", "question"]);
+
 /** @internal Stable HMR boundary for conversation timeline. */
 export function ConversationTimeline() {
   const {
@@ -127,13 +151,14 @@ export function ConversationTimeline() {
     clearNewMessages,
     closeChatSearch,
     composerHasContent,
-    copiedMessageId,
+    quotedMessageId,
     branchThread,
     dismissPendingSend,
     downloadMessageImageFile,
     editingDeliveryId,
     editPendingSend,
     copyMessage,
+    copiedMessageId,
     messageText,
     expandedEmojiMessageId,
     installedSkills,
@@ -159,6 +184,7 @@ export function ConversationTimeline() {
     openSharedFile,
     openWorkspaceFile,
     openQuote,
+    openTaggedReference,
     pendingSendFor,
     presentedQueueDeliveries,
     providerUpdateRequired,
@@ -168,6 +194,7 @@ export function ConversationTimeline() {
     sendCardMessage,
     reactToMessage,
     renderedAgentActivity,
+    activeStepActivity,
     providerOffline,
     providerSilentMinutes,
     agentProviderName,
@@ -175,6 +202,7 @@ export function ConversationTimeline() {
     replyToMessage,
     addPageText,
     setPageContext,
+    quoteSelection,
     retryPendingSend,
     scheduleUnreadDividerVisibilityUpdate,
     setChatSearchQuery,
@@ -322,13 +350,37 @@ export function ConversationTimeline() {
 
   const runtime = conversationRuntime(props);
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
-  const loadImageFile = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
+  const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
   const instructionsCalls = agentInstructionsCalls();
   /** View and Undo on an instructions change line: the file is in the workspace on this computer. */
   const localInstructionsCalls = () =>
     props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
+
+  /**
+   * Send on a feedback card resolves the approval at once, but the tool still waits for GitHub. The
+   * card stays, with its loader, until the next row (the thank-you card) arrives or the turn ends.
+   */
+  const [sendingFeedback, setSendingFeedback] = createSignal<{
+    approval: AgentApproval;
+    rows: number;
+    turnId: string | null | undefined;
+  } | null>(null);
+  const heldFeedback = createMemo(() => {
+    const held = sendingFeedback();
+    if (!held || props.approval) return undefined;
+    if (props.messages.length !== held.rows || props.activeTurnId !== held.turnId) return undefined;
+    return held.approval;
+  });
+  async function approve(approval: AgentApproval) {
+    if (feedbackApproval(approval)) {
+      setSendingFeedback({ approval, rows: props.messages.length, turnId: props.activeTurnId });
+    }
+    const accepted = await props.onRespondToApproval("accept");
+    if (!accepted) setSendingFeedback(null);
+    return accepted;
+  }
   /**
    * The other person who wrote a message. The reader's own message, an agent message, and a message
    * from before senders were kept have none, so a chat with one person looks as it always did.
@@ -411,14 +463,21 @@ export function ConversationTimeline() {
             agents={props.agents}
             referencedMessage={quoted()}
             referencedAuthorName={quotedAuthorName()}
-            onSelectAgent={props.onSelectAgent}
+            // The sender's name opens the side thread that sent the message, or else the sender's own chat.
+            // Another agent, such as a mention in the text, opens as before.
+            onSelectAgent={(agentId) =>
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent(agentId)
+            }
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
-            onOpenSharedFile={openSharedFile}
+            onOpenSharedFile={(path) => openSharedFile(path)}
             // A workspace path is in the workspace of the agent that wrote it, as in a channel.
             onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
             onOpenQuote={openQuote}
+            onOpenTag={openTaggedReference}
             macWindowControls={props.platform === "darwin"}
           />
         )}
@@ -434,7 +493,11 @@ export function ConversationTimeline() {
       : channel && message.author === "agent"
         ? `agent:${message.senderAgentId ?? ""}`
         : message.author;
-    return message.createdAt === undefined ? { author } : { author, createdAt: message.createdAt };
+    return {
+      author,
+      ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
+      ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
+    };
   };
   /**
    * An agent's record of a routine it created or changed is a card whose schedule the person can
@@ -489,6 +552,17 @@ export function ConversationTimeline() {
     },
   );
   const webhookRoutines = createChatWebhookRoutines(webhookRoutineSource);
+  /**
+   * Opens the side thread of a routine's runs. A routine that now runs in the chat has no link, also when
+   * an earlier run made a thread: its new runs are not there. A remote host without
+   * `routine-run-place-v1` does not send the place, so its routines keep the link.
+   */
+  const openRoutineThread = (routineId: string) => {
+    const routine =
+      props.routines?.find((candidate) => candidate.id === routineId) ??
+      webhookRoutines.state.routines.find((candidate) => candidate.id === routineId);
+    return routine?.runIn === "chat" ? undefined : props.threads?.routineThread(routineId);
+  };
   // The plain marker of a webhook routine opens it too: the host lists those routines on their own.
   const availableRoutineIds = createMemo(() =>
     props.availableRoutineIds
@@ -541,6 +615,10 @@ export function ConversationTimeline() {
     // In a shared chat, a message from another member is theirs.
     question: (message) =>
       message.author === "you" && !message.actionMarker && !otherSender(message) ? message.body : undefined,
+    // The first answer the reader would call a message, or a question the agent asks: not thinking, a plan,
+    // a tool exchange, an error or a quiet run.
+    reply: (message) =>
+      countableTimelineMessage(message) && REPLY_KINDS.has(message.kind ?? "text") ? message.body : undefined,
     storedCount: () => props.messages.length,
     unloaded: () => props.unloadedHistory,
     virtualizer: messageVirtualizer,
@@ -553,6 +631,7 @@ export function ConversationTimeline() {
     activeTurnId: () => props.activeTurnId,
   });
   const showAgentSteps = useShowAgentSteps();
+  const compactActions = useCompactMessageActions();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
   /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
@@ -580,9 +659,48 @@ export function ConversationTimeline() {
       if (shownSubagentId() !== subagentId) toggleSubagentPanel(subagentId);
     },
   });
+  /** The Natural style shows the plain activity line: what the agent does now, and nothing more. */
+  const plainActivity = () => !channel && props.responseStyle === "natural";
   const channelWorkingSteps = createMemo(() => (channel ? turnSteps.workingSteps(channel.workingTurns()) : []));
+  /*
+   * The channel's activity line leaves as the agent chat's line does: it waits a moment for the next
+   * member, then folds away with the workers and steps it last showed. When it went at once, the chat
+   * above it jumped down.
+   */
+  const [channelActivity, setChannelActivity] = createSignal<{
+    workers: ChannelWorker[];
+    steps: readonly AgentStep[];
+    phase: "active" | "exiting";
+  } | null>(null);
+  createEffect(
+    (): ChannelWorker[] => channel?.workers() ?? [],
+    (workers) => {
+      if (workers.length > 0) {
+        setChannelActivity({
+          workers,
+          steps: untrack(channelWorkingSteps),
+          phase: "active",
+        });
+        return;
+      }
+      if (!untrack(channelActivity)) return;
+      let exitTimer: number | undefined;
+      const delayTimer = window.setTimeout(() => {
+        setChannelActivity((latest) => latest && { ...latest, phase: "exiting" });
+        exitTimer = window.setTimeout(() => setChannelActivity(null), agentActivityExitDuration());
+      }, agentActivityExitDelay());
+      return () => {
+        window.clearTimeout(delayTimer);
+        window.clearTimeout(exitTimer);
+      };
+    },
+  );
+  createEffect(channelWorkingSteps, (steps) => {
+    if (untrack(channelActivity)?.phase === "active" && untrack(() => channel?.workers().length))
+      setChannelActivity((latest) => latest && { ...latest, steps });
+  });
   /**
-   * A direct chat with no message yet, and no turn, queued send or question. A queued send leaves the
+   * A direct chat with no message yet, and no turn, queued send, welcome or question. A queued send leaves the
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
    * Its empty state plays a faint turn from the agent's own routine and skill.
    */
@@ -592,6 +710,7 @@ export function ConversationTimeline() {
     !props.hasOlder &&
     !props.activeTurnId &&
     presentedQueueDeliveries().length === 0 &&
+    !(props.queue?.welcome && props.queue.agentId === props.agent?.id) &&
     !renderedAgentActivity() &&
     !props.prompt
       ? props.agent
@@ -728,14 +847,20 @@ export function ConversationTimeline() {
                     : arrives;
                 /*
                  * The separator above the row. The first row always carries one, and a later row
-                 * carries one when it opens a new day. A message with no stored timestamp can only
+                 * carries one when it opens a new day. The agent chat shows no time under a message,
+                 * so a pause of an hour or more also gets one there. A message with no stored timestamp can only
                  * open the transcript, so it falls back to the time it prints in its footer.
                  */
                 const dayMarker = createMemo(() => {
                   const current = message();
                   if (!current) return null;
                   const previous = previousMessage();
-                  if (current.createdAt) return dayMarkerLabel(previous?.createdAt, current.createdAt, { t, format });
+                  if (current.createdAt)
+                    return dayMarkerLabel(previous?.createdAt, current.createdAt, {
+                      t,
+                      format,
+                      ...(channel || !compactActions() ? {} : { gapMs: AGENT_CHAT_TIME_GAP_MS }),
+                    });
                   return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
                 });
                 /*
@@ -793,6 +918,30 @@ export function ConversationTimeline() {
                   if (!channel) return props.agent?.id;
                   const current = message();
                   return current?.author === "agent" ? current.senderAgentId : undefined;
+                };
+                // A bare file name can be a file that the same turn attached, from a subfolder or a tool
+                // that reports no path. It opens when the workspace has no such file (#5189).
+                const turnAttachment = (path: string) => {
+                  const turnId = message()?.turnId;
+                  if (!turnId || /[/\\]/u.test(path)) return undefined;
+                  const matches = timelineMessages()
+                    .filter((candidate) => candidate.turnId === turnId)
+                    .flatMap((candidate) => candidate.attachments ?? [])
+                    .filter((attachment) => attachment.name === path);
+                  return matches.length === 1 ? matches[0] : undefined;
+                };
+                const imageScope = () => ({
+                  serverId: props.server?.id ?? "local",
+                  messageId: message()?.id ?? initialMessage.id,
+                  agentId: workspaceAgentId(),
+                });
+                // A chip joins a file name to the folder that the message names. When nothing is there,
+                // the name opens as the agent wrote it, from its workspace (#5270).
+                const writtenFile = (asWritten: string | undefined) => {
+                  const agentId = workspaceAgentId();
+                  return asWritten && agentId
+                    ? () => openWorkspaceFile(asWritten, undefined, agentId, "tab", turnAttachment(asWritten))
+                    : undefined;
                 };
                 // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
                 // host's, even after the host answered.
@@ -896,8 +1045,9 @@ export function ConversationTimeline() {
                                                 )}
                                                 onSelectAgent={props.onSelectAgent}
                                                 onOpenRoutine={openRoutineSettings}
-                                                openRoutineThread={props.threads?.routineThread}
+                                                openRoutineThread={openRoutineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                onOpenLink={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
                                                 agentMessageText={agentMessageText}
@@ -1089,8 +1239,8 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
-                if (untrack(() => initialMessage.kind === "memory-changes")) {
-                  // Only a turn with no answer gets this row: an answer shows the changes in its steps.
+                if (untrack(() => initialMessage.kind === "memory-changes" || initialMessage.kind === "thinking")) {
+                  // Only a finished turn with no answer gets this row: an answer shows the steps above it.
                   return (
                     <div
                       data-index={virtualRow.index}
@@ -1130,6 +1280,13 @@ export function ConversationTimeline() {
                   // A visual reply is the agent's page. It shows above the final reply, with no bubble.
                   const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
                   const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
+                  // The page quotes as its file, as in the side panel, so the quote chip opens the page.
+                  const pageQuoteId = () =>
+                    fileQuoteId({
+                      source: "attachment",
+                      attachmentId: visual().attachment.id,
+                      name: visual().attachment.name,
+                    });
                   const [page, setPage] = createSignal<{ html?: string; failed?: boolean }>({});
                   if (loadPage && !pageUrl()) {
                     let mounted = true;
@@ -1190,6 +1347,9 @@ export function ConversationTimeline() {
                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
+                            onQuote={(text) => quoteSelection(pageQuoteId(), text)}
+                            quoteShortcut={deviceQuoteShortcut(props.platform)}
+                            onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
                             isAppShortcut={isChatVisualAppShortcut}
                             macWindowControls={props.platform === "darwin"}
                           />
@@ -1224,9 +1384,12 @@ export function ConversationTimeline() {
                     if (currentMessage) void copyMessage(currentMessage);
                   },
                 };
-                // A channel shows an agent's actions beside the answer. Its steps show only with them, and
-                // they open only the trace.
-                const stepsInRow = () => Boolean(channel) && author().kind === "agent" && !message()?.questionPrompt;
+                // An agent's actions stand beside its answer, and its steps show with them and open only the
+                // trace. In an agent chat, "Show agent steps" keeps the open list above the answer.
+                const stepsInRow = () =>
+                  author().kind === "agent" && !message()?.questionPrompt && (Boolean(channel) || !showAgentSteps());
+                // The reader's own actions stand beside the bubble, so a run of their messages sits close.
+                const actionsBeside = () => stepsInRow() || author().kind === "you";
                 const stepsDisclosure = () => (
                   <Show when={turnSteps.stepsAbove(message()?.id)}>
                     {(steps) => (
@@ -1247,6 +1410,29 @@ export function ConversationTimeline() {
                   spokenReplyIds().has((message() ?? initialMessage).id)
                     ? undefined
                     : readAloudAction(message() ?? initialMessage);
+                // The right-click menu and the More button of the action row show the same items.
+                const menuItems = (): MessageMenuItemsProps => ({
+                  message: message() ?? initialMessage,
+                  reactions: !channel,
+                  ...messageActions,
+                  readAloud: messageReadAloud(),
+                  onMarkUnread: markUnreadAction(message() ?? initialMessage),
+                  sendToChannel: sendToChannelAction(message() ?? initialMessage),
+                  onBranch: branchAction(message() ?? initialMessage),
+                  branchDisabled: Boolean(props.activeTurnId),
+                  onDelete: deleteAction(message() ?? initialMessage),
+                });
+                /*
+                 * With "Compact message actions" on, the row shows React, Reply and More. With it off, the row
+                 * shows every action and the time, as before. Named functions keep the conditions out of the
+                 * component props.
+                 */
+                const rowMenu = () => (compactActions() ? () => <MessageMenuItems {...menuItems()} /> : undefined);
+                const rowCopy = () => (compactActions() ? undefined : messageActions.onCopy);
+                const rowCopied = () => !compactActions() && copiedMessageId() === message()?.id;
+                const rowReadAloud = () => (compactActions() ? undefined : messageReadAloud());
+                const rowBranch = () => (compactActions() ? undefined : branchAction(message() ?? initialMessage));
+                const rowActionTime = () => Boolean(channel) || !compactActions();
                 return (
                   <div
                     data-index={virtualRow.index}
@@ -1289,15 +1475,25 @@ export function ConversationTimeline() {
                           <ChatMessageRow
                             message={message() ?? initialMessage}
                             author={author()}
+                            showFull={
+                              chatSearchOpen() && chatSearchOpensMessage(message()?.body ?? "", chatSearchQuery())
+                            }
+                            open={quotedMessageId() === message()?.id && chatSearchCanOpen(message()?.body ?? "")}
                             showAuthor={
                               author().kind === "member" || (channel && author().kind === "agent")
                                 ? !continuesRun()
                                 : undefined
                             }
                             showTime={!continuesRun()}
+                            actionRow={!turnStep()}
+                            actionTime={rowActionTime()}
                             steps={stepsInRow() ? stepsDisclosure() : undefined}
-                            actionsBeside={stepsInRow()}
+                            actionsBeside={actionsBeside()}
                             animate={animateEntrance}
+                            // Natural shows a message once it is complete, in an agent chat and in a channel.
+                            // Its bubble enters with all of its text, so the height does not grow while the
+                            // words fade in, and a complete answer does not look as if it still arrives.
+                            textAtOnce={props.responseStyle === "natural"}
                             agents={props.agents}
                             skills={installedSkills()}
                             referencedMessage={referencedMessage()}
@@ -1315,28 +1511,34 @@ export function ConversationTimeline() {
                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                             onPreview={(attachment) => void previewAttachment(attachment)}
                             onAttachmentAction={attachmentAction}
-                            onOpenSharedFile={openSharedFile}
+                            onOpenSharedFile={(path, asWritten) => openSharedFile(path, "tab", writtenFile(asWritten))}
                             onOpenWorkspaceFile={
                               workspaceAgentId()
-                                ? (path) => openWorkspaceFile(path, undefined, workspaceAgentId())
+                                ? (path, asWritten) =>
+                                    openWorkspaceFile(
+                                      path,
+                                      undefined,
+                                      workspaceAgentId(),
+                                      "tab",
+                                      turnAttachment(path),
+                                      writtenFile(asWritten),
+                                    )
                                 : undefined
                             }
                             onOpenQuote={openQuote}
+                            onOpenTag={openTaggedReference}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
                             downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
-                            loadImageFile={
-                              loadImageFile &&
-                              ((file) =>
-                                loadImageFile(file, {
-                                  serverId: props.server?.id ?? "local",
-                                  messageId: message()?.id ?? initialMessage.id,
-                                  agentId: workspaceAgentId(),
-                                }))
-                            }
+                            loadImageFile={messageImageFiles && ((file) => messageImageFiles.load(file, imageScope()))}
                             onDownloadImageFile={
-                              loadImageFile && ((file) => downloadMessageImageFile(file, workspaceAgentId()))
+                              messageImageFiles &&
+                              ((file) =>
+                                downloadMessageImageFile(
+                                  messageImageFiles.source(file, imageScope()),
+                                  workspaceAgentId(),
+                                ))
                             }
                             actions={
                               <>
@@ -1366,7 +1568,6 @@ export function ConversationTimeline() {
                                     message={message() ?? initialMessage}
                                     pickerOpen={openReactionMessageId() === message()?.id}
                                     expandedEmoji={expandedEmojiMessageId() === message()?.id}
-                                    copied={copiedMessageId() === message()?.id}
                                     reactions={!channel}
                                     authorName={channel ? author().name : undefined}
                                     onTogglePicker={() => {
@@ -1382,9 +1583,13 @@ export function ConversationTimeline() {
                                         current === messageId ? null : messageId,
                                       );
                                     }}
-                                    {...messageActions}
-                                    readAloud={messageReadAloud()}
-                                    onBranch={branchAction(message() ?? initialMessage)}
+                                    onReact={messageActions.onReact}
+                                    onReply={messageActions.onReply}
+                                    menu={rowMenu()}
+                                    onCopy={rowCopy()}
+                                    copied={rowCopied()}
+                                    readAloud={rowReadAloud()}
+                                    onBranch={rowBranch()}
                                     branchDisabled={Boolean(props.activeTurnId)}
                                   />
                                 </Show>
@@ -1394,18 +1599,7 @@ export function ConversationTimeline() {
                               hostless() || turnStep()
                                 ? undefined
                                 : () => (
-                                    <MessageMenu
-                                      message={message() ?? initialMessage}
-                                      reactions={!channel}
-                                      authorName={channel ? author().name : undefined}
-                                      {...messageActions}
-                                      readAloud={messageReadAloud()}
-                                      onMarkUnread={markUnreadAction(message() ?? initialMessage)}
-                                      sendToChannel={sendToChannelAction(message() ?? initialMessage)}
-                                      onBranch={branchAction(message() ?? initialMessage)}
-                                      branchDisabled={Boolean(props.activeTurnId)}
-                                      onDelete={deleteAction(message() ?? initialMessage)}
-                                    />
+                                    <MessageMenu {...menuItems()} authorName={channel ? author().name : undefined} />
                                   )
                             }
                           >
@@ -1472,39 +1666,6 @@ export function ConversationTimeline() {
             <Show when={!compactionBefore()}>
               <CompactionMarker />
             </Show>
-            <div
-              class="agent-activity-slot"
-              data-reserved={agentActivitySpaceReserved() ? "true" : "false"}
-              ref={setAgentActivitySlotElement}
-            >
-              <Show
-                when={!channel}
-                fallback={
-                  <Show when={channel && channel.workers().length > 0}>
-                    <ChannelActivityIndicator
-                      workers={channel?.workers() ?? []}
-                      steps={channelWorkingSteps()}
-                      stepsOpenByDefault={showAgentSteps()}
-                    />
-                  </Show>
-                }
-              >
-                <Show when={renderedAgentActivity()}>
-                  {(activity) => (
-                    <AgentActivityIndicator
-                      agent={activity().agent}
-                      detail={activity().detail}
-                      label={activity().label}
-                      phase={activity().phase}
-                      since={activity().since}
-                      steps={turnSteps.activeSteps()}
-                      stepsOpenByDefault={showAgentSteps()}
-                      waitingFor={waitingProviderName()}
-                    />
-                  )}
-                </Show>
-              </Show>
-            </div>
             {/* Under an open side thread, the thread draws the card of its own question. */}
             <Show when={!sideThreadOpen()}>
               <ConversationQuestionPrompt
@@ -1512,13 +1673,14 @@ export function ConversationTimeline() {
                 registerComposerAnswer={registerPromptComposerAnswer}
               />
             </Show>
-            <Show keyed when={props.approval}>
+            <Show keyed when={props.approval ?? heldFeedback()}>
               {(approval) => (
                 <Loading>
                   <ApprovalCard
                     approval={approval}
                     agentName={interactionAgentName()}
-                    onApprove={() => props.onRespondToApproval("accept")}
+                    sending={heldFeedback() !== undefined}
+                    onApprove={() => approve(approval)}
                     onReject={() => props.onRespondToApproval("decline")}
                     onAlwaysAllow={props.onAlwaysAllowApproval}
                   />
@@ -1540,6 +1702,45 @@ export function ConversationTimeline() {
             <Show when={!sideThreadOpen()}>
               <ConversationBrowserTakeover />
             </Show>
+            {/* The working line goes under an open card, as the steps line goes under an agent message. */}
+            <div
+              class="agent-activity-slot"
+              data-reserved={agentActivitySpaceReserved() ? "true" : "false"}
+              ref={setAgentActivitySlotElement}
+            >
+              <Show
+                when={!channel}
+                fallback={
+                  <Show when={channelActivity()}>
+                    {(activity) => (
+                      <ChannelActivityIndicator
+                        workers={activity().workers}
+                        steps={activity().steps}
+                        phase={activity().phase}
+                        stepsOpenByDefault={showAgentSteps()}
+                      />
+                    )}
+                  </Show>
+                }
+              >
+                <Show when={renderedAgentActivity()}>
+                  {(activity) => (
+                    <AgentActivityIndicator
+                      agent={activity().agent}
+                      detail={activity().detail}
+                      label={activity().label}
+                      phase={activity().phase}
+                      since={activity().since}
+                      steps={turnSteps.activeSteps()}
+                      stepsOpenByDefault={showAgentSteps()}
+                      waitingFor={waitingProviderName()}
+                      plain={plainActivity()}
+                      activity={activeStepActivity()}
+                    />
+                  )}
+                </Show>
+              </Show>
+            </div>
           </div>
         </Show>
       </div>

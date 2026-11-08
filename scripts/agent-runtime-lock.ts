@@ -8,7 +8,18 @@ const nativeProviderArtifactSchema = z.object({
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
-  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe", "devin", "devin.exe", "copilot", "copilot.exe"]),
+  executable: z.enum([
+    "pi",
+    "pi.exe",
+    "muse",
+    "muse.exe",
+    "devin",
+    "devin.exe",
+    "copilot",
+    "copilot.exe",
+    "vibe-acp",
+    "vibe-acp.exe",
+  ]),
   files: z.record(z.string().min(1), sha256Schema),
 });
 const nativeProviderLockSchema = z.object({
@@ -311,6 +322,12 @@ const agentRuntimeLockSchema = z.object({
    * it in a release.
    */
   copilot: nativeProviderLockSchema,
+  /**
+   * Mistral Vibe's ACP server, `vibe-acp`, from the GitHub releases of `mistralai/mistral-vibe`. Each
+   * archive is a PyInstaller folder build: the program and the `_internal` folder that holds Python.
+   * The licence is the one in the package metadata of that folder, so `files` holds its hash.
+   */
+  mistral: nativeProviderLockSchema,
   cline: z.object({
     registry: z.literal("https://registry.npmjs.org"),
     repository: z.literal("https://github.com/cline/cline"),

@@ -60,6 +60,8 @@ export const messages = {
     "Espera a que terminen el turno activo y la cola antes de iniciar un nuevo chat.",
   "error.agent.waitBeforeCompactContext":
     "Espera a que terminen el turno activo y la cola antes de compactar el contexto.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Espera a que terminen el turno activo y la cola antes de eliminar el historial.",
   "error.agent.compactContextUnavailable": "Este agente no puede compactar su contexto ahora.",
   "error.agent.unknown": "Agente desconocido: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -109,6 +111,10 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Solo el equipo que ejecuta el agente puede cambiar este ajuste.",
   "error.agent.sideQuestionBusy": "Hay demasiadas preguntas aparte en curso. Inténtalo de nuevo en breve.",
   "error.agent.sideQuestionFailed": "El agente no pudo responder la pregunta aparte. Inténtalo de nuevo.",
+  "error.agent.webSearchSignIn": "La búsqueda web necesita iniciar sesión en Codex con una cuenta de ChatGPT.",
+  "error.agent.webSearchBusy":
+    "Hay demasiadas búsquedas y preguntas secundarias en curso. Inténtalo de nuevo en breve.",
+  "error.agent.webSearchFailed": "La búsqueda web no terminó. Inténtalo de nuevo.",
   "error.agent.busyMessageModeLocalOnly":
     "El comportamiento de los mensajes mientras trabaja el agente solo se puede configurar en el equipo que lo ejecuta.",
   "error.agent.backupModelsLocalOnly":

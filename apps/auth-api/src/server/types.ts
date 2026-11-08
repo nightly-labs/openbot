@@ -19,6 +19,8 @@ export interface WorkerBindings {
   GITHUB_TOKEN_RATE_LIMITER: RateLimit;
   /** Checked by the Live Activity relay only, so a Worker without it keeps its other routes. */
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
+  /** Checked by the bug report route only, so a Worker without it keeps its other routes. */
+  FEEDBACK_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;
@@ -29,6 +31,11 @@ export interface WorkerBindings {
   EMAIL_LICENSE_FROM?: string;
   /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
   EMAIL_RELAY?: Fetcher;
+  /**
+   * Cloudflare Email Service. It sends a message only when the SMTP mailbox surely did not, such as
+   * when its hourly sender limit is spent. Without it, an SMTP failure is final.
+   */
+  EMAIL_FALLBACK?: SendEmail;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
@@ -235,15 +242,15 @@ export interface TeamInviteEmailDelivery {
 }
 
 export interface WelcomeEmailDelivery {
-  send(message: SmtpWelcomeMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpWelcomeMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface LicenseEmailDelivery {
-  send(message: SmtpLicenseMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpLicenseMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface ContactMessageDelivery {
-  send(message: SmtpContactMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpContactMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export type EmailVerificationResult =

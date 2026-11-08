@@ -11,6 +11,7 @@ import {
   type AgentMemorySelectionState,
   type AgentTask,
   type AgentTaskInput,
+  type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
   type ApplyAgentImportInput,
@@ -42,6 +43,7 @@ import {
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAttachmentSummary,
@@ -55,12 +57,15 @@ import {
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
   type QueuedMessageReceipt,
+  type ReadAgentTaskPageInput,
   type RemoteAgentImportResult,
   type RemoteInstanceTransferResult,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
+  type Routine,
+  type RoutineRunPlace,
   remoteBrowserSecretResponse,
   type SetAgentMemoryInclusionInput,
   type StartAgentTaskInput,
@@ -84,6 +89,7 @@ import {
   isAgentThreadBranchLinks,
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_PAGES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -95,6 +101,12 @@ import {
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  decodeRoutineRunPlace,
+  decodeRoutineRunPlaces,
+  ROUTINE_RUN_PLACE_ROUTES,
+  type RoutineRunPlaceEntry,
+} from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
 
@@ -195,6 +207,7 @@ export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(funct
 const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks response");
 const decodeAgentTask = guardedDecoder(isAgentTask, "agent task response");
 const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conversation response");
+const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
 
 /**
@@ -213,6 +226,16 @@ export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
   { agentId, taskId }: AgentTaskInput,
 ): Effect.fn.Return<ConversationSnapshot, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.read, decodeTaskConversation, { agentId, taskId }));
+});
+
+/** Older messages of a task, before a message that the client holds. Send it only to a host with `agent-thread-pages-v1`. */
+export const readAgentThreadPage = Effect.fn("TeamClient.readAgentThreadPage")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, beforeMessageId, limit }: ReadAgentTaskPageInput,
+): Effect.fn.Return<AgentTaskPage, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, decodeTaskPage, { agentId, taskId, beforeMessageId, limit }),
+  );
 });
 
 /**
@@ -556,18 +579,72 @@ export type TeamAgentRoutinesApi = Pick<
   "listRoutines" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "listRoutineRuns"
 >;
 
-/** The frozen v1 agent routine routes. Every host serves them. */
-export function teamAgentRoutinesApi(request: TeamApiRequest): TeamAgentRoutinesApi {
+/** Gives each routine the place where the host runs it, from the `routine-run-place-v1` list. */
+export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunPlace }>(
+  routines: readonly R[],
+  places: readonly RoutineRunPlaceEntry[],
+): R[] {
+  const placeOf = new Map(places.map((place) => [place.routineId, place.runIn]));
+  return routines.map((routine) => {
+    const runIn = placeOf.get(routine.id);
+    return runIn ? { ...routine, runIn } : routine;
+  });
+}
+
+/**
+ * The frozen v1 agent routine routes. Every host serves them. They leave out where a routine runs, so
+ * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes.
+ */
+export function teamAgentRoutinesApi(
+  request: TeamApiRequest,
+  runPlaces: () => boolean = () => false,
+): TeamAgentRoutinesApi {
+  // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
+  // and a second save does not make a second routine.
+  const withRunPlace = async (
+    routine: Routine,
+    runIn: RoutineRunPlace | undefined,
+    created = false,
+  ): Promise<Routine> => {
+    if (!runIn || !runPlaces()) return routine;
+    const placed = request("POST", ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+      agentId: routine.agentId,
+      routineId: routine.id,
+      runIn,
+    });
+    const place = created ? await placed.catch(() => ({ runIn: "chat" as const })) : await placed;
+    return { ...routine, runIn: place.runIn };
+  };
   return {
-    listRoutines: (agentId) => request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
-    createRoutine: (input) =>
-      request("POST", TEAM_API_ROUTES.agent.routines(input.agentId), decodeRoutine, decodeTeamProtocolV2Json(input)),
-    updateRoutine: (input) =>
-      request(
-        "PATCH",
-        TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-        decodeRoutine,
-        decodeTeamProtocolV2Json(input),
+    listRoutines: async (agentId) => {
+      const routines = request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
+      if (!runPlaces()) return routines;
+      const [list, places] = await Promise.all([
+        routines,
+        request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+      ]);
+      return withRoutineRunPlaces(list, places);
+    },
+    createRoutine: async ({ runIn, ...input }) =>
+      withRunPlace(
+        await request(
+          "POST",
+          TEAM_API_ROUTES.agent.routines(input.agentId),
+          decodeRoutine,
+          decodeTeamProtocolV2Json(input),
+        ),
+        runIn,
+        true,
+      ),
+    updateRoutine: async ({ runIn, ...input }) =>
+      withRunPlace(
+        await request(
+          "PATCH",
+          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+          decodeRoutine,
+          decodeTeamProtocolV2Json(input),
+        ),
+        runIn,
       ),
     deleteRoutine: ({ agentId, routineId }) =>
       request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse),

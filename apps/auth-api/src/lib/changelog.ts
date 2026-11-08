@@ -56,6 +56,8 @@ export interface StoreAvailability {
   store: MobileStore;
   /** `YYYY-MM-DD`, the day the store made the version available. Empty while it reviews it. */
   date: string;
+  /** The store will never ship the version, because a newer one replaced it. `date` is empty. */
+  skipped: boolean;
 }
 
 export interface ChangelogRelease {
@@ -84,6 +86,8 @@ const IN_REVIEW_HEADING = /^## \[[^\]]+\]\s+-\s+In review\s*$/;
 const SHARED_DATE_HEADING = /^## \[[^\]]+\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$/;
 /** `2026-10-14 (Android)`: one store's date in a mobile heading, as `scripts/release-notes.ts` writes it. */
 const STORE_DATE = /(\d{4}-\d{2}-\d{2}) \((iOS|Android)\)/g;
+/** `Skipped (Android)`: a store that will never ship the version, as `scripts/release-notes.ts` writes it. */
+const STORE_SKIPPED = /Skipped \((iOS|Android)\)/g;
 const STORE_NAMES: Record<string, MobileStore> = { iOS: "ios", Android: "android" };
 const MOBILE_STORES: readonly MobileStore[] = ["ios", "android"];
 const GROUP_HEADING = /^### (.+)$/;
@@ -117,7 +121,12 @@ function storeAvailability(line: string, date: string): StoreAvailability[] {
     const store = STORE_NAMES[name];
     if (store && isRealDate(day)) dates.set(store, day);
   }
-  return MOBILE_STORES.map((store) => ({ store, date: dates.get(store) ?? "" })).sort(
+  const skipped = new Set<MobileStore>();
+  for (const [, name = ""] of line.matchAll(STORE_SKIPPED)) {
+    const store = STORE_NAMES[name];
+    if (store && !dates.has(store)) skipped.add(store);
+  }
+  return MOBILE_STORES.map((store) => ({ store, date: dates.get(store) ?? "", skipped: skipped.has(store) })).sort(
     (a, b) => (a.date === "" ? 1 : 0) - (b.date === "" ? 1 : 0) || a.date.localeCompare(b.date),
   );
 }
@@ -167,8 +176,10 @@ export function parseChangelog(
       const firstDate = isRealDate(written) ? written : "";
       const availability = stores ? storeAvailability(line, firstDate) : [];
       group = undefined;
+      // A mobile version that no store made available, because each one reviews or skipped it.
+      const unavailable = stores && availability.every((entry) => entry.date === "");
       release =
-        version.toLowerCase() === "unreleased" || IN_REVIEW_HEADING.test(line)
+        version.toLowerCase() === "unreleased" || IN_REVIEW_HEADING.test(line) || unavailable
           ? undefined
           : {
               version,

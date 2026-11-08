@@ -90,6 +90,17 @@
     inset-inline-start: var(--server-rail-width);
   }
 
+  /* The agent dock in the window has its column at the right edge, as wide as the dock
+   * (`DOCK_WIDTH` in `agent-dock-motion.ts`), so it does not cover the card. */
+  .app-window > .app-frame-edge.app-frame-agent-dock {
+    --agent-dock-column: calc(64px - var(--window-edge) - 1px);
+    padding-inline-end: calc(var(--window-edge) + 1px + var(--agent-dock-column));
+  }
+
+  .app-window > .app-frame-edge.app-frame-agent-dock::before {
+    inset-inline-end: calc(var(--window-edge) + var(--agent-dock-column));
+  }
+
   .app-window > .app-frame-edge > .server-rail {
     background: var(--window-frame);
   }
@@ -487,7 +498,8 @@
   /* The schedule, usage and Marketplace titles, and the path to an open settings detail page, go in the
    * top row, after the server menu, and the rest of the top row lets clicks through to that menu. The
    * rail is the way back, so these titles have no Back button and no server name. The section list and
-   * the panel of a settings page start below the top row. */
+   * the panel of a settings page start below the top row. The page covers the server menu and inherits
+   * `-webkit-app-region`, so the frame must not drag: a drag region over the menu takes its clicks. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page {
     pointer-events: none;
   }
@@ -524,11 +536,6 @@
     max-width: none;
     margin-inline: 0;
     padding-inline: 0;
-  }
-
-  /* The hidden chat header no longer moves the window, so the empty top row of the settings page does. */
-  .app-frame-edge[data-window-page-kind="settings"] {
-    -webkit-app-region: drag;
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {
@@ -898,14 +905,55 @@
   animation: quit-shortcut-in var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
+/* The hint names the agents that the quit stops, beside their working faces. */
 .quit-shortcut-hint {
-  padding: var(--openbot-space-3) var(--openbot-space-6);
+  --agent-avatar-outline: var(--openbot-bg-surface-raised);
+
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-4);
+  max-width: calc(100vw - 2 * var(--openbot-space-4));
+  padding: var(--openbot-space-3) var(--openbot-space-8) var(--openbot-space-3) var(--openbot-space-3);
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
+}
+
+.quit-shortcut-avatars {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+/* The plush sits low in its box, as in a sidebar row, so the same optical offset centres it. */
+.quit-shortcut-avatars .agent-avatar {
+  --agent-avatar-optical-offset: -5px;
+
+  width: 40px;
+  height: 40px;
+}
+
+.quit-shortcut-avatars .agent-avatar + .agent-avatar {
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
+}
+
+.quit-shortcut-copy {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+}
+
+.quit-shortcut-agents {
+  font-size: var(--openbot-text-xl);
   font-weight: 500;
+  line-height: var(--openbot-leading-xl);
+  text-wrap: balance;
+}
+
+.quit-shortcut-instruction {
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
   white-space: nowrap;
 }
 

@@ -227,9 +227,13 @@
   padding: var(--openbot-space-6) 0 var(--openbot-space-3);
 }
 
+/* The file icon covers the two lines of the name and the folder. */
 .agent-instructions-bar-icon {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   flex: none;
   color: var(--openbot-text-muted);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .agent-instructions-bar-file {

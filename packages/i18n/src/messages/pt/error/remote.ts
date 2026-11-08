@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "O teste de área de trabalho remota está indisponível.",
   "error.remote.controlUnavailable": "O controle remoto está indisponível.",
   "error.remote.controlSessionNotFound": "Sessão de controle remoto não encontrada.",
+  "error.remote.controlNotAllowed": "O proprietário deste computador não permite que sua função o controle.",
+  "error.remote.controlDeclined": "A pessoa neste computador não permitiu o controle remoto.",
   "error.remote.testRuntimeUpdate":
     "Atualize o ambiente de execução da área de trabalho remota do macOS para executar este teste.",
   "error.remote.testOtherSessions": "Encerre as outras sessões de área de trabalho remota antes de iniciar um teste.",
@@ -195,12 +197,15 @@ export const messages = {
   "error.remote.hostNotRegistered": "Este computador anfitrião não está mais registrado no serviço do OpenBot.",
   "error.remote.membershipEnded":
     "Você não é mais membro deste computador anfitrião. Peça um novo convite ao proprietário.",
+  "error.remote.membershipChanged":
+    "Outra pessoa alterou este membro ao mesmo tempo. Carregue os membros novamente e tente de novo.",
   "error.remote.accountSessionInactive": "Seu login não está mais ativo. Entre novamente.",
   "error.remote.hostOtherAccount": "Este computador anfitrião pertence a outra conta.",
   "error.remote.remoteNotConfigured": "As conexões remotas não estão configuradas neste serviço do OpenBot.",
   "error.remote.hostRefused": "O computador anfitrião recusou a solicitação ({status}).",
   "error.remote.formUnavailable": "Este formulário não está mais disponível.",
   "error.remote.hostedServerRemoval": "Use a seção Cobrança para excluir um servidor hospedado.",
+  "error.remote.hostRemoved": "O proprietário removeu este servidor da conta.",
   "error.remote.channelsUnsupported": "Atualize este servidor no computador para usar canais.",
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",

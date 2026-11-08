@@ -80,6 +80,18 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.maxOutput": "Maximale output van model {number}",
   "customProvider.model.maxOutputPlaceholder": "Tokens",
+  "customProvider.model.efforts": "Redeneerniveau van model {number}",
+  "customProvider.model.effortsLabel": "Redeneerniveau",
+  "customProvider.model.effortsHintOpenCode":
+    "Selecteer de redeneerniveaus die elk model accepteert. Zonder selectie biedt OpenCode Laag, Middel en Hoog.",
+  "customProvider.model.effortsHintPi":
+    "Selecteer de redeneerniveaus die elk model accepteert. Zonder selectie redeneert het model niet.",
+  "customProvider.model.inputs": "Invoer van model {number}",
+  "customProvider.model.inputsLabel": "Accepteert",
+  "customProvider.model.inputImage": "Afbeeldingen",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Selecteer wat elk model naast tekst kan lezen.",
+  "customProvider.model.foundValuesHint": "Sommige waarden komen van het endpoint. Je kunt ze wijzigen.",
   "customProvider.model.remove": "Model {number} verwijderen",
   "customProvider.model.add": "Model toevoegen",
   "customProvider.headers": "Headers",

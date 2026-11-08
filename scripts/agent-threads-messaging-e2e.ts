@@ -28,6 +28,8 @@
 // 12. The same, but A archives the side thread. The answer goes to A's own chat.
 // 13. B steers busy messages and runs a turn in a new own chat when A asks it. The request goes into
 //    that running turn, not into a new one. It needs a provider that steers natively.
+// 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
+//    come to the side thread, not to A's own chat.
 // At the end it stops and deletes each thread that it started.
 // Writes .openbot-build/agent-threads-messaging-e2e/report.json.
 import assert from "node:assert/strict";
@@ -706,6 +708,59 @@ try {
     } finally {
       await mode(settings.busyMessageMode);
     }
+  });
+  // 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
+  //    after it come to the side thread, not to A's own chat (#5093).
+  await step("question back without replyToMessageId", async (details) => {
+    const word = `M14${run}`;
+    const question = (m: ConversationMessage) => m.senderAgentId === to && m.text.includes(`Q14${run}`);
+    // The run id can hold "11", so the answer is a message from B without the question's marker.
+    const answer = (m: ConversationMessage) =>
+      m.senderAgentId === to && !question(m) && m.text.replaceAll(run, "").includes("11");
+    const questionsBefore = count(await bridge.main(from), question);
+    const answersBefore = count(await bridge.main(from), answer);
+    // A's numbers reply to B's question, so OpenBot sends no automatic result: B must send the sum.
+    const side = await bridge.startTask(
+      from,
+      [
+        `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply true:`,
+        `"${word}: Before you answer, ask me which two numbers to add. Ask with openbot.send_message as a new message:`,
+        `recipientAgentIds ["${from}"], no replyToMessageId, expectsReply true, and text that starts with Q14${run}.`,
+        'Then end your turn. When I give you the numbers, send me only their sum with openbot.send_message."',
+        `When ${toAgentInfo.name} asks which numbers, answer "5 and 6" with openbot.send_message and replyToMessageId.`,
+        "Then end your turn and reply with the single word SENT. Do not wait for the answer.",
+      ].join("\n"),
+    );
+    details.taskId = side.id;
+    const asked = await waitFor(
+      page,
+      "the question comes to the side thread",
+      () => bridge.side(from, side.id),
+      (s) => has(s, question),
+      TURN_MS,
+    );
+    // With a reply id, the old path routes the question, and the step would not check the fix.
+    details.questionReplyTo = asked.messages.find(question)?.replyToMessageId ?? null;
+    assert.equal(details.questionReplyTo, null, "B sent the question with replyToMessageId.");
+    await waitFor(
+      page,
+      "the answer comes to the side thread",
+      () => bridge.side(from, side.id),
+      (s) => has(s, answer),
+      TURN_MS,
+    );
+    await waitFor(
+      page,
+      "the side thread reads it",
+      () => task(from, side.id),
+      (e) => e?.state === "idle",
+      TURN_MS,
+    );
+    const ownChat = await bridge.main(from);
+    details.questionInSenderChat = count(ownChat, question) > questionsBefore;
+    details.answerInSenderChat = count(ownChat, answer) > answersBefore;
+    assert.equal(details.questionInSenderChat, false, "A's own chat got the question to its side thread.");
+    assert.equal(details.answerInSenderChat, false, "A's own chat got the answer to its side thread.");
   });
   report.passed = report.steps.every((entry) => entry.passed);
 } finally {

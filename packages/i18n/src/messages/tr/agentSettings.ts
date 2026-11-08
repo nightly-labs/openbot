@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa {name} hangi modelin kullanılacağını size sorar.",
   "agentSettings.backupModels.introAutomatic":
-    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa veya bir sağlayıcı hatasıyla başarısız olursa {name} sıradaki ilk uygun modele geçer.",
+    "{model} kullanım sınırına ulaşırsa {name} sıradaki ilk uygun modele geçer. {name} yazmaya başlamadan önce {model} bir sağlayıcı hatasıyla başarısız olursa da {name} geçiş yapar.",
   "agentSettings.backupModels.ask": "Değiştirmeden önce sor",
   "agentSettings.backupModels.order": "Sıra",
   "agentSettings.backupModels.listLabel": "Yedek modeller, sırayla",
@@ -145,10 +145,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Ajan avatarı işlenemedi.",
   "agentSettings.runtime.model": "Ajan modeli",
   "agentSettings.runtime.modelUnavailable": "Modeller bir ajan CLI'sı bağlandıktan sonra kullanılabilir.",
-  "agentSettings.runtime.reasoning": "Akıl yürütme",
-  "agentSettings.runtime.reasoningLabel": "Ajan akıl yürütme düzeyi",
-  "agentSettings.runtime.selectReasoning": "Akıl yürütmeyi seçin",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider} belirler",
   "agentSettings.runtime.access": "Erişim",
   "agentSettings.runtime.accessLabel": "Ajan erişimi",
   "agentSettings.runtime.busyMessage": "Çalışırken",
@@ -188,6 +184,14 @@ export const messages = {
     "Ajan bu sohbeti unutur. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
+  "agentSettings.deleteHistory.title": "Geçmişi sil",
+  "agentSettings.deleteHistory.description": "Bu sohbetin mesajları silinir ve ajan onları unutur. Kurulumu kalır.",
+  "agentSettings.deleteHistory.button": "Sil",
+  "agentSettings.deleteHistory.confirmTitle": "{name} ile sohbet geçmişi silinsin mi?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Bu sohbetin tüm mesajları ve dosyaları OpenBot'tan silinir ve ajan onları unutur. Bu işlem geri alınamaz. Yan konular, talimatlar, model, araçlar, anılar, çalışma alanı ve tarayıcı değişmez.",
+  "agentSettings.deleteHistory.confirm": "Geçmişi sil",
+  "agentSettings.deleteHistory.failed": "Geçmiş silinemedi.",
   "agentSettings.fullAccess.title": "Bu ajana tam erişim verilsin mi?",
   "agentSettings.fullAccess.askTitle": "Bu ajan çalışma alanının dışında çalışabilsin mi?",
   "agentSettings.fullAccess.description":
@@ -222,8 +226,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "agentSettings.quickAcknowledgement.title": "Uzun görevlerden önce planı göster",
-  "agentSettings.quickAcknowledgement.description":
-    "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
+  "agentSettings.quickAcknowledgement.description": "Uzun bir görevden önce ajan planını gösterir.",
   "agentSettings.browserProfile.label": "Tarayıcı profili",
   "agentSettings.browserProfile.shared": "Paylaşılan",
   "agentSettings.browserProfile.agent": "Yalnızca bu ajan",

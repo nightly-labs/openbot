@@ -35,6 +35,7 @@ import {
   type CentralAuthIssue,
   type CentralAuthState,
   type CentralAuthUser,
+  type ChatBackgroundColor,
   type ChatWindowTarget,
   CUSTOM_AGENT_LIMITS,
   type CustomAgentCheckResult,
@@ -70,8 +71,10 @@ import {
   isApprovalAutomationPreference,
   isAppThemePalette,
   isAppThemePaletteId,
+  isAutomationRunsPerHour,
   isAvatarColor,
   isBusyMessageMode,
+  isChatBackgroundColor,
   isCodexLiveVoice,
   isCustomAgentCheckResult,
   isCustomAgentResult,
@@ -82,16 +85,20 @@ import {
   isDetectedAcpAgent,
   isDetectedModelServer,
   isDiscoverModelsResult,
+  isElevenLabsSpeechVoice,
+  isPlanStartAfterMs,
   isProviderDetectionSettings,
   isRemoteDesktopSetupStatus,
   isRemoteDesktopTestStatus,
   isRemoteNetworkRoute,
+  isSpeechModelId,
   isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  isXaiSpeechVoice,
   type LinkAccountStatus,
   type MobileConnectedDevice,
   type MobileConnectLink,
@@ -104,11 +111,12 @@ import {
   parseGitHubConnectorStatus,
   parseLinkAccountStatus,
   parseOnePasswordConnectorStatus,
+  QUIT_GUARDS,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   type RemoteNetworkRouteState,
   type RemoteSessionReusePreference,
-  SPEECH_MODEL_ID,
+  type SentMessageStats,
   type SpeechAudio,
   type SpeechModelStatus,
   type SpeechSettings,
@@ -155,7 +163,7 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering } = info;
+  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering, hourCycle } = info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
@@ -164,6 +172,7 @@ export function decodeAppInfo(value: unknown): AppInfo {
     throw new Error("Invalid analytics install ID.");
   if (softwareRendering !== undefined && !isBoolean(softwareRendering))
     throw new Error("Invalid software rendering flag.");
+  if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -172,7 +181,15 @@ export function decodeAppInfo(value: unknown): AppInfo {
     ...(analyticsCaptureUrl === undefined ? {} : { analyticsCaptureUrl }),
     ...(analyticsInstallId === undefined ? {} : { analyticsInstallId }),
     ...(softwareRendering === undefined ? {} : { softwareRendering }),
+    ...(hourCycle === undefined ? {} : { hourCycle }),
   };
+}
+
+export function decodeSentMessageStats(value: unknown): SentMessageStats {
+  const stats = decodeRecord(value, "sent message stats");
+  const sentCount = requiredNumber(stats, "sentCount");
+  if (!Number.isSafeInteger(sentCount) || sentCount < 0) throw new Error("Invalid sentCount.");
+  return { firstSentAt: nullableString(stats, "firstSentAt"), sentCount };
 }
 
 export function decodeAppSetupState(value: unknown): AppSetupState {
@@ -202,6 +219,10 @@ export function decodeAgentDefaults(value: unknown): AgentDefaults {
   const defaults = decodeRecord(value, "agent defaults");
   const decoded = { ...DEFAULT_AGENT_DEFAULTS };
   for (const key of AGENT_DEFAULT_KEYS) decoded[key] = requiredBoolean(defaults, key);
+  if (!isPlanStartAfterMs(defaults.planStartAfterMs)) throw new Error("Invalid plan start time.");
+  decoded.planStartAfterMs = defaults.planStartAfterMs;
+  if (!isAutomationRunsPerHour(defaults.automationRunsPerHour)) throw new Error("Invalid local script limit.");
+  decoded.automationRunsPerHour = defaults.automationRunsPerHour;
   return decoded;
 }
 
@@ -229,17 +250,26 @@ function decodeThemePalette(palette: DynamicRecord): AppThemePalette {
   return { id: palette.id, name: palette.name, scheme: palette.scheme, colors: { ...palette.colors } };
 }
 
+/** A chat background becomes a CSS property value in the page, so only a hex color or null passes. */
+function decodeChatBackground(value: unknown): ChatBackgroundColor | null {
+  if (value !== null && !isChatBackgroundColor(value)) throw new Error("Invalid chat background.");
+  return value;
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
   if (typeof preference.transparentWindow !== "boolean") throw new Error("Invalid transparent window.");
   if (preference.palette !== null && !isAppThemePaletteId(preference.palette))
     throw new Error("Invalid theme palette.");
+  const palettes = decodeList(preference.palettes, "theme palettes", decodeThemePalette);
   return {
     appearance: preference.appearance,
     transparentWindow: preference.transparentWindow,
     palette: preference.palette,
-    palettes: decodeList(preference.palettes, "theme palettes", decodeThemePalette),
+    palettes,
+    chatBackgroundLight: decodeChatBackground(preference.chatBackgroundLight),
+    chatBackgroundDark: decodeChatBackground(preference.chatBackgroundDark),
   };
 }
 
@@ -426,7 +456,14 @@ export function decodeAppBehaviorPreference(value: unknown): AppBehaviorPreferen
     keepRunningInBackground: nullableBoolean(preference, "keepRunningInBackground"),
     keepAwake: nullableBoolean(preference, "keepAwake"),
     keepAwakeOnBattery: nullableBoolean(preference, "keepAwakeOnBattery"),
+    quitGuard: decodeQuitGuard(preference.quitGuard),
   };
+}
+
+function decodeQuitGuard(value: unknown): AppBehaviorPreference["quitGuard"] {
+  if (value === null) return null;
+  if (!isOneOf(QUIT_GUARDS, value)) throw new Error("Invalid quitGuard.");
+  return value;
 }
 
 export function decodeExternalLinkPreference(value: unknown): ExternalLinkPreference {
@@ -524,11 +561,7 @@ export function decodeVoiceStreamTranscript(value: unknown): VoiceStreamTranscri
 export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
   const status = decodeRecord(value, "speech model status");
   const { modelId, phase, progress } = status;
-  if (
-    modelId !== SPEECH_MODEL_ID ||
-    !isOneOf(VOICE_MODEL_PHASES, phase) ||
-    (progress !== null && !isNumber(progress))
-  ) {
+  if (!isSpeechModelId(modelId) || !isOneOf(VOICE_MODEL_PHASES, phase) || (progress !== null && !isNumber(progress))) {
     throw new Error("Invalid speech model status.");
   }
   return { modelId, phase, progress, message: nullableString(status, "message") };
@@ -536,12 +569,22 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { voice, speed, codexLiveVoice } = settings;
-  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed) || !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)))
+  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice } = settings;
+  if (
+    !isSpeechModelId(modelId) ||
+    !isSpeechVoice(voice) ||
+    !isElevenLabsSpeechVoice(elevenLabsVoice) ||
+    !isXaiSpeechVoice(xaiVoice) ||
+    !isSpeechSpeed(speed) ||
+    !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice))
+  )
     throw new Error("Invalid speech settings.");
   return {
     readReplies: requiredBoolean(settings, "readReplies"),
+    modelId,
     voice,
+    elevenLabsVoice,
+    xaiVoice,
     speed,
     codexLive: requiredBoolean(settings, "codexLive"),
     codexLiveVoice,
@@ -624,12 +667,6 @@ export function decodeAgentImportSkill(value: unknown): string {
 }
 
 export const decodeVoid = emptyDecoder("IPC returned unexpected data.");
-
-/** True shows the hint that `Cmd + Q` must be held or pressed twice, and false removes it. */
-export function decodeQuitShortcutHint(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  throw new Error("Invalid quit shortcut hint.");
-}
 
 export function decodeHostedSite(value: unknown): HostedSiteSummary {
   const site = parseHostedSiteSummary(value);

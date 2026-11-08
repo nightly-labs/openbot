@@ -1,5 +1,5 @@
-// Checks that each routine of an agent runs in its own side thread, and that each run starts its own
-// provider session, so that it does not send the whole chat context again. Runs the real agent
+// Checks that each routine of an agent that is set to run in a separate thread runs in its own side
+// thread, and that each run starts its own provider session, so that it does not send the whole chat context again. Runs the real agent
 // service on a temporary profile with a fake Codex app-server. The fake keeps the context of each
 // session: each request sends all of the session's earlier input again, as a model request does, and
 // reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
@@ -8,8 +8,10 @@
 // the chat, that the chat keeps its session, and that the chat turns read the answers. While the
 // second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
 // for each other. The second routine opens a wait, which a routine thread can do as the chat can.
+// A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
 // It also drives saved password and authenticator fills through the routine tool router, checks
-// the sign-in guidance, and checks that no secret reaches the provider.
+// the sign-in guidance, and checks that no secret reaches the provider. Each run keeps the agent's
+// Computer Use, as the chat does: a scheduled run can drive a desktop app.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -21,6 +23,8 @@ import {
   AGENT_PROVIDERS,
   type AgentEvent,
   type BrowserTab,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   decodeUsageTokens,
   parseRoutineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
@@ -112,7 +116,7 @@ const answer = (message) => {
     case "config/batchWrite": return write({ id: message.id, result: {} });
     case "thread/start": {
       const id = "thread-" + (++threads);
-      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions });
+      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions, mcpServers: Object.entries((params.config && params.config.mcp_servers) || {}).filter(([, server]) => server.enabled !== false).map(([name]) => name) });
       return write({ id: message.id, result: { thread: { id, turns: [] } } });
     }
     case "thread/resume":
@@ -211,6 +215,7 @@ interface LogEntry {
   prompt?: number;
   text?: string;
   instructions?: string;
+  mcpServers?: string[];
   tool?: string;
   result?: { success: boolean; contentItems: { type: string; text?: string }[] };
   error?: { message: string };
@@ -237,6 +242,7 @@ const report: {
   runMarkersInChat?: string[];
   waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
+  chatRoutine?: { threads: number; answersInChat: number; runStatus: string };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -300,6 +306,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Waits for a state of the service, its database or the fake's log. */
@@ -355,6 +364,20 @@ const agents = new AgentService({
     },
   },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  // The driver is not started: only the entry that the provider is given is checked.
+  computerUseMcpServer: () => ({
+    id: COMPUTER_USE_MCP_SERVER_ID,
+    name: COMPUTER_USE_MCP_SERVER_NAME,
+    transport: "stdio",
+    enabled: true,
+    command: fakeCodex,
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  }),
 });
 agents.on("event", (event: AgentEvent) => {
   if (event.type === "browser-takeover-requested") takeoverRequests += 1;
@@ -480,6 +503,7 @@ try {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "09:00" },
+    runIn: "thread",
   });
   const secondRoutine = agents.createRoutine({
     agentId: agent.id,
@@ -488,6 +512,7 @@ try {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "10:00" },
+    runIn: "thread",
   });
   const buildTurns = () =>
     fakeEntries().filter(
@@ -572,10 +597,15 @@ try {
     "Secrets stay outside provider input and tool results",
     [PASSWORD, CODE].every((value) => !JSON.stringify(entries).includes(value)),
   );
+  // Codex gets the saved-login rules with the first user turn, not in the developer instructions.
+  const firstTurnText = (threadId: unknown) =>
+    entries.find((entry) => entry.method === "turn/start" && entry.threadId === threadId)?.text ?? "";
   const routineRule = "In a routine run, first check saved logins with openbot_browser.list_logins";
   pass(
     "Routine sessions receive the saved-login rule",
-    routineStarts.every((entry) => entry.instructions?.includes(routineRule)),
+    routineStarts.every(
+      (entry) => firstTurnText(entry.threadId).includes(routineRule) && !entry.instructions?.includes(routineRule),
+    ),
   );
   pass(
     "Discovered browser guidance reports only a sign-in that needs the user",
@@ -586,10 +616,18 @@ try {
   pass(
     "Routine guidance reports steps that need a person",
     routineStarts.every((entry) =>
-      entry.instructions?.includes("do not call request_takeover or submit_secret without loginId"),
+      firstTurnText(entry.threadId).includes("do not call request_takeover or submit_secret without loginId"),
     ),
   );
   pass("Each routine run starts one new session", routineStarts.length === 3);
+  pass(
+    "Each routine run gets Computer Use",
+    routineStarts.every(
+      (entry) =>
+        entry.mcpServers?.includes(COMPUTER_USE_MCP_SERVER_NAME) &&
+        entry.instructions?.includes(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`),
+    ),
+  );
   pass(
     "Routine sessions are ephemeral and not saved",
     routineStarts.every((entry) => entry.persistSession === false),
@@ -683,6 +721,37 @@ try {
     "The chat did not resume or restart its session",
     !fakeEntries().some((entry) => entry.method === "thread/resume") &&
       report.threadStarts.filter((entry) => entry.ephemeral !== true).length === 1,
+  );
+
+  // A routine with no run place runs in the chat, as before 0.61.
+  const chatRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Chat check",
+    instruction: "Check the chat and report.",
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "11:00" },
+  });
+  const chatRun = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: chatRoutine.id }));
+  assert.ok(chatRun.deliveryId, "chat routine: no delivery");
+  const chatRunDeliveryId = chatRun.deliveryId;
+  await settled(chatRunDeliveryId, "chat routine run");
+  const chatRunStatus = await waitFor("the chat routine run to end", () => {
+    const status = agents.listRoutineRuns({ agentId: agent.id, routineId: chatRoutine.id })[0]?.status;
+    return status && status !== "running" && status !== "queued" ? status : null;
+  });
+  const chatRunTurnId = mailbox.getDelivery(chatRunDeliveryId)?.delivery.turnId;
+  report.chatRoutine = {
+    threads: agents.listTasks(agent.id).tasks.filter((task) => task.routineId === chatRoutine.id).length,
+    answersInChat: (await runCauseEffect(agents.readConversation(agent.id))).messages.filter(
+      (message) =>
+        chatRunTurnId !== undefined && message.turnId === chatRunTurnId && message.itemType === "final_answer",
+    ).length,
+    runStatus: chatRunStatus,
+  };
+  pass(
+    "A routine with no run place answers in the chat and gets no thread",
+    report.chatRoutine.threads === 0 && report.chatRoutine.answersInChat === 1 && chatRunStatus === "succeeded",
   );
   report.passed = true;
 } catch (error) {

@@ -9,6 +9,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.codexUnresponsive": "Codex stopped answering, so OpenBot ended its process.",
   "error.provider.acpUnresponsive": "{provider} did not answer in time, so OpenBot ended its process.",
   "error.provider.acpSignInLost": "{provider} lost its sign-in, so OpenBot ended its process. Send your message again.",
+  "error.provider.acpPlanUsedUp":
+    "{provider} says that your plan is used up. Choose another model, or upgrade your {provider} plan.",
   "error.provider.acpMcpNotLoaded":
     "{provider} did not load OpenBot's tools, so this agent cannot use them or reach its teammates. A {provider} team policy can block local MCP servers. Ask your team admin to allow them, then try again.",
   "error.provider.endpointsReadOnly":
@@ -105,6 +107,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.contextWindowInvalid":
     "A model's context window must be a whole number of tokens from {min} to {max}.",
   "error.provider.maxOutputInvalid": "A model's max output must be a whole number of tokens from {min} to {max}.",
+  "error.provider.reasoningEffortsInvalid": "A model's reasoning efforts are not valid.",
+  "error.provider.inputsInvalid": "A model's input kinds are not valid.",
   "error.provider.headersTooMany": "There are too many headers.",
   "error.provider.headerNameCharacter": "A header name has a character HTTP does not allow.",
   "error.provider.headerNameTooLong": "A header name is too long.",
@@ -207,6 +211,8 @@ export const messages = defineMessages("error.provider", {
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT is still preparing its local history after an earlier start. Wait a few minutes, then try again.",
+  "error.provider.realtimeLimitZero":
+    "Linux stopped the provider because OpenBot has a real-time CPU limit of 0. The limit comes from your system. Install and start rtkit (`rtkit-daemon`), run `systemctl --user restart xdg-desktop-portal`, then restart OpenBot. Restarting xdg-desktop-portal alone does not help while rtkit is missing.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
   "error.provider.opencodeNoAnswer":
@@ -265,17 +271,22 @@ export const messages = defineMessages("error.provider", {
   "error.provider.kimiSignIn": "Sign in with Kimi Code to use Kimi.",
   "error.provider.devinSignIn": "Sign in with Devin to use Devin.",
   "error.provider.copilotSignIn": "Sign in with GitHub or set COPILOT_GITHUB_TOKEN to use GitHub Copilot.",
+  "error.provider.mistralSignIn": "Sign in with Mistral or set MISTRAL_API_KEY to use Mistral.",
   "error.provider.hermesMissing": "Hermes Agent is not installed. Install it, then try again.",
   "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
   "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
   "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
+  "error.provider.claudeApiKeyNoCredit":
+    "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
   "error.provider.museMcpStartupFault":
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
@@ -292,6 +303,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
   "error.provider.geminiKeyRefused":
     "Gemini refused the saved API key. Replace or remove the key in Settings, then connect again.",
+  "error.provider.geminiVerificationRequired":
+    "Google must verify your account before Gemini can answer. Verify your Google account in a browser, then send your message again.",
   "error.provider.keyProviderRefused":
     "{provider} refused the saved API key. Replace or remove the key in Settings, then try again.",
   "error.provider.keyProviderNoBalance":

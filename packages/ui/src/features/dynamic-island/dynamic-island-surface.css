@@ -1,6 +1,6 @@
-html:has(.dynamic-island-surface),
-body:has(.dynamic-island-surface),
-#root:has(.dynamic-island-surface) {
+:root[data-surface="dynamic-island"],
+:root[data-surface="dynamic-island"] body,
+:root[data-surface="dynamic-island"] #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -401,6 +401,11 @@ body:has(.dynamic-island-surface),
 .dynamic-island-surface-working-badge .ui-spinner {
   border-color: var(--openbot-success-soft);
   border-top-color: currentColor;
+}
+
+/* The island is above every app all day. Its spinner turns only while the user looks at it. */
+.openbot-dynamic-island-transition-root[data-ambient-motion="paused"] .ui-spinner {
+  animation-play-state: paused;
 }
 
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-surface-compact-name {

@@ -2,9 +2,11 @@ import {
   isRoutineRunFields,
   isRoutineSchedule,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
   type RoutineRunFields,
+  type RoutineRunPlace,
   type RoutineSchedule,
 } from "./ipc-routines";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
@@ -68,6 +70,8 @@ export interface EventRoutine {
   trigger: EventRoutineTrigger;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  /** Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`. */
+  runIn?: RoutineRunPlace;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,6 +86,11 @@ export interface SaveEventRoutineInput {
   trigger: EventRoutineTriggerInput;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  /**
+   * Only an agent routine reads it, on this computer's host or on a remote host with
+   * `routine-run-place-v1`. Left out, a save keeps the saved place.
+   */
+  runIn?: RoutineRunPlace;
 }
 
 /** `secret` is set only when this save made a new webhook trigger. The host does not show it again. */
@@ -260,6 +269,7 @@ function isEventRoutine(value: unknown): value is EventRoutine {
     isEventRoutineTrigger(value.trigger) &&
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
+    (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );

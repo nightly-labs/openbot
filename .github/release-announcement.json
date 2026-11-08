@@ -1,10 +1,10 @@
 {
-  "version": "0.61.0",
+  "version": "0.65.0",
   "highlights": [
-    "Delete a message in a chat or a channel: right-click it and select Delete.",
-    "Agents can build, change and run workflows, and you watch them add each step on the canvas.",
-    "Talk to a Codex agent in real time with Codex live voice, in Settings → Voice.",
-    "Devin and GitHub Copilot are new providers.",
-    "Each routine now runs in its own thread, so it no longer waits for the chat or other routines."
+    "A new Library page shows every picture and file from your chats, with search and filters.",
+    "Agents now use logins that you save in a password manager or the Vault, also after their chat started.",
+    "Read replies aloud with ElevenLabs or xAI, dictate with Groq, and add Mistral as a provider.",
+    "Agents use fewer tokens on most providers, and OpenBot uses less memory for tabs and idle agents.",
+    "Delete the history of a chat or a channel, and open an agent's page as a side panel tab."
   ]
 }

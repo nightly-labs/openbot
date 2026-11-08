@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} no respondió a tiempo, así que OpenBot terminó su proceso.",
   "error.provider.acpSignInLost":
     "{provider} perdió su inicio de sesión, así que OpenBot terminó su proceso. Envía tu mensaje de nuevo.",
+  "error.provider.acpPlanUsedUp":
+    "{provider} indica que tu plan está agotado. Elige otro modelo o mejora tu plan de {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} no cargó las herramientas de OpenBot, así que este agente no puede usarlas ni comunicarse con sus compañeros. Una política de equipo de {provider} puede bloquear los servidores MCP locales. Pide al administrador de tu equipo que los permita y vuelve a intentarlo.",
   "error.provider.endpointsReadOnly":
@@ -111,6 +113,8 @@ export const messages = {
     "La ventana de contexto de un modelo debe ser un número entero de tokens entre {min} y {max}.",
   "error.provider.maxOutputInvalid":
     "La salida máxima de un modelo debe ser un número entero de tokens entre {min} y {max}.",
+  "error.provider.reasoningEffortsInvalid": "Los niveles de esfuerzo de un modelo no son válidos.",
+  "error.provider.inputsInvalid": "Los tipos de entrada de un modelo no son válidos.",
   "error.provider.headersTooMany": "Hay demasiadas cabeceras.",
   "error.provider.headerNameCharacter": "El nombre de una cabecera contiene un carácter que HTTP no permite.",
   "error.provider.headerNameTooLong": "El nombre de una cabecera es demasiado largo.",
@@ -222,6 +226,8 @@ export const messages = {
     "OpenCode no pudo conectarse al proveedor del modelo. Comprueba la conexión de red del equipo que ejecuta OpenBot e inténtalo de nuevo.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT todavía está preparando su historial local después de un inicio anterior. Espera unos minutos y vuelve a intentarlo.",
+  "error.provider.realtimeLimitZero":
+    "Linux detuvo el proveedor porque OpenBot tiene un límite de CPU en tiempo real de 0. El límite viene de tu sistema. Instala e inicia rtkit (`rtkit-daemon`), ejecuta `systemctl --user restart xdg-desktop-portal` y luego reinicia OpenBot. Reiniciar solo xdg-desktop-portal no sirve mientras falte rtkit.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode no pudo abrir su base de datos porque una versión más reciente de OpenCode la cambió. Actualiza OpenCode a la versión 2 o posterior y vuelve a intentarlo.",
   "error.provider.opencodeNoAnswer":
@@ -282,18 +288,23 @@ export const messages = {
   "error.provider.kimiSignIn": "Inicia sesión con Kimi Code para usar Kimi.",
   "error.provider.devinSignIn": "Inicia sesión con Devin para usar Devin.",
   "error.provider.copilotSignIn": "Inicia sesión con GitHub o define COPILOT_GITHUB_TOKEN para usar GitHub Copilot.",
+  "error.provider.mistralSignIn": "Inicia sesión con Mistral o define MISTRAL_API_KEY para usar Mistral.",
   "error.provider.hermesMissing": "Hermes Agent no está instalado. Instálalo y vuelve a intentarlo.",
   "error.provider.hermesNotStarted": "Hermes Agent no se pudo iniciar. Ejecuta `hermes --version` en una terminal.",
   "error.provider.hermesVersionUnreadable": "No se puede leer la versión de Hermes Agent.",
   "error.provider.hermesSignIn":
     "Inicia sesión con Nous Portal o ejecuta `hermes setup` en una terminal para usar Hermes.",
   "error.provider.usageLimitReached": "La cuenta alcanzó su límite de uso.",
+  "error.provider.claudeApiKeyNoCredit":
+    "La clave de API de Anthropic no tiene crédito de API. Un plan de Claude no paga las solicitudes con una clave de API. Añade crédito en la Anthropic Console, o inicia sesión en Claude en Ajustes y selecciona la cuenta de Claude en el menú de modelos del agente.",
   "error.provider.foreignReasoning":
     "{provider} no aceptó el razonamiento anterior de este chat porque lo recibió otra cuenta o clave de API. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.opencodeSessionRejected":
     "OpenCode rechazó la solicitud y no indicó la causa. Esto puede ocurrir en un chat largo o después de cambiar de modelo. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo o un esfuerzo menor.",
   "error.provider.museMcpStartupFault":
     "Muse no pudo iniciar un servidor MCP y bloqueó MCP en esta sesión. OpenBot inició una nueva sesión de Muse con el historial del chat. Inténtalo de nuevo. Si el error continúa, desactiva Uso del equipo o el servidor MCP que falló para este agente.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code no encontró la sesión guardada de este chat. OpenBot inició una nueva sesión de Claude Code con el historial del chat. Inténtalo de nuevo.",
   "error.provider.grokSignIn": "Ejecuta `grok login` o define XAI_API_KEY para usar Grok.",
   "error.provider.acpSignInTimedOut": "Se agotó el tiempo del inicio de sesión.",
   "error.provider.acpSignInStopped": "El inicio de sesión se detuvo antes de completarse.",
@@ -310,6 +321,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Solo se pueden abrir en el navegador enlaces de inicio de sesión HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini rechazó la clave de API guardada. Reemplaza o elimina la clave en Ajustes y vuelve a conectar.",
+  "error.provider.geminiVerificationRequired":
+    "Google debe verificar tu cuenta antes de que Gemini pueda responder. Verifica tu cuenta de Google en un navegador y vuelve a enviar tu mensaje.",
   "error.provider.keyProviderRefused":
     "{provider} rechazó la clave de API guardada. Reemplaza o elimina la clave en Ajustes y vuelve a intentarlo.",
   "error.provider.keyProviderNoBalance":

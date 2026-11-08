@@ -65,9 +65,14 @@ class ProcessConfinementUnavailableError extends Error {
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 
+/** The state directory of the Grok CLI: `$GROK_HOME`, or `~/.grok`. */
+export function grokHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.GROK_HOME?.trim() || join(home, ".grok");
+}
+
 /** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
 export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const grokHome = env.GROK_HOME?.trim() || join(home, ".grok");
+  const grokHome = grokHomeDirectory(env, home);
   return {
     writable: [grokHome],
     protected: [
@@ -338,6 +343,65 @@ export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+/** The home folder of Mistral Vibe: `$VIBE_HOME`, or `~/.vibe`. */
+export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.VIBE_HOME?.trim() || join(home, ".vibe");
+}
+
+/**
+ * Mistral Vibe 3.1.0 writes its session logs, history, caches, locks and the folders that it trusts
+ * in its home folder. Its settings and MCP servers (`config.toml`), the saved API key (`.env`), the
+ * trusted folders, hooks, instructions, tools, skills, agents, prompts and plugins are in that folder
+ * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache and
+ * the model catalogue cache are settings layers, so they stay read-only too: the provider's shared
+ * process saves the catalogue, and a confined process reads it. Vibe 3.1.0 only logs a failed save. On macOS the CLI reads the API key of a sign-in from the
+ * login Keychain with `security` (`keychainLockFiles`).
+ */
+export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const vibeHome = mistralHomeDirectory(env, home);
+  makeMistralTrustedFolders(vibeHome);
+  return {
+    writable: [vibeHome],
+    writableContents: keychainLockFiles(),
+    protected: [
+      "config.toml",
+      ".env",
+      "trusted_folders.toml",
+      "hooks.toml",
+      "AGENTS.md",
+      "tools",
+      "skills",
+      "skills.toml",
+      "skills-registry-cache",
+      "agents",
+      "prompts",
+      "plugins",
+      "projects.toml",
+      "local_projects.toml",
+      "managed_config_cache.json",
+      "model_catalog_cache.json",
+      "connector_bootstrap_cache.json",
+    ].map((name) => join(vibeHome, name)),
+  };
+}
+
+/**
+ * At each start, Mistral Vibe 3.1.0 writes an empty `trusted_folders.toml` when the file is missing.
+ * When it cannot, it stops, and a confined process cannot write that file. Thus OpenBot makes the
+ * file when it is missing, with the same contents.
+ */
+function makeMistralTrustedFolders(vibeHome: string): void {
+  mkdirSync(vibeHome, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(join(vibeHome, "trusted_folders.toml"), "trusted = []\nuntrusted = []\n", {
+      flag: "wx",
+      mode: 0o600,
+    });
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
+}
+
 /** The folder of Devin's sign-in and sessions: `$XDG_DATA_HOME/devin`, on macOS too. */
 export function devinDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return join(env.XDG_DATA_HOME?.trim() || join(home, ".local", "share"), "devin");
@@ -379,14 +443,19 @@ export function piAgentDirectory(env: NodeJS.ProcessEnv = process.env, home = ho
 /**
  * Pi can write sessions, but cannot change the sign-in, settings or extensions a later full-access
  * run loads. Pi 1.4.0 takes a lock folder beside `auth.json`, `settings.json` and `trust.json` each
- * time it reads one, and a read stops with EPERM when it cannot make that folder.
+ * time it reads one, and a read stops with EPERM when it cannot make that folder. Pi also locks its
+ * saved model catalog, `models-store.json`, to read it. Without that lock Pi lists the catalog of
+ * its release, which does not have the models that OpenBot's refresh saved (#4926). The catalog
+ * itself stays read-only.
  */
 export function piStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const agentDirectory = piAgentDirectory(env, home);
   return {
     writable: [join(agentDirectory, "sessions")],
     protected: [],
-    lockFolders: ["auth.json", "settings.json", "trust.json"].map((name) => join(agentDirectory, `${name}.lock`)),
+    lockFolders: ["auth.json", "settings.json", "trust.json", "models-store.json"].map((name) =>
+      join(agentDirectory, `${name}.lock`),
+    ),
   };
 }
 
@@ -499,6 +568,9 @@ const PROJECT_SETTINGS = [
   ".clinerules",
   // Kimi reads its project skills and instructions from `.kimi`.
   ".kimi",
+  // Mistral Vibe reads its project settings, MCP servers, hooks, tools, skills, agents and prompts
+  // from `.vibe`.
+  ".vibe",
   // Devin reads its project settings, MCP servers, hooks and skills from `.devin`, and Windsurf
   // rules and hooks from `.windsurf`.
   ".devin",
@@ -546,7 +618,7 @@ export function confineSpawnTarget(
       PROJECT_SETTINGS.filter((name) => name.includes("/")).map((name) => join(root, name)),
     ),
   ];
-  if (platform === "darwin") {
+  if (canConfineProcesses(platform)) {
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
     return {
       command: SANDBOX_EXEC,
@@ -569,6 +641,11 @@ export function confineSpawnTarget(
   // bubblewrap on Linux cannot deny a protected file that does not exist yet, such as a new
   // `opencode.json`, so Linux fails closed until it can.
   throw new ProcessConfinementUnavailableError(sourceText("error.agent.workspaceOnlyMacOnly"));
+}
+
+/** Whether `confineSpawnTarget` can make a sandbox on this platform. Only macOS has one now. */
+export function canConfineProcesses(platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "darwin";
 }
 
 function unavailable(tool: string): string {

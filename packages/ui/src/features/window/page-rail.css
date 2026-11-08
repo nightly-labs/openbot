@@ -55,7 +55,11 @@
   -webkit-app-region: no-drag;
 }
 
+/* A rail icon is 20px, so it takes the line of the large icons. The line does not change on hover or on
+ * the open page; only the color does. */
 .window-rail-button {
+  --openbot-icon-stroke: var(--openbot-icon-stroke-lg);
+
   position: relative;
   display: flex;
   width: var(--openbot-control-lg);
@@ -94,7 +98,6 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
 }
-
 /* The dot of a rail button that has a notice, such as an update. */
 .window-rail-notice {
   position: absolute;
@@ -219,27 +222,15 @@
   }
 }
 
-/* Only a pinned page has a filled pin. A highlighted pin stays an outline. */
-.ui-action-menu.window-rail-more-menu .window-rail-more-pin > .agent-context-icon > * {
-  fill-opacity: 0;
+/* A pinned page has a pin in the primary text color, as a highlighted icon. Icons stay outlines. */
+.window-rail-more-menu .window-rail-more-row[data-pinned] .window-rail-more-pin > .agent-context-icon {
+  color: var(--openbot-text-primary);
 }
 
-.window-rail-more-menu .window-rail-more-row[data-pinned] .window-rail-more-pin > .agent-context-icon > * {
-  fill-opacity: 1;
-}
-
-/* The page icon follows the line, also when the pin is highlighted. */
+/* The page icon takes the primary text color with its row, also when the pin is highlighted. */
 .ui-action-menu.window-rail-more-menu
   .window-rail-more-row:is(:hover, :has([data-highlighted]))
   > [role="menuitem"]
   > .agent-context-icon {
   color: var(--openbot-text-primary);
-}
-
-.ui-action-menu.window-rail-more-menu
-  .window-rail-more-row:is(:hover, :has([data-highlighted]))
-  > [role="menuitem"]
-  > .agent-context-icon
-  > * {
-  fill-opacity: 1;
 }

@@ -609,6 +609,10 @@
   gap: 10px;
 }
 
+.message-show-full {
+  justify-self: start;
+}
+
 .message-content-resize {
   min-width: 0;
 }
@@ -1629,7 +1633,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .choice-card {

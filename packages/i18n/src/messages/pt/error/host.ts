@@ -32,4 +32,5 @@ export const messages = {
     "O tempo para encerrar o ambiente de usuário esgotou. Nenhuma substituição do aplicativo foi iniciada.",
   "error.host.tenantHealthMissing":
     "Os relatórios de integridade dos ambientes de usuário estão ausentes ou indicam falhas após a reinicialização. Verifique as sessões dos ambientes de usuário antes de outra atualização.",
+  "error.host.personalityInvalid": "Este estilo de resposta não é conhecido.",
 } as const satisfies PartialTranslation<typeof source>;

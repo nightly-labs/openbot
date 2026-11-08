@@ -8,6 +8,9 @@
 // that a prompt on a channel thread names the channel and a prompt on the agent's own thread does
 // not, and that only the peer with the capability gets `threads`, the preview author and status and
 // the UI blocks, while the released peer reads its wire with the frozen channels-v1 codec.
+// It also checks channel-isolation-v1 (#5380): only a protocol 9 peer with the capability reads and
+// saves "Keep memories in this channel", a save without the field keeps the stored value, and the host
+// ignores the field from a peer without the capability.
 // Run: `bun scripts/channel-notifications-e2e.ts`.
 // Writes .openbot-build/channel-notifications-e2e/report.json.
 
@@ -21,6 +24,7 @@ import {
   type AgentEvent,
   type ChannelMessage,
   type ChannelTask,
+  decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
   IPC_ENDPOINTS,
@@ -32,11 +36,15 @@ import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_V8,
+  TEAM_PROTOCOL_V9,
   TEAM_PROTOCOL_VERSION_HEADER,
   teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES, channelResponse } from "@openbot/contracts/team-protocol/channels-v1";
-import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  CHANNEL_ISOLATION_CAPABILITY,
+  TEAM_CHANNEL_ATTENTION_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { createFormat, translateFor } from "@openbot/i18n";
 import { plugin } from "bun";
@@ -238,6 +246,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 const teamBrowser: TeamApiBrowser = {
   listTabs: () => [],
@@ -309,14 +320,24 @@ function agentMessage(
 /** The capabilities that a protocol 8 peer sends. */
 const V8_PEER_CAPABILITIES = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V8);
 
-/** One HTTP request of a v8 peer that advertises `capabilities`. */
+/** The capabilities that a protocol 9 peer sends. channel-isolation-v1 is one of them. */
+const V9_PEER_CAPABILITIES = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+
+/** One HTTP request of a peer of `protocol` (v8 when absent) that advertises `capabilities`. */
 async function wire(
   port: number,
-  input: { method: string; path: string; capabilities: readonly string[]; body?: unknown; token?: string },
+  input: {
+    method: string;
+    path: string;
+    capabilities: readonly string[];
+    body?: unknown;
+    token?: string;
+    protocol?: number;
+  },
 ): Promise<{ status: number; body: unknown }> {
   const headers = new Headers({
     Accept: "application/json",
-    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V8),
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(input.protocol ?? TEAM_PROTOCOL_V8),
     [TEAM_APP_VERSION_HEADER]: APP_VERSION,
     [TEAM_CAPABILITIES_HEADER]: input.capabilities.join(","),
   });
@@ -651,6 +672,117 @@ try {
       return attentionKeys(list, page);
     },
   );
+
+  const codec = teamSideRouteCodec(CHANNEL_ROUTES.command);
+  assert.ok(codec);
+  const withoutIsolation = V9_PEER_CAPABILITIES.filter((capability) => capability !== CHANNEL_ISOLATION_CAPABILITY);
+  assert.ok(
+    V9_PEER_CAPABILITIES.includes(CHANNEL_ISOLATION_CAPABILITY),
+    "A protocol 9 peer does not send the capability.",
+  );
+  const stored = () => channels.store.get(channel.id).isolated;
+  /** A settings save of the channel, as the editor sends it, with `isolated` only when it is given. */
+  const save = (isolated?: boolean) => {
+    const current = channels.store.get(channel.id);
+    return {
+      type: "save",
+      operationId: randomUUID(),
+      channelId: channel.id,
+      update: true,
+      draft: {
+        name: current.name,
+        title: current.title,
+        instructions: current.instructions,
+        members: current.members,
+        leadAgentId: current.leadAgentId,
+        ...(isolated === undefined ? {} : { isolated }),
+      },
+    };
+  };
+  /** A request of a protocol 9 peer; `isolation` says whether it advertises channel-isolation-v1. */
+  const v9 = (isolation: boolean, method: string, path: string, body?: unknown) =>
+    wire(port, {
+      method,
+      path,
+      capabilities: isolation ? V9_PEER_CAPABILITIES : withoutIsolation,
+      token,
+      protocol: TEAM_PROTOCOL_V9,
+      ...(body === undefined ? {} : { body }),
+    });
+  /** What a client with channel-isolation-v1 reads as `isolated` in the list, the page and `response`. */
+  const readIsolated = async (response: { status: number; body: unknown }) => {
+    assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+    const options = { channelAttention: true, channelIsolation: true };
+    const list = await v9(true, "GET", CHANNEL_ROUTES.list);
+    const page = await v9(true, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    const summary = decodeChannelSummaries(codec.response(CHANNEL_ROUTES.list, 200, list.body, options)).find(
+      (candidate) => candidate.id === channel.id,
+    );
+    return {
+      list: summary?.isolated,
+      page: decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, page.body, options)).channel.isolated,
+      command: decodeChannel(codec.response(CHANNEL_ROUTES.command, 200, response.body, options)).isolated,
+      stored: stored(),
+    };
+  };
+
+  await step("A peer without channel-isolation-v1 cannot turn the setting on, and gets no isolated field", async () => {
+    assert.notEqual(stored(), true, "The channel starts with the setting on.");
+    // The raw body carries the field: the host must ignore it because the peer did not advertise it.
+    const response = await v9(false, "POST", CHANNEL_ROUTES.command, save(true));
+    assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+    assert.notEqual(stored(), true, "The host stored isolated from a peer without the capability.");
+    const list = await v9(false, "GET", CHANNEL_ROUTES.list);
+    const page = await v9(false, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    const sent = {
+      list:
+        Array.isArray(list.body) && list.body.some((item) => isDynamicRecord(item) && Object.hasOwn(item, "isolated")),
+      page:
+        isDynamicRecord(page.body) &&
+        isDynamicRecord(page.body.channel) &&
+        Object.hasOwn(page.body.channel, "isolated"),
+      command: isDynamicRecord(response.body) && Object.hasOwn(response.body, "isolated"),
+    };
+    assert.deepEqual(sent, { list: false, page: false, command: false });
+    channelResponse(CHANNEL_ROUTES.list, 200, list.body);
+    channelResponse(CHANNEL_ROUTES.read, 200, page.body);
+    return { sent, stored: stored() ?? null };
+  });
+
+  await step(
+    "A peer with channel-isolation-v1 turns the setting on and reads it in the list, the page and the answer",
+    async () => {
+      const body = codec.request(CHANNEL_ROUTES.command, save(true), { channelIsolation: true });
+      const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
+      assert.deepEqual(read, { list: true, page: true, command: true, stored: true });
+      return read;
+    },
+  );
+
+  await step(
+    "A save of a peer without channel-isolation-v1 keeps the setting on, even with isolated false",
+    async () => {
+      // An older desktop client, the phone, or a client of an older host: the raw body may carry the field.
+      const response = await v9(false, "POST", CHANNEL_ROUTES.command, save(false));
+      assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+      assert.equal(stored(), true, "A save of a peer without the capability turned the setting off.");
+      return { stored: stored() ?? null };
+    },
+  );
+
+  await step("A save without isolated keeps the setting on, as the editor sends a rename", async () => {
+    const body = codec.request(CHANNEL_ROUTES.command, save(), { channelIsolation: true });
+    const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
+    assert.deepEqual(read, { list: true, page: true, command: true, stored: true });
+    return read;
+  });
+
+  await step("A peer with channel-isolation-v1 turns the setting off again", async () => {
+    const body = codec.request(CHANNEL_ROUTES.command, save(false), { channelIsolation: true });
+    const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
+    assert.deepEqual(read, { list: false, page: false, command: false, stored: false });
+    return read;
+  });
 
   report.passed = true;
 } finally {

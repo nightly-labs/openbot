@@ -105,6 +105,30 @@ const PLUGIN_TEXT = {
       "prompt-tokens": "marketplace.plugin.paper.prompt.tokens",
     },
   },
+  higgsfield: {
+    tagline: "marketplace.plugin.higgsfield.tagline",
+    description: "marketplace.plugin.higgsfield.description",
+    apps: {
+      "app-higgsfield-mcp": "marketplace.plugin.higgsfield.app",
+    },
+    prompts: {
+      "prompt-credits": "marketplace.plugin.higgsfield.prompt.credits",
+      "prompt-product-shot": "marketplace.plugin.higgsfield.prompt.productShot",
+      "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
+    },
+  },
+  elevenlabs: {
+    tagline: "marketplace.plugin.elevenlabs.tagline",
+    description: "marketplace.plugin.elevenlabs.description",
+    apps: {
+      "app-elevenlabs-mcp": "marketplace.plugin.elevenlabs.app",
+    },
+    prompts: {
+      "prompt-speech": "marketplace.plugin.elevenlabs.prompt.speech",
+      "prompt-agents": "marketplace.plugin.elevenlabs.prompt.agents",
+      "prompt-conversations": "marketplace.plugin.elevenlabs.prompt.conversations",
+    },
+  },
   "apple-apps": {
     tagline: "marketplace.plugin.appleApps.tagline",
     description: "marketplace.plugin.appleApps.description",
@@ -127,6 +151,18 @@ const PLUGIN_TEXT = {
       "prompt-new-errors": "marketplace.plugin.sentry.prompt.newErrors",
       "prompt-top-crash": "marketplace.plugin.sentry.prompt.topCrash",
       "prompt-release-health": "marketplace.plugin.sentry.prompt.releaseHealth",
+    },
+  },
+  gitlab: {
+    tagline: "marketplace.plugin.gitlab.tagline",
+    description: "marketplace.plugin.gitlab.description",
+    apps: {
+      "app-gitlab-mcp": "marketplace.plugin.gitlab.app",
+    },
+    prompts: {
+      "prompt-review-queue": "marketplace.plugin.gitlab.prompt.reviewQueue",
+      "prompt-failed-pipeline": "marketplace.plugin.gitlab.prompt.failedPipeline",
+      "prompt-new-issue": "marketplace.plugin.gitlab.prompt.newIssue",
     },
   },
   vercel: {
@@ -271,6 +307,18 @@ const PLUGIN_TEXT = {
       "prompt-send": "marketplace.plugin.resend.prompt.send",
       "prompt-status": "marketplace.plugin.resend.prompt.status",
       "prompt-template": "marketplace.plugin.resend.prompt.template",
+    },
+  },
+  omnisend: {
+    tagline: "marketplace.plugin.omnisend.tagline",
+    description: "marketplace.plugin.omnisend.description",
+    apps: {
+      "app-omnisend-mcp": "marketplace.plugin.omnisend.app",
+    },
+    prompts: {
+      "prompt-last-campaign": "marketplace.plugin.omnisend.prompt.lastCampaign",
+      "prompt-segment": "marketplace.plugin.omnisend.prompt.segment",
+      "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
     },
   },
   composio: {

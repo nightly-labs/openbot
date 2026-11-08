@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Lokaal",
   "mobile.server.drawer.remote": "Extern",
-  "mobile.server.drawer.routines": "Routines",
   "mobile.server.drawer.usage": "Gebruik",
   "mobile.server.drawer.editOrder": "Volgorde wijzigen",
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} lid", other: "{count} leden" },
   "mobile.server.drawer.doneEditing": "Klaar met volgorde wijzigen",
+  "mobile.server.drawer.editSidebar": "Zijbalk bewerken",
+  "mobile.server.drawer.unpinTool": "Losmaken",
+  "mobile.server.drawer.pinToolNamed": "{name} vastmaken",
+  "mobile.server.drawer.unpinToolNamed": "{name} losmaken",
+  "mobile.server.drawer.unpinnedTool": "{name}, losgemaakt",
+  "mobile.server.drawer.toolsHint":
+    "Sleep de grepen om tools te verplaatsen. Losgemaakte tools zie je alleen tijdens het bewerken. De volgorde wordt op dit apparaat bewaard.",
+  "mobile.server.drawer.doneEditingSidebar": "Bewerken voltooien",
   "mobile.server.drawer.join": "Word lid van een server",
   "mobile.server.drawer.add": "Server toevoegen",
   "mobile.server.drawer.settings": "Instellingen",
@@ -355,6 +362,7 @@ export const messages = {
   "mobile.server.storage.noFiles": "Er zijn geen bestanden op deze server opgeslagen.",
   "mobile.server.route.providers": "Aanbieders",
   "mobile.server.route.provider": "Aanbieder",
+  "mobile.server.route.providerModels": "Modellen",
   "mobile.server.route.mcp": "MCP-servers",
   "mobile.server.route.mcpServer": "MCP-server",
   "mobile.server.members.rowLabel": "{name}, {role}",
@@ -378,15 +386,13 @@ export const messages = {
     "Deze persoon verliest de toegang tot {server} en heeft een nieuwe uitnodiging nodig om weer lid te worden.",
   "mobile.server.members.expires": "Verloopt",
   "mobile.server.members.revokeInvitation": "Uitnodiging intrekken",
-  "mobile.server.settings.status": "Status",
   "mobile.server.settings.yourRole": "Je rol",
   "mobile.server.settings.memberCount": { other: "{count} van {limit}" },
   "mobile.server.settings.aiSection": "AI en tools",
   "mobile.server.settings.dataSection": "Gegevens",
-  "mobile.server.settings.maintenanceSection": "Onderhoud",
   "mobile.server.settings.peopleSection": "Personen",
   "mobile.server.settings.moveSection": "Importeren en overdracht",
-  "mobile.server.settings.general": "Algemeen",
+  "mobile.server.settings.serverSection": "Server",
   "mobile.server.settings.timezone": "Tijdzone",
   "mobile.server.settings.timezoneAutomatic": "Automatisch",
   "mobile.server.settings.timezoneSystem": "Serverzone: {zone}",
@@ -466,15 +472,63 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "Dit verwijdert de aanmeldingen, cookies en sitegegevens van het profiel. De open tabbladen sluiten.",
   "mobile.server.browserProfiles.deleteAgents": "Deze agents gaan naar het gedeelde profiel: {agents}.",
+  "mobile.server.browserProxies.unsupported": "Werk OpenBot op deze server bij om de proxy's hier te beheren.",
+  "mobile.server.browserProxies.loading": "Proxy's laden…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot kon de proxy's niet laden.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot kon de proxy niet wijzigen.",
+  "mobile.server.browserProxies.title": "Proxy's",
+  "mobile.server.browserProxies.sectionHint":
+    "Een profiel met een proxy opent zijn pagina's via die proxy. Een lid deelt een computer vanuit de OpenBot-desktop-app.",
+  "mobile.server.browserProxies.limit": "Een server kan maximaal {limit} proxy's hebben.",
+  "mobile.server.browserProxies.add": "Proxy toevoegen",
+  "mobile.server.browserProxies.new": "Nieuwe proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatisch",
+  "mobile.server.browserProxies.profileHint":
+    "“Automatisch” gebruikt de proxy-instellingen van de computer waarop de server draait.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · poort {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { one: "{count} profiel", other: "{count} profielen" },
+  "mobile.server.browserProxies.online": "Online",
+  "mobile.server.browserProxies.offline": "{name} is offline",
+  "mobile.server.browserProxies.failing": "{name} reageert niet",
+  "mobile.server.browserProxies.signInRefused": "{name} heeft de aanmelding geweigerd",
+  "mobile.server.browserProxies.yourComputer": "Je computer",
+  "mobile.server.browserProxies.memberComputer": "Computer van {name}",
+  "mobile.server.browserProxies.unknownComputer": "Computer van een lid",
+  "mobile.server.browserProxies.gone": "Deze proxy staat niet meer op de server.",
+  "mobile.server.browserProxies.editTitle": "{name} wijzigen?",
+  "mobile.server.browserProxies.address": "Adres",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Gebruik socks5, http of https. Een gebruikersnaam en een wachtwoord zijn optioneel. Het wachtwoord blijft versleuteld op de computer waarop de server draait.",
+  "mobile.server.browserProxies.addressInvalid":
+    "Dit is geen proxyadres. Gebruik socks5://host:1080, http://user:password@host:3128 of host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "De pagina's van de profielen die deze computer gebruiken, gaan via zijn internetverbinding zolang het lid hem deelt vanuit de OpenBot-desktop-app. De computer opent alleen openbare internetadressen.",
+  "mobile.server.browserProxies.profilesTitle": "Profielen",
+  "mobile.server.browserProxies.delete": "Proxy verwijderen",
+  "mobile.server.browserProxies.deleteHint": "Verwijderen zet de profielen van deze proxy op “Automatisch”.",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profiel gebruikt deze proxy. Het gaat over op “Automatisch”.",
+    other: "{count} profielen gebruiken deze proxy. Ze gaan over op “Automatisch”.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Geen enkel profiel gebruikt deze proxy.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "{count} open tabblad wordt gesloten.",
+    other: "{count} open tabbladen worden gesloten.",
+  },
+  "mobile.server.browserProxies.changeTitle": "Proxy van {name} wijzigen?",
+  "mobile.server.browserProxies.change": "Proxy wijzigen",
+  "mobile.server.browserProxies.choiceHint":
+    "“Automatisch” gebruikt de proxy-instellingen van de computer waarop de server draait. Een wijziging sluit de open tabbladen van het profiel.",
+  "mobile.server.browserProxies.shareHint": "Deel je computer in de OpenBot-desktop-app om hem te gebruiken.",
   "mobile.server.route.connectors": "Connectors",
-  "mobile.server.settings.connectors": "Connectors",
   "mobile.server.connectors.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de connectors te beheren.",
   "mobile.server.connectors.unsupported": "Werk OpenBot bij op deze server om de connectors hier te beheren.",
   "mobile.server.connectors.loading": "Connectors laden…",
-  "mobile.server.connectors.onServer": "Op {name}",
-  "mobile.server.connectors.notSetUp": "Niet ingesteld",
-  "mobile.server.connectors.available": "Beschikbaar",
   "mobile.server.connectors.localOnly": "Alleen desktop-app",
   "mobile.server.connectors.statusConnected": "Verbonden",
   "mobile.server.connectors.statusAttention": "Aandacht nodig",
@@ -494,10 +548,7 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Agent toevoegen",
   "mobile.server.connectors.later": "Later",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Vult browserlogins in vanuit Bitwarden. Stel dit in in de desktop-app.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Repository’s, issues en pull requests voor elke agent",
   "mobile.server.connectors.github.description":
     "Elke agent op {host} kan je GitHub-repository’s, issues en pull requests gebruiken, en gh en git.",
   "mobile.server.connectors.github.unavailable": "OpenBot op deze server kan GitHub niet verbinden.",
@@ -531,7 +582,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "Hiermee verwijder je de login van @{login} van {host} en verliest elke agent de GitHub-tools, gh en git. Daarna opent GitHub, waar je OpenBot kunt intrekken.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "Een gedeelde kluis voor logins in de OpenBot-browser",
   "mobile.server.connectors.onePassword.description":
     "Deel via een serviceaccount een aparte 1Password-kluis met OpenBot op {host}, zodat agents op {host} in de browser bij sites kunnen inloggen.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -550,16 +600,53 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password ontkoppelen?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} vergeet het token. De kluis en het serviceaccount blijven in 1Password; verwijder ze daar als je ze niet meer nodig hebt.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Deel een Proton Pass-kluis met OpenBot op {host}, zodat agents op {host} zich in de browser bij sites kunnen aanmelden.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Maak in Proton Pass een toegangssleutel die alleen de kluis kan lezen die je met OpenBot deelt, en plak die hier. {host} bewaart de sleutel; deze telefoon niet.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} is niet beschikbaar op deze server.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Meld je op deze telefoon aan bij {name}. Daarna maakt {host} een gedeelde kluis en een alleen-lezen toegangssleutel ervoor, en bewaart alleen die sleutel. Agents zien nooit een wachtwoord.",
+  "mobile.server.connectors.passwordManager.connect": "{name} verbinden",
+  "mobile.server.connectors.passwordManager.connecting": "Verbinden…",
+  "mobile.server.connectors.passwordManager.useKey": "Een toegangssleutel gebruiken",
+  "mobile.server.connectors.passwordManager.key": "Toegangssleutel",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Verbinden met sleutel",
+  "mobile.server.connectors.passwordManager.signInTitle": "Aanmelden bij {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Meld je aan op de pagina van {name}. Deze pagina verandert zodra je bent aangemeld.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} haalt de aanmeldpagina op…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Aanmeldpagina openen",
+  "mobile.server.connectors.passwordManager.copyLink": "Link kopiëren",
+  "mobile.server.connectors.passwordManager.extraPassword": "Extra wachtwoord",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} vraagt om je extra wachtwoord. Het gaat één keer naar {host}; deze telefoon bewaart het niet.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Het extra wachtwoord is niet juist. Probeer het opnieuw.",
+  "mobile.server.connectors.passwordManager.continue": "Doorgaan",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} maakt de gedeelde kluis…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Gedeelde kluis",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Verplaats in {name} een login naar deze kluis zodat agents zich ermee kunnen aanmelden. Verwijder hem om te stoppen.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} login", other: "{count} logins" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Toegangssleutel",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Alleen lezen",
+  "mobile.server.connectors.passwordManager.keyExpires": "Alleen lezen. Verloopt op {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Verlopen op {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "De opdrachtregeltool van {name} vereist een betaald abonnement. Wijzig het abonnement van je account en verbind daarna opnieuw.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "De sleutel van {name} is verlopen",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Agents op {host} kunnen zich pas weer aanmelden met je gedeelde logins als je opnieuw verbindt.",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} ontkoppelen",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} ontkoppelen?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} verwijdert zijn toegangssleutel. De kluis en de logins erin blijven in je {name}-account.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Mensen noemen @OpenBot in Slack",
   "mobile.server.connectors.slack.description":
     "Mensen noemen @OpenBot in Slack of sturen een direct bericht. De Slack Orchestrator vraagt het de juiste agent en antwoordt.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator antwoordt",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · Nog geen agent die antwoordt",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} werkruimte · Slack Orchestrator antwoordt",
-    other: "{count} werkruimten · Slack Orchestrator antwoordt",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} werkruimte heeft aandacht nodig",
     other: "{count} werkruimten hebben aandacht nodig",
@@ -602,15 +689,8 @@ export const messages = {
     "Deze nieuwe agent beantwoordt alles wat mensen in {workspace} naar @OpenBot sturen.",
   "mobile.server.connectors.slack.installFailed": "Slack heeft de installatie niet voltooid. Probeer het opnieuw.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Mensen noemen @OpenBot in een Discord-server",
   "mobile.server.connectors.discord.description":
     "Mensen noemen @OpenBot in een kanaal van een Discord-server. De Discord Orchestrator vraagt het de juiste agent en antwoordt.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator antwoordt",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · Nog geen agent die antwoordt",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} Discord-server · Discord Orchestrator antwoordt",
-    other: "{count} Discord-servers · Discord Orchestrator antwoordt",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} Discord-server heeft aandacht nodig",
     other: "{count} Discord-servers hebben aandacht nodig",
@@ -653,17 +733,8 @@ export const messages = {
     "Deze nieuwe agent beantwoordt alles wat mensen in {workspace} naar @OpenBot sturen.",
   "mobile.server.connectors.discord.installFailed": "Discord heeft de autorisatie niet voltooid. Probeer het opnieuw.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Voeg de OpenBot-bot toe aan een Telegram-chat",
   "mobile.server.connectors.telegram.description":
     "Voeg de OpenBot-bot toe aan een Telegram-groep of open een directe chat ermee. De Telegram Orchestrator vraagt het de juiste agent en antwoordt.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} chat · Telegram Orchestrator antwoordt",
-    other: "{count} chats · Telegram Orchestrator antwoordt",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} chat · Nog geen agent die antwoordt",
-    other: "{count} chats · Nog geen agent die antwoordt",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} chat heeft aandacht nodig",
     other: "{count} chats hebben aandacht nodig",
@@ -701,6 +772,110 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "De gesprekken en de Telegram Orchestrator blijven in OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Dit is de laatste chat, dus de Telegram Orchestrator en zijn gesprekken worden uit OpenBot verwijderd.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Koppel een WhatsApp-nummer aan deze server. De WhatsApp Orchestrator vraagt de juiste agent en antwoordt.",
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} nummer heeft aandacht nodig",
+    other: "{count} nummers hebben aandacht nodig",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Nummers",
+  "mobile.server.connectors.whatsapp.linkNumber": "Koppel een nummer",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
+  "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Voeg de WhatsApp Orchestrator toe, anders krijgt WhatsApp geen antwoord.",
+  "mobile.server.connectors.whatsapp.addAgent": "Voeg de WhatsApp Orchestrator toe",
+  "mobile.server.connectors.whatsapp.note":
+    "Schrijf op je persoonlijke nummer in je chat “Bericht aan jezelf”. De mensen die je toestaat schrijven naar het nummer.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Koppel WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Kies het nummer en koppel deze server daarna vanuit WhatsApp op je telefoon.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "Op een telefoon koppel je met een koppelcode. Gebruik OpenBot op een computer om in plaats daarvan een QR-code te scannen.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Nummer",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Telefoonnummer",
+  "mobile.server.connectors.whatsapp.phoneDescription": "Met de landcode, zoals +31 6 12345678.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Typ het telefoonnummer met de landcode.",
+  "mobile.server.connectors.whatsapp.getCode": "Code ophalen",
+  "mobile.server.connectors.whatsapp.starting": "WhatsApp om een code vragen…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "Open in WhatsApp Gekoppelde apparaten en tik op Apparaat koppelen",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Tik op In plaats daarvan koppelen met telefoonnummer",
+  "mobile.server.connectors.whatsapp.codeStepType": "Typ deze code op de telefoon",
+  "mobile.server.connectors.whatsapp.codeLabel": "Koppelcode {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Kopieer code",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Wachten op de telefoon.",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp is niet gekoppeld",
+  "mobile.server.connectors.whatsapp.failedTimeout": "De code is verlopen voordat de telefoon hem gebruikte.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp weigerde de koppeling. Wacht een paar minuten en probeer het dan opnieuw.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Er loopt al een andere koppeling. Wacht tot die klaar is en probeer het dan opnieuw.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot kan WhatsApp niet bereiken. Controleer de internetverbinding.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Probeer opnieuw",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Deze nieuwe agent beantwoordt de berichten voor OpenBot op {number} en op elk nummer dat je later koppelt.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot is gekoppeld aan {number}",
+  "mobile.server.connectors.whatsapp.done": "Klaar",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "{number} loskoppelen?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot logt uit bij WhatsApp op {number}. Als OpenBot uit stond, verwijder het apparaat dan ook in WhatsApp > Gekoppelde apparaten.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "Mensen kunnen je agents niet meer bereiken via {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "De gesprekken en de WhatsApp Orchestrator blijven in OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "Dit is het laatste nummer, dus de WhatsApp Orchestrator en zijn gesprekken worden uit OpenBot verwijderd.",
+  "mobile.server.connectors.whatsapp.keep": "Gekoppeld houden",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Wie naar {number} kan schrijven",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Deze contacten en groepen kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Alleen jij kunt schrijven. Voeg een contact of een groep toe.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Groep",
+  "mobile.server.connectors.whatsapp.removeSender": "Verwijderen",
+  "mobile.server.connectors.whatsapp.addContact": "Contact toevoegen",
+  "mobile.server.connectors.whatsapp.addGroup": "Groep toevoegen",
+  "mobile.server.connectors.whatsapp.contactTitle": "Voeg een contact toe",
+  "mobile.server.connectors.whatsapp.contactDescription": "Deze persoon kan vanuit WhatsApp werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.contactName": "Naam",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
+  "mobile.server.connectors.whatsapp.add": "Toevoegen",
+  "mobile.server.connectors.whatsapp.groupTitle": "Voeg een groep toe",
+  "mobile.server.connectors.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Zoek groepen",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Groepen lezen…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Dit nummer zit in geen enkele groep.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Geen groep heeft deze naam.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Toegevoegd",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Verzoeken voor {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Deze mensen schreven naar het nummer en kregen een code. Keur een persoon alleen goed als die je dezelfde code gaf.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Geen verzoeken.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Code {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Goedkeuren",
+  "mobile.server.connectors.whatsapp.deny": "Weigeren",
   "mobile.server.settings.providers": "Aanbieders",
   "mobile.server.settings.providersConnected": { one: "{count} verbonden", other: "{count} verbonden" },
   "mobile.server.providers.description": "De AI-aanbieders van de computer waarop deze server draait.",
@@ -736,6 +911,8 @@ export const messages = {
   "mobile.server.providers.copy": "Kopiëren",
   "mobile.server.providers.copyCode": "Kopieer code",
   "mobile.server.providers.paste": "Plakken",
+  "mobile.server.providers.codeStepChatgpt":
+    "Open in ChatGPT op een computer de beveiligingsinstellingen en zet inloggen met apparaatcode voor Codex aan. Bij een werkaccount zet de beheerder van je workspace dit aan.",
   "mobile.server.providers.codeStepCopy": "Kopieer de code.",
   "mobile.server.providers.codeStepEnter": "Open de aanmeldpagina en voer de code in.",
   "mobile.server.providers.codeStepReturn": "Ga terug naar OpenBot. De aanmelding rondt zichzelf af.",
@@ -797,6 +974,43 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.models": "Modellen",
+  "mobile.server.providers.modelsCount": "{shown} van {total}",
+  "mobile.server.providers.modelsTitle": "Modellen van {name}",
+  "mobile.server.providers.modelsSearch": "Modellen zoeken",
+  "mobile.server.providers.modelsShowAll": "Alles tonen",
+  "mobile.server.providers.modelsHideAll": "Alles verbergen",
+  "mobile.server.providers.modelsReset": "Standaard herstellen",
+  "mobile.server.providers.modelsSelected": "Geselecteerd: {shown} van {total}.",
+  "mobile.server.providers.modelsHint":
+    "De modelkiezer van deze server toont de geselecteerde modellen. Agents kunnen nog steeds elk model gebruiken.",
+  "mobile.server.providers.modelsNoMatch": "Geen modellen komen overeen met je zoekopdracht.",
+  "mobile.server.providers.modelsNone": "Deze provider heeft geen modellen.",
+  "mobile.server.providers.modelsLoading": "Modellen laden…",
+  "mobile.server.providers.modelsLoadFailed": "Kan de modellen van deze provider niet laden.",
+  "mobile.server.providers.modelsFailed": "Kan de modellen niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.providers.promptCache": "Promptcache",
+  "mobile.server.providers.promptCacheHint":
+    "Hoe lang Claude de context van een agent tussen beurten in de cache houdt. Een wijziging geldt wanneer Claude opnieuw start.",
+  "mobile.server.providers.promptCacheDefault": "Standaard van Claude Code",
+  "mobile.server.providers.promptCacheHour": "1 uur",
+  "mobile.server.providers.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "mobile.server.providers.disconnect": "Ontkoppelen",
+  "mobile.server.providers.disconnectTitle": "{name} ontkoppelen?",
+  "mobile.server.providers.disconnectBody":
+    "OpenBot meldt {provider} af op de server. De agents wachten tot je {provider} opnieuw koppelt.",
+  "mobile.server.providers.resetUsage": "Gebruik resetten",
+  "mobile.server.providers.resettingUsage": "Resetten…",
+  "mobile.server.providers.resetUsageTitle": "Het gebruik van {name} resetten?",
+  "mobile.server.providers.resetUsageBody":
+    "Dit gebruikt één resettegoed. De verbruikte gebruikslimieten van dit account beginnen nu opnieuw. Je kunt dit niet ongedaan maken.",
+  "mobile.server.providers.resetUsageHint": "Resettegoed: {available}.",
+  "mobile.server.providers.resetUsageDone": "De gebruikslimieten van {name} beginnen nu opnieuw.",
+  "mobile.server.providers.resetUsageNothing":
+    "{name} heeft geen verbruikte gebruikslimiet. Er is geen tegoed gebruikt.",
+  "mobile.server.providers.resetUsageNoCredit": "{name} heeft geen resettegoed meer.",
+  "mobile.server.providers.resetUsageAlreadyRedeemed": "Dit tegoed van {name} is al gebruikt.",
+  "mobile.server.providers.resetUsageFailed": "Kan het gebruik niet resetten. Probeer het opnieuw.",
   "mobile.server.settings.mcp": "MCP-servers",
   "mobile.server.settings.mcpCount": { one: "{count} server", other: "{count} servers" },
   "mobile.server.mcp.unsupported": "Werk OpenBot bij op deze server om de MCP-servers hier te beheren.",

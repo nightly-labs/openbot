@@ -438,6 +438,16 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     writeTabs(agentId, null);
   }
 
+  // The open thread and the threads in the side panel keep their conversations. The conversations of
+  // the other threads go when there are too many, and the thread reads it again when its tab opens.
+  createEffect(
+    () => {
+      const agentId = activeAgentId();
+      return agentId ? [activeId(agentId), ...sideIds(agentId)].join("\n") : "";
+    },
+    (key) => tasks.showConversations(key ? key.split("\n") : []),
+  );
+
   // The open thread and the threads in the side panel read their conversations once, also when their
   // tabs are open after a restart. Events then keep them current. A thread that waits for its read is
   // not read again when another thread loads; it is read again only after it stops waiting and waits again.

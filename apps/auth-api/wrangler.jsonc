@@ -88,6 +88,15 @@
       "service": "openbot-email-relay"
     }
   ],
+  // Cloudflare Email Service sends when the SMTP mailbox surely did not, such as when its hourly limit
+  // (500 messages) is spent. The senders must be on an onboarded Email Sending domain (openbot.run).
+  // Only production has it: the preview and test Workers keep SMTP only.
+  "send_email": [
+    {
+      "name": "EMAIL_FALLBACK",
+      "allowed_sender_addresses": ["hello@openbot.run", "licenses@openbot.run"]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -143,6 +152,11 @@
       "name": "LIVE_ACTIVITY_RATE_LIMITER",
       "namespace_id": "2026092901",
       "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "FEEDBACK_RATE_LIMITER",
+      "namespace_id": "2026110801",
+      "simple": { "limit": 3, "period": 60 }
     }
   ],
   "env": {
@@ -225,6 +239,11 @@
           "name": "LIVE_ACTIVITY_RATE_LIMITER",
           "namespace_id": "2026092902",
           "simple": { "limit": 300, "period": 60 }
+        },
+        {
+          "name": "FEEDBACK_RATE_LIMITER",
+          "namespace_id": "2026110802",
+          "simple": { "limit": 3, "period": 60 }
         }
       ]
     },
@@ -325,6 +344,11 @@
           "name": "LIVE_ACTIVITY_RATE_LIMITER",
           "namespace_id": "2026092903",
           "simple": { "limit": 300, "period": 60 }
+        },
+        {
+          "name": "FEEDBACK_RATE_LIMITER",
+          "namespace_id": "2026110803",
+          "simple": { "limit": 3, "period": 60 }
         }
       ]
     }

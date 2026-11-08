@@ -56,8 +56,10 @@ export const messages = {
   "error.team.providersUnsupported": "이 연결에서는 제공자 설정을 지원하지 않아요.",
   "error.team.providerNotManaged": "OpenBot은 이 제공자의 CLI를 관리하지 않아요.",
   "error.team.channelsUnsupported": "이 연결에서는 채널 채팅을 지원하지 않아요.",
+  "error.team.channelContextUnsupported": "이 연결은 채널의 새 대화나 압축을 지원하지 않습니다.",
   "error.team.channelPictureUnsupported": "이 연결에서는 채널 사진을 지원하지 않아요.",
   "error.team.channelDeleteUnsupported": "이 연결에서는 채널 삭제를 지원하지 않아요.",
+  "error.team.historyDeleteUnsupported": "이 연결에서는 기록 삭제를 지원하지 않아요.",
   "error.team.channelTaskCancelUnsupported": "이 연결에서는 채널 작업 취소를 지원하지 않아요.",
   "error.team.membersCannotDeleteChannels": "멤버는 채널을 삭제할 수 없어요.",
   "error.team.membersCannotArchiveChannels": "멤버는 채널을 보관할 수 없어요.",
@@ -67,6 +69,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "이 연결에서는 에이전트 숨기기를 지원하지 않아요.",
   "error.team.agentColorsUnsupported": "이 연결에서는 에이전트 색상을 지원하지 않아요.",
   "error.team.chatColorsUnsupported": "이 연결에서는 채팅 색상을 지원하지 않아요.",
+  "error.team.routineRunPlaceUnsupported": "이 연결에서는 루틴이 실행되는 위치를 바꿀 수 없어요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
@@ -81,6 +84,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "이 연결에서는 폴더 표시를 지원하지 않아요.",
   "error.team.conversationFileSearchUnsupported": "이 연결에서는 파일 검색을 지원하지 않아요.",
   "error.team.sideQuestionUnsupported": "이 연결에서는 사이드 질문을 지원하지 않아요.",
+  "error.team.liveVoiceUnsupported":
+    "이 서버는 Codex 라이브 음성을 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
   "error.team.routineFlowsUnsupported":
     "이 서버는 루틴 플로우를 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
   "error.team.routineCanvasTooLarge":
@@ -142,6 +147,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "이 클라이언트는 보안 인증을 지원하지 않아요.",
   "error.team.agentSettingsUnsupported": "이 연결에서는 에이전트 설정을 지원하지 않아요.",
   "error.team.adminRequired": "관리자 권한이 필요해요.",
+  "error.team.mcpServerNotYours": "이 MCP 서버는 추가한 사람이나 관리자만 변경할 수 있어요.",
   "error.team.ownerRequired": "이 서버의 소유자만 할 수 있어요.",
   "error.team.requestTooLarge": "요청 본문이 너무 커요.",
   "error.team.signInRelayUnsupported": "이 서버는 로그인을 중계할 수 없어요. 호스트의 OpenBot을 업데이트해 주세요.",
@@ -152,4 +158,5 @@ export const messages = {
   "error.team.signInRelayUsed": "이 로그인은 이미 전송되었어요.",
   "error.team.signInRelayMismatch": "이 주소는 이 로그인에서 만든 주소가 아니에요.",
   "error.team.signInRelayLinkUnknown": "이 서버의 어떤 에이전트도 이 로그인 링크를 표시하지 않았어요.",
+  "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
 } as const satisfies PartialTranslation<typeof source>;

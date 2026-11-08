@@ -765,7 +765,7 @@
   height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .server-rail-tooltip {
@@ -1340,7 +1340,7 @@ textarea {
 .sidebar-marketplace-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-history-button > svg {
@@ -1366,7 +1366,7 @@ textarea {
 .sidebar-update-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-search-wrap {
@@ -1818,24 +1818,30 @@ textarea {
   z-index: 4;
 }
 
-/* The sticky header covers the top of the list, so the list keeps only its bottom fade. The top
-   fade would make the header partly transparent. */
-.agent-list.scroll-fade-top:has(.sidebar-folder):not(.scroll-fade-bottom) {
-  -webkit-mask-image: none;
-  mask-image: none;
+/* The rows fade in under the folder headers that stay at the top, so no row is cut at a header's
+   edge. `--agent-list-stuck-height` is the bottom of those headers, or 0 when none is at the top. */
+.sidebar .agent-list:is(.scroll-fade-top, .scroll-fade-bottom) {
+  --agent-list-fade-top: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
+  --agent-list-fade-bottom: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
+  -webkit-mask-image: var(--agent-list-fade-top), var(--agent-list-fade-bottom);
+  mask-image: var(--agent-list-fade-top), var(--agent-list-fade-bottom);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
 
-.agent-list.scroll-fade-top.scroll-fade-bottom:has(.sidebar-folder) {
-  -webkit-mask-image: linear-gradient(
+.sidebar .agent-list.scroll-fade-top {
+  --agent-list-fade-top: linear-gradient(
     to bottom,
-    var(--openbot-text-primary) 0,
-    var(--openbot-text-primary) calc(100% - 18px),
-    transparent 100%
+    var(--openbot-text-primary) var(--agent-list-stuck-height),
+    transparent var(--agent-list-stuck-height),
+    var(--openbot-text-primary) calc(var(--agent-list-stuck-height) + var(--agent-list-fade-size, 18px))
   );
-  mask-image: linear-gradient(
+}
+
+.sidebar .agent-list.scroll-fade-bottom {
+  --agent-list-fade-bottom: linear-gradient(
     to bottom,
-    var(--openbot-text-primary) 0,
-    var(--openbot-text-primary) calc(100% - 18px),
+    var(--openbot-text-primary) calc(100% - var(--agent-list-fade-size, 18px)),
     transparent 100%
   );
 }
@@ -2329,10 +2335,28 @@ textarea {
   border-color: var(--openbot-bg-control);
 }
 
+/* In the light theme, a surface card on the light sidebar is hard to see (issue 4715), so the selected
+   row has an ink fill, and keeps it on hover. The dark theme keeps the card, and so does the first
+   agent button, which is the only row and needs its hover fill. The sidebar holds the colour,
+   because the ring filter of the channel faces reads it there (`SidebarFrame`). */
+:root[data-openbot-color-scheme="light"] .sidebar {
+  --sidebar-row-selected: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-sidebar));
+}
+
+:root[data-openbot-color-scheme="light"] .sidebar .agent-row.agent-row-active:not(.sidebar-first-agent-action) {
+  --agent-avatar-outline: var(--sidebar-row-selected);
+
+  background: var(--sidebar-row-selected);
+}
+
+:root[data-openbot-color-scheme="light"] .sidebar .agent-row-active .agent-row-agent-status {
+  border-color: var(--sidebar-row-selected);
+}
+
 /* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
 
-/* The unread count and the failed routine mark are felt too, with their transitions, in
-   `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
+/* The unread count, the failed routine mark and the badge of an agent that waits for the user are
+   felt too, with their transitions, in `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
 
 .agent-row-thinking-dots {
   display: inline-flex;
@@ -2388,21 +2412,6 @@ textarea {
 .agent-row-agent-status-limited svg {
   width: 10px;
   height: 10px;
-}
-
-/* An agent that waits for the user: amber, and a little larger than the routine marks, so it is
-   the first badge the eye finds in a busy list. */
-.agent-row-agent-status-waiting {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-warning);
-  color: var(--openbot-bg-sidebar);
-}
-
-.agent-row-agent-status-waiting svg {
-  width: 11px;
-  height: 11px;
 }
 
 /* The action chip takes the time slot: the time does not matter while the agent waits. */
@@ -2775,7 +2784,7 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .avatar-image-upload-preview .agent-avatar {
@@ -3026,10 +3035,18 @@ textarea {
 }
 
 /* At the default width and below, the wait chip keeps only its icon so that a long name keeps its
-   space. The row's label and tooltip still name the action. */
+   space. The row's label and tooltip still name the action. The chip is then an 18px circle. */
 @container (max-width: 300px) {
   .agent-row-wait-chip:has(.agent-row-wait-chip-label) {
-    padding: 1px 5px;
+    width: 18px;
+    height: 18px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .agent-row-wait-chip:has(.agent-row-wait-chip-label) svg {
+    width: 12px;
+    height: 12px;
   }
 
   .agent-row-wait-chip-label {
@@ -3379,6 +3396,9 @@ textarea {
 }
 
 .sidebar-compact .agent-list {
+  /* An 18px fade is too short for a 64px row: a cut avatar looks like a hard edge. Half a row fades. */
+  --agent-list-fade-size: 32px;
+
   padding-inline: 12px;
 }
 
@@ -3537,6 +3557,7 @@ textarea {
 .reaction-picker-row button:focus-visible,
 .reaction-picker-row button[aria-checked="true"],
 .composer-button:hover,
+.composer-button[aria-expanded="true"],
 .composer-attachment > button:hover,
 .agent-context-menu button:hover,
 .agent-context-menu button:focus-visible {

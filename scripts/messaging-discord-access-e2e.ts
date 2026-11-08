@@ -113,6 +113,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** A Gateway event as Discord sends it. JSON, as on the wire. */
@@ -303,6 +306,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     forgetThread: () => Effect.void,
     ownChat: () => false,
     contextSession: () => null,
+    progressUpdates: () => null,
   });
   const messaging = new MessagingService({
     threads,

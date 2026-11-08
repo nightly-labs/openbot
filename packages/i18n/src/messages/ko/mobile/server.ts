@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "로컬",
   "mobile.server.drawer.remote": "원격",
-  "mobile.server.drawer.routines": "루틴",
   "mobile.server.drawer.usage": "사용량",
   "mobile.server.drawer.editOrder": "순서 편집",
   "mobile.server.drawer.leaveFailed": "{name}에서 나가지 못했어요",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { other: "멤버 {count}명" },
   "mobile.server.drawer.doneEditing": "순서 편집 완료",
+  "mobile.server.drawer.editSidebar": "사이드바 편집",
+  "mobile.server.drawer.unpinTool": "고정 해제",
+  "mobile.server.drawer.pinToolNamed": "{name} 고정",
+  "mobile.server.drawer.unpinToolNamed": "{name} 고정 해제",
+  "mobile.server.drawer.unpinnedTool": "{name}, 고정 해제됨",
+  "mobile.server.drawer.toolsHint":
+    "핸들을 끌어 도구를 옮기세요. 고정 해제된 도구는 편집할 때만 보입니다. 순서는 이 기기에 저장됩니다.",
+  "mobile.server.drawer.doneEditingSidebar": "편집 완료",
   "mobile.server.drawer.join": "서버 참여",
   "mobile.server.drawer.add": "서버 추가",
   "mobile.server.drawer.settings": "설정",
@@ -345,6 +352,7 @@ export const messages = {
   "mobile.server.storage.noFiles": "이 서버에 저장된 파일이 없어요.",
   "mobile.server.route.providers": "제공자",
   "mobile.server.route.provider": "제공자",
+  "mobile.server.route.providerModels": "모델",
   "mobile.server.route.mcp": "MCP 서버",
   "mobile.server.route.mcpServer": "MCP 서버",
   "mobile.server.members.rowLabel": "{name}, {role}",
@@ -365,15 +373,13 @@ export const messages = {
   "mobile.server.members.removeBody": "{server}에 대한 접근 권한을 잃어요. 다시 참여하려면 새 초대가 필요해요.",
   "mobile.server.members.expires": "만료",
   "mobile.server.members.revokeInvitation": "초대 취소",
-  "mobile.server.settings.status": "상태",
   "mobile.server.settings.yourRole": "내 역할",
   "mobile.server.settings.memberCount": { other: "{count}/{limit}" },
   "mobile.server.settings.aiSection": "AI 및 도구",
   "mobile.server.settings.dataSection": "데이터",
-  "mobile.server.settings.maintenanceSection": "유지 관리",
   "mobile.server.settings.peopleSection": "사용자",
   "mobile.server.settings.moveSection": "가져오기 및 이전",
-  "mobile.server.settings.general": "일반",
+  "mobile.server.settings.serverSection": "서버",
   "mobile.server.settings.timezone": "시간대",
   "mobile.server.settings.timezoneAutomatic": "자동",
   "mobile.server.settings.timezoneSystem": "서버 시간대: {zone}",
@@ -446,14 +452,57 @@ export const messages = {
   "mobile.server.browserProfiles.deleteTitle": "{name}을(를) 삭제할까요?",
   "mobile.server.browserProfiles.deleteBody": "프로필의 로그인, 쿠키, 사이트 데이터를 삭제합니다. 열린 탭은 닫힙니다.",
   "mobile.server.browserProfiles.deleteAgents": "다음 에이전트는 공유 프로필로 바뀝니다: {agents}.",
+  "mobile.server.browserProxies.unsupported": "여기서 프록시를 관리하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.server.browserProxies.loading": "프록시를 불러오는 중…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot이 프록시를 불러오지 못했어요.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot이 프록시를 바꾸지 못했어요.",
+  "mobile.server.browserProxies.title": "프록시",
+  "mobile.server.browserProxies.sectionHint":
+    "프록시가 있는 프로필은 그 프록시를 통해 페이지를 열어요. 멤버는 OpenBot 데스크톱 앱에서 컴퓨터를 공유해요.",
+  "mobile.server.browserProxies.limit": "서버 하나에 프록시는 최대 {limit}개예요.",
+  "mobile.server.browserProxies.add": "프록시 추가",
+  "mobile.server.browserProxies.new": "새 프록시",
+  "mobile.server.browserProxies.menu": "프록시",
+  "mobile.server.browserProxies.automatic": "자동",
+  "mobile.server.browserProxies.profileHint": "‘자동’은 서버를 실행하는 컴퓨터의 프록시 설정을 사용해요.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · 포트 {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { other: "프로필 {count}개" },
+  "mobile.server.browserProxies.online": "온라인",
+  "mobile.server.browserProxies.offline": "{name}이(가) 오프라인이에요",
+  "mobile.server.browserProxies.failing": "{name}이(가) 응답하지 않아요",
+  "mobile.server.browserProxies.signInRefused": "{name}이(가) 로그인을 거부했어요",
+  "mobile.server.browserProxies.yourComputer": "내 컴퓨터",
+  "mobile.server.browserProxies.memberComputer": "{name}의 컴퓨터",
+  "mobile.server.browserProxies.unknownComputer": "멤버의 컴퓨터",
+  "mobile.server.browserProxies.gone": "이 프록시는 더 이상 서버에 없어요.",
+  "mobile.server.browserProxies.editTitle": "{name}을(를) 바꿀까요?",
+  "mobile.server.browserProxies.address": "주소",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "socks5, http 또는 https를 사용하세요. 사용자 이름과 비밀번호는 선택 사항이에요. 비밀번호는 서버를 실행하는 컴퓨터에 암호화되어 보관돼요.",
+  "mobile.server.browserProxies.addressInvalid":
+    "프록시 주소가 아니에요. socks5://host:1080, http://user:password@host:3128 또는 host:port:user:password를 사용하세요.",
+  "mobile.server.browserProxies.computerHint":
+    "이 컴퓨터를 사용하는 프로필의 페이지는 멤버가 OpenBot 데스크톱 앱에서 이 컴퓨터를 공유하는 동안 이 컴퓨터의 인터넷 연결을 통해 나가요. 이 컴퓨터는 공개 인터넷 주소만 열어요.",
+  "mobile.server.browserProxies.profilesTitle": "프로필",
+  "mobile.server.browserProxies.delete": "프록시 삭제",
+  "mobile.server.browserProxies.deleteHint": "삭제하면 이 프록시의 프로필이 ‘자동’으로 바뀌어요.",
+  "mobile.server.browserProxies.deleteUsed": {
+    other: "프로필 {count}개가 이 프록시를 사용해요. 이 프로필은 ‘자동’으로 바뀌어요.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "이 프록시를 사용하는 프로필이 없어요.",
+  "mobile.server.browserProxies.closesTabs": { other: "열린 탭 {count}개가 닫혀요." },
+  "mobile.server.browserProxies.changeTitle": "{name}의 프록시를 바꿀까요?",
+  "mobile.server.browserProxies.change": "프록시 바꾸기",
+  "mobile.server.browserProxies.choiceHint":
+    "‘자동’은 서버를 실행하는 컴퓨터의 프록시 설정을 사용해요. 변경하면 프로필의 열린 탭이 닫혀요.",
+  "mobile.server.browserProxies.shareHint": "내 컴퓨터를 사용하려면 OpenBot 데스크톱 앱에서 공유하세요.",
   "mobile.server.route.connectors": "커넥터",
-  "mobile.server.settings.connectors": "커넥터",
   "mobile.server.connectors.unavailable": "커넥터를 관리하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.connectors.unsupported": "여기에서 커넥터를 관리하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.connectors.loading": "커넥터 불러오는 중…",
-  "mobile.server.connectors.onServer": "{name}에서",
-  "mobile.server.connectors.notSetUp": "설정 안 됨",
-  "mobile.server.connectors.available": "사용 가능",
   "mobile.server.connectors.localOnly": "데스크톱 앱 전용",
   "mobile.server.connectors.statusConnected": "연결됨",
   "mobile.server.connectors.statusAttention": "확인 필요",
@@ -473,9 +522,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "에이전트 추가",
   "mobile.server.connectors.later": "나중에",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Bitwarden으로 브라우저 로그인 정보를 입력해요. 데스크톱 앱에서 설정하세요.",
-  "mobile.server.connectors.bitwarden.hostSummary": "Bitwarden 또는 Vaultwarden으로 브라우저 로그인 정보를 입력해요",
   "mobile.server.connectors.bitwarden.description":
     "Bitwarden 또는 Vaultwarden에서 {host}의 브라우저 로그인 정보를 입력해요.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -502,7 +548,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host}에서 API 키와 마스터 비밀번호를 삭제해요. {host}의 에이전트가 더 이상 Bitwarden에서 로그인을 채울 수 없어요.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "모든 에이전트가 저장소, 이슈, 풀 리퀘스트를 사용해요",
   "mobile.server.connectors.github.description":
     "{host}의 모든 에이전트가 GitHub 저장소, 이슈, 풀 리퀘스트와 gh, git을 사용할 수 있어요.",
   "mobile.server.connectors.github.unavailable": "이 서버의 OpenBot은 GitHub에 연결할 수 없어요.",
@@ -534,7 +579,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "{host}에서 @{login}의 로그인 정보가 삭제되고, 모든 에이전트가 GitHub 도구, gh, git을 사용할 수 없게 돼요. 이후 GitHub가 열리면 OpenBot 접근 권한을 취소할 수 있어요.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "OpenBot 브라우저 로그인을 위한 공유 보관함",
   "mobile.server.connectors.onePassword.description":
     "서비스 계정을 통해 {host}의 OpenBot과 전용 1Password 보관함을 공유하면, {host}의 에이전트가 브라우저에서 사이트에 로그인할 수 있어요.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -553,15 +597,52 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password 연결을 해제할까요?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host}에서 토큰이 삭제돼요. 보관함과 서비스 계정은 1Password에 남아 있으니, 필요 없으면 1Password에서 삭제하세요.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Proton Pass 보관함 하나를 {host}의 OpenBot과 공유하면 {host}의 에이전트가 브라우저에서 사이트에 로그인할 수 있어요.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Proton Pass에서 OpenBot과 공유하는 보관함만 읽을 수 있는 액세스 키를 만든 다음 여기에 붙여 넣으세요. 키는 {host}에 보관되고 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "이 서버에서는 {name}을(를) 사용할 수 없어요.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "이 휴대폰에서 {name}에 로그인하세요. 그러면 {host}이(가) 공유 보관함과 그 보관함의 읽기 전용 액세스 키를 만들고, 그 키만 보관해요. 에이전트는 비밀번호를 볼 수 없어요.",
+  "mobile.server.connectors.passwordManager.connect": "{name} 연결",
+  "mobile.server.connectors.passwordManager.connecting": "연결 중…",
+  "mobile.server.connectors.passwordManager.useKey": "액세스 키 사용",
+  "mobile.server.connectors.passwordManager.key": "액세스 키",
+  "mobile.server.connectors.passwordManager.connectWithKey": "키로 연결",
+  "mobile.server.connectors.passwordManager.signInTitle": "{name}에 로그인",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "{name} 페이지에서 로그인하세요. 로그인이 완료되면 이 페이지가 바뀌어요.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host}이(가) 로그인 페이지를 가져오는 중…",
+  "mobile.server.connectors.passwordManager.openSignIn": "로그인 페이지 열기",
+  "mobile.server.connectors.passwordManager.copyLink": "링크 복사",
+  "mobile.server.connectors.passwordManager.extraPassword": "추가 비밀번호",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name}에서 추가 비밀번호를 요청해요. 비밀번호는 {host}에 한 번만 전송되고 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "추가 비밀번호가 올바르지 않아요. 다시 시도하세요.",
+  "mobile.server.connectors.passwordManager.continue": "계속",
+  "mobile.server.connectors.passwordManager.setupBody": "{host}이(가) 공유 보관함을 만드는 중…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "공유 보관함",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "{name}에서 로그인 항목을 이 보관함으로 옮기면 에이전트가 그 항목으로 로그인할 수 있어요. 중지하려면 삭제하세요.",
+  "mobile.server.connectors.passwordManager.loginCount": { other: "로그인 {count}개" },
+  "mobile.server.connectors.passwordManager.keyTitle": "액세스 키",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "읽기 전용",
+  "mobile.server.connectors.passwordManager.keyExpires": "읽기 전용. {date}에 만료돼요.",
+  "mobile.server.connectors.passwordManager.keyExpired": "{date}에 만료됨",
+  "mobile.server.connectors.passwordManager.plan":
+    "{name} 명령줄 도구에는 유료 플랜이 필요해요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "{name} 키가 만료되었어요",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "다시 연결할 때까지 {host}의 에이전트는 공유 로그인 항목으로 로그인할 수 없어요.",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} 연결 해제",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} 연결을 해제할까요?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host}에서 액세스 키가 삭제돼요. 보관함과 로그인 항목은 {name} 계정에 남아 있어요.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Slack에서 @OpenBot을 멘션해요",
   "mobile.server.connectors.slack.description":
     "Slack에서 @OpenBot을 멘션하거나 다이렉트 메시지를 보낼 수 있어요. Slack Orchestrator가 알맞은 에이전트에게 물어보고 답변해요.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator가 답변해요",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · 답변하는 에이전트가 아직 없어요",
-  "mobile.server.connectors.slack.many": {
-    other: "워크스페이스 {count}개 · Slack Orchestrator가 답변해요",
-  },
   "mobile.server.connectors.slack.attention": {
     other: "워크스페이스 {count}개 확인 필요",
   },
@@ -601,14 +682,8 @@ export const messages = {
     "이 새 에이전트가 {workspace}에서 @OpenBot에게 보내는 모든 요청에 답변해요.",
   "mobile.server.connectors.slack.installFailed": "Slack 설치가 완료되지 않았어요. 다시 시도해 주세요.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Discord 서버에서 @OpenBot을 멘션해요",
   "mobile.server.connectors.discord.description":
     "Discord 서버의 채널에서 @OpenBot을 멘션할 수 있어요. Discord Orchestrator가 알맞은 에이전트에게 물어보고 답변해요.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator가 답변해요",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · 답변하는 에이전트가 아직 없어요",
-  "mobile.server.connectors.discord.many": {
-    other: "Discord 서버 {count}개 · Discord Orchestrator가 답변해요",
-  },
   "mobile.server.connectors.discord.attention": {
     other: "Discord 서버 {count}개 확인 필요",
   },
@@ -648,15 +723,8 @@ export const messages = {
     "이 새 에이전트가 {workspace}에서 @OpenBot에게 보내는 모든 요청에 답변해요.",
   "mobile.server.connectors.discord.installFailed": "Discord 승인이 완료되지 않았어요. 다시 시도해 주세요.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Telegram 채팅에 OpenBot 봇을 추가해요",
   "mobile.server.connectors.telegram.description":
     "Telegram 그룹에 OpenBot 봇을 추가하거나 봇과 1:1 채팅을 시작하세요. Telegram Orchestrator가 알맞은 에이전트에게 물어보고 답변해요.",
-  "mobile.server.connectors.telegram.connected": {
-    other: "채팅 {count}개 · Telegram Orchestrator가 답변해요",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    other: "채팅 {count}개 · 답변하는 에이전트가 아직 없어요",
-  },
   "mobile.server.connectors.telegram.attention": {
     other: "채팅 {count}개 확인 필요",
   },
@@ -692,6 +760,105 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "대화와 Telegram Orchestrator는 OpenBot에 그대로 남아 있어요.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "마지막 채팅이므로 Telegram Orchestrator와 해당 대화가 OpenBot에서 삭제돼요.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "WhatsApp 번호를 이 서버에 연결하세요. WhatsApp 오케스트레이터가 알맞은 에이전트에게 물어보고 답해요.",
+  "mobile.server.connectors.whatsapp.attention": { other: "번호 {count}개 확인 필요" },
+  "mobile.server.connectors.whatsapp.numbersTitle": "번호",
+  "mobile.server.connectors.whatsapp.linkNumber": "번호 연결",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
+  "mobile.server.connectors.whatsapp.linkAgain": "다시 연결",
+  "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "WhatsApp 오케스트레이터를 추가하지 않으면 WhatsApp에는 답변이 가지 않아요.",
+  "mobile.server.connectors.whatsapp.addAgent": "WhatsApp 오케스트레이터 추가",
+  "mobile.server.connectors.whatsapp.note":
+    "개인 번호에서는 “나에게 메시지 보내기” 채팅에 메시지를 쓰세요. 허용한 사람들은 그 번호로 메시지를 보내요.",
+  "mobile.server.connectors.whatsapp.linkTitle": "WhatsApp 연결",
+  "mobile.server.connectors.whatsapp.linkDescription": "번호를 선택한 다음 휴대폰의 WhatsApp에서 이 서버를 연결하세요.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "휴대폰에서는 페어링 코드로 연결합니다. QR 코드를 스캔하려면 컴퓨터의 OpenBot을 사용하세요.",
+  "mobile.server.connectors.whatsapp.kindLabel": "번호",
+  "mobile.server.connectors.whatsapp.kindPersonal": "내 개인 번호",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 전용 번호",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "전화번호",
+  "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123처럼 국가 코드를 포함해 주세요.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "국가 코드를 포함한 전화번호를 입력하세요.",
+  "mobile.server.connectors.whatsapp.getCode": "코드 받기",
+  "mobile.server.connectors.whatsapp.starting": "WhatsApp에 코드를 요청하는 중이에요…",
+  "mobile.server.connectors.whatsapp.codeStepDevices": "WhatsApp에서 연결된 기기를 열고 기기 연결을 탭하세요",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "대신 전화번호로 연결을 탭하세요",
+  "mobile.server.connectors.whatsapp.codeStepType": "휴대폰에 이 코드를 입력하세요",
+  "mobile.server.connectors.whatsapp.codeLabel": "페어링 코드 {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "코드 복사",
+  "mobile.server.connectors.whatsapp.codeWaiting": "휴대폰을 기다리는 중이에요.",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp이 연결되지 않았어요",
+  "mobile.server.connectors.whatsapp.failedTimeout": "휴대폰이 사용하기 전에 코드가 만료되었어요.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp이 연결을 거부했어요. 몇 분 기다린 다음 다시 시도해 주세요.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "다른 연결이 진행 중이에요. 끝날 때까지 기다린 다음 다시 시도해 주세요.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot이 WhatsApp에 연결할 수 없어요. 인터넷 연결을 확인하세요.",
+  "mobile.server.connectors.whatsapp.tryAgain": "다시 시도",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "이 새 에이전트가 {number} 및 이후에 연결하는 모든 번호에서 OpenBot에게 오는 메시지에 답해요.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot이 {number}에 연결되었어요",
+  "mobile.server.connectors.whatsapp.done": "완료",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "{number} 연결을 해제할까요?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot이 {number}의 WhatsApp에서 로그아웃해요. OpenBot이 꺼져 있었다면 WhatsApp > 연결된 기기에서도 기기를 삭제하세요.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "더 이상 {number}을(를) 통해 내 에이전트에게 연락할 수 없어요.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "대화와 WhatsApp 오케스트레이터는 OpenBot에 그대로 남아요.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "마지막 번호라서 WhatsApp 오케스트레이터와 대화가 OpenBot에서 삭제돼요.",
+  "mobile.server.connectors.whatsapp.keep": "연결 유지",
+  "mobile.server.connectors.whatsapp.sendersTitle": "{number}에 메시지를 보낼 수 있는 사람",
+  "mobile.server.connectors.whatsapp.sendersDescription": "이 연락처와 그룹은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "나만 메시지를 보낼 수 있어요. 연락처나 그룹을 추가하세요.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "번호 하나에 연락처와 그룹을 최대 {count}개까지 허용할 수 있어요.",
+  "mobile.server.connectors.whatsapp.senderGroup": "그룹",
+  "mobile.server.connectors.whatsapp.removeSender": "제거",
+  "mobile.server.connectors.whatsapp.addContact": "연락처 추가",
+  "mobile.server.connectors.whatsapp.addGroup": "그룹 추가",
+  "mobile.server.connectors.whatsapp.contactTitle": "연락처 추가",
+  "mobile.server.connectors.whatsapp.contactDescription":
+    "이 사람은 WhatsApp에서 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.contactName": "이름",
+  "mobile.server.connectors.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
+  "mobile.server.connectors.whatsapp.add": "추가",
+  "mobile.server.connectors.whatsapp.groupTitle": "그룹 추가",
+  "mobile.server.connectors.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.groupSearch": "그룹 검색",
+  "mobile.server.connectors.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "이 번호가 속한 그룹이 없어요.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "이 이름의 그룹이 없어요.",
+  "mobile.server.connectors.whatsapp.groupAdded": "추가됨",
+  "mobile.server.connectors.whatsapp.requestsTitle": "{number}에 온 요청",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "이 사람들은 번호에 메시지를 보내고 코드를 받았어요. 나에게 같은 코드를 알려 준 사람만 승인하세요.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "요청이 없어요.",
+  "mobile.server.connectors.whatsapp.requestDetail": "코드 {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "승인",
+  "mobile.server.connectors.whatsapp.deny": "거부",
   "mobile.server.settings.providers": "제공자",
   "mobile.server.settings.providersConnected": { other: "{count}개 연결됨" },
   "mobile.server.providers.description": "이 서버를 실행하는 컴퓨터의 AI 제공자예요.",
@@ -726,6 +893,8 @@ export const messages = {
   "mobile.server.providers.copy": "복사",
   "mobile.server.providers.copyCode": "코드 복사",
   "mobile.server.providers.paste": "붙여넣기",
+  "mobile.server.providers.codeStepChatgpt":
+    "컴퓨터의 ChatGPT에서 보안 설정을 열고 Codex용 기기 코드 로그인을 켜세요. 회사 계정은 워크스페이스 관리자가 켜요.",
   "mobile.server.providers.codeStepCopy": "코드를 복사합니다.",
   "mobile.server.providers.codeStepEnter": "로그인 페이지를 열고 코드를 입력합니다.",
   "mobile.server.providers.codeStepReturn": "OpenBot으로 돌아옵니다. 로그인은 자동으로 완료됩니다.",
@@ -787,6 +956,42 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.models": "모델",
+  "mobile.server.providers.modelsCount": "{shown}/{total}",
+  "mobile.server.providers.modelsTitle": "{name} 모델",
+  "mobile.server.providers.modelsSearch": "모델 검색",
+  "mobile.server.providers.modelsShowAll": "모두 표시",
+  "mobile.server.providers.modelsHideAll": "모두 숨기기",
+  "mobile.server.providers.modelsReset": "기본값으로 재설정",
+  "mobile.server.providers.modelsSelected": "선택됨: {shown}/{total}.",
+  "mobile.server.providers.modelsHint":
+    "이 서버의 모델 선택기에는 선택한 모델이 표시됩니다. 에이전트는 계속 모든 모델을 사용할 수 있습니다.",
+  "mobile.server.providers.modelsNoMatch": "검색과 일치하는 모델이 없습니다.",
+  "mobile.server.providers.modelsNone": "이 제공자에는 모델이 없습니다.",
+  "mobile.server.providers.modelsLoading": "모델 불러오는 중…",
+  "mobile.server.providers.modelsLoadFailed": "이 제공자의 모델을 불러올 수 없습니다.",
+  "mobile.server.providers.modelsFailed": "모델을 변경할 수 없습니다. 다시 시도하세요.",
+  "mobile.server.providers.promptCache": "프롬프트 캐시",
+  "mobile.server.providers.promptCacheHint":
+    "턴 사이에 Claude가 에이전트의 컨텍스트를 캐시에 보관하는 시간입니다. 변경 사항은 Claude가 다시 시작할 때 적용됩니다.",
+  "mobile.server.providers.promptCacheDefault": "Claude Code 기본값",
+  "mobile.server.providers.promptCacheHour": "1시간",
+  "mobile.server.providers.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없습니다.",
+  "mobile.server.providers.disconnect": "연결 해제",
+  "mobile.server.providers.disconnectTitle": "{name} 연결을 해제할까요?",
+  "mobile.server.providers.disconnectBody":
+    "OpenBot이 서버에서 {provider} 로그아웃을 합니다. 에이전트는 {provider}에 다시 연결할 때까지 기다립니다.",
+  "mobile.server.providers.resetUsage": "사용량 재설정",
+  "mobile.server.providers.resettingUsage": "재설정 중…",
+  "mobile.server.providers.resetUsageTitle": "{name}의 사용량을 재설정할까요?",
+  "mobile.server.providers.resetUsageBody":
+    "사용량 재설정 크레딧 1개를 사용합니다. 이 계정의 소진된 사용 한도가 지금 다시 시작됩니다. 되돌릴 수 없습니다.",
+  "mobile.server.providers.resetUsageHint": "사용량 재설정 크레딧: {available}.",
+  "mobile.server.providers.resetUsageDone": "{name}의 사용 한도가 지금 다시 시작됩니다.",
+  "mobile.server.providers.resetUsageNothing": "{name}에는 소진된 사용 한도가 없습니다. 크레딧을 사용하지 않았습니다.",
+  "mobile.server.providers.resetUsageNoCredit": "{name}에 남은 재설정 크레딧이 없습니다.",
+  "mobile.server.providers.resetUsageAlreadyRedeemed": "{name}의 이 크레딧은 이미 사용되었습니다.",
+  "mobile.server.providers.resetUsageFailed": "사용량을 재설정할 수 없습니다. 다시 시도하세요.",
   "mobile.server.settings.mcp": "MCP 서버",
   "mobile.server.settings.mcpCount": { other: "서버 {count}개" },
   "mobile.server.mcp.unsupported": "여기에서 MCP 서버를 관리하려면 이 서버의 OpenBot을 업데이트해 주세요.",

@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "ローカル",
   "mobile.server.drawer.remote": "リモート",
-  "mobile.server.drawer.routines": "ルーティン",
   "mobile.server.drawer.usage": "使用量",
   "mobile.server.drawer.editOrder": "順序を編集",
   "mobile.server.drawer.leaveFailed": "{name} から退出できませんでした",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { other: "メンバー {count} 人" },
   "mobile.server.drawer.doneEditing": "順序の編集を完了",
+  "mobile.server.drawer.editSidebar": "サイドバーを編集",
+  "mobile.server.drawer.unpinTool": "固定を解除",
+  "mobile.server.drawer.pinToolNamed": "{name} を固定",
+  "mobile.server.drawer.unpinToolNamed": "{name} の固定を解除",
+  "mobile.server.drawer.unpinnedTool": "{name}、固定解除",
+  "mobile.server.drawer.toolsHint":
+    "ハンドルをドラッグしてツールを移動します。固定を解除したツールは編集中にのみ表示されます。順序はこのデバイスに保存されます。",
+  "mobile.server.drawer.doneEditingSidebar": "編集を完了",
   "mobile.server.drawer.join": "サーバーに参加",
   "mobile.server.drawer.add": "サーバーを追加",
   "mobile.server.drawer.settings": "設定",
@@ -352,6 +359,7 @@ export const messages = {
   "mobile.server.storage.noFiles": "このサーバーに保存されているファイルはありません。",
   "mobile.server.route.providers": "プロバイダー",
   "mobile.server.route.provider": "プロバイダー",
+  "mobile.server.route.providerModels": "モデル",
   "mobile.server.route.mcp": "MCP サーバー",
   "mobile.server.route.mcpServer": "MCP サーバー",
   "mobile.server.members.rowLabel": "{name}、{role}",
@@ -373,15 +381,13 @@ export const messages = {
   "mobile.server.members.removeBody": "{server} にアクセスできなくなります。再び参加するには新しい招待が必要です。",
   "mobile.server.members.expires": "有効期限",
   "mobile.server.members.revokeInvitation": "招待を取り消す",
-  "mobile.server.settings.status": "状態",
   "mobile.server.settings.yourRole": "あなたのロール",
   "mobile.server.settings.memberCount": { other: "{count} / {limit}" },
   "mobile.server.settings.aiSection": "AI とツール",
   "mobile.server.settings.dataSection": "データ",
-  "mobile.server.settings.maintenanceSection": "メンテナンス",
   "mobile.server.settings.peopleSection": "ユーザー",
   "mobile.server.settings.moveSection": "インポートと移行",
-  "mobile.server.settings.general": "一般",
+  "mobile.server.settings.serverSection": "サーバー",
   "mobile.server.settings.timezone": "タイムゾーン",
   "mobile.server.settings.timezoneAutomatic": "自動",
   "mobile.server.settings.timezoneSystem": "サーバーのゾーン: {zone}",
@@ -463,15 +469,63 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "プロファイルのサインイン、Cookie、サイトデータを削除します。開いているタブは閉じます。",
   "mobile.server.browserProfiles.deleteAgents": "これらのエージェントは共有プロファイルに変わります: {agents}。",
+  "mobile.server.browserProxies.unsupported":
+    "ここでプロキシを管理するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.browserProxies.loading": "プロキシを読み込んでいます…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot はプロキシを読み込めませんでした。",
+  "mobile.server.browserProxies.saveFailed": "OpenBot はプロキシを変更できませんでした。",
+  "mobile.server.browserProxies.title": "プロキシ",
+  "mobile.server.browserProxies.sectionHint":
+    "プロキシを設定したプロファイルは、そのプロキシを通じてページを開きます。メンバーは OpenBot デスクトップアプリからコンピュータを共有します。",
+  "mobile.server.browserProxies.limit": "1 つのサーバーに作れるプロキシは最大 {limit} 個です。",
+  "mobile.server.browserProxies.add": "プロキシを追加",
+  "mobile.server.browserProxies.new": "新しいプロキシ",
+  "mobile.server.browserProxies.menu": "プロキシ",
+  "mobile.server.browserProxies.automatic": "自動",
+  "mobile.server.browserProxies.profileHint":
+    "「自動」は、サーバーを実行しているコンピューターのプロキシ設定を使用します。",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · ポート {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { other: "{count} 個のプロファイル" },
+  "mobile.server.browserProxies.online": "オンライン",
+  "mobile.server.browserProxies.offline": "{name} はオフラインです",
+  "mobile.server.browserProxies.failing": "{name} が応答しません",
+  "mobile.server.browserProxies.signInRefused": "{name} がサインインを拒否しました",
+  "mobile.server.browserProxies.yourComputer": "あなたのコンピュータ",
+  "mobile.server.browserProxies.memberComputer": "{name} のコンピュータ",
+  "mobile.server.browserProxies.unknownComputer": "メンバーのコンピュータ",
+  "mobile.server.browserProxies.gone": "このプロキシはサーバーにありません。",
+  "mobile.server.browserProxies.editTitle": "{name} を変更しますか？",
+  "mobile.server.browserProxies.address": "アドレス",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "socks5、http、https を使用できます。ユーザー名とパスワードは任意です。パスワードはサーバーを実行しているコンピューターに暗号化して保存されます。",
+  "mobile.server.browserProxies.addressInvalid":
+    "プロキシのアドレスではありません。socks5://host:1080、http://user:password@host:3128、または host:port:user:password を使用してください。",
+  "mobile.server.browserProxies.computerHint":
+    "このコンピュータを使用するプロファイルのページは、メンバーが OpenBot デスクトップアプリで共有している間、このコンピュータのインターネット接続を通じて送信されます。このコンピュータは公開インターネット上のアドレスだけを開きます。",
+  "mobile.server.browserProxies.profilesTitle": "プロファイル",
+  "mobile.server.browserProxies.delete": "プロキシを削除",
+  "mobile.server.browserProxies.deleteHint": "削除すると、このプロキシのプロファイルは「自動」に切り替わります。",
+  "mobile.server.browserProxies.deleteUsed": {
+    other: "{count} 個のプロファイルがこのプロキシを使用しています。これらは「自動」に切り替わります。",
+  },
+  "mobile.server.browserProxies.deleteUnused": "このプロキシを使用しているプロファイルはありません。",
+  "mobile.server.browserProxies.closesTabs": {
+    other: "開いている {count} 個のタブが閉じます。",
+  },
+  "mobile.server.browserProxies.changeTitle": "{name} のプロキシを変更しますか？",
+  "mobile.server.browserProxies.change": "プロキシを変更",
+  "mobile.server.browserProxies.choiceHint":
+    "「自動」は、サーバーを実行しているコンピューターのプロキシ設定を使用します。変更するとプロファイルの開いているタブは閉じます。",
+  "mobile.server.browserProxies.shareHint":
+    "あなたのコンピュータを使用するには、OpenBot デスクトップアプリで共有してください。",
   "mobile.server.route.connectors": "コネクター",
-  "mobile.server.settings.connectors": "コネクター",
   "mobile.server.connectors.unavailable":
     "コネクターを管理するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.connectors.unsupported": "ここでコネクターを管理するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.connectors.loading": "コネクターを読み込んでいます…",
-  "mobile.server.connectors.onServer": "{name} 上",
-  "mobile.server.connectors.notSetUp": "未設定",
-  "mobile.server.connectors.available": "利用可能",
   "mobile.server.connectors.localOnly": "デスクトップアプリのみ",
   "mobile.server.connectors.statusConnected": "接続済み",
   "mobile.server.connectors.statusAttention": "対応が必要",
@@ -491,10 +545,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "エージェントを追加",
   "mobile.server.connectors.later": "後で",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Bitwarden のログイン情報をブラウザーに入力します。デスクトップアプリで設定してください。",
-  "mobile.server.connectors.bitwarden.hostSummary":
-    "Bitwarden または Vaultwarden のログイン情報をブラウザーに入力します",
   "mobile.server.connectors.bitwarden.description":
     "{host} のブラウザーのログインを Bitwarden または Vaultwarden から入力します。",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -521,7 +571,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} は API キーとマスターパスワードを削除します。{host} のエージェントは Bitwarden からログインを入力できなくなります。",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "すべてのエージェントにリポジトリ、Issue、プルリクエストを提供",
   "mobile.server.connectors.github.description":
     "{host} のすべてのエージェントが、GitHub のリポジトリ、Issue、プルリクエスト、gh と git を使えます。",
   "mobile.server.connectors.github.unavailable": "このサーバーの OpenBot は GitHub を接続できません。",
@@ -552,7 +601,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "{host} から @{login} のサインインが削除され、すべてのエージェントが GitHub のツール、gh、git を使えなくなります。その後 GitHub が開き、OpenBot のアクセスを取り消せます。",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "OpenBot ブラウザーでのサインイン用の共有保管庫",
   "mobile.server.connectors.onePassword.description":
     "サービスアカウントを通じて専用の 1Password 保管庫を {host} 上の OpenBot と共有すると、{host} のエージェントがそのブラウザーでサイトにサインインできます。",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -571,13 +619,53 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password を切断しますか？",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} はトークンを削除します。保管庫とサービスアカウントは 1Password に残ります。不要になった場合は 1Password で削除してください。",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Proton Pass の保管庫を 1 つ {host} の OpenBot と共有すると、{host} のエージェントがそのブラウザでサイトにサインインできます。",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Proton Pass で、OpenBot と共有する保管庫だけを読み取れるアクセスキーを作成し、ここに貼り付けてください。キーは {host} が保持し、この電話には保存されません。",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} はこのサーバーでは利用できません。",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "この電話で {name} にサインインしてください。その後 {host} が共有保管庫とその読み取り専用アクセスキーを作成し、そのキーだけを保持します。エージェントがパスワードを見ることはありません。",
+  "mobile.server.connectors.passwordManager.connect": "{name} を接続",
+  "mobile.server.connectors.passwordManager.connecting": "接続中…",
+  "mobile.server.connectors.passwordManager.useKey": "アクセスキーを使用",
+  "mobile.server.connectors.passwordManager.key": "アクセスキー",
+  "mobile.server.connectors.passwordManager.connectWithKey": "キーで接続",
+  "mobile.server.connectors.passwordManager.signInTitle": "{name} にサインイン",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "{name} のページでサインインしてください。サインインが完了すると、このページが変わります。",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} がサインインページを取得しています…",
+  "mobile.server.connectors.passwordManager.openSignIn": "サインインページを開く",
+  "mobile.server.connectors.passwordManager.copyLink": "リンクをコピー",
+  "mobile.server.connectors.passwordManager.extraPassword": "追加パスワード",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} が追加パスワードを求めています。パスワードは一度だけ {host} に送られ、この電話には保存されません。",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "追加パスワードが正しくありません。もう一度お試しください。",
+  "mobile.server.connectors.passwordManager.continue": "続ける",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} が共有保管庫を作成しています…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "共有保管庫",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "{name} でログインをこの保管庫に移動すると、エージェントがそのログインでサインインできます。やめるには削除してください。",
+  "mobile.server.connectors.passwordManager.loginCount": { other: "ログイン情報 {count} 件" },
+  "mobile.server.connectors.passwordManager.keyTitle": "アクセスキー",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "読み取り専用",
+  "mobile.server.connectors.passwordManager.keyExpires": "読み取り専用。{date} に期限切れになります。",
+  "mobile.server.connectors.passwordManager.keyExpired": "{date} に期限切れ",
+  "mobile.server.connectors.passwordManager.plan":
+    "{name} のコマンドラインツールには有料プランが必要です。アカウントのプランを変更してから、もう一度接続してください。",
+  "mobile.server.connectors.passwordManager.expiredTitle": "{name} のキーの期限が切れました",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "再接続するまで、{host} のエージェントは共有ログインでサインインできません。",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} を切断",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} を切断しますか？",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} はアクセスキーを削除します。保管庫とそのログインは {name} アカウントに残ります。",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Slack で @OpenBot をメンションします",
   "mobile.server.connectors.slack.description":
     "Slack で @OpenBot をメンションするか、ダイレクトメッセージを送ります。Slack Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator が回答します",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · 回答するエージェントはまだいません",
-  "mobile.server.connectors.slack.many": { other: "ワークスペース {count} 件 · Slack Orchestrator が回答します" },
   "mobile.server.connectors.slack.attention": { other: "{count} 件のワークスペースに対応が必要です" },
   "mobile.server.connectors.slack.connect": "Slack を接続",
   "mobile.server.connectors.slack.connectFooter":
@@ -614,12 +702,8 @@ export const messages = {
     "この新しいエージェントは、{workspace} で @OpenBot に送られたすべてのメッセージに回答します。",
   "mobile.server.connectors.slack.installFailed": "Slack でインストールが完了しませんでした。もう一度お試しください。",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Discord サーバーで @OpenBot をメンションします",
   "mobile.server.connectors.discord.description":
     "Discord サーバーのチャンネルで @OpenBot をメンションします。Discord Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator が回答します",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · 回答するエージェントはまだいません",
-  "mobile.server.connectors.discord.many": { other: "Discord サーバー {count} 件 · Discord Orchestrator が回答します" },
   "mobile.server.connectors.discord.attention": { other: "{count} 件の Discord サーバーに対応が必要です" },
   "mobile.server.connectors.discord.connect": "Discord を接続",
   "mobile.server.connectors.discord.connectFooter":
@@ -655,11 +739,8 @@ export const messages = {
     "この新しいエージェントは、{workspace} で @OpenBot に送られたすべてのメッセージに回答します。",
   "mobile.server.connectors.discord.installFailed": "Discord で認証が完了しませんでした。もう一度お試しください。",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "OpenBot ボットを Telegram チャットに追加します",
   "mobile.server.connectors.telegram.description":
     "OpenBot ボットを Telegram グループに追加するか、ボットとのダイレクトチャットを開きます。Telegram Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.telegram.connected": { other: "チャット {count} 件 · Telegram Orchestrator が回答します" },
-  "mobile.server.connectors.telegram.noAgent": { other: "チャット {count} 件 · 回答するエージェントはまだいません" },
   "mobile.server.connectors.telegram.attention": { other: "{count} 件のチャットに対応が必要です" },
   "mobile.server.connectors.telegram.groupTitle": "グループ",
   "mobile.server.connectors.telegram.directTitle": "ダイレクトチャット",
@@ -692,6 +773,111 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "会話と Telegram Orchestrator は OpenBot に残ります。",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "これが最後のチャットのため、Telegram Orchestrator とその会話は OpenBot から削除されます。",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "WhatsApp の番号をこのサーバーにリンクします。WhatsApp Orchestrator が適切なエージェントに依頼して回答します。",
+  "mobile.server.connectors.whatsapp.attention": {
+    other: "{count} 件の番号に対応が必要です",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "番号",
+  "mobile.server.connectors.whatsapp.linkNumber": "番号をリンク",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
+  "mobile.server.connectors.whatsapp.linkAgain": "再リンク",
+  "mobile.server.connectors.whatsapp.ownNumber": "個人の番号",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。OpenBot 専用の番号ではオフにしてください。",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "WhatsApp Orchestrator を追加してください。追加しないと、WhatsApp に回答が届きません。",
+  "mobile.server.connectors.whatsapp.addAgent": "WhatsApp Orchestrator を追加",
+  "mobile.server.connectors.whatsapp.note":
+    "個人の番号では、「自分にメッセージ」チャットに書き込みます。許可した人はその番号に書き込みます。",
+  "mobile.server.connectors.whatsapp.linkTitle": "WhatsApp をリンク",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "番号を選んでから、スマートフォンの WhatsApp でこのサーバーをリンクします。",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "スマートフォンではペアリングコードでリンクします。QR コードを読み取るには、コンピューターの OpenBot を使用してください。",
+  "mobile.server.connectors.whatsapp.kindLabel": "番号",
+  "mobile.server.connectors.whatsapp.kindPersonal": "自分の個人番号",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。",
+  "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 専用の番号",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "知らない人には、あなたに伝えるためのコードが届きます。ここでその人を承認します。",
+  "mobile.server.connectors.whatsapp.phoneLabel": "電話番号",
+  "mobile.server.connectors.whatsapp.phoneDescription": "国番号を含めて入力します（例: +44 7700 900123）。",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "電話番号を国番号付きで入力してください。",
+  "mobile.server.connectors.whatsapp.getCode": "コードを取得",
+  "mobile.server.connectors.whatsapp.starting": "WhatsApp にコードを要求しています…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "WhatsApp で「リンク済みデバイス」を開き、「デバイスをリンク」をタップします",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "「代わりに電話番号でリンク」をタップします",
+  "mobile.server.connectors.whatsapp.codeStepType": "このコードをスマートフォンに入力します",
+  "mobile.server.connectors.whatsapp.codeLabel": "ペアリングコード {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "コードをコピー",
+  "mobile.server.connectors.whatsapp.codeWaiting": "スマートフォンを待っています。",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp をリンクできませんでした",
+  "mobile.server.connectors.whatsapp.failedTimeout": "スマートフォンで使われる前に、コードの有効期限が切れました。",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp がリンクを拒否しました。数分待ってから、もう一度お試しください。",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "別のリンクを実行中です。終わるのを待ってから、もう一度お試しください。",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot は WhatsApp に接続できません。インターネット接続を確認してください。",
+  "mobile.server.connectors.whatsapp.tryAgain": "もう一度試す",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "この新しいエージェントは、{number} と、あとでリンクする各番号で、OpenBot 宛てのメッセージに回答します。",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot が {number} にリンクされました",
+  "mobile.server.connectors.whatsapp.done": "完了",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "{number} を切断しますか？",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot は {number} の WhatsApp からログアウトします。OpenBot がオフだった場合は、WhatsApp の「リンク済みデバイス」からもデバイスを削除してください。",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "{number} からあなたのエージェントに連絡できなくなります。",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "会話と WhatsApp Orchestrator は OpenBot に残ります。",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "これが最後の番号のため、WhatsApp Orchestrator とその会話は OpenBot から削除されます。",
+  "mobile.server.connectors.whatsapp.keep": "リンクを維持",
+  "mobile.server.connectors.whatsapp.sendersTitle": "{number} に書き込める人",
+  "mobile.server.connectors.whatsapp.sendersDescription":
+    "これらの連絡先とグループは、エージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.sendersEmpty":
+    "書き込めるのはあなただけです。連絡先かグループを追加してください。",
+  "mobile.server.connectors.whatsapp.sendersLimit": "1 つの番号で許可できる連絡先とグループは最大 {count} 件です。",
+  "mobile.server.connectors.whatsapp.senderGroup": "グループ",
+  "mobile.server.connectors.whatsapp.removeSender": "削除",
+  "mobile.server.connectors.whatsapp.addContact": "連絡先を追加",
+  "mobile.server.connectors.whatsapp.addGroup": "グループを追加",
+  "mobile.server.connectors.whatsapp.contactTitle": "連絡先を追加",
+  "mobile.server.connectors.whatsapp.contactDescription": "この人は WhatsApp からエージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.contactName": "名前",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "省略できます。空の場合、一覧には電話番号が表示されます。",
+  "mobile.server.connectors.whatsapp.add": "追加",
+  "mobile.server.connectors.whatsapp.groupTitle": "グループを追加",
+  "mobile.server.connectors.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.groupSearch": "グループを検索",
+  "mobile.server.connectors.whatsapp.groupsLoading": "グループを読み込んでいます…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "この番号はどのグループにも参加していません。",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "この名前のグループはありません。",
+  "mobile.server.connectors.whatsapp.groupAdded": "追加済み",
+  "mobile.server.connectors.whatsapp.requestsTitle": "{number} へのリクエスト",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "これらの人はこの番号に書き込み、コードを受け取りました。同じコードをあなたに伝えた人だけを承認してください。",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "リクエストはありません。",
+  "mobile.server.connectors.whatsapp.requestDetail": "コード {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "承認",
+  "mobile.server.connectors.whatsapp.deny": "拒否",
   "mobile.server.settings.providers": "プロバイダー",
   "mobile.server.settings.providersConnected": { other: "{count} 件接続済み" },
   "mobile.server.providers.description": "このサーバーを実行しているコンピューターの AI プロバイダーです。",
@@ -729,6 +915,8 @@ export const messages = {
   "mobile.server.providers.copy": "コピー",
   "mobile.server.providers.copyCode": "コードをコピー",
   "mobile.server.providers.paste": "貼り付け",
+  "mobile.server.providers.codeStepChatgpt":
+    "パソコンの ChatGPT でセキュリティ設定を開き、Codex のデバイスコードによるサインインをオンにします。仕事用アカウントでは、ワークスペースの管理者がオンにします。",
   "mobile.server.providers.codeStepCopy": "コードをコピーします。",
   "mobile.server.providers.codeStepEnter": "サインインページを開き、コードを入力します。",
   "mobile.server.providers.codeStepReturn": "OpenBot に戻ります。サインインは自動で完了します。",
@@ -790,6 +978,42 @@ export const messages = {
   "mobile.server.providers.status.ready": "インストール済み",
   "mobile.server.providers.status.notInstalled": "未インストール",
   "mobile.server.providers.status.checking": "確認中",
+  "mobile.server.providers.models": "モデル",
+  "mobile.server.providers.modelsCount": "{shown} / {total}",
+  "mobile.server.providers.modelsTitle": "{name} のモデル",
+  "mobile.server.providers.modelsSearch": "モデルを検索",
+  "mobile.server.providers.modelsShowAll": "すべて表示",
+  "mobile.server.providers.modelsHideAll": "すべて非表示",
+  "mobile.server.providers.modelsReset": "デフォルトに戻す",
+  "mobile.server.providers.modelsSelected": "選択中: {shown} / {total}。",
+  "mobile.server.providers.modelsHint":
+    "このサーバーのモデル選択には、選択したモデルが表示されます。エージェントは引き続きすべてのモデルを使えます。",
+  "mobile.server.providers.modelsNoMatch": "検索に一致するモデルはありません。",
+  "mobile.server.providers.modelsNone": "このプロバイダーにはモデルがありません。",
+  "mobile.server.providers.modelsLoading": "モデルを読み込み中…",
+  "mobile.server.providers.modelsLoadFailed": "このプロバイダーのモデルを読み込めませんでした。",
+  "mobile.server.providers.modelsFailed": "モデルを変更できませんでした。もう一度お試しください。",
+  "mobile.server.providers.promptCache": "プロンプトキャッシュ",
+  "mobile.server.providers.promptCacheHint":
+    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間です。変更は Claude の次回起動時に適用されます。",
+  "mobile.server.providers.promptCacheDefault": "Claude Code のデフォルト",
+  "mobile.server.providers.promptCacheHour": "1 時間",
+  "mobile.server.providers.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "mobile.server.providers.disconnect": "接続を解除",
+  "mobile.server.providers.disconnectTitle": "{name} の接続を解除しますか？",
+  "mobile.server.providers.disconnectBody":
+    "OpenBot はサーバー上で {provider} からサインアウトします。エージェントは {provider} を再接続するまで待機します。",
+  "mobile.server.providers.resetUsage": "使用量をリセット",
+  "mobile.server.providers.resettingUsage": "リセット中…",
+  "mobile.server.providers.resetUsageTitle": "{name} の使用量をリセットしますか？",
+  "mobile.server.providers.resetUsageBody":
+    "リセットクレジットを 1 つ使います。このアカウントの使用済みの上限は今すぐリセットされます。元に戻せません。",
+  "mobile.server.providers.resetUsageHint": "リセットクレジット: {available}。",
+  "mobile.server.providers.resetUsageDone": "{name} の使用量の上限はリセットされました。",
+  "mobile.server.providers.resetUsageNothing": "{name} には使用済みの上限がありません。クレジットは使われていません。",
+  "mobile.server.providers.resetUsageNoCredit": "{name} にはリセットクレジットが残っていません。",
+  "mobile.server.providers.resetUsageAlreadyRedeemed": "{name} のこのクレジットはすでに使われています。",
+  "mobile.server.providers.resetUsageFailed": "使用量をリセットできませんでした。もう一度お試しください。",
   "mobile.server.settings.mcp": "MCP サーバー",
   "mobile.server.settings.mcpCount": { other: "{count} 台" },
   "mobile.server.mcp.unsupported": "ここで MCP サーバーを管理するには、このサーバーの OpenBot を更新してください。",

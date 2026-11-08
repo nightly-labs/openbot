@@ -83,7 +83,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Cuando {model} alcanza su límite de uso antes de que {name} empiece a escribir, {name} te pregunta qué modelo usar.",
   "agentSettings.backupModels.introAutomatic":
-    "Cuando {model} alcanza su límite de uso o falla con un error del proveedor antes de que {name} empiece a escribir, {name} cambia al primer modelo disponible del orden.",
+    "Cuando {model} alcanza su límite de uso, {name} cambia al primer modelo disponible del orden. {name} también cambia cuando {model} falla con un error del proveedor antes de que {name} empiece a escribir.",
   "agentSettings.backupModels.ask": "Preguntar antes de cambiar",
   "agentSettings.backupModels.order": "Orden",
   "agentSettings.backupModels.listLabel": "Modelos de respaldo, en orden",
@@ -144,10 +144,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "No se pudo procesar el avatar del agente.",
   "agentSettings.runtime.model": "Modelo del agente",
   "agentSettings.runtime.modelUnavailable": "Los modelos estarán disponibles cuando se conecte una CLI de agente.",
-  "agentSettings.runtime.reasoning": "Razonamiento",
-  "agentSettings.runtime.reasoningLabel": "Nivel de razonamiento del agente",
-  "agentSettings.runtime.selectReasoning": "Seleccionar razonamiento",
-  "agentSettings.runtime.reasoningSetByProvider": "Según {provider}",
   "agentSettings.runtime.access": "Acceso",
   "agentSettings.runtime.accessLabel": "Acceso del agente",
   "agentSettings.runtime.busyMessage": "Durante el trabajo",
@@ -187,6 +183,15 @@ export const messages = {
     "El agente olvida este chat. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
+  "agentSettings.deleteHistory.title": "Eliminar historial",
+  "agentSettings.deleteHistory.description":
+    "Los mensajes de este chat se eliminan y el agente los olvida. Su configuración se mantiene.",
+  "agentSettings.deleteHistory.button": "Eliminar",
+  "agentSettings.deleteHistory.confirmTitle": "¿Eliminar el historial del chat con {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Todos los mensajes y archivos de este chat se eliminan de OpenBot y el agente los olvida. No se puede deshacer. Los hilos secundarios, las instrucciones, el modelo, las herramientas, las memorias, el espacio de trabajo y el navegador no cambian.",
+  "agentSettings.deleteHistory.confirm": "Eliminar historial",
+  "agentSettings.deleteHistory.failed": "No se pudo eliminar el historial.",
   "agentSettings.fullAccess.title": "¿Dar acceso completo a este agente?",
   "agentSettings.fullAccess.askTitle": "¿Dejar que este agente trabaje fuera de su espacio de trabajo?",
   "agentSettings.fullAccess.description":
@@ -233,8 +238,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Permite que el agente inicie un chat nuevo cuando su chat sea largo. Antes guarda notas.",
   "agentSettings.quickAcknowledgement.title": "Mostrar el plan antes de tareas largas",
-  "agentSettings.quickAcknowledgement.description":
-    "Antes de una tarea larga, el agente muestra su plan. Empieza tras 10 s o cuando pulsas Iniciar.",
+  "agentSettings.quickAcknowledgement.description": "Antes de una tarea larga, el agente muestra su plan.",
   "agentSettings.browserProfile.label": "Perfil del navegador",
   "agentSettings.browserProfile.shared": "Compartido",
   "agentSettings.browserProfile.agent": "Solo este agente",

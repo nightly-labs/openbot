@@ -9,6 +9,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
+import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
 import { useChannels } from "./features/channels/channels-context";
@@ -19,6 +20,7 @@ import { useDirectMessages } from "./features/conversation/direct-messages-conte
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agent-usage-polling";
+import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
@@ -96,6 +98,9 @@ export function WorkspaceShell(props: {
     refreshServers,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
+  const agentDockPlacement = useAgentDockPlacement();
+  /* The dock in the window keeps a column at the right edge, so it does not cover the panes. */
+  const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
   const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
@@ -137,6 +142,17 @@ export function WorkspaceShell(props: {
     () => {
       const server = activeServer();
       return middlePane() === "tasks" && !tasksSupported() && !!server?.compatibility?.hostAppVersion;
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
+  /** The Library follows a server switch too. An older joined server has no storage routes and no Library button. */
+  createEffect(
+    () => {
+      const server = activeServer();
+      if (usage.state.serverId === null || usage.state.view !== "library") return false;
+      return !!server?.compatibility?.hostAppVersion && !serverHasStorage(server);
     },
     (unsupported) => {
       if (unsupported) usage.closeUsage();
@@ -307,7 +323,7 @@ export function WorkspaceShell(props: {
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />
         <WorkspaceFrame
-          class={chatWindow ? "app-frame-chat-window" : undefined}
+          class={chatWindow ? "app-frame-chat-window" : windowAgentDock() ? "app-frame-agent-dock" : undefined}
           compact={layout.leftPanelCompact()}
           initialLoading={!serversLoaded() || !scope.connection.synced}
           connection={
@@ -343,6 +359,7 @@ export function WorkspaceShell(props: {
               <WorkspaceOverlays account={props.account} />
               <Show when={!chatWindow}>
                 <ServerUpdateDialogHost hosts={remoteHosts()} />
+                <AgentDockHost />
               </Show>
             </>
           }

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "بانتظار إجابتك",
   "uiBlock.status.answered": "تمت الإجابة",
   "uiBlock.outcome.expired": "لم تُقدَّم إجابة في الوقت المحدد",
   "uiBlock.outcome.closed": "أُغلق دون إجابة",
@@ -11,20 +10,12 @@ export const messages = {
   "uiBlock.confirm.prompt": "تأكيد: {action}؟",
   "uiBlock.confirm.accept": "تأكيد",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds} ث",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "معاينة",
   "uiBlock.confirm.showFullPreview": "عرض الكل",
   "uiBlock.confirm.hideFullPreview": "عرض أقل",
   "uiBlock.choice.submit": "إرسال",
   "uiBlock.choice.shortcutHint": "اضغط من {first} إلى {last} للاختيار",
-  "uiBlock.choice.selectedCount": {
-    zero: "لم يُحدَّد شيء",
-    one: "عنصر واحد محدد",
-    two: "عنصران محددان",
-    few: "{count} عناصر محددة",
-    many: "{count} عنصرًا محددًا",
-    other: "{count} عنصر محدد",
-  },
-  "uiBlock.choice.noneSelected": "لم يُحدَّد شيء",
   "uiBlock.quick.label": "ردود سريعة",
   "uiBlock.quick.textLabel": "ردّك الخاص",
   "uiBlock.quick.textPlaceholder": "أو اكتب ردّك الخاص",

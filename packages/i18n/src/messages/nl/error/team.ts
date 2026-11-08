@@ -58,8 +58,11 @@ export const messages = {
   "error.team.providersUnsupported": "Deze verbinding ondersteunt geen instellingen voor aanbieders.",
   "error.team.providerNotManaged": "OpenBot beheert de CLI van deze aanbieder niet.",
   "error.team.channelsUnsupported": "Deze verbinding ondersteunt geen kanaalchats.",
+  "error.team.channelContextUnsupported":
+    "Deze verbinding ondersteunt geen nieuw gesprek of comprimeren in een kanaal.",
   "error.team.channelPictureUnsupported": "Deze verbinding ondersteunt geen kanaalafbeeldingen.",
   "error.team.channelDeleteUnsupported": "Deze verbinding ondersteunt het verwijderen van kanalen niet.",
+  "error.team.historyDeleteUnsupported": "Deze verbinding ondersteunt het wissen van de geschiedenis niet.",
   "error.team.channelTaskCancelUnsupported": "Deze verbinding ondersteunt het annuleren van kanaaltaken niet.",
   "error.team.membersCannotDeleteChannels": "Leden kunnen geen kanalen verwijderen.",
   "error.team.membersCannotArchiveChannels": "Leden kunnen geen kanalen archiveren.",
@@ -69,6 +72,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Deze verbinding ondersteunt het verbergen van agents niet.",
   "error.team.agentColorsUnsupported": "Deze verbinding ondersteunt geen agentkleuren.",
   "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
+  "error.team.routineRunPlaceUnsupported": "Deze verbinding kan niet wijzigen waar een routine wordt uitgevoerd.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
@@ -83,6 +87,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Deze verbinding ondersteunt het tonen van mappen niet.",
   "error.team.conversationFileSearchUnsupported": "Deze verbinding ondersteunt het zoeken in bestanden niet.",
   "error.team.sideQuestionUnsupported": "Deze verbinding ondersteunt geen zijvragen.",
+  "error.team.liveVoiceUnsupported":
+    "Deze server ondersteunt geen Codex live spraak. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.routineFlowsUnsupported":
     "Deze server ondersteunt geen routineflows. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.routineCanvasTooLarge":
@@ -146,6 +152,8 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Deze client ondersteunt geen beveiligde verificatie.",
   "error.team.agentSettingsUnsupported": "Deze verbinding ondersteunt geen instellingen van agents.",
   "error.team.adminRequired": "Beheerderstoegang is verplicht.",
+  "error.team.mcpServerNotYours":
+    "Alleen de persoon die deze MCP-server heeft toegevoegd, of een beheerder, kan hem wijzigen.",
   "error.team.ownerRequired": "Alleen de eigenaar van deze server kan dit doen.",
   "error.team.requestTooLarge": "De inhoud van het verzoek is te groot.",
   "error.team.signInRelayUnsupported": "Deze server kan geen inlogs doorgeven. Werk OpenBot bij op de host.",
@@ -159,4 +167,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Deze inlog is al verstuurd.",
   "error.team.signInRelayMismatch": "Dit adres hoort niet bij deze inlog.",
   "error.team.signInRelayLinkUnknown": "Geen enkele agent op deze server heeft deze inloglink getoond.",
+  "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
 } as const satisfies PartialTranslation<typeof source>;

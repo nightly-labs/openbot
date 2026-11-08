@@ -43,7 +43,9 @@ import {
   isAvatarColor,
   isCustomProviderContextWindow,
   isCustomProviderHarness,
+  isCustomProviderInputs,
   isCustomProviderMaxOutput,
+  isCustomProviderReasoningEfforts,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -311,6 +313,7 @@ export class InstanceTransferService {
           schedule: routine.trigger.schedule,
           ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
           ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+          ...(routine.runIn ? { runIn: routine.runIn } : {}),
         }));
       const oneTimeRoutines = routines.filter((routine) => routine.schedule.kind === "once");
 
@@ -695,11 +698,13 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: provider.models.map(({ id, name, contextWindow, maxOutput }) => ({
+          models: provider.models.map(({ id, name, contextWindow, maxOutput, reasoningEfforts, inputs }) => ({
             id,
             name,
             ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
             ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
+            ...(isCustomProviderReasoningEfforts(reasoningEfforts) ? { reasoningEfforts: [...reasoningEfforts] } : {}),
+            ...(isCustomProviderInputs(inputs) ? { inputs: [...inputs] } : {}),
           })),
           headers: [],
           ...(isCustomProviderHarness(provider.harness) ? { harness: provider.harness } : {}),
@@ -910,6 +915,7 @@ export class InstanceTransferService {
                   schedule: routine.schedule,
                   ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
                   ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+                  ...(routine.runIn ? { runIn: routine.runIn } : {}),
                 },
                 { recordConversationEvent: false },
               ),

@@ -60,8 +60,11 @@ export const messages = {
   "error.team.providersUnsupported": "Diese Verbindung unterstützt keine Anbietereinstellungen.",
   "error.team.providerNotManaged": "OpenBot verwaltet die CLI dieses Anbieters nicht.",
   "error.team.channelsUnsupported": "Diese Verbindung unterstützt keine Kanalchats.",
+  "error.team.channelContextUnsupported":
+    "Diese Verbindung unterstützt keine neue Unterhaltung und kein Komprimieren in einem Kanal.",
   "error.team.channelPictureUnsupported": "Diese Verbindung unterstützt keine Kanalbilder.",
   "error.team.channelDeleteUnsupported": "Diese Verbindung unterstützt das Löschen von Kanälen nicht.",
+  "error.team.historyDeleteUnsupported": "Diese Verbindung unterstützt das Löschen des Verlaufs nicht.",
   "error.team.channelTaskCancelUnsupported": "Diese Verbindung unterstützt das Abbrechen von Kanalaufgaben nicht.",
   "error.team.membersCannotDeleteChannels": "Mitglieder können keine Kanäle löschen.",
   "error.team.membersCannotArchiveChannels": "Mitglieder können keine Kanäle archivieren.",
@@ -71,6 +74,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Diese Verbindung unterstützt das Ausblenden von Agenten nicht.",
   "error.team.agentColorsUnsupported": "Diese Verbindung unterstützt keine Agentenfarben.",
   "error.team.chatColorsUnsupported": "Diese Verbindung unterstützt keine Chatfarben.",
+  "error.team.routineRunPlaceUnsupported": "Diese Verbindung kann nicht ändern, wo eine Routine läuft.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
   "error.team.agentNotificationLevelsUnsupported":
     "Dieser Server kann keine eigene Benachrichtigungsstufe pro Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
@@ -86,6 +90,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Diese Verbindung unterstützt das Anzeigen von Ordnern nicht.",
   "error.team.conversationFileSearchUnsupported": "Diese Verbindung unterstützt das Suchen von Dateien nicht.",
   "error.team.sideQuestionUnsupported": "Diese Verbindung unterstützt keine Nebenfragen.",
+  "error.team.liveVoiceUnsupported":
+    "Dieser Server unterstützt keine Codex-Live-Sprache. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.routineFlowsUnsupported":
     "Dieser Server unterstützt keine Routinenabläufe. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.routineCanvasTooLarge":
@@ -144,6 +150,8 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Dieser Client unterstützt keine sichere Authentifizierung.",
   "error.team.agentSettingsUnsupported": "Diese Verbindung unterstützt keine Agenteneinstellungen.",
   "error.team.adminRequired": "Administratorzugriff ist erforderlich.",
+  "error.team.mcpServerNotYours":
+    "Nur die Person, die diesen MCP-Server hinzugefügt hat, oder ein Admin kann ihn ändern.",
   "error.team.ownerRequired": "Nur der Eigentümer dieses Servers kann das tun.",
   "error.team.requestTooLarge": "Der Anfragetext ist zu groß.",
   "error.team.signInRelayUnsupported":
@@ -157,4 +165,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Diese Anmeldung wurde bereits gesendet.",
   "error.team.signInRelayMismatch": "Diese Adresse gehört nicht zu dieser Anmeldung.",
   "error.team.signInRelayLinkUnknown": "Kein Agent auf diesem Server hat diesen Anmeldelink angezeigt.",
+  "error.team.hostPersonalityUnsupported": "Diese Verbindung unterstützt die Server-Persönlichkeit nicht.",
 } as const satisfies PartialTranslation<typeof source>;

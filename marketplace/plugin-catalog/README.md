@@ -105,3 +105,60 @@ Troubleshooting:
   the prompts again.
 - Mail or Calendar tools time out: AppleScript is slow on large mailboxes and
   on many subscribed calendars. Ask for one folder and a smaller count.
+
+## GitLab
+
+The listing connects to GitLab's own MCP server at `https://gitlab.com/api/v4/mcp`
+(<https://docs.gitlab.com/user/model_context_protocol/mcp_server/>). The server
+uses OAuth with dynamic client registration and the `mcp` scope, so the user
+signs in through the browser and types no token.
+
+A listing cannot ask for a server address and a browser sign-in together: a
+`url` field exists only in a `key` flow. GitLab refuses classic personal access
+tokens on this server, so a key flow would need a fine-grained token. For a
+self-hosted GitLab, the user adds `https://<gitlab-host>/api/v4/mcp` in the
+server's MCP servers settings and selects Sign in.
+
+Troubleshooting:
+
+- A self-hosted server refuses the connection or has no MCP endpoint: an admin
+  must allow access to the MCP server for the instance. The server is GA from
+  GitLab 19.5.
+
+## Omnisend
+
+The listing connects to Omnisend's own MCP server at `https://mcp.omnisend.com/mcp`
+(<https://api-docs.omnisend.com/reference/mcp-server>). The server uses OAuth with
+dynamic client registration, so the user signs in through the browser and types
+no key. The user selects the access level on Omnisend's consent screen. The
+account needs the Owner, Admin, Manager or Partner role.
+
+The server shows four tools: `search`, `tool_schema`, `tool_documentation` and
+`execute`. The agent finds an Omnisend operation with `search` and runs it with
+`execute`. With write access, the operations include sending and deleting
+campaigns, automations and segments.
+
+Troubleshooting:
+
+- A write fails with "Permission denied": the user granted read-only access.
+  Disconnect and sign in again with write access.
+- The account has more than one brand: one connection works on one brand.
+  Omnisend's guide adds a separate server for each brand with a `?brand=` query
+  parameter; add it in the MCP servers settings and select Sign in.
+
+## ElevenLabs
+
+The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`
+(<https://elevenlabs.io/docs/eleven-agents/operate/hosted-mcp>). ElevenLabs deprecated its local
+server. The authorization server has no client registration. It reads OpenBot's client metadata
+document, `https://openbot.run/oauth/mcp-client.json`, so the user signs in through the browser and
+types no key. Generated audio comes back as a short-lived download link.
+
+The data residency servers (`api.eu.residency.elevenlabs.io`, `api.in.residency.elevenlabs.io`,
+`api.sg.residency.elevenlabs.io`) use separate accounts. The user adds `https://<host>/v1/mcp` in
+the server's MCP servers settings and selects Sign in.
+
+Troubleshooting:
+
+- The sign-in page refuses the redirect address: another program uses port 28417, so OpenBot
+  listens on another port that the document does not list. Close that program and restart OpenBot.

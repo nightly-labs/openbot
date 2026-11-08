@@ -164,31 +164,14 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     const { server } = this.#preferences.get();
     const model = server?.routes.dictation ? server.routes.transcriptionModel : null;
     if (!server || !model) return yield* routeOff();
-    const form = new FormData();
-    form.set("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "audio.wav");
-    form.set("model", model);
-    form.set("response_format", "json");
-    if (language !== AUTOMATIC_VOICE_LANGUAGE) form.set("language", language);
-    const startedAt = Date.now();
-    const text = yield* exchange(
+    return yield* transcribeRecording(
       this.#fetch,
       { address: server.address, apiKey: this.#apiKeys.get() },
-      "audio/transcriptions",
-      { method: "POST", body: form },
-      TRANSCRIPTION_TIMEOUT_MS,
-      (response, host) => readJson(response, host, LIST_BODY_LIMIT),
-    ).pipe(
-      Effect.flatMap((body) =>
-        isDynamicRecord(body) && isString(body.text)
-          ? Effect.succeed(body.text)
-          : Effect.fail(invalidAnswer(server.address)),
-      ),
-      Effect.mapError((failure) => {
-        logger.warn(`Voice server transcription failed after ${Date.now() - startedAt}ms.`);
-        return new VoiceOperationError({ cause: new Error(failure.message) });
-      }),
+      model,
+      wav,
+      language,
+      { label: "Voice server" },
     );
-    return { text: text.trim() } satisfies VoiceTranscriptionResult;
   }).bind(this);
 
   /** Reads one part of a reply with the server's speech route, as 16-bit mono PCM. */
@@ -234,6 +217,56 @@ interface ServerTarget {
   apiKey: string | null;
 }
 
+/** How one caller of `transcribeRecording` names itself in logs and explains refused requests. */
+interface TranscriptionCaller {
+  /** The first words of the failure log line. It names no host. */
+  label: string;
+  /** The text for a status that the caller explains itself, or null for the shared text. */
+  refused?: StatusText;
+}
+
+/** Localized text for an answer status, or null to use the shared text. */
+type StatusText = (status: number) => string | null;
+
+/**
+ * Sends a 16 kHz mono WAV recording to `POST {address}/audio/transcriptions` of an OpenAI-compatible
+ * API. The user's own server and Groq dictation use it.
+ */
+export function transcribeRecording(
+  fetcher: typeof fetch,
+  target: ServerTarget,
+  model: string,
+  wav: Uint8Array,
+  language: VoiceLanguage,
+  caller: TranscriptionCaller,
+): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> {
+  const form = new FormData();
+  form.set("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "audio.wav");
+  form.set("model", model);
+  form.set("response_format", "json");
+  if (language !== AUTOMATIC_VOICE_LANGUAGE) form.set("language", language);
+  const startedAt = Date.now();
+  return exchange(
+    fetcher,
+    target,
+    "audio/transcriptions",
+    { method: "POST", body: form },
+    TRANSCRIPTION_TIMEOUT_MS,
+    (response, host) => readJson(response, host, LIST_BODY_LIMIT),
+    caller.refused,
+  ).pipe(
+    Effect.flatMap((body) =>
+      isDynamicRecord(body) && isString(body.text)
+        ? Effect.succeed({ text: body.text.trim() } satisfies VoiceTranscriptionResult)
+        : Effect.fail(invalidAnswer(target.address)),
+    ),
+    Effect.mapError((failure) => {
+      logger.warn(`${caller.label} transcription failed after ${Date.now() - startedAt}ms.`);
+      return new VoiceOperationError({ cause: new Error(failure.message) });
+    }),
+  );
+}
+
 /** The part of an address that an error may name. */
 function hostOf(address: string): string {
   try {
@@ -260,7 +293,8 @@ function invalidAudio(host: string) {
 
 /**
  * One request to `{address}/{path}`, with the status checks every route shares. `read` reads the body
- * while the request is still open, so the timeout and the abort cover it too.
+ * while the request is still open, so the timeout and the abort cover it too. `refused` explains a
+ * status before the shared checks do.
  */
 function exchange<A>(
   fetcher: typeof fetch,
@@ -269,6 +303,7 @@ function exchange<A>(
   init: RequestInit,
   timeoutMs: number,
   read: (response: Response, host: string) => Effect.Effect<A, VoiceServerFailure>,
+  refused?: StatusText,
 ): Effect.Effect<A, VoiceServerFailure> {
   const host = hostOf(target.address);
   const fail = (field: VoiceServerProbeField, message: string) => new VoiceServerFailure({ field, message });
@@ -291,6 +326,8 @@ function exchange<A>(
           try: () => fetcher(url, { ...init, headers, redirect: "manual", signal: controller.signal }),
           catch: () => fail("address", sourceText("error.provider.discoveryUnreachable", { host })),
         });
+        const explained = response.ok ? null : (refused?.(response.status) ?? null);
+        if (explained) return yield* fail("address", explained);
         if (response.status >= 300 && response.status < 400)
           return yield* fail("address", sourceText("error.provider.discoveryRedirect", { host }));
         if (response.status === 401 || response.status === 403)

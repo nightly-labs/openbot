@@ -226,7 +226,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
     <section class="server-connection-toast" aria-label={title()}>
       <Show when={!urgent()}>
         <IconButton
-          class="server-connection-toast-close"
+          class="ui-toast-card-close"
           size="icon-xs"
           variant="ghost"
           label={t("common.close")}
@@ -239,7 +239,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
       <Show when={detail()}>{(text) => <p class="server-connection-toast-body">{text()}</p>}</Show>
       <ErrorReference reference={props.reference} />
       {upsell()}
-      <div class="server-connection-toast-actions">
+      <div class="server-connection-toast-actions ui-toast-card-actions">
         {detailsButton("sm")}
         {manageButton("sm")}
         <Button variant="default" size="sm" onClick={retry}>

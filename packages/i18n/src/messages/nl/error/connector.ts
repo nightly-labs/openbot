@@ -34,4 +34,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Kan de Bitwarden-CLI niet installeren op deze server. Controleer de netwerkverbinding en verbind opnieuw.",
   "error.connector.bitwardenFileUnreadable": "Het verbindingsbestand van Bitwarden is onleesbaar.",
+  "error.connector.passwordManagerUnknown": "OpenBot kent deze wachtwoordbeheerder niet.",
+  "error.connector.passwordManagerMethod": "Deze wachtwoordbeheerder kan niet op deze manier verbinden.",
+  "error.connector.passwordManagerNoSignIn": "Er is geen aanmeldpagina open. Verbind opnieuw.",
+  "error.connector.protonPassFailed": "Kan Proton Pass niet verbinden. Verbind opnieuw.",
+  "error.connector.protonPassCliInstallFailed":
+    "Kan de Proton Pass CLI niet installeren. Controleer de netwerkverbinding en verbind daarna opnieuw.",
+  "error.connector.protonPassPlan":
+    "Je Proton-abonnement staat de Proton Pass CLI niet toe. Wijzig het abonnement en verbind daarna opnieuw.",
+  "error.connector.protonPassExpired": "De toegang tot Proton Pass is beëindigd. Verbind opnieuw.",
+  "error.connector.protonPassKeyInvalid": "Voer een Proton Pass-toegangssleutel in die met pst_ begint.",
+  "error.connector.protonPassExtraPassword": "Het extra wachtwoord is onjuist. Voer het opnieuw in.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass heeft niet om een extra wachtwoord gevraagd.",
+  "error.connector.protonPassFileUnreadable": "Het Proton Pass-verbindingsbestand is onleesbaar.",
+  "error.connector.protonPassSignInTimeout": "Het aanmelden bij Proton duurde te lang. Verbind opnieuw.",
+  "error.connector.protonPassSetupFailed":
+    "Kan de kluis Shared with OpenBot of de toegangssleutel ervan niet maken in Proton Pass. Verbind opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

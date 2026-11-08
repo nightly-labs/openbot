@@ -3,13 +3,14 @@ import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
 import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
 import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { diskRestoreEnded, diskRestoring } from "../backend/disk-restore";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
@@ -29,7 +30,12 @@ import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-displa
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
-import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
+import {
+  type BrowserProfileService,
+  browserProxyConnection,
+  createBrowserProfileService,
+} from "./browser-profile-service";
+import { feedbackFacts, feedbackSender } from "./feedback";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -88,6 +94,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentBrowserProfile,
+  DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   IPC_ENDPOINTS,
   isManagedToolRuntime,
   isUpdateBusyPhase,
@@ -120,6 +127,7 @@ import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
@@ -140,6 +148,7 @@ import {
   type AgentDefaultsPreferenceStore,
   createAgentDefaultsPreferenceStore,
 } from "./agent-defaults-preference-store";
+import { AgentDockFailed, AgentDockWindowController, toAgentDockFailed } from "./agent-dock-window";
 import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
@@ -166,6 +175,8 @@ import { managedBitwardenCli } from "./bitwarden-cli-installer";
 import { BitwardenConnectorService } from "./bitwarden-connector-service";
 import { BitwardenConnectorStore } from "./bitwarden-connector-store";
 import { BrowserDockOverlay } from "./browser-dock-overlay";
+import { BrowserEgressClient } from "./browser-egress-client";
+import { BrowserEgressHost } from "./browser-egress-host";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
@@ -176,6 +187,11 @@ import {
   readMobileConnectApiUrl,
 } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
+import {
+  type ClaudeUserSetupPreferenceStore,
+  createClaudeUserSetupPreferenceStore,
+} from "./claude-user-setup-preference-store";
+import { createComputerIdle } from "./computer-idle";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
@@ -216,7 +232,7 @@ import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
-import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
+import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
@@ -237,7 +253,9 @@ import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
   type LocalServerChildEnvironment,
+  LocalServerMarketplace,
   LocalServerMembers,
+  reportLocalServerWorkingAgents,
   startLocalServerChild,
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
@@ -252,9 +270,11 @@ import {
   computerUseDesktopPoint,
   computerUseDesktopRect,
   computerUseDisplays,
+  createAgentDockWindow,
   createComputerUseHighlightWindow,
   createComputerUsePermissionHelpWindow,
   createDynamicIslandWindow,
+  loadAgentDockRenderer,
   loadBrowserDockRenderer,
   loadComputerUseHighlightRenderer,
   loadComputerUsePermissionHelpRenderer,
@@ -272,12 +292,17 @@ import {
   startMcpOAuthRedirectServer,
 } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
+import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
+import { EncryptedRecordStore } from "./password-managers/encrypted-record-store";
+import { PasswordManagersService } from "./password-managers/password-managers-service";
+import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
+import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
@@ -292,6 +317,8 @@ import { ProviderUseSettingsStore } from "./provider-use-settings-store";
 import { RelayedMessagingInstalls } from "./relayed-messaging-installs";
 import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
 import { RemoteConnectTrace } from "./remote-connect-trace";
+import { createRemoteControlPolicyStore } from "./remote-control-policy-store";
+import { createRemoteControlQuestion } from "./remote-control-question";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -314,6 +341,7 @@ import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import type { UncleanExitProperties } from "./run-marker";
 import { ScreenCapturer } from "./screen-capture";
 import {
   createSecretStorage,
@@ -324,6 +352,7 @@ import {
 import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
+import { ServerPersonalityPreferenceStore } from "./server-personality-preference-store";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
   configureApplicationProtocol,
@@ -338,6 +367,7 @@ import { SignalIngress } from "./signal-ingress";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
+import { StartupTiming } from "./startup-timing";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -363,7 +393,9 @@ import { VoiceApiKeyStore } from "./voice-api-key-store";
 import { openScribeSocket } from "./voice-cloud-stream";
 import {
   BARK_PLUS_MODEL_DIRECTORY,
+  COHERE_TRANSCRIBE_MODEL_DIRECTORY,
   PARAKEET_MODEL_DIRECTORY,
+  PARAKEET_UNIFIED_MODEL_DIRECTORY,
   removeLegacyWhisperCache,
   SUPERTONIC_MODEL_DIRECTORY,
   WHISPER_TURBO_MODEL_DIRECTORY,
@@ -387,7 +419,7 @@ const ROUTINE_FEED_FILE = "openbot-routine-feed-v1.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
-const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
+export const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
 const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
@@ -399,11 +431,14 @@ const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
+const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
+const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
 const MODEL_VISIBILITY_PREFERENCE_FILE = "openbot-model-visibility-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const EXTERNAL_LINK_PREFERENCE_FILE = "openbot-external-link-preference-v1.json";
 const REMOTE_NETWORK_ROUTE_PREFERENCE_FILE = "openbot-remote-network-route-v1.json";
+const REMOTE_CONTROL_POLICY_FILE = "openbot-remote-control-policy-v1.json";
 const APP_BEHAVIOR_PREFERENCE_FILE = "openbot-app-behavior-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
@@ -430,6 +465,8 @@ const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
+/** The Proton Pass agent access key of this computer or host, with the same cipher. */
+const PROTONPASS_CONNECTOR_FILE = "openbot-protonpass-connector-v1.json";
 /** The logins, payment cards and contact info of the Vault in Server settings, with the same cipher. */
 const VAULT_FILE = "openbot-vault-v1.json";
 /** Which agent each imported Hermes profile made, so a second import updates that agent. */
@@ -453,6 +490,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
+  startupTiming: 9.5,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -465,6 +503,7 @@ const TEARDOWN_ORDER = {
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
+  agentDock: 20.5,
   machineAlerts: 21,
   themePalettes: 22,
   // Before the browser, so no sign-in opens a tab while it stops.
@@ -493,6 +532,8 @@ const TEARDOWN_ORDER = {
   // After the connections that hold it.
   signalIngress: 86,
   host: 90,
+  /** Before the team WebRTC bridge: the computer proxy streams stop before their channels. */
+  browserEgress: 99,
   teamWebRtcBridge: 100,
   // Before the agent service, so no handoff is sent to an agent while the service stops.
   routineFlows: 103,
@@ -504,6 +545,8 @@ const TEARDOWN_ORDER = {
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
   bitwardenConnector: 106.5,
+  // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
+  passwordManagers: 106.75,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
   // Before the agent service, so no payment wait outlives the agents that asked for it.
@@ -552,6 +595,8 @@ export interface ApplicationServiceContext {
   localServerChild: LocalServerChildEnvironment | null;
   /** The control pipe of a local server: the commands of the desktop app. */
   localServerControl: Readable | null;
+  /** How the previous run ended when it did not quit cleanly (`run-marker.ts`). */
+  previousUncleanExit: UncleanExitProperties | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -592,6 +637,7 @@ export interface ApplicationServices {
   linkAccount: LinkAccountService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
+  passwordManagers: PasswordManagersService;
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
@@ -636,7 +682,9 @@ export interface ApplicationServices {
   agentAccess: AgentAccessStore;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
+  serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
+  claudeUserSetup: ClaudeUserSetupPreferenceStore;
   modelVisibility: ModelVisibility;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   externalLinkPreference: ExternalLinkPreferenceStore;
@@ -679,12 +727,17 @@ export interface ApplicationServices {
   speech: VoiceSpeechService;
   voiceServer: VoiceServerService;
   dynamicIsland: DynamicIslandWindowController;
+  agentDock: AgentDockWindowController;
   cuaDriver: CuaDriverRuntime;
   computerUseHighlight: ComputerUseHighlightController;
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
+  /** Starts the shared agent database host early. The entry point runs it after the first window loads. */
+  prewarmAgentDatabase: Effect.Effect<void>;
   trace: TraceFile;
   resourceMonitor: ResourceMonitor;
+  /** Null for a local server child: its parent desktop reports the start. */
+  startup: StartupTiming | null;
   machineAlerts: MachineAlertMonitor;
   teamStore: TeamStore;
   /**
@@ -947,6 +1000,7 @@ export async function createApplicationServices({
   hostingDeveloperKey,
   localServerChild,
   localServerControl,
+  previousUncleanExit,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -960,6 +1014,8 @@ export async function createApplicationServices({
   prepareForUpdateInstall,
   quitting,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // The start of the first `openbot:services.*` step, for the `system_startup` summary.
+  performance.mark("openbot:services.start");
   // First, so the provider lines of the whole startup reach the file.
   teardown.push(
     TEARDOWN_ORDER.providerLog,
@@ -994,6 +1050,10 @@ export async function createApplicationServices({
   const dynamicIsland = new DynamicIslandWindowController({
     platform: process.platform,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
+    // Only the dev server build starts with the island off, the same builds as the agent dock default.
+    ...(process.env.ELECTRON_RENDERER_URL
+      ? { defaultPreference: { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE, enabled: false } }
+      : {}),
     createWindow: createDynamicIslandWindow,
     loadWindow: (window, display) => loadDynamicIslandRenderer(window, display, appVariant),
     getDisplays: () => screen.getAllDisplays(),
@@ -1017,6 +1077,37 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
+  const agentDock = new AgentDockWindowController({
+    platform: process.platform,
+    createWindow: createAgentDockWindow,
+    loadWindow: loadAgentDockRenderer,
+    screen,
+    getMainWindow: windows.getMainWindow,
+    ensureMainWindow: windows.ensureMainWindow,
+    presentMainWindow: showMainWindow,
+    // The same send as a reply from the Dynamic Island: main sends it to the local or the remote agent.
+    sendMessage: (action) =>
+      Effect.suspend(() => {
+        if (!criticalActionTargets) {
+          return Effect.fail(new AgentDockFailed({ cause: new Error(sourceText("error.app.notReady")) }));
+        }
+        const { agents, host, remoteServers } = criticalActionTargets;
+        return performDynamicIslandCriticalAction(
+          {
+            type: "send-message",
+            serverId: action.serverId,
+            agentId: action.agentId,
+            text: action.text,
+            clientMessageId: action.clientMessageId,
+          },
+          agents,
+          remoteServers,
+          { decodeVoid, decodeQueuedMessageReceipt },
+          () => host.conversationSender(),
+        ).pipe(toAgentDockFailed);
+      }),
+  });
+  teardown.push(TEARDOWN_ORDER.agentDock, "the agent dock", () => agentDock.destroy());
   const centralAuthApiUrl = readCentralAuthApiUrl(
     process.env.OPENBOT_AUTH_API_URL,
     app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
@@ -1155,6 +1246,9 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () =>
     runCauseEffect(teamWebRtcBridge.stop()),
   );
+  // The computers of members that share their connection with this server, for computer proxies.
+  const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
+  teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
   // Only a hosted, self-hosted or container server: one unit or container holds OpenBot and every
   // agent process. The desktop app does not hold turns for memory.
   const hostMemory =
@@ -1180,6 +1274,10 @@ export async function createApplicationServices({
     teardown.push(TEARDOWN_ORDER.serverMemory, "the server memory reading", () => Effect.runPromise(hostMemory.stop()));
   }
   const browserProfileStore = new BrowserProfileStore(store.database);
+  const browserProxyStore = new BrowserProxyStore(store.database);
+  const browserProxyCipher = safeStorageCipher("error.app.secretStorageUnavailable");
+  // The agent service starts after the browser: a proxy failure before it has no open list to update.
+  let browserProxyStatusChanged = () => {};
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     browserProfile: (agentId) => {
@@ -1187,7 +1285,11 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
+    profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
+    onProxyStatusChanged: () => browserProxyStatusChanged(),
+    computerExit: (memberId) => browserEgress.exit(memberId),
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
+    pagePreload: join(__dirname, "../preload/browserPage.cjs"),
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
@@ -1286,16 +1388,26 @@ export async function createApplicationServices({
         serverAuditNames(teamStore.configured ? teamStore.listMembers() : [], service.listAgents()),
       ),
   });
+  const mcpServerOwners = new McpServerOwnersStore(join(app.getPath("userData"), MCP_SERVER_OWNERS_FILE));
+  await runCauseEffect(mcpServerOwners.load());
   if (!(await runCauseEffect(agentAccess.load())))
     logger.warn("The roles file did not load. Members get no access to agents until an admin saves the roles.");
   const serverTimezone = new ServerTimezonePreferenceStore(
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
   );
   await runCauseEffect(serverTimezone.load());
+  const serverPersonality = new ServerPersonalityPreferenceStore(
+    join(app.getPath("userData"), SERVER_PERSONALITY_PREFERENCE_FILE),
+  );
+  await runCauseEffect(serverPersonality.load());
   const promptCacheTtl = new PromptCacheTtlPreferenceStore(
     join(app.getPath("userData"), PROMPT_CACHE_TTL_PREFERENCE_FILE),
   );
   await runCauseEffect(promptCacheTtl.load());
+  const claudeUserSetup = createClaudeUserSetupPreferenceStore(
+    join(app.getPath("userData"), CLAUDE_USER_SETUP_PREFERENCE_FILE),
+  );
+  await runCauseEffect(claudeUserSetup.load());
   const remoteSessionReuse = createRemoteSessionReusePreferenceStore(
     join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
   );
@@ -1305,6 +1417,8 @@ export async function createApplicationServices({
     join(app.getPath("userData"), REMOTE_NETWORK_ROUTE_PREFERENCE_FILE),
   );
   await runCauseEffect(remoteNetworkRoute.load());
+  const remoteControlPolicy = createRemoteControlPolicyStore(join(app.getPath("userData"), REMOTE_CONTROL_POLICY_FILE));
+  await runCauseEffect(remoteControlPolicy.load());
   const appBehavior = new AppBehaviorService({
     path: join(app.getPath("userData"), APP_BEHAVIOR_PREFERENCE_FILE),
     loginItem: createLoginItem({
@@ -1314,6 +1428,7 @@ export async function createApplicationServices({
     offersBackground: !hostedServer && !serverModeEnvironment && !localServerChild,
     menuBar: process.platform === "darwin",
     offersKeepAwake: process.platform !== "linux" && !hostedServer && !serverModeEnvironment && !localServerChild,
+    offersQuitGuard: process.platform === "darwin" && !hostedServer && !serverModeEnvironment && !localServerChild,
   });
   await runCauseEffect(appBehavior.load());
   void Effect.runPromise(appBehavior.refreshLoginItem()).catch((error) =>
@@ -1402,8 +1517,15 @@ export async function createApplicationServices({
         .pipe(Effect.asVoid, toProviderRuntimeFailure);
     },
   });
+  // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
+  let updateCheckWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
-    runCauseEffect(providerRuntimes.stop()),
+    runCauseEffect(
+      Effect.gen(function* () {
+        if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        yield* providerRuntimes.stop();
+      }),
+    ),
   );
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await runCauseEffect(providerRuntimes.initialize());
@@ -1613,6 +1735,36 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () =>
     runCauseEffect(onePasswordConnector.dispose()),
   );
+  /*
+   * The password-manager engine. 1Password and Bitwarden keep their own services, panels and
+   * teardown, and the browser reads their logins directly. The Proton Pass CLI data and OpenBot's
+   * copy of `pass-cli` stay outside every root an agent can write.
+   */
+  const protonPassCliTarget = runtimeTarget(process.platform, process.arch);
+  const passwordManagers = new PasswordManagersService([
+    new ProtonPassDriver({
+      store: new EncryptedRecordStore({
+        path: join(app.getPath("userData"), PROTONPASS_CONNECTOR_FILE),
+        cipher: secretCipher,
+        decode: Schema.decodeUnknownSync(protonPassRecordSchema),
+        unreadable: sourceText("error.connector.protonPassFileUnreadable"),
+      }),
+      dataDirectory: join(app.getPath("userData"), "provider-state", "protonpass-host"),
+      hostName: hostname(),
+      installCli: protonPassCliTarget
+        ? (signal) =>
+            managedProtonPassCli({
+              directory: join(app.getPath("userData"), "provider-state", "protonpass-cli"),
+              target: protonPassCliTarget,
+              signal,
+            })
+        : null,
+    }),
+  ]);
+  await runCauseEffect(passwordManagers.load());
+  teardown.push(TEARDOWN_ORDER.passwordManagers, "the password managers", () =>
+    runCauseEffect(passwordManagers.dispose()),
+  );
   // Read by the resource monitor, which starts after the analytics that needs the services.
   const statementTimings = new StatementTimings();
   const tables = new AgentTables({
@@ -1687,6 +1839,8 @@ export async function createApplicationServices({
     loadWindow: loadComputerUseHighlightRenderer,
     place: sendComputerUseHighlightPlacement,
     displays: computerUseDisplays,
+    // `service` is built below; the controller starts only after it.
+    idle: () => service.earliestRunningTurnStartedAt() === null,
     // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
     readPointer: () => {
@@ -1782,6 +1936,8 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    feedbackFacts: feedbackFacts(),
+    feedback: feedbackSender(centralAuth),
     marketplaceAppServer: (appId) => {
       const listed = catalogPluginServers.filter((server) => server.slug === appId);
       const [server] = listed;
@@ -1840,6 +1996,8 @@ export async function createApplicationServices({
       apiKey: (provider) => providerCredentials.get(provider),
       // Read at each Claude spawn, so a change from Server settings applies to the next process.
       promptCacheTtl: () => promptCacheTtl.get().ttl,
+      // Also read at each Claude spawn, from Settings > Providers > Claude of this computer.
+      claudeUserSetup: () => claudeUserSetup.get().enabled,
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
       customProviders: () => customProviders.configs(),
@@ -1879,6 +2037,7 @@ export async function createApplicationServices({
     passwordVault: passwordVaultRouter([
       { prefix: "", vault: onePasswordConnector },
       { prefix: "bitwarden:", vault: bitwardenConnector },
+      ...passwordManagers.routes(),
       { prefix: "openbot:", vault: vault.logins },
     ]),
     vaultItems: vault.items,
@@ -1893,6 +2052,7 @@ export async function createApplicationServices({
     busyMessageMode: () => busyMessageMode.get().mode,
     agentMemoryLimit: () => agentMemoryLimit.get().limit,
     memoryReviewInterval: () => memoryReview.get().interval,
+    responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),
     // `workflowTriggers` is built later, after the workflows.
     extraRoutineSources: () => (workflowTriggers ? [workflowTriggers] : []),
@@ -1916,14 +2076,17 @@ export async function createApplicationServices({
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
+  // The next turn of each agent uses the instructions of the new personality.
+  serverPersonality.onChange(() => service.responseStyleChanged());
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
+  promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
   const modelVisibility = new ModelVisibility({
     path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
     catalog: new ModelReleaseCatalog(),
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
-    modelsChanged: () => service.notifyModelsChanged(),
+    modelsChanged: () => service.notifyProviderSettingsChanged(),
   });
   await runCauseEffect(modelVisibility.load());
   /** The answer an agent gave in one turn, for routine flows, routine results and local scripts. */
@@ -2013,6 +2176,7 @@ export async function createApplicationServices({
       notify: forwardWorkflowNotice,
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
+      channelPost: (input) => service.channels.postNote(input),
       discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),
       telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),
       slackSend: (connectionId, send) => service.messaging.slackSend(connectionId, send),
@@ -2154,9 +2318,13 @@ export async function createApplicationServices({
   });
   // The rim follows the daemon: it can show nothing while the agents hold no tools, and polling a
   // socket nothing answers would only log failures.
+  /** The rim shows only where the agents share the user's display and the daemon gives them tools. */
+  const startComputerUseHighlight = () => {
+    if (drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+  };
   cuaDriver.onMcpServerChanged(() => {
     if (cuaDriver.mcpServerForProviders()) {
-      if (drawsComputerUseHighlight) computerUseHighlight.start();
+      startComputerUseHighlight();
     } else {
       computerUseHighlight.stop();
       // The daemon this connection was opened to is gone, so the socket behind it is too.
@@ -2175,14 +2343,14 @@ export async function createApplicationServices({
   // whether it worked or not.
   const computerUseWarmUp = Effect.runFork(
     cuaDriver.warmUp().pipe(
-      Effect.tap(() =>
-        Effect.sync(() => {
-          if (drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
-        }),
-      ),
+      Effect.tap(() => Effect.sync(startComputerUseHighlight)),
       Effect.exit,
     ),
   );
+  // The poll rests while no turn runs, so each turn wakes it.
+  service.on("event", (event) => {
+    if (event.type === "turn-started") startComputerUseHighlight();
+  });
   /*
    * Where the decision put the download: onboarding, which is the screen this start is about to
    * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
@@ -2239,7 +2407,17 @@ export async function createApplicationServices({
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   // After the status forward, so the offer a check finds reaches the renderer.
   const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
-  providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  // A hosted server checks after its disk restore: the check reads and removes CLI versions, and the
+  // start of the server waits for its own files first.
+  if (diskRestoring()) {
+    updateCheckWait = Effect.runFork(
+      diskRestoreEnded.pipe(
+        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
+      ),
+    );
+  } else {
+    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  }
   if (appUpgraded)
     void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
       logger.warn("The provider CLI app version did not save.", toLogValue(error)),
@@ -2281,8 +2459,15 @@ export async function createApplicationServices({
   });
   // A grant changed on this computer must reach the phones and web clients that show it.
   approvalAutomation.subscribe(() => service.notifyAgentsChanged());
+  // A server on this computer has no account session: the desktop app makes the Marketplace reads that
+  // adding an agent needs.
+  const localServerMarketplace = new LocalServerMarketplace(
+    (line) => process.stdout.write(line),
+    (path) => centralAuth.resolveApiUrl(path),
+  );
+  const marketplaceAuth = localServerChild ? localServerMarketplace : centralAuth;
   const skills = new SkillMarketplaceService(
-    centralAuth,
+    marketplaceAuth,
     () => service.listAgents(),
     // Every skill change ends here: install, update, uninstall, turning one on or off, and a skill
     // an agent creates. The event reaches this computer's windows and the joined clients.
@@ -2292,7 +2477,7 @@ export async function createApplicationServices({
         .pipe(Effect.ensuring(Effect.sync(() => service.notifySkillsChanged(agentId)))),
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
-  const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
+  const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
   const agentTemplates = new AgentTemplateService(centralAuth, service, {
     listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
     installVersion: (input) => skills.installVersion(input),
@@ -2328,6 +2513,8 @@ export async function createApplicationServices({
     ingress: signalIngress,
     hostId: () => teamStore.getIdentity()?.serverId ?? null,
   });
+  // Analytics starts later in this function. A request before then is not reported.
+  let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
     workflows: {
@@ -2340,6 +2527,7 @@ export async function createApplicationServices({
       const state = centralAuth.getState();
       return state.status === "signed_in" ? state.user.id : null;
     },
+    onDelivery: (report) => reportWebhookDelivery?.(report),
   });
   const eventsRuntime = new HostEventsRuntime(events);
   signalIngress.handleWebhooks((input) => events.receive(input));
@@ -2423,10 +2611,20 @@ export async function createApplicationServices({
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
+    proxies: browserProxyStore,
+    cipher: browserProxyCipher,
     agents: service,
     browser,
+    memberName: (memberId) => {
+      const member = teamStore.getMember(memberId);
+      return member ? (member.name ?? member.username) : null;
+    },
+    computerOnline: (memberId) => browserEgress.online(memberId),
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
+  browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
+  // A computer that comes online or goes offline changes the proxy list.
+  browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
@@ -2567,6 +2765,11 @@ export async function createApplicationServices({
   // Development only: a shorter or longer time without input before a phone notifies, to test it.
   const awaySeconds = app.isPackaged ? Number.NaN : Number(process.env.OPENBOT_DEV_AWAY_SECONDS);
   const awayAfterMs = Number.isInteger(awaySeconds) && awaySeconds > 0 ? awaySeconds * 1_000 : DESKTOP_USE_MS;
+  const computerIdle = createComputerIdle(
+    (contents) =>
+      windows.getMainWindow()?.webContents === contents ||
+      windows.getChatWindows().some((chat) => chat.webContents === contents),
+  );
   // A server on this computer has no account session: the desktop app reads its directory for it.
   const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
   const host = new HostService({
@@ -2582,11 +2785,15 @@ export async function createApplicationServices({
     browser,
     chat: teamChatStore,
     channels: service.channels,
-    // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
+    // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only without `mcpServerOwners`.
     mcpServers: service,
-    // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only.
+    // Present, so the host advertises `mcp-member-access-v1`. A member then uses the MCP routes too,
+    // and changes only the servers that they added.
+    mcpServerOwners,
+    // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only without `mcpServerOwners`.
     mcpSignIns: mcpHostSignIns,
-    // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only.
+    // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only, but for a member's
+    // MCP sign-in with `mcpServerOwners`.
     signInRelay: signInRelayHost,
     // Present, so the host advertises `connectors-v1`. GitHub answers `available: false` when this
     // build has no GitHub App. The routes are admin-only.
@@ -2597,6 +2804,9 @@ export async function createApplicationServices({
     // Present, so the host advertises `bitwarden-connector-v1`. An owner or admin connects it with an
     // API key and the master password: a session key from their computer cannot open this vault.
     bitwardenConnector,
+    // Present, so the host advertises `password-managers-v1`. An owner or admin connects Proton Pass
+    // with a sign-in on the host or with an agent access key. The routes are admin-only.
+    passwordManagers,
     // Present, so the host advertises `vault-v1`. The routes are admin-only.
     vault,
     // Present on Linux, so the host advertises `provider-host-sign-in-v1`. The routes are admin-only.
@@ -2611,6 +2821,15 @@ export async function createApplicationServices({
     storage: storageUsage,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
+    // Present, so the host advertises `live-voice-v1`. A member's voice uses the Codex sign-in of this host.
+    liveVoice: {
+      startLiveVoice: (input, voice, owner) => service.startLiveVoice(input, voice, owner),
+      stopLiveVoice: (sessionId, memberId) => service.stopLiveVoice(sessionId, memberId),
+      subscribe: (listener) => {
+        service.on("liveVoice", listener);
+        return () => service.off("liveVoice", listener);
+      },
+    },
     // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.
     hostedSites,
     // Present, so the host advertises `agent-import-v1`. Any member can import.
@@ -2627,6 +2846,8 @@ export async function createApplicationServices({
     },
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
+    // Present, so the host advertises `routine-run-place-v1`. Any member reads the places; a change needs manage access.
+    routineRunPlaces: service.routineRecords,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
     agentNotificationLevels,
     // Present, so the host advertises `sidebar-pins-v1`. Each member saves their own pins.
@@ -2672,6 +2893,7 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      personality: serverPersonality,
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
       promptCacheTtl,
@@ -2746,6 +2968,7 @@ export async function createApplicationServices({
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     },
     teamWebRtcBridge,
+    peerMemberChanged: browserEgress.peerMemberChanged,
     privateNetwork: () => remoteNetworkRoute.get().route === "private",
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input).pipe(toRemoteWorkflowError),
     handOverRemoteHostKey: (hostId, handover) =>
@@ -2764,7 +2987,9 @@ export async function createApplicationServices({
     hostComputerInUse: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return false;
+      // Also a locked screen. In a Wayland session, `computerIdle` counts the input in OpenBot only.
       if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
+      if (computerIdle.seconds() * 1_000 >= awayAfterMs) return false;
       if (window.isFocused()) return true;
       // Without a notification service, as on Linux without a daemon, the desktop shows nothing.
       if (!Notification.isSupported()) return false;
@@ -2812,6 +3037,17 @@ export async function createApplicationServices({
     platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
     unattended: false,
     remoteDesktopRuntimePaths: remoteDesktopRuntime,
+    remoteControlPolicy,
+    // A server process has no window and nobody to answer, so a policy that asks refuses there.
+    ...(hostedServer || serverModeEnvironment || localServerChild
+      ? {}
+      : {
+          askRemoteControl: createRemoteControlQuestion({
+            translate: language.translate,
+            ensureMainWindow: windows.ensureMainWindow,
+            presentMainWindow: showMainWindow,
+          }),
+        }),
     openRemoteDesktopSetup: (action, appPath) =>
       Effect.tryPromise({
         try: async () => {
@@ -2918,6 +3154,8 @@ export async function createApplicationServices({
     trace,
     statementTimings,
     tabProcessIds: () => browser.tabProcessIds(),
+    appWindowContents: () => BrowserWindow.getAllWindows().map((window) => window.webContents),
+    turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
   });
   teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>
     Effect.runPromise(resourceMonitor.close()),
@@ -2952,6 +3190,7 @@ export async function createApplicationServices({
         envKey: (name) => Boolean(process.env[name]?.trim()),
       }),
     resolveTurnUsage: (agentId, turnId, since) => service.getTurnUsage(agentId, turnId, since),
+    resolveTurnTiming: (turnId) => service.takeTurnTiming(turnId),
     resolveMcpServer: (name) => {
       const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
       if (configs.length === 0) return null;
@@ -2961,13 +3200,24 @@ export async function createApplicationServices({
     },
     resolveRoutineRun: (agentId, routineId, runId) => {
       const run = service.listRoutineRuns({ agentId, routineId }).find((item) => item.id === runId);
-      const routine = service.listRoutines(agentId).find((item) => item.id === routineId);
-      return run && routine ? { runKind: run.kind, triggerType: routine.trigger.schedule.kind } : null;
+      // The records include webhook routines, which the schedule list leaves out.
+      const routine = service.routineRecords.get({ kind: "agent", id: agentId }, routineId);
+      if (!run || !routine) return null;
+      return {
+        runKind: run.kind,
+        runSource: run.source ?? null,
+        triggerType: routine.trigger.kind === "webhook" ? "webhook" : routine.trigger.schedule.kind,
+      };
     },
     resolveInventory: () =>
       collectAnalyticsInventory({
         agents: () => service.listAgents(),
         routines: (agentId) => service.listRoutines(agentId),
+        enabledWebhookRoutineCount: (agentId) =>
+          service.routineRecords
+            .list({ kind: "agent", id: agentId })
+            .filter((routine) => routine.active && routine.trigger.kind === "webhook").length,
+        webhookRouteCount: () => service.routineRecords.routes.list().length,
         workflowCount: () => workflowStore.list().length,
         // The local read: `listInstalled` asks the marketplace for each skill's latest version.
         skills: (agentId) => skills.listInstalledForChatTags(agentId),
@@ -2977,6 +3227,7 @@ export async function createApplicationServices({
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
     resources: resourceMonitor,
+    uncleanExit: previousUncleanExit,
   });
   teardown.push(TEARDOWN_ORDER.analytics, "host analytics", () => Effect.runPromise(analytics.close()));
   const analyticsPreferences = new AnalyticsPreferenceService({
@@ -2992,8 +3243,25 @@ export async function createApplicationServices({
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
+  reportWebhookDelivery = (report) => analytics.handleWebhookDelivery(report);
   resourceMonitor.start(() => analytics.checkResources());
-  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
+  const startup = localServerChild
+    ? null
+    : new StartupTiming({
+        userDataPath: app.getPath("userData"),
+        appVersion: app.getVersion(),
+        server: hostedServer !== null || serverModeEnvironment !== null,
+        send: (properties) => analytics.handleStartup(properties),
+      });
+  if (startup) {
+    // Not awaited: the summary goes much later, and a start not read by then gives `unknown`.
+    Effect.runFork(startup.recordStart());
+    teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
+  }
+  const connectTrace = new RemoteConnectTrace(
+    (span) => trace.record(span),
+    (summary) => analytics.handleRemoteConnect(summary),
+  );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
   installRemoteSyncProfileSink(
@@ -3035,7 +3303,7 @@ export async function createApplicationServices({
         : {
             computerActivity: {
               awayAfterMs,
-              idleSeconds: () => powerMonitor.getSystemIdleTime(),
+              idleSeconds: () => computerIdle.seconds(),
               showsEvents: (server) => {
                 const window = windows.getMainWindow();
                 if (!window || window.isDestroyed()) return false;
@@ -3087,6 +3355,16 @@ export async function createApplicationServices({
   // account check and its coalescing; this only forwards the notice to it.
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
+  // This computer's connection, for the computer proxies of the joined servers that the user shares it with.
+  const browserEgressClient = new BrowserEgressClient(teamWebRtcBridge, {
+    serverIds: () => remoteServers.list().map((server) => server.id),
+    browserEgressWanted: (serverId) => remoteServers.browserEgressWanted(serverId),
+  });
+  remoteServers.on("changed", browserEgressClient.reconcile);
+  teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxy of this computer", () => {
+    remoteServers.off("changed", browserEgressClient.reconcile);
+    browserEgressClient.dispose();
+  });
   performance.mark("openbot:services.plugin-catalog");
   // Not on a server: a local server is a workspace of the desktop app.
   const localServers =
@@ -3120,6 +3398,10 @@ export async function createApplicationServices({
                 Effect.catch((error) => (isHostNotOnAccount(error.cause) ? Effect.void : Effect.fail(error))),
                 toRemoteWorkflowError,
               ),
+            apiOrigin: new URL(centralAuth.resolveApiUrl("/")).origin,
+            requestAuthorized: (path, init) =>
+              centralAuth.requestAuthorized(path, init, (value) => value).pipe(toRemoteWorkflowError),
+            downloadAuthorized: (path) => centralAuth.downloadAuthorized(path).pipe(toRemoteWorkflowError),
           },
           log: {
             info: (message) => logger.info(message),
@@ -3173,6 +3455,7 @@ export async function createApplicationServices({
         host,
         writeReady: (line) => process.stdout.write(line),
         members: localServerMembers,
+        marketplace: localServerMarketplace,
         readCommands: (onLine) => {
           if (localServerControl) createInterface({ input: localServerControl }).on("line", onLine);
         },
@@ -3203,6 +3486,11 @@ export async function createApplicationServices({
         warn: (message, cause) => logger.warn(message, toLogValue(cause)),
       }),
     );
+    reportLocalServerWorkingAgents({
+      read: () => service.workingAgents(),
+      subscribe: (listener) => service.on("event", listener),
+      write: (line) => process.stdout.write(line),
+    });
   }
   configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
   configureServerLogoProtocols({ teamStore, remoteServers });
@@ -3238,6 +3526,12 @@ export async function createApplicationServices({
     cipher: secretCipher,
   });
   await runCauseEffect(voiceApiKeys.load());
+  // The Groq key for Groq dictation. It is a file of its own, apart from the ElevenLabs key.
+  const groqVoiceKeys = new VoiceApiKeyStore({
+    path: join(app.getPath("userData"), "groq-api-key.json"),
+    cipher: secretCipher,
+  });
+  await runCauseEffect(groqVoiceKeys.load());
   const voice = new VoiceTranscriptionService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
     // `voice:prepare` puts Parakeet in `.openbot-build/voice/model` for development. In development
@@ -3246,15 +3540,21 @@ export async function createApplicationServices({
       "parakeet-tdt-0.6b-v3": app.isPackaged
         ? join(app.getPath("userData"), "runtimes", PARAKEET_MODEL_DIRECTORY)
         : resolve(".openbot-build/voice/model"),
+      "parakeet-unified-en-0.6b": app.isPackaged
+        ? join(app.getPath("userData"), "runtimes", PARAKEET_UNIFIED_MODEL_DIRECTORY)
+        : resolve(".openbot-build/voice", PARAKEET_UNIFIED_MODEL_DIRECTORY),
       "bark-3.0-plus": app.isPackaged
         ? join(app.getPath("userData"), "runtimes", BARK_PLUS_MODEL_DIRECTORY)
         : resolve(".openbot-build/voice", BARK_PLUS_MODEL_DIRECTORY),
       "whisper-turbo": app.isPackaged
         ? join(app.getPath("userData"), "runtimes", WHISPER_TURBO_MODEL_DIRECTORY)
         : resolve(".openbot-build/voice", WHISPER_TURBO_MODEL_DIRECTORY),
+      "cohere-transcribe-03-2026": app.isPackaged
+        ? join(app.getPath("userData"), "runtimes", COHERE_TRANSCRIBE_MODEL_DIRECTORY)
+        : resolve(".openbot-build/voice", COHERE_TRANSCRIBE_MODEL_DIRECTORY),
     },
     preferences: voicePreferences,
-    apiKeys: voiceApiKeys,
+    apiKeys: { elevenlabs: voiceApiKeys, groq: groqVoiceKeys },
     spawnHost: spawnVoiceTranscriptionHost,
     openStreamSocket: openScribeSocket,
   });
@@ -3269,6 +3569,12 @@ export async function createApplicationServices({
   voice.on("streamTranscript", forwardVoiceStreamTranscript);
   const speechPreferences = new SpeechPreferenceStore(join(app.getPath("userData"), "speech-preference.json"));
   await runCauseEffect(speechPreferences.load());
+  // The xAI key for replies read aloud. The ElevenLabs key is the key of ElevenLabs dictation.
+  const xaiSpeechKeys = new VoiceApiKeyStore({
+    path: join(app.getPath("userData"), "xai-api-key.json"),
+    cipher: secretCipher,
+  });
+  await runCauseEffect(xaiSpeechKeys.load());
   const speech = new VoiceSpeechService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
     modelDirectory: app.isPackaged
@@ -3276,6 +3582,7 @@ export async function createApplicationServices({
       : resolve(".openbot-build/voice", SUPERTONIC_MODEL_DIRECTORY),
     preferences: speechPreferences,
     spawnHost: spawnVoiceSpeechHost,
+    apiKeys: { elevenlabs: voiceApiKeys, xai: xaiSpeechKeys },
   });
   teardown.push(TEARDOWN_ORDER.speech, "speech", () => Effect.runPromise(speech.shutdown()));
   speech.on("modelStatus", forwardSpeechModelStatus);
@@ -3294,7 +3601,8 @@ export async function createApplicationServices({
   const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
   // A hosted or self-installed server runs a release that root owns. Root installs updates for it
   // when openbot-hosted-update has installed its request units. A container of openbot-instance asks
-  // the host instead, which pulls the image. Other containers have neither.
+  // the host instead, which pulls the image. Other containers have neither. The mode file names the
+  // whole computer, so a desktop AppImage beside a self-installed server keeps its own updater.
   const containerInstaller =
     app.isPackaged &&
     process.platform === "linux" &&
@@ -3304,7 +3612,7 @@ export async function createApplicationServices({
     containerInstaller ||
     (app.isPackaged &&
       process.platform === "linux" &&
-      (process.env.OPENBOT_HOSTED_SERVER === "1" || installationMode === "self") &&
+      (process.env.OPENBOT_HOSTED_SERVER === "1" || (serverModeEnvironment !== null && installationMode === "self")) &&
       existsSync(HOSTED_UPDATE_TRIGGER));
   // A local server is the same application as its parent, which installs the update for both.
   const updatesEnabled =
@@ -3376,10 +3684,14 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
   const agentInitialization = new AgentInitializationGate((rosterLoaded) =>
     Effect.gen(function* () {
-      yield* Fiber.join(computerUseWarmUp);
-      yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
-      // A client's agent list waits only until here. The steps below do not change the roster.
-      yield* rosterLoaded;
+      // A client's agent list waits only until the agents are restored, not for the provider starts.
+      // The providers start after the computer-use warm-up: it decides whether the MCP entry is
+      // there, and a session made while it still probes would keep a command that it can stop.
+      yield* service.initialize({
+        heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)),
+        rosterLoaded,
+        beforeProviderStart: Fiber.join(computerUseWarmUp).pipe(Effect.asVoid),
+      });
       yield* eventsRuntime.start();
       yield* automation.sync();
       // Picks up the flows a restart stopped between one agent's answer and the next agent's message.
@@ -3527,7 +3839,7 @@ export async function createApplicationServices({
           if (auth.status === "error" && auth.issue.code === "auth_api_unavailable")
             yield* centralAuth.retry().pipe(toRemoteWorkflowError);
           if (centralAuth.getState().status !== "signed_in") return;
-          return yield* host.start();
+          return yield* host.start(true);
         }),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
@@ -3556,8 +3868,10 @@ export async function createApplicationServices({
       hostPhase: () => host.getStatus().phase,
       startHost: () =>
         Effect.gen(function* () {
+          // The owner removed this server. It stays private until a sign-in or another publish (#5273).
+          if (host.getStatus().message === sourceText("status.host.removed")) return;
           if (centralAuth.getState().status === "error") yield* centralAuth.retry().pipe(toRemoteWorkflowError);
-          yield* serverMode.publish();
+          yield* serverMode.publish(true);
         }),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
@@ -3592,6 +3906,7 @@ export async function createApplicationServices({
     linkAccount,
     onePasswordConnector,
     bitwardenConnector,
+    passwordManagers,
     vault,
     mailbox,
     storageUsage,
@@ -3625,7 +3940,9 @@ export async function createApplicationServices({
     agentAccess,
     serverAudit,
     serverTimezone,
+    serverPersonality,
     promptCacheTtl,
+    claudeUserSetup,
     modelVisibility,
     remoteSessionReuse,
     externalLinkPreference,
@@ -3669,12 +3986,15 @@ export async function createApplicationServices({
     speech,
     voiceServer,
     dynamicIsland,
+    agentDock,
     cuaDriver,
     computerUseHighlight,
     computerUsePermissionHelp,
     analytics,
+    prewarmAgentDatabase: tables.prewarm(),
     trace,
     resourceMonitor,
+    startup,
     machineAlerts,
     teamStore,
     appliedAccount: signedInState,

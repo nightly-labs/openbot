@@ -1,4 +1,5 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import type {
   AgentProviderId,
   AgentStatus,
@@ -10,6 +11,7 @@ import type {
 import { decodeRegistryEntries, decodeRegistryInstallResult, decodeRegistryOperations } from "@openbot/contracts/ipc";
 import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
@@ -98,6 +100,7 @@ const CODE_LOGIN_POLL_MS = 3000;
 const WEB_EXTERNAL_DESTINATIONS: Partial<Record<ExternalDestination, string>> = {
   "opencode-auth": "https://opencode.ai/auth",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
+  "report-problem": bugReportFormUrl({ platform: "Web client" }),
   message: "https://x.com/norbertbodziony",
   changelog: "https://openbot.run/changelog",
   guides: "https://openbot.run/guides",
@@ -329,12 +332,14 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
   });
   // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.
   const readsClaudeKey = createMemo(() => serverSupportsCapability(options.server(), CLAUDE_API_KEY_CAPABILITY));
+  const readsCodexKey = createMemo(() => serverSupportsCapability(options.server(), CODEX_API_KEY_CAPABILITY));
   const providerKeys = createMemo(() => {
     const id = serverId();
     return id
       ? {
           ...hostProviderKeyApi(() => admin, id, openWebDestination),
           readsClaudeKey: readsClaudeKey(),
+          readsCodexKey: readsCodexKey(),
         }
       : undefined;
   });

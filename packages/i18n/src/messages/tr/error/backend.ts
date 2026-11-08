@@ -60,6 +60,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Kanal lideri modeli kullanılamıyor.",
   "error.backend.contextCompactionIneffective":
     "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
+  "error.backend.contextCompactionStopped":
+    'Bu sohbetin art arda iki sıkıştırması başarısız oldu, bu yüzden OpenBot onu otomatik olarak sıkıştırmayı bırakıyor. Her deneme tüm sohbeti modele gönderir ve plan sınırınızı kullanır. Yeniden denemek için "Şimdi sıkıştır"ı seçin veya yeni bir sohbet başlatın.',
   "error.backend.providerRetrying":
     "Sağlayıcı bu isteği {attempts} kez tamamlayamadı ve yeniden deniyor. Ajan devam etmezse turu durdurun.",
   "error.backend.providerRetryingLargeContext":
@@ -70,6 +72,12 @@ export const messages = {
     "Kanalda onaylanmamış bir görev başlangıcı var. Silmeden önce sonucunu kontrol edin.",
   "error.backend.channelNotFound": "Kanal bulunamadı.",
   "error.backend.channelMemberUnavailable": "Bir kanal üyesi kullanılamıyor.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Bu kanaldaki iş bitene kadar bekleyin, sonra yeni bir konuşma başlatın.",
+  "error.backend.channelWaitBeforeCompact": "Bu kanaldaki iş bitene kadar bekleyin, sonra kanalı sıkıştırın.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Bu kanaldaki iş bitene kadar bekleyin, sonra geçmişini silin.",
+  "error.backend.channelCompactUnavailable":
+    "Bu kanalın hiçbir üyesi şu anda bağlamını sıkıştıramıyor. Önce bir üyenin kanalda yanıt vermesi ve sağlayıcısının sıkıştırmayı desteklemesi gerekir.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
@@ -230,6 +238,10 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. MCP ayarlarını açın ve Oturum aç'ı seçin.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider}, {name} MCP sunucusunu başlatamadı. Nedeni görmek için MCP ayarlarını açın ve Bağlantıyı test et'i seçin.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -299,6 +311,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Bu adla bir tarayıcı profili zaten var.",
   "error.backend.browserSessionInUse": "Bir sekme bu tarayıcı oturumunu hâlâ kullanıyor. Yeniden deneyin.",
   "error.backend.browserProfileLimit": "En fazla {limit} tarayıcı profiliniz olabilir.",
+  "error.backend.browserProxyNotFound": "Bu proxy artık yok.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 veya http://user:password@host:3128 gibi bir proxy adresi yazın.",
+  "error.backend.browserProxyLimit": "En fazla {limit} proxy'niz olabilir.",
+  "error.backend.browserProxyTaken": "Bu adrese sahip bir proxy zaten var.",
+  "error.backend.browserProxyChanged": "Bu proxy siz açtıktan sonra değişti. Yeniden kontrol edip tekrar deneyin.",
+  "error.backend.browserProxyUnreachable": "{name} proxy'si yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserCertificateUntrusted":
+    "Bu sitenin güvenlik sertifikasına güvenilmiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",

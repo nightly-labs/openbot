@@ -116,6 +116,18 @@ restart that resumes the run still has it. Runs use the existing agent and chann
 limits, and approval controls. While a restart waits for idle agents (`holdRoutines`), the host
 answers 503 and writes no receipt, so the sender retries after the restart.
 
+### Analytics
+
+`HostEventsService` gives each request that it processed, and each test event, to its `onDelivery`
+option as a `WebhookDeliveryReport`: owner kind, format, result, ignored reason, status, body size,
+handle time and, for a request with a valid signature, the delivery age. The application services
+send it as `system_webhook_delivery`, at most 60 each minute (`HostAnalytics.handleWebhookDelivery`).
+The report has no route ID, delivery ID, secret, event type or body. A request that Signal refuses
+before the host does not reach it: Signal counts its answers by status and its waits for the host in
+`/metrics` (`openbot_remote_webhook_*`), and the capacity reporter sends the change of each 5 minutes
+in `signal_capacity`. `bun run test:webhook-analytics` checks the host side. See
+[ANALYTICS.md](../../ANALYTICS.md).
+
 ### Workflow webhook triggers
 
 A workflow webhook trigger has no route until its first secret: `rotateWorkflowSecret` makes the
@@ -246,8 +258,10 @@ owner or admin changes a Slack node (`route-workflows.ts`).
 - Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
   API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
   routes need a host administrator. A client without the capability does not offer GitHub.
-- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own. Only the desktop that
-  hosts the workflows offers them, and the `workflows-v1` graph save refuses a change from a member.
+- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own, and the `workflows-v1`
+  graph save refuses a change from a member. The desktop that hosts the workflows offers all three. With
+  `workflows-chats-v1`, an owner or admin of a joined server also adds and changes Telegram and Slack
+  nodes, with the chats and channels of the `routine-results-v1` options.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.

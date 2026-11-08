@@ -110,7 +110,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   queue_action: {
-    action: "cancel" | "steer" | "edit" | "reorder" | "interrupt";
+    action: "cancel" | "steer" | "send_now" | "edit" | "reorder" | "interrupt";
     result: AnalyticsResult;
     failure_code?: string;
   };
@@ -239,7 +239,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   speech_reply: {
-    trigger: "voice_conversation" | "dictation" | "read_aloud";
+    trigger: "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
     result: AnalyticsResult;
     /** False when the user or a new turn stopped the reading. */
     completed?: boolean;
@@ -331,13 +331,13 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   connector_action: {
-    connector: "slack" | "discord" | "telegram" | "whatsapp" | "github" | "onepassword" | "bitwarden";
+    connector: "slack" | "discord" | "telegram" | "whatsapp" | "github" | "onepassword" | "bitwarden" | "protonpass";
     action: "connect_started" | "connected" | "disconnected" | "enabled" | "disabled";
     result: AnalyticsResult;
     failure_code?: string;
   };
   computer_use_action: { action: "permission_opened"; permission: "screen-recording" | "accessibility" };
-  help_link_opened: { destination: "discord" | "feedback" | "guides" | "changelog" };
+  help_link_opened: { destination: "discord" | "feedback" | "report-problem" | "guides" | "changelog" };
   channel_action: {
     action: "created" | "archived" | "member_added";
     result: AnalyticsResult;
@@ -515,6 +515,7 @@ const SAFE_FAILURE_CODES = new Set([
   "response_failed",
   "search_failed",
   "send_failed",
+  "send_now_failed",
   "server_select_failed",
   "sign_in_code_expired",
   "sign_out_failed",
@@ -528,6 +529,7 @@ const SAFE_FAILURE_CODES = new Set([
   "unknown",
   "unpublish_failed",
   "update_failed",
+  "webhook_route_limit",
   "verification_failed",
   "hosted_site_failed",
   "cancelled",
@@ -563,7 +565,7 @@ const SAFE_FAILURE_CODES = new Set([
 const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
-  queue_action: ["cancel", "steer", "edit", "reorder", "interrupt"],
+  queue_action: ["cancel", "steer", "send_now", "edit", "reorder", "interrupt"],
   routine_action: ["create", "update", "delete", "test"],
   workflow_action: WORKFLOW_ACTIONS,
   team_action: [
@@ -679,10 +681,10 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   outcome: ["completed", "cancelled"],
   step: ["choose", "plan", "computer", "language"],
   path: ["free", "plan"],
-  connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden"],
+  connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden", "protonpass"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],
-  destination: ["discord", "feedback", "guides", "changelog"],
+  destination: ["discord", "feedback", "report-problem", "guides", "changelog"],
   range: ["7d", "30d", "90d", "1y"],
   from_provider: AGENT_PROVIDERS,
   to_provider: AGENT_PROVIDERS,

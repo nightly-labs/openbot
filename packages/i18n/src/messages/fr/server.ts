@@ -307,6 +307,7 @@ export const messages = {
   "server.settings.addLogo": "Ajouter un logo au serveur",
   "server.settings.removeLogo": "Supprimer le logo du serveur",
   "server.settings.access": "Accès",
+  "server.companySignIn.desktopOnly": "Configurez l’authentification unique dans l’application de bureau OpenBot.",
   "server.settings.publish": "Publier ce serveur",
   "server.settings.published": "Le serveur est publié",
   "server.settings.setUpDesktopTitle": "Configurer le bureau à distance",
@@ -450,8 +451,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "L’invitation ne fonctionne plus. Les personnes qui l’ont utilisée restent membres.",
   "server.desktop.accessTitle": "Accès au bureau à distance",
-  "server.desktop.gatewayDescription":
-    "Chaque membre actif du serveur peut contrôler cet hôte. Il n’y a pas de mot de passe distinct pour le bureau à distance.",
+  "server.desktop.gatewayPolicyDescription":
+    "Il n’y a pas de mot de passe distinct pour le bureau à distance. Les réglages ci-dessous choisissent qui peut contrôler cet ordinateur.",
   "server.desktop.componentInstalled": "Composant hôte installé",
   "server.desktop.componentNotInstalled": "Composant hôte non installé",
   "server.desktop.sessions": "Sans surveillance : {unattended} · Sessions actives : {active}/{max}",
@@ -464,12 +465,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Reconnectez-vous à l’hôte avant d’ouvrir son bureau.",
   "server.desktop.hostUpdateDescription": "Mettez à jour OpenBot sur l’hôte pour utiliser le contrôle à distance.",
   "server.desktop.serviceAvailable": "Service disponible",
-  "server.desktop.serviceAvailableDescription": "Le contrôle WebRTC est disponible pour tous les membres actifs.",
   "server.desktop.serviceNotReady": "Service non prêt",
   "server.desktop.serviceNotReadyDescription":
     "Démarrez le contrôle à distance pour vérifier les composants et les autorisations de l’hôte. L’hôte signalera toute erreur de configuration.",
   "server.desktop.remoteControl": "Contrôle à distance",
   "server.desktop.startHint": "Démarrez le contrôle à distance depuis le bouton moniteur dans l’en-tête du serveur.",
+  "server.desktop.accessLabel": "Qui peut contrôler cet ordinateur",
+  "server.desktop.accessDescription":
+    "Les membres qui peuvent ouvrir le bureau de cet ordinateur depuis un autre appareil.",
+  "server.desktop.accessOwner": "Le propriétaire uniquement",
+  "server.desktop.accessAdmins": "Propriétaire et admins",
+  "server.desktop.accessMembers": "Tous les membres",
+  "server.desktop.askLabel": "Demander sur cet ordinateur",
+  "server.desktop.askDescription":
+    "Chaque session attend qu’une personne devant cet ordinateur l’autorise. Sans réponse sous 30 secondes, OpenBot la refuse.",
+  "server.desktop.activeTitle": "Sessions de bureau à distance actives : {active}",
+  "server.desktop.activeDescription": "Met fin à chaque session maintenant. Les membres peuvent redemander.",
+  "server.desktop.stopAll": "Arrêter tout contrôle à distance",
+  "server.desktop.policyLoadFailed": "Impossible de charger les réglages du contrôle à distance.",
+  "server.desktop.policySaveFailed": "Impossible d’enregistrer les réglages du contrôle à distance.",
+  "server.desktop.stopFailed": "Impossible d’arrêter le contrôle à distance.",
   "server.settings.providersTitle": "Fournisseurs",
   "server.settings.providersDescription": "Gérez les fournisseurs d’IA de l’ordinateur qui exécute ce serveur.",
   "server.settings.providersSwitchNote": "Passez à {name} pour gérer ses fournisseurs d’IA.",
@@ -592,4 +607,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} redémarre pour installer une mise à jour",
   "server.restartNotice.restartingDescription": "OpenBot se reconnecte automatiquement quand {name} est de retour.",
   "server.restartNotice.backTitle": "{name} est de nouveau en ligne",
+  "server.settings.personalityTitle": "Personnalité",
+  "server.settings.personalityDescription": "Choisissez comment les agents de ce serveur vous parlent.",
+  "server.settings.responseStyle": "Style de réponse",
+  "server.settings.responseStyleDescription":
+    "Naturel : les agents envoient de courtes mises à jour pendant leur travail, et le chat les affiche. Classique : les agents répondent une seule fois, à la fin.",
+  "server.settings.responseStyleNatural": "Naturel",
+  "server.settings.responseStyleClassic": "Classique",
+  "server.settings.personalityLoadFailed": "Impossible de charger la personnalité du serveur.",
 } as const satisfies PartialTranslation<typeof source>;

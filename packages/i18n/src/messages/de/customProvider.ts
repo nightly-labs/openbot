@@ -84,6 +84,18 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.maxOutput": "Maximale Ausgabe von Modell {number}",
   "customProvider.model.maxOutputPlaceholder": "Tokens",
+  "customProvider.model.efforts": "Denkaufwand von Modell {number}",
+  "customProvider.model.effortsLabel": "Denkaufwand",
+  "customProvider.model.effortsHintOpenCode":
+    "Wählen Sie den Denkaufwand, den jedes Modell annimmt. Ohne Auswahl bietet OpenCode Niedrig, Mittel und Hoch an.",
+  "customProvider.model.effortsHintPi":
+    "Wählen Sie den Denkaufwand, den jedes Modell annimmt. Ohne Auswahl denkt das Modell nicht nach.",
+  "customProvider.model.inputs": "Eingaben von Modell {number}",
+  "customProvider.model.inputsLabel": "Akzeptiert",
+  "customProvider.model.inputImage": "Bilder",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Wähle, was jedes Modell neben Text lesen kann.",
+  "customProvider.model.foundValuesHint": "Einige Werte kommen vom Endpunkt. Du kannst sie ändern.",
   "customProvider.model.remove": "Modell {number} entfernen",
   "customProvider.model.add": "Modell hinzufügen",
   "customProvider.headers": "Header",

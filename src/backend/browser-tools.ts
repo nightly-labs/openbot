@@ -165,6 +165,7 @@ const evaluateFields = {
 };
 
 export const BROWSER_SCRIPT_MAX_STEPS = 200;
+export const BROWSER_SCRIPT_MAX_SLEEP_MS = 25_000;
 const BROWSER_SCRIPT_MAX_CHARS = 20_000;
 export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
 const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
@@ -181,6 +182,8 @@ const browserStepSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("wait_for"), ...waitForFields }),
   z.strictObject({ action: z.literal("evaluate"), ...evaluateFields }),
   z.strictObject({ action: z.literal("snapshot") }),
+  // A script has no timers of its own, so a pause is a step that the host waits out.
+  z.strictObject({ action: z.literal("sleep"), ms: z.number().int().min(0).max(BROWSER_SCRIPT_MAX_SLEEP_MS) }),
 ]);
 
 export type BrowserStep = z.infer<typeof browserStepSchema>;
@@ -195,7 +198,7 @@ export function parseBrowserStep(value: unknown): BrowserStep {
 const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "open",
-    description: "Open an HTTP(S) URL in a new persistent private-browser tab.",
+    description: "Open an HTTP(S) URL in a new persistent private-browser tab; returns its first snapshot.",
     shape: { url: requiredString(INPUT_LIMITS.browserUrl) },
   }),
   browserTool({
@@ -252,7 +255,10 @@ const BROWSER_TOOL_DEFINITIONS = [
         .describe(
           "Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry.",
         ),
-      loginId: identifier
+      loginId: z
+        .string()
+        .min(1)
+        .max(INPUT_LIMITS.vaultLoginId)
         .optional()
         .describe(
           "For password or authenticator: the id of a saved login from list_logins. OpenBot fills its password or current code without asking the user.",
@@ -269,13 +275,13 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "list_logins",
     description:
-      "List 1Password, Bitwarden and OpenBot Vault logins for the tab's HTTPS site: id, title, username and hasOneTimePassword. Use it to log in with a password manager. No passwords or codes. Type the username, then call submit_secret with loginId.",
+      "List password manager and OpenBot Vault logins for the tab's HTTPS site: id, title, username and hasOneTimePassword. No passwords or codes. Type the username, then call submit_secret with loginId.",
     shape: { tabId },
   }),
   browserTool({
     name: "list_vault_items",
     description:
-      "List what the user saved in the OpenBot Vault, not 1Password or Bitwarden. A login shows id, website and username; its password and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy, when present, names the agent that added the item.",
+      "List what the user saved in the OpenBot Vault, not a password manager. A login shows id, website and username; its password and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy, when present, names the agent that added the item.",
     shape: {},
   }),
   browserTool({
@@ -522,7 +528,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "run_script",
     description:
-      "Run a short JavaScript program that drives one tab in one call and returns one final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, and for loops, such as paging until a condition holds. It runs in an isolated sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(condition, text, or page function), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
       script: requiredString(BROWSER_SCRIPT_MAX_CHARS),

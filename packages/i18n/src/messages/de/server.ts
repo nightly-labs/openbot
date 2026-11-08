@@ -308,6 +308,7 @@ export const messages = {
   "server.settings.addLogo": "Serverlogo hinzufügen",
   "server.settings.removeLogo": "Serverlogo entfernen",
   "server.settings.access": "Zugriff",
+  "server.companySignIn.desktopOnly": "Richte Single Sign-on in der OpenBot-Desktop-App ein.",
   "server.settings.publish": "Server veröffentlichen",
   "server.settings.published": "Server ist veröffentlicht",
   "server.settings.setUpDesktopTitle": "Remotedesktop einrichten",
@@ -458,8 +459,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "Die Einladung funktioniert nicht mehr. Wer damit beigetreten ist, bleibt Mitglied.",
   "server.desktop.accessTitle": "Remotedesktop-Zugriff",
-  "server.desktop.gatewayDescription":
-    "Jedes aktive Servermitglied kann diesen Host steuern. Es gibt kein separates Remotedesktop-Passwort.",
+  "server.desktop.gatewayPolicyDescription":
+    "Es gibt kein separates Passwort für den Remotedesktop. Die Einstellungen unten legen fest, wer diesen Computer steuern darf.",
   "server.desktop.componentInstalled": "Host-Komponente installiert",
   "server.desktop.componentNotInstalled": "Host-Komponente nicht installiert",
   "server.desktop.sessions": "Unbeaufsichtigt: {unattended} · Aktive Sitzungen: {active}/{max}",
@@ -472,12 +473,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Verbinde dich erneut mit dem Host, bevor du seinen Desktop öffnest.",
   "server.desktop.hostUpdateDescription": "Aktualisiere OpenBot auf dem Host, um die Fernsteuerung zu verwenden.",
   "server.desktop.serviceAvailable": "Dienst verfügbar",
-  "server.desktop.serviceAvailableDescription": "Die WebRTC-Steuerung ist für alle aktiven Mitglieder verfügbar.",
   "server.desktop.serviceNotReady": "Dienst nicht bereit",
   "server.desktop.serviceNotReadyDescription":
     "Starte die Fernsteuerung, um Host-Komponenten und Berechtigungen zu prüfen. Der Host meldet alle Einrichtungsfehler.",
   "server.desktop.remoteControl": "Fernsteuerung",
   "server.desktop.startHint": "Starte die Fernsteuerung über die Monitor-Schaltfläche in der Server-Kopfzeile.",
+  "server.desktop.accessLabel": "Wer diesen Computer steuern darf",
+  "server.desktop.accessDescription":
+    "Die Mitglieder, die den Desktop dieses Computers von einem anderen Gerät aus öffnen können.",
+  "server.desktop.accessOwner": "Nur der Eigentümer",
+  "server.desktop.accessAdmins": "Eigentümer und Administratoren",
+  "server.desktop.accessMembers": "Alle Mitglieder",
+  "server.desktop.askLabel": "Auf diesem Computer fragen",
+  "server.desktop.askDescription":
+    "Jede Sitzung wartet, bis eine Person an diesem Computer sie erlaubt. Ohne Antwort innerhalb von 30 Sekunden lehnt OpenBot sie ab.",
+  "server.desktop.activeTitle": "Aktive Remotedesktop-Sitzungen: {active}",
+  "server.desktop.activeDescription": "Beendet jede Sitzung sofort. Mitglieder können erneut fragen.",
+  "server.desktop.stopAll": "Alle Fernsteuerungen beenden",
+  "server.desktop.policyLoadFailed": "Die Einstellungen der Fernsteuerung konnten nicht geladen werden.",
+  "server.desktop.policySaveFailed": "Die Einstellungen der Fernsteuerung konnten nicht gespeichert werden.",
+  "server.desktop.stopFailed": "Die Fernsteuerung konnte nicht beendet werden.",
   "server.settings.providersTitle": "Anbieter",
   "server.settings.providersDescription": "Verwalte die KI-Anbieter des Computers, auf dem dieser Server läuft.",
   "server.settings.providersSwitchNote": "Wechsle zu {name}, um seine KI-Anbieter zu verwalten.",
@@ -601,4 +616,12 @@ export const messages = {
   "server.restartNotice.restartingDescription":
     "OpenBot verbindet sich automatisch erneut, sobald {name} wieder verfügbar ist.",
   "server.restartNotice.backTitle": "{name} ist wieder online",
+  "server.settings.personalityTitle": "Persönlichkeit",
+  "server.settings.personalityDescription": "Lege fest, wie die Agenten auf diesem Server mit dir sprechen.",
+  "server.settings.responseStyle": "Antwortstil",
+  "server.settings.responseStyleDescription":
+    "Natürlich: Agenten senden während der Arbeit kurze Updates, und der Chat zeigt sie. Klassisch: Agenten antworten einmal, wenn sie fertig sind.",
+  "server.settings.responseStyleNatural": "Natürlich",
+  "server.settings.responseStyleClassic": "Klassisch",
+  "server.settings.personalityLoadFailed": "Die Persönlichkeit des Servers konnte nicht geladen werden.",
 } as const satisfies PartialTranslation<typeof source>;

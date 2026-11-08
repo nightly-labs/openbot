@@ -47,6 +47,7 @@ function webHostAdmin(
   routineRecoveryEnabled?: () => boolean,
   webhookTestsEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -54,6 +55,7 @@ function webHostAdmin(
     () => routineRecoveryEnabled?.() === true,
     () => webhookTestsEnabled?.() === true,
     () => webhookSenderSecretEnabled?.() === true,
+    () => routineRunPlaceEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -125,6 +127,8 @@ export function createWebConversationRuntime(
   webhookTestsEnabled?: () => boolean,
   browserProfilesEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  browserProxiesEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
@@ -259,7 +263,9 @@ export function createWebConversationRuntime(
   });
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
-  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
+  const browserProfiles = adminRequest
+    ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
+    : undefined;
   const listLevels = remote.listAgentNotificationLevels;
   return {
     agent: {
@@ -386,7 +392,10 @@ export function createWebConversationRuntime(
     // `request()` names the connected host at call time, so a host switch reaches the new host.
     routines: adminRequest
       ? {
-          ...teamAgentRoutinesApi((...args) => adminRequest()(...args)),
+          ...teamAgentRoutinesApi(
+            (...args) => adminRequest()(...args),
+            () => routineRunPlaceEnabled?.() === true,
+          ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
               if (event.type === "routines-changed") listener(event);
@@ -402,6 +411,7 @@ export function createWebConversationRuntime(
           routineRecoveryEnabled,
           webhookTestsEnabled,
           webhookSenderSecretEnabled,
+          routineRunPlaceEnabled,
         )
       : undefined,
   };

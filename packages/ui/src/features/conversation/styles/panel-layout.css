@@ -1,26 +1,31 @@
-.conversation-panel:has(.settings-panel) .conversation-header,
-.conversation-panel:has(.settings-panel) .conversation-scroll,
-.conversation-panel:has(.settings-panel) .composer-wrap {
+/*
+ * The panels set these attributes on the conversation panel (`SettingsPanel`, `BrowserPreviewSidebar`,
+ * `FilePreviewPanel`). A `:has()` on the conversation panel would make the browser restyle the whole
+ * chat each time it adds a message.
+ */
+.conversation-panel[data-settings-panel] .conversation-header,
+.conversation-panel[data-settings-panel] .conversation-scroll,
+.conversation-panel[data-settings-panel] .composer-wrap {
   width: calc(100% - var(--settings-panel-width, 360px));
 }
 
-.conversation-panel:has(.settings-panel) .chat-search {
+.conversation-panel[data-settings-panel] .chat-search {
   inset-inline-end: calc(var(--settings-panel-width, 360px) + 16px);
   max-width: calc(100% - var(--settings-panel-width, 360px) - 32px);
 }
 
-.conversation-panel:has(#browser-side-panel) .chat-search,
-.conversation-panel:has(#file-preview-panel) .chat-search {
+.conversation-panel[data-browser-side-panel] .chat-search,
+.conversation-panel[data-file-preview-panel] .chat-search {
   inset-inline-end: calc(var(--browser-panel-width, 380px) + 16px);
   max-width: calc(100% - var(--browser-panel-width, 380px) - 32px);
 }
 
-.conversation-panel:has(#browser-side-panel) .conversation-header,
-.conversation-panel:has(#browser-side-panel) .conversation-scroll,
-.conversation-panel:has(#browser-side-panel) .composer-wrap,
-.conversation-panel:has(#file-preview-panel) .conversation-header,
-.conversation-panel:has(#file-preview-panel) .conversation-scroll,
-.conversation-panel:has(#file-preview-panel) .composer-wrap {
+.conversation-panel[data-browser-side-panel] .conversation-header,
+.conversation-panel[data-browser-side-panel] .conversation-scroll,
+.conversation-panel[data-browser-side-panel] .composer-wrap,
+.conversation-panel[data-file-preview-panel] .conversation-header,
+.conversation-panel[data-file-preview-panel] .conversation-scroll,
+.conversation-panel[data-file-preview-panel] .composer-wrap {
   width: 100%;
 }
 
@@ -31,6 +36,30 @@
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A new chat bubble rises 8px and grows from 97% as Grok Bot's do. The timing curve passes 100% a
+   little and comes back, so the bubble settles with a small bounce. */
+@keyframes message-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The user's own message rises 12px, as Grok Bot's does when it is sent. A tall message that also
+   grew from 97% would move its top edge far, so it only rises. */
+@keyframes message-sent-in {
+  from {
+    transform: translateY(12px);
+  }
+  to {
     transform: translateY(0);
   }
 }
@@ -86,15 +115,20 @@
   .browser-panel,
   .remote-desktop-workspace,
   .message-entry,
+  .message-entry-animated,
   .chat-action-entry-animated,
+  .chat-action-target-entering,
   .agent-activity-entry,
   .agent-activity-content,
   .agent-activity-avatar,
+  .agent-activity-entry .agent-activity-avatar,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
   .mention-picker,
   .mention-picker-list,
+  .mention-picker-highlight,
+  .mention-picker-option[data-entering],
   .settings-panel {
     animation: none;
     transition: none;

@@ -431,6 +431,11 @@ export class AgentStore {
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
+      // A named profile carries over; "Only this agent" would give the copy a new, empty session.
+      if (source.browserProfileId !== undefined) {
+        record.browserProfileId = source.browserProfileId;
+        record.ownBrowserSession = true;
+      }
       record.avatarSeed = source.avatarSeed;
       record.avatarHue = source.avatarHue;
       if (source.avatarColor) record.avatarColor = source.avatarColor;
@@ -1562,6 +1567,22 @@ export class AgentStore {
       const agent = this.#requireAgent(id);
       agent.preview = preview.slice(0, AGENT_PREVIEW_MAX_LENGTH);
       agent.updatedAt = new Date().toISOString();
+      this.#persist("agent.preview-updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * After "Delete history": the row shows the localized "no messages" text, and the agent keeps its
+   * place in the list.
+   */
+  clearPreview = Effect.fn("AgentStore.clearPreview")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.#requireAgent(id).preview = "";
       this.#persist("agent.preview-updated");
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });

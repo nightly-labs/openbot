@@ -38,14 +38,20 @@ export const DialogFilled: Story = {
   args: { draft: localEndpoint, onBack: fn() },
 };
 
-/** An endpoint on this computer: each model can set its context window. */
+/** An endpoint on this computer: each model can set its context window, max output, efforts and inputs. */
 export const DialogContextWindows: Story = {
   args: {
     contextWindows: true,
     draft: {
       ...localEndpoint,
       models: [
-        { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B", contextWindow: "262144" },
+        {
+          id: "qwen3-coder:30b",
+          name: "Qwen3 Coder 30B",
+          contextWindow: "262144",
+          reasoningEfforts: ["low", "high", "max"],
+          inputs: ["image"],
+        },
         { id: "gpt-oss:120b", name: "GPT-OSS 120B", contextWindow: "" },
       ],
     },
@@ -186,6 +192,32 @@ export const DiscoveryFound: Story = {
     draft: { ...ollama, models: localEndpoint.models },
     onDiscoverModels: fn(),
     discovery: { status: "found", models: discovered },
+  },
+};
+
+/**
+ * After Find models, the list gives a window, a max output and input kinds (#3946): they fill the empty
+ * fields of the rows that it names, and a line says where they come from.
+ */
+export const DiscoveryFoundValues: Story = {
+  args: {
+    contextWindows: true,
+    draft: {
+      ...ollama,
+      models: [
+        { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B", contextWindow: "262144", maxOutput: "65536", inputs: [] },
+        { id: "gpt-oss:120b", name: "GPT-OSS 120B", contextWindow: "131072" },
+      ],
+    },
+    onDiscoverModels: fn(),
+    discovery: {
+      status: "found",
+      models: [
+        { id: "qwen3-coder:30b", contextWindow: 262_144, maxOutput: 65_536, inputs: [] },
+        { id: "gpt-oss:120b", contextWindow: 131_072 },
+        { id: "gemma3:27b", contextWindow: 131_072, inputs: ["image"] },
+      ],
+    },
   },
 };
 

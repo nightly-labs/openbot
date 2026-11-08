@@ -26,6 +26,9 @@ export const messages = {
   "error.workflow.notRetryable": "Somente uma etapa que falhou ou parou pode ser executada novamente.",
   "error.workflow.noDecision": "Esta etapa não aguarda uma decisão.",
   "error.workflow.outputPlaceMissing": "Escolha um local de mensagens para esta saída.",
+  "error.workflow.outputChannelMissing": "Escolha um canal para esta saída.",
+  "error.workflow.outputChannelFailed":
+    "O OpenBot não conseguiu publicar o resultado no canal. Execute a etapa novamente.",
   "error.workflow.discordNoMessage":
     "Esta saída age na mensagem do Discord que iniciou a execução. Inicie a execução a partir de uma menção no Discord ou escolha Publicar no canal.",
   "error.workflow.slackNoMessage":

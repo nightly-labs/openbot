@@ -22,7 +22,11 @@ import type {
   UpdateChannelMemoryInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
-import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
+import {
+  CONTEXT_RESET_ITEM_TYPE,
+  channelRoutingConversationEventItemType,
+  isContextResetMarker,
+} from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText } from "@openbot/i18n/source";
 import { avatarImageDataUrl } from "@openbot/ui/avatar-image";
@@ -238,6 +242,44 @@ export function createMockChannels(
       channels.set(channel.id, structuredClone(channel));
       changed(channel.id, channel.revision);
       return structuredClone(channel);
+    },
+    clearChannelContext: async (channelId: string): Promise<void> => {
+      const channel = requireChannel(channelId);
+      if ((tasks.get(channelId) ?? []).some((task) => ["queued", "running", "waiting"].includes(task.state)))
+        throw new Error(sourceText("error.backend.channelWaitBeforeNewConversation"));
+      const list = messages.get(channelId) ?? [];
+      const last = list.at(-1);
+      if (!last || isContextResetMarker(last.message)) return;
+      const id = `context-reset-${crypto.randomUUID()}`;
+      list.push({
+        id,
+        channelId,
+        sequence: (last.sequence ?? list.length) + 1,
+        author: { kind: "member", id: "preview", name: "You" },
+        taskId: null,
+        superseded: false,
+        message: {
+          id,
+          author: "system",
+          source: "system",
+          text: sourceText("status.agent.contextCleared"),
+          createdAt: new Date().toISOString(),
+          status: "completed",
+          itemType: CONTEXT_RESET_ITEM_TYPE,
+        },
+      });
+      messages.set(channelId, list);
+      changed(channel.id, channel.revision);
+    },
+    compactChannelContext: async (channelId: string): Promise<void> => {
+      requireChannel(channelId);
+    },
+    deleteChannelHistory: async (channelId: string): Promise<void> => {
+      const channel = requireChannel(channelId);
+      if ((tasks.get(channelId) ?? []).some((task) => ["queued", "running", "waiting"].includes(task.state)))
+        throw new Error(sourceText("error.backend.channelWaitBeforeDeleteHistory"));
+      messages.set(channelId, []);
+      changed(channel.id, channel.revision);
     },
     deleteChannelMessage: async (input: { channelId: string; messageId: string }): Promise<void> => {
       const channel = requireChannel(input.channelId);

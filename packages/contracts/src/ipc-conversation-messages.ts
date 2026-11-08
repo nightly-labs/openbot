@@ -52,6 +52,8 @@ export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
+  /** A short line under the question. The Team API does not carry it. */
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
   /** The user can pick more than one option. Set only when true. */
@@ -64,6 +66,7 @@ export function isAgentPromptQuestion(value: unknown): value is AgentPromptQuest
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.header, INPUT_LIMITS.promptHeader) &&
     isBoundedString(value.question, INPUT_LIMITS.promptQuestion) &&
+    (value.detail === undefined || isBoundedString(value.detail, INPUT_LIMITS.promptQuestion)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
@@ -151,6 +154,11 @@ export interface AgentExchangeSummary {
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
   /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
   expectsReply?: boolean;
+  /**
+   * The sender's side thread that sent an incoming message. The sender link opens it. The Team API
+   * does not carry it, so a joined client opens the sender's own chat.
+   */
+  senderTaskId?: string;
 }
 
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
@@ -175,7 +183,8 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
           (isNumber(delivery.position) && Number.isInteger(delivery.position) && delivery.position >= 1)) &&
         (delivery.error === null || isBoundedString(delivery.error, INPUT_LIMITS.messageText)),
     ) &&
-    (value.expectsReply === undefined || isBoolean(value.expectsReply))
+    (value.expectsReply === undefined || isBoolean(value.expectsReply)) &&
+    (value.senderTaskId === undefined || isIdentifier(value.senderTaskId))
   );
 }
 
@@ -312,6 +321,13 @@ function isConversationDelivery(value: unknown): boolean {
  * The desktop chat shows it inside the run, which starts collapsed.
  */
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
+
+/**
+ * The item type of the setup message that a client sends to a new agent (`agent-welcome-v1`). The
+ * agent answers it with a welcome. No chat, history page, search, queue or preview shows it, and it
+ * does not go to a Team API client.
+ */
+export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
 
 /**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the

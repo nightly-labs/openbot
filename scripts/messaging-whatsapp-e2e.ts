@@ -339,6 +339,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 function memoryCredentials(): MessagingCredentials {
@@ -833,6 +836,41 @@ try {
       );
       await until(() => phone.textsTo(contactJid).includes("To a contact"), "the post to an allowed contact, as it is");
       return { refused: true, spacer: true };
+    });
+
+    await step("adapter: an answer that mentions a person is a new post that notifies them", async () => {
+      const values = credentials.get(connectionId(agents));
+      assert.ok(values);
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      await runCauseEffect(adapter.identify());
+      const target = { platformChannelId: OWNER_JID, replyThreadId: null };
+      const sentFrom = phone.sent.length;
+      // Without a mention, the answer replaces the status post in place.
+      const quiet = await runCauseEffect(adapter.post(target, { text: "Working on it…" }));
+      // An email address and a number in code mention nobody.
+      const quietText = `Done. Mail support@${FRIEND}.example, run \`ping @${FRIEND}\`.`;
+      assert.equal(await runCauseEffect(adapter.postAnswer(target, quietText, quiet)), quiet);
+      assert.ok(
+        phone.sent.some((sent) => "edit" in sent.content && sent.content.edit?.id === quiet),
+        "An answer without a mention did not edit the status post.",
+      );
+      // An edit notifies nobody: the status post goes, and the answer is a new post that lists the person.
+      const status = await runCauseEffect(adapter.post(target, { text: "Working on it…" }));
+      const answerId = await runCauseEffect(adapter.postAnswer(target, `Done, @${FRIEND}.`, status));
+      assert.notEqual(answerId, status, "An answer with a mention kept the edited status post.");
+      const sent = phone.sent.slice(sentFrom);
+      assert.ok(
+        !sent.some((entry) => "edit" in entry.content && entry.content.edit?.id === status),
+        "An answer with a mention was an edit, which notifies nobody.",
+      );
+      const deleted = sent.findIndex((entry) => "delete" in entry.content && entry.content.delete?.id === status);
+      assert.ok(deleted >= 0, "The status post stayed above the answer.");
+      const answerAt = sent.findIndex((entry) => entry.id === answerId);
+      assert.ok(answerAt < deleted, "The status post was deleted before the answer was posted.");
+      const answer = sent[answerAt];
+      assert.ok(answer && "mentions" in answer.content, "The answer was not sent.");
+      assert.deepEqual(answer.content.mentions, [`${FRIEND}@s.whatsapp.net`], "The answer did not list the person.");
+      return { mentions: answer.content.mentions };
     });
   });
 

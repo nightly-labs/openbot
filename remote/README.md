@@ -111,7 +111,8 @@ A socket with a Discord route gets a `discord-session` token and the list of the
 bearer of its calls to `POST /v1/discord/api`: post, edit or delete a message, add or remove a
 reaction, read the messages after one message, read a member or channel name, list the guild's roles, answer a button press,
 and upload one file of at most 10 MB. Signal makes each call with the bot token, only in a guild that
-is routed to that socket, and only in a channel of that guild. No post can ping anyone. The token is
+is routed to that socket, and only in a channel of that guild. Only a new text post can ping, and only
+a user that it mentions, never a role or `@everyone`. The token is
 valid while the socket is open.
 
 So the answers and files of Discord conversations pass through Signal. Signal does not store them or

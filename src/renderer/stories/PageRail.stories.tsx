@@ -90,6 +90,7 @@ function RailPreview(props: {
               onOpenChangelog={fn()}
               onOpenGuides={fn()}
               onOpenDiscord={fn()}
+              onReportProblem={fn()}
               onSendFeedback={fn()}
             />
           }

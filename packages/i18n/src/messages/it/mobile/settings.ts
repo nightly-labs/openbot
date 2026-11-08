@@ -26,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Assistenza",
   "mobile.settings.home.supportHint": "Ricevi aiuto e salva un log di assistenza",
   "mobile.settings.support.help": "Chiedi aiuto",
+  "mobile.settings.support.discord": "Apri un ticket su Discord",
+  "mobile.settings.support.discordHint": "Il modo più rapido per ricevere aiuto",
   "mobile.settings.support.message": "Scrivici su X",
   "mobile.settings.support.issues": "Segnala un problema su GitHub",
   "mobile.settings.support.helpFooter":
-    "Raccontaci cosa è successo e quando. Allega il file del log di assistenza alla tua segnalazione su GitHub.",
+    "Raccontaci cosa è successo e quando. Allega il file del log di assistenza al tuo ticket su Discord o alla tua segnalazione su GitHub.",
   "mobile.settings.support.log": "Log di assistenza",
+  "mobile.settings.support.show": "Mostra log",
   "mobile.settings.support.save": "Salva file del log",
   "mobile.settings.support.events": { one: "{count} evento", other: "{count} eventi" },
   "mobile.settings.support.clear": "Cancella log",
@@ -40,8 +43,8 @@ export const messages = {
     "Il log resta su questo telefono e OpenBot non lo invia. Registra i passaggi di connessione, le richieste e gli errori. Non registra messaggi o file e nasconde password e token. Leggi il file prima di condividerlo.",
   "mobile.settings.support.saveFailed": "Impossibile salvare il file del log. Riprova.",
   "mobile.settings.support.sharingUnavailable": "La condivisione non è disponibile su questo telefono.",
-  "mobile.settings.support.recent": "Eventi recenti",
-  "mobile.settings.support.recentFooter": "Prima i più recenti. Il file salvato contiene tutti gli eventi.",
+  "mobile.settings.support.newestFirst": "Prima i più recenti.",
+  "mobile.settings.support.showOlder": "Mostra eventi precedenti",
   "mobile.settings.support.empty": "Ancora nessun evento.",
   "mobile.settings.sessions.kindDesktop": "desktop",
   "mobile.settings.sessions.kindMobile": "dispositivo mobile",
@@ -268,6 +271,15 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Ascolto",
   "mobile.settings.voice.tab.speaking": "Voce",
+  "mobile.settings.voice.pause.title": "Pausa prima dell’invio",
+  "mobile.settings.voice.pause.label": "Attendi nuove parole",
+  "mobile.settings.voice.pause.footer":
+    "In una conversazione vocale, OpenBot invia le tue parole quando non riconosce nuove parole per questo tempo. Il rumore senza parole non lo tiene in ascolto. Scegli una pausa più lunga se parli lentamente o ti fermi a pensare.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Velocità risposte",
+  "mobile.settings.voice.speed.footer":
+    "La velocità delle risposte che OpenBot legge ad alta voce, anche in una conversazione vocale.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot invia la tua voce a ElevenLabs con un token monouso, ed ElevenLabs lo addebita sul tuo account. La chiave resta su questo telefono.",
 } as const satisfies PartialTranslation<typeof source>;

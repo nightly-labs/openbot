@@ -58,6 +58,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "نموذج الوكيل الرئيسي للقناة غير متاح.",
   "error.backend.contextCompactionIneffective":
     "لا يؤدي الضغط إلى تصغير هذه الدردشة: بعد عمليتي ضغط لا تزال تستخدم {percent}% من نافذة سياق النموذج، لذا يتوقف OpenBot عن ضغطها. تستخدم الأدوات والتعليمات معظم النافذة. أوقف خوادم MCP أو التحكم في الحاسوب التي لا يحتاج إليها هذا الوكيل، أو اختر نموذجًا بنافذة أكبر. ثم ابدأ دردشة جديدة.",
+  "error.backend.contextCompactionStopped":
+    'فشلت عمليتا ضغط متتاليتان لهذه الدردشة، لذا يتوقف OpenBot عن ضغطها تلقائيًا. كل محاولة ترسل الدردشة كاملة إلى النموذج وتستهلك من حد خطتك. اختر "الضغط الآن" للمحاولة مرة أخرى، أو ابدأ دردشة جديدة.',
   "error.backend.providerRetrying":
     "فشل المزوّد في هذا الطلب {attempts} مرات ويحاول مرة أخرى. إذا لم يتابع الوكيل، فأوقف الدور.",
   "error.backend.providerRetryingLargeContext":
@@ -67,6 +69,11 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "للقناة بدء تعيين غير مؤكد. تحقق من نتيجته قبل حذفها.",
   "error.backend.channelNotFound": "لم يتم العثور على القناة.",
   "error.backend.channelMemberUnavailable": "أحد أعضاء القناة غير متاح.",
+  "error.backend.channelWaitBeforeNewConversation": "انتظر حتى يتوقف العمل في هذه القناة، ثم ابدأ محادثة جديدة.",
+  "error.backend.channelWaitBeforeCompact": "انتظر حتى يتوقف العمل في هذه القناة، ثم اضغطها.",
+  "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",
+  "error.backend.channelCompactUnavailable":
+    "لا يمكن لأي عضو في هذه القناة ضغط سياقه الآن. يجب أن يرد العضو في القناة أولًا، وأن يدعم مزوده الضغط.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",
   "error.backend.channelTaskNotFound": "لم يتم العثور على مهمة القناة.",
@@ -219,6 +226,10 @@ export const messages = {
     "تعذّر على OpenBot قراءة معلومات تسجيل الدخول لهذا الخادم. تحقق من عنوان الخادم وحاول مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
+  "error.backend.mcpServerFailedForProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح إعدادات MCP واختر اختبار الاتصال لمعرفة السبب.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -292,6 +303,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "يوجد بالفعل ملف تعريف متصفح بهذا الاسم.",
   "error.backend.browserSessionInUse": "لا تزال علامة تبويب تستخدم جلسة المتصفح هذه. حاول مرة أخرى.",
   "error.backend.browserProfileLimit": "يمكن أن يكون لديك {limit} ملفات تعريف للمتصفح كحد أقصى.",
+  "error.backend.browserProxyNotFound": "لم يعد هذا البروكسي موجودًا.",
+  "error.backend.browserProxyAddressInvalid":
+    "اكتب عنوان بروكسي مثل socks5://host:1080 أو http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "يمكن أن يكون لديك {limit} بروكسي كحد أقصى.",
+  "error.backend.browserProxyTaken": "يوجد بالفعل بروكسي بهذا العنوان.",
+  "error.backend.browserProxyChanged": "تغيّر هذا البروكسي بعد أن فتحته. راجعه مرة أخرى، ثم حاول مجددًا.",
+  "error.backend.browserProxyUnreachable": "الوكيل {name} لا يستجيب، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserProxyComputerUnreachable":
+    "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserCertificateUntrusted": "شهادة الأمان لهذا الموقع غير موثوقة، لذلك لم تُفتح الصفحة.",
   "error.backend.browserLowMemory":
     "ذاكرة هذا الخادم منخفضة، لذا لا يمكن للمتصفح فتح علامة تبويب أخرى. أغلق علامة تبويب، أو انتظر حتى ينتهي الوكلاء الآخرون.",
   "error.backend.browserOpenFailed": "تعذّر فتح {url}: {reason}",
@@ -314,6 +336,8 @@ export const messages = {
   "error.backend.browserInputProtected": "إدخال المتصفح محمي أثناء المصادقة.",
   "error.backend.browserTypingFocusMoved":
     "نقلت الصفحة التركيز بعيدًا عن الهدف قبل الكتابة. لم تتم كتابة أي شيء. التقط لقطة جديدة.",
+  "error.backend.browserTypingFocusMovedWhileTyping":
+    "نقلت الصفحة التركيز بعيدًا قبل كتابة النص كله. الجزء الأول فقط من النص موجود في الحقل. التقط لقطة جديدة وتحقق من الحقل قبل أن تكتب مرة أخرى.",
   "error.backend.browserTypingSubmitSkipped":
     "النص موجود في الحقل، لكن الصفحة نقلت التركيز بعيدًا، لذا لم يتم إرسال Enter. لا تكتب النص مرة أخرى. التقط لقطة جديدة.",
   "error.backend.mcpServerHttpCredentials": "أجاب الخادم بـ {status}. تحقق من مفتاح API أو بيانات الاعتماد الأخرى.",

@@ -27,6 +27,8 @@
 //  14. A review does not forget a memory that it sees only redacted, and does not add the text of a
 //      saved memory again, which would change the user's inclusion choice.
 //  15. Stopping the service during a slow review applies nothing and shows no error.
+//  16. After a restart, a review reads only the messages after the saved cursor of the last review.
+//      Without a saved cursor, it reads the latest messages again, as before.
 // No provider, account or network is used. `bun run test:memory-review`.
 // Writes .openbot-build/memory-review-e2e/report.json.
 import assert from "node:assert/strict";
@@ -114,7 +116,7 @@ const answer = (message) => {
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
-    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
+    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + process.pid + "-" + (++threads), turns: [] } } });
     case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
     case "thread/turns/list":
@@ -189,6 +191,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Waits for a state of the service, its database or the fake's log. */
@@ -234,22 +239,35 @@ async function check(name: string, run: () => Promise<unknown>) {
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
 control({ operations: [] });
-const database = new OpenBotDatabase(userData);
-const store = new AgentStore(userData, home, database);
-const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
 /** The app setting, as main reads it at each use. */
 let reviewInterval = 20;
-const service = new AgentService({
-  store,
-  mailbox,
-  browser,
-  preferredProvider: "codex",
-  memoryReviewIdleMs: IDLE_MS,
-  memoryReviewInterval: () => reviewInterval,
-  offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
-});
 const events: AgentEvent[] = [];
-service.on("event", (event) => events.push(event));
+/** The service on the profile. Check 16 starts it again, as an app restart does. */
+function open() {
+  const database = new OpenBotDatabase(userData);
+  const store = new AgentStore(userData, home, database);
+  const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
+  const service = new AgentService({
+    store,
+    mailbox,
+    browser,
+    preferredProvider: "codex",
+    memoryReviewIdleMs: IDLE_MS,
+    memoryReviewInterval: () => reviewInterval,
+    offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  });
+  service.on("event", (event) => events.push(event));
+  return { database, store, mailbox, service };
+}
+let { database, store, mailbox, service } = open();
+/** Stops the service and starts it again on the same profile. */
+async function restart(edit?: () => void) {
+  await runCauseEffect(service.stop());
+  database.close();
+  edit?.();
+  ({ database, store, mailbox, service } = open());
+  await runCauseEffect(service.initialize());
+}
 
 const ended = (status: string | undefined) =>
   status === "completed" || status === "failed" || status === "interrupted" || status === "cancelled";
@@ -631,6 +649,50 @@ try {
     assert.equal(service.listMemories(third.id).length, before, "Nothing changed.");
     assert.equal(errorsFor(third.id, since).length, 0, "No error shows.");
     return { stopMs };
+  });
+
+  await check("after a restart, a review reads only the messages after its saved cursor", async () => {
+    await restart();
+    reviewInterval = 3;
+    control({ operations: [] });
+    const count = reviews().length;
+    // The first message and two more are the three turns of one review.
+    const saved = await createAgent("Saved");
+    await chat(saved.id, 2, "Saved old");
+    await reviewed(count + 1);
+    const unsaved = await createAgent("Unsaved");
+    await chat(unsaved.id, 2, "Unsaved old");
+    await reviewed(count + 2);
+    const cursors = join(userData, "memory-review-cursors.json");
+    const stored = await waitFor("the saved cursors", () => {
+      try {
+        const value = JSON.parse(readFileSync(cursors, "utf8"));
+        const ids = value.cursors.map((cursor: { agentId: string }) => cursor.agentId);
+        return ids.includes(saved.id) && ids.includes(unsaved.id) && value;
+      } catch {
+        return null;
+      }
+    });
+    // The second agent has no saved cursor after the restart, as with the release before this change.
+    await restart(() =>
+      writeFileSync(
+        cursors,
+        JSON.stringify({
+          ...stored,
+          cursors: stored.cursors.filter((cursor: { agentId: string }) => cursor.agentId !== unsaved.id),
+        }),
+      ),
+    );
+    const before = reviews().length;
+    await chat(saved.id, 3, "Saved new");
+    await reviewed(before + 1);
+    await chat(unsaved.id, 3, "Unsaved new");
+    await reviewed(before + 2);
+    const [withCursor = "", withoutCursor = ""] = reviews().slice(before);
+    assert.ok(withCursor.includes("Saved new message 3."), "The review reads the new messages.");
+    assert.ok(!withCursor.includes("Saved old message"), "A saved cursor skips the reviewed messages.");
+    assert.ok(withoutCursor.includes("Unsaved old message 1."), "No cursor reads the latest messages again.");
+    return { withCursorCharacters: withCursor.length, withoutCursorCharacters: withoutCursor.length };
   });
 
   report.passed = true;

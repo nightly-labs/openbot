@@ -9,7 +9,7 @@
   display: grid;
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-4);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
@@ -18,29 +18,22 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* The buttons sit nearer the corner. The thank-you state has no buttons and keeps even padding. */
+/* The buttons sit 8px from the bottom edge. The thank-you state has no buttons and keeps even padding. */
 .github-star-toast:has(.github-star-toast-actions) {
-  padding-inline-end: var(--openbot-space-3);
-  padding-bottom: var(--openbot-space-3);
+  padding-bottom: var(--openbot-space-2);
 }
 
-.github-star-toast-close {
-  position: absolute;
-  top: var(--openbot-space-2);
-  inset-inline-end: var(--openbot-space-2);
-  color: var(--openbot-text-muted);
-}
-
-/* The end padding keeps the title clear of the close button. */
+/* The close control sits on the corner, mostly outside the card, so the title keeps a small space. */
 .github-star-toast-head {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding-inline-end: var(--openbot-space-6);
+  padding-inline-end: var(--openbot-space-1);
 }
 
 .github-star-toast-head > strong {
   font-weight: var(--openbot-weight-semibold);
+  text-wrap: balance;
 }
 
 .github-star-toast-mark {
@@ -55,19 +48,17 @@
   fill: var(--openbot-star);
 }
 
+/* The words start in one column after the mark, as in the shared toast. */
 .github-star-toast-body {
   margin: 0;
+  padding-inline-start: calc(var(--openbot-icon-lg) + var(--openbot-space-2));
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-wrap: pretty;
 }
 
-/* A long label in a translation moves the buttons to a new line, not past the edge. */
+/* With the grid gap, the button row is 12px below the words. */
 .github-star-toast-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--openbot-space-1-5);
   margin-top: var(--openbot-space-1);
 }

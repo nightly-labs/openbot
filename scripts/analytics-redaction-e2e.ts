@@ -9,7 +9,8 @@
 // agent reports token usage for each answered turn, and the script checks that the turn event carries
 // those counts, the same counts as the Usage report, that the model's own token event carries them,
 // that the turn says how it is paid for,
-// that a turn with no usage reports unknown, and that the failed turn's failure report arrives.
+// that a turn with no usage reports unknown, that the failed turn's failure report arrives, and that
+// the failed turn's own event names the failure and cause codes of that report.
 //
 // Start the dev app with the capture server's address first, then run the script:
 //   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47321 bun run dev
@@ -377,6 +378,14 @@ try {
     () => null,
   );
   check("the failed turn's failure report arrives", report !== null, report?.properties);
+  // The fake agent refuses the prompt with ACP's internal error and "Authentication failed" text.
+  check(
+    "the failed turn names the error that ended it",
+    failure.properties.failure_code === "agent_event_failed" &&
+      failure.properties.cause_code === "authentication" &&
+      report?.properties.cause_code === failure.properties.cause_code,
+    failure.properties,
+  );
   check(
     "a turn with no provider usage reports unknown, not 0",
     failure.properties.token_usage === "unknown" &&

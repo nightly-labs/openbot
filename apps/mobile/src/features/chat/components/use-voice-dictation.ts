@@ -396,6 +396,9 @@ function useSystemDictation({
 
   useEffect(
     () => () => {
+      // No recognizer event reaches this hook after it unmounts, so a `finish` that waits would wait
+      // forever. The draft already holds the last result.
+      for (const resolve of finished.current.splice(0)) resolve();
       if (owner !== id) return;
       // The draft already holds the last result, so leaving the chat keeps it.
       speechRecognition?.abort();
@@ -430,13 +433,10 @@ function useActiveRecognition(): "system" | ModelRecognition {
 export function useVoiceDictation({
   enabled,
   onDraft,
-  onSpeaking,
 }: {
   /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
   onDraft: (text: string) => void;
-  /** The user speaks now. Only Parakeet and ElevenLabs report it, about ten times a second. */
-  onSpeaking?: () => void;
 }): VoiceDictation {
   const engine = useActiveRecognition();
   const system = useSystemDictation({ enabled: enabled && engine === "system", onDraft });
@@ -444,7 +444,6 @@ export function useVoiceDictation({
     engine: engine === "system" ? null : engine,
     enabled: enabled && engine !== "system",
     onDraft,
-    onSpeaking,
   });
   return engine === "system" ? system : model;
 }

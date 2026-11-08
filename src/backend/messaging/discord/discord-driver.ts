@@ -75,7 +75,7 @@ const BUTTON_STYLES = { primary: "primary", danger: "danger" } as const;
 
 /**
  * The Discord side of one guild's connection. Every call goes through Signal, which holds the bot
- * token and refuses a call outside this host's guilds. Signal sends no post that can ping anyone. It
+ * token and refuses a call outside this host's guilds. Only a new text post can ping, and only a user. It
  * never logs message text or a response body.
  */
 class DiscordAdapter implements MessagingAdapter {
@@ -490,7 +490,7 @@ class DiscordAdapter implements MessagingAdapter {
     return this.#call({ op: "listRoles", guildId: this.#guildId }, decodeDiscordRoles);
   }
 
-  /** Signal posts with no mention allowed, so a mention shows the person and pings nobody. */
+  /** A new text post pings the person; an edit or a private reply shows the person and pings nobody. */
   mention(userId: string): string {
     return /^[0-9]+$/.test(userId) ? `<@${userId}>` : userId;
   }

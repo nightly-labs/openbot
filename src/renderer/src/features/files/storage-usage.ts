@@ -6,10 +6,12 @@ import {
   type StorageUsage,
 } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
+import type { AgentProfile } from "@openbot/ui/data";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { type Accessor, createEffect, createSignal, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { toAgentProfile } from "../../app-message-projection";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { type FilesPort, filesPort } from "./files-port";
 
@@ -21,6 +23,31 @@ export function serverHasStorage(server: ServerSummary | undefined): server is S
 /** Every member reads storage; the host lets only an owner or admin delete or clear. */
 export function canManageStorage(server: ServerSummary): boolean {
   return serverRoleCanAdminister(server);
+}
+
+/**
+ * The agents of one server, to name the rows of its storage. They are read for that server, because a
+ * storage view can be open for a server that is not the selected one.
+ */
+export function createServerAgents(
+  serverId: () => string,
+  calls: () => FilesPort = filesPort,
+): Accessor<AgentProfile[]> {
+  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
+  createEffect(serverId, (id) => {
+    let current = true;
+    untrack(calls)
+      .agent.listAgents(id)
+      .then((list) => {
+        if (current) setAgents(list.map(toAgentProfile));
+      })
+      // Without names the rows still show their chats and sizes; the storage read reports its own failure.
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  });
+  return agents;
 }
 
 /** One storage scope of one server. Settings can be open for a server that is not the selected one. */

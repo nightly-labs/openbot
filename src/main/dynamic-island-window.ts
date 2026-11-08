@@ -50,6 +50,8 @@ export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFaile
 export interface DynamicIslandWindowControllerOptions {
   platform: NodeJS.Platform;
   preferencePath: string;
+  /** The preference before the user saves one. Development builds start with the island off. */
+  defaultPreference?: DynamicIslandPreference;
   createWindow: (bounds: Rectangle, display: Display) => BrowserWindow;
   loadWindow: (window: BrowserWindow, display: Display) => Promise<void>;
   getDisplays: () => Display[];
@@ -63,7 +65,7 @@ export interface DynamicIslandWindowControllerOptions {
 
 export class DynamicIslandWindowController {
   readonly #options: DynamicIslandWindowControllerOptions;
-  #preference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
+  #preference: DynamicIslandPreference;
   #presentation = IDLE_DYNAMIC_ISLAND_PRESENTATION;
   readonly #windows = new Map<number, BrowserWindow>();
   readonly #interactiveDisplays = new Set<number>();
@@ -77,12 +79,16 @@ export class DynamicIslandWindowController {
 
   constructor(options: DynamicIslandWindowControllerOptions) {
     this.#options = options;
+    this.#preference = { ...(options.defaultPreference ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE) };
   }
 
   // Reads only the saved preference. The caller starts `reconcileWindow`, so the island page loads do
   // not hold back the main window.
   readonly initialize = Effect.fn("DynamicIsland.initialize")(function* (this: DynamicIslandWindowController) {
-    this.#preference = yield* readDynamicIslandPreference(this.#options.preferencePath);
+    this.#preference = yield* readDynamicIslandPreference(
+      this.#options.preferencePath,
+      this.#options.defaultPreference,
+    );
   }).bind(this);
 
   get preference(): DynamicIslandPreference {
@@ -353,6 +359,19 @@ export class DynamicIslandWindowController {
       window.showInactive();
     });
     window.on("blur", () => this.setInteractive(window.webContents.id, false));
+    // macOS moves a window off a display that goes away, for example when the displays sleep, and
+    // can do it after the last display event. The island then stays on the wrong display, under the
+    // island of that display (#4594). Put it back at the top of its own display.
+    window.on("move", () => {
+      if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
+      const current = this.#options.getDisplays().find((candidate) => candidate.id === display.id);
+      if (!current) return;
+      const bounds = dynamicIslandWindowBounds(current);
+      const { x, y } = window.getBounds();
+      if (x === bounds.x && y === bounds.y) return;
+      const interactive = this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id);
+      window.setBounds(this.#windowBounds(current, bounds, interactive), false);
+    });
     window.on("closed", () => {
       if (this.#windows.get(display.id) === window) {
         this.#windows.delete(display.id);

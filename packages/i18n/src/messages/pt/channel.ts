@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Reatribuir a tarefa interrompida de {name}",
   "channel.stoppedTask.reassign": "Reatribuir",
   "channel.stoppedTask.cancel": "Cancelar tarefa",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} passaram esta tarefa entre si vezes demais. Ela parou para evitar um loop.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Os membros passaram esta tarefa entre si vezes demais. Ela parou para evitar um loop.",
   "channel.conversation.noMembers": "Adicione agentes nas configurações do canal para começar o trabalho.",
   "channel.conversation.archivedNotice": "Canal excluído. Somente visualização.",
   "channel.composer.label": "Mensagem para o canal",
@@ -21,6 +25,27 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "Os agentes guardam o que aprendem aqui como memórias do canal. As outras conversas deles não as veem.",
   "channel.settings.memoryCount": { one: "{count} salva", other: "{count} salvas" },
+  "channel.settings.newConversation.title": "Nova conversa",
+  "channel.settings.newConversation.description":
+    "Os membros esquecem as mensagens anteriores. A configuração do canal permanece.",
+  "channel.settings.newConversation.button": "Iniciar",
+  "channel.settings.newConversation.confirmTitle": "Iniciar uma nova conversa em {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "Os membros esquecem as mensagens anteriores deste canal. As mensagens continuam visíveis acima de um divisor. Os membros, as instruções, as memórias e as rotinas não mudam.",
+  "channel.settings.newConversation.confirm": "Iniciar nova conversa",
+  "channel.settings.newConversation.failed": "Não foi possível iniciar uma nova conversa.",
+  "channel.settings.compact.title": "Compactar contexto",
+  "channel.settings.compact.description": "Os membros mantêm um resumo curto da sessão do canal e usam menos tokens.",
+  "channel.settings.compact.failed": "Não foi possível compactar o contexto do canal.",
+  "channel.settings.deleteHistory.title": "Excluir histórico",
+  "channel.settings.deleteHistory.description":
+    "As mensagens são excluídas e os membros as esquecem. A configuração do canal continua.",
+  "channel.settings.deleteHistory.button": "Excluir",
+  "channel.settings.deleteHistory.confirmTitle": "Excluir o histórico de {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Todas as mensagens e arquivos deste canal são excluídos do OpenBot e os membros os esquecem. Não é possível desfazer. Membros, instruções, memórias, rotinas e tarefas não mudam.",
+  "channel.settings.deleteHistory.confirm": "Excluir histórico",
+  "channel.settings.deleteHistory.failed": "Não foi possível excluir o histórico.",
   "channel.settings.routines": "Rotinas",
   "channel.settings.routineCount": { one: "{count} configurada", other: "{count} configuradas" },
   "channel.create.close": "Fechar novo canal",

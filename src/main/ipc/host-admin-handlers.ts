@@ -18,17 +18,20 @@ import {
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
+  decodeHostPersonality,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
   decodeServerAuditLog,
+  type HostPersonality,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
   hostMemoryReview,
   isPromptCacheTtl,
+  LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type PromptCacheTtl,
@@ -51,6 +54,10 @@ import {
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import {
+  HOST_PERSONALITY_CAPABILITY,
+  HOST_PERSONALITY_ROUTES,
+} from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
@@ -79,6 +86,7 @@ import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preferen
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { ServerAuditStore } from "../server-audit-store";
+import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
 import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -102,6 +110,7 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
@@ -126,6 +135,7 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  serverPersonality,
   agentMemoryLimit,
   memoryReview,
   machineAlerts,
@@ -153,6 +163,9 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remotePersonality(serverId: string, route: string, body: Record<string, never> | HostPersonality) {
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostPersonality, { method: "POST", body }));
   }
   function remoteMemoryLimit(serverId: string, route: string, body: { limit?: number }) {
     if (!remoteServers.supportsCapability(serverId, AGENT_MEMORY_LIMIT_CAPABILITY))
@@ -280,6 +293,22 @@ export function hostAdminIpcHandlers({
       setTimezone: scopedHandler(parseServerTimezone, {
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
+      }),
+      // A host before host-personality-v1 uses the classic prompt.
+      getPersonality: scopedQueryHandler({
+        local: () => serverPersonality.get(),
+        remote: async (serverId) =>
+          remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY)
+            ? remotePersonality(serverId, HOST_PERSONALITY_ROUTES.settings, {})
+            : { responseStyle: LEGACY_RESPONSE_STYLE },
+      }),
+      setPersonality: scopedHandler(parseServerPersonality, {
+        local: (personality) => runCauseEffect(serverPersonality.set(personality)),
+        remote: (personality, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY))
+            throw new Error(sourceText("error.team.hostPersonalityUnsupported"));
+          return remotePersonality(serverId, HOST_PERSONALITY_ROUTES.update, personality);
+        },
       }),
       getAgentMemoryLimit: scopedQueryHandler({
         local: () => hostAgentMemoryLimit(agentMemoryLimit.get()),

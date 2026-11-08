@@ -78,9 +78,11 @@ export function AgentDeleteUndoToast(props: AgentDeleteUndoToastProps) {
         <strong class="agent-delete-undo-toast-title">{t("agent.deleteUndo.title", { name: props.agent.name })}</strong>
         {props.agent.title && <span class="agent-delete-undo-toast-detail">{props.agent.title}</span>}
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={() => props.onUndo()}>
-        {t("agent.deleteUndo.action")}
-      </Button>
+      <div class="ui-toast-card-actions agent-delete-undo-toast-actions">
+        <Button type="button" variant="default" size="sm" onClick={() => props.onUndo()}>
+          {t("agent.deleteUndo.action")}
+        </Button>
+      </div>
       <Progress
         value={props.countdown.left() * 100}
         minValue={0}

@@ -24,6 +24,8 @@ export const messages = {
   "error.workflow.notRetryable": "لا يمكن إعادة تشغيل إلا خطوة أخفقت أو توقفت.",
   "error.workflow.noDecision": "لا تنتظر هذه الخطوة قرارًا.",
   "error.workflow.outputPlaceMissing": "اختر مكان مراسلة لهذا المُخرَج.",
+  "error.workflow.outputChannelMissing": "اختر قناة لهذا المُخرَج.",
+  "error.workflow.outputChannelFailed": "لم يتمكن OpenBot من نشر النتيجة في القناة. شغّل الخطوة مرة أخرى.",
   "error.workflow.discordNoMessage":
     "يعمل هذا المُخرَج على رسالة Discord التي بدأت التشغيل. ابدأ التشغيل من إشارة في Discord، أو اختر «النشر في القناة».",
   "error.workflow.slackNoMessage":

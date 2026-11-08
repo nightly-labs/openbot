@@ -16,7 +16,7 @@ import {
   Text,
 } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
-import { MessageActions, MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageActions, MessageBody, MessageMenuItems } from "@openbot/ui/features/conversation/MessageRendering";
 import { createMemo, createSignal, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -41,7 +41,6 @@ function PrototypeMessage(props: {
 }) {
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [expandedEmoji, setExpandedEmoji] = createSignal(false);
-  const [copied, setCopied] = createSignal(false);
   const [reaction, setReaction] = createSignal<MessageReaction | null | undefined>(props.reaction);
   const message = createMemo<AgentMessage>(() => ({ ...props.message, reaction: reaction() }));
   const own = () => props.message.author === "you";
@@ -93,7 +92,6 @@ function PrototypeMessage(props: {
               message={message()}
               pickerOpen={pickerOpen()}
               expandedEmoji={expandedEmoji()}
-              copied={copied()}
               onTogglePicker={() => setPickerOpen((current) => !current)}
               onExpandEmoji={() => setExpandedEmoji((current) => !current)}
               onReact={(value) => {
@@ -101,7 +99,7 @@ function PrototypeMessage(props: {
                 setPickerOpen(false);
               }}
               onReply={props.onReply ?? fn()}
-              onCopy={() => setCopied(true)}
+              menu={() => <MessageMenuItems message={message()} onReact={setReaction} onCopy={fn()} />}
             />
           </div>
         </Show>

@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { decodeAgentTaskReadStates, decodeFilePreview } from "./conversation-decoding";
+import { decodeAgentTask, decodeAgentTaskReadStates, decodeFilePreview } from "./conversation-decoding";
 
 const preview = {
   name: "report.html",
@@ -30,6 +30,51 @@ describe("file preview page decoding", () => {
       1,
     ]) {
       expect(() => decodeFilePreview({ ...preview, pageUrl: address })).toThrow("Invalid file preview response.");
+    }
+  });
+});
+
+const task = {
+  id: "task-1",
+  agentId: "agent-1",
+  threadId: "thread-1",
+  origin: "user",
+  title: "Thread",
+  state: "running",
+  outcome: null,
+  hold: null,
+  activeTurnId: "turn-1",
+  progress: null,
+  error: null,
+  queuedMessages: [{ deliveryId: "delivery-1", text: "next", createdAt: "2026-11-04T18:00:00.000Z" }],
+  createdAt: "2026-11-04T18:00:00.000Z",
+  updatedAt: "2026-11-04T18:00:00.000Z",
+  closedAt: null,
+};
+const queued = {
+  id: "delivery-1",
+  messageId: "message-1",
+  recipientAgentId: "agent-1",
+  sender: { kind: "user" },
+  text: "next",
+  attachments: [],
+  replyToMessageId: null,
+  status: "queued",
+  position: 1,
+  turnId: null,
+  error: null,
+  createdAt: "2026-11-04T18:00:00.000Z",
+};
+
+describe("side thread queue decoding", () => {
+  it("accepts a task with or without the full queue of its thread", () => {
+    expect(decodeAgentTask(task)).toEqual(task);
+    expect(decodeAgentTask({ ...task, queue: [queued] })).toEqual({ ...task, queue: [queued] });
+  });
+
+  it("rejects a queue that is not a list of queued messages", () => {
+    for (const queue of [null, queued, [{ ...queued, status: "waiting" }], [{ ...queued, text: 1 }]]) {
+      expect(() => decodeAgentTask({ ...task, queue })).toThrow("Invalid task response.");
     }
   });
 });

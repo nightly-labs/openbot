@@ -1,17 +1,22 @@
 /* Interactive blocks an agent draws: confirm, choice, quick replies and form. Tokens only. */
 
-.ui-block-card {
+/* The frame of confirm, choice and form blocks: a muted bubble with the look of an agent question
+   (question-prompt.css). */
+.ui-block-card.ui-bubble {
+  width: min(540px, 100%);
+  max-width: 100%;
+}
+
+.ui-block-card > .ui-block-content {
   display: flex;
-  max-width: 600px;
+  width: 100%;
   flex-direction: column;
   gap: var(--openbot-space-3);
-  border-color: var(--openbot-border-strong);
-  background: var(--openbot-bg-surface);
-  transition: border-color var(--openbot-duration-slow) var(--openbot-ease-out);
+  padding: var(--openbot-space-4) var(--openbot-space-4) var(--openbot-space-3);
 }
 
 /* Only an open block warns: a closed one has nothing left to press. */
-.ui-block-card[data-danger][data-status="pending"] {
+.ui-block-card[data-danger][data-status="pending"] > .ui-block-content {
   border-color: var(--openbot-danger-border);
 }
 
@@ -24,44 +29,31 @@
   display: flex;
   min-width: 0;
   align-items: flex-start;
-  justify-content: space-between;
   gap: var(--openbot-space-3);
 }
 
 .ui-block-heading {
+  display: grid;
   min-width: 0;
+  flex: 1;
+  gap: var(--openbot-space-0-5);
 }
 
 .ui-block-title {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xl);
+  font-size: var(--openbot-text-lg);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-xl);
+  line-height: var(--openbot-leading-lg);
+  letter-spacing: var(--openbot-tracking-tight);
   overflow-wrap: anywhere;
-  text-wrap: balance;
 }
 
 .ui-block-subtitle {
-  margin: var(--openbot-space-0-5) 0 0;
+  margin: 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
-}
-
-.ui-block-status[data-slot="badge"] {
-  flex: 0 0 auto;
-  gap: var(--openbot-space-1-5);
-  border-radius: var(--openbot-radius-pill);
-  font-size: var(--openbot-text-sm);
-  font-weight: var(--openbot-weight-medium);
-}
-
-.ui-block-status svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  flex: 0 0 auto;
-  stroke-width: var(--openbot-icon-stroke);
 }
 
 .ui-block-body {
@@ -73,6 +65,27 @@
 
 .ui-block-body:empty {
   display: none;
+}
+
+/* The footer of an open block: Skip and the block's buttons at the end, the main one last. */
+.ui-block-card-footer {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* A small choice at the start of the footer keeps its own width; the buttons go to the next line first. */
+.ui-block-footer-select {
+  width: auto;
+  max-width: 100%;
+  flex: none;
+}
+
+.ui-block-footer-select > .ui-select-trigger {
+  width: auto;
+  max-width: 100%;
 }
 
 /* The line a frozen block ends with. */
@@ -119,7 +132,6 @@
 
 .ui-block-error {
   min-width: 0;
-  flex: 1 1 auto;
   margin: 0;
   color: var(--openbot-danger-text);
   font-size: var(--openbot-text-sm);
@@ -127,7 +139,11 @@
   overflow-wrap: anywhere;
 }
 
-.ui-block-skip {
+.ui-block-footer .ui-block-error {
+  flex: 1 1 auto;
+}
+
+.ui-block-footer .ui-block-skip {
   margin-inline-start: auto;
 }
 
@@ -138,9 +154,16 @@
   gap: var(--openbot-space-2);
 }
 
-/* A block that answers itself has no Skip, so its last button, such as Cancel, sits at the far end. */
-.ui-block-actions-auto > button:last-of-type {
+.ui-block-card-footer > .ui-block-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   margin-inline-start: auto;
+}
+
+.ui-block-card .ui-block-actions > .ui-button {
+  border-radius: var(--openbot-radius-pill);
+  padding-inline: var(--openbot-space-4);
+  font-size: var(--openbot-text-md);
 }
 
 .ui-block-confirm-step {
@@ -156,8 +179,11 @@
   font-weight: var(--openbot-weight-medium);
 }
 
+.ui-block-confirm-step > .ui-block-actions {
+  justify-content: flex-end;
+}
+
 .ui-block-hint,
-.ui-block-counter,
 .ui-block-sending {
   margin: 0;
   color: var(--openbot-text-dim);
@@ -270,37 +296,45 @@
   position: relative;
 }
 
-/* Choice */
+/* Choice: the option rows of an agent question. The rows reach into the padding, so their text
+   lines up with the title. */
 .ui-block-options {
+  display: grid;
   min-width: 0;
-  margin: 0;
+  gap: var(--openbot-space-0-5);
+  margin: 0 calc(-1 * var(--openbot-space-2));
   padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-card);
+  border: 0;
 }
 
 .ui-block-option {
   position: relative;
   display: grid;
-  grid-template-columns: var(--openbot-control-xs) minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 40px;
+  /* A long meta wraps in its own column; it never takes the label's width. */
+  grid-template-columns: 22px minmax(0, 1fr) fit-content(40%);
   align-items: center;
   gap: var(--openbot-space-3);
-  padding: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
   cursor: pointer;
-  transition: background var(--openbot-duration-fast) var(--openbot-ease-out);
+  transition: background-color var(--openbot-duration-fast) ease-out;
 }
 
-.ui-block-option + .ui-block-option {
-  border-top: 1px solid var(--openbot-border-strong);
-}
-
-.ui-block-option:hover {
-  background: var(--openbot-hover);
+.ui-block-option:hover:not([data-disabled]) {
+  background: var(--openbot-question-option-soft);
 }
 
 .ui-block-option[data-checked] {
-  background: var(--openbot-question-option-soft);
+  background: var(--openbot-question-option-hover);
+}
+
+.ui-block-option:active:not([data-disabled]) {
+  background: var(--openbot-question-option-pressed);
 }
 
 .ui-block-option[data-disabled] {
@@ -311,9 +345,9 @@
   opacity: 0.5;
 }
 
-.ui-block-option:focus-within {
-  outline: 2px solid var(--openbot-border-focus);
-  outline-offset: -2px;
+.ui-block-option:has(.ui-block-option-input:focus-visible) {
+  background: var(--openbot-question-option-soft);
+  box-shadow: inset 0 0 0 1px var(--openbot-question-option);
 }
 
 .ui-block-option .ui-block-option-input {
@@ -328,38 +362,37 @@
   cursor: inherit;
 }
 
-.ui-block-option-key {
-  display: grid;
-  width: var(--openbot-control-xs);
-  height: var(--openbot-control-xs);
-  place-items: center;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-surface-raised);
-  color: var(--openbot-text-muted);
+.ui-block-option-key.ui-kbd {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  border-color: transparent;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-question-badge-soft);
+  color: var(--openbot-question-badge-text);
   font-family: var(--openbot-font-sans);
-  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
+  transition:
+    background-color var(--openbot-duration-fast) ease-out,
+    color var(--openbot-duration-fast) ease-out;
 }
 
-.ui-block-option[data-checked] .ui-block-option-key {
-  border-color: var(--openbot-question-option);
+.ui-block-option[data-checked] .ui-block-option-key.ui-kbd {
   background: var(--openbot-question-option);
-  color: var(--openbot-text-on-light);
+  color: var(--openbot-text-on-status);
 }
 
 .ui-block-option-label {
   min-width: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-medium);
   overflow-wrap: anywhere;
 }
 
 .ui-block-option-meta {
+  min-width: 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* Quick replies */
@@ -467,19 +500,6 @@
   align-items: center;
 }
 
-.ui-block-header:has(> .ui-block-icon) > .ui-block-heading {
-  flex: 1;
-}
-
-.ui-block-header:has(> .ui-block-icon) .ui-block-title {
-  font-size: var(--openbot-text-lg);
-  line-height: var(--openbot-leading-lg);
-}
-
-.ui-block-header:has(> .ui-block-icon) > .ui-block-status {
-  align-self: flex-start;
-}
-
 .ui-block-answer-rows {
   display: flex;
   min-width: 0;
@@ -538,8 +558,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ui-block-card,
   .ui-block-option,
+  .ui-block-option-key.ui-kbd,
   .ui-block-hold-fill {
     transition: none;
   }

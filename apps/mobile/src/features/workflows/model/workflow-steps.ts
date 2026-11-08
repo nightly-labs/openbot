@@ -125,14 +125,14 @@ export function telegramAction(node: WorkflowNode): WorkflowTelegramAction {
   return typeof value === "string" && isOneOf(WORKFLOW_TELEGRAM_ACTIONS, value) ? value : "reply";
 }
 
-const SLACK_ACTION_LABEL = {
+export const SLACK_ACTION_LABEL = {
   reply: "mobile.workflow.slack.action.reply",
   post: "mobile.workflow.discord.action.post",
   react: "mobile.workflow.discord.action.react",
 } as const satisfies Record<WorkflowSlackAction, MobileTextKey>;
 
 /** The action of a Slack output, as the host reads it: a reply in the thread when it has none. */
-function slackAction(node: WorkflowNode): WorkflowSlackAction {
+export function slackAction(node: WorkflowNode): WorkflowSlackAction {
   const value = node.fields.action;
   return typeof value === "string" && isOneOf(WORKFLOW_SLACK_ACTIONS, value) ? value : "reply";
 }
@@ -199,6 +199,8 @@ function outputText(node: WorkflowNode, t: MobileTranslate): string {
   switch (text(node, "target")) {
     case "channel":
       return t("mobile.workflow.output.channel");
+    case "chat-channel":
+      return t("mobile.workflow.output.chatChannel");
     case "file":
       return t("mobile.workflow.output.file");
     case "github": {

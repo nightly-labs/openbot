@@ -55,7 +55,7 @@ function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
     "After a submit in the same document, OpenBot clears the filled fields and keeps the page; evaluate and recording are off in that tab and its popup or opener until the page navigates, but snapshots and actions work. A submit does not prove the sign-in: take a fresh snapshot and ask for the next step, such as a code, with submit_secret. Use takeover when a submit or an automatic reload fails, and take a fresh snapshot after a takeover.",
     ...(options.passwordVault
       ? [
-          `When the user shares a password vault, call ${OPENBOT_BROWSER_NAMESPACE}.list_logins once for the tab before a username, password, or authenticator-app step. For a login of the site, type its username where the page asks, then call submit_secret with its loginId: OpenBot fills the password or code, and you never see it. When the result says that OpenBot filled a saved login, say that you used the saved login, not that the user typed it. With several logins, use the one that the task names, or ask. With no login, call submit_secret without loginId, and the user types the secret. Do not use evaluate on a sign-in site before the fill: OpenBot then asks the user instead.`,
+          `When the user shares a password vault, call ${OPENBOT_BROWSER_NAMESPACE}.list_logins once for the tab before a username, password, or authenticator-app step. For a login of the site, type its username where the page asks, then call submit_secret with its loginId: OpenBot fills the password or code, and you never see it. When the result says that OpenBot filled a saved login, say that you used the saved login, not that the user typed it. With several logins, use the one that the task names, or ask. With no login, call submit_secret without loginId, and the user types the secret. Reload a page where you ran evaluate before the fill, or OpenBot asks the user.`,
         ]
       : []),
   ].join("\n");
@@ -154,8 +154,10 @@ function openbotGuidance(namespace: string, tool: string): string {
         "Add, change, turn on or off, or remove an MCP server only when the user asks. When a Marketplace app covers the service, use openbot.suggest_marketplace_app instead. Every agent of this server gets an enabled server's tools: say so in your answer. Call openbot.list_mcp_servers first for the names in use. Do not ask the user to confirm a requested change: OpenBot asks for approval when needed, and a declined change is final for the request.",
         "openbot.save_mcp_server connects to the server before it saves it. On ready, give the user the tool names. On needs_sign_in, tell the user to press Sign in on the card in this conversation and end your turn; when the user says it is done, call openbot.test_mcp_server. On needs_key, tell the user to enter the key in Server settings, MCP, then test again; never put a key in a URL or an argument. On error, report it and what to change. The new tools reach the agents from the next turn.",
       ].join("\n");
+    case "send_feedback":
+      return "Use it for a problem in OpenBot itself, not the user's project, or for a wanted OpenBot change. When the user complains about OpenBot, first help or give a workaround, then call it unasked: the card asks. Call it once per problem, and not again after Not now. Most users are not developers: write the text yourself, in plain words. Do not ask for versions, logs, or settings; OpenBot adds them. Ask one question only when you do not know what went wrong or what they want. Leave out secrets, private paths, and other chat contents. Never send a security problem: give https://github.com/nightly-labs/openbot/security/advisories/new. For a question you cannot answer, or a discussion, give https://github.com/nightly-labs/openbot/discussions. Say that the issue is public and does not show their name. Then follow the result's next field. Never open an issue with a browser or gh.";
     case "suggest_marketplace_app":
-      return "openbot.suggest_marketplace_app is a direct tool. Use the next field of its result for the end of your answer. When no plugin applies, give the needed sign-in or Computer Use setting.";
+      return "Use the next field of its result for the end of your answer. When no plugin applies, give the needed sign-in or Computer Use setting.";
     case "messaging_remember":
     case "messaging_forget_memory":
     case "messaging_history":
@@ -176,8 +178,8 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "send_message":
       return [
         RECIPIENT_RULE,
-        "Use openbot.send_message for asynchronous messages and local files to one or more teammates, and set replyToMessageId when you answer a teammate. Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, or channel_result instead; outside a channel task, do not call channel_ tools.",
-        "Set expectsReply for each message. Keep the default, true, for a question, request, or delegated work: OpenBot sends the result back once, in a later turn, so do your own parts, then end your turn. Do not wait with provider tools such as wait_agent: they wait only for provider subagents. Set it to false to pass information on, such as a status, a finding, a file, or an answer with replyToMessageId: the recipient does not answer, and you get nothing back. Never send a request only to thank, to confirm receipt, or to say that you are done.",
+        "Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, channel_reply, or channel_result instead of openbot.send_message.",
+        "With expectsReply true, OpenBot sends the result back once, in a later turn. Provider tools such as wait_agent wait only for provider subagents. Never send a request only to thank, to confirm receipt, or to say that you are done.",
       ].join("\n");
     case "list_channels":
     case "send_to_channel":

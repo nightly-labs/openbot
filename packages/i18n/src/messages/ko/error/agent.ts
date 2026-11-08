@@ -55,6 +55,7 @@ export const messages = {
     "이 에이전트의 작업이 실행 중이에요. 제공자를 변경하기 전에 작업이 끝날 때까지 기다리거나 작업을 중지해 주세요.",
   "error.agent.waitBeforeClearContext": "새 채팅을 시작하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.waitBeforeCompactContext": "컨텍스트를 압축하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
+  "error.agent.waitBeforeDeleteHistory": "기록을 삭제하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.compactContextUnavailable": "이 에이전트는 지금 컨텍스트를 압축할 수 없어요.",
   "error.agent.unknown": "알 수 없는 에이전트: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -101,6 +102,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "이 설정은 에이전트를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.agent.sideQuestionBusy": "곁다리 질문이 너무 많이 실행 중이에요. 잠시 후 다시 시도해 주세요.",
   "error.agent.sideQuestionFailed": "에이전트가 곁다리 질문에 답하지 못했어요. 다시 시도해 주세요.",
+  "error.agent.webSearchSignIn": "웹 검색을 사용하려면 ChatGPT 계정으로 Codex에 로그인해야 합니다.",
+  "error.agent.webSearchBusy": "실행 중인 검색과 사이드 질문이 너무 많습니다. 잠시 후 다시 시도하세요.",
+  "error.agent.webSearchFailed": "웹 검색이 완료되지 않았습니다. 다시 시도하세요.",
   "error.agent.busyMessageModeLocalOnly":
     "에이전트가 작업 중일 때 메시지를 처리하는 방식은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
   "error.agent.backupModelsLocalOnly": "백업 모델은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",

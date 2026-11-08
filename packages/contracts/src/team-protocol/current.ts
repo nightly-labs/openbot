@@ -26,15 +26,19 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "./agent-task-ui-blocks-v1";
 import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "./agent-thread-files-v1";
+import { AGENT_THREAD_PAGES_CAPABILITY } from "./agent-thread-pages-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
+import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
+import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "./browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "./browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CAPABILITY } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CAPABILITY } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "./browser-user-control-v1";
@@ -47,14 +51,17 @@ import {
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
+import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
 import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
@@ -64,12 +71,14 @@ import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
@@ -79,6 +88,7 @@ import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
@@ -102,6 +112,7 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
@@ -123,6 +134,7 @@ import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
@@ -143,11 +155,25 @@ export const TEAM_ZIP_ATTACHMENTS_CAPABILITY = "zip-attachments";
 export const TEAM_MP4_ATTACHMENTS_CAPABILITY = "mp4-attachments";
 export const TEAM_SVG_ATTACHMENTS_CAPABILITY = "svg-attachments";
 /**
+ * A host that accepts a file with any name. A file with no known type is stored as an opaque `file`
+ * attachment, and the agent gets its path. An older host refuses a name outside the known types.
+ */
+export const TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY = "any-file-attachments";
+/**
  * A host that keeps a separate MCP sign-in for each row whose URL ends in an `#account-…` fragment.
  * An older host files every row on one URL under one sign-in, so the client offers "Add account"
  * for a listing only when the host advertises this.
  */
 export const MCP_ACCOUNTS_CAPABILITY = "mcp-accounts-v1";
+/**
+ * A host that lets a member, and not only an owner or admin, use the routes of `mcp-servers-v1`,
+ * `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`. A member can read
+ * the list, test, and add a server. A member can change, sign in, sign out, or remove only a server
+ * that the member added; the host refuses any other row with 403. The host lets a member in only
+ * when the client also sends this capability, so a released client sees no change. Each server
+ * still has one sign-in, which every agent of the host uses.
+ */
+export const MCP_MEMBER_ACCESS_CAPABILITY = "mcp-member-access-v1";
 /**
  * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
  * caller, a member or an admin, removes their own membership with the same effects as an admin's
@@ -192,19 +218,24 @@ export {
   AGENT_TASKS_CAPABILITY,
   AGENT_THREAD_BRANCHES_CAPABILITY,
   AGENT_THREAD_FILES_CAPABILITY,
+  AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
+  BROWSER_EGRESS_CAPABILITY,
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_EVENTS_CAPABILITY,
+  BROWSER_PROXIES_CAPABILITY,
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -212,6 +243,7 @@ export {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
@@ -235,6 +267,7 @@ export {
   MESSAGE_DELETE_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
+  PASSWORD_MANAGERS_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
@@ -254,6 +287,7 @@ export {
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
@@ -288,6 +322,7 @@ export {
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   WORKFLOWS_CAPABILITY,
+  WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
 };
@@ -437,6 +472,20 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  WORKFLOWS_CHATS_CAPABILITY,
+  PASSWORD_MANAGERS_CAPABILITY,
+  BROWSER_PROXIES_CAPABILITY,
+  BROWSER_EGRESS_CAPABILITY,
+  CODEX_API_KEY_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  AGENT_THREAD_PAGES_CAPABILITY,
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  HOST_PERSONALITY_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
+  LIVE_VOICE_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -599,7 +648,21 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHAT_COLORS_CAPABILITY &&
     capability !== WEBHOOK_SENDER_SECRET_CAPABILITY &&
     capability !== WHATSAPP_CONNECTOR_CAPABILITY &&
-    capability !== MESSAGE_DELETE_CAPABILITY,
+    capability !== MESSAGE_DELETE_CAPABILITY &&
+    capability !== CONVERSATION_UNREAD_FROM_CAPABILITY &&
+    capability !== WORKFLOWS_CHATS_CAPABILITY &&
+    capability !== PASSWORD_MANAGERS_CAPABILITY &&
+    capability !== BROWSER_PROXIES_CAPABILITY &&
+    capability !== BROWSER_EGRESS_CAPABILITY &&
+    capability !== CODEX_API_KEY_CAPABILITY &&
+    capability !== CHANNEL_ISOLATION_CAPABILITY &&
+    capability !== AGENT_THREAD_PAGES_CAPABILITY &&
+    capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
+    capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
+    capability !== HOST_PERSONALITY_CAPABILITY &&
+    capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
+    capability !== LIVE_VOICE_CAPABILITY &&
+    capability !== AGENT_WELCOME_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -638,6 +701,20 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  WORKFLOWS_CHATS_CAPABILITY,
+  PASSWORD_MANAGERS_CAPABILITY,
+  BROWSER_PROXIES_CAPABILITY,
+  BROWSER_EGRESS_CAPABILITY,
+  CODEX_API_KEY_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  AGENT_THREAD_PAGES_CAPABILITY,
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  HOST_PERSONALITY_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
+  LIVE_VOICE_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -759,6 +836,20 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHAT_COLORS_CAPABILITY &&
       capability !== WEBHOOK_SENDER_SECRET_CAPABILITY &&
       capability !== WHATSAPP_CONNECTOR_CAPABILITY &&
-      capability !== MESSAGE_DELETE_CAPABILITY,
+      capability !== MESSAGE_DELETE_CAPABILITY &&
+      capability !== CONVERSATION_UNREAD_FROM_CAPABILITY &&
+      capability !== WORKFLOWS_CHATS_CAPABILITY &&
+      capability !== PASSWORD_MANAGERS_CAPABILITY &&
+      capability !== BROWSER_PROXIES_CAPABILITY &&
+      capability !== BROWSER_EGRESS_CAPABILITY &&
+      capability !== CODEX_API_KEY_CAPABILITY &&
+      capability !== CHANNEL_ISOLATION_CAPABILITY &&
+      capability !== AGENT_THREAD_PAGES_CAPABILITY &&
+      capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
+      capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
+      capability !== HOST_PERSONALITY_CAPABILITY &&
+      capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
+      capability !== LIVE_VOICE_CAPABILITY &&
+      capability !== AGENT_WELCOME_CAPABILITY,
   );
 }

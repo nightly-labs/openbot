@@ -57,8 +57,10 @@ export const messages = {
   "error.team.providersUnsupported": "To połączenie nie obsługuje ustawień dostawców.",
   "error.team.providerNotManaged": "OpenBot nie zarządza CLI tego dostawcy.",
   "error.team.channelsUnsupported": "To połączenie nie obsługuje czatów kanałów.",
+  "error.team.channelContextUnsupported": "To połączenie nie obsługuje nowej rozmowy ani kompaktowania w kanale.",
   "error.team.channelPictureUnsupported": "To połączenie nie obsługuje obrazów kanałów.",
   "error.team.channelDeleteUnsupported": "To połączenie nie obsługuje usuwania kanałów.",
+  "error.team.historyDeleteUnsupported": "To połączenie nie obsługuje usuwania historii.",
   "error.team.channelTaskCancelUnsupported": "To połączenie nie obsługuje anulowania zadań kanałów.",
   "error.team.membersCannotDeleteChannels": "Członkowie nie mogą usuwać kanałów.",
   "error.team.membersCannotArchiveChannels": "Członkowie nie mogą archiwizować kanałów.",
@@ -68,6 +70,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "To połączenie nie obsługuje ukrywania agentów.",
   "error.team.agentColorsUnsupported": "To połączenie nie obsługuje kolorów agentów.",
   "error.team.chatColorsUnsupported": "To połączenie nie obsługuje kolorów czatu.",
+  "error.team.routineRunPlaceUnsupported": "To połączenie nie może zmienić miejsca uruchamiania rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
@@ -82,6 +85,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "To połączenie nie obsługuje pokazywania folderów.",
   "error.team.conversationFileSearchUnsupported": "To połączenie nie obsługuje wyszukiwania plików.",
   "error.team.sideQuestionUnsupported": "To połączenie nie obsługuje pytań pobocznych.",
+  "error.team.liveVoiceUnsupported":
+    "Ten serwer nie obsługuje głosu na żywo Codex. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.routineFlowsUnsupported":
     "Ten serwer nie obsługuje przepływów rutyn. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.routineCanvasTooLarge":
@@ -140,6 +145,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Ten klient nie obsługuje bezpiecznego uwierzytelniania.",
   "error.team.agentSettingsUnsupported": "To połączenie nie obsługuje ustawień agentów.",
   "error.team.adminRequired": "Wymagany jest dostęp administratora.",
+  "error.team.mcpServerNotYours": "Ten serwer MCP może zmienić tylko osoba, która go dodała, albo administrator.",
   "error.team.ownerRequired": "Tylko właściciel tego serwera może to zrobić.",
   "error.team.requestTooLarge": "Treść żądania jest za duża.",
   "error.team.signInRelayUnsupported": "Ten serwer nie może przekazywać logowań. Zaktualizuj OpenBot na hoście.",
@@ -151,4 +157,5 @@ export const messages = {
   "error.team.signInRelayUsed": "To logowanie zostało już wysłane.",
   "error.team.signInRelayMismatch": "Ten adres nie pochodzi z tego logowania.",
   "error.team.signInRelayLinkUnknown": "Żaden agent na tym serwerze nie pokazał tego linku logowania.",
+  "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
 } as const satisfies PartialTranslation<typeof source>;

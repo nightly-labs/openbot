@@ -7,6 +7,8 @@ import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
+/** A 12-hour clock with AM and PM, or a 24-hour clock. */
+export type HourCycle = "h12" | "h23";
 
 export interface AppInfo {
   name: string;
@@ -22,6 +24,11 @@ export interface AppInfo {
    * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
    */
   softwareRendering?: boolean;
+  /**
+   * The clock that the macOS "24-hour time" setting selects. Chromium does not read it, so times
+   * follow it only through this value. Not set when the language's own clock applies.
+   */
+  hourCycle?: HourCycle;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -216,6 +223,30 @@ export type HostDefaultProvider = Pick<AppSetupState, "preferredProvider" | "pre
 
 export interface AnalyticsPreference {
   enabled: boolean;
+}
+
+/**
+ * Renderer timing for host analytics: counts and milliseconds only. The renderer sends it at most
+ * once a minute, and once when the main window's workspace finished its first load.
+ */
+/** The bounds of one renderer timing report. The renderer keeps to them and main rejects a report outside them. */
+export const RENDERER_TIMING_LIMITS = {
+  longTasks: 10_000,
+  inputs: 100_000,
+  /** Timed inputs in one report. Inputs past this count are left out of `inputs` too. */
+  inputDelays: 64,
+  inputDelayMs: 600_000,
+} as const;
+
+export interface RendererTimingReport {
+  /** The main window's workspace finished its first load. Main times it on its own clock. */
+  workspaceReady?: true;
+  /** Renderer tasks of more than 200 ms since the last report. */
+  longTasks: number;
+  /** Key presses and pointer presses since the last report. */
+  inputs: number;
+  /** The input delay of each of those inputs that the browser timed (16 ms or more of handling), in ms. */
+  inputDelaysMs: number[];
 }
 
 export interface SetAnalyticsPreferenceInput {
@@ -532,6 +563,16 @@ export interface ChatWindowTarget {
   agentId: string;
 }
 
+/**
+ * The messages that the user sent to agents on this computer, from the database. The social toast
+ * reads it, so a user who used OpenBot before the toast shipped gets it on time.
+ */
+export interface SentMessageStats {
+  /** When the first message was written, as ISO 8601 text, or null before the first message. */
+  firstSentAt: string | null;
+  sentCount: number;
+}
+
 export type ExternalDestination =
   | "opencode-install"
   | "opencode-auth"
@@ -539,6 +580,8 @@ export type ExternalDestination =
   | "claude-install"
   | "hermes-install"
   | "feedback"
+  // The GitHub bug report form, from the Help menu, with the version and the system filled in.
+  | "report-problem"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
   // The community card of the sidebar also opens Discord.
@@ -547,8 +590,24 @@ export type ExternalDestination =
   | "discord"
   // The OpenBot repository, from the toast that asks for a GitHub star.
   | "github"
-  // The OpenBot account on X, from the community card of the sidebar.
+  // The OpenBot account on X, from the community card of the sidebar and the social toast.
   | "x"
+  // The OpenBot profiles and community that the social toast asks the user to follow or join.
+  | "threads"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "linkedin"
+  | "reddit"
+  // The pages that start a post about OpenBot, from the social toast. Main writes the first post
+  // in the app language.
+  | "x-post"
+  | "threads-post"
+  | "linkedin-post"
+  | "reddit-post"
+  | "facebook-post"
+  | "instagram-post"
+  | "tiktok-post"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.

@@ -1,9 +1,12 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
+import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
+import { TurnContext } from "./agent/turn-context";
 import { AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
@@ -25,6 +28,7 @@ import {
   type ProviderHistoryFragment,
   type ProviderHistoryRequest,
 } from "./provider-history";
+import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 import { registerProviderProcess } from "./provider-processes";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { endProcessTree } from "./windows-process-tree";
@@ -50,6 +54,8 @@ interface ClientEvents {
 const CRASH_RECORD = /\bpanicked at\b|^(?:\S+\s+)?FATAL\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
 /** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
 const STDERR_END_WAIT_MS = 250;
+/** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
+const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
 
 export class AppServerError extends Error {
   constructor(
@@ -65,11 +71,28 @@ export class AppServerError extends Error {
 export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "codex";
+  /**
+   * The memories and section-mates go with the turns. Codex keeps the developer instructions that a
+   * session started with, also on `thread/resume`, so in the instructions a change reached only a
+   * new session, which writes the full conversation to the cache again.
+   */
+  readonly turnContext = true;
+  /**
+   * Kept by thread across process restarts: a resumed thread holds the blocks that it was sent.
+   * `releaseThread` ends it, as the Claude client does: a released session that comes back gets
+   * the blocks in full.
+   */
+  readonly #turnContext = new TurnContext();
   readonly #executable: string;
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
   readonly #pending = new Map<RequestId, PendingRequest>();
   readonly #toolRequests = new Map<RequestId, { threadId: string; turnId: string; controller: AbortController }>();
+  /**
+   * The Codex id of each server request, by the id OpenBot gives it. Each process numbers its requests
+   * from 0, so its ids are not unique among the processes of other accounts or after a restart (#5465).
+   */
+  readonly #serverRequestIds = new Map<string, RequestId>();
   readonly #interruptedTurns = new Set<string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   /** The end of a process that failed. `stop` waits for it, because `#process` no longer holds it. */
@@ -97,15 +120,19 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     this.#stopping = false;
     this.#decoder = new JsonLineDecoder();
+    // An answer to a request of the previous process must not reach a request of this one.
+    this.#serverRequestIds.clear();
     const target = cliSpawnTarget(this.#executable, ["app-server", "--listen", "stdio://"]);
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: this.#extraEnv ? { ...process.env, ...this.#extraEnv } : process.env,
       windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
+      detached: PROVIDER_PROCESS_GROUP,
     });
     this.#process = child;
     registerProviderProcess(child, "codex");
+    endProcessGroupOnExit(child);
 
     child.stdin.on("error", (error) => this.#fail(error, child));
     child.stdout.on("data", (chunk: Buffer) => {
@@ -184,13 +211,36 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    *
    * A thread this connection never subscribed to answers `NotSubscribed`, which is not an error
    * here: either way this side has stopped using it.
+   *
+   * `resumes`: an idle release. `thread/resume` loads the same rollout, which holds the memories and
+   * section-mates that its turns were sent, so they do not go again.
    */
   readonly releaseThread = Effect.fn("CodexAppServer.releaseThread")(function* (
     this: CodexAppServerClient,
     threadId: string,
+    resumes = false,
   ) {
+    if (!resumes) this.#turnContext.forget(threadId);
     if (!this.running) return;
     yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
+  });
+
+  /**
+   * Whether the thread has a background terminal. The unload that follows `thread/unsubscribe`
+   * ends every unified exec process of the thread, so a release would stop a dev server or a watch
+   * that the agent left running. `thread/backgroundTerminals/list` is an experimental method; the
+   * `initialize` request turns on `experimentalApi`.
+   */
+  readonly holdsBackgroundWork = Effect.fn("CodexAppServer.holdsBackgroundWork")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    const terminals = yield* this.request(
+      "thread/backgroundTerminals/list",
+      { threadId, limit: 1 },
+      decodeBackgroundTerminals,
+    );
+    return terminals.data.length > 0;
   });
 
   /**
@@ -302,19 +352,23 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   ) {
     const id = this.#nextId++;
     const child = this.#process;
+    let answered = false;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
-        resolve: (value) =>
+        resolve: (value) => {
+          answered = true;
+          this.#trackTurnContext(method, params, value);
           resume(
             Effect.try({
               try: () => decoder(value),
               catch: (cause) => new ProviderClientOperationError({ cause }),
             }),
-          ),
+          );
+        },
         reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
       });
       try {
-        this.#write({ method, id, params: method === "thread/resume" ? metadataOnlyResumeParams(params) : params });
+        this.#write({ method, id, params: this.#wireParams(method, params) });
         if (method === "turn/interrupt" && isRecord(params) && isString(params.threadId) && isString(params.turnId)) {
           this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
           this.#cancelToolRequests(params.threadId, params.turnId);
@@ -333,7 +387,15 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
             ),
           ),
       }),
-      Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#pending.delete(id);
+          // A turn that was refused, timed out or interrupted may not be in the history, so the
+          // next turn sends its blocks again.
+          if (method === "turn/start" && !answered && isRecord(params) && isString(params.threadId))
+            this.#turnContext.resend(params.threadId);
+        }),
+      ),
     );
   });
 
@@ -342,13 +404,62 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
-    this.#toolRequests.delete(id);
-    this.#write({ id, result });
+    const codexId = this.#takeServerRequestId(id);
+    if (codexId !== undefined) this.#write({ id: codexId, result });
   }
 
   respondError(id: RequestId, error: RpcError): void {
+    const codexId = this.#takeServerRequestId(id);
+    if (codexId !== undefined) this.#write({ id: codexId, error });
+  }
+
+  /**
+   * The params as Codex gets them. The turn context fields stay on this side, and a turn takes its
+   * blocks in front of the user's input, each a text item of its own, so that history readers can
+   * tell them from the user's text.
+   */
+  #wireParams(method: string, params: unknown): unknown {
+    if (method === "thread/start") return withoutTurnContextParams(params);
+    if (method === "thread/resume") return { ...withoutTurnContextParams(params), excludeTurns: true };
+    if (method !== "turn/start" || !isRecord(params) || !isString(params.threadId) || !Array.isArray(params.input))
+      return params;
+    const blocks = this.#turnContext.take(params.threadId);
+    if (blocks.length === 0) return params;
+    return { ...params, input: [...blocks.map((text) => ({ type: "text", text })), ...params.input] };
+  }
+
+  /** Takes the turn context of a thread that Codex started or resumed, and drops it with the thread. */
+  #trackTurnContext(method: string, params: unknown, result: unknown): void {
+    if (method === "thread/start") {
+      const thread = isRecord(result) ? result.thread : undefined;
+      if (!isRecord(thread) || !isString(thread.id)) return;
+      this.#turnContext.set(thread.id, params, false);
+      return;
+    }
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
+    else if (method === "thread/archive" || method === "thread/delete") this.#turnContext.forget(params.threadId);
+  }
+
+  /**
+   * A failed turn may not be kept, and a compaction summary can leave the blocks out. The next turn
+   * of the thread sends them in full.
+   */
+  #observeTurnContext(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    const failed = method === "turn/completed" && isRecord(params.turn) && params.turn.status === "failed";
+    const compacted =
+      method === "thread/compacted" ||
+      (method === "item/completed" && isRecord(params.item) && params.item.type === "contextCompaction");
+    if (failed || compacted) this.#turnContext.resend(params.threadId);
+  }
+
+  #takeServerRequestId(id: RequestId): RequestId | undefined {
     this.#toolRequests.delete(id);
-    this.#write({ id, error });
+    if (!isString(id)) return undefined;
+    const codexId = this.#serverRequestIds.get(id);
+    this.#serverRequestIds.delete(id);
+    return codexId;
   }
 
   #write(message: unknown): void {
@@ -361,6 +472,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #handleMessage(message: RpcMessage): void {
     if ("method" in message) {
       if ("id" in message) {
+        const id = randomUUID();
+        this.#serverRequestIds.set(id, message.id);
         let signal: AbortSignal | undefined;
         if (
           message.method === "item/tool/call" &&
@@ -369,21 +482,21 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           isString(message.params.turnId)
         ) {
           const controller = new AbortController();
-          this.#toolRequests.set(message.id, {
+          this.#toolRequests.set(id, {
             threadId: message.params.threadId,
             turnId: message.params.turnId,
             controller,
           });
           signal = controller.signal;
           if (this.#interruptedTurns.has(JSON.stringify([message.params.threadId, message.params.turnId]))) {
-            this.#toolRequests.delete(message.id);
+            this.#toolRequests.delete(id);
             controller.abort();
           }
         }
         this.emit("request", {
           ...(signal ? { signal } : {}),
           method: message.method,
-          id: message.id,
+          id,
           params: message.params,
         });
       } else {
@@ -397,6 +510,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           this.#cancelToolRequests(message.params.threadId, message.params.turn.id);
           this.#interruptedTurns.delete(JSON.stringify([message.params.threadId, message.params.turn.id]));
         }
+        this.#observeTurnContext(message.method, message.params);
         this.emit("notification", { method: message.method, params: message.params });
       }
       return;
@@ -488,8 +602,17 @@ interface HistoryItemPage {
   nextCursor: string | null;
 }
 
-function metadataOnlyResumeParams(params: unknown): DynamicRecord {
-  return { ...(isRecord(params) ? params : {}), excludeTurns: true };
+/** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
+function withoutTurnContextParams(params: unknown): DynamicRecord {
+  if (!isRecord(params)) return {};
+  const {
+    memoryContext: _memories,
+    sectionTeammates: _section,
+    savedLogins: _logins,
+    turnStyleReminder: _style,
+    ...rest
+  } = params;
+  return rest;
 }
 
 function decodeTurnHistoryPage(value: unknown): HistoryTurnPage {
@@ -529,7 +652,17 @@ function decodeHistoryItemEntry(value: unknown): { turnId: string; item: ThreadI
   }
   // Preserve provider item fields (tool output, image metadata, command status, and so on) while
   // validating the discriminator at the untrusted app-server boundary.
-  return { turnId: value.turnId, item: { ...value.item, type: value.item.type } };
+  const item: ThreadItem = { ...value.item, type: value.item.type };
+  // The turn context blocks are text items of their own in front of the user's input. The last
+  // item is always the user's, also when the user wrote text that starts like a block.
+  if (item.type === "userMessage" && Array.isArray(item.content)) {
+    const last = item.content.length - 1;
+    item.content = item.content.filter(
+      (part, index) =>
+        index === last || !(part.type === "text" && isString(part.text) && isTurnContextBlock(part.text)),
+    );
+  }
+  return { turnId: value.turnId, item };
 }
 
 function nullableString(value: unknown, label: string): string | null {

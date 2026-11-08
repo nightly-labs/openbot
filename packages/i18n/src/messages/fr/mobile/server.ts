@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Local",
   "mobile.server.drawer.remote": "Distant",
-  "mobile.server.drawer.routines": "Routines",
   "mobile.server.drawer.usage": "Utilisation",
   "mobile.server.drawer.editOrder": "Modifier l’ordre",
   "mobile.server.drawer.leaveFailed": "Impossible de quitter {name}",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} membre", other: "{count} membres" },
   "mobile.server.drawer.doneEditing": "Terminer la modification de l’ordre",
+  "mobile.server.drawer.editSidebar": "Modifier la barre latérale",
+  "mobile.server.drawer.unpinTool": "Désépingler",
+  "mobile.server.drawer.pinToolNamed": "Épingler {name}",
+  "mobile.server.drawer.unpinToolNamed": "Désépingler {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, désépinglé",
+  "mobile.server.drawer.toolsHint":
+    "Faites glisser les poignées pour déplacer les outils. Les outils désépinglés n'apparaissent qu'en modification. L'ordre est enregistré sur cet appareil.",
+  "mobile.server.drawer.doneEditingSidebar": "Terminer la modification",
   "mobile.server.drawer.join": "Rejoindre un serveur",
   "mobile.server.drawer.add": "Ajouter un serveur",
   "mobile.server.drawer.settings": "Réglages",
@@ -359,6 +366,7 @@ export const messages = {
   "mobile.server.storage.noFiles": "Aucun fichier n’est stocké sur ce serveur.",
   "mobile.server.route.providers": "Fournisseurs",
   "mobile.server.route.provider": "Fournisseur",
+  "mobile.server.route.providerModels": "Modèles",
   "mobile.server.route.mcp": "Serveurs MCP",
   "mobile.server.route.mcpServer": "Serveur MCP",
   "mobile.server.members.rowLabel": "{name}, {role}",
@@ -382,15 +390,13 @@ export const messages = {
     "Cette personne perd l’accès à {server}. Une nouvelle invitation sera nécessaire pour revenir.",
   "mobile.server.members.expires": "Expire",
   "mobile.server.members.revokeInvitation": "Révoquer l’invitation",
-  "mobile.server.settings.status": "État",
   "mobile.server.settings.yourRole": "Votre rôle",
   "mobile.server.settings.memberCount": { one: "{count} sur {limit}", other: "{count} sur {limit}" },
   "mobile.server.settings.aiSection": "IA et outils",
   "mobile.server.settings.dataSection": "Données",
-  "mobile.server.settings.maintenanceSection": "Maintenance",
   "mobile.server.settings.peopleSection": "Personnes",
   "mobile.server.settings.moveSection": "Import et transfert",
-  "mobile.server.settings.general": "Général",
+  "mobile.server.settings.serverSection": "Serveur",
   "mobile.server.settings.timezone": "Fuseau horaire",
   "mobile.server.settings.timezoneAutomatic": "Automatique",
   "mobile.server.settings.timezoneSystem": "Fuseau du serveur : {zone}",
@@ -471,15 +477,64 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "Cela supprime les connexions, cookies et données de sites du profil. Ses onglets ouverts se ferment.",
   "mobile.server.browserProfiles.deleteAgents": "Ces agents passent au profil partagé : {agents}.",
+  "mobile.server.browserProxies.unsupported": "Mettez à jour OpenBot sur ce serveur pour gérer ses proxys ici.",
+  "mobile.server.browserProxies.loading": "Chargement des proxys…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot n’a pas pu charger les proxys.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot n’a pas pu modifier le proxy.",
+  "mobile.server.browserProxies.title": "Proxys",
+  "mobile.server.browserProxies.sectionHint":
+    "Un profil avec un proxy ouvre ses pages via ce proxy. Un membre partage un ordinateur depuis l’application de bureau OpenBot.",
+  "mobile.server.browserProxies.limit": "Un serveur peut avoir au plus {limit} proxys.",
+  "mobile.server.browserProxies.add": "Ajouter un proxy",
+  "mobile.server.browserProxies.new": "Nouveau proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatique",
+  "mobile.server.browserProxies.profileHint":
+    "« Automatique » utilise les réglages de proxy de l’ordinateur qui exécute le serveur.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { one: "{count} profil", other: "{count} profils" },
+  "mobile.server.browserProxies.online": "En ligne",
+  "mobile.server.browserProxies.offline": "{name} est hors ligne",
+  "mobile.server.browserProxies.failing": "{name} ne répond pas",
+  "mobile.server.browserProxies.signInRefused": "{name} a refusé l’identification",
+  "mobile.server.browserProxies.yourComputer": "Votre ordinateur",
+  "mobile.server.browserProxies.memberComputer": "Ordinateur de {name}",
+  "mobile.server.browserProxies.unknownComputer": "Ordinateur d’un membre",
+  "mobile.server.browserProxies.gone": "Ce proxy n’est plus sur le serveur.",
+  "mobile.server.browserProxies.editTitle": "Modifier {name} ?",
+  "mobile.server.browserProxies.address": "Adresse",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Utilisez socks5, http ou https. Le nom d’utilisateur et le mot de passe sont facultatifs. Le mot de passe reste chiffré sur l’ordinateur qui exécute le serveur.",
+  "mobile.server.browserProxies.addressInvalid":
+    "Ce n’est pas une adresse de proxy. Utilisez socks5://host:1080, http://user:password@host:3128 ou host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "Les pages des profils qui utilisent cet ordinateur passent par sa connexion Internet tant que son membre le partage depuis l’application de bureau OpenBot. L’ordinateur n’ouvre que les adresses Internet publiques.",
+  "mobile.server.browserProxies.profilesTitle": "Profils",
+  "mobile.server.browserProxies.delete": "Supprimer le proxy",
+  "mobile.server.browserProxies.deleteHint": "La suppression fait passer les profils de ce proxy en « Automatique ».",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profil utilise ce proxy. Il passe en « Automatique ».",
+    other: "{count} profils utilisent ce proxy. Ils passent en « Automatique ».",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Aucun profil n’utilise ce proxy.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "{count} onglet ouvert se ferme.",
+    other: "{count} onglets ouverts se ferment.",
+  },
+  "mobile.server.browserProxies.changeTitle": "Changer le proxy de {name} ?",
+  "mobile.server.browserProxies.change": "Changer de proxy",
+  "mobile.server.browserProxies.choiceHint":
+    "« Automatique » utilise les réglages de proxy de l’ordinateur qui exécute le serveur. Un changement ferme les onglets ouverts du profil.",
+  "mobile.server.browserProxies.shareHint":
+    "Pour utiliser votre ordinateur, partagez-le dans l’application de bureau OpenBot.",
   "mobile.server.route.connectors": "Connecteurs",
-  "mobile.server.settings.connectors": "Connecteurs",
   "mobile.server.connectors.unavailable":
     "Connectez-vous à ce serveur en tant que propriétaire ou administrateur pour gérer ses connecteurs.",
   "mobile.server.connectors.unsupported": "Mettez à jour OpenBot sur ce serveur pour gérer ses connecteurs ici.",
   "mobile.server.connectors.loading": "Chargement des connecteurs…",
-  "mobile.server.connectors.onServer": "Sur {name}",
-  "mobile.server.connectors.notSetUp": "Non configuré",
-  "mobile.server.connectors.available": "Disponible",
   "mobile.server.connectors.localOnly": "App de bureau uniquement",
   "mobile.server.connectors.statusConnected": "Connecté",
   "mobile.server.connectors.statusAttention": "Action requise",
@@ -499,10 +554,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Ajouter un agent",
   "mobile.server.connectors.later": "Plus tard",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Remplit les identifiants du navigateur depuis Bitwarden. Configurez-le dans l’app de bureau.",
-  "mobile.server.connectors.bitwarden.hostSummary":
-    "Remplit les identifiants du navigateur depuis Bitwarden ou Vaultwarden",
   "mobile.server.connectors.bitwarden.description":
     "Remplir les identifiants du navigateur sur {host} depuis Bitwarden ou Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -529,7 +580,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} supprime la clé d’API et le mot de passe principal. Les agents de {host} ne peuvent plus remplir les identifiants depuis Bitwarden.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Dépôts, tickets et pull requests pour chaque agent",
   "mobile.server.connectors.github.description":
     "Chaque agent de {host} peut utiliser vos dépôts, tickets et pull requests GitHub, ainsi que gh et git.",
   "mobile.server.connectors.github.unavailable": "OpenBot sur ce serveur ne peut pas connecter GitHub.",
@@ -562,7 +612,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "Cela supprime la connexion de @{login} de {host}, et tous les agents perdent les outils GitHub, gh et git. GitHub s’ouvre ensuite, et vous pouvez y révoquer OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "Un coffre partagé pour les connexions dans le navigateur OpenBot",
   "mobile.server.connectors.onePassword.description":
     "Partagez un coffre 1Password dédié avec OpenBot sur {host} via un compte de service, pour que les agents de {host} puissent se connecter aux sites dans son navigateur.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -581,16 +630,53 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Déconnecter 1Password ?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} oublie le jeton. Le coffre et le compte de service restent dans 1Password ; supprimez-les là-bas si vous n’en avez plus besoin.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Partagez un coffre Proton Pass avec OpenBot sur {host}, pour que les agents de {host} puissent se connecter à des sites dans son navigateur.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Dans Proton Pass, créez une clé d’accès qui peut lire uniquement le coffre partagé avec OpenBot, puis collez-la ici. {host} garde la clé ; ce téléphone non.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} n’est pas disponible sur ce serveur.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Connectez-vous à {name} sur ce téléphone. Ensuite, {host} crée un coffre partagé et une clé d’accès en lecture seule pour ce coffre, et ne garde que cette clé. Les agents ne voient jamais de mot de passe.",
+  "mobile.server.connectors.passwordManager.connect": "Connecter {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Connexion…",
+  "mobile.server.connectors.passwordManager.useKey": "Utiliser une clé d’accès",
+  "mobile.server.connectors.passwordManager.key": "Clé d’accès",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Connecter avec la clé",
+  "mobile.server.connectors.passwordManager.signInTitle": "Se connecter à {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Connectez-vous sur la page de {name}. Cette page change lorsque vous êtes connecté.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} obtient la page de connexion…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Ouvrir la page de connexion",
+  "mobile.server.connectors.passwordManager.copyLink": "Copier le lien",
+  "mobile.server.connectors.passwordManager.extraPassword": "Mot de passe supplémentaire",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} demande votre mot de passe supplémentaire. Il est envoyé une fois à {host} ; ce téléphone ne le garde pas.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Le mot de passe supplémentaire n’est pas correct. Réessayez.",
+  "mobile.server.connectors.passwordManager.continue": "Continuer",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} crée le coffre partagé…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Coffre partagé",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Déplacez un identifiant dans ce coffre dans {name} pour que les agents puissent l’utiliser. Retirez-le pour arrêter.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} identifiant", other: "{count} identifiants" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Clé d’accès",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Lecture seule",
+  "mobile.server.connectors.passwordManager.keyExpires": "Lecture seule. Expire le {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Expirée le {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "L’outil en ligne de commande de {name} nécessite une offre payante. Changez l’offre de votre compte, puis reconnectez-vous.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "La clé {name} a expiré",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Les agents de {host} ne peuvent pas se connecter avec vos identifiants partagés tant que vous ne vous reconnectez pas.",
+  "mobile.server.connectors.passwordManager.disconnect": "Déconnecter {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Déconnecter {name} ?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} supprime sa clé d’accès. Le coffre et ses identifiants restent dans votre compte {name}.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Les utilisateurs mentionnent @OpenBot dans Slack",
   "mobile.server.connectors.slack.description":
     "Les utilisateurs mentionnent @OpenBot dans Slack ou lui envoient un message direct. Le Slack Orchestrator sollicite le bon agent et répond.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Le Slack Orchestrator répond",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · Aucun agent ne répond encore",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} espace de travail · Le Slack Orchestrator répond",
-    other: "{count} espaces de travail · Le Slack Orchestrator répond",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} espace de travail demande votre attention",
     other: "{count} espaces de travail demandent votre attention",
@@ -634,15 +720,8 @@ export const messages = {
     "Ce nouvel agent répond à tout ce que les utilisateurs envoient à @OpenBot dans {workspace}.",
   "mobile.server.connectors.slack.installFailed": "Slack n’a pas terminé l’installation. Réessayez.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Les utilisateurs mentionnent @OpenBot dans un serveur Discord",
   "mobile.server.connectors.discord.description":
     "Les utilisateurs mentionnent @OpenBot dans un canal d’un serveur Discord. Le Discord Orchestrator sollicite le bon agent et répond.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Le Discord Orchestrator répond",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · Aucun agent ne répond encore",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} serveur Discord · Le Discord Orchestrator répond",
-    other: "{count} serveurs Discord · Le Discord Orchestrator répond",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} serveur Discord demande votre attention",
     other: "{count} serveurs Discord demandent votre attention",
@@ -686,17 +765,8 @@ export const messages = {
     "Ce nouvel agent répond à tout ce que les utilisateurs envoient à @OpenBot dans {workspace}.",
   "mobile.server.connectors.discord.installFailed": "Discord n’a pas terminé l’autorisation. Réessayez.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Ajoutez le bot OpenBot à une discussion Telegram",
   "mobile.server.connectors.telegram.description":
     "Ajoutez le bot OpenBot à un groupe Telegram ou ouvrez une discussion directe avec lui. Le Telegram Orchestrator sollicite le bon agent et répond.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} discussion · Le Telegram Orchestrator répond",
-    other: "{count} discussions · Le Telegram Orchestrator répond",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} discussion · Aucun agent ne répond encore",
-    other: "{count} discussions · Aucun agent ne répond encore",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} discussion demande votre attention",
     other: "{count} discussions demandent votre attention",
@@ -736,6 +806,114 @@ export const messages = {
     "Les conversations et le Telegram Orchestrator restent dans OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "C’est la dernière discussion : le Telegram Orchestrator et ses conversations sont supprimés d’OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Associez un numéro WhatsApp à ce serveur. Le WhatsApp Orchestrator sollicite le bon agent et répond.",
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} numéro demande votre attention",
+    other: "{count} numéros demandent votre attention",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Numéros",
+  "mobile.server.connectors.whatsapp.linkNumber": "Associer un numéro",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "Les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp a retiré ce serveur des appareils connectés. Associez à nouveau le numéro.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot ne peut pas joindre WhatsApp sur ce numéro. Reconnectez-le ou déconnectez-le.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp a demandé à OpenBot de patienter. Nouvel essai à {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Réassocier",
+  "mobile.server.connectors.whatsapp.ownNumber": "Numéro personnel",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Seules votre discussion « Message à vous-même » et les personnes que vous autorisez peuvent écrire. Désactivez pour un numéro réservé à OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Cet agent reçoit les messages destinés à OpenBot depuis tous vos numéros associés. Il répond lui-même aux messages courts, confie les autres tâches au bon agent et répond dans WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Ajoutez le WhatsApp Orchestrator, sinon WhatsApp ne reçoit aucune réponse.",
+  "mobile.server.connectors.whatsapp.addAgent": "Ajouter le WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.note":
+    "Sur votre numéro personnel, écrivez dans votre discussion « Message à vous-même ». Les personnes que vous autorisez écrivent au numéro.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Associer WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Sélectionnez le numéro, puis associez ce serveur depuis WhatsApp sur votre téléphone.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "Sur un téléphone, associez avec un code d’association. Pour scanner un code QR, utilisez OpenBot sur un ordinateur.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Numéro",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Mon numéro personnel",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot répond uniquement à votre discussion « Message à vous-même » et aux personnes que vous autorisez.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Un numéro réservé à OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Les inconnus reçoivent un code à vous transmettre. Vous les approuvez ici.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Numéro de téléphone",
+  "mobile.server.connectors.whatsapp.phoneDescription": "Avec l’indicatif du pays, par exemple +44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Saisissez le numéro de téléphone avec l’indicatif du pays.",
+  "mobile.server.connectors.whatsapp.getCode": "Obtenir le code",
+  "mobile.server.connectors.whatsapp.starting": "Demande d’un code à WhatsApp…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "Dans WhatsApp, ouvrez Appareils connectés et touchez Connecter un appareil",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Touchez Connecter avec un numéro de téléphone",
+  "mobile.server.connectors.whatsapp.codeStepType": "Saisissez ce code sur le téléphone",
+  "mobile.server.connectors.whatsapp.codeLabel": "Code d’association {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Copier le code",
+  "mobile.server.connectors.whatsapp.codeWaiting": "En attente du téléphone.",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp n’a pas été associé",
+  "mobile.server.connectors.whatsapp.failedTimeout": "Le code a expiré avant que le téléphone l’utilise.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp a refusé l’association. Patientez quelques minutes, puis réessayez.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Une autre association est en cours. Attendez qu’elle se termine, puis réessayez.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot ne peut pas joindre WhatsApp. Vérifiez la connexion Internet.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Réessayer",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Ce nouvel agent répond aux messages destinés à OpenBot sur {number} et sur chaque numéro que vous associerez plus tard.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot est associé à {number}",
+  "mobile.server.connectors.whatsapp.done": "Terminé",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "Déconnecter {number} ?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot se déconnecte de WhatsApp sur {number}. Si OpenBot était éteint, retirez aussi l’appareil dans WhatsApp > Appareils connectés.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "Personne ne peut plus joindre vos agents via {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept":
+    "Les conversations et le WhatsApp Orchestrator restent dans OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "C’est le dernier numéro : le WhatsApp Orchestrator et ses conversations sont supprimés d’OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "Rester associé",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Qui peut écrire à {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription":
+    "Ces contacts et groupes peuvent confier des tâches à vos agents.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Vous seul pouvez écrire. Ajoutez un contact ou un groupe.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Un numéro peut autoriser jusqu’à {count} contacts et groupes.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Groupe",
+  "mobile.server.connectors.whatsapp.removeSender": "Retirer",
+  "mobile.server.connectors.whatsapp.addContact": "Ajouter un contact",
+  "mobile.server.connectors.whatsapp.addGroup": "Ajouter un groupe",
+  "mobile.server.connectors.whatsapp.contactTitle": "Ajouter un contact",
+  "mobile.server.connectors.whatsapp.contactDescription":
+    "Cette personne peut confier des tâches à vos agents depuis WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "Nom",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "Facultatif. S’il est vide, la liste affiche le numéro de téléphone.",
+  "mobile.server.connectors.whatsapp.add": "Ajouter",
+  "mobile.server.connectors.whatsapp.groupTitle": "Ajouter un groupe",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Les membres de ce groupe peuvent confier des tâches à vos agents.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Rechercher des groupes",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Lecture des groupes…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot n’a pas pu lire les groupes",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Ce numéro n’est dans aucun groupe.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Aucun groupe ne porte ce nom.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Ajouté",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Demandes pour {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Ces personnes ont écrit au numéro et ont reçu un code. Approuvez une personne uniquement si elle vous a donné le même code.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Aucune demande.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Code {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Approuver",
+  "mobile.server.connectors.whatsapp.deny": "Refuser",
   "mobile.server.settings.providers": "Fournisseurs",
   "mobile.server.settings.providersConnected": { one: "{count} connecté", other: "{count} connectés" },
   "mobile.server.providers.description": "Les fournisseurs d’IA de l’ordinateur qui exécute ce serveur.",
@@ -771,6 +949,8 @@ export const messages = {
   "mobile.server.providers.copy": "Copier",
   "mobile.server.providers.copyCode": "Copier le code",
   "mobile.server.providers.paste": "Coller",
+  "mobile.server.providers.codeStepChatgpt":
+    "Dans ChatGPT sur un ordinateur, ouvrez les paramètres de sécurité et activez la connexion par code d’appareil pour Codex. Pour un compte professionnel, l’administrateur de votre espace de travail l’active.",
   "mobile.server.providers.codeStepCopy": "Copiez le code.",
   "mobile.server.providers.codeStepEnter": "Ouvrez la page de connexion et saisissez le code.",
   "mobile.server.providers.codeStepReturn": "Revenez dans OpenBot. La connexion se termine toute seule.",
@@ -833,6 +1013,43 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installé",
   "mobile.server.providers.status.notInstalled": "Non installé",
   "mobile.server.providers.status.checking": "Vérification",
+  "mobile.server.providers.models": "Modèles",
+  "mobile.server.providers.modelsCount": "{shown} sur {total}",
+  "mobile.server.providers.modelsTitle": "Modèles de {name}",
+  "mobile.server.providers.modelsSearch": "Rechercher des modèles",
+  "mobile.server.providers.modelsShowAll": "Tout afficher",
+  "mobile.server.providers.modelsHideAll": "Tout masquer",
+  "mobile.server.providers.modelsReset": "Rétablir par défaut",
+  "mobile.server.providers.modelsSelected": "Sélectionnés : {shown} sur {total}.",
+  "mobile.server.providers.modelsHint":
+    "Le sélecteur de modèles de ce serveur affiche les modèles sélectionnés. Les agents peuvent toujours utiliser tous les modèles.",
+  "mobile.server.providers.modelsNoMatch": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.server.providers.modelsNone": "Ce fournisseur ne liste aucun modèle.",
+  "mobile.server.providers.modelsLoading": "Chargement des modèles…",
+  "mobile.server.providers.modelsLoadFailed": "Impossible de charger les modèles de ce fournisseur.",
+  "mobile.server.providers.modelsFailed": "Impossible de modifier les modèles. Réessayez.",
+  "mobile.server.providers.promptCache": "Cache des prompts",
+  "mobile.server.providers.promptCacheHint":
+    "Durée pendant laquelle Claude garde le contexte d'un agent en cache entre les tours. Le changement s'applique au prochain démarrage de Claude.",
+  "mobile.server.providers.promptCacheDefault": "Par défaut de Claude Code",
+  "mobile.server.providers.promptCacheHour": "1 heure",
+  "mobile.server.providers.promptCacheLoadFailed": "Impossible de charger la durée du cache des prompts de ce serveur.",
+  "mobile.server.providers.disconnect": "Déconnecter",
+  "mobile.server.providers.disconnectTitle": "Déconnecter {name} ?",
+  "mobile.server.providers.disconnectBody":
+    "OpenBot déconnecte {provider} sur le serveur. Ses agents attendent que vous reconnectiez {provider}.",
+  "mobile.server.providers.resetUsage": "Réinitialiser l'usage",
+  "mobile.server.providers.resettingUsage": "Réinitialisation…",
+  "mobile.server.providers.resetUsageTitle": "Réinitialiser l'usage de {name} ?",
+  "mobile.server.providers.resetUsageBody":
+    "Cela utilise un crédit de réinitialisation. Les limites d'usage consommées de ce compte repartent maintenant. Cette action est irréversible.",
+  "mobile.server.providers.resetUsageHint": "Crédits de réinitialisation : {available}.",
+  "mobile.server.providers.resetUsageDone": "Les limites d'usage de {name} repartent maintenant.",
+  "mobile.server.providers.resetUsageNothing":
+    "{name} n'a aucune limite d'usage consommée. Aucun crédit n'a été utilisé.",
+  "mobile.server.providers.resetUsageNoCredit": "{name} n'a plus de crédit de réinitialisation.",
+  "mobile.server.providers.resetUsageAlreadyRedeemed": "Ce crédit de {name} a déjà été utilisé.",
+  "mobile.server.providers.resetUsageFailed": "Impossible de réinitialiser l'usage. Réessayez.",
   "mobile.server.settings.mcp": "Serveurs MCP",
   "mobile.server.settings.mcpCount": { one: "{count} serveur", other: "{count} serveurs" },
   "mobile.server.mcp.unsupported": "Mettez à jour OpenBot sur ce serveur pour gérer ses serveurs MCP ici.",

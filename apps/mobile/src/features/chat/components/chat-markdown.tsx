@@ -13,12 +13,14 @@ import * as Linking from "expo-linking";
 import { useThemeColor } from "heroui-native/hooks";
 import Blocks from "lucide-react-native/icons/blocks";
 import FileText from "lucide-react-native/icons/file-text";
+import Globe from "lucide-react-native/icons/globe";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import type { Token, Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 import {
   type ColorValue,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   type TextStyle,
@@ -57,7 +59,9 @@ import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
 import { ChatCodePreview } from "./chat-code-preview";
+import { useOpenMessageFile } from "./chat-file-actions";
 import { ChatMath } from "./chat-math";
+import { useOpenTaggedTab } from "./chat-tag-actions";
 import { CHAT_CODE_STYLES, CHAT_HEADING_RAMP, CHAT_TEXT_STYLES, type ChatTextType } from "./chat-text-styles";
 import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
@@ -152,7 +156,11 @@ function textSize(presentation: TextPresentation): number {
 function textContainerStyle(source: string, presentation: TextPresentation): TextStyle {
   const hasMention =
     chatTagReferences(source).some(
-      (reference) => reference.kind === "agent" || reference.kind === "skill" || reference.kind === "mcp",
+      (reference) =>
+        reference.kind === "agent" ||
+        reference.kind === "skill" ||
+        reference.kind === "mcp" ||
+        reference.kind === "tab",
     ) || plainMentionParts(source, presentation.agents).some((part) => part.agent);
   // Inline math is moved down to the math axis in the same way.
   const hasMath = chatMathStart(source) !== undefined;
@@ -218,7 +226,7 @@ const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
 
 /**
  * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
- * in the colour of its file family. Mobile cannot open workspace files, so it is not a control.
+ * in the colour of its file family. In a chat message, a tap opens the file, as on desktop.
  */
 function FileReference({
   text,
@@ -231,31 +239,45 @@ function FileReference({
 }) {
   const name = fileReferenceName(text.trim());
   const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
+  const open = useOpenMessageFile()?.(text);
   const small = presentation.type === "body-sm";
+  // A chip that opens nothing stays a view, so it does not take the touch from the message.
+  const Chip = open ? Pressable : View;
+  const control = open
+    ? {
+        accessibilityRole: "button" as const,
+        accessibilityLabel: presentation.t("mobile.chat.markdown.openFile", { name }),
+        onPress: open,
+      }
+    : null;
   if (Platform.OS === "android") {
     // Android does not move a view that is wider than the rest of the line to the next line, so a long
     // path was cut at the edge of the message. Only the small badge is a view; the name is text of the
     // paragraph and wraps as text does.
     return (
       <>
-        <View
+        {/* The name is the one button that a screen reader finds; the badge only takes the tap. */}
+        <Chip
           collapsable={false}
           className="pl-0.5 pr-1"
           style={{ transform: [{ translateY: presentation.mentionOffset }] }}
+          accessible={false}
+          {...(control ? { onPress: control.onPress } : null)}
         >
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
-        </View>
-        <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }}>
+        </Chip>
+        <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }} {...control}>
           {`${WORD_JOINER}${text.trim()}`}
         </Text>
       </>
     );
   }
   return (
-    <View
+    <Chip
       collapsable={false}
       className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5"
       style={inlineChipStyle(presentation, small ? 16 : CHAT_TEXT_STYLES[presentation.type].lineHeight, inRow)}
+      {...control}
     >
       <FileBadge name={name} color={String(color)} soft={String(soft)} />
       <Text
@@ -270,7 +292,7 @@ function FileReference({
       >
         {text.trim()}
       </Text>
-    </View>
+    </Chip>
   );
 }
 
@@ -409,6 +431,44 @@ function SkillMention({ name, app, presentation }: { name: string; app: boolean;
   );
 }
 
+/**
+ * A browser tab that a message tags: the same chip as a skill, with the globe mark. Where the phone
+ * can show the host's browser, a tap opens the tab, as a click on the desktop chip does.
+ */
+function TabMention({ id, name, presentation }: { id: string; name: string; presentation: TextPresentation }) {
+  const openTab = useOpenTaggedTab();
+  const chip = mentionChip(presentation);
+  const content = (
+    <>
+      <Globe
+        color={presentation.style.color === undefined ? undefined : String(presentation.style.color)}
+        size={chip.mark - 2 * presentation.fontScale}
+        strokeWidth={2}
+      />
+      <Text style={chip.label}>{name}</Text>
+    </>
+  );
+  const className = "max-w-full flex-row items-center gap-1 rounded-full bg-control/30 pr-1.5 pl-1";
+  if (!openTab)
+    return (
+      <View collapsable={false} className={className} style={chip.style}>
+        {content}
+      </View>
+    );
+  return (
+    <Pressable
+      collapsable={false}
+      className={className}
+      style={chip.style}
+      accessibilityRole="button"
+      accessibilityLabel={presentation.t("mobile.chat.markdown.openBrowserTab", { name })}
+      onPress={() => openTab(id)}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
 function openMessageLink(url: string): void {
   void haptics.impact("soft");
   void Linking.openURL(url).catch((error: unknown) => {
@@ -447,6 +507,12 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
           app={reference?.kind === "mcp"}
           presentation={presentation}
         />
+      );
+    }
+    if (token.type === "tabMention") {
+      const reference = chatTagReferences(token.raw)[0];
+      return (
+        <TabMention key={offset} id={reference?.id ?? ""} name={reference?.name ?? ""} presentation={presentation} />
       );
     }
     if (token.type === "br") return "\n";

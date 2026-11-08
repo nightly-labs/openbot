@@ -68,12 +68,48 @@ interface HostWorkflowWebhooks {
   changed(workflowId: string): void;
 }
 
+/** What happened to one inbound webhook request. It holds no ID, body, or secret. */
+type WebhookDeliveryResult =
+  | "started"
+  | "ignored"
+  | "duplicate"
+  | "gone"
+  | "too_large"
+  | "unavailable"
+  | "signed_out"
+  | "unknown_route"
+  | "secret_unreadable"
+  | "bad_signature"
+  | "bad_body"
+  | "failed";
+
+type WebhookIgnoredReason = "event-type" | "filter" | "inactive" | "busy" | "refused";
+
+/** One inbound webhook request, for usage analytics. */
+export interface WebhookDeliveryReport {
+  /** Null when no route has the request's route ID. */
+  ownerKind: WebhookRouteOwner["kind"] | null;
+  format: "openbot" | "standard";
+  result: WebhookDeliveryResult;
+  ignoredReason: WebhookIgnoredReason | null;
+  status: WebhookDeliveryStatus;
+  bodyBytes: number;
+  /** The time from the start of the checks to the answer. */
+  handleMs: number;
+  /** The time from the signed timestamp to the receipt. Null before the signature is verified. */
+  ageMs: number | null;
+  /** A test event that the host sent to itself. */
+  test: boolean;
+}
+
 export interface HostEventsServiceOptions {
   routines: RoutineRecords;
   workflows?: HostWorkflowWebhooks;
   cipher: SecretCipher;
   relay: HostWebhookRelay;
   accountPrincipal: () => string | null;
+  /** Receives one report for each inbound request after the answer is known. */
+  onDelivery?: (report: WebhookDeliveryReport) => void;
 }
 
 const { sync: eventStep, rewrap: toHostEventsFailure } = causeHelpers(HostEventsFailure);
@@ -132,6 +168,35 @@ function testEventData(filters: readonly EventFilter[]): EventJsonValue {
 }
 
 type ReceivedDelivery = WebhookReceiveResult<unknown> | WorkflowWebhookResult | { kind: "unavailable" };
+
+/** The checks' result for one request. `received` is null when a check refused the request first. */
+interface ProcessedDelivery {
+  status: WebhookDeliveryStatus;
+  received: ReceivedDelivery | null;
+  refusal: WebhookDeliveryResult | null;
+  ownerKind: WebhookRouteOwner["kind"] | null;
+  /** True after the signature check passed. */
+  authenticated: boolean;
+}
+
+function refused(
+  status: WebhookDeliveryStatus,
+  refusal: WebhookDeliveryResult,
+  ownerKind: WebhookRouteOwner["kind"] | null = null,
+  authenticated = false,
+): ProcessedDelivery {
+  return { status, received: null, refusal, ownerKind, authenticated };
+}
+
+function deliveryResult(received: ReceivedDelivery): WebhookDeliveryResult {
+  return received.kind === "too-large" ? "too_large" : received.kind;
+}
+
+/** Signed timestamps are unix seconds. A sender clock ahead of the host gives zero. */
+function deliveryAgeMs(timestamp: string, now: number): number | null {
+  const seconds = Number(timestamp);
+  return Number.isFinite(seconds) ? Math.max(0, now - seconds * 1000) : null;
+}
 
 function deliveryStatus(result: ReceivedDelivery) {
   switch (result.kind) {
@@ -330,7 +395,7 @@ export class HostEventsService implements HostEventsApi {
     this: HostEventsService,
     input: WebhookIngressDelivery,
   ): Effect.fn.Return<{ status: WebhookDeliveryStatus }, HostEventsFailure> {
-    const { status } = yield* this.#process(input);
+    const { status } = yield* this.#deliver(input, false);
     return { status };
   }).bind(this);
 
@@ -366,13 +431,16 @@ export class HostEventsService implements HostEventsApi {
     const timestamp = String(Math.floor(Date.now() / 1000));
     // A new ID for each test, so the receipt check never takes it for a redelivery.
     const deliveryId = `openbot-test-${randomUUID()}`;
-    const { status, received } = yield* this.#process({
-      routeId: route.routeId,
-      deliveryId,
-      timestamp,
-      signature: signWebhookBody(secret, timestamp, deliveryId, body),
-      body,
-    });
+    const { status, received } = yield* this.#deliver(
+      {
+        routeId: route.routeId,
+        deliveryId,
+        timestamp,
+        signature: signWebhookBody(secret, timestamp, deliveryId, body),
+        body,
+      },
+      true,
+    );
     if (received?.kind === "started")
       return { eventType, status: "started", reason: null, runId: runIdOf(received.run) };
     // The route is a routine's, so it is never busy or refused: only a workflow skips a request so.
@@ -487,6 +555,31 @@ export class HostEventsService implements HostEventsApi {
     this.#options.relay.setAccountActive(principalId !== null);
   }
 
+  /** Processes one request and reports it, also when the processing fails. */
+  readonly #deliver = Effect.fn("HostEvents.deliver")(function* (
+    this: HostEventsService,
+    input: WebhookIngressDelivery,
+    test: boolean,
+  ): Effect.fn.Return<ProcessedDelivery, HostEventsFailure> {
+    const started = performance.now();
+    const outcome = yield* Effect.result(this.#process(input));
+    const processed = outcome._tag === "Success" ? outcome.success : null;
+    const received = processed?.received ?? null;
+    this.#options.onDelivery?.({
+      ownerKind: processed?.ownerKind ?? null,
+      format: input.format === STANDARD_WEBHOOKS_FORMAT ? "standard" : "openbot",
+      result: processed ? (processed.refusal ?? (received ? deliveryResult(received) : "failed")) : "failed",
+      ignoredReason: received?.kind === "ignored" ? received.reason : null,
+      status: processed?.status ?? 503,
+      bodyBytes: input.body.byteLength,
+      handleMs: performance.now() - started,
+      ageMs: processed?.authenticated ? deliveryAgeMs(input.timestamp, Date.now()) : null,
+      test,
+    });
+    if (outcome._tag === "Failure") return yield* outcome.failure;
+    return outcome.success;
+  });
+
   /**
    * Verifies one request and starts its routine. `received` is what the routine did with a verified
    * request, and null when a check refused the request first.
@@ -494,11 +587,12 @@ export class HostEventsService implements HostEventsApi {
   readonly #process = Effect.fn("HostEvents.process")(function* (
     this: HostEventsService,
     input: WebhookIngressDelivery,
-  ): Effect.fn.Return<{ status: WebhookDeliveryStatus; received: ReceivedDelivery | null }, HostEventsFailure> {
-    if (this.#options.accountPrincipal() === null) return { status: 503, received: null };
-    if (input.body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) return { status: 413, received: null };
+  ): Effect.fn.Return<ProcessedDelivery, HostEventsFailure> {
+    if (this.#options.accountPrincipal() === null) return refused(503, "signed_out");
+    if (input.body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) return refused(413, "too_large");
     const route = yield* eventStep(() => this.#options.routines.routes.find(input.routeId));
-    if (!route) return { status: 404, received: null };
+    if (!route) return refused(404, "unknown_route");
+    const ownerKind = route.owner.kind;
     const secret = yield* Effect.result(
       eventStep(() => {
         const value = this.#options.cipher.decrypt(Buffer.from(route.secretCiphertext, "base64"));
@@ -509,14 +603,14 @@ export class HostEventsService implements HostEventsApi {
     // The sender's request is not at fault, so it can retry when the host can read the secret again.
     if (secret._tag === "Failure") {
       logger.warn("A webhook signing secret could not be decrypted.");
-      return { status: 503, received: null };
+      return refused(503, "secret_unreadable", ownerKind);
     }
     const standard = input.format === STANDARD_WEBHOOKS_FORMAT;
     const verify = standard ? verifyStandardWebhookSignature : verifyWebhookSignature;
     const authenticated = yield* Effect.result(eventStep(() => verify(secret.success, input, input.signature)));
-    if (authenticated._tag === "Failure") return { status: 401, received: null };
+    if (authenticated._tag === "Failure") return refused(401, "bad_signature", ownerKind);
     const body = standard ? decodeStandardWebhookBody(input.body) : decodeWebhookBody(input.body);
-    if (!body) return { status: 400, received: null };
+    if (!body) return refused(400, "bad_body", ownerKind, true);
     const receivedAt = new Date().toISOString();
     const event = {
       deliveryId: input.deliveryId,
@@ -530,7 +624,7 @@ export class HostEventsService implements HostEventsApi {
       owner.kind === "workflow"
         ? yield* this.#receiveWorkflow({ workflowId: owner.id, nodeId: route.routineId, event })
         : yield* toHostEventsFailure(this.#options.routines.receiveWebhook(owner, route.routineId, event));
-    return { status: deliveryStatus(received), received };
+    return { status: deliveryStatus(received), received, refusal: null, ownerKind, authenticated: true };
   });
 
   /** A route of a workflow while this host has no workflows is gone, as a deleted routine is. */
@@ -571,6 +665,7 @@ export class HostEventsService implements HostEventsApi {
           trigger: recordTrigger,
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+          ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
         }),
       );
       return { saved, secret };

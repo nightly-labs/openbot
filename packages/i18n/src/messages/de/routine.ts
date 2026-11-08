@@ -330,6 +330,9 @@ export const messages = {
   "routine.settings.missedPolicy": "Wenn OpenBot zur geplanten Zeit geschlossen war",
   "routine.settings.missedPolicy.skip": "Diese Ausführung überspringen",
   "routine.settings.missedPolicy.runOnce": "Einmal ausführen, wenn OpenBot öffnet",
+  "routine.settings.runInThread": "In einem eigenen Thread ausführen",
+  "routine.settings.runInSaveFailed":
+    "Die Routine ist gespeichert, die Einstellung für den eigenen Thread aber nicht. Versuche es erneut.",
   "routine.settings.resultDestination": "Antworten senden an",
   "routine.settings.resultDestination.none": "Nur dieser Chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

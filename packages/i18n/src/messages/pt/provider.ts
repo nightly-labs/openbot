@@ -91,6 +91,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Iniciando o login de {name} em {host}…",
   "provider.codeLogin.pageOpening": "Abrindo a página de login de {name} em {host}…",
   "provider.codeLogin.linkStep": "Entre em {name}. O OpenBot continua sozinho.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "No ChatGPT em um computador, abra as configurações de segurança e ative o login com código de dispositivo para o Codex. Em uma conta de trabalho, o administrador do workspace ativa isso.",
   "provider.useApp.title": "Conecte {name} no app OpenBot",
   "provider.useApp.description":
     "O login em {name} volta para o computador que o iniciou, e uma aba do navegador não consegue recebê-lo. Conecte {name} no app OpenBot. O app conclui o login sozinho.",
@@ -152,7 +154,7 @@ export const messages = {
   "provider.geminiKey.label": "Chave de API do Gemini",
   "provider.claudeKey.title": "Chave de API da Anthropic",
   "provider.claudeKey.description":
-    'Salve uma chave de API da Anthropic no host. A Anthropic cobra cada solicitação na chave. Para usá-la em um agente, selecione a conta "Chave de API" no menu de modelos do agente. Quando o Claude não está conectado, todos os agentes usam a chave.',
+    'Salve uma chave de API da Anthropic no host. A Anthropic cobra cada solicitação no crédito de API da chave, não no seu plano do Claude. Para usá-la em um agente, selecione a conta "Chave de API" no menu de modelos do agente. Quando o Claude não está conectado, todos os agentes usam a chave.',
   "provider.claudeKey.label": "Chave de API da Anthropic",
   "provider.inceptionKey.title": "Chave de API da Inception",
   "provider.inceptionKey.description":
@@ -223,6 +225,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 hora",
   "provider.settings.promptCacheDefault": "Padrão do Claude Code",
   "provider.settings.promptCacheLoadFailed": "Não foi possível carregar a duração do cache de prompts deste servidor.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Usar minha configuração do Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Os agentes carregam seu CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
+  "provider.settings.claudeUserSetupLoadFailed": "Não foi possível carregar a configuração do Claude Code.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece no seletor de modelos.",
@@ -235,17 +242,10 @@ export const messages = {
   "provider.settings.modelShow": "Mostrar {name} ({id}) no seletor de modelos",
   "provider.settings.modelsNoMatch": "Nenhum modelo corresponde à busca.",
   "provider.settings.modelsLoadFailed": "Não foi possível carregar os modelos deste servidor.",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "CLI do {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 versão · {size}",
-    other: "{version} · {count} versões · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 versão · {size}", other: "{count} versões · {size}" },
-  "provider.settings.downloadAgain": "Quando você ativar {name}, o OpenBot baixa a CLI de novo.",
-  "provider.settings.removeDownloadConfirm": "Remover {size}?",
-  "provider.settings.removeDownloadKeeps": "Contas, logins e agentes continuam.",
-  "provider.settings.removeDownload": "Remover download",
-  "provider.settings.removingDownload": "Removendo…",
+  "provider.settings.deleteTitle": "Excluir {name}",
+  "provider.settings.deleteOn":
+    "Desativa {name} e exclui a CLI que o OpenBot baixou. Contas, logins e agentes continuam.",
+  "provider.settings.deleteOff":
+    "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
 } as const satisfies PartialTranslation<typeof source>;

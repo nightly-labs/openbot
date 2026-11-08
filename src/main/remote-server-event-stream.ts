@@ -1,4 +1,5 @@
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
@@ -57,6 +58,10 @@ const REMOTE_EVENT_RECONNECT_JITTER = 0.2;
 // focus. Focus and a manual retry still retry at once.
 const REMOTE_HOST_OFFLINE_RETRY_MS = 5 * 60_000;
 const REMOTE_HOST_OFFLINE_UNFOCUSED_RETRY_MS = 15 * 60_000;
+// A host that this app saw online within this time did not go away for good: its computer or its
+// network restarted, and it comes back soon. It keeps the normal backoff, so it reconnects within a
+// minute after it comes back, not after the offline delay (#4132). The backoff stops after this time.
+const REMOTE_HOST_RECENTLY_ONLINE_MS = 10 * 60_000;
 // A hosted server that starts after a wake request comes online in about a minute. It retries at
 // this delay, not with the backoff, so the user does not wait for a long delay after the start.
 const HOSTED_SERVER_START_RETRY_MS = 5_000;
@@ -115,6 +120,7 @@ export interface RemoteEventStreamOptions {
   onDirectTyping: (serverId: string, event: DirectTypingRealtimeEvent) => void;
   onHostRestart: (serverId: string, event: HostRestartEvent) => void;
   onMachineAlert: (serverId: string, event: MachineAlertEvent) => void;
+  onLiveVoice: (serverId: string, event: LiveVoiceEvent) => void;
   onOffline: (serverId: string) => void;
   onChanged: () => void;
 }
@@ -134,6 +140,7 @@ export class RemoteEventStream {
   readonly #onDirectTyping: RemoteEventStreamOptions["onDirectTyping"];
   readonly #onHostRestart: RemoteEventStreamOptions["onHostRestart"];
   readonly #onMachineAlert: RemoteEventStreamOptions["onMachineAlert"];
+  readonly #onLiveVoice: RemoteEventStreamOptions["onLiveVoice"];
   readonly #onOffline: RemoteEventStreamOptions["onOffline"];
   readonly #onChanged: RemoteEventStreamOptions["onChanged"];
   readonly #controllers = new Map<string, AbortController>();
@@ -144,6 +151,8 @@ export class RemoteEventStream {
   readonly #authenticationPaused = new Set<string>();
   /** When Signal last reported each host offline. */
   readonly #offlineHosts = new Map<string, number>();
+  /** When this app last saw each host online. */
+  readonly #seenOnlineAt = new Map<string, number>();
   /** Hosted servers that start after a wake request. */
   readonly #startingHosts = new Set<string>();
   #appFocused = true;
@@ -162,6 +171,7 @@ export class RemoteEventStream {
     this.#onDirectTyping = options.onDirectTyping;
     this.#onHostRestart = options.onHostRestart;
     this.#onMachineAlert = options.onMachineAlert;
+    this.#onLiveVoice = options.onLiveVoice;
     this.#onOffline = options.onOffline;
     this.#onChanged = options.onChanged;
   }
@@ -183,6 +193,7 @@ export class RemoteEventStream {
     this.#reconnectTimers.clear();
     this.#reconnectAttempts.clear();
     this.#offlineHosts.clear();
+    this.#seenOnlineAt.clear();
     this.#transportAttempts.clear();
     this.#authenticationPaused.clear();
     yield* Scope.close(this.#scope, Exit.void);
@@ -272,7 +283,15 @@ export class RemoteEventStream {
     return this.#offlineHosts.has(serverId);
   }
 
-  /** The next retry for this host waits the offline delay, also over a shorter one already set. */
+  /** The host is online now, or was online until now. */
+  markSeenOnline(serverId: string): void {
+    this.#seenOnlineAt.set(serverId, Date.now());
+  }
+
+  /**
+   * The next retry for this host waits the offline delay, also over a shorter one already set. A host
+   * seen online recently keeps the normal backoff.
+   */
   markHostOffline(serverId: string): void {
     this.#offlineHosts.set(serverId, Date.now());
     const reconnectTimer = this.#reconnectTimers.get(serverId);
@@ -367,6 +386,7 @@ export class RemoteEventStream {
     this.#reconnectTimers.delete(serverId);
     this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
+    this.#seenOnlineAt.delete(serverId);
     this.#startingHosts.delete(serverId);
     this.#authenticationPaused.delete(serverId);
     this.#sockets.delete(serverId);
@@ -431,7 +451,9 @@ export class RemoteEventStream {
     if (this.#authenticationPaused.has(serverId)) return;
     const attempt = (this.#reconnectAttempts.get(serverId) ?? 0) + 1;
     this.#reconnectAttempts.set(serverId, attempt);
-    const hostOffline = this.#offlineHosts.has(serverId);
+    const seenOnlineAt = this.#seenOnlineAt.get(serverId);
+    const recentlyOnline = seenOnlineAt !== undefined && Date.now() - seenOnlineAt < REMOTE_HOST_RECENTLY_ONLINE_MS;
+    const hostOffline = this.#offlineHosts.has(serverId) && !recentlyOnline;
     const offlineDelay = this.#appFocused ? REMOTE_HOST_OFFLINE_RETRY_MS : REMOTE_HOST_OFFLINE_UNFOCUSED_RETRY_MS;
     const maximumDelay = hostOffline ? offlineDelay : REMOTE_EVENT_RECONNECT_MAX_MS;
     const exponentialDelay = hostOffline
@@ -567,6 +589,8 @@ export class RemoteEventStream {
               this.#onHostRestart(serverId, event);
             } else if (event.type === "machine-alert") {
               this.#onMachineAlert(serverId, event);
+            } else if (event.type === "live-voice") {
+              this.#onLiveVoice(serverId, event);
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {

@@ -5,9 +5,11 @@ import type {
   AgentInstructionsChange,
   AgentModelId,
   AgentReasoningEffort,
+  AgentTask,
   AttachmentSummary,
   AvatarColor,
   AvatarHue,
+  BrowserTab,
   ChannelRoutingConversationEvent,
   ClientAgentSummary,
   ConversationMemoryChange,
@@ -79,6 +81,8 @@ export interface AgentMessageMarkerModel {
   replyToMessageId: string | null;
   /** The sender asked for no answer, so the marker names it as information rather than a request. */
   expectsReply: boolean;
+  /** The sender's side thread that sent an incoming message. The sender link opens it. */
+  senderTaskId?: string;
   /** Set when the chat has the text of the message: whether the text shows under the marker. */
   expanded?: boolean;
 }
@@ -144,11 +148,23 @@ export type ChatActionMarkerModel =
       url: string | null;
       timestamp: string;
     }
-  | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
+  /**
+   * Where a channel request went. Consecutive receipts of one action, such as the lead giving parts
+   * of one request to three members, are one row: "Assigned to Chief, Builder and Launch". Only the
+   * timeline joins them: each stored receipt names one member. `timestamp` is the newest receipt.
+   */
+  | {
+      kind: "channel-routing";
+      action: ChannelRoutingConversationEvent["action"];
+      agentIds: string[];
+      timestamp: string;
+    }
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
   | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
+  /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
+  | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */
@@ -228,6 +244,8 @@ export interface AgentMessage {
   itemIds?: string[];
   /** When the host wrote each of `items`, to place them between a turn's progress lines. */
   itemCreatedAt?: string[];
+  /** Whether the host still writes each of `items`. */
+  itemStreaming?: boolean[];
   plan?: AgentMessagePlan | undefined;
   /** The subagents that the agent started in this turn, on a `subagents` message. */
   subagents?: ConversationSubagent[] | undefined;
@@ -317,3 +335,9 @@ export type ComposerMcpServer = Pick<
   McpServerConfig,
   "id" | "name" | "enabled" | "transport" | "command" | "args" | "url"
 >;
+
+/** A browser tab of the agent that the composer can tag. */
+export type ComposerBrowserTab = Pick<BrowserTab, "id" | "title" | "url">;
+
+/** A side thread of the agent that the composer can tag. Its id is the task id. */
+export type ComposerThread = Pick<AgentTask, "id" | "title" | "state" | "outcome" | "progress" | "error">;

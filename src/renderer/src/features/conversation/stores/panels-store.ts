@@ -7,6 +7,7 @@ import {
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
@@ -22,6 +23,7 @@ import type {
   SidePanelPane,
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
+import { SHARED_FOLDER_PATH } from "../message-image-files";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -82,28 +84,6 @@ const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
 
-/** The panel mode of each pane. */
-export const SIDE_PANEL_MODES = {
-  browser: "browser",
-  files: "files",
-  settings: "settings",
-  question: "question",
-  voice: "voice",
-  subagent: "subagent",
-} as const satisfies Record<SidePanelPane, RightPanelMode>;
-
-function isSidePanelPane(value: string): value is SidePanelPane {
-  return value in SIDE_PANEL_MODES;
-}
-
-/** The pane that shows a panel mode, or null for a mode outside the side panel. */
-function paneOfMode(mode: RightPanelMode): SidePanelPane | null {
-  for (const [pane, paneMode] of Object.entries(SIDE_PANEL_MODES)) {
-    if (paneMode === mode && isSidePanelPane(pane)) return pane;
-  }
-  return null;
-}
-
 export interface PanelsStoreDeps {
   props: ConversationProps;
   rightPanels: () => Record<string, RightPanelMode>;
@@ -160,7 +140,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     activeRightPanel() === "side-panel" ||
     activeRightPanel() === "thread" ||
     activeRightPanel() === "file-preview" ||
-    paneOfMode(activeRightPanel()) !== null;
+    isSidePanelPane(activeRightPanel());
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -241,12 +221,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
-    const pane = paneOfMode(mode);
-    if (pane)
+    if (isSidePanelPane(mode))
       updateSidePanel(agentId, (state) => ({
         ...state,
-        panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
-        selected: pane,
+        panes: state.panes.includes(mode) ? state.panes : [...state.panes, mode],
+        selected: mode,
         file: null,
       }));
     else if (mode === "side-panel" || mode === "thread")
@@ -297,9 +276,12 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setRoutineSettingsRequest(null);
   }
 
-  function openRoutineRunMessage(messageId: string): void {
+  /** Opens the message of a routine run: in the routine's side thread when the run ran there, else in the chat. */
+  async function openRoutineRunMessage(messageId: string, routineId?: string): Promise<void> {
     setActiveRightPanel("none");
-    void deps.props.onOpenSearchMessage?.(messageId);
+    const threads = deps.props.threads;
+    if (routineId && threads && (await threads.onOpenRoutineRun(routineId, messageId).catch(() => false))) return;
+    await deps.props.onOpenSearchMessage?.(messageId);
   }
 
   function showBrowserPip() {
@@ -370,7 +352,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentFiles.open(attachment, action);
   }
 
-  function openSharedFile(path: string, place: FileTabPlace = "tab") {
+  /** `fallback` opens another target when nothing exists at `path`, in place of the error. */
+  function openSharedFile(path: string, place: FileTabPlace = "tab", fallback?: () => void) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId) return;
     const serverId = deps.props.server?.id ?? "local";
@@ -395,7 +378,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           const showError = () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            deps.setComposerError(filePreviewError(error, path), target);
+            // The fallback is for the conversation that was open at the click.
+            if (fallback) {
+              if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
+            } else deps.setComposerError(filePreviewError(error, path), target);
           };
           // A link can name a folder. A local one is shown in the file manager; when that fails too,
           // the preview error stays. A remote or web host cannot show a folder on this computer.
@@ -412,15 +398,22 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    * A chip can name a folder as well as a file. When the file preview fails, the folder listing is
    * tried; when that fails too, the preview error stays, because it names the path the agent wrote.
    * `agentId` is the agent whose workspace holds the path; in a channel, the agent that wrote it.
+   * `attachment` is the file of the same turn that the chip names. It opens when the path does not.
+   * `fallback` opens another target when the attachment does not open either, in place of the error.
    */
   function openWorkspaceFile(
     path: string,
     folder?: string,
     agentId = deps.props.agent?.id,
     place: FileTabPlace = "tab",
+    attachment?: AttachmentSummary,
+    fallback?: () => void,
   ) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
+    // Agents also write a shared file as `Shared/…`, as the host reads it. It opens from the shared
+    // folder when the workspace has nothing at that path (#5657).
+    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(path, place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -446,7 +439,14 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           },
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            deps.setComposerError(filePreviewError(error, path), target);
+            if (!attachment || !canPreviewAttachment(attachment)) {
+              if (next) {
+                if (current()) next();
+              } else deps.setComposerError(filePreviewError(error, path), target);
+              return;
+            }
+            // The attachment is of the conversation that was open at the click.
+            if (current()) void previewAttachment(attachment, place);
           },
         ),
     );

@@ -78,6 +78,18 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "الرموز",
   "customProvider.model.maxOutput": "الحد الأقصى للإخراج للنموذج {number}",
   "customProvider.model.maxOutputPlaceholder": "الرموز",
+  "customProvider.model.efforts": "جهد التفكير للنموذج {number}",
+  "customProvider.model.effortsLabel": "جهد التفكير",
+  "customProvider.model.effortsHintOpenCode":
+    "اختر مستويات جهد التفكير التي يقبلها كل نموذج. إذا لم تختر أي مستوى، يعرض OpenCode منخفض ومتوسط ومرتفع.",
+  "customProvider.model.effortsHintPi":
+    "اختر مستويات جهد التفكير التي يقبلها كل نموذج. إذا لم تختر أي مستوى، لا يفكر النموذج.",
+  "customProvider.model.inputs": "ما يقبله النموذج {number}",
+  "customProvider.model.inputsLabel": "يقبل",
+  "customProvider.model.inputImage": "الصور",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "اختر ما يمكن لكل نموذج قراءته إلى جانب النص.",
+  "customProvider.model.foundValuesHint": "بعض القيم تأتي من نقطة النهاية. يمكنك تغييرها.",
   "customProvider.model.remove": "إزالة النموذج {number}",
   "customProvider.model.add": "إضافة نموذج",
   "customProvider.headers": "الترويسات",

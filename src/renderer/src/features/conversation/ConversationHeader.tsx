@@ -7,14 +7,12 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   providerDisplayName,
 } from "@openbot/contracts/ipc";
-import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
-import { providerAccountName } from "@openbot/ui/components/provider-accounts";
+import { findModelOption, providerAccountName } from "@openbot/ui/components/provider-accounts";
 import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
 import { ThreadHeader } from "@openbot/ui/features/conversation/threads/ThreadHeader";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Show } from "solid-js";
-import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
@@ -36,9 +34,9 @@ export function ConversationHeader() {
     actingBrowserControl,
     agentActivity,
     browserControlAgent,
-    changeFastMode,
     channel,
     fastMode,
+    fastModeChange,
     props,
     runningTurnRuntime,
     selectAndConfirmModel,
@@ -73,7 +71,7 @@ export function ConversationHeader() {
   /** Each part shows only where the two runtimes differ, so a model change alone names only the models. */
   const runtimeLabel = (runtime: BadgeRuntime, other: BadgeRuntime) => {
     const parts = [
-      props.modelOptions.find((option) => option.provider === runtime.provider && option.id === runtime.model)?.name ??
+      findModelOption(props.modelOptions, props.agentStatus?.providers, runtime.provider, runtime.model)?.name ??
         runtime.model,
     ];
     if (runtime.provider !== other.provider) parts.unshift(providerName(runtime.provider));
@@ -133,13 +131,8 @@ export function ConversationHeader() {
         onChange: (model, provider, accountId, effort) =>
           void selectAndConfirmModel(model, provider, accountId, effort),
         onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
-        // Codex only for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
         fastMode: fastMode(),
-        onFastModeChange:
-          settingsProvider() === "codex" &&
-          (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
-            ? (next) => void changeFastMode(next)
-            : undefined,
+        onFastModeChange: fastModeChange(),
       }}
       remoteControl={
         props.remoteDesktopEnabled !== false && props.server?.kind === "remote"

@@ -7,6 +7,7 @@ import {
   CreditCard,
   Mic,
   MousePointer2,
+  PanelRight,
   PanelTop,
   Server,
   Settings,
@@ -20,6 +21,7 @@ export type SettingsTab =
   | "notifications"
   | "voice"
   | "dynamic-island"
+  | "agent-dock"
   | "computer-use"
   | "profile"
   | "billing"
@@ -67,8 +69,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
+      { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
+      {
+        titleKey: "settings.compactMessageActions.title",
+        descriptionKey: "settings.compactMessageActions.description",
+      },
       { titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
       { titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
       { titleKey: "settings.keepRemoteSessions.title", descriptionKey: "settings.keepRemoteSessions.description" },
@@ -77,6 +84,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.keepAwake.title", descriptionKey: "settings.keepAwake.description" },
       { titleKey: "settings.keepAwakeOnBattery.title", descriptionKey: "settings.keepAwakeOnBattery.description" },
       { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
+      { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
     ],
   },
@@ -152,6 +160,18 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     ],
   },
   {
+    value: "agent-dock",
+    titleKey: "settings.tab.agentDock.title",
+    descriptionKey: "settings.tab.agentDock.description",
+    icon: PanelRight,
+    rows: [
+      { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
+      { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
+      { titleKey: "settings.agentDock.display.title", descriptionKey: "settings.agentDock.display.description" },
+      { titleKey: "settings.agentDock.agents.title" },
+    ],
+  },
+  {
     value: "computer-use",
     titleKey: "settings.tab.computerUse.title",
     descriptionKey: "settings.tab.computerUse.description",
@@ -214,11 +234,16 @@ export function navItem(tab: SettingsTab): SettingsNavItem {
 
 /**
  * Whether the settings panel and its search show the tab. Hosted servers opens from its own entry, not
- * from this panel.
+ * from this panel. The Dynamic Island and the agent dock are macOS features of the main window.
  */
-export function settingsTabShown(tab: SettingsTab, dynamicIslandShown: boolean): boolean {
+export function settingsTabShown(
+  tab: SettingsTab,
+  window: { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
+): boolean {
   if (tab === "hosted-servers") return false;
-  return tab !== "dynamic-island" || dynamicIslandShown;
+  if (tab === "dynamic-island") return dynamicIslandSettingsShown(window.platform, window.chatWindow);
+  if (tab === "agent-dock") return window.platform === "darwin" && !window.chatWindow;
+  return true;
 }
 
 /**

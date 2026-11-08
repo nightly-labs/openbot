@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name}의 중단된 작업 다시 배정",
   "channel.stoppedTask.reassign": "다시 배정",
   "channel.stoppedTask.cancel": "작업 취소",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} 사이에서 이 작업이 너무 많이 넘겨졌습니다. 반복을 막기 위해 중단했습니다.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "멤버들이 이 작업을 서로 너무 많이 넘겼습니다. 반복을 막기 위해 중단했습니다.",
   "channel.conversation.noMembers": "채널 설정에서 에이전트를 추가하면 작업을 시작할 수 있어요.",
   "channel.conversation.archivedNotice": "삭제된 채널이에요. 미리보기만 가능해요.",
   "channel.composer.label": "채널에 메시지 보내기",
@@ -21,6 +25,25 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "에이전트가 여기서 배운 내용은 채널 메모리로 저장되며, 다른 채팅에서는 보이지 않습니다.",
   "channel.settings.memoryCount": { other: "{count}개 저장됨" },
+  "channel.settings.newConversation.title": "새 대화",
+  "channel.settings.newConversation.description": "멤버가 이전 메시지를 잊습니다. 채널 설정은 그대로입니다.",
+  "channel.settings.newConversation.button": "시작",
+  "channel.settings.newConversation.confirmTitle": "{name}에서 새 대화를 시작할까요?",
+  "channel.settings.newConversation.confirmDescription":
+    "멤버가 이 채널의 이전 메시지를 잊습니다. 메시지는 구분선 위에 계속 보입니다. 멤버, 지침, 메모리, 루틴은 바뀌지 않습니다.",
+  "channel.settings.newConversation.confirm": "새 대화 시작",
+  "channel.settings.newConversation.failed": "새 대화를 시작할 수 없습니다.",
+  "channel.settings.compact.title": "컨텍스트 압축",
+  "channel.settings.compact.description": "멤버가 채널 세션의 짧은 요약을 유지하고 토큰을 덜 사용합니다.",
+  "channel.settings.compact.failed": "채널 컨텍스트를 압축할 수 없습니다.",
+  "channel.settings.deleteHistory.title": "기록 삭제",
+  "channel.settings.deleteHistory.description": "메시지가 삭제되고 멤버도 잊어요. 채널 설정은 그대로예요.",
+  "channel.settings.deleteHistory.button": "삭제",
+  "channel.settings.deleteHistory.confirmTitle": "{name}의 기록을 삭제할까요?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "이 채널의 모든 메시지와 파일이 OpenBot에서 삭제되고 멤버도 잊어요. 되돌릴 수 없어요. 멤버, 지침, 메모리, 루틴, 작업은 바뀌지 않아요.",
+  "channel.settings.deleteHistory.confirm": "기록 삭제",
+  "channel.settings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
   "channel.settings.routines": "루틴",
   "channel.settings.routineCount": { other: "{count}개 설정됨" },
   "channel.create.close": "새 채널 닫기",

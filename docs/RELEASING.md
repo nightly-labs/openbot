@@ -318,6 +318,18 @@ that release, and check its SHA-256 against the asset `digest`. Set `url`, `asse
 `downloadBytes`, `installedBytes` (the size of the extracted `copilot` or `copilot.exe`) and the
 SHA-256 of `bin/copilot` (`bin/copilot.exe` on Windows).
 
+## Pin Mistral Vibe
+
+`native-runtime.lock.json` pins Mistral Vibe's ACP server by hand. Read the tag of
+`https://api.github.com/repos/mistralai/mistral-vibe/releases/latest` and set `version` without its
+`v`, and `licenseUrl` to `LICENSE` at that tag. For each target, download
+`vibe-acp-<triple>-<version>.tar.gz` (`.zip` on Windows) from that release, and check its SHA-256
+against the asset `digest`. Set `url`, `assetSha256`, `downloadBytes`, `installedBytes` above the
+extracted size, and the SHA-256 of each file in `files`: `bin/vibe-acp` (`bin/vibe-acp.exe` on
+Windows), `bin/_internal/base_library.zip`, the Python library, and
+`bin/_internal/mistral_vibe-<version>.dist-info/licenses/LICENSE`. Do not follow or copy the symbolic
+links in the archive.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode
@@ -432,9 +444,12 @@ it, `bun run mobile:release:published ios` (or `android`) writes the date of tha
 `## [x.y.z] - 2026-10-14 (Android)`. Run it again for the other store:
 `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`. A date with no store is the date of both
 stores. `/changelog` shows each store, and a store that does not have the version as "In review".
+A store that a newer version replaced is `Skipped (Android)`, and `/changelog` shows it as skipped.
+`bun run mobile:release` does each step from a menu and opens the pull request
+(`apps/mobile/README.md#release-menu`).
 
-When a store makes a version available, also set that version for the store in
-`MOBILE_LATEST_VERSIONS` in `apps/auth-api/src/server/mobile-features-config.ts` and deploy the account
+The same step sets that version for the store in `MOBILE_LATEST_VERSIONS` and in the `upTo` of each
+feature in `apps/auth-api/src/server/mobile-features-config.ts`. The merge deploys the account
 service. An app with an older version then shows the update header on home. Set it only after the
 store has the build: before, Update opens a store page that cannot install the version.
 
@@ -460,6 +475,16 @@ Use short, plain sentences that explain what the user can do. Put required upgra
 `notices`. Use `added`, `changed`, and `fixed` for the other entries. Do not copy commit messages,
 developer setup, internal paths, credentials, or unpublished plans. Review this text with the
 release notes before tagging. A release can have no dialog entry when it has nothing to show.
+
+The dialog shows the notes in the app language. Each translated language has
+`src/renderer/src/features/updates/whats-new/<locale>.json` in the shape of the English file. When
+you add a release to the English file, add its translation to each of these files: the same version
+and date, the same notices, groups and item order, and one item for each English item. Write the
+first sentence of each item as its headline, as in English; Chinese and Japanese end it with `。`.
+Use the tone, the terms, and the screen names of the app catalogs in [i18n.md](i18n.md#terms).
+`bun scripts/whats-new-translations.ts <version>` checks the files; `release:preflight` and the
+tag workflow run it and stop a release that has no translation. A release that a file does not
+have shows in English, so an older release that was never translated keeps its English text.
 
 The app bundles this text and loads it when needed, so reading it does not send data or require
 network access. The full changelog button opens the existing public page. Changing the bundled
@@ -641,10 +666,18 @@ artifact. OpenBot downloads its four pinned files on first voice use, checks the
 each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
 for later offline use. The optional Whisper large-v3 turbo int8 model, which takes a fixed dictation
 language, is downloaded the same way only when the user selects Download in Settings > Voice. Its
-three pinned files go in `runtimes/whisper-turbo-int8`. The optional Underdog Bark 3.0 Plus
-int8 model, which recognizes English only, is downloaded the same way when the user selects Download
-in Settings > Voice. Its four pinned files go in `runtimes/bark-3.0-plus-int8`. They come from an
+three pinned files go in `runtimes/whisper-turbo-int8`. The Underdog Bark 3.0 Plus int8 model,
+which recognizes English only, is no longer offered: Settings > Voice shows it only while it is in
+use or downloaded, and a saved choice of it still works. Its four pinned files go in
+`runtimes/bark-3.0-plus-int8`. They come from an
 unofficial sherpa-onnx conversion; the license is in `build/licenses/Underdog-Bark-3.0-Plus-LICENSE`.
+The optional NVIDIA Parakeet Unified EN 0.6B int8 model, which recognizes English only, is downloaded
+the same way when the user selects Download in Settings > Voice. Its four pinned files go in
+`runtimes/parakeet-unified-en-0.6b-int8`. It is under the NVIDIA Open Model License; the license and
+its notice are in `build/licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE`. The optional Cohere
+Transcribe int8 model, which takes one of its 14 languages, is downloaded the same way when the user
+selects Download in Settings > Voice. Its four pinned files (about 2.9 GB) go in
+`runtimes/cohere-transcribe-14-lang-int8`. Its license is in `build/licenses/Cohere-Transcribe-LICENSE`.
 At startup, a packaged application removes the old `runtimes/whisper` directory if it exists. The
 Supertonic 3 int8 voice model, which reads replies aloud, is downloaded the same way only when the
 user turns on Read replies aloud or selects Download in the Spoken replies section. Its eight pinned

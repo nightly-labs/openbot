@@ -8,7 +8,7 @@ import type { WebWorkspaceRuntime } from "./web-runtime";
 
 /** An image above this size keeps its file icon: a thumbnail must not cost a large download. */
 const WEB_THUMBNAIL_BYTES = 2 * 1024 * 1024;
-/** The host connection sends at most this many bytes for one file. */
+/** The chat holds each shown file in memory, so a larger file keeps its card and downloads on a click. */
 const WEB_MEDIA_BYTES = MOBILE_ATTACHMENT_BYTES;
 const CACHE_BYTES = 64 * 1024 * 1024;
 /** The chat shares the host connection, so only a few files download at the same time. */

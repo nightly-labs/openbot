@@ -1,11 +1,13 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
+  SIGNAL_NO_READY_CLOSE_CODE,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_REFRESH_INTERVAL_MS,
   type SignalClientMessage,
   type SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
+import { BROWSER_EGRESS_CHANNEL } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
@@ -22,6 +24,9 @@ export interface BridgeCommand {
     | "restart-ice"
     | "renew-host-signal"
     | "set-private-network"
+    | "open-egress"
+    | "close-egress"
+    | "send-egress"
     | "close";
   peerId: string;
   signalUrl?: string;
@@ -30,6 +35,8 @@ export interface BridgeCommand {
   iceTransportPolicy?: "all" | "relay";
   /** For a host: devices connect only over a private network, with no STUN or TURN. */
   privateNetwork?: boolean;
+  /** For a client: Signal holds the attempt while the host is offline, and sends `ready` when it connects. */
+  waitForHost?: boolean;
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
 }
@@ -72,8 +79,17 @@ interface PeerState {
   iceTransportPolicy: "all" | "relay";
   /** A host and its device connections use only private network candidates and no ICE servers. */
   privateNetwork: boolean;
+  /** A client hello asks Signal to wait for an offline host. Main asks for it while a hosted server starts. */
+  waitForHost: boolean;
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
+  /**
+   * The optional `browser-egress-v1` channel. It is not one of the four channels that make the
+   * connection ready, and its close never drops the connection. Its frames are sent as they are.
+   */
+  egress: RTCDataChannel | null;
+  /** Egress frames go out in the order main sends them, also while the channel waits for buffer space. */
+  egressChain: Promise<void>;
   reconnectAttempt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
@@ -81,6 +97,10 @@ interface PeerState {
   turnRefreshDueAt: number;
   /** Opens a new Signal socket when a lost path did not come back. */
   signalRenewTimer: number | null;
+  /** A host's wait for the `ready` that answers its hello or its probe. */
+  signalReadyTimer: number | null;
+  /** When a host asks a quiet socket for `ready` again. */
+  signalProbeTimer: number | null;
   /** Reports a lost path that did not come back as a disconnected peer. */
   disconnectedTimer: number | null;
   iceRestartPending: boolean;
@@ -100,6 +120,14 @@ interface PeerState {
 // connects again with a new ticket. Before this, main read the peer as connected until a restart.
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 const DISCONNECT_GRACE_MS = 15_000;
+// Signal can accept a host's hello and not answer, and a socket can become half-open. The host then
+// gets no close event, so it did not connect again, and devices got `host_unavailable` until a restart
+// (#3749). A host waits this long for each `ready`, and then opens a new socket.
+const SIGNAL_READY_DEADLINE_MS = 30_000;
+// A host asks a socket that received nothing for this long for `ready` with a `turn-refresh`. Signal
+// gives the same TURN credentials again for 5 minutes, so a probe makes new ones at most every 8
+// minutes. A socket with traffic is not probed and keeps the 45-minute refresh.
+const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
 
 const peers = new Map<string, PeerState>();
 // Main can replace a peer after an initial connection error. Keep the rate wait across that replacement.
@@ -172,13 +200,18 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         iceServers: [],
         iceTransportPolicy: command.iceTransportPolicy,
         privateNetwork: command.peer === "host" && command.privateNetwork === true,
+        waitForHost: command.peer === "client" && command.waitForHost === true,
         channels: {},
         payloadDecoders: {},
+        egress: null,
+        egressChain: Promise.resolve(),
         reconnectAttempt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         signalRenewTimer: null,
+        signalReadyTimer: null,
+        signalProbeTimer: null,
         disconnectedTimer: null,
         iceRestartPending: false,
         iceRestarting: false,
@@ -205,6 +238,31 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       if (channel?.readyState !== "open" || command.data === undefined)
         throw new Error(sourceText("error.remote.channelNotOpen"));
       await sendChannelPayload(state, channel, command.data);
+    } else if (command.type === "open-egress") {
+      const state = requirePeer(command.peerId);
+      // Only a client opens it, and only on a connection that is up. A new connection needs a new one.
+      if (state.role !== "client" || !state.peerConnection || state.channels.rpc?.readyState !== "open")
+        throw new Error(sourceText("error.remote.channelNotOpen"));
+      // A channel that closes now does not count: its close comes later and opens nothing again.
+      if (!state.egress || state.egress.readyState === "closing" || state.egress.readyState === "closed")
+        bindEgressChannel(state, state.peerConnection.createDataChannel(BROWSER_EGRESS_CHANNEL, { ordered: true }));
+    } else if (command.type === "close-egress") {
+      const state = peers.get(command.peerId);
+      state?.egress?.close();
+    } else if (command.type === "send-egress") {
+      const state = requirePeer(command.peerId);
+      const channel = state.egress;
+      const data = command.data;
+      if (channel?.readyState !== "open" || data === undefined)
+        throw new Error(sourceText("error.remote.channelNotOpen"));
+      const sent = state.egressChain.then(async () => {
+        await waitForWritableChannel(channel);
+        if (channel.readyState !== "open") throw new Error(sourceText("error.remote.channelNotOpen"));
+        if (isString(data)) channel.send(data);
+        else channel.send(data);
+      });
+      state.egressChain = sent.catch(() => undefined);
+      await sent;
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
     } else if (command.type === "renew-host-signal") {
@@ -315,8 +373,10 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       peer: state.role,
       token: state.resumeToken ?? state.token,
       ...(state.role === "host" ? { multiplex: true } : {}),
+      ...(state.waitForHost ? { waitForHost: true } : {}),
     };
     socket.send(JSON.stringify(hello));
+    awaitSignalReady(state, socket);
   };
   // A prepared socket can be open already. It told main when it opened.
   const open = prepared?.readyState === WebSocket.OPEN;
@@ -330,6 +390,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     refusal = signalErrorCode(event.data) ?? refusal;
+    // Any frame shows that the socket works, also while earlier frames wait in the chain.
+    if (state.socket === socket) probeSignalLater(state);
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
@@ -349,6 +411,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("close", (event) => {
     if (state.socket !== socket) return;
     state.socket = null;
+    clearSignalLiveness(state);
     // Main logs a host's own socket that Signal or the network closed, so the journal shows why the
     // host left Signal. A socket this peer closed follows an error that main already logged.
     if (state.role === "host" && !state.closed)
@@ -367,10 +430,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
   // Signal sends Slack, Discord, webhook, GitHub and Telegram messages only to the main process's `ingress`
-  // socket, never to this peer. `host-waiting` answers only a hello with `waitForHost`, which this
-  // peer does not send.
+  // socket, never to this peer.
   if (
-    message.type === "host-waiting" ||
     message.type === "slack-delivery" ||
     message.type === "discord-session" ||
     message.type === "discord-delivery" ||
@@ -383,6 +444,14 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "queued-delivery"
   )
     return;
+  // Signal holds this attempt until the host says hello, and then sends `ready` on this socket. The
+  // resume token renews the socket with no new ticket. Main then waits longer for the connection.
+  if (message.type === "host-waiting") {
+    state.reconnectAttempt = 0;
+    state.resumeToken = message.resumeToken;
+    post({ type: "host-waiting", peerId: state.id });
+    return;
+  }
   if (message.type === "account-profile-changed") {
     post({ type: "account-profile-changed", peerId: state.id });
     return;
@@ -501,6 +570,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         signalRenewTimer: null,
+        signalReadyTimer: null,
+        signalProbeTimer: null,
         disconnectedTimer: null,
         pathLost: false,
         signalChain: Promise.resolve(),
@@ -626,6 +697,11 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     });
   };
   connection.ondatachannel = (event) => {
+    // A host reads the egress channel of a desktop client. Main decides if it uses it.
+    if (event.channel.label === BROWSER_EGRESS_CHANNEL && state.role === "host") {
+      bindEgressChannel(state, event.channel);
+      return;
+    }
     const channel = channelKind(event.channel.label);
     if (channel) bindDataChannel(state, channel, event.channel);
   };
@@ -717,6 +793,33 @@ function bindDataChannel(
   channel.onclose = () => {
     if (state.closed || state.channels[kind] !== channel) return;
     dropConnection(state);
+  };
+}
+
+/**
+ * Binds the optional egress channel. Its open and close go to main as their own events: they do not
+ * change whether the connection is ready, and a lost egress channel leaves the connection up.
+ */
+function bindEgressChannel(state: PeerState, channel: RTCDataChannel): void {
+  const previous = state.egress;
+  state.egress = channel;
+  previous?.close();
+  channel.binaryType = "arraybuffer";
+  channel.bufferedAmountLowThreshold = 1024 * 1024;
+  const current = () => !state.closed && state.egress === channel;
+  channel.onopen = () => {
+    if (current()) post({ type: "egress-open", peerId: state.id });
+  };
+  channel.onmessage = (event) => {
+    if (!current()) return;
+    const data = egressFrame(event.data);
+    if (data !== null) post({ type: "egress-data", peerId: state.id, data });
+    else channel.close();
+  };
+  channel.onclose = () => {
+    if (state.egress !== channel) return;
+    state.egress = null;
+    if (!state.closed) post({ type: "egress-closed", peerId: state.id });
   };
 }
 
@@ -909,6 +1012,7 @@ function replaceSignal(state: PeerState): void {
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   state.reconnectTimer = null;
   state.restartIceOnReady = true;
+  clearSignalLiveness(state);
   const socket = state.socket;
   state.socket = null;
   socket?.close(1000, "Network changed");
@@ -928,6 +1032,40 @@ function scheduleSignalReconnect(state: PeerState): void {
     state.reconnectTimer = null;
     connectSignal(state);
   }, delay);
+}
+
+/** A host socket that does not answer in time is replaced. Its close comes late or never. */
+function awaitSignalReady(state: PeerState, socket: WebSocket): void {
+  if (state.role !== "host") return;
+  clearSignalLiveness(state);
+  state.signalReadyTimer = window.setTimeout(() => {
+    state.signalReadyTimer = null;
+    if (state.closed || state.socket !== socket) return;
+    state.socket = null;
+    socket.close(1000, "No ready");
+    post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CLOSE_CODE, terminal: false });
+    scheduleSignalReconnect(state);
+  }, SIGNAL_READY_DEADLINE_MS);
+}
+
+function probeSignalLater(state: PeerState): void {
+  if (state.role !== "host") return;
+  clearSignalLiveness(state);
+  const socket = state.socket;
+  state.signalProbeTimer = window.setTimeout(() => {
+    state.signalProbeTimer = null;
+    if (state.closed || !socket || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+    // Null asks for this socket's own credentials, and Signal answers with a `ready`.
+    sendSignal(state, { type: "turn-refresh", version: SIGNAL_PROTOCOL_VERSION, connectionId: null });
+    awaitSignalReady(state, socket);
+  }, SIGNAL_PROBE_INTERVAL_MS);
+}
+
+function clearSignalLiveness(state: PeerState): void {
+  if (state.signalReadyTimer !== null) clearTimeout(state.signalReadyTimer);
+  if (state.signalProbeTimer !== null) clearTimeout(state.signalProbeTimer);
+  state.signalReadyTimer = null;
+  state.signalProbeTimer = null;
 }
 
 function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
@@ -965,6 +1103,7 @@ function disconnect(peerId: string): void {
   }
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+  clearSignalLiveness(state);
   clearPathRecovery(state);
   disconnectPeerConnection(state);
   state.socket?.close(1000, "Peer stopped");
@@ -982,6 +1121,10 @@ function disconnectPeerConnection(state: PeerState): void {
     };
     socket.send(JSON.stringify(message));
   }
+  const egress = state.egress;
+  state.egress = null;
+  egress?.close();
+  if (egress && !state.closed) post({ type: "egress-closed", peerId: state.id });
   state.peerConnection?.close();
   state.peerConnection = null;
   state.connectionId = null;
@@ -1054,4 +1197,9 @@ function channelKind(label: string): "rpc" | "events" | "files" | "desktop" | nu
 
 function post(message: MainBridgeMessage): void {
   mainPort.postMessage(message);
+}
+
+/** An egress frame: a control string or a binary data frame. Anything else is not one. */
+function egressFrame(data: unknown): string | ArrayBuffer | null {
+  return isString(data) || data instanceof ArrayBuffer ? data : null;
 }

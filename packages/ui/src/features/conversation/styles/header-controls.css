@@ -176,8 +176,10 @@
   }
 }
 
-/* The Fast chip gets its own room, so the model name keeps the width it has without it. */
-.provider-model-trigger:has(.provider-model-trigger-fast) {
+/* The Fast chip gets its own room, so the model name keeps the width it has without it. A form field
+   keeps the width of its row. `:where()` keeps the specificity low, so the narrow header rule below
+   still wins. */
+.provider-model-trigger:where(:not(.provider-model-trigger-field)):has(.provider-model-trigger-fast) {
   max-width: 296px;
 }
 
@@ -364,7 +366,8 @@
 }
 
 /* Many providers or accounts scroll here, so the add button below stays in the panel. The padding
- * keeps the focus outline inside the scroll box. */
+ * keeps the focus outline and the account badges, which sit across the button corner, inside the
+ * scroll box. */
 .provider-model-rail-tabs {
   display: flex;
   min-height: 0;
@@ -373,8 +376,8 @@
   gap: var(--openbot-space-1);
   overflow-y: auto;
   scrollbar-width: none;
-  margin: -2px;
-  padding: 2px;
+  margin: -5px;
+  padding: 5px;
 }
 
 /* Opens the provider settings, to connect a provider that the rail leaves out. */
@@ -486,11 +489,12 @@
   background: var(--openbot-warning);
 }
 
-/* The place of an account in its provider's list, when the provider has more than one. */
+/* The place of an account in its provider's list, when the provider has more than one. The API key
+ * account shows a key, as it bills API credit and not the provider's plan. */
 .provider-model-rail-account {
   position: absolute;
-  inset-inline-end: 2px;
-  bottom: 2px;
+  inset-inline-end: -3px;
+  bottom: -3px;
   min-width: 16px;
   height: 16px;
   padding: 0 3px;
@@ -505,6 +509,12 @@
   font-weight: var(--openbot-weight-medium);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+}
+
+.provider-model-rail-account svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.75;
 }
 
 .provider-model-panel {
@@ -828,8 +838,9 @@
     max-width: 148px;
   }
 
-  /* A narrow header keeps the model name; the label and the title still name the effort. */
-  .provider-model-trigger-effort {
+  /* A narrow header keeps the model name; the label and the title still name the effort. A form
+     field has the room of its row. */
+  .provider-model-trigger:not(.provider-model-trigger-field) .provider-model-trigger-effort {
     display: none;
   }
 }

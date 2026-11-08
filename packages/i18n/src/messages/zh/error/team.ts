@@ -56,8 +56,10 @@ export const messages = {
   "error.team.providersUnsupported": "当前连接不支持服务商设置。",
   "error.team.providerNotManaged": "OpenBot 不管理该服务商的 CLI。",
   "error.team.channelsUnsupported": "当前连接不支持频道聊天。",
+  "error.team.channelContextUnsupported": "此连接不支持在频道中开始新对话或压缩。",
   "error.team.channelPictureUnsupported": "当前连接不支持频道图片。",
   "error.team.channelDeleteUnsupported": "当前连接不支持删除频道。",
+  "error.team.historyDeleteUnsupported": "当前连接不支持删除历史记录。",
   "error.team.channelTaskCancelUnsupported": "当前连接不支持取消频道任务。",
   "error.team.membersCannotDeleteChannels": "成员不能删除频道。",
   "error.team.membersCannotArchiveChannels": "成员不能归档频道。",
@@ -67,6 +69,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "当前连接不支持隐藏助手。",
   "error.team.agentColorsUnsupported": "当前连接不支持助手颜色。",
   "error.team.chatColorsUnsupported": "当前连接不支持聊天颜色。",
+  "error.team.routineRunPlaceUnsupported": "当前连接无法更改自动化任务的运行位置。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
@@ -80,6 +83,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "当前连接不支持显示文件夹。",
   "error.team.conversationFileSearchUnsupported": "当前连接不支持搜索文件。",
   "error.team.sideQuestionUnsupported": "当前连接不支持旁问。",
+  "error.team.liveVoiceUnsupported": "该服务器不支持 Codex 实时语音，请更新运行它的电脑上的 OpenBot。",
   "error.team.routineFlowsUnsupported": "该服务器不支持自动化任务流程，请更新运行它的电脑上的 OpenBot。",
   "error.team.routineCanvasTooLarge":
     "该自动化任务画布过大，无法发送到这台设备。请在运行服务器的电脑上精简自动化任务指令。",
@@ -139,6 +143,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "当前客户端不支持安全认证。",
   "error.team.agentSettingsUnsupported": "当前连接不支持助手设置。",
   "error.team.adminRequired": "需要管理员权限。",
+  "error.team.mcpServerNotYours": "只有添加此 MCP 服务器的人或管理员可以更改它。",
   "error.team.ownerRequired": "只有此服务器的所有者可以执行此操作。",
   "error.team.requestTooLarge": "请求体过大。",
   "error.team.signInRelayUnsupported": "该服务器无法中继登录，请更新主机上的 OpenBot。",
@@ -151,4 +156,5 @@ export const messages = {
   "error.team.signInRelayUsed": "该登录已发送过。",
   "error.team.signInRelayMismatch": "该地址不属于本次登录。",
   "error.team.signInRelayLinkUnknown": "该服务器上没有任何助手展示过该登录链接。",
+  "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
 } as const satisfies PartialTranslation<typeof source>;

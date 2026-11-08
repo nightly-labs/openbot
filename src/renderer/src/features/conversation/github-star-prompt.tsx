@@ -8,6 +8,13 @@ const PROMPTED = "shown";
 const SENDS_BEFORE_PROMPT = 3;
 const TOAST_ID = "github-star-prompt";
 
+let shownThisSession = false;
+
+/** True after the star toast showed in this app session. Other prompts then wait for a later one. */
+export function githubStarPromptShownThisSession(): boolean {
+  return shownThisSession;
+}
+
 /**
  * Count one message that the user sent to an agent on this device. The third one asks for a star on
  * GitHub, one time only. The toast has no timer: it stays until the user answers or closes it.
@@ -24,6 +31,7 @@ export function noteAgentMessageSent(): void {
     return;
   }
   if (sent < SENDS_BEFORE_PROMPT) return;
+  shownThisSession = true;
 
   // Sonner renders the content more than once, so the answer lives here and not in the toast.
   const [thanked, setThanked] = createSignal(false);

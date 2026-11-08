@@ -16,6 +16,7 @@ export const messages = {
   "mobile.share.action": "Partager avec {name}",
   "mobile.share.extension.send": "Envoyer",
   "mobile.share.extension.footer": "OpenBot envoie ceci à l’agent maintenant. L’app ne s’ouvre pas.",
+  "mobile.share.extension.message": "Ajouter un message",
   "mobile.share.extension.sending": "Envoi à {name}…",
   "mobile.share.extension.sent": "Envoyé à {name}",
   "mobile.share.extension.failed": "OpenBot n’a pas pu envoyer ceci. Ouvre l’app pour l’envoyer depuis là.",

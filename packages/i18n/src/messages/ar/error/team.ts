@@ -57,8 +57,10 @@ export const messages = {
   "error.team.providersUnsupported": "إعدادات المزوّد غير مدعومة في هذا الاتصال.",
   "error.team.providerNotManaged": "لا يدير OpenBot واجهة CLI لهذا المزوّد.",
   "error.team.channelsUnsupported": "دردشات القنوات غير مدعومة في هذا الاتصال.",
+  "error.team.channelContextUnsupported": "هذا الاتصال لا يدعم محادثة جديدة أو الضغط في قناة.",
   "error.team.channelPictureUnsupported": "صور القنوات غير مدعومة في هذا الاتصال.",
   "error.team.channelDeleteUnsupported": "حذف القنوات غير مدعوم في هذا الاتصال.",
+  "error.team.historyDeleteUnsupported": "حذف السجل غير مدعوم في هذا الاتصال.",
   "error.team.channelTaskCancelUnsupported": "إلغاء مهام القنوات غير مدعوم في هذا الاتصال.",
   "error.team.membersCannotDeleteChannels": "لا يمكن للأعضاء حذف القنوات.",
   "error.team.membersCannotArchiveChannels": "لا يمكن للأعضاء أرشفة القنوات.",
@@ -68,6 +70,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "إخفاء الوكلاء غير مدعوم في هذا الاتصال.",
   "error.team.agentColorsUnsupported": "هذا الاتصال لا يدعم ألوان الوكلاء.",
   "error.team.chatColorsUnsupported": "ألوان الدردشة غير مدعومة في هذا الاتصال.",
+  "error.team.routineRunPlaceUnsupported": "لا يمكن لهذا الاتصال تغيير مكان تشغيل المهمة الدورية.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
@@ -82,6 +85,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "عرض المجلدات غير مدعوم في هذا الاتصال.",
   "error.team.conversationFileSearchUnsupported": "البحث في الملفات غير مدعوم في هذا الاتصال.",
   "error.team.sideQuestionUnsupported": "الأسئلة الجانبية غير مدعومة في هذا الاتصال.",
+  "error.team.liveVoiceUnsupported": "لا يدعم هذا الخادم صوت Codex المباشر. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.routineFlowsUnsupported": "لا يدعم هذا الخادم تدفقات المهام الدورية. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.routineCanvasTooLarge":
     "لوحة هذه المهمة الدورية كبيرة جدًا لإرسالها إلى هذا الجهاز. اختصر تعليمات المهمة الدورية على الحاسوب الذي يشغّل الخادم.",
@@ -143,6 +147,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "المصادقة الآمنة غير مدعومة في هذا العميل.",
   "error.team.agentSettingsUnsupported": "إعدادات الوكيل غير مدعومة في هذا الاتصال.",
   "error.team.adminRequired": "يلزم وصول المسؤول.",
+  "error.team.mcpServerNotYours": "لا يمكن تغيير خادم MCP هذا إلا للشخص الذي أضافه أو لمسؤول.",
   "error.team.ownerRequired": "لا يمكن إلا لمالك هذا الخادم فعل ذلك.",
   "error.team.requestTooLarge": "نص الطلب كبير جدًا.",
   "error.team.signInRelayUnsupported": "لا يمكن لهذا الخادم تمرير عمليات تسجيل الدخول. حدّث OpenBot على المضيف.",
@@ -155,4 +160,5 @@ export const messages = {
   "error.team.signInRelayUsed": "أُرسل تسجيل الدخول هذا بالفعل.",
   "error.team.signInRelayMismatch": "هذا العنوان ليس من تسجيل الدخول هذا.",
   "error.team.signInRelayLinkUnknown": "لم يعرض أي وكيل على هذا الخادم رابط تسجيل الدخول هذا.",
+  "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -92,7 +92,8 @@ import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-fram
 // A type, not an interface: the command crosses the native/DOM bridge as JSON.
 export type RemoteLargeDownload = {
   maxBytes: number;
-  mimeType: string;
+  /** Without a type, a larger file of any type can answer. */
+  mimeType?: string | undefined;
 };
 
 export type RemoteTeamCommand =
@@ -186,8 +187,9 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
  * a command; `commandId` is then its ID when it has one, so the page can still answer it.
  */
 function decodeRemoteLargeDownload(value: unknown): RemoteLargeDownload | null {
-  if (!isDynamicRecord(value) || !isNumber(value.maxBytes) || !isString(value.mimeType)) return null;
-  return { maxBytes: value.maxBytes, mimeType: value.mimeType };
+  if (!isDynamicRecord(value) || !isNumber(value.maxBytes)) return null;
+  if (value.mimeType === undefined) return { maxBytes: value.maxBytes };
+  return isString(value.mimeType) ? { maxBytes: value.maxBytes, mimeType: value.mimeType } : null;
 }
 
 export function decodeRemoteTeamCommand(value: unknown): {
@@ -262,15 +264,22 @@ export interface RemoteTeamDiagnostic {
     | "signal-ready"
     | "signal-retry"
     | "signal-moved"
+    | "signal-error"
     | "host-waiting"
     | "path-check"
     | "event-reset"
     | "event-gap"
+    | "resume"
+    | "offer-sent"
+    | "answer"
     | "peer-state"
+    | "ice-state"
+    | "ice-gathering"
     | "route"
     | "ice-recovery"
     | "channels-open"
     | "authenticated"
+    | "stalled"
     | "failed";
   detail?: string;
 }
@@ -376,6 +385,16 @@ interface PeerState {
   answeredRequest: boolean;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
+  /** For the support log: when the current socket opened, and when and why the last offer went out. */
+  signalOpenedAt: number;
+  offerSentAt: number | null;
+  offerKind: "new connection" | "ICE restart" | null;
+  /**
+   * For the support log: the candidate lines of this connection, so a candidate that arrives twice
+   * counts once. The lines hold addresses; only their types and counts go into the log.
+   */
+  localCandidates: Set<string>;
+  remoteCandidates: Set<string>;
   hostProtocol: number | undefined;
   /** The compatibility read in flight. A request waits for it when the host protocol is not known. */
   hostProtocolRead?: Deferred.Deferred<void>;
@@ -574,18 +593,30 @@ export function createRemoteTeamPeer(
         rejectRequests(new Error(sourceText("error.remote.appInBackground")), true);
         if (!state.authenticated) failPeer(state, new Error(sourceText("error.remote.appInBackground")), actions);
       } else {
+        const resumed = (decision: string) =>
+          diagnose(
+            state,
+            "resume",
+            `away ${Math.round(away / 1000)} s, ${state.connection?.connectionState ?? "no connection"}, ${decision}`,
+          );
         if (away >= REMOTE_PEER_LOST_AFTER_MS && state.authenticated) {
+          resumed("replace connection");
           // The host has dropped this connection. Close it without an offline update: the consumer
           // connects on each return, and that connect starts the new peer on the same session. A
           // resume hello would only renew an expired token through the account service, and a read
           // would wait for its timeout on the dead path.
           void runPeerEffect(closePeer(actions.current.endSession, true));
         } else if (canRecoverPeer(state)) {
+          resumed("recover ICE");
           recoverIce(state, actions, 0);
         } else if (!isPeerOnline(state)) {
+          resumed(state.authenticated ? "connect again" : "attempt not finished");
           failPeer(state, new Error(sourceText("error.remote.desktopRestoreNeeded")), actions);
         } else {
           resumeTurnRefresh(state);
+          resumed(
+            away >= ICE_CONSENT_TIMEOUT_MS ? "renew Signal" : state.socket ? "keep path and Signal" : "open Signal",
+          );
           // The host stopped using the path. A renewed socket restarts ICE on its `ready`: the path
           // comes back, or the answer of a host that dropped the connection fails the peer at once.
           if (away >= ICE_CONSENT_TIMEOUT_MS) renewSignal(state, actions);
@@ -808,7 +839,9 @@ export function createRemoteTeamPeer(
     if (!active || state.disconnectedTimer !== null) return;
     state.disconnectedTimer = setTimeout(() => {
       state.disconnectedTimer = null;
-      if (!isPeerOnline(state)) failPeer(state, iceFailure(state.connection?.connectionState), actions);
+      if (isPeerOnline(state)) return;
+      diagnose(state, "stalled", `ICE grace end: ${connectionSnapshot(state)}`);
+      failPeer(state, iceFailure(state.connection?.connectionState), actions);
     }, DISCONNECT_GRACE_MS);
   }
 
@@ -979,6 +1012,11 @@ export function createRemoteTeamPeer(
         signalReady: false,
         answeredRequest: false,
         lastSignalClose: null,
+        signalOpenedAt: 0,
+        offerSentAt: null,
+        offerKind: null,
+        localCandidates: new Set(),
+        remoteCandidates: new Set(),
         hostProtocol: hostProtocols.get(hostId),
       };
       peer = state;
@@ -1004,12 +1042,19 @@ export function createRemoteTeamPeer(
     state.socket = socket;
     state.signalReady = false;
     state.signalAnswered = false;
+    state.signalOpenedAt = 0;
     // Signal closes with 1008 after several refusals, and an expired session is not a rate limit (#1867).
     // The error frame arrives before the close, but its locked handler can run after it.
     let refusal: string | null = null;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
-      diagnose(state, "signal-open");
+      state.signalOpenedAt = Date.now();
+      // The kind of token only, never the token.
+      diagnose(
+        state,
+        "signal-open",
+        `${state.resumeToken ? "resume" : "ticket"}${waitForHost ? ", wait for host" : ""}`,
+      );
       const hello: SignalClientMessage = {
         type: "hello",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -1062,7 +1107,11 @@ export function createRemoteTeamPeer(
       if (event) state.lastSignalClose = event.code;
       if (event?.code === 1008 && (refusal === null || refusal === "rate_limited"))
         signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
-      diagnose(state, "signal-closed", `code ${event?.code ?? "unknown"}`);
+      diagnose(
+        state,
+        "signal-closed",
+        `code ${event?.code ?? "unknown"}${state.signalAnswered ? "" : state.signalOpenedAt ? `, no answer after ${Date.now() - state.signalOpenedAt} ms` : ", not opened"}`,
+      );
       // An attempt that is not authenticated has nothing to keep, and a new socket would wait 60 s. Its
       // refusal, such as `host_unavailable`, is handled after the close and is lost. Fail the attempt now
       // with that refusal, so the recovery owner retries it, and not the connect deadline 30 s later.
@@ -1109,6 +1158,8 @@ export function createRemoteTeamPeer(
       if (message.type === "error") {
         // `code` is a fixed identifier, so it can name the failure. The Signal text never goes into a reference.
         const reference = referenceFrom("signal", message.code);
+        // The fixed code only. The Signal text can change between releases and is not needed here.
+        yield* notify(diagnosticCall(state, "signal-error", message.code));
         if (message.code === "rate_limited") {
           signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
           state.socket?.close();
@@ -1204,7 +1255,13 @@ export function createRemoteTeamPeer(
           return yield* referenced(sourceText("error.remote.relayUnavailable"), "signal/no_ice_servers");
         const connectionId = state.connectionId;
         state.signalReady = true;
-        yield* notify(diagnosticCall(state, "signal-ready", `${state.iceServers.length} ICE servers`));
+        yield* notify(
+          diagnosticCall(
+            state,
+            "signal-ready",
+            `${state.iceServers.length} ICE servers${turnRefresh ? ", TURN refresh" : `, ${Date.now() - state.signalOpenedAt} ms after open`}`,
+          ),
+        );
         // A kept path still uses the credentials of its last ICE restart, so keep their deadline. The
         // answer to a refresh starts a new one, or the next refresh would be due at once.
         if (state.connection && !restartsIce && !turnRefresh) resumeTurnRefresh(state);
@@ -1217,6 +1274,7 @@ export function createRemoteTeamPeer(
           if (restartsIce) yield* restartIce(state);
         }
         if (!state.connection) {
+          const startedAt = Date.now();
           const connection = yield* peerDecode(() => createPeerConnection(state, state.iceServers, actions));
           for (const kind of CHANNELS)
             bindChannel(state, kind, connection.createDataChannel(channelLabel(kind), { ordered: true }), actions);
@@ -1230,6 +1288,11 @@ export function createRemoteTeamPeer(
               channel: "team",
               sdp: requiredSdp(offer),
             }),
+          );
+          state.offerSentAt = Date.now();
+          state.offerKind = "new connection";
+          yield* notify(
+            diagnosticCall(state, "offer-sent", `new connection, made in ${state.offerSentAt - startedAt} ms`),
           );
         }
         return;
@@ -1254,6 +1317,15 @@ export function createRemoteTeamPeer(
           return yield* new RemotePeerError({ message: sourceText("error.remote.connectionDropped") });
         }
         yield* peerCall(() => state.connection?.setRemoteDescription({ type: "answer", sdp: message.sdp }));
+        // The answer can hold the host's candidates, such as after an ICE restart.
+        for (const line of sdpCandidateLines(message.sdp)) state.remoteCandidates.add(line);
+        yield* notify(
+          diagnosticCall(
+            state,
+            "answer",
+            `${state.offerSentAt === null ? "no offer time" : `${Date.now() - state.offerSentAt} ms after offer`}${state.offerKind ? `, ${state.offerKind}` : ""}`,
+          ),
+        );
       } else if (message.type === "ice-candidate") {
         yield* peerCall(() =>
           state.connection?.addIceCandidate({
@@ -1262,6 +1334,7 @@ export function createRemoteTeamPeer(
             sdpMLineIndex: message.sdpMLineIndex,
           }),
         );
+        state.remoteCandidates.add(message.candidate);
       } else {
         yield* restartIce(state);
       }
@@ -1272,6 +1345,8 @@ export function createRemoteTeamPeer(
     const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
     state.connection = connection;
     connection.onicecandidate = (event) => {
+      if (event.candidate?.candidate && state.connection === connection)
+        state.localCandidates.add(event.candidate.candidate);
       // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
       if (!event.candidate?.candidate || !state.connectionId || !canSignal(state)) return;
       sendSignal(state, {
@@ -1287,6 +1362,20 @@ export function createRemoteTeamPeer(
     connection.ondatachannel = (event) => {
       const kind = channelKind(event.channel.label);
       if (kind) bindChannel(state, kind, event.channel, actions);
+    };
+    // A path that does not start can stop at gathering (no local candidates) or at the checks.
+    connection.onicegatheringstatechange = () => {
+      if (state.connection !== connection || state.closed || peer !== state) return;
+      const gathering = connection.iceGatheringState;
+      diagnose(
+        state,
+        "ice-gathering",
+        gathering === "complete" ? `complete, local ${candidateCounts(state.localCandidates)}` : gathering,
+      );
+    };
+    connection.oniceconnectionstatechange = () => {
+      if (state.connection !== connection || state.closed || peer !== state) return;
+      diagnose(state, "ice-state", connection.iceConnectionState);
     };
     connection.onconnectionstatechange = () => {
       if (state.connection !== connection || state.closed || peer !== state) return;
@@ -1467,6 +1556,7 @@ export function createRemoteTeamPeer(
                     historyExtent: true,
                     channelAttention: true,
                     agentTaskUiBlocks: true,
+                    channelIsolation: true,
                   }),
                 )
               : yield* peerDecode(() =>
@@ -1622,7 +1712,7 @@ export function createRemoteTeamPeer(
         const payloadBody = upload
           ? null
           : sideRoute
-            ? yield* peerDecode(() => sideRoute.request(path, body))
+            ? yield* peerDecode(() => sideRoute.request(path, body, { channelIsolation: true }))
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
@@ -1864,6 +1954,10 @@ export function createRemoteTeamPeer(
       const connection = state.connection;
       if (!connection || !state.connectionId) return;
       const connectionId = state.connectionId;
+      const startedAt = Date.now();
+      // A restart gathers a new set of candidates on both ends.
+      state.localCandidates.clear();
+      state.remoteCandidates.clear();
       yield* peerDecode(() => connection.restartIce());
       const offer = yield* peerCall(() => connection.createOffer({ iceRestart: true }));
       yield* peerCall(() => connection.setLocalDescription(offer));
@@ -1876,6 +1970,9 @@ export function createRemoteTeamPeer(
           sdp: requiredSdp(offer),
         }),
       );
+      state.offerSentAt = Date.now();
+      state.offerKind = "ICE restart";
+      yield* notify(diagnosticCall(state, "offer-sent", `ICE restart, made in ${state.offerSentAt - startedAt} ms`));
     })();
   }
 
@@ -1950,8 +2047,7 @@ export function createRemoteTeamPeer(
   ): void {
     if (state.closed || peer !== state) return;
     const failure = referenced(failureMessage(error), failureReference(error));
-    const message = failure.message;
-    diagnose(state, "failed", code ? `${code}: ${message}` : message);
+    diagnose(state, "failed", failureDetail(failure, code));
     rejectConnection(state, failure);
     void runPeerEffect(connectionOffline(state, failure, actions, code));
     // A revoked session or a host that broke the protocol starts again from a new session.
@@ -1968,8 +2064,7 @@ export function createRemoteTeamPeer(
     return Effect.gen(function* () {
       if (state.closed || peer !== state) return;
       const failure = referenced(failureMessage(error), failureReference(error));
-      const message = failure.message;
-      yield* notify(diagnosticCall(state, "failed", code ? `${code}: ${message}` : message));
+      yield* notify(diagnosticCall(state, "failed", failureDetail(failure, code)));
       rejectConnection(state, failure);
       yield* notify(connectionOffline(state, failure, actions, code));
       // A revoked session or a host that broke the protocol starts again from a new session.
@@ -1979,6 +2074,12 @@ export function createRemoteTeamPeer(
         uninterruptible: true,
       });
     });
+  }
+
+  /** The failure for the support log. The reference holds fixed identifiers only, such as `timeout/connect/ice`. */
+  function failureDetail(failure: RemotePeerError, code?: RemoteTeamConnectionUpdate["code"]): string {
+    const text = code ? `${code}: ${failure.message}` : failure.message;
+    return failure.reference ? `${text} [${failure.reference}]` : text;
   }
 
   function failureMessage(error: unknown): string {
@@ -2096,7 +2197,29 @@ export function createRemoteTeamPeer(
   /** The deadline of a connect attempt. It does not run while Signal holds the attempt for the host. */
   function armConnectedTimer(state: PeerState, actions: ActionsRef): void {
     if (!state.connected || state.connectedTimer !== null) return;
-    state.connectedTimer = setTimeout(() => failPeer(state, connectTimeout(state), actions), 30_000);
+    state.connectedTimer = setTimeout(() => {
+      diagnose(state, "stalled", `connect deadline: ${connectionSnapshot(state)}`);
+      failPeer(state, connectTimeout(state), actions);
+    }, 30_000);
+  }
+
+  /** Each step of a connection that did not finish, for the support log. Counts and states only. */
+  function connectionSnapshot(state: PeerState): string {
+    const connection = state.connection;
+    const signal = `Signal ${state.socket ? (state.signalReady ? "ready" : "open, no ready") : "closed"}`;
+    if (!connection) return `${signal}, no connection`;
+    const open = CHANNELS.filter((kind) => state.channels[kind]?.readyState === "open").length;
+    return [
+      signal,
+      `offer ${state.offerSentAt === null ? "not sent" : `sent ${Date.now() - state.offerSentAt} ms ago`}`,
+      `signaling ${connection.signalingState}`,
+      `ICE ${connection.iceConnectionState}`,
+      `gathering ${connection.iceGatheringState}`,
+      `local ${candidateCounts(state.localCandidates)}`,
+      `remote ${candidateCounts(state.remoteCandidates)}`,
+      `channels ${open}/${CHANNELS.length}`,
+      `auth ${state.authenticated ? "done" : state.binding ? "started" : "not started"}`,
+    ].join(", ");
   }
 
   function settleConnected(state: PeerState): void {
@@ -2140,6 +2263,34 @@ export function createRemoteTeamPeer(
   function randomBase64Url(size: number): string {
     return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(size)));
   }
+}
+
+/**
+ * The type and protocol of an ICE candidate line, such as `srflx/udp`. The line is
+ * `candidate:<foundation> <component> <protocol> <priority> <address> <port> typ <type> ...`; the
+ * address is never read.
+ */
+function candidateType(candidate: string): string {
+  // A damaged line could have an address in that place, so only the two known values are kept.
+  const word = candidate.split(" ")[2]?.toLowerCase();
+  const protocol = word === "udp" || word === "tcp" ? word : "unknown";
+  const type = / typ (host|srflx|prflx|relay)\b/u.exec(candidate)?.[1] ?? "unknown";
+  return `${type}/${protocol}`;
+}
+
+/** The candidate lines in a session description, in the form that a trickled candidate has. */
+function sdpCandidateLines(sdp: string): string[] {
+  return [...sdp.matchAll(/^a=(candidate:[^\r\n]+)$/gmu)].map((match) => match[1] ?? "");
+}
+
+/** The types and counts of candidate lines, such as `host/udp:2 srflx/udp:1`, or `none`. */
+function candidateCounts(candidates: Set<string>): string {
+  const counts = new Map<string, number>();
+  for (const line of candidates) {
+    const type = candidateType(line);
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
+  return counts.size === 0 ? "none" : [...counts].map(([type, count]) => `${type}:${count}`).join(" ");
 }
 
 function signalErrorCode(data: string): string | null {

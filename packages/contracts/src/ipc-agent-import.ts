@@ -39,8 +39,9 @@ export const HERMES_EXPORT_PROMPT = "/openbot-export";
 export const AGENT_IMPORT_EXPORT_AGENT_NAME = "OpenBot export";
 
 export const AGENT_IMPORT_LIMITS = {
-  archiveBytes: 500 * 1024 * 1024,
-  files: 5_000,
+  /** The same as the instance transfer: the file is read into memory, so it stays below 2 GiB. */
+  archiveBytes: 2 * 1024 ** 3 - 1,
+  files: 50_000,
   /** One key names one agent in the archive: lowercase letters, digits and hyphens. */
   key: 64,
   sourceApp: 64,

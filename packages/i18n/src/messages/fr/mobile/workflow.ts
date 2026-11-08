@@ -92,6 +92,7 @@ export const messages = {
   "mobile.workflow.webhook.secretFailed": "Impossible de créer un secret",
   "mobile.workflow.output.notify": "Notification",
   "mobile.workflow.output.channel": "Messagerie",
+  "mobile.workflow.output.chatChannel": "Canal OpenBot",
   "mobile.workflow.output.file": "Fichier",
   "mobile.workflow.status.running": "En cours",
   "mobile.workflow.status.approval": "Vous attend",
@@ -133,6 +134,7 @@ export const messages = {
   "mobile.workflow.step.sendTo": "Envoyer à",
   "mobile.workflow.step.channelHint":
     "Un propriétaire ou un administrateur choisit la messagerie dans OpenBot sur l’ordinateur.",
+  "mobile.workflow.step.chatChannelHint": "Un propriétaire ou un admin choisit le canal dans OpenBot sur l’ordinateur.",
   "mobile.workflow.problem.noTitle": "Saisissez un nom.",
   "mobile.workflow.problem.noAgent": "Choisir un agent",
   "mobile.workflow.problem.agentGone": "L’agent n’est pas disponible. Choisir un agent",
@@ -220,6 +222,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "Répond, publie ou ajoute une réaction dans un chat Telegram lié.",
+  "mobile.workflow.output.slackHint": "Répond, publie ou ajoute une réaction dans un canal Slack.",
   "mobile.workflow.run.stopStep": "Arrêter l’étape",
   "mobile.workflow.run.stopStepFailed": "Impossible d’arrêter l’étape",
   "mobile.workflow.version.history": "Historique des versions",
@@ -362,8 +366,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "Répondre dans le fil",
   "mobile.workflow.telegram.hostOnly":
     "Seul l’ordinateur qui exécute OpenBot a les discussions Telegram. Modifiez cette étape dans OpenBot sur cet ordinateur.",
-  "mobile.workflow.telegram.triggerComputerOnly":
-    "Modifiez ce déclencheur dans OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Discussion",
   "mobile.workflow.telegram.anyChat": "Toute discussion liée",
@@ -380,4 +382,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "Publier dans la discussion",
   "mobile.workflow.telegram.action.react": "Ajouter une réaction",
   "mobile.workflow.telegram.emoji": "Emoji",
+  "mobile.workflow.chats.adminOnly": "Seul un propriétaire ou un administrateur peut modifier cette étape.",
+  "mobile.workflow.chats.loadFailed": "Les chats de ce serveur ne se sont pas chargés. Réessayez plus tard.",
+  "mobile.workflow.slack.hostOnly":
+    "Seul l’ordinateur qui exécute OpenBot a les espaces de travail Slack. Modifiez cette étape dans OpenBot sur cet ordinateur.",
+  "mobile.workflow.slack.workspace": "Espace de travail",
+  "mobile.workflow.slack.chooseWorkspace": "Choisir un espace de travail",
+  "mobile.workflow.slack.oneWorkspace": "Un espace de travail",
+  "mobile.workflow.slack.chooseChannel": "Choisir un canal",
+  "mobile.workflow.slack.needsWorkspace": "Choisissez un espace de travail. Sans lui, le déclencheur ne démarre pas.",
+  "mobile.workflow.slack.needsChannel": "Choisissez un espace de travail et un canal où publier.",
 } as const satisfies PartialTranslation<typeof source>;

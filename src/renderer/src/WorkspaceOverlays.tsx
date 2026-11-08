@@ -808,9 +808,11 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
           hostPromptCacheTtl={{}}
+          claudeUserSetup
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
@@ -874,8 +876,22 @@ function AppSettings(props: AccountProps) {
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
   const { servers, activeServer, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
-  const { agentStatus } = useAgents();
+  const { agentStatus, agentList, userHiddenAgentIds } = useAgents();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const { openServerSettings } = useServerSettings();
+  /** The agent dock tab lists the agents of the active server in sidebar order, without hidden agents. */
+  const agentDockSettings = createMemo(() => {
+    const server = activeServer();
+    return {
+      server: server ? { id: server.id, name: server.name } : null,
+      agents: sidebarAgentOrder(agentList(), {
+        layout: sidebarLayout(),
+        pinnedItems: pinnedSidebarItems(),
+        hiddenAgentIds: userHiddenAgentIds(),
+      }),
+      hiddenAgentIds: userHiddenAgentIds(),
+    };
+  });
   /** Live voice runs on this computer's Codex, whose status shows only while this computer is active. */
   const codexLiveAccess = () =>
     activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
@@ -908,6 +924,7 @@ function AppSettings(props: AccountProps) {
         chatWindow={platform.chatWindow !== null}
         builtInDisplayGeometry={builtInDisplayGeometry()}
         servers={servers()}
+        agentDock={agentDockSettings()}
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
         onOpenWhatsNew={

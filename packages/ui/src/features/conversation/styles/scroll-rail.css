@@ -1,24 +1,19 @@
 /*
  * Where the reader is in a long chat, on the end edge of the transcript (right in LTR, left in RTL).
- * The public site's reading progress draws the same rail for its articles.
  *
- * One segment per message the reader wrote, as long as the message and the replies under it. The
- * part the reader has passed fills in a muted neutral, and the segment they are in glows at the point
- * they have reached. Pointing at the rail brings in the messages as titles through a blur, over a
- * scrim with no edge.
+ * One tick per message the reader wrote, at the same spacing for each. The ticks the reader has passed
+ * are stronger, and the tick of the current section is the longest. With a mouse, the ticks fade in
+ * small when the pointer comes near, and grow when it is on the rail. Pointing at a tick brings in a
+ * card through a blur, over a blur of the transcript, with the message and the start of its reply.
  *
  * The anchor sticks to the top of the scroll container with the viewport's height, and its negative
  * margin gives that height back, so the transcript under it does not move.
  */
 .chat-scroll-rail {
-  /* A muted neutral: a colour pulls the eye while the reader reads. */
-  --chat-scroll-rail-accent: var(--openbot-text-muted);
-  --chat-scroll-rail-track: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
-  --chat-scroll-rail-glow: color-mix(in srgb, var(--chat-scroll-rail-accent) 60%, transparent);
+  --chat-scroll-rail-pitch: var(--openbot-space-2);
+  --chat-scroll-rail-hit: clamp(12px, var(--chat-scroll-rail-inset, 20px), 20px);
   --chat-scroll-rail-ease: var(--openbot-ease-out);
-  --chat-scroll-rail-duration: var(--openbot-duration-island-content);
   --chat-scroll-rail-quick: var(--openbot-duration-overlay);
-  --chat-scroll-rail-blur: 8px;
 
   position: sticky;
   z-index: 3;
@@ -26,96 +21,25 @@
   pointer-events: none;
 }
 
-/* Only the bars take the pointer until the rail opens, so the messages beside it stay selectable.
-   The nav reaches into the container's side padding, so the bars stand beside the messages. */
+/* Only the ticks take the pointer, so the messages beside them stay selectable. The nav reaches into
+   the container's side padding, so the ticks stand beside the messages. It is wider than the hit areas
+   by the room a tick takes when it grows. */
 .chat-scroll-rail-nav {
   position: absolute;
   top: 50%;
   inset-inline-end: calc(-1 * var(--chat-scroll-rail-inset, 0px));
-  width: min(260px, 70%);
+  width: calc(var(--chat-scroll-rail-hit) + var(--openbot-space-2));
   height: min(64%, 600px);
   display: flex;
   flex-direction: column;
-  padding: var(--openbot-space-3) 0;
   transform: translateY(-50%);
 }
 
-.chat-scroll-rail-nav:hover,
-.chat-scroll-rail-nav:has(:focus-visible) {
-  pointer-events: auto;
-}
-
-/* A scrim in the transcript colour that blurs the messages under the titles, with no edge of its own.
-   It darkens and blurs only where the titles are, so they stay legible over a wide message. Both
-   masks fade it out: at the top and bottom, and at the start before the titles. The blur is set
-   only while the rail is open, so a scroll does not filter the transcript under a hidden scrim. */
-.chat-scroll-rail-surface {
-  position: absolute;
-  inset-block: calc(-1 * var(--openbot-space-8));
-  inset-inline: calc(-2 * var(--openbot-space-8)) 0;
-  background: color-mix(in srgb, var(--openbot-bg-canvas) 80%, transparent);
-  mask-image:
-    linear-gradient(
-      to bottom,
-      transparent,
-      var(--openbot-text-primary) var(--openbot-space-8),
-      var(--openbot-text-primary) calc(100% - var(--openbot-space-8)),
-      transparent
-    ),
-    linear-gradient(to right, transparent, var(--openbot-text-primary) calc(2 * var(--openbot-space-8)));
-  mask-composite: intersect;
-  opacity: 0;
-  transition: opacity var(--openbot-duration-slow) ease;
-}
-
-/* In RTL the rail is on the left edge: the scrim fades out on the right, and the titles come in from
-   the left. */
-:dir(rtl) .chat-scroll-rail-surface {
-  mask-image:
-    linear-gradient(
-      to bottom,
-      transparent,
-      var(--openbot-text-primary) var(--openbot-space-8),
-      var(--openbot-text-primary) calc(100% - var(--openbot-space-8)),
-      transparent
-    ),
-    linear-gradient(to left, transparent, var(--openbot-text-primary) calc(2 * var(--openbot-space-8)));
-}
-
-.chat-scroll-rail-eyebrow {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  margin: 0 0 var(--openbot-space-3);
-  padding: 0 var(--openbot-space-4) 0 var(--openbot-space-4);
-  color: var(--openbot-text-dim);
-  font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-sm);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0;
-  transition: opacity var(--openbot-duration-slow) ease;
-}
-
-/* The digits of the current section lift in and sharpen, as in the task list. */
-.chat-scroll-rail-count {
-  --digit-dur: var(--openbot-duration-overlay);
-  --digit-distance: var(--openbot-space-1);
-  --digit-blur: var(--openbot-space-0-5);
-  --digit-ease: var(--openbot-ease-out);
-
-  color: var(--chat-scroll-rail-accent);
-  font-variant-numeric: tabular-nums;
-  /* "03 / 12" keeps the position first in a right-to-left page. */
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-
-/* Each section keeps room for its title. A chat with more sections than the rail holds scrolls the
-   track inside the rail, so every section stays in reach; the track keeps the current one in view.
-   The reading head scrolls with the list. */
+/* A chat with more sections than the rail holds scrolls the ticks inside the rail, so every section
+   stays in reach; the track keeps the current one in view. */
 .chat-scroll-rail-track {
   position: relative;
+  transition: opacity var(--chat-scroll-rail-quick) ease;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -127,188 +51,159 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .chat-scroll-rail-item {
-  flex-basis: 0;
-  min-height: 22px;
+  flex: none;
+  height: var(--chat-scroll-rail-pitch);
   display: flex;
 }
 
+/* A hit area as tall as the spacing and as wide as the side padding, so it does not cover the edge of
+   a message. */
 .chat-scroll-rail .chat-scroll-rail-link {
-  flex: 1;
-  min-width: 0;
+  position: relative;
+  flex: none;
+  width: var(--chat-scroll-rail-hit);
   height: auto;
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  gap: var(--openbot-space-3);
-  padding-block: 0;
-  padding-inline: var(--openbot-space-4) 0;
-  /* The button's border would move the bars out of the side padding. */
+  margin-inline-start: auto;
+  padding: 0;
+  /* The button's border would move the ticks out of the side padding. */
   border: 0;
   border-radius: 0;
-  color: var(--openbot-text-muted);
-  font-weight: inherit;
-  text-decoration: none;
   outline: none;
-}
-
-.chat-scroll-rail-item[data-state="read"] .chat-scroll-rail-link {
-  color: var(--openbot-text-secondary);
-}
-
-.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-link,
-.chat-scroll-rail .chat-scroll-rail-link:hover,
-.chat-scroll-rail .chat-scroll-rail-link:focus-visible {
-  color: var(--openbot-text-primary);
-  text-decoration: none;
-}
-
-.chat-scroll-rail-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  margin-top: -3px;
-  font-size: var(--openbot-text-sm);
-  line-height: 18px;
-  text-align: end;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0;
-  filter: blur(var(--chat-scroll-rail-blur));
-  transform: translateX(var(--openbot-space-2));
-  transition:
-    color var(--openbot-duration-slow) ease,
-    opacity var(--openbot-duration-slow) ease,
-    filter var(--openbot-duration-slow) ease,
-    transform var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease);
-}
-
-:dir(rtl) .chat-scroll-rail-label {
-  transform: translateX(calc(-1 * var(--openbot-space-2)));
-}
-
-.chat-scroll-rail-link:focus-visible .chat-scroll-rail-label {
-  text-decoration: underline;
-  text-decoration-color: var(--chat-scroll-rail-accent);
-  text-underline-offset: 4px;
-}
-
-/* A hit area wider than the 2px bar it holds. The bars always take the pointer, so the hit area stays
-   inside the container's side padding and does not cover the edge of a message. The bar is 3-9px
-   from the edge, inside the 12px padding the narrowest transcript keeps. */
-.chat-scroll-rail-bar {
-  position: relative;
-  width: clamp(12px, var(--chat-scroll-rail-inset, 20px), 20px);
-  flex: none;
-  padding-bottom: var(--openbot-space-1);
-}
-
-.chat-scroll-rail .chat-scroll-rail-bar {
   pointer-events: auto;
 }
 
-.chat-scroll-rail-bar::before,
-.chat-scroll-rail-fill {
-  content: "";
+/* With a mouse, the ticks show only when the pointer is near the rail or a tick has focus. */
+@media (hover: hover) {
+  .chat-scroll-rail:not([data-near]) .chat-scroll-rail-nav:not(:has(:focus-visible)) .chat-scroll-rail-track {
+    opacity: 0;
+  }
+}
+
+/* The ticks are small until the pointer or the focus is on the rail. */
+.chat-scroll-rail-tick {
   position: absolute;
-  top: 0;
-  inset-inline-end: 5px;
-  bottom: var(--openbot-space-1);
-  width: 2px;
+  top: 50%;
+  inset-inline-end: var(--openbot-space-1);
+  width: var(--openbot-space-1);
+  height: 2px;
   border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 18%, transparent);
+  transform: translateY(-50%);
   transition:
     width var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
-    inset-inline-end var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
     background-color var(--chat-scroll-rail-quick) ease;
 }
 
-.chat-scroll-rail-bar::before {
-  background: var(--chat-scroll-rail-track);
+.chat-scroll-rail-item[data-state="read"] .chat-scroll-rail-tick {
+  background: color-mix(in srgb, var(--openbot-text-primary) 36%, transparent);
 }
 
-.chat-scroll-rail-fill {
-  background: var(--chat-scroll-rail-accent);
-  transform: scaleY(var(--chat-scroll-rail-fill, 0));
-  transform-origin: top center;
+.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-tick {
+  width: var(--openbot-space-2);
+  background: var(--openbot-text-secondary);
 }
 
-.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-bar::before,
-.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-fill {
-  inset-inline-end: 4.5px;
-  width: 3px;
+.chat-scroll-rail-nav:is(:hover, :has(:focus-visible)) .chat-scroll-rail-tick {
+  width: var(--openbot-space-2);
 }
 
-.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-fill {
-  box-shadow: 0 0 10px var(--chat-scroll-rail-glow);
+/* The ticks beside the one under the pointer grow a little, less the farther they are. */
+.chat-scroll-rail-nav:is(:hover, :has(:focus-visible))
+  :is(.chat-scroll-rail-item[data-open] + * + *, .chat-scroll-rail-item:has(+ * + [data-open]))
+  .chat-scroll-rail-tick {
+  width: 10px;
 }
 
-/* The reading head: where the reader is inside the current section. One head for the whole list, so
-   it runs from section to section with the place. */
-.chat-scroll-rail-head {
-  position: absolute;
-  top: 0;
-  inset-inline-end: 3px;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--chat-scroll-rail-accent);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--chat-scroll-rail-accent) 18%, transparent),
-    0 0 12px var(--chat-scroll-rail-glow);
-  pointer-events: none;
-  transform: translateY(
-    calc(
-      var(--chat-scroll-rail-head-top) +
-      (var(--chat-scroll-rail-head-length) - var(--openbot-space-1)) *
-      var(--chat-scroll-rail-fill, 0) -
-      50%
-    )
-  );
+.chat-scroll-rail-nav:is(:hover, :has(:focus-visible))
+  :is(
+    .chat-scroll-rail-item[data-state="active"],
+    .chat-scroll-rail-item[data-open] + *,
+    .chat-scroll-rail-item:has(+ [data-open])
+  )
+  .chat-scroll-rail-tick {
+  width: var(--openbot-space-3);
 }
 
-.chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
-.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-surface {
+.chat-scroll-rail-nav:is(:hover, :has(:focus-visible)) .chat-scroll-rail-item[data-open] .chat-scroll-rail-tick {
+  width: var(--openbot-space-4);
+  background: var(--openbot-text-primary);
+}
+
+/* The card stands level with its tick, toward the transcript. It is in a portal, because the mask that
+   fades the transcript's edges stops the blur of the messages under it. It comes in through a blur of
+   its own. */
+.chat-scroll-rail-card {
+  --chat-scroll-rail-quick: var(--openbot-duration-overlay);
+  --chat-scroll-rail-ease: var(--openbot-ease-out);
+
+  position: fixed;
+  z-index: var(--openbot-layer-tooltip);
+  top: var(--chat-scroll-rail-card-top);
+  right: calc(100vw - var(--chat-scroll-rail-card-left) + var(--openbot-space-2));
+  width: max-content;
+  max-width: min(300px, 60vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-3);
+  border: 1px solid color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-glass);
   backdrop-filter: blur(var(--openbot-space-4));
-  opacity: 1;
-  transition: opacity var(--openbot-duration-overlay) ease;
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(var(--openbot-space-1));
+  transform: translateY(-50%) translateX(var(--openbot-space-1));
+  transition:
+    opacity var(--chat-scroll-rail-quick) ease,
+    filter var(--chat-scroll-rail-quick) ease,
+    transform var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease);
 }
 
-.chat-scroll-rail-nav:hover .chat-scroll-rail-eyebrow,
-.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-eyebrow {
-  opacity: 1;
+:dir(rtl) .chat-scroll-rail-card {
+  right: auto;
+  left: calc(var(--chat-scroll-rail-card-right) + var(--openbot-space-2));
+  transform: translateY(-50%) translateX(calc(-1 * var(--openbot-space-1)));
 }
 
-/* The titles come in one after another, but a long list does not make the reader wait: the delay
-   stops growing after the first twelve. */
-.chat-scroll-rail-nav:hover .chat-scroll-rail-label,
-.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-label {
-  --chat-scroll-rail-delay: calc(min(var(--chat-scroll-rail-index, 0), 12) * 18ms);
-
+.chat-scroll-rail-card[data-open] {
   opacity: 1;
   filter: blur(0);
-  transform: none;
-  transition:
-    color var(--openbot-duration-slow) ease,
-    opacity var(--chat-scroll-rail-quick) ease var(--chat-scroll-rail-delay),
-    filter var(--chat-scroll-rail-quick) ease var(--chat-scroll-rail-delay),
-    transform var(--chat-scroll-rail-duration) var(--chat-scroll-rail-ease) var(--chat-scroll-rail-delay);
+  transform: translateY(-50%);
+}
+
+.chat-scroll-rail-card-title {
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-scroll-rail-card-reply {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 /* The rules above name their own transitions, which outrank the global reduced-motion rule, so the
-   titles would still slide and blur in. */
+   card would still blur in. */
 @media (prefers-reduced-motion: reduce) {
-  .chat-scroll-rail .chat-scroll-rail-nav *,
-  .chat-scroll-rail .chat-scroll-rail-nav *::before,
-  .chat-scroll-rail .chat-scroll-rail-nav *::after,
-  .chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
-  .chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-surface,
-  .chat-scroll-rail-nav:hover .chat-scroll-rail-label,
-  .chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-label {
+  .chat-scroll-rail .chat-scroll-rail-track,
+  .chat-scroll-rail .chat-scroll-rail-tick,
+  .chat-scroll-rail-card.chat-scroll-rail-card {
     transition: none;
   }
 }

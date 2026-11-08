@@ -105,6 +105,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Démarrage de la connexion à {name} sur {host}…",
   "provider.codeLogin.pageOpening": "Ouverture de la page de connexion de {name} sur {host}…",
   "provider.codeLogin.linkStep": "Connectez-vous à {name}. OpenBot continue tout seul.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "Dans ChatGPT sur un ordinateur, ouvrez les paramètres de sécurité et activez la connexion par code d’appareil pour Codex. Pour un compte professionnel, l’administrateur de votre espace de travail l’active.",
   "provider.useApp.title": "Connectez {name} dans l’app OpenBot",
   "provider.useApp.description":
     "La connexion à {name} revient sur l’ordinateur qui l’a lancée, et un onglet du navigateur ne peut pas la recevoir. Connectez {name} dans l’app OpenBot. L’app termine la connexion toute seule.",
@@ -168,7 +170,7 @@ export const messages = {
   "provider.geminiKey.label": "Clé d’API Gemini",
   "provider.claudeKey.title": "Clé d’API Anthropic",
   "provider.claudeKey.description":
-    "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête à la clé. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
+    "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête au crédit API de la clé, pas à votre forfait Claude. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
   "provider.claudeKey.label": "Clé d’API Anthropic",
   "provider.inceptionKey.title": "Clé d’API Inception",
   "provider.inceptionKey.description":
@@ -238,6 +240,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 heure",
   "provider.settings.promptCacheDefault": "Défaut de Claude Code",
   "provider.settings.promptCacheLoadFailed": "Impossible de charger la durée du cache de prompt de ce serveur.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Utiliser ma configuration Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Les agents chargent votre CLAUDE.md, vos skills, agents, hooks et plugins depuis ~/.claude. Désactivé, chaque tour envoie un prompt plus court. Les fichiers de l’espace de travail restent chargés.",
+  "provider.settings.claudeUserSetupLoadFailed": "Impossible de charger le réglage Claude Code.",
   "provider.settings.models": "Modèles",
   "provider.settings.modelsDescription": {
     one: "{shown} modèle sur {count} apparaît dans le sélecteur de modèle.",
@@ -250,17 +257,10 @@ export const messages = {
   "provider.settings.modelShow": "Afficher {name} ({id}) dans le sélecteur de modèle",
   "provider.settings.modelsNoMatch": "Aucun modèle ne correspond à votre recherche.",
   "provider.settings.modelsLoadFailed": "Impossible de charger les modèles de ce serveur.",
-  "provider.settings.download": "Téléchargement",
-  "provider.settings.downloadedCli": "CLI {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 version · {size}",
-    other: "{version} · {count} versions · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 version · {size}", other: "{count} versions · {size}" },
-  "provider.settings.downloadAgain": "Quand vous activez {name}, OpenBot télécharge à nouveau sa CLI.",
-  "provider.settings.removeDownloadConfirm": "Supprimer {size} ?",
-  "provider.settings.removeDownloadKeeps": "Les comptes, les connexions et les agents restent.",
-  "provider.settings.removeDownload": "Supprimer le téléchargement",
-  "provider.settings.removingDownload": "Suppression…",
+  "provider.settings.deleteTitle": "Supprimer {name}",
+  "provider.settings.deleteOn":
+    "Désactive {name} et supprime la CLI qu'OpenBot a téléchargée. Les comptes, les connexions et les agents restent.",
+  "provider.settings.deleteOff":
+    "Supprime la CLI qu'OpenBot a téléchargée pour {name} ({size}). Les comptes, les connexions et les agents restent.",
   "provider.settings.removeDownloadFailed": "Impossible de supprimer le téléchargement.",
 } as const satisfies PartialTranslation<typeof source>;

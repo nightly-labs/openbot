@@ -1,6 +1,7 @@
 import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
-import { Context, Deferred, Effect, Fiber } from "effect";
+import { Context, Deferred, Effect, Fiber, Result } from "effect";
 import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
+import { CHALLENGE_POLL_MS, CHALLENGE_WAIT_MS, describeChallenge } from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -157,11 +158,18 @@ export function passImageOn(tab: BrowserHostTab): void {
   if (tab.image) tab.image.operation = tab.operations ?? 0;
 }
 
+/** The time for one snapshot read when the caller gives no timeout. */
+const SNAPSHOT_READ_TIMEOUT_MS = 10_000;
+
+/** The time that a bot check wait leaves for the last read. */
+const SNAPSHOT_READ_RESERVE_MS = 2_000;
+
 export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function* (
   tab: BrowserHostTab,
   revision: number,
   keepQueueBlocked: KeepQueueBlocked,
-  timeoutMs = 10_000,
+  /** The time for the whole read, the bot check wait included. Without it, each read gets 10 s. */
+  timeoutMs?: number,
   timeoutMessage = "Browser snapshot timed out.",
   /**
    * The last work before the snapshot reaches the agent, such as a policy check or its image. When it
@@ -169,23 +177,80 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
    */
   release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
-  const history = tab.diagnostics.snapshot();
-  const result = yield* boundEngineOperation(
-    tab,
-    tab.engine.snapshot({
-      tabId: tab.id,
-      revision,
-      environment: tab.environment,
-      diagnostics: history.diagnostics,
-      actions: history.actions,
-    }),
-    timeoutMs,
-    timeoutMessage,
-    keepQueueBlocked,
-  );
-  tab.revision = revision;
+  const heldByUser = yield* BrowserToolHold;
+  const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+  const read = (readRevision: number) =>
+    Effect.gen(function* () {
+      const history = tab.diagnostics.snapshot();
+      const readTimeout = deadline === undefined ? SNAPSHOT_READ_TIMEOUT_MS : Math.max(1, deadline - Date.now());
+      const result = yield* boundEngineOperation(
+        tab,
+        tab.engine.snapshot({
+          tabId: tab.id,
+          revision: readRevision,
+          environment: tab.environment,
+          diagnostics: history.diagnostics,
+          actions: history.actions,
+          deadline: Date.now() + readTimeout,
+        }),
+        readTimeout,
+        timeoutMessage,
+        keepQueueBlocked,
+      );
+      tab.revision = readRevision;
+      return { result, cursor: history.cursor };
+    });
+  let current = yield* read(revision);
+  // A check that clears by itself, such as a Cloudflare interstitial, takes a few seconds. Waiting
+  // here saves the agent the turns of a wait, a reload, and a retry. A person who takes the tab, a
+  // secret entry, or a closed tab ends the wait at once.
+  const waitStarted = Date.now();
+  const waitDocument = tab.documents;
+  const priorWaitMs = tab.challengeWait?.document === waitDocument ? tab.challengeWait.waitedMs : 0;
+  let waitedVendor: string | null = null;
+  let lastReadFailed = false;
+  while (
+    current.result.challenge?.kind === "non-interactive" &&
+    Date.now() - waitStarted < CHALLENGE_WAIT_MS - priorWaitMs &&
+    // A caller with its own timeout gets the check result, not a timeout.
+    (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
+    !tab.secret &&
+    !tab.closing &&
+    !tab.contents.isDestroyed() &&
+    !heldByUser(tab.id)
+  ) {
+    waitedVendor = current.result.challenge.vendor;
+    yield* Effect.sleep(CHALLENGE_POLL_MS);
+    if (tab.closing || tab.contents.isDestroyed()) break;
+    // A passed check reloads the page, and a read during that navigation fails. The next poll reads
+    // the new document.
+    const next = yield* Effect.result(read(tab.revision + 1));
+    lastReadFailed = Result.isFailure(next);
+    if (Result.isSuccess(next)) current = next.success;
+  }
+  if (lastReadFailed) current = yield* read(tab.revision + 1);
+  const { result, cursor } = current;
+  if (waitedVendor !== null && result.challenge?.kind === "non-interactive") {
+    const waitedMs = Date.now() - waitStarted + (tab.documents === waitDocument ? priorWaitMs : 0);
+    tab.challengeWait = { document: tab.documents, waitedMs };
+  }
+  if (!tab.secret) {
+    const sharedWaitMs =
+      tab.challengeWait?.document === tab.documents
+        ? tab.challengeWait.waitedMs
+        : tab.documents === waitDocument
+          ? priorWaitMs
+          : 0;
+    const challenge = describeChallenge(
+      result.challenge,
+      waitedVendor,
+      waitedVendor === null ? 0 : Date.now() - waitStarted,
+      CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS,
+    );
+    if (challenge) result.snapshot.challenge = challenge;
+  }
   if (release) yield* release(result);
-  tab.diagnostics.delivered(history.cursor);
+  tab.diagnostics.delivered(cursor);
   return result;
 });
 

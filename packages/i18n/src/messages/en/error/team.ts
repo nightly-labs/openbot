@@ -56,8 +56,11 @@ export const messages = defineMessages("error.team", {
   "error.team.providersUnsupported": "Provider settings are not supported by this connection.",
   "error.team.providerNotManaged": "OpenBot does not manage this provider's CLI.",
   "error.team.channelsUnsupported": "Channel chats are not supported by this connection.",
+  "error.team.channelContextUnsupported":
+    "This connection does not support a new conversation or compaction in a channel.",
   "error.team.channelPictureUnsupported": "Channel pictures are not supported by this connection.",
   "error.team.channelDeleteUnsupported": "Channel deletion is not supported by this connection.",
+  "error.team.historyDeleteUnsupported": "Deleting the history is not supported by this connection.",
   "error.team.channelTaskCancelUnsupported": "Cancelling channel tasks is not supported by this connection.",
   "error.team.membersCannotDeleteChannels": "Members cannot delete channels.",
   "error.team.membersCannotArchiveChannels": "Members cannot archive channels.",
@@ -67,6 +70,7 @@ export const messages = defineMessages("error.team", {
   "error.team.agentHideUnsupported": "Hiding agents is not supported by this connection.",
   "error.team.agentColorsUnsupported": "Agent colors are not supported by this connection.",
   "error.team.chatColorsUnsupported": "Chat colors are not supported by this connection.",
+  "error.team.routineRunPlaceUnsupported": "This connection cannot change where a routine runs.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
@@ -81,6 +85,8 @@ export const messages = defineMessages("error.team", {
   "error.team.workspaceDirectoryUnsupported": "Showing folders is not supported by this connection.",
   "error.team.conversationFileSearchUnsupported": "Searching files is not supported by this connection.",
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
+  "error.team.liveVoiceUnsupported":
+    "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.routineCanvasTooLarge":
@@ -143,6 +149,7 @@ export const messages = defineMessages("error.team", {
   "error.team.secureAuthUnsupported": "Secure authentication is not supported by this client.",
   "error.team.agentSettingsUnsupported": "Agent settings are not supported by this connection.",
   "error.team.adminRequired": "Administrator access is required.",
+  "error.team.mcpServerNotYours": "Only the person who added this MCP server, or an admin, can change it.",
   "error.team.ownerRequired": "Only the owner of this server can do this.",
   "error.team.requestTooLarge": "Request body is too large.",
   "error.team.signInRelayUnsupported": "This server cannot relay sign-ins. Update OpenBot on the host.",
@@ -156,4 +163,5 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRelayUsed": "This sign-in was already sent.",
   "error.team.signInRelayMismatch": "This address is not from this sign-in.",
   "error.team.signInRelayLinkUnknown": "No agent on this server showed this sign-in link.",
+  "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
 });

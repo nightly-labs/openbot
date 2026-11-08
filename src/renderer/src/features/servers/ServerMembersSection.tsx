@@ -10,6 +10,7 @@ import {
 } from "@openbot/contracts/license";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { AppTextKey } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import {
   Alert,
   AlertContent,
@@ -368,6 +369,9 @@ export function createServerMembersSection(
   function accessDescription() {
     if (!local()) return published() ? t("server.settings.remoteOnline") : t("server.settings.remoteOffline");
     if (published()) return t("server.settings.reachable");
+    // The owner removed this server on another device, and the account service refused its automatic
+    // publish. Main sends the status as its English source text (#5273).
+    if (props.hostStatus?.message === sourceText("status.host.removed")) return t("status.host.removed");
     return configured() ? t("server.settings.notReachable") : t("server.settings.notPublished");
   }
 

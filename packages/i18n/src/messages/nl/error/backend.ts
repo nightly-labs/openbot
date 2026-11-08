@@ -62,6 +62,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Het model van de kanaalleider is niet beschikbaar.",
   "error.backend.contextCompactionIneffective":
     "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
+  "error.backend.contextCompactionStopped":
+    "Twee compressies van deze chat zijn na elkaar mislukt, dus OpenBot comprimeert hem niet meer automatisch. Elke poging stuurt de hele chat naar het model en gebruikt je abonnementslimiet. Kies ‘Nu comprimeren’ om het opnieuw te proberen, of start een nieuwe chat.",
   "error.backend.providerRetrying":
     "De provider kon dit verzoek {attempts} keer niet uitvoeren en probeert het opnieuw. Als de agent niet verdergaat, stop dan de beurt.",
   "error.backend.providerRetryingLargeContext":
@@ -72,6 +74,12 @@ export const messages = {
     "Het kanaal heeft een start van een opdracht die niet is bevestigd. Controleer het resultaat voordat je het verwijdert.",
   "error.backend.channelNotFound": "Kanaal niet gevonden.",
   "error.backend.channelMemberUnavailable": "Een lid van het kanaal is niet beschikbaar.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Wacht tot het werk in dit kanaal stopt en start dan een nieuw gesprek.",
+  "error.backend.channelWaitBeforeCompact": "Wacht tot het werk in dit kanaal stopt en comprimeer het dan.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Wacht tot het werk in dit kanaal stopt en wis dan de geschiedenis.",
+  "error.backend.channelCompactUnavailable":
+    "Geen lid van dit kanaal kan zijn context nu comprimeren. Een lid moet eerst in het kanaal antwoorden, en zijn provider moet comprimeren ondersteunen.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
@@ -242,6 +250,10 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} kon de MCP-server {name} niet starten. Open de MCP-instellingen en kies Verbinding testen om de oorzaak te zien.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -319,6 +331,20 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Er bestaat al een browserprofiel met deze naam.",
   "error.backend.browserSessionInUse": "Een tabblad gebruikt deze browsersessie nog. Probeer het opnieuw.",
   "error.backend.browserProfileLimit": "Je kunt maximaal {limit} browserprofielen hebben.",
+  "error.backend.browserProxyNotFound": "Deze proxy bestaat niet meer.",
+  "error.backend.browserProxyAddressInvalid":
+    "Typ een proxyadres zoals socks5://host:1080 of http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Je kunt maximaal {limit} proxy's hebben.",
+  "error.backend.browserProxyTaken": "Er bestaat al een proxy met dit adres.",
+  "error.backend.browserProxyChanged":
+    "Deze proxy is gewijzigd nadat je hem opende. Bekijk hem opnieuw en probeer het nog eens.",
+  "error.backend.browserProxyUnreachable": "De proxy {name} reageert niet, dus de pagina is niet geopend.",
+  "error.backend.browserProxySignInRefused":
+    "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
+  "error.backend.browserProxyComputerUnreachable":
+    "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
+  "error.backend.browserCertificateUntrusted":
+    "Het beveiligingscertificaat van deze site wordt niet vertrouwd, dus de pagina is niet geopend.",
   "error.backend.browserLowMemory":
     "Deze server heeft weinig geheugen, dus de browser kan geen tabblad meer openen. Sluit een tabblad, of wacht tot andere agents klaar zijn.",
   "error.backend.browserOpenFailed": "Kan {url} niet openen: {reason}",

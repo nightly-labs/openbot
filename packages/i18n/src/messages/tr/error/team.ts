@@ -57,8 +57,10 @@ export const messages = {
   "error.team.providersUnsupported": "Sağlayıcı ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.providerNotManaged": "OpenBot bu sağlayıcının CLI aracını yönetmiyor.",
   "error.team.channelsUnsupported": "Kanal sohbetleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.channelContextUnsupported": "Bu bağlantı kanalda yeni konuşmayı veya sıkıştırmayı desteklemiyor.",
   "error.team.channelPictureUnsupported": "Kanal resimleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelDeleteUnsupported": "Kanal silme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.historyDeleteUnsupported": "Geçmiş silme bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelTaskCancelUnsupported": "Kanal görevlerini iptal etme bu bağlantı tarafından desteklenmiyor.",
   "error.team.membersCannotDeleteChannels": "Üyeler kanalları silemez.",
   "error.team.membersCannotArchiveChannels": "Üyeler kanalları arşivleyemez.",
@@ -68,6 +70,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Ajan gizleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.chatColorsUnsupported": "Sohbet renkleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.routineRunPlaceUnsupported": "Bu bağlantı bir rutinin nerede çalıştığını değiştiremez.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
@@ -82,6 +85,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Klasörleri gösterme bu bağlantı tarafından desteklenmiyor.",
   "error.team.conversationFileSearchUnsupported": "Dosya arama bu bağlantı tarafından desteklenmiyor.",
   "error.team.sideQuestionUnsupported": "Yan sorular bu bağlantı tarafından desteklenmiyor.",
+  "error.team.liveVoiceUnsupported":
+    "Bu sunucu Codex canlı sesi desteklemiyor. Sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
   "error.team.routineFlowsUnsupported":
     "Bu sunucu rutin akışlarını desteklemiyor. Sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
   "error.team.routineCanvasTooLarge":
@@ -139,6 +144,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Güvenli kimlik doğrulaması bu istemci tarafından desteklenmiyor.",
   "error.team.agentSettingsUnsupported": "Ajan ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.adminRequired": "Yönetici erişimi gereklidir.",
+  "error.team.mcpServerNotYours": "Bu MCP sunucusunu yalnızca onu ekleyen kişi veya bir yönetici değiştirebilir.",
   "error.team.ownerRequired": "Bunu yalnızca bu sunucunun sahibi yapabilir.",
   "error.team.requestTooLarge": "İstek gövdesi çok büyük.",
   "error.team.signInRelayUnsupported": "Bu sunucu oturum açmaları aktaramaz. Ana makinedeki OpenBot'u güncelleyin.",
@@ -150,4 +156,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Bu oturum açma zaten gönderildi.",
   "error.team.signInRelayMismatch": "Bu adres bu oturum açmaya ait değil.",
   "error.team.signInRelayLinkUnknown": "Bu sunucudaki hiçbir ajan bu oturum açma bağlantısını göstermedi.",
+  "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
 } as const satisfies PartialTranslation<typeof source>;

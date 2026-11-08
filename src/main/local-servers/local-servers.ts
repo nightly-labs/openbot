@@ -17,7 +17,11 @@
 //
 // The child has no account session, so it cannot read its members from the account directory. It
 // asks on stdout, and this process writes the list to its control pipe. After this app changes a
-// member of the server, it writes the new list without a request.
+// member of the server, it writes the new list without a request. In the same way, this process makes
+// the Marketplace reads that adding an agent needs, with its own session, and only those reads.
+//
+// Each child writes the agents that work on it when the list changes. A quit of the desktop app stops
+// the children, so `Cmd + Q` asks for a hold while one of them works, as it does for the local agents.
 
 import { type ChildProcess, type SpawnOptions, spawn as spawnProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -25,7 +29,7 @@ import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { Readable, Writable } from "node:stream";
-import { LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
+import { type AgentSummary, isAgentSummary, LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effect";
@@ -38,8 +42,11 @@ import {
   LOCAL_SERVER_MEMBERS_REQUEST,
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
+  LOCAL_SERVER_WORKING_PREFIX,
   type LocalServerCommand,
+  type LocalServerMarketplaceRequest,
   type LocalServerReady,
+  parseLocalServerMarketplaceRequest,
 } from "../local-server-child";
 import type { LocalServerAttachInput, RemoteServerManager } from "../remote-server-manager";
 import type { TokenCipher } from "../remote-server-store";
@@ -110,6 +117,20 @@ function parseReadyLine(line: string): LocalServerReady | null {
   }
 }
 
+/**
+ * The agents in a working line. The avatar address points into the child's own data, which this
+ * process cannot read, so each agent shows its generated face.
+ */
+function parseWorkingLine(line: string): AgentSummary[] | null {
+  if (!line.startsWith(LOCAL_SERVER_WORKING_PREFIX)) return null;
+  try {
+    const value = JSON.parse(line.slice(LOCAL_SERVER_WORKING_PREFIX.length));
+    return Array.isArray(value) ? value.filter(isAgentSummary).map((agent) => ({ ...agent, avatarUrl: null })) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The parent's end of the child's control pipe: `LOCAL_SERVER_CONTROL_FD` on Windows, else standard input. */
 function controlPipe(child: ChildProcess, platform: NodeJS.Platform): Writable | null {
   const stream = platform === "win32" ? child.stdio[LOCAL_SERVER_CONTROL_FD] : child.stdin;
@@ -142,6 +163,64 @@ interface LocalServerAccount {
   listMembers(hostId: string): Effect.Effect<RemoteMemberRecord[], RemoteWorkflowError>;
   /** Removes a deleted server. A server that the account service refuses for good counts as removed. */
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
+  /** The origin of the account service. */
+  apiOrigin: string;
+  /** A JSON request with this app's session. Only the Marketplace reads below get here. */
+  requestAuthorized(path: string, init: RequestInit): Effect.Effect<unknown, RemoteWorkflowError>;
+  /** A file with this app's session. Only the Marketplace reads below get here. */
+  downloadAuthorized(path: string): Effect.Effect<Uint8Array, RemoteWorkflowError>;
+}
+
+/**
+ * The account service reads that a child may ask for: what adding or updating an agent from a listing
+ * reads (`AgentMarketplaceService.install`), what adding or listing a Marketplace skill reads
+ * (`SkillMarketplaceService`), and their install counts. Any other read is refused, so a child cannot
+ * use the account session for anything else.
+ */
+const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boolean; path: RegExp }> = [
+  { method: "GET", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/listing$/u },
+  { method: "GET", download: true, path: /^\/v1\/marketplace\/agents\/[^/]+\/avatar$/u },
+  // A skill, not the list of the user's own submissions.
+  { method: "GET", download: false, path: /^\/v1\/skills\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/content$/u },
+  { method: "GET", download: false, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/u },
+  { method: "POST", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/install$/u },
+  { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
+];
+
+const installReceiptSchema = Schema.Struct({ receiptId: Schema.String });
+const decodeInstallReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(installReceiptSchema));
+
+/** The path and the request to make for a child's read, or null when the read is not allowed. */
+function allowedMarketplaceRead(
+  request: LocalServerMarketplaceRequest,
+  apiOrigin: string,
+): { path: string; init: RequestInit } | null {
+  let url: URL;
+  try {
+    url = new URL(request.path, apiOrigin);
+  } catch {
+    return null;
+  }
+  // An id never holds `%`, so an encoded `/` cannot move a read to another route.
+  if (url.origin !== apiOrigin || url.pathname.includes("%")) return null;
+  const allowed = MARKETPLACE_READS.some(
+    (read) => read.method === request.method && read.download === request.download && read.path.test(url.pathname),
+  );
+  if (!allowed) return null;
+  const path = `${url.pathname}${url.search}`;
+  if (request.method === "GET") return request.body === undefined ? { path, init: { method: "GET" } } : null;
+  // An install count sends only its receipt id.
+  try {
+    const { receiptId } = decodeInstallReceipt(request.body);
+    return {
+      path,
+      init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** A server on this computer, as the owner's other devices see it (`local-servers-v1`). */
@@ -185,6 +264,8 @@ export class LocalServers {
   readonly #running = new Map<string, RunningChild>();
   /** The times each server stopped on its own, in the last `RESTART_WINDOW_MS`. */
   readonly #exits = new Map<string, number[]>();
+  /** The agents that work on each running server, by registry id. */
+  readonly #working = new Map<string, AgentSummary[]>();
   /** The last ready line of each running server, by registry id. */
   readonly #ready = new Map<string, LocalServerReady>();
   /** The registry ids of the children that have a machine token, and the account it belongs to. */
@@ -203,6 +284,11 @@ export class LocalServers {
     this.#options = options;
     this.#registry = new LocalServerRegistry(options.registryPath);
     this.#spawn = options.spawn ?? spawnProcess;
+  }
+
+  /** The agents that work on the servers on this computer. A quit stops them. */
+  workingAgents(): AgentSummary[] {
+    return [...this.#working.values()].flat();
   }
 
   /** The process ids of the children, which the update install does not wait for. */
@@ -441,6 +527,56 @@ export class LocalServers {
     );
   }
 
+  /**
+   * Makes a Marketplace read for a child with this app's session and writes the answer to it. A read that
+   * is not allowed, or that fails, gets the reason, so that the child does not wait.
+   */
+  #readMarketplace(id: string, running: RunningChild, request: LocalServerMarketplaceRequest): void {
+    const read = allowedMarketplaceRead(request, this.#options.account.apiOrigin);
+    // The request holds the read and its ids only, no secret.
+    if (!read)
+      this.#options.log.warn("A server on this computer asked for an account read that is not allowed.", {
+        method: request.method,
+        path: request.path,
+      });
+    const answer: Effect.Effect<LocalServerCommand, RemoteWorkflowError> = !read
+      ? Effect.succeed({ type: "marketplace", id: request.id, error: sourceText("error.team.requestFailed") })
+      : request.download
+        ? this.#options.account.downloadAuthorized(read.path).pipe(
+            Effect.map(
+              (bytes): LocalServerCommand => ({
+                type: "marketplace",
+                id: request.id,
+                bytes: Buffer.from(bytes).toString("base64"),
+              }),
+            ),
+          )
+        : this.#options.account
+            .requestAuthorized(read.path, read.init)
+            .pipe(Effect.map((value): LocalServerCommand => ({ type: "marketplace", id: request.id, value })));
+    Effect.runFork(
+      Effect.forkIn(
+        answer.pipe(
+          // The same sentence as on the desktop app's own server, such as "Sign in is required."
+          Effect.catch(({ cause }) =>
+            Effect.succeed<LocalServerCommand>({
+              type: "marketplace",
+              id: request.id,
+              error: cause instanceof Error ? cause.message : sourceText("error.team.requestFailed"),
+            }),
+          ),
+          Effect.flatMap((command) =>
+            Effect.sync(() => {
+              if (this.#running.get(id) === running) this.#send(id, command);
+            }),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+  }
+
   /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
@@ -564,6 +700,16 @@ export class LocalServers {
           this.#readMembers(entry.id);
           return;
         }
+        const marketplace = parseLocalServerMarketplaceRequest(line);
+        if (marketplace) {
+          this.#readMarketplace(entry.id, running, marketplace);
+          return;
+        }
+        const working = parseWorkingLine(line);
+        if (working) {
+          if (this.#running.get(entry.id) === running) this.#working.set(entry.id, working);
+          return;
+        }
         const value = parseReadyLine(line);
         if (value) Deferred.doneUnsafe(ready, Exit.succeed(value));
       });
@@ -634,6 +780,7 @@ export class LocalServers {
   #exited(entry: StoredLocalServer, running: RunningChild, code: number | null, signal: NodeJS.Signals | null): void {
     if (this.#running.get(entry.id) === running) {
       this.#running.delete(entry.id);
+      this.#working.delete(entry.id);
       // The next child gets its machine token again when it starts.
       this.#published.delete(entry.id);
       this.#announcePublished();

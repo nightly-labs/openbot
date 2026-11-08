@@ -7,14 +7,16 @@ import {
 } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
-import { File } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useMemo, useRef, useState } from "react";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid } from "@/shared/lib/platform";
 import { readFileBase64 } from "@/shared/lib/read-file-base64";
 import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
@@ -46,6 +48,40 @@ function base64(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+let sharedImagesCleared = false;
+
+/**
+ * An Android copy of a shared or pasted image, so the image views get a short file URI, not a data
+ * URL of many megabytes: Android Glide copies its source text, and a large data URL ran the app out
+ * of memory. A copy stays for one launch: the first copy of a launch removes those of the launch
+ * before. iOS keeps the data URL. A copy that cannot be written also leaves the data URL.
+ */
+async function keepSharedImage(file: RemoteFileUpload): Promise<string | undefined> {
+  if (!isAndroid || !file.mimeType.startsWith("image/")) return undefined;
+  const folder = new Directory(Paths.cache, "composer-images");
+  if (!sharedImagesCleared) {
+    sharedImagesCleared = true;
+    try {
+      if (folder.exists) folder.delete();
+    } catch {
+      // The system clears the cache folder itself when it needs the space.
+    }
+  }
+  try {
+    folder.create({ intermediates: true, idempotent: true });
+    const extension =
+      file.name
+        .split(".")
+        .at(-1)
+        ?.replace(/[^a-zA-Z0-9]/gu, "") || "img";
+    const copy = new File(folder, `${Crypto.randomUUID()}.${extension}`);
+    await copy.write(file.base64, { encoding: "base64" });
+    return copy.uri;
+  } catch {
+    return undefined;
+  }
 }
 
 export function useChatAttachments(
@@ -94,8 +130,9 @@ export function useChatAttachments(
   // The same checks as desktop, named per file: one selection can hold several, and the user
   // needs to know which one to fix.
   function assertSupported(name: string) {
-    if (!isSupportedAttachmentName(name)) throw new Error(t("mobile.chat.attachment.unsupported", { name }));
-    if (support && !isSupportedAttachmentNameFor(name, support())) {
+    if (!support) {
+      if (!isSupportedAttachmentName(name)) throw new Error(t("mobile.chat.attachment.unsupported", { name }));
+    } else if (!isSupportedAttachmentNameFor(name, support())) {
       const type = attachmentFileExtension(name)?.toUpperCase();
       throw new Error(
         type
@@ -281,7 +318,8 @@ export function useChatAttachments(
           if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
           // The caller deletes the copy after this read, so the item keeps the bytes, not the address.
           const { name, mimeType, base64 } = await readFile(file.uri, file.name);
-          await add({ name, mimeType, base64 });
+          const uri = await keepSharedImage({ name, mimeType, base64 });
+          await add({ name, mimeType, base64, ...(uri ? { uri } : {}) });
         } catch (error) {
           failures.push(error);
         }

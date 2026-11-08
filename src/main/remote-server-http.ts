@@ -56,7 +56,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
     options.body === undefined
       ? undefined
       : sideRoute
-        ? JSON.stringify(sideRoute.request(path, options.body))
+        ? JSON.stringify(sideRoute.request(path, options.body, { channelIsolation: true }))
         : codec.encodeRequest(method, path, options.body, {
             ...(options.preserveSemanticTags === undefined
               ? {}
@@ -96,8 +96,14 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
     const decoded = yield* Effect.result(
       Effect.tryPromise({
         try: () => response.json(),
+        // The host labels every reply JSON. A reply that is not labeled JSON and does not parse came
+        // from something between this app and the host, such as a Wi-Fi sign-in page. That is a
+        // network fault that a retry can fix, not a host that sends bad data. It fails as `fetch` does
+        // when it cannot reach the host, with a `TypeError`.
         catch: (cause) =>
-          new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidData"), null, { cause }),
+          isJsonContentType(response.headers.get("content-type"))
+            ? new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidData"), null, { cause })
+            : new RemoteTransportError({ cause: new TypeError("The reply did not come from the host.", { cause }) }),
       }),
     );
     if (Result.isFailure(decoded)) {
@@ -113,6 +119,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               historyExtent: true,
               channelAttention: true,
               agentTaskUiBlocks: true,
+              channelIsolation: true,
             })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>
@@ -133,12 +140,16 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
   });
 }, Effect.scoped);
 
+function isJsonContentType(contentType: string | null | undefined): boolean {
+  const mimeType = contentType?.split(";", 1)[0]?.trim().toLowerCase();
+  return mimeType === "application/json" || mimeType?.endsWith("+json") === true;
+}
+
 export function webRtcRequestBody(
   body: RequestInit["body"],
   contentType: string | undefined,
 ): RequestInit["body"] | TeamProtocolV2Json {
-  const mimeType = contentType?.split(";", 1)[0]?.trim().toLowerCase();
-  if (!body || (mimeType !== "application/json" && !mimeType?.endsWith("+json"))) return body;
+  if (!body || !isJsonContentType(contentType)) return body;
   let text: string;
   if (isString(body)) text = body;
   else if (body instanceof ArrayBuffer) text = new TextDecoder().decode(body);

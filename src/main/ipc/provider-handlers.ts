@@ -26,6 +26,7 @@ import { registerSecretValue } from "@openbot/logging";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SignInRegion } from "../../backend/kimi-region";
+import type { ClaudeUserSetupPreferenceStore } from "../claude-user-setup-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -39,6 +40,7 @@ export interface ProviderIpcDependencies {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
   credentials: ProviderCredentialStore;
+  claudeUserSetup: ClaudeUserSetupPreferenceStore;
   /** Opens a web page in the program that the user chose in Settings. */
   openLink: (url: string) => Promise<void>;
 }
@@ -47,6 +49,7 @@ export function providerIpcHandlers({
   service,
   providerRuntimes,
   credentials,
+  claudeUserSetup,
   openLink,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   async function connect(provider: AgentProviderId, region: SignInRegion) {
@@ -161,6 +164,14 @@ export function providerIpcHandlers({
         provider,
         status: credentials.status(provider),
       })),
+      getClaudeUserSetup: handler(() => claudeUserSetup.get()),
+      setClaudeUserSetup: payloadHandler(parseClaudeUserSetup, async (enabled) => {
+        const changed = claudeUserSetup.get().enabled !== enabled;
+        const next = await runCauseEffect(claudeUserSetup.set({ enabled }));
+        // The provider status event makes every open settings page read the setting again.
+        if (changed) service.notifyProviderSettingsChanged();
+        return next;
+      }),
     },
     providerRuntimes: {
       getStatus: handler(() => providerRuntimes.getStatus()),
@@ -218,6 +229,11 @@ export function parseDownloadableProviderId(value: unknown): DownloadableProvide
 function parseRefreshProvidersInput(value: unknown): { automatic: boolean } {
   if (!isDynamicRecord(value) || typeof value.automatic !== "boolean") throw new Error("Invalid provider refresh.");
   return { automatic: value.automatic };
+}
+
+function parseClaudeUserSetup(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
+  return value;
 }
 
 function parseProviderUseInput(value: unknown): { provider: AgentProviderId; on: boolean } {

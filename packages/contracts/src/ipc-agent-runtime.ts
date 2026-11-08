@@ -68,6 +68,8 @@ export interface AgentRuntimePromptQuestion {
   id: string;
   header: string;
   question: string;
+  /** See `AgentPromptQuestion.detail`. */
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
   /** See `AgentPromptQuestion.multiSelect`. */
@@ -80,6 +82,7 @@ function isRuntimePromptQuestion(value: unknown): value is AgentRuntimePromptQue
     isIdentifier(value.id) &&
     isBoundedString(value.header, AGENT_RUNTIME_QUESTION_HEADER_LIMIT) &&
     isBoundedString(value.question, AGENT_RUNTIME_TEXT_LIMIT) &&
+    (value.detail === undefined || isBoundedString(value.detail, AGENT_RUNTIME_TEXT_LIMIT)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||

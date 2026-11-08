@@ -173,7 +173,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           // The user's own server takes the whole recording once: it has no live preview or stream.
           const own = server?.routes.dictation === true;
           livePreview = !own && (model?.livePreview ?? true);
-          streamed = !own && model?.kind === "cloud";
+          // Only ElevenLabs streams. Groq takes the whole recording after Stop, as a server does.
+          streamed = !own && model?.kind === "cloud" && model.provider === "elevenlabs";
         }),
         voice.prepareModel(),
       ]);
@@ -461,8 +462,11 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceThreadSend = false;
     resources.voiceChunks = [];
     resources.voiceSubmitRequest = undefined;
-    // The recorder also stops by itself, for example when the microphone is disconnected.
+    // The recorder also stops by itself, for example when the microphone is disconnected. Then the
+    // limit timer must not stop the next recording before its time.
     stopVoiceElapsedTimer();
+    if (resources.voiceRecordingTimer) clearTimeout(resources.voiceRecordingTimer);
+    resources.voiceRecordingTimer = undefined;
     stopVoiceStream();
     if (!targetAgentId || !targetServerId || resources.voiceDisposed) {
       if (cloud) {

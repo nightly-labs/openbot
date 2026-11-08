@@ -10,6 +10,7 @@ import {
   hostedSiteConversationEvent,
   isAgentModel,
   parseRoutineRunConversationEventItemType,
+  ROUTINE_RUN_SOURCES,
   type RoutineRunConversationEventStatus,
   type UsageTokens,
   WORKFLOW_RUN_SOURCES,
@@ -18,6 +19,7 @@ import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } f
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import {
   ANALYTICS_GENERATIONS,
+  type CauseCode,
   classifyFailure,
   operationForCode,
   type ReportQueue,
@@ -28,12 +30,17 @@ import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
 import type { FailureSignal } from "../backend/agent/failure-signal";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
+import type { TurnTiming } from "../backend/agent/turn-lifecycle";
 import type { BrowserSiteVisit } from "../backend/browser-host";
 import type { TurnModelUsage } from "../backend/database/agent-usage";
 import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
+import type { WebhookDeliveryReport } from "./host-events-service";
+import { REMOTE_CONNECT_PHASES, type RemoteConnectPhase, type RemoteConnectSummary } from "./remote-connect-trace";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
+import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
+import { SERVICE_STEP_PROPERTY_NAMES, SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
@@ -54,6 +61,50 @@ const MAX_TOOL_ROWS_PER_TURN = 32;
 const MAX_TURN_TOKENS = 10_000_000_000;
 // Usage rows carry the time of the provider's turn start, which can precede the host event.
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
+/** The turn timing values and the `system_turn_completed` properties that carry them. */
+const TURN_TIMING_PROPERTIES = [
+  ["queueWaitMs", "queue_wait_ms"],
+  ["startMs", "start_ms"],
+  ["providerStartMs", "provider_start_ms"],
+  ["firstOutputMs", "first_output_ms"],
+] as const satisfies readonly (readonly [keyof TurnTiming, string])[];
+const MAX_QUEUE_WAIT_MS = 7 * ACTIVE_TURN_TTL_MS;
+/** The marks are times after the process started. A start that waits longer than a day is not one. */
+const MAX_STARTUP_MS = 24 * 60 * 60_000;
+/** One connection attempt has its own timeouts, so a phase that takes an hour is not one. */
+const MAX_REMOTE_CONNECT_PHASE_MS = 60 * 60_000;
+/** A host can stay away for a day of retries, or a hosted start can wait as long. */
+const MAX_REMOTE_CONNECT_WAIT_MS = 24 * 60 * 60_000;
+const REMOTE_CONNECT_PHASE_PROPERTIES = [
+  ["session", "session_ms"],
+  ["ticket", "ticket_ms"],
+  ["bridge", "bridge_ms"],
+  ["signal-socket", "signal_socket_ms"],
+  ["signal", "signal_ms"],
+  ["channels", "channels_ms"],
+  ["auth", "auth_ms"],
+  ["compatibility", "compatibility_ms"],
+  ["first-request", "first_request_ms"],
+] as const satisfies readonly (readonly [RemoteConnectPhase, string])[];
+const REMOTE_CONNECT_ENUMS = {
+  outcome: ["connected", "failed"],
+  connection: ["first", "reconnect"],
+  session_kind: ["new", "stored", "reused"],
+  last_phase: ["start", ...REMOTE_CONNECT_PHASES],
+  first_request: ["ok", "error"],
+} as const;
+const STARTUP_PROPERTY_NAMES = [
+  "start_kind",
+  "host_kind",
+  "when_ready_ms",
+  "window_ready_ms",
+  "services_ready_ms",
+  "renderer_loaded_ms",
+  "workspace_ready_ms",
+  "slowest_service_step",
+  "slowest_service_step_ms",
+  ...SERVICE_STEP_PROPERTY_NAMES,
+] as const satisfies readonly (keyof StartupProperties)[];
 // A turn uses its agent's model and sometimes a few more, such as a Claude subagent's model.
 const MAX_TOKEN_ROWS_PER_TURN = 8;
 const TOKEN_PROPERTIES = [
@@ -78,6 +129,8 @@ const MAX_INVENTORY_ITEMS = 32;
 const ANALYTICS_SCHEMA_VERSION = ANALYTICS_GENERATIONS.desktop_host;
 const CURATED_AGENT_PREFIX = "openbot-curated-agent-";
 const LISTING_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+/** An OpenBot version, such as `0.52.1` or `0.53.0-beta.2`. */
+const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,6}(?:-[0-9A-Za-z.]{1,24})?$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/u;
 const TOOL_KINDS = [
   "command",
@@ -111,7 +164,33 @@ const ROUTINE_TRIGGER_TYPES = [
   "advanced",
   "custom",
   "once",
+  "webhook",
 ] as const;
+const WEBHOOK_DELIVERY_RESULTS = [
+  "started",
+  "ignored",
+  "duplicate",
+  "gone",
+  "too_large",
+  "unavailable",
+  "signed_out",
+  "unknown_route",
+  "secret_unreadable",
+  "bad_signature",
+  "bad_body",
+  "failed",
+] as const;
+const WEBHOOK_IGNORED_REASONS = ["event-type", "filter", "inactive", "busy", "refused"] as const;
+const WEBHOOK_DELIVERY_STATUSES = [200, 202, 400, 401, 404, 413, 429, 503] as const;
+/** Signal and the host refuse larger bodies, so a larger count is not a real request. */
+const MAX_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
+/** Signal waits less than this for the host's answer. */
+const MAX_WEBHOOK_HANDLE_MS = 10 * 60 * 1_000;
+/** The signature check refuses a timestamp older than 5 minutes. */
+const MAX_WEBHOOK_AGE_MS = 10 * 60 * 1_000;
+/** A busy sender can send many requests. Analytics sends at most this many each minute. */
+const MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE = 60;
+const WEBHOOK_DELIVERY_WINDOW_MS = 60 * 1_000;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
 /**
@@ -132,8 +211,12 @@ type HostEventName =
   | "system_site_visited"
   | "system_routine_run"
   | "system_workflow_run"
+  | "system_webhook_delivery"
   | "system_inventory"
   | "system_resources"
+  | "system_startup"
+  | "system_unclean_exit"
+  | "system_remote_connect"
   | "hosted_site_action";
 /**
  * Events that go only when the user links analytics to their account: the sites they visit, the
@@ -173,6 +256,8 @@ export interface HostAnalyticsOptions {
    * the Usage report reads. An empty list means the provider reported none.
    */
   resolveTurnUsage?: (agentId: string, turnId: string, since: string) => readonly TurnModelUsage[];
+  /** Where the time of a finished turn went, in milliseconds. Each value is null when it is not known. */
+  resolveTurnTiming?: (turnId: string) => TurnTiming | null;
   /**
    * The user's MCP servers that a provider reports under `name`: `null` when there is none, else the
    * catalog plugin slug they all share, or `slug: null` for the user's own server.
@@ -182,6 +267,8 @@ export interface HostAnalyticsOptions {
   resolveInventory?: () => Effect.Effect<AnalyticsInventory, AnalyticsOperationFailure>;
   inventoryDay?: AnalyticsInventoryDayStore;
   resources?: AnalyticsResourceSource;
+  /** How the previous run ended when it did not quit cleanly. Sent once, never saved for a later run. */
+  uncleanExit?: UncleanExitProperties | null;
 }
 
 /** The resource summary of the last closed local day, which the resource monitor keeps. */
@@ -194,13 +281,19 @@ export interface AnalyticsResourceSource {
 
 interface AnalyticsRoutineRun {
   runKind: "scheduled" | "manual";
+  /** What started a manual run: a test, a script or a webhook request. */
+  runSource: (typeof ROUTINE_RUN_SOURCES)[number] | null;
   triggerType: string;
 }
 
 /** Counts and closed-set names only: never a user-authored name, URL or command. */
 interface AnalyticsInventory {
   agentCount: number;
+  /** Agent routines with a schedule that are on. */
   enabledRoutineCount: number;
+  enabledWebhookRoutineCount: number;
+  /** Webhook addresses of agents, channels and workflows. */
+  webhookRouteCount: number;
   workflowCount: number;
   customMcpServerCount: number;
   plugins: string[];
@@ -226,8 +319,11 @@ const HOST_ALLOWLIST = {
     ...AGENT_PROPERTY_NAMES,
     "origin",
     "status",
+    "failure_code",
+    "cause_code",
     "provider_auth",
     "duration_ms",
+    ...TURN_TIMING_PROPERTIES.map(([, property]) => property),
     "token_usage",
     "uncached_input_tokens",
     "cached_input_tokens",
@@ -269,7 +365,19 @@ const HOST_ALLOWLIST = {
     "total_tokens",
   ],
   system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
-  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "trigger_type"],
+  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "run_source", "trigger_type"],
+  system_webhook_delivery: [
+    "owner_kind",
+    "format",
+    "result",
+    "ignored_reason",
+    "status_code",
+    "body_bytes",
+    "handle_ms",
+    "delivery_age_ms",
+    "test",
+    "skipped_count",
+  ],
   system_workflow_run: [
     "status",
     "source",
@@ -280,6 +388,8 @@ const HOST_ALLOWLIST = {
   system_inventory: [
     "agent_count",
     "enabled_routine_count",
+    "enabled_webhook_routine_count",
+    "webhook_route_count",
     "workflow_count",
     "custom_mcp_server_count",
     "plugins",
@@ -291,6 +401,37 @@ const HOST_ALLOWLIST = {
     "computer_use_enabled",
   ],
   system_resources: RESOURCE_PROPERTY_NAMES,
+  system_startup: STARTUP_PROPERTY_NAMES,
+  system_unclean_exit: [
+    "phase",
+    "previous_app_version",
+    "uptime_class",
+    "crash_dump_count",
+    "slept",
+    "ended_asleep",
+    "os_restarted",
+    "host_kind",
+  ],
+  system_remote_connect: [
+    "outcome",
+    "connection",
+    "session_kind",
+    "last_phase",
+    "first_request",
+    "session_ms",
+    "ticket_ms",
+    "bridge_ms",
+    "signal_socket_ms",
+    "signal_ms",
+    "channels_ms",
+    "auth_ms",
+    "compatibility_ms",
+    "first_request_ms",
+    "total_ms",
+    "wait_ms",
+    "hosted_start_wait_ms",
+    "failed_attempts",
+  ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
 
@@ -309,6 +450,8 @@ type ActiveTurn = {
   owner: AnalyticsSubject | null;
   ownerResolutionPending: boolean;
   tools: Map<string, ToolUseRow>;
+  /** The error that ended the turn, as `handleFailure` classified it. A failed turn sends it. */
+  failure?: { failureCode: string; causeCode: CauseCode };
 };
 
 export class HostAnalytics {
@@ -317,11 +460,13 @@ export class HostAnalytics {
   readonly #resolveAgent: HostAnalyticsOptions["resolveAgent"];
   readonly #resolveProviderAuth: HostAnalyticsOptions["resolveProviderAuth"];
   readonly #resolveTurnUsage: HostAnalyticsOptions["resolveTurnUsage"];
+  readonly #resolveTurnTiming: HostAnalyticsOptions["resolveTurnTiming"];
   readonly #resolveMcpServer: NonNullable<HostAnalyticsOptions["resolveMcpServer"]>;
   readonly #resolveRoutineRun: NonNullable<HostAnalyticsOptions["resolveRoutineRun"]>;
   readonly #resolveInventory: HostAnalyticsOptions["resolveInventory"];
   readonly #inventoryDayStore: HostAnalyticsOptions["inventoryDay"];
   readonly #resources: HostAnalyticsOptions["resources"];
+  #uncleanExit: UncleanExitProperties | null;
   readonly #client: HostOpenPanelClient | null;
   #identifiedOwner: AnalyticsIdentity | null = null;
   #trackingEnabled: boolean;
@@ -335,6 +480,9 @@ export class HostAnalytics {
   readonly #routineRunOwners = new Map<string, AnalyticsSubject | null>();
   readonly #routineRunReports = new Set<string>();
   readonly #workflowRunReports = new Set<string>();
+  #webhookWindowStart = 0;
+  #webhookWindowCount = 0;
+  #webhookSkipped = 0;
   /** A workflow run that began before this process is a replay after a restart, and is not sent. */
   readonly #createdAt = Date.now();
   #closed = false;
@@ -350,11 +498,13 @@ export class HostAnalytics {
     this.#resolveAgent = options.resolveAgent;
     this.#resolveProviderAuth = options.resolveProviderAuth;
     this.#resolveTurnUsage = options.resolveTurnUsage;
+    this.#resolveTurnTiming = options.resolveTurnTiming;
     this.#resolveMcpServer = options.resolveMcpServer ?? (() => null);
     this.#resolveRoutineRun = options.resolveRoutineRun ?? (() => null);
     this.#resolveInventory = options.resolveInventory;
     this.#inventoryDayStore = options.inventoryDay;
     this.#resources = options.resources;
+    this.#uncleanExit = options.uncleanExit ?? null;
     this.#trackingEnabled = options.trackingEnabled ?? true;
     this.#install = options.installId ? { id: options.installId, email: null } : null;
     if (!options.enabled) {
@@ -427,11 +577,16 @@ export class HostAnalytics {
             ...this.#agentProperties(event.agentId),
             origin,
             status: normalizedTurnStatus(event.status),
+            // A failed turn with no failure signal sends neither code.
+            ...(event.status === "failed" && activeTurn?.failure
+              ? { failure_code: activeTurn.failure.failureCode, cause_code: activeTurn.failure.causeCode }
+              : {}),
             ...this.#providerAuth(event.agentId),
             ...(activeTurn === undefined
               ? {}
               : {
                   duration_ms: Math.max(0, Math.round(performance.now() - activeTurn.startedAt)),
+                  ...this.#turnTiming(event.turnId),
                   ...(usage ? tokenProperties(sumTokens(usage)) : {}),
                 }),
           },
@@ -521,16 +676,44 @@ export class HostAnalytics {
     Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
+  /** One summary per main process. It waits for the owner like other events when there is none yet. */
+  handleStartup(properties: StartupProperties): void {
+    if (this.#closed) return;
+    this.#track("system_startup", properties);
+  }
+
+  /** One connection to a remote host: phase times and counts, never the host. */
+  handleRemoteConnect(summary: RemoteConnectSummary): void {
+    if (this.#closed) return;
+    const properties: HostProperties = {
+      outcome: summary.outcome,
+      connection: summary.connection,
+      ...(summary.session ? { session_kind: summary.session } : {}),
+      last_phase: summary.lastPhase,
+      ...(summary.firstRequest ? { first_request: summary.firstRequest } : {}),
+      total_ms: summary.totalMs,
+      wait_ms: summary.waitMs,
+      ...(summary.hostedStartWaitMs === undefined ? {} : { hosted_start_wait_ms: summary.hostedStartWaitMs }),
+      failed_attempts: summary.failedAttempts,
+    };
+    for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) {
+      const ms = summary.phases[phase];
+      if (ms !== undefined) properties[property] = ms;
+    }
+    this.#track("system_remote_connect", properties);
+  }
+
   /** Only the local service emits this signal. Remote clients never send host reports. */
   handleFailure(failure: FailureSignal): void {
-    if (!this.#reports) return;
-    this.#configureReports();
     const candidates = [...this.#activeTurns.values()].filter((turn) => turn.agentId === failure.agentId);
     const turn = failure.turnId
       ? this.#activeTurns.get(failure.turnId)
       : candidates.length === 1
         ? candidates[0]
         : undefined;
+    if (turn && (failure.severity ?? "error") === "error") noteTurnFailure(turn, failure);
+    if (!this.#reports) return;
+    this.#configureReports();
     if (turn?.owner && turn.owner.id !== this.#currentSubject()?.id) return;
     const properties = turn?.properties ?? (failure.agentId ? this.#agentProperties(failure.agentId) : {});
     const provider =
@@ -595,6 +778,38 @@ export class HostAnalytics {
     });
   }
 
+  /**
+   * Reports one inbound webhook request: whose route it reached, what the host answered and how long
+   * it took. At most 60 go each minute; the next event sent counts the requests that did not go.
+   */
+  handleWebhookDelivery(report: WebhookDeliveryReport): void {
+    if (!this.#client) return;
+    const now = Date.now();
+    if (now - this.#webhookWindowStart >= WEBHOOK_DELIVERY_WINDOW_MS) {
+      this.#webhookWindowStart = now;
+      this.#webhookWindowCount = 0;
+    }
+    if (this.#webhookWindowCount >= MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE) {
+      this.#webhookSkipped += 1;
+      return;
+    }
+    this.#webhookWindowCount += 1;
+    const skipped = this.#webhookSkipped;
+    this.#webhookSkipped = 0;
+    this.#track("system_webhook_delivery", {
+      ...(report.ownerKind ? { owner_kind: report.ownerKind } : {}),
+      format: report.format,
+      result: report.result,
+      ...(report.ignoredReason ? { ignored_reason: report.ignoredReason } : {}),
+      status_code: report.status,
+      body_bytes: report.bodyBytes,
+      handle_ms: Math.round(report.handleMs),
+      ...(report.ageMs === null ? {} : { delivery_age_ms: Math.round(report.ageMs) }),
+      test: report.test,
+      ...(skipped > 0 ? { skipped_count: skipped } : {}),
+    });
+  }
+
   /** Reports a tab that reached a new registrable domain. The hostname itself is never sent. */
   handleSiteVisit(visit: BrowserSiteVisit): void {
     if (!this.#client || !this.#trackingEnabled) return;
@@ -626,6 +841,7 @@ export class HostAnalytics {
     }
     this.#checkInventory();
     this.checkResources();
+    this.#checkUncleanExit();
   }
 
   /** The account signed out. Later events go with the install ID only when the user does not share analytics. */
@@ -742,7 +958,13 @@ export class HostAnalytics {
         {
           ...this.#agentProperties(agentId),
           status: event.status,
-          ...(run ? { run_kind: run.runKind, trigger_type: run.triggerType } : {}),
+          ...(run
+            ? {
+                run_kind: run.runKind,
+                ...(run.runSource ? { run_source: run.runSource } : {}),
+                trigger_type: run.triggerType,
+              }
+            : {}),
         },
         owner,
         false,
@@ -814,6 +1036,8 @@ export class HostAnalytics {
           {
             agent_count: inventory.agentCount,
             enabled_routine_count: inventory.enabledRoutineCount,
+            enabled_webhook_routine_count: inventory.enabledWebhookRoutineCount,
+            webhook_route_count: inventory.webhookRouteCount,
             workflow_count: inventory.workflowCount,
             custom_mcp_server_count: inventory.customMcpServerCount,
             plugins: inventory.plugins,
@@ -870,6 +1094,23 @@ export class HostAnalytics {
         Effect.forkIn(this.#scope, { startImmediately: true }),
       ),
     );
+  }
+
+  /**
+   * Sends how the previous run ended, once. It stays in memory only: a user who shares analytics and
+   * is signed out sends it at sign-in in this run, or never. With analytics disabled, or with no
+   * install ID while the user does not share analytics, it is dropped.
+   */
+  #checkUncleanExit(): void {
+    const properties = this.#uncleanExit;
+    if (this.#closed || !properties) return;
+    const owner = this.#client ? this.#currentSubject() : null;
+    if (!owner) {
+      if (!this.#client || !this.#trackingEnabled) this.#uncleanExit = null;
+      return;
+    }
+    this.#uncleanExit = null;
+    this.#trackForOwner("system_unclean_exit", { ...properties }, owner);
   }
 
   /**
@@ -982,6 +1223,21 @@ export class HostAnalytics {
     }
   }
 
+  #turnTiming(turnId: string): Record<string, number> {
+    let timing: TurnTiming | null = null;
+    try {
+      timing = this.#resolveTurnTiming?.(turnId) ?? null;
+    } catch {
+      return {};
+    }
+    const properties: Record<string, number> = {};
+    for (const [key, property] of TURN_TIMING_PROPERTIES) {
+      const value = timing?.[key];
+      if (isNumber(value) && Number.isFinite(value)) properties[property] = Math.max(0, Math.round(value));
+    }
+    return properties;
+  }
+
   #pruneActiveTurns(now: number): void {
     for (const [turnId, turn] of this.#activeTurns) {
       if (now - turn.startedAt <= ACTIVE_TURN_TTL_MS) continue;
@@ -1072,13 +1328,51 @@ function sanitizeHostEvent(name: HostEventName, properties: HostProperties): Hos
 }
 
 function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): HostPropertyValue | undefined {
+  if (name === "system_startup") {
+    if (key === "start_kind") return isOneOf(START_KINDS, value) ? value : undefined;
+    if (key === "host_kind") return isOneOf(["desktop", "server"] as const, value) ? value : undefined;
+    if (key === "slowest_service_step") return isOneOf(SERVICE_STEPS, value) ? value : undefined;
+    return boundedCount(value, MAX_STARTUP_MS);
+  }
+  if (name === "system_remote_connect") {
+    if (
+      key === "outcome" ||
+      key === "connection" ||
+      key === "session_kind" ||
+      key === "last_phase" ||
+      key === "first_request"
+    ) {
+      const allowed: readonly string[] = REMOTE_CONNECT_ENUMS[key];
+      return isString(value) && allowed.includes(value) ? value : undefined;
+    }
+    if (key === "failed_attempts") return boundedCount(value, 100_000);
+    if (key === "wait_ms" || key === "hosted_start_wait_ms") return boundedCount(value, MAX_REMOTE_CONNECT_WAIT_MS);
+    return boundedCount(value, MAX_REMOTE_CONNECT_PHASE_MS);
+  }
   if (name === "system_resources") {
-    if (key === "ram_class" || key === "cpu_class" || key === "arch" || key === "host_kind") {
+    if (
+      key === "ram_class" ||
+      key === "cpu_class" ||
+      key === "arch" ||
+      key === "host_kind" ||
+      key === "main_loop_delay_max_phase"
+    ) {
       const allowed: readonly string[] = RESOURCE_ENUMS[key];
       return isString(value) && allowed.includes(value) ? value : undefined;
     }
-    if (key === "provider_tree_supported") return isBoolean(value) ? value : undefined;
+    if (key === "provider_tree_supported" || key === "main_loop_delay_max_turn_active") {
+      return isBoolean(value) ? value : undefined;
+    }
     return boundedCount(value, 10_000_000);
+  }
+  if (name === "system_unclean_exit") {
+    if (key === "phase" || key === "uptime_class" || key === "host_kind") {
+      const allowed: readonly string[] = UNCLEAN_EXIT_ENUMS[key];
+      return isString(value) && allowed.includes(value) ? value : undefined;
+    }
+    if (key === "previous_app_version") return isString(value) && APP_VERSION_PATTERN.test(value) ? value : undefined;
+    if (key === "crash_dump_count") return boundedCount(value, 10);
+    return isBoolean(value) ? value : undefined;
   }
   if (key === "cause_code" || key === "severity" || key === "operation") {
     const safe = safeProperties({
@@ -1115,7 +1409,21 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       return isOneOf([...ROUTINE_TERMINAL_STATUSES, "needs-attention"] as const, value) ? value : undefined;
     }
     if (key === "run_kind") return isOneOf(["scheduled", "manual"] as const, value) ? value : undefined;
+    if (key === "run_source") return isOneOf(ROUTINE_RUN_SOURCES, value) ? value : undefined;
     if (key === "trigger_type") return isOneOf(ROUTINE_TRIGGER_TYPES, value) ? value : undefined;
+  }
+  if (name === "system_webhook_delivery") {
+    if (key === "owner_kind") return isOneOf(["agent", "channel", "workflow"] as const, value) ? value : undefined;
+    if (key === "format") return isOneOf(["openbot", "standard"] as const, value) ? value : undefined;
+    if (key === "result") return isOneOf(WEBHOOK_DELIVERY_RESULTS, value) ? value : undefined;
+    if (key === "ignored_reason") return isOneOf(WEBHOOK_IGNORED_REASONS, value) ? value : undefined;
+    if (key === "status_code") return isOneOf(WEBHOOK_DELIVERY_STATUSES, value) ? value : undefined;
+    if (key === "body_bytes") return boundedCount(value, MAX_WEBHOOK_BODY_BYTES);
+    if (key === "handle_ms") return boundedCount(value, MAX_WEBHOOK_HANDLE_MS);
+    if (key === "delivery_age_ms") return boundedCount(value, MAX_WEBHOOK_AGE_MS);
+    if (key === "skipped_count") return boundedCount(value, 1_000_000);
+    if (key === "test") return isBoolean(value) ? value : undefined;
+    return undefined;
   }
   if (name === "system_workflow_run") {
     if (key === "status") return isOneOf(["done", "failed", "stopped"] as const, value) ? value : undefined;
@@ -1168,6 +1476,11 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   }
   if (key === "duration_ms") {
     return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= ACTIVE_TURN_TTL_MS ? value : undefined;
+  }
+  if (name === "system_turn_completed") {
+    // A usage-limit hold keeps a message in the queue for hours, so its wait has a wider bound.
+    if (key === "queue_wait_ms") return boundedCount(value, MAX_QUEUE_WAIT_MS);
+    if (TURN_TIMING_PROPERTIES.some(([, property]) => property === key)) return boundedCount(value, ACTIVE_TURN_TTL_MS);
   }
   if (key === "has_secret_prompt") return isBoolean(value) ? value : undefined;
   return undefined;
@@ -1267,6 +1580,12 @@ function hostedSiteFailureCode(value: string): string {
 
 function normalizedTurnStatus(value: string): string {
   return ["completed", "failed", "interrupted", "cancelled"].includes(value) ? value : "other";
+}
+
+/** Keeps the last error of a turn, but a later `unknown` does not hide a known cause. */
+function noteTurnFailure(turn: ActiveTurn, failure: FailureSignal): void {
+  if (failure.causeCode === "unknown" && turn.failure && turn.failure.causeCode !== "unknown") return;
+  turn.failure = { failureCode: systemFailureCode(failure.code), causeCode: failure.causeCode };
 }
 
 function systemFailureCode(value: string): string {

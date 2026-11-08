@@ -193,6 +193,11 @@ export function decodeAgents(value: unknown): ClientAgentSummary[] {
   return value;
 }
 
+/** The agents that the `Cmd + Q` hint names, or null when the hint is hidden. */
+export function decodeQuitShortcutHint(value: unknown): ClientAgentSummary[] | null {
+  return value === null ? null : decodeAgents(value);
+}
+
 export function decodeMemory(value: unknown): AgentMemory {
   if (!isAgentMemory(value)) throw new Error("Invalid agent memory response.");
   return value;

@@ -176,12 +176,15 @@
   --openbot-chart-storage-runtimes: #c98500;
   --openbot-chart-storage-app: var(--openbot-text-dim);
   /* The felt sidebar badges. The fills are the colours of the felt art at its edge (light at the
-     top, dark at the bottom), under `assets/plush/felt-pill-lilac.webp` darkened to plum and
-     `felt-x-ball.webp`. They are art colours, so both themes use them. The digits are cream yarn. */
+     top, dark at the bottom), under `assets/plush/felt-pill-lilac.webp` darkened to plum,
+     `felt-pill-amber.webp` and `felt-x-ball.webp`. They are art colours, so both themes use them.
+     The digits and the wait icons are cream yarn. */
   --openbot-felt-plum-top: rgb(112 80 131);
   --openbot-felt-plum-bottom: rgb(74 40 92);
   --openbot-felt-raspberry-top: rgb(245 32 112);
   --openbot-felt-raspberry-bottom: rgb(180 6 65);
+  --openbot-felt-amber-top: rgb(255 149 17);
+  --openbot-felt-amber-bottom: rgb(203 104 12);
   --openbot-felt-cream: #f6efe2;
   --openbot-felt-cream-stroke: #efe4d2;
   --openbot-logo-production: #d6adf2;
@@ -359,14 +362,22 @@
   --openbot-switch-sm-inset: 1px;
   /* Unitless on purpose. Lucide icons carry viewBox="0 0 24 24", so CSS stroke-width
    * resolves in user units, not px: a literal 1px paints 1 * (16/24) = 0.67 device px at
-   * the 16px default size and reads blurry. 1.5 user units is the 1px the design asks for.
+   * the 16px default size and reads blurry. 2 user units paint 1.33 px at 16px, which is the
+   * weight of the Linear sidebar icons (1.5 on a 16-unit grid at 14px). The line stays the
+   * same on hover and selection; only the color changes.
+   *
+   * The line scales with the icon, so an icon of 18px or more uses --openbot-icon-stroke-lg:
+   * 1.5 paints 1.13 px at 18px, 1.25 px at 20px and 1.5 px at 24px. With 2, a 20px icon
+   * paints 1.67 px and looks heavier than the 16px icons beside it. Icons smaller than 12px
+   * occur only on a zoomed canvas, where the line shrinks with the drawing.
    *
    * Which is also why three kinds of SVG keep a weight of their own rather than reading
    * this: the hand-written icons under src/renderer/src/features draw on a 16- or 20-unit
    * viewBox, so the same number paints a different device weight there; the onboarding
    * computer is a drawing, not an icon; and the checkbox tick would come out at 0.75
    * device px inside its 12px box. Every lucide icon in the renderer reads this token. */
-  --openbot-icon-stroke: 1.5;
+  --openbot-icon-stroke: 2;
+  --openbot-icon-stroke-lg: 1.5;
   --openbot-icon-xs: 12px;
   --openbot-icon-sm: 14px;
   --openbot-icon-md: 16px;
@@ -387,6 +398,11 @@
   --openbot-duration-toast-exit: 220ms;
   --openbot-duration-island-content: 340ms;
   --openbot-duration-island-content-exit: 220ms;
+  /*
+   * A new turn shows the working agent after this wait. The local host starts a turn at once, so a
+   * shorter wait shows the agent while the sent message still moves in. Grok Bot shows it after 670–900ms.
+   */
+  --openbot-agent-activity-show-delay: 750ms;
   --openbot-agent-activity-exit-delay: 500ms;
   /* A loading indicator waits this long, so a fast answer replaces it before it shows. */
   --openbot-loading-indicator-delay: 400ms;
@@ -457,6 +473,10 @@
 }
 
 [data-provider="copilot"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="mistral"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
 

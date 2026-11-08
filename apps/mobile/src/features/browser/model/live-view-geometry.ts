@@ -27,6 +27,13 @@ export const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 /** The largest zoom. A 1280-pixel page on a phone is about three times too small to read, so four leaves room. */
 export const MAX_ZOOM = 5;
 
+// The worklet plugin makes each worklet a `var` that takes its closure when the module loads, so a
+// worklet comes before the worklets that call it. Below them, `clamp` would be undefined in them.
+export function clamp(value: number, minimum: number, maximum: number): number {
+  "worklet";
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
 /** The page fitted into the stage without zoom: whole, centered, with bars where the shapes differ. */
 export function fittedRect(stage: Size, frame: Size): Rect {
   "worklet";
@@ -134,9 +141,4 @@ export function revealFraction(stage: Size, frame: Size, zoom: Zoom, fraction: P
     y: zoom.y + shift(point.y, stage.height),
   };
   return clampZoom(stage, frame, moved);
-}
-
-export function clamp(value: number, minimum: number, maximum: number): number {
-  "worklet";
-  return Math.min(maximum, Math.max(minimum, value));
 }

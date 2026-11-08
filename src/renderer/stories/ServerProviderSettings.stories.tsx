@@ -14,6 +14,7 @@ import { Toaster, toast } from "@openbot/ui";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -27,6 +28,7 @@ import { createFakeConnection } from "./provider-connection-fixture";
 import { SettingsPageStory } from "./settings-page-story";
 
 const localServer = localStoryServer();
+const teamServer = STORY_SERVERS.find((candidate) => candidate.kind === "remote") ?? localServer;
 
 const providerAgentStatus: AgentStatus = {
   phase: "blocked",
@@ -55,6 +57,7 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
   devin: { phase: "not-downloaded", progress: null, message: null, version: null },
   copilot: { phase: "not-downloaded", progress: null, message: null, version: null },
+  mistral: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -123,6 +126,27 @@ const codeSignInAgentStatus: AgentStatus = {
       : provider,
   ),
 };
+/**
+ * Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. The host status
+ * does not carry the key, so only the key route says it is saved.
+ */
+const hostCodexKeyAgentStatus: AgentStatus = {
+  ...codeSignInAgentStatus,
+  providers: (codeSignInAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex" ? { ...provider, state: "available", message: null } : provider,
+  ),
+};
+/** The key routes of a joined server's host that logs Codex in with a pasted OpenAI key. */
+function hostCodexKeys(codex: "missing" | "saved"): ProviderKeyApi {
+  return {
+    readsCodexKey: true,
+    onHost: true,
+    getProviderApiKeyState: async (provider) => ({ provider, status: provider === "codex" ? codex : "missing" }),
+    setProviderApiKey: fn(async () => undefined),
+    clearProviderApiKey: fn(async () => undefined),
+    openExternal: fn(async () => undefined),
+  };
+}
 /** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
@@ -153,6 +177,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   devin: { phase: "ready", progress: 100, message: null, version: "3000.11.234" },
   copilot: { phase: "ready", progress: 100, message: null, version: "1.0.105" },
+  mistral: { phase: "ready", progress: 100, message: null, version: "3.1.0" },
 };
 
 /** The Providers section of Server settings, with the providers of this computer. */
@@ -181,6 +206,8 @@ function ServerProvidersStory(props: {
    * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
    */
   hermes?: ProviderRuntimeStatus | null;
+  /** A joined server whose host logs Codex in with an OpenAI key: before the key, or with it. */
+  hostCodexKey?: "missing" | "saved";
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const hermes = props.hermes;
@@ -279,6 +306,7 @@ function ServerProvidersStory(props: {
   // compiled ternary prop cannot create its memo.
   const switchToManageProviders = props.inactive ? fn() : undefined;
   function storyServer(): ServerSummary {
+    if (props.hostCodexKey) return { ...teamServer, active: true };
     return props.inactive ? { ...localServer, active: false } : localServer;
   }
 
@@ -302,6 +330,7 @@ function ServerProvidersStory(props: {
       },
       get agentStatus() {
         if (hermesAgentStatus) return hermesAgentStatus;
+        if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
           : props.codeSignIn
@@ -341,6 +370,7 @@ function ServerProvidersStory(props: {
           ? fn()
           : undefined,
       accountActions: usageResetAccounts,
+      providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
       onUpdateCustomProvider: updateCustomProvider,
@@ -406,6 +436,7 @@ function ServerProvidersStory(props: {
             onRecheckScreenRecording={fn(async () => undefined)}
             initialSection="providers"
             hostPromptCacheTtl={{}}
+            claudeUserSetup
             hostModelVisibility={{}}
             onSwitchToManageProviders={switchToManageProviders}
             providers={providerOptions()}
@@ -521,6 +552,16 @@ export const CodeSignIn: Story = {
   render: () => <ServerProvidersStory codeSignIn />,
 };
 
+/** A joined server with `codex-api-key-v1`: the signed-out Codex row offers API key next to Connect. */
+export const HostCodexKey: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="missing" />,
+};
+
+/** The same server after the key: Codex on the host uses the OpenAI API key. */
+export const HostCodexKeySaved: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="saved" />,
+};
+
 export const ProviderDownloads: Story = {
   render: () => <ServerProvidersStory providerDownloads />,
   parameters: { viewport: { defaultViewport: "serverPhone" } },
@@ -537,8 +578,8 @@ export const ProviderUpdateRetry: Story = {
 
 /**
  * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
- * Codex and Claude, so those switches stay on. Open Cursor: its Download section offers Remove download,
- * and after it the list reads "Off · Not downloaded".
+ * Codex and Claude, so those switches stay on. Open Cursor: its Danger zone offers Delete, and after
+ * it the list reads "Off · Not downloaded".
  */
 export const ProvidersOff: Story = {
   render: () => (

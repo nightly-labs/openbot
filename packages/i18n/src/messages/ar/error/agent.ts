@@ -48,6 +48,7 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange": "تعمل مهام لهذا الوكيل. انتظر انتهاءها، أو أوقفها، قبل تغيير المزوّد.",
   "error.agent.waitBeforeClearContext": "انتظر انتهاء الدور النشط وقائمة الانتظار قبل بدء دردشة جديدة.",
   "error.agent.waitBeforeCompactContext": "انتظر انتهاء الدور النشط وقائمة الانتظار قبل ضغط السياق.",
+  "error.agent.waitBeforeDeleteHistory": "انتظر انتهاء الدور النشط وقائمة الانتظار قبل حذف السجل.",
   "error.agent.compactContextUnavailable": "لا يستطيع هذا الوكيل ضغط سياقه الآن.",
   "error.agent.unknown": "وكيل غير معروف: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -93,6 +94,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "الحاسوب الذي يشغّل الوكيل وحده يمكنه تغيير هذا الإعداد.",
   "error.agent.sideQuestionBusy": "تعمل أسئلة جانبية كثيرة جدًا. أعد المحاولة بعد قليل.",
   "error.agent.sideQuestionFailed": "تعذّر على الوكيل الإجابة عن السؤال الجانبي. أعد المحاولة.",
+  "error.agent.webSearchSignIn": "يحتاج البحث في الويب إلى تسجيل الدخول إلى Codex بحساب ChatGPT.",
+  "error.agent.webSearchBusy": "تعمل عمليات بحث وأسئلة جانبية كثيرة جدًا. حاول مرة أخرى بعد قليل.",
+  "error.agent.webSearchFailed": "لم يكتمل البحث في الويب. حاول مرة أخرى.",
   "error.agent.busyMessageModeLocalOnly":
     "لا يمكن تحديد ما تفعله الرسائل أثناء عمل الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.backupModelsLocalOnly": "لا يمكن تعيين النماذج الاحتياطية إلا على الحاسوب الذي يشغّل الوكيل.",

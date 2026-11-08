@@ -316,6 +316,9 @@ export const messages = {
   "routine.settings.missedPolicy": "予定時刻に OpenBot が閉じていた場合",
   "routine.settings.missedPolicy.skip": "この実行をスキップ",
   "routine.settings.missedPolicy.runOnce": "OpenBot を開いたときに 1 回実行",
+  "routine.settings.runInThread": "別のスレッドで実行",
+  "routine.settings.runInSaveFailed":
+    "ルーティンは保存されましたが、別スレッドの設定は保存されていません。もう一度お試しください。",
   "routine.settings.resultDestination": "回答の送信先",
   "routine.settings.resultDestination.none": "このチャットのみ",
   "routine.settings.resultDestination.place": "{connection} · {place}",

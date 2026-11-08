@@ -24,12 +24,22 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { readJsonBody } from "../backend/local-mcp-bridge";
+import { cutModelText, MCP_RESULT_MORE, MCP_RESULT_TEXT_LIMIT } from "../backend/model-text-limit";
 
 const logger = createOpenBotLogger("github-mcp-proxy");
 
 /** A GitHub call rarely takes long. The limit only stops a call that GitHub never answers. */
 const UPSTREAM_TIMEOUT_MS = 5 * 60_000;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
+/** GitHub's answer when the installation does not have a permission that the call needs. */
+const MISSING_PERMISSION = "Resource not accessible by integration";
+/** For the agent, which tells the user. GitHub needs `administration: write` to create a repository. */
+const REPOSITORY_CREATION_HINT =
+  'OpenBot cannot create repositories for this owner. GitHub needs the "Administration: write" permission of the ' +
+  "OpenBotGit app on that account. An owner of the account installs OpenBotGit there, or approves its pending " +
+  "permission request, in GitHub settings: Applications > Installed GitHub Apps (for an organization, in the " +
+  "organization settings). Organization policy can also block repository creation. Tell the user this, and do " +
+  "not try another credential. The user can also create the repository on github.com.";
 
 export interface GitHubMcpProxyOptions {
   /** GitHub's remote MCP server. */
@@ -224,7 +234,12 @@ export class GitHubMcpProxy {
       const owner = isDynamicRecord(args) && isString(args.owner) ? args.owner : null;
       const name = isDynamicRecord(args) && isString(args.repo) ? args.repo : null;
       const token = (owner && name && this.#options.botToken(owner, name)) || userToken;
-      return forward(token, (client) => client.callTool(params, undefined, requestOptions(extra.signal)));
+      return forward(token, async (client) => {
+        const result = await client.callTool(params, undefined, requestOptions(extra.signal));
+        if (params.name === "create_repository") addRepositoryCreationHint(result);
+        boundTextContent(result);
+        return result;
+      });
     });
     if (capabilities.prompts) {
       mcp.setRequestHandler(ListPromptsRequestSchema, ({ params }, extra) =>
@@ -303,6 +318,28 @@ export class GitHubMcpProxy {
     const secret = Buffer.from(this.#options.secret());
     return candidate.length === secret.length && timingSafeEqual(candidate, secret);
   }
+}
+
+/** Explains a refusal that the app's permissions cause, because GitHub's own text does not say what to do. */
+function addRepositoryCreationHint(result: Awaited<ReturnType<Client["callTool"]>>): void {
+  if (result.isError !== true || !Array.isArray(result.content)) return;
+  const refused = result.content.some(
+    (item) => isDynamicRecord(item) && isString(item.text) && item.text.includes(MISSING_PERMISSION),
+  );
+  if (refused) result.content.push({ type: "text", text: REPOSITORY_CREATION_HINT });
+}
+
+/**
+ * Cuts each text item past the model limit: a long issue list or search result otherwise stays in the
+ * agent's context for the rest of the session. The note says how to read more.
+ */
+function boundTextContent(result: Awaited<ReturnType<Client["callTool"]>>): void {
+  if (!Array.isArray(result.content)) return;
+  result.content = result.content.map((item) => {
+    if (!isDynamicRecord(item) || item.type !== "text" || !isString(item.text)) return item;
+    const cut = cutModelText(item.text, MCP_RESULT_TEXT_LIMIT, MCP_RESULT_MORE);
+    return cut ? { ...item, text: `${cut.text}\n${cut.note}` } : item;
+  });
 }
 
 function requestOptions(signal: AbortSignal): RequestOptions {
