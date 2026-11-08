@@ -274,3 +274,52 @@ Invoke-RestMethod -Method Post `
   that you want such processes to message and control, including approval decisions, the
   agent's model and provider account, and a new chat. A script cannot change the agent's permissions or turn Local
   scripts on.
+
+## MCP server
+
+Run `node "/path/to/resources/cli/openbot-cli.mjs" mcp` to expose the Local scripts API over stdio.
+It needs Node 18 or later and the same per-agent **Local scripts** setting. It reads the same URL
+and token files. It uses only Node built-ins, so the packaged CLI needs no `node_modules` folder.
+Copy the CLI file out of an AppImage before use.
+
+For Claude Code, use the installed path for your platform:
+
+```sh
+claude mcp add openbot -- node "/Applications/OpenBot.app/Contents/Resources/cli/openbot-cli.mjs" mcp
+```
+
+For Codex, add this entry to your Codex `config.toml`:
+
+```toml
+[mcp_servers.openbot]
+command = "node"
+args = ["/Applications/OpenBot.app/Contents/Resources/cli/openbot-cli.mjs", "mcp"]
+tool_timeout_sec = 1900
+```
+
+Cursor and other MCP clients can use the same command and arguments. Set `OPENBOT_AUTOMATION_DIR`
+in the MCP server environment to select a development profile. Do not put the token in the configuration.
+
+The server exposes these tools:
+
+| Tool | Operation |
+| --- | --- |
+| `list_agents` | List enabled agents and their routines. |
+| `send_message` | Send `text` to an `agent` ID or name. Optional `wait` defaults to false. With `wait: true`, return the answer, `state: "needs-person"`, or `state: "timed-out"`. Optional `timeout` uses the CLI duration format and defaults to `30m`. Optional `clientMessageId` is the retry key. |
+| `get_delivery` | Read `deliveryId` for an `agent`. |
+| `get_pending` | Read requests that need a person. |
+| `answer_question` | Submit `answers` for an `agent` and `requestId`. |
+| `respond_to_approval` | Submit `decision: "accept"` or `"decline"` for an `agent` and `requestId`. |
+| `run_routine` | Run `routineId` for an `agent`, with optional `payload` and `waitId`. |
+| `update_agent` | Set `provider`, `model`, `reasoningEffort`, or `providerAccountId` for an `agent`. |
+| `new_chat` | Start a new chat for an `agent`. |
+
+The read tools have read-only annotations. Write tools have destructive annotations. Show the full
+approval details to the person before `respond_to_approval`. Ask the person before `new_chat`.
+Annotations are hints for clients; the Local scripts API still checks every request.
+Secret questions and browser takeovers must be completed in OpenBot.
+
+When the client supplies a progress token, `send_message` sends progress notifications during its wait.
+Set the client's tool timeout above the requested wait. A timeout ends only the wait; the work continues.
+Use `get_delivery` to read the result later. Tool errors use MCP `isError`; delivery outcomes stay in the result.
+Channels are not exposed because the Local scripts API has no channel routes.

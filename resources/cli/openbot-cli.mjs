@@ -8,8 +8,10 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 
 const USAGE = `Usage:
+  openbot-cli mcp
   openbot-cli list [--json]
   openbot-cli run <agent> <task|-> [--wait] [--timeout 30m] [--id <key>] [--json]
   openbot-cli status <agent> <deliveryId> [--json]
@@ -199,14 +201,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {{ id: string, name: string }} agent
  * @param {string} deliveryId
  * @param {number} timeoutMs
+ * @param {(delivery: {status: string}) => void} [progress]
  */
-async function waitForDelivery(target, agent, deliveryId, timeoutMs) {
+async function waitForDelivery(target, agent, deliveryId, timeoutMs, progress) {
   const base = `/v1/agents/${encodeURIComponent(agent.id)}`;
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     let delivery;
     try {
       delivery = await request(target, "GET", `${base}/deliveries/${encodeURIComponent(deliveryId)}`);
+      progress?.(delivery);
       if (ENDED.has(delivery.status)) {
         return { result: delivery, exitCode: delivery.status === "completed" ? EXIT.done : EXIT.failed };
       }
@@ -341,17 +345,215 @@ function describeDelivery(agent, delivery) {
   return `${agent.name}: ${delivery.status}.`;
 }
 
-let json = false;
-try {
-  const { positional, flags } = parse(process.argv.slice(2));
-  json = flags.has("--json");
-  const { result, exitCode, text } = await main(positional, flags);
-  process.stdout.write(json ? `${JSON.stringify({ ok: exitCode === EXIT.done, exitCode, ...result })}\n` : `${text}\n`);
-  process.exitCode = exitCode;
-} catch (error) {
-  const exitCode = error instanceof CliError ? error.exitCode : EXIT.failed;
-  const message = error instanceof Error ? error.message : String(error);
-  if (json) process.stdout.write(`${JSON.stringify({ ok: exitCode === EXIT.done, exitCode, error: message })}\n`);
-  else (exitCode === EXIT.done ? process.stdout : process.stderr).write(`${message}\n`);
-  process.exitCode = exitCode;
+const string = { type: "string", minLength: 1 };
+const MCP_TOOLS = [
+  ["list_agents", "List agents with Local scripts on and their routines.", {}, [], true],
+  [
+    "send_message",
+    "Send work. With wait, return the answer, needs-person, or timed-out. Work continues after a timeout.",
+    { agent: string, text: string, clientMessageId: string, wait: { type: "boolean" }, timeout: string },
+    ["agent", "text"],
+    false,
+  ],
+  [
+    "get_delivery",
+    "Read a delivery and its answer.",
+    { agent: string, deliveryId: string },
+    ["agent", "deliveryId"],
+    true,
+  ],
+  [
+    "get_pending",
+    "Read questions, approvals, and browser takeovers. Secret questions and browser takeovers need OpenBot.",
+    { agent: string },
+    ["agent"],
+    true,
+  ],
+  [
+    "answer_question",
+    "Answer a pending question with question IDs and arrays of answer strings.",
+    {
+      agent: string,
+      requestId: string,
+      answers: { type: "object", additionalProperties: { type: "array", items: { type: "string" } } },
+    },
+    ["agent", "requestId", "answers"],
+    false,
+  ],
+  [
+    "respond_to_approval",
+    "Show the full approval details to the person and get their decision before this call.",
+    { agent: string, requestId: string, decision: { type: "string", enum: ["accept", "decline"] } },
+    ["agent", "requestId", "decision"],
+    false,
+  ],
+  [
+    "run_routine",
+    "Run a routine. Retrying can start it twice.",
+    { agent: string, routineId: string, payload: { type: "string" }, waitId: string },
+    ["agent", "routineId"],
+    false,
+  ],
+  [
+    "update_agent",
+    "Change an agent's model, provider, effort, or account. Use default for the provider sign-in.",
+    {
+      agent: string,
+      provider: string,
+      model: string,
+      reasoningEffort: string,
+      providerAccountId: { type: ["string", "null"] },
+    },
+    ["agent"],
+    false,
+  ],
+  [
+    "new_chat",
+    "Ask the person before this call. Start a new chat. The agent forgets the conversation; its setup stays.",
+    { agent: string },
+    ["agent"],
+    false,
+  ],
+].map(([name, description, properties, required, readOnly]) => ({
+  name,
+  description,
+  inputSchema: { type: "object", properties, required, additionalProperties: false },
+  annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly, openWorldHint: false },
+}));
+
+function validInput(value, schema) {
+  if (schema.enum && !schema.enum.includes(value)) return false;
+  const type = value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+  if (!(Array.isArray(schema.type) ? schema.type : [schema.type]).includes(type)) return false;
+  if (type === "string") return value.length >= (schema.minLength ?? 0);
+  if (type === "array") return value.every((item) => validInput(item, schema.items));
+  if (type !== "object") return true;
+  return (
+    (schema.required ?? []).every((key) => Object.hasOwn(value, key)) &&
+    Object.entries(value).every(([key, item]) => {
+      const child = schema.properties?.[key] ?? schema.additionalProperties;
+      return child && validInput(item, child);
+    })
+  );
+}
+
+async function callTool(name, args, progress) {
+  const tool = MCP_TOOLS.find((item) => item.name === name);
+  if (!tool || !validInput(args, tool.inputSchema))
+    throw new CliError("Unknown tool or invalid arguments.", EXIT.usage);
+  const timeoutMs = duration(args.timeout ?? "30m");
+  const target = await connection();
+  if (name === "list_agents") return { agents: await request(target, "GET", "/v1/agents") };
+  const agent = await findAgent(target, args.agent);
+  const base = `/v1/agents/${encodeURIComponent(agent.id)}`;
+  if (name === "send_message") {
+    const receipt = await request(target, "POST", `${base}/messages`, {
+      text: args.text,
+      clientMessageId: args.clientMessageId ?? `mcp-${randomUUID()}`,
+    });
+    const delivery = receipt.deliveries.find((item) => item.recipientAgentId === agent.id);
+    if (!delivery) throw new CliError("OpenBot did not queue the message.", EXIT.failed);
+    if (!args.wait) return { agent, messageId: receipt.messageId, deliveryId: delivery.id, status: delivery.status };
+    const waited = await waitForDelivery(target, agent, delivery.id, timeoutMs, progress);
+    return { agent, messageId: receipt.messageId, deliveryId: delivery.id, ...waited.result };
+  }
+  if (name === "get_delivery")
+    return request(target, "GET", `${base}/deliveries/${encodeURIComponent(args.deliveryId)}`);
+  if (name === "get_pending") return request(target, "GET", `${base}/pending`);
+  if (name === "new_chat") return request(target, "POST", `${base}/context/clear`);
+  if (name === "answer_question")
+    return request(target, "POST", `${base}/prompts/${encodeURIComponent(args.requestId)}/answer`, {
+      answers: args.answers,
+    });
+  if (name === "respond_to_approval")
+    return request(target, "POST", `${base}/approvals/${encodeURIComponent(args.requestId)}/respond`, {
+      decision: args.decision,
+    });
+  if (name === "run_routine")
+    return request(target, "POST", `${base}/routines/${encodeURIComponent(args.routineId)}/run`, {
+      payload: args.payload ?? "",
+      ...(args.waitId ? { waitId: args.waitId } : {}),
+    });
+  const { agent: _reference, ...settings } = args;
+  return request(target, "POST", `${base}/settings`, settings);
+}
+
+async function serveMcp() {
+  const write = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+  const handle = async (line) => {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      write({ id: null, error: { code: -32700, message: "Invalid JSON." } });
+      return;
+    }
+    if (message?.jsonrpc !== "2.0" || typeof message.method !== "string") {
+      write({ id: message?.id ?? null, error: { code: -32600, message: "Invalid request." } });
+      return;
+    }
+    if (message.id === undefined) return;
+    const reply = (result) => write({ id: message.id, result });
+    if (message.method === "initialize") {
+      const requested = message.params?.protocolVersion;
+      return reply({
+        protocolVersion: ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"].includes(requested)
+          ? requested
+          : "2025-11-25",
+        capabilities: { tools: {} },
+        serverInfo: { name: "openbot", version: "1.0.0" },
+      });
+    }
+    if (message.method === "ping") return reply({});
+    if (message.method === "tools/list") return reply({ tools: MCP_TOOLS });
+    if (message.method !== "tools/call") {
+      write({ id: message.id, error: { code: -32601, message: "Unknown method." } });
+      return;
+    }
+    let progress = 0;
+    const token = message.params?._meta?.progressToken;
+    try {
+      const result = await callTool(message.params?.name, message.params?.arguments ?? {}, (delivery) => {
+        if (typeof token === "string" || typeof token === "number")
+          write({
+            method: "notifications/progress",
+            params: { progressToken: token, progress: ++progress, message: delivery.status },
+          });
+      });
+      reply({ content: [{ type: "text", text: JSON.stringify(result) }] });
+    } catch (error) {
+      reply({
+        isError: true,
+        content: [{ type: "text", text: error instanceof CliError ? error.message : "OpenBot request failed." }],
+      });
+    }
+  };
+  const pending = new Set();
+  for await (const line of createInterface({ input: process.stdin, crlfDelay: Infinity })) {
+    const task = handle(line);
+    pending.add(task);
+    void task.finally(() => pending.delete(task));
+  }
+  await Promise.all(pending);
+}
+
+if (process.argv.length === 3 && process.argv[2] === "mcp") {
+  await serveMcp();
+} else {
+  let json = false;
+  try {
+    const { positional, flags } = parse(process.argv.slice(2));
+    json = flags.has("--json");
+    const { result, exitCode, text } = await main(positional, flags);
+    process.stdout.write(
+      json ? `${JSON.stringify({ ok: exitCode === EXIT.done, exitCode, ...result })}\n` : `${text}\n`,
+    );
+    process.exitCode = exitCode;
+  } catch (error) {
+    const exitCode = error instanceof CliError ? error.exitCode : EXIT.failed;
+    const message = error instanceof Error ? error.message : String(error);
+    if (json) process.stdout.write(`${JSON.stringify({ ok: exitCode === EXIT.done, exitCode, error: message })}\n`);
+    else (exitCode === EXIT.done ? process.stdout : process.stderr).write(`${message}\n`);
+    process.exitCode = exitCode;
+  }
 }

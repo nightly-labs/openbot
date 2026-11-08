@@ -4,10 +4,12 @@
 // the CLI's output and exit codes for each outcome and that the token never reaches the output.
 // Writes .openbot-build/automation-cli-e2e/report.json. Run: `bun scripts/automation-cli-e2e.ts`.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   type AgentModelOption,
   DEFAULT_AGENT_DEFAULTS,
@@ -73,6 +75,8 @@ const models = [
 const deliveries = new Map<string, FakeDelivery>();
 const updates: UpdateAgentInput[] = [];
 const cleared: string[] = [];
+const attentionResponses: unknown[] = [];
+const routineRuns: unknown[] = [];
 let busy = false;
 /** The account default "Requests an hour" of Settings › Agents › Local scripts. */
 let automationRunsPerHour = DEFAULT_AGENT_DEFAULTS.automationRunsPerHour;
@@ -97,8 +101,11 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
   listAgents: () => agents,
   agentDefaults: () => ({ ...DEFAULT_AGENT_DEFAULTS, automationRunsPerHour }),
   listModels: () => models,
-  listRoutines: () => [],
-  runRoutine: () => Effect.die(new Error("No routine runs in this test.")),
+  listRoutines: () => [{ id: "routine-1", name: "Wake", active: false }],
+  runRoutine: (input) => {
+    routineRuns.push(input);
+    return Effect.succeed({ id: "run-1", deliveryId: null });
+  },
   sendMessage: (input) => {
     const id = `delivery-${deliveries.size + 1}`;
     const outcome: Outcome =
@@ -131,7 +138,10 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
       browserTakeovers: waiting ? [{ requestId: "takeover-1", requiresOpenBot: true }] : [],
     };
   },
-  respondToLocalAttention: () => Effect.void,
+  respondToLocalAttention: (agentId, input) => {
+    attentionResponses.push({ agentId, ...input });
+    return Effect.void;
+  },
   delivery: (deliveryId) => {
     const delivery = deliveries.get(deliveryId);
     return delivery ? deliveryState(delivery) : null;
@@ -202,7 +212,173 @@ async function check(name: string, args: string[], expectCode: number, test: (ru
 }
 const parsed = (run: Run) => JSON.parse(run.stdout);
 
+async function mcpChecks() {
+  const standalone = join(root, "openbot-cli.mjs");
+  copyFileSync(CLI, standalone);
+  const client = new Client({ name: "openbot-e2e", version: "1.0.0" });
+  const transport = new StdioClientTransport({
+    command: "node",
+    args: [standalone, "mcp"],
+    env: { PATH: process.env.PATH ?? "", OPENBOT_AUTOMATION_DIR: root },
+    stderr: "pipe",
+    cwd: tmpdir(),
+  });
+  transport.stderr?.on("data", (chunk: Buffer) => outputs.push(chunk.toString()));
+  const verify = (name: string, passed: boolean, detail: unknown) => checks.push({ name, passed, detail });
+  const call = async (name: string, args: Parameters<Client["callTool"]>[0]["arguments"]) => {
+    const result = await client.callTool({ name, arguments: args });
+    outputs.push(JSON.stringify(result));
+    assert(Array.isArray(result.content));
+    const text = result.content.find((item) => item.type === "text")?.text;
+    assert.equal(typeof text, "string");
+    return { error: result.isError === true, value: result.isError ? text : JSON.parse(text) };
+  };
+  try {
+    await client.connect(transport);
+    const listed = await client.listTools();
+    outputs.push(JSON.stringify(listed));
+    verify(
+      "MCP lists all nine tools with approval and new-chat annotations",
+      listed.tools.length === 9 &&
+        ["respond_to_approval", "new_chat"].every(
+          (name) => listed.tools.find((tool) => tool.name === name)?.annotations?.destructiveHint === true,
+        ),
+      listed,
+    );
+    const agents = await call("list_agents", {});
+    verify(
+      "MCP lists only enabled agents and routines",
+      !agents.error && agents.value.agents.length === 1 && agents.value.agents[0].routines[0].id === "routine-1",
+      agents,
+    );
+    const queued = await call("send_message", { agent: "Ada", text: "hello", clientMessageId: "mcp-retry" });
+    verify("MCP sends work without waiting", !queued.error && queued.value.status === "queued", queued);
+    const progress: string[] = [];
+    const complete = await client.callTool(
+      {
+        name: "send_message",
+        arguments: { agent: "Ada", text: "hello", wait: true },
+        _meta: { progressToken: "wait-1" },
+      },
+      undefined,
+      {
+        onprogress: (value) => {
+          progress.push(value.message ?? "");
+          outputs.push(JSON.stringify(value));
+        },
+      },
+    );
+    outputs.push(JSON.stringify(complete));
+    assert(Array.isArray(complete.content));
+    const answer = complete.content.find((item) => item.type === "text")?.text;
+    assert.equal(typeof answer, "string");
+    const completed = JSON.parse(answer);
+    verify(
+      "MCP waits for the answer and sends progress",
+      completed.status === "completed" &&
+        completed.answer === `Answer of turn-${completed.deliveryId}` &&
+        progress.includes("queued") &&
+        progress.includes("completed"),
+      completed,
+    );
+    const delivery = await call("get_delivery", { agent: "Ada", deliveryId: completed.deliveryId });
+    verify("MCP reads the delivery answer", !delivery.error && delivery.value.answer === completed.answer, delivery);
+    const person = await call("send_message", { agent: "Ada", text: "ask me", wait: true });
+    verify("MCP returns needs-person", !person.error && person.value.state === "needs-person", person);
+    const pending = await call("get_pending", { agent: "Ada" });
+    verify(
+      "MCP reads pending attention",
+      !pending.error && pending.value.browserTakeovers[0].requiresOpenBot === true,
+      pending,
+    );
+    const question = await call("answer_question", {
+      agent: "Ada",
+      requestId: "question-1",
+      answers: { build: ["Debug"] },
+    });
+    verify(
+      "MCP submits the question answer",
+      !question.error &&
+        question.value.ok &&
+        JSON.stringify(attentionResponses.at(-1)) ===
+          JSON.stringify({
+            agentId: "agent-ada",
+            kind: "prompt",
+            requestId: "question-1",
+            answers: { build: ["Debug"] },
+          }),
+      attentionResponses.at(-1),
+    );
+    for (const decision of ["accept", "decline"]) {
+      const approval = await call("respond_to_approval", { agent: "Ada", requestId: "approval-1", decision });
+      verify(
+        `MCP submits approval ${decision}`,
+        !approval.error &&
+          approval.value.ok &&
+          JSON.stringify(attentionResponses.at(-1)) ===
+            JSON.stringify({ agentId: "agent-ada", kind: "approval", requestId: "approval-1", decision }),
+        attentionResponses.at(-1),
+      );
+    }
+    const routine = await call("run_routine", { agent: "Ada", routineId: "routine-1", payload: "build done" });
+    verify(
+      "MCP runs a routine",
+      !routine.error &&
+        routine.value.runId === "run-1" &&
+        JSON.stringify(routineRuns.at(-1)) ===
+          JSON.stringify({ agentId: "agent-ada", routineId: "routine-1", payload: "build done" }),
+      routine,
+    );
+    const updated = await call("update_agent", { agent: "Ada", model: "claude-opus-5-5", reasoningEffort: "max" });
+    verify(
+      "MCP updates the agent",
+      !updated.error && updated.value.model === "claude-opus-5-5" && updates.at(-1)?.reasoningEffort === "max",
+      updated,
+    );
+    const count = cleared.length;
+    const chat = await call("new_chat", { agent: "Ada" });
+    verify("MCP starts a new chat", !chat.error && chat.value.ok && cleared.length === count + 1, chat);
+    const timeout = await call("send_message", { agent: "Ada", text: "forever", wait: true, timeout: "0s" });
+    verify(
+      "MCP timeout leaves the delivery queued",
+      !timeout.error && timeout.value.state === "timed-out" && deliveries.has(timeout.value.deliveryId),
+      timeout,
+    );
+    const failed = await call("send_message", { agent: "Ada", text: "please fail", wait: true });
+    verify(
+      "MCP returns a failed turn",
+      !failed.error && failed.value.status === "failed" && failed.value.error === "The provider stopped.",
+      failed,
+    );
+    const before = deliveries.size;
+    const invalid = await call("send_message", { agent: "Ada", text: "hello", wait: "yes" });
+    verify("MCP refuses invalid input without sending work", invalid.error && deliveries.size === before, invalid);
+    const disabled = await call("send_message", { agent: "Bo", text: "hello" });
+    verify("MCP refuses an agent without Local scripts", disabled.error && deliveries.size === before, disabled);
+    await Effect.runPromise(server.stop());
+    const stopped = await call("list_agents", {});
+    verify(
+      "MCP reports OpenBot not running",
+      stopped.error && stopped.value.includes("OpenBot is not running"),
+      stopped,
+    );
+  } catch (error) {
+    verify("MCP client completes the tool checks", false, String(error));
+  } finally {
+    await client.close();
+  }
+}
+
 try {
+  const runtime = spawnSync("node", ["-p", "JSON.stringify({node:process.versions.node,bun:process.versions.bun})"], {
+    encoding: "utf8",
+  });
+  const version = runtime.status === 0 ? JSON.parse(runtime.stdout) : null;
+  checks.push({
+    name: "child processes use Node 18 or later",
+    passed: !!version && !version.bun && Number(version.node.split(".")[0]) >= 18,
+    detail: version,
+  });
   await Effect.runPromise(server.sync());
   const token = readFileSync(join(root, "token"), "utf8").trim();
 
@@ -332,14 +508,24 @@ try {
     return run.stderr.includes("Wait for the active turn to finish.") && cleared.length === 1;
   });
   busy = false;
+  automationRunsPerHour = DEFAULT_AGENT_DEFAULTS.automationRunsPerHour;
+  await mcpChecks();
   await Effect.runPromise(server.stop());
   await check("a stopped app exits 5", ["list"], 5, (run) => run.stderr.includes("OpenBot is not running"));
   await check("a wrong command line exits 2 also when the app is stopped", ["agent", "foo", "Ada"], 2, (run) =>
     run.stderr.includes("Usage:"),
   );
+  const leaked = outputs.some((text) => text.includes(token) || text.includes(newToken));
+  for (const item of checks) {
+    item.detail = JSON.parse(
+      JSON.stringify(item.detail ?? null)
+        .replaceAll(token, "[REDACTED]")
+        .replaceAll(newToken, "[REDACTED]"),
+    );
+  }
   checks.push({
     name: "the token is never in the output",
-    passed: outputs.every((text) => !text.includes(token) && !text.includes(newToken)),
+    passed: !leaked,
     detail: null,
   });
 } finally {
