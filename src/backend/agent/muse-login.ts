@@ -19,10 +19,9 @@ const LOGIN_START_TIMEOUT_MS = 30_000;
 const CANCEL_TIMEOUT_MS = 15_000;
 
 const LoginStartResult = Schema.Struct({ verificationUrl: Schema.String, userCode: Schema.String });
-const LoginCompleted = Schema.Struct({
-  outcome: Schema.String,
-  message: Schema.optional(Schema.NullOr(Schema.String)),
-});
+const LoginCompleted = Schema.Struct({ outcome: Schema.String });
+/** Muse's reason for a refused sign-in. A `message` of another type does not change the outcome. */
+const LoginMessage = Schema.Struct({ message: Schema.String });
 
 /**
  * Starts a Muse device-code sign-in: a `muse serve` host that asks Meta for a code, and that saves
@@ -181,11 +180,15 @@ export const readMuseAccount = Effect.fn("MuseLogin.readAccount")(
  * reason, such as an account that has no payment method (#5544).
  */
 function waitForLoginCompleted(host: SpawnedMspConnection, timeoutMs: number, onAnswer: () => void) {
-  const outcome = new Promise<typeof LoginCompleted.Type>((resolve, reject) => {
+  const outcome = new Promise<{ outcome: string; message: string | null }>((resolve, reject) => {
     host.connection.onNotification((notification) => {
       if (notification.method !== "account/loginCompleted") return;
       onAnswer();
-      resolve(Schema.is(LoginCompleted)(notification.params) ? notification.params : { outcome: "failed" });
+      const { params } = notification;
+      resolve({
+        outcome: Schema.is(LoginCompleted)(params) ? params.outcome : "failed",
+        message: Schema.is(LoginMessage)(params) ? params.message : null,
+      });
     });
     void host.exited.then(() => reject(new Error(sourceText("error.provider.acpSignInFailed"))));
   });
