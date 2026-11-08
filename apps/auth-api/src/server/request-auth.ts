@@ -200,25 +200,57 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
   }
 });
 
-/** A few feedback issues for each account and minute: each one is a public issue that a person reads. */
+/** The feedback issues that one account can open in a UTC day. */
+const FEEDBACK_DAILY_LIMIT = 10;
+
+/**
+ * A few feedback issues for each account and minute, and 10 each day: each one is a public issue
+ * that a person reads. The daily count is the only feedback data that D1 keeps.
+ */
 export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLimit")(function* (userId: string) {
-  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
-  if (!limiter) {
-    return yield* new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
-  }
-  const result = yield* Effect.tryPromise({
-    try: () => limiter.limit({ key: `user:${userId}` }),
-    catch: () => new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available."),
-  });
+  const bindings = requireWorkerBindings(env);
+  const limiter = bindings.FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({ try: () => limiter.limit({ key: `user:${userId}` }), catch: unavailable });
   if (!result.success) {
     return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too much feedback. Try again later.");
   }
+  const day = new Date().toISOString().slice(0, 10);
+  // One statement counts and checks, so two requests at the same time cannot both pass the limit.
+  const [, counted] = yield* Effect.tryPromise({
+    try: () =>
+      bindings.DB.batch([
+        bindings.DB.prepare("DELETE FROM feedback_daily_counts WHERE user_id = ? AND day < ?").bind(userId, day),
+        bindings.DB.prepare(
+          `INSERT INTO feedback_daily_counts(user_id, day, count) VALUES (?, ?, 1)
+           ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 WHERE count < ?
+           RETURNING count`,
+        ).bind(userId, day, FEEDBACK_DAILY_LIMIT),
+      ]),
+    catch: unavailable,
+  });
+  if (!counted?.results.length) {
+    return yield* new GitHubInstallationTokensError(
+      429,
+      "feedback_daily_limit",
+      "Too much feedback today. Try again tomorrow.",
+    );
+  }
 });
+
+/** The seconds to the next UTC day, when the daily feedback limit starts again. */
+function secondsToNextUtcDay(now = Date.now()): number {
+  const day = 86_400_000;
+  return Math.ceil((day - (now % day)) / 1000);
+}
 
 export function githubInstallationTokensErrorResponse(error: unknown): Response {
   if (error instanceof GitHubInstallationTokensError) {
     const response = apiError(error.status, error.code, error.message);
-    if (error.status === 429) response.headers.set("Retry-After", "60");
+    if (error.status === 429)
+      response.headers.set("Retry-After", String(error.code === "feedback_daily_limit" ? secondsToNextUtcDay() : 60));
     return response;
   }
   return authErrorResponse(error);
