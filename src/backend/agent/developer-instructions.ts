@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
   AGENT_MEMORY_CONTEXT_BUDGET_BYTES,
   essentialMemoryBytes,
@@ -102,6 +103,13 @@ export interface DeveloperInstructionOptions {
    * (`homeSkills: "instructions"`). Omitted or empty, the instructions name none.
    */
   homeSkills?: readonly HomeSkill[];
+  /**
+   * The user's skill folders in the workspace's `.agents/skills`, for Codex. Codex lists a skill by a short
+   * root name (`r9/...`), and the user's `~/.agents/skills` root ends in the same folders, so a model
+   * read that folder and said that a workspace skill was missing (#5810). Only the folder in the
+   * instructions did not help in real turns; the names did. Omitted or empty, the instructions name none.
+   */
+  workspaceSkills?: readonly string[];
   /** OpenBot runs on a server, so its browser has a data-center address. Fixed for the process. */
   serverHost?: boolean;
   /** The agent gets an http MCP server, which can need a sign-in that the provider cannot do. */
@@ -417,7 +425,11 @@ export function developerInstructions(
       : options.sectionTeammates
         ? sectionTeammateInstructions(options.sectionTeammates)
         : []),
-    `Your working directory, for your own persistent files, is ${agent.workspacePath}. The shared directory, for files that other OpenBot agents need, is ${sharedRoot}. You can change files and run commands in both.`,
+    `Your working directory, for your own persistent files, is ${agent.workspacePath}. The shared directory, for files that other OpenBot agents need, is ${sharedRoot}. You can change files and run commands in both.${
+      options.workspaceSkills?.length
+        ? ` Your workspace skills, each at ${join(agent.workspacePath, ".agents", "skills", "<name>", "SKILL.md")}: ${options.workspaceSkills.slice(0, MAX_HOME_SKILLS_IN_INSTRUCTIONS).join(", ")}.`
+        : ""
+    }`,
     ...(folders.length
       ? [
           `The user also gave you these folders to work in: ${folders.join(", ")}. You can change files and run commands in them. They belong to the user: keep your own files in your working directory.`,
