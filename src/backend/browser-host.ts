@@ -459,6 +459,20 @@ function runBrowserTool<Name extends BrowserToolName>(
 const AGENT_CODE_CARD_FILL =
   "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
 
+/**
+ * The origins of the frames in the page, or `undefined` when the page cannot be read. Electron throws
+ * when code reads a frame whose renderer is gone, for example after a crash, and in an Electron event
+ * listener that throw stops the main process.
+ */
+function frameOrigins(contents: WebContents): string[] | undefined {
+  if (contents.isDestroyed()) return undefined;
+  try {
+    return contents.mainFrame.framesInSubtree.map((frame) => frame.origin);
+  } catch {
+    return undefined;
+  }
+}
+
 function markScriptedOrigin(tab: BrowserHostTab, origin: string): void {
   const origins = tab.scriptedOrigins ?? new Set<string>();
   origins.add(origin);
@@ -1628,7 +1642,8 @@ export class BrowserHost {
     const site = approximateSite(origin);
     for (const connected of this.#connectedTabs(tab)) {
       if (connected === tab || connected.contents.isDestroyed()) continue;
-      const origins = connected.contents.mainFrame.framesInSubtree.map((frame) => frame.origin);
+      // A page that cannot be read can still show the site when its renderer comes back.
+      const origins = frameOrigins(connected.contents) ?? [origin];
       if (origins.some((frameOrigin) => frameOrigin !== "null" && approximateSite(frameOrigin) === site))
         throw new Error(
           "Secure input is unavailable while a connected popup or opener tab shows the same site. Use takeover.",
@@ -1676,10 +1691,11 @@ export class BrowserHost {
     if (!scripted) return;
     const connected = this.#connectedTabs(tab);
     for (const other of this.#sessionTabs(target)) {
-      if (other === tab || other.contents.isDestroyed()) continue;
-      const frameOrigins = new Set(other.contents.mainFrame.framesInSubtree.map((frame) => frame.origin));
+      if (other === tab) continue;
+      // A tab whose renderer is gone has no document to mark. Its next document clears the marks.
+      const otherOrigins = new Set(frameOrigins(other.contents));
       for (const origin of scripted) {
-        if (!frameOrigins.has(origin)) continue;
+        if (!otherOrigins.has(origin)) continue;
         if (connected.has(other)) markScriptedOrigin(other, origin);
         else markWorkerExposedOrigin(other, origin);
       }
@@ -1766,7 +1782,8 @@ export class BrowserHost {
         other !== tab &&
         !other.contents.isDestroyed() &&
         this.#tabSession(other) === target &&
-        other.contents.mainFrame.framesInSubtree.some((frame) => frame.origin === origin),
+        // A page that cannot be read counts as open, so the origin stays tainted.
+        (frameOrigins(other.contents)?.includes(origin) ?? true),
     );
   }
 
