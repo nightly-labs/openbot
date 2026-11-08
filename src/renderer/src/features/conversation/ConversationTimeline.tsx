@@ -658,7 +658,7 @@ export function ConversationTimeline() {
   const plainActivity = () => !channel && props.responseStyle === "natural";
   const channelWorkingSteps = createMemo(() => (channel ? turnSteps.workingSteps(channel.workingTurns()) : []));
   /**
-   * A direct chat with no message yet, and no turn, queued send or question. A queued send leaves the
+   * A direct chat with no message yet, and no turn, queued send, welcome or question. A queued send leaves the
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
    * Its empty state plays a faint turn from the agent's own routine and skill.
    */
@@ -668,6 +668,7 @@ export function ConversationTimeline() {
     !props.hasOlder &&
     !props.activeTurnId &&
     presentedQueueDeliveries().length === 0 &&
+    !(props.queue?.welcome && props.queue.agentId === props.agent?.id) &&
     !renderedAgentActivity() &&
     !props.prompt
       ? props.agent
@@ -1622,41 +1623,6 @@ export function ConversationTimeline() {
             <Show when={!compactionBefore()}>
               <CompactionMarker />
             </Show>
-            <div
-              class="agent-activity-slot"
-              data-reserved={agentActivitySpaceReserved() ? "true" : "false"}
-              ref={setAgentActivitySlotElement}
-            >
-              <Show
-                when={!channel}
-                fallback={
-                  <Show when={channel && channel.workers().length > 0}>
-                    <ChannelActivityIndicator
-                      workers={channel?.workers() ?? []}
-                      steps={channelWorkingSteps()}
-                      stepsOpenByDefault={showAgentSteps()}
-                    />
-                  </Show>
-                }
-              >
-                <Show when={renderedAgentActivity()}>
-                  {(activity) => (
-                    <AgentActivityIndicator
-                      agent={activity().agent}
-                      detail={activity().detail}
-                      label={activity().label}
-                      phase={activity().phase}
-                      since={activity().since}
-                      steps={turnSteps.activeSteps()}
-                      stepsOpenByDefault={showAgentSteps()}
-                      waitingFor={waitingProviderName()}
-                      plain={plainActivity()}
-                      activity={activeStepActivity()}
-                    />
-                  )}
-                </Show>
-              </Show>
-            </div>
             {/* Under an open side thread, the thread draws the card of its own question. */}
             <Show when={!sideThreadOpen()}>
               <ConversationQuestionPrompt
@@ -1693,6 +1659,42 @@ export function ConversationTimeline() {
             <Show when={!sideThreadOpen()}>
               <ConversationBrowserTakeover />
             </Show>
+            {/* The working line goes under an open card, as the steps line goes under an agent message. */}
+            <div
+              class="agent-activity-slot"
+              data-reserved={agentActivitySpaceReserved() ? "true" : "false"}
+              ref={setAgentActivitySlotElement}
+            >
+              <Show
+                when={!channel}
+                fallback={
+                  <Show when={channel && channel.workers().length > 0}>
+                    <ChannelActivityIndicator
+                      workers={channel?.workers() ?? []}
+                      steps={channelWorkingSteps()}
+                      stepsOpenByDefault={showAgentSteps()}
+                    />
+                  </Show>
+                }
+              >
+                <Show when={renderedAgentActivity()}>
+                  {(activity) => (
+                    <AgentActivityIndicator
+                      agent={activity().agent}
+                      detail={activity().detail}
+                      label={activity().label}
+                      phase={activity().phase}
+                      since={activity().since}
+                      steps={turnSteps.activeSteps()}
+                      stepsOpenByDefault={showAgentSteps()}
+                      waitingFor={waitingProviderName()}
+                      plain={plainActivity()}
+                      activity={activeStepActivity()}
+                    />
+                  )}
+                </Show>
+              </Show>
+            </div>
           </div>
         </Show>
       </div>

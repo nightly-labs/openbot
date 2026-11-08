@@ -57,6 +57,7 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
+import { visibleDynamicTools } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import {
   AgentProcessExitError,
@@ -623,6 +624,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       modelSetUnsaved: options.flavor.modelSetUnsaved,
       configSetUnsaved: options.flavor.configSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
+      probeCloseDelayMs: options.flavor.probeCloseDelayMs,
     });
   }
 
@@ -757,6 +759,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 threadId: request.threadId,
                 cwd: request.cwd,
                 includeTurns: request.items === "full",
+                // The turns that follow use the session that this read opens (#5778).
+                dynamicTools: visibleDynamicTools(this.provider),
               },
               true,
             ),
@@ -1470,13 +1474,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<AcpThread | null, ProviderClientOperationError> {
     const held = this.#threads.get(id);
     if (held) return yield* providerSync(() => held);
-    if (!getString(params, "cwd")) return null;
+    if (!isRecord(params) || !getString(params, "cwd")) return null;
     // A resume that is already loading this session opens it for a turn, not for this read.
     const resuming = this.#startingThreads.has(id);
     try {
       providerResult(yield* Effect.result(this.#ensureInitializedEffect()));
       if (!this.#loadsSessions) return null;
-      providerResult(yield* Effect.result(this.#startThread(params, true)));
+      // The turns that follow use the session that this read opens, so it gets the agent's OpenBot tools (#5778).
+      providerResult(
+        yield* Effect.result(this.#startThread({ ...params, dynamicTools: visibleDynamicTools(this.provider) }, true)),
+      );
     } catch (error) {
       // The next turn replaces the missing session, so the user has nothing to act on.
       if (!(error instanceof MissingAcpSessionError)) {

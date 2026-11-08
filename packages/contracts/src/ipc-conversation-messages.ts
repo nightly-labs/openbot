@@ -323,6 +323,13 @@ function isConversationDelivery(value: unknown): boolean {
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
 
 /**
+ * The item type of the setup message that a client sends to a new agent (`agent-welcome-v1`). The
+ * agent answers it with a welcome. No chat, history page, search, queue or preview shows it, and it
+ * does not go to a Team API client.
+ */
+export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
+
+/**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the
  * subagents and a quiet routine answer are not an answer.
  */

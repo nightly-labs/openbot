@@ -1,6 +1,7 @@
 import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  AGENT_WELCOME_ITEM_TYPE,
   type AgentSummary,
   type AskSideQuestionInput,
   CONVERSATION_PLAN_ITEM_TYPE,
@@ -29,6 +30,8 @@ function chatMessage(message: ConversationMessage): boolean {
     message.itemType !== "commentary" &&
     message.itemType !== "question_prompt" &&
     message.itemType !== "agent_attachment" &&
+    // The user did not write a new agent's setup message, and does not see it.
+    message.itemType !== AGENT_WELCOME_ITEM_TYPE &&
     !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&

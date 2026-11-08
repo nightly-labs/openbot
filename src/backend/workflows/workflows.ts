@@ -229,6 +229,16 @@ export interface WorkflowsDependencies {
     placeId: string,
     markdown: string,
   ): Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /**
+   * Posts a note into an OpenBot channel of this host. The same operation id posts once. Absent where
+   * this host has no channels.
+   */
+  channelPost?: (input: {
+    operationId: string;
+    channelId: string;
+    author: { id: string; name: string };
+    text: string;
+  }) => Effect.Effect<"posted" | "missing" | "archived", { readonly cause: unknown }>;
   /** Replies, posts or reacts in a Discord server; absent where this host has no messaging. */
   discordSend?: (
     connectionId: string,
@@ -575,6 +585,60 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         };
 
         /**
+         * Posts the input into an OpenBot channel as a note of the workflow. The step id is the operation
+         * id, so the same call after a restart does not post it twice.
+         */
+        const sendChannelNote = Effect.fn("Workflows.sendChannelNote")(function* (
+          step: StoredWorkflowStep,
+          node: WorkflowNode,
+        ) {
+          const channelId = fieldText(node, "channelId");
+          if (!channelId) {
+            settle(step, { status: "failed", error: sourceText("error.workflow.outputChannelMissing") });
+            return;
+          }
+          // Nothing to say: the channel gets no post, as for a messaging place.
+          if (!step.input.trim()) {
+            settle(step, { status: "done", output: "" });
+            return;
+          }
+          if (!dependencies.channelPost) {
+            settle(step, { status: "failed", error: sourceText("error.workflow.outputChannelFailed") });
+            return;
+          }
+          const posted = yield* dependencies
+            .channelPost({
+              operationId: step.id,
+              channelId,
+              author: {
+                id: `workflow:${step.workflowId}`,
+                name: titleOf(step.workflowId).slice(0, INPUT_LIMITS.accountName),
+              },
+              text: step.input,
+            })
+            .pipe(
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("A workflow output could not post into a channel.", { cause: String(failure.cause) });
+                  return "failed" as const;
+                }),
+              ),
+            );
+          if (posted === "posted") settle(step, { status: "done", output: step.input });
+          else
+            settle(step, {
+              status: "failed",
+              error: sourceText(
+                posted === "archived"
+                  ? "error.backend.channelArchived"
+                  : posted === "missing"
+                    ? "error.backend.channelNotFound"
+                    : "error.workflow.outputChannelFailed",
+              ),
+            });
+        });
+
+        /**
          * Ends an output step whose post has no fiber, after a restart: a post that did not start is
          * sent now, and one that was on its way may be in the place in part. Answers whether it ended.
          */
@@ -858,6 +922,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
             return yield* resumeOutput(step, slackPost(plan));
           }
+          if (node && fieldText(node, "target") === "chat-channel") {
+            yield* sendChannelNote(step, node);
+            return runs.step(step.id)?.status !== "running";
+          }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
           return runs.step(step.id)?.status !== "running";
@@ -901,6 +969,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             case "output":
               if (fieldText(node, "target") === "channel") {
                 yield* sendOutput(step, node);
+                return;
+              }
+              if (fieldText(node, "target") === "chat-channel") {
+                yield* sendChannelNote(step, node);
                 return;
               }
               if (fieldText(node, "target") === "github") {

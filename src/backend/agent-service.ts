@@ -460,6 +460,7 @@ const TASK_STOP_WAIT_MS = 15_000;
 /**
  * How long after a list that lacks an agent's model a `catalog.partialListAtStart` provider is asked
  * again. Grok 1.0.70 has its whole catalogue about a second after it starts on an expired sign-in.
+ * Mistral Vibe 3.1.0 saves its account catalogue while its probe session is open (`probeCloseDelayMs`).
  */
 const PARTIAL_LIST_RECHECK_MS = 5_000;
 /**
@@ -918,9 +919,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             // before an agent leaves a model. A second list that is not fresh moves nobody, and
             // neither does one from a process that replaced this one: its own activation decides.
             let listConfirmed = true;
+            const catalog = requireProviderDriver(provider).catalog;
             if (
-              requireProviderDriver(provider).catalog?.partialListAtStart &&
-              this.#endpoints.hasAgentsOffList(provider)
+              catalog?.partialListAtStart &&
+              (catalog.relistAfterStart || this.#endpoints.hasAgentsOffList(provider))
             ) {
               const client = this.#providers.currentClient(provider);
               yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS);
@@ -2665,14 +2667,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return { provider: this.#providers.preferredProvider(), model: this.#providers.preferredModel() };
   }
 
-  /** `sender` is the person who writes the first message, as `sendMessage` takes it. */
-
+  /**
+   * `sender` is the person who writes the first message, as `sendMessage` takes it. `welcome` marks
+   * that message as the client's setup message (`agent-welcome-v1`): the agent answers it, and no
+   * chat, queue or preview shows it.
+   */
   readonly createAgent = Effect.fn("AgentService.createAgent")(function* (
     this: AgentService,
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Effect.Effect<AgentSummary, AgentLifecycleFailed>,
     profileOperationId?: string,
     sender?: ConversationMessageSender,
+    welcome = false,
   ) {
     const initialMessage = yield* lifecycleStep("validate initial message", () => {
       const text = input.initialMessage.trim();
@@ -2691,7 +2697,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         yield* this.#prepareAgentWorkspace(agent);
         agent = yield* this.#assignNewAgentModel(agent, input, true);
         if (configure) agent = yield* configure(agent);
-        yield* this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] }, sender);
+        // The delivery would make the chat thread only when the turn starts, and no agent update
+        // follows that. Clients key a question of the first turn, such as the welcome question, by
+        // this thread, so the agent update that the first message sends must hold it.
+        yield* this.#store
+          .ensureThreadId(agent.id)
+          .pipe(
+            Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "create agent", cause: failure.cause })),
+          );
+        yield* this.#sendUserMessage(
+          { agentId: agent.id, text: initialMessage, attachmentDraftIds: [] },
+          sender,
+          undefined,
+          undefined,
+          welcome,
+        );
         return this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
       }).pipe(
         Effect.catchDefect((cause) => Effect.fail(new AgentLifecycleFailed({ operation: "create agent", cause }))),
@@ -5438,6 +5458,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     sender: ConversationMessageSender | undefined,
     timezone: string | undefined,
     idempotencyKey?: string,
+    welcome = false,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -5484,6 +5505,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // A reply names a message of the thread that takes it: the agent's own chat, or the task's thread.
         replyToMessageId: input.replyToMessageId ?? null,
         ...(idempotencyKey ? { idempotencyKey } : {}),
+        ...(welcome ? { welcome } : {}),
       })
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause })),
@@ -5508,7 +5530,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const snapshot = this.#conversation.ensureSnapshot(agent.id, targetThreadId);
     // A task message shows in the task's row until its turn starts, not in the agent's own chat.
     if (!task) this.#mailboxSync.syncMailboxMessages(snapshot);
-    if (!task)
+    // The setup message is hidden, so the agent's welcome is the first preview.
+    if (!task && !welcome)
       yield* this.#store
         .updatePreview(
           agent.id,
@@ -5527,6 +5550,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ),
         );
     yield* this.#steerWhenBusy(agent, task, snapshot, delivery.delivery.id, true);
+    // A turn that waits on a question in this chat reads no message until that question is answered,
+    // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
+    const waitingTurnId = snapshot.activeTurnId;
+    if (targetThreadId && waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
+      this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     if (!task) {
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       this.#conversation.emitConversation(snapshot);

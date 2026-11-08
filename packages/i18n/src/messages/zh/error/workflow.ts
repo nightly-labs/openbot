@@ -24,6 +24,8 @@ export const messages = {
   "error.workflow.notRetryable": "只有失败或已停止的步骤可以再次运行。",
   "error.workflow.noDecision": "该步骤不等待决定。",
   "error.workflow.outputPlaceMissing": "为该输出选择一个消息发送位置。",
+  "error.workflow.outputChannelMissing": "为此输出选择一个频道。",
+  "error.workflow.outputChannelFailed": "OpenBot 无法将结果发布到频道。请再次运行此步骤。",
   "error.workflow.discordNoMessage":
     "此输出作用于启动本次运行的 Discord 消息。请从 Discord 提及启动运行，或选择“在频道中发布”。",
   "error.workflow.slackNoMessage":

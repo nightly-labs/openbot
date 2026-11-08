@@ -62,6 +62,7 @@ export const messages = defineMessages("mobile.onboarding", {
   "mobile.onboarding.task.creating": "Creating…",
   "mobile.onboarding.task.withoutTask": "Create without a task",
   "mobile.onboarding.task.failed": "Could not create the agent. Try again.",
+  "mobile.onboarding.task.sendFailed": "Your first task was not sent. Send it in the chat.",
   "mobile.onboarding.idea.builder1": "Make a small to-do list web app.",
   "mobile.onboarding.idea.builder2": "Explain how Git branches work, with examples.",
   "mobile.onboarding.idea.builder3": "Write a script that sorts my photos by date.",

@@ -1,7 +1,6 @@
 import {
   type AgentEvent,
   type AvatarColor,
-  type CreateAgentInput,
   canAdministerServer,
   isQueuedMessageReceipt,
   MCP_SERVERS_CAPABILITY,
@@ -31,7 +30,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
-import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
@@ -113,6 +112,7 @@ import { Effect } from "effect";
 import * as Crypto from "expo-crypto";
 import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
+import { agentInitialMessage, type NewAgentInput } from "@/features/agents/model/agent-initial-message";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
@@ -1953,18 +1953,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ),
         );
       },
-      createAgent: async (input: CreateAgentInput) => {
+      createAgent: async (input: NewAgentInput) => {
+        const serverId = currentActiveServer().id;
+        const firstTask = input.firstTask?.trim() ?? "";
+        const welcome = hasCapability(serverCapabilities.current, serverId, AGENT_WELCOME_CAPABILITY);
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
           name: input.name,
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
-          initialMessage: input.initialMessage,
+          initialMessage: agentInitialMessage(
+            input.description,
+            firstTask,
+            welcome ? { locale: currentText().locale } : null,
+          ),
           // The host applies the pair before it queues the initial message. A host without the
           // capability starts its own default.
           ...(input.provider &&
           input.model &&
-          hasCapability(serverCapabilities.current, currentActiveServer().id, TEAM_AGENT_CREATE_MODEL_CAPABILITY)
+          hasCapability(serverCapabilities.current, serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY)
             ? {
                 provider: input.provider,
                 model: input.model,
@@ -1972,7 +1979,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               }
             : {}),
         });
-        const serverId = currentActiveServer().id;
         setAgents((current) => [
           ...current.filter((agent) => agent.id !== created.id),
           projectAgent(serverId, created, null),
@@ -1984,6 +1990,34 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             () => supportLog.add("warn", "app", "The new agent's colour was not saved."),
           );
         }
+        // The host hides the setup message, so the first task goes as the user's own message after it.
+        // The agent exists now, so a failure does not fail the create: the user sends the task again.
+        if (welcome && firstTask)
+          await request(
+            "POST",
+            TEAM_API_ROUTES.agent.messages(created.id),
+            (value) => {
+              if (!isQueuedMessageReceipt(value)) throw new Error("The host returned an invalid message receipt.");
+              return value;
+            },
+            {
+              text: firstTask,
+              attachmentDraftIds: [],
+              replyToMessageId: null,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              clientMessageId: Crypto.randomUUID(),
+            },
+            serverId,
+          ).catch((error: unknown) => {
+            supportLog.add("warn", "app", "The new agent's first task was not sent.");
+            const text = currentText();
+            showFailureAlert(
+              error,
+              "agent",
+              text.t("mobile.chat.outbox.failed"),
+              text.errorMessage(error, text.t("mobile.onboarding.task.sendFailed")),
+            );
+          });
         return created.id;
       },
       updateAgent: async (input: UpdateAgentInput, serverId = activeServerIdRef.current ?? undefined) => {

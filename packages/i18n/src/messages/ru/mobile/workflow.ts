@@ -106,6 +106,7 @@ export const messages = {
   "mobile.workflow.webhook.secretFailed": "Не удалось создать секрет",
   "mobile.workflow.output.notify": "Уведомление",
   "mobile.workflow.output.channel": "Место в мессенджере",
+  "mobile.workflow.output.chatChannel": "Канал OpenBot",
   "mobile.workflow.output.file": "Файл",
   "mobile.workflow.status.running": "Выполняется",
   "mobile.workflow.status.approval": "Ждёт вас",
@@ -146,6 +147,7 @@ export const messages = {
   "mobile.workflow.step.sendTo": "Куда отправить",
   "mobile.workflow.step.channelHint":
     "Место в мессенджере выбирает владелец или администратор в OpenBot на компьютере.",
+  "mobile.workflow.step.chatChannelHint": "Владелец или администратор выбирает канал в OpenBot на компьютере.",
   "mobile.workflow.problem.noTitle": "Введите название.",
   "mobile.workflow.problem.noAgent": "Выберите агента",
   "mobile.workflow.problem.agentGone": "Агент недоступен. Выберите агента",

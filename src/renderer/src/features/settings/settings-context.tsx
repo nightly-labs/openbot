@@ -34,6 +34,19 @@ function sameExternalLinkTarget(left: ExternalLinkTarget, right: ExternalLinkTar
   return left.kind === right.kind && (left.kind !== "app" || right.kind !== "app" || left.path === right.path);
 }
 
+/** Compares two settings values field by field. The values hold only JSON data. */
+function samePlainValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  const leftEntries = Object.entries(left);
+  const rightEntries = new Map(Object.entries(right));
+  return (
+    leftEntries.length === rightEntries.size &&
+    leftEntries.every(([key, value]) => rightEntries.has(key) && samePlainValue(value, rightEntries.get(key)))
+  );
+}
+
 /** Tells the user why a switch went back to its previous value. */
 function showSaveFailure(error: unknown): void {
   const { t, errorMessage } = currentText();
@@ -119,15 +132,21 @@ const Settings = createSimpleContext({
       nonce: number;
     } | null>(null);
     let hostedServerDeleteNonce = 0;
-    const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
-      ...DEFAULT_GENERAL_SETTINGS,
-      taskSound: readTaskSound(),
-      sendShortcut: readSendShortcutMode(),
-      showAgentSteps: readShowAgentSteps(),
-      compactMessageActions: readCompactMessageActions(),
-      soundFeedback: isActionSoundEnabled(),
-      soundTheme: readActionSoundTheme(),
-    });
+    // A write of equal values keeps the current object. A new object rebuilds the options of each
+    // Select on the page, and a Select reports its value again for new options. Without this, a
+    // Select that saves the value it reports freezes the window (#5708).
+    const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(
+      {
+        ...DEFAULT_GENERAL_SETTINGS,
+        taskSound: readTaskSound(),
+        sendShortcut: readSendShortcutMode(),
+        showAgentSteps: readShowAgentSteps(),
+        compactMessageActions: readCompactMessageActions(),
+        soundFeedback: isActionSoundEnabled(),
+        soundTheme: readActionSoundTheme(),
+      },
+      { equals: samePlainValue },
+    );
     // The mode also changes outside this dialog: another window, or the web Preferences tab on
     // the same page. The shared signal carries those changes into the displayed settings value.
     // Two-arg form: compute tracks the signal, apply writes the store outside tracking.

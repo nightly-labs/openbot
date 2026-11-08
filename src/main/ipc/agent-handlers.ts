@@ -663,7 +663,9 @@ export function agentIpcHandlers({
           ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
-        local: (parsed) => runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender())),
+        // The renderer always sends a setup message to its own host.
+        local: (parsed) =>
+          runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender(), true)),
         remote: async (parsed, serverId) => {
           // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
           // The released route does not carry the account, so a remote agent starts on the provider's own sign-in.

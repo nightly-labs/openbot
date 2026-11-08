@@ -434,9 +434,14 @@ const COPILOT_ARGV: readonly string[] = ["--acp", "--no-auto-update"];
 
 /**
  * Mistral Vibe 3.1.0 sends usage data to Mistral unless told not to (`PRIVACY.md`). Every process gets
- * the variable, the sign-in and sign-out processes too.
+ * the variable, the sign-in and sign-out processes too. Without its model catalogue, Vibe 3.1.0 lists
+ * only Mistral Medium 3.5 and the models of `config.toml`. With it, each session asks Mistral for the
+ * models of the account, and a failed request keeps that list (#5712).
  */
-const MISTRAL_ENV: Readonly<Record<string, string>> = { VIBE_ENABLE_TELEMETRY: "false" };
+const MISTRAL_ENV: Readonly<Record<string, string>> = {
+  VIBE_ENABLE_TELEMETRY: "false",
+  VIBE_EXPERIMENTAL_ENABLE_MODEL_CATALOG: "true",
+};
 
 /** `vibe-acp` serves the Agent Client Protocol on stdio, with no argument. */
 const MISTRAL_ARGV: readonly string[] = [];
@@ -608,6 +613,11 @@ interface ProviderModelCatalog {
    * A list that lacks an agent's model is read once more before the agent leaves that model.
    */
   readonly partialListAtStart?: true;
+  /**
+   * With `partialListAtStart`: the list is read once more after each start, also when no agent is off
+   * it, because models that come later belong in the model picker too.
+   */
+  readonly relistAfterStart?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
@@ -1390,6 +1400,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       }),
     authState: (account) => ({ kind: "mistral", email: account?.email ?? null }),
     validateAccount: () => undefined,
+    // Vibe 3.1.0 adds the catalogue's models to a session only after it opens. A probe session that
+    // stays open saves the catalogue, and the next session lists it from the start (`MISTRAL_ACP_FLAVOR`).
+    catalog: { partialListAtStart: true, relistAfterStart: true },
   },
   {
     id: "hermes",

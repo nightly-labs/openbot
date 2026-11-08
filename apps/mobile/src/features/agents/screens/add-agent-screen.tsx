@@ -10,7 +10,6 @@ import { Alert } from "react-native";
 import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
-import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
 import { useMobileWorkspace, useMobileWorkspaceReader } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
@@ -86,7 +85,6 @@ export function AddAgentScreen() {
       await workspace().createAgent({
         name: name.trim(),
         description: description.trim(),
-        initialMessage: agentInitialMessage(description),
         avatarSeed,
         avatarHue: avatarColor.hue,
         avatarColor: avatarColor.color,

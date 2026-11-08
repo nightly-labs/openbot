@@ -1686,8 +1686,10 @@ and session files in `~/.vibe`, or in `$VIBE_HOME`. OpenBot does not read, copy,
 uses `MISTRAL_API_KEY` when OpenBot's environment has it; OpenBot does not log or export this value.
 OpenBot starts Vibe with its telemetry off (`VIBE_ENABLE_TELEMETRY=false`), so it sends no usage
 events, traces or experiment requests, unless your Mistral organization's managed settings turn
-telemetry on. Mistral's terms apply. Team members see the host's Mistral agents when their app
-supports Mistral.
+telemetry on. OpenBot also turns on Vibe's model catalogue (`VIBE_EXPERIMENTAL_ENABLE_MODEL_CATALOG=true`):
+when a session opens, Vibe asks Mistral (`api.mistral.ai`) for the models of your account, with the
+same API key, and keeps the list in `model_catalog_cache.json` in `~/.vibe`, or in `$VIBE_HOME`.
+Mistral's terms apply. Team members see the host's Mistral agents when their app supports Mistral.
 
 ### Hermes
 

@@ -1320,18 +1320,15 @@ export function createConversationViewScope(props: ConversationProps) {
   let lastPanelAgentId: string | undefined;
   const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest | undefined>(undefined);
   let lastRuntimeSettingsSignature: string | undefined;
+  /** Gives `false` when no agent is open. A refused save rejects, so that its caller can show why. */
   async function saveAgentPatch(
     updates: Omit<UpdateAgentInput, "agentId">,
     targetAgentId = props.agent?.id,
   ): Promise<boolean> {
     const agentId = targetAgentId;
     if (!agentId) return false;
-    try {
-      await props.onUpdateAgent(agentId, updates);
-      return true;
-    } catch {
-      return false;
-    }
+    await props.onUpdateAgent(agentId, updates);
+    return true;
   }
   // The switch shows the new value while the save runs. The saved agent then holds it.
   const [fastModeDraft, setFastModeDraft] = createSignal<{ agentId: string; fastMode: boolean }>();
@@ -1354,12 +1351,17 @@ export function createConversationViewScope(props: ConversationProps) {
     const draft = { agentId, fastMode: next };
     setFastModeDraft(draft);
     setScopedComposerError(null);
-    const saved = await saveAgentPatch({ fastMode: next }, agentId);
+    const { t, errorMessage } = currentText();
+    let saved = false;
+    let failure = t("composer.error.changeFastMode");
+    try {
+      saved = await saveAgentPatch({ fastMode: next }, agentId);
+    } catch (error) {
+      failure = errorMessage(error, failure);
+    }
     if (fastModeDraft() !== draft) return;
     setFastModeDraft(undefined);
-    if (!saved && props.agent?.id === agentId) {
-      setScopedComposerError(currentText().t("composer.error.changeFastMode"));
-    }
+    if (!saved && props.agent?.id === agentId) setScopedComposerError(failure);
   }
 
   onSettled(() => {

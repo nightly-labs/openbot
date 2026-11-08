@@ -36,7 +36,11 @@ export function isNonActionableCodexWarning(message: string): boolean {
     message.startsWith("Skill descriptions were shortened to fit") ||
     // Codex sends this when it changes transport, and the same turn continues over HTTPS
     // (`codex-rs/core/src/responses_retry.rs`). A final failure comes as an `error` (#2559).
-    message.startsWith("Falling back from WebSockets to HTTPS transport.")
+    message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
+    // Codex sends this on each thread start when the user turned on a feature such as
+    // `async_compaction` in `config.toml` (`codex-rs/features/src/lib.rs`). The turn continues, and
+    // the text has the config path, so the banner replaced it with "could not continue".
+    message.startsWith("Under-development features enabled:")
   );
 }
 

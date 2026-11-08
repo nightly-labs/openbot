@@ -751,6 +751,11 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
 }
 
 const BEAM_MS = 1400;
+/**
+ * The ring stops at this deadline when it has not ended. A hidden or covered window gets no frames, and
+ * a caller that waits for the ring (Restart) must not wait until the window shows again.
+ */
+const BEAM_DEADLINE_MS = BEAM_MS * 2;
 /** The ring's width, as a part of the sweep's wash, and its opacity. */
 const BEAM_SPREAD = 0.55;
 const BEAM_ALPHA = 0.7;
@@ -760,14 +765,15 @@ let stopBeam: (() => void) | undefined;
 
 /**
  * Draws the wash as a ring around `element`. With "in" it comes from outside the window and closes in
- * on the element; with "out" it spreads out from the element and leaves the window. Returns false when
- * no ring plays, such as with reduced motion.
+ * on the element; with "out" it spreads out from the element and leaves the window. Returns a promise
+ * that settles when the ring ends or a newer ring stops it, or null when no ring plays, such as with
+ * reduced motion.
  */
-export function beam(element: Element, direction: RingDirection): boolean {
+export function beam(element: Element, direction: RingDirection): Promise<void> | null {
   stopBeam?.();
-  if (!canAnimate()) return false;
+  if (!canAnimate()) return null;
   const band = createBand("theme-sweep-beam");
-  if (!band) return false;
+  if (!band) return null;
   const rect = element.getBoundingClientRect();
   const x = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
@@ -785,19 +791,28 @@ export function beam(element: Element, direction: RingDirection): boolean {
   const ripple = createRingRipple(direction, x, y);
 
   let frame = 0;
+  let end = () => {};
+  const ended = new Promise<void>((resolve) => {
+    end = resolve;
+  });
   // An inline filter, because other code (such as Storybook's vision simulator) sets the body's filter inline.
   const body = document.body.style;
   const previousFilter = [body.getPropertyValue("filter"), body.getPropertyPriority("filter")] as const;
+  let deadline = 0;
   const stop = () => {
     cancelAnimationFrame(frame);
+    window.clearTimeout(deadline);
     body.setProperty("filter", ...previousFilter);
     ripple.element.remove();
     band.dispose();
     if (stopBeam === stop) stopBeam = undefined;
+    end();
   };
   stopBeam = stop;
-  const start = performance.now();
+  // The clock starts at the first frame, so a slow first frame (the shader compiles) does not skip the ring's start.
+  let start: number | undefined;
   const tick = (now: number) => {
+    start ??= now;
     const elapsed = Math.max(0, now - start);
     const progress = Math.min(1, elapsed / BEAM_MS);
     // "out" is "in" played backwards, so both ways have the same speed and the same fade.
@@ -817,5 +832,6 @@ export function beam(element: Element, direction: RingDirection): boolean {
   document.documentElement.append(ripple.element, band.canvas);
   body.setProperty("filter", `url("#${RING_RIPPLE_ID}")`);
   frame = requestAnimationFrame(tick);
-  return true;
+  deadline = window.setTimeout(stop, BEAM_DEADLINE_MS);
+  return ended;
 }
