@@ -1495,7 +1495,7 @@ export function createConversationViewScope(props: ConversationProps) {
       void closeBrowserTab(tab.id);
     };
     const closeMessageMenus = (event: MouseEvent) => {
-      if (event.target instanceof Element && event.target.closest(".message-actions")) return;
+      if (event.target instanceof Element && event.target.closest(".message-actions, .reaction-picker")) return;
       setOpenReactionMessageId(null);
       setExpandedEmojiMessageId(null);
     };
