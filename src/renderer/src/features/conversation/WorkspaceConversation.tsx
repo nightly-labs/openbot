@@ -161,6 +161,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     stopActiveTurn,
     usageLimits,
     usageLimitedModels,
+    failedModels,
     waitedUsageLimits,
     setWaitedUsageLimits,
     queues,
@@ -398,6 +399,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   /** Whether a usage limit holds this model and account now. */
   const usageLimited = (choice: AgentModelChoice) =>
     usageLimitedModels().some((limited) => sameAgentModelChoice(limited, choice));
+  /** Whether a provider error holds this model and account now, so that a switch passes over it. */
+  const providerFailed = (choice: AgentModelChoice) =>
+    failedModels().some((failed) => sameAgentModelChoice(failed, choice));
 
   /** Whether the reader is the sender `senderId`: a member on a joined server, or anyone on this computer. */
   const isOwnSender = (senderId: string) => {
@@ -645,6 +649,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         approval={activeApproval()}
         usageLimitAsk={usageLimitAsk()}
         usageLimited={activeServer()?.kind === "local" ? usageLimited : undefined}
+        providerFailed={activeServer()?.kind === "local" ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}

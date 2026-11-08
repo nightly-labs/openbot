@@ -97,6 +97,8 @@ const Turns = createSimpleContext({
     const [subagentTurns, setSubagentTurns] = createSignal<Record<string, string>>({});
     // Each provider account and model that a usage limit holds, also with no agent on it.
     const [usageLimitedModels, setUsageLimitedModels] = createSignal<AgentModelChoice[]>([]);
+    // Each provider account and model that a provider error holds, so that a switch passes over it.
+    const [failedModels, setFailedModels] = createSignal<AgentModelChoice[]>([]);
     // The holds whose ask card the user closed with "Wait", by agent, with the reset of that hold.
     const [waitedUsageLimits, setWaitedUsageLimits] = createSignal<Record<string, number | null>>({});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
@@ -579,6 +581,8 @@ const Turns = createSimpleContext({
       setSubagentTurns,
       usageLimitedModels,
       setUsageLimitedModels,
+      failedModels,
+      setFailedModels,
       waitedUsageLimits,
       setWaitedUsageLimits,
       queues,
