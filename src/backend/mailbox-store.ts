@@ -2132,8 +2132,8 @@ export class MailboxStore {
   }, Effect.uninterruptible).bind(this);
 
   /**
-   * Whether the turn sent the recipient a message. A reply to one of `turnRequestIds`, the requests
-   * that the turn read, answers only that request, so it does not count for the others (#5804).
+   * Whether the turn sent the recipient a message. A reply to one of `turnRequestIds`, the recipient's
+   * requests that the turn read, answers only that request, so it does not count for the others (#5804).
    */
   hasAgentMessageFromTurnTo(
     agentId: string,

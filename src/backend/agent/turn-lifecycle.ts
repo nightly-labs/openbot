@@ -1465,9 +1465,8 @@ export class TurnLifecycle {
           terminal === "completed" &&
           latestAssistant
         ) {
-          const requestIds = new Set(deliveries.map(({ delivery }) => delivery.messageId));
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, requestIds, latestAssistant.text);
+            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant.text);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
         if (!continuation && terminal === "failed") {
@@ -1804,13 +1803,24 @@ export class TurnLifecycle {
     agentId: string,
     turnId: string,
     delivery: DeliveryContext,
-    requestIds: ReadonlySet<string>,
+    turnDeliveries: readonly DeliveryContext[],
     text: string,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
     const messageId = delivery.delivery.messageId;
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
     const recipientAgentId = delivery.delivery.sender.agentId;
+    // The requests of this sender that the turn read. A reply to one of them answers only that one.
+    const requestIds = new Set(
+      turnDeliveries
+        .filter(
+          ({ delivery: other }) =>
+            other.sender.kind === "agent" &&
+            other.sender.agentId === recipientAgentId &&
+            this.#mailbox.expectsReply(other.messageId),
+        )
+        .map(({ delivery: other }) => other.messageId),
+    );
     if (
       !originAgentId ||
       originAgentId === agentId ||
