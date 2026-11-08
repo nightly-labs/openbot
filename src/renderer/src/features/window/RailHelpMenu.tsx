@@ -27,15 +27,18 @@ export function RailHelpMenu(props: {
     desktopAnalytics.track("help_link_opened", { destination });
     props.onOpenLink(destination);
   };
-  let loading = false;
+  // A load for a different language replaces this one, and the result of the old load is dropped.
+  let loadingLocale: string | null = null;
 
   async function loadNews() {
     const locale = i18n.locale();
-    if (loading || (news().length > 0 && newsLocale === locale)) return;
-    loading = true;
+    if (loadingLocale === locale || (news().length > 0 && newsLocale === locale)) return;
+    loadingLocale = locale;
+    if (newsLocale !== locale) setNews([]);
     try {
       const version = props.version;
       const releases = await loadWhatsNewReleases(AbortSignal.timeout(10_000), locale);
+      if (loadingLocale !== locale) return;
       setNews(
         releases
           .filter((release) => !version || compareReleaseVersions(release.version, version) <= 0)
@@ -50,7 +53,7 @@ export function RailHelpMenu(props: {
     } catch {
       // The menu shows its links without the list. The next opening tries again.
     } finally {
-      loading = false;
+      if (loadingLocale === locale) loadingLocale = null;
     }
   }
 

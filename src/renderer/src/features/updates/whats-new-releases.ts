@@ -62,9 +62,11 @@ async function loadNotes(url: string, signal: AbortSignal): Promise<WhatsNewRele
  * into the installed app, not a remote service.
  */
 export async function loadWhatsNewReleases(signal: AbortSignal, locale: TranslatedLocale): Promise<WhatsNewRelease[]> {
-  const english = loadNotes(notesUrl, signal);
-  if (locale === "en") return english;
-  const translated = await loadNotes(TRANSLATED_NOTES_URLS[locale], signal).catch(() => []);
+  if (locale === "en") return loadNotes(notesUrl, signal);
+  const [english, translated] = await Promise.all([
+    loadNotes(notesUrl, signal),
+    loadNotes(TRANSLATED_NOTES_URLS[locale], signal).catch(() => []),
+  ]);
   const byVersion = new Map(translated.map((release) => [release.version, release]));
-  return (await english).map((release) => byVersion.get(release.version) ?? release);
+  return english.map((release) => byVersion.get(release.version) ?? release);
 }
