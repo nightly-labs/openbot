@@ -188,6 +188,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "Paneel sluiten",
   "conversation.tasks.panel.label": "Taak {title}",
   "conversation.tasks.panel.openInChat": "Openen in chat",
+  "conversation.tasks.panel.resize": "Formaat van taakpaneel wijzigen",
   "conversation.tasks.section.needsYou": "Heeft je nodig",
   "conversation.tasks.section.waiting": "Wacht",
   "conversation.tasks.section.unread": "Ongelezen",

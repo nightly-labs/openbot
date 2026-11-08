@@ -187,6 +187,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "패널 닫기",
   "conversation.tasks.panel.label": "작업 {title}",
   "conversation.tasks.panel.openInChat": "채팅에서 열기",
+  "conversation.tasks.panel.resize": "작업 패널 크기 조정",
   "conversation.tasks.section.needsYou": "확인 필요",
   "conversation.tasks.section.waiting": "대기 중",
   "conversation.tasks.section.unread": "읽지 않음",

@@ -411,8 +411,7 @@ li[data-arrived] > .tasks-page-row {
  */
 .tasks-page-side {
   position: relative;
-  flex: 0 0 420px;
-  overflow: hidden;
+  flex: 0 0 var(--tasks-page-side-width, 420px);
   transition:
     flex-basis var(--openbot-duration-overlay) var(--openbot-ease-out),
     opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
@@ -432,12 +431,29 @@ li[data-arrived] > .tasks-page-row {
   transition-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
 }
 
+/* The user draws the panel wider or narrower: the width follows the pointer with no transition. */
+html.panel-resizing .tasks-page-side {
+  transition: none;
+}
+
+.tasks-page-side[data-closing] > .panel-resizer {
+  visibility: hidden;
+}
+
+/* The clip of the opening and closing panel. The edge handle is outside it, so it stays whole. */
+.tasks-page-side-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
 .tasks-page-side-content {
   position: absolute;
   inset-block: 0;
   inset-inline: 0 auto;
   display: flex;
-  width: 420px;
+  width: var(--tasks-page-side-width, 420px);
   --browser-panel-width: 100%;
 }
 
