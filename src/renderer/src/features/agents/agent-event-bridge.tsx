@@ -357,7 +357,7 @@ export function AgentEventBridge() {
         return;
       }
       case "runtime-snapshot":
-        void channels.refresh();
+        void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":

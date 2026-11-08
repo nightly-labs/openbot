@@ -902,13 +902,15 @@ export class MailboxStore {
    * `queuedOnly`, only the lanes with a queued delivery.
    */
   channelLanes(agentId: string, queuedOnly = false): string[] {
-    const messages = this.#messagesById();
-    const lanes = new Set<string>();
     const deliveries = queuedOnly
       ? this.#queuedFor(agentId)
       : this.#state.deliveries.filter(
           (delivery) => delivery.recipientAgentId === agentId && isActiveDelivery(delivery),
         );
+    // The scheduler asks on each check, and an idle agent has no delivery: skip the message index.
+    if (deliveries.length === 0) return [];
+    const messages = this.#messagesById();
+    const lanes = new Set<string>();
     for (const delivery of deliveries) {
       const lane = this.#laneOf(delivery, messages);
       if (lane !== null && laneChannelId(lane) !== null) lanes.add(lane);
@@ -2709,15 +2711,18 @@ export class MailboxStore {
     );
   }
 
-  /** As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own threads. */
-  hasUnfinishedDeliveryOutsideTasks(agentId: string): boolean {
+  /**
+   * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
+   * threads. Channel work counts only with `includeChannels`: on a provider that runs one turn at a
+   * time, a channel turn holds the agent's own chat too.
+   */
+  hasUnfinishedDeliveryOutsideTasks(agentId: string, includeChannels: boolean): boolean {
     const messages = this.#messagesById();
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId &&
-        isActiveDelivery(delivery) &&
-        this.#laneOf(delivery, messages) === null,
-    );
+    return this.#state.deliveries.some((delivery) => {
+      if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
+      const lane = this.#laneOf(delivery, messages);
+      return lane === null || (includeChannels && laneChannelId(lane) !== null);
+    });
   }
 
   /** As {@link hasUnfinishedDelivery}, without the `queued` deliveries that a usage limit holds. */

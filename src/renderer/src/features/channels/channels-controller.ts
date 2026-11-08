@@ -619,6 +619,14 @@ export function createChannelsController(env: ChannelsEnvironment) {
       if (channelId !== state.selectedId) keptPages.delete(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
+    /**
+     * A runtime snapshot follows a start or a reconnect, when host events can be missed. The kept
+     * pages can then be old, so they go, and the next visit shows Loading until its read ends.
+     */
+    resync: () => {
+      keptPages.clear();
+      return refresh();
+    },
     command,
     send,
     perform,

@@ -1377,10 +1377,11 @@ export class TurnLifecycle {
         break;
       }
       const outcome = requeued ? "interrupted" : status;
-      // The failed turn of the agent's own chat only: a task shows its outcome in its own row, and a
-      // channel turn in its channel.
-      if (!taskTurn && !channelTurn && outcome === "failed") this.#failedTurns.set(agentId, turnId);
-      else if (!taskTurn && !channelTurn) this.#failedTurns.delete(agentId);
+      // The failed turn of the agent's own chat and its messaging work only: a task shows its outcome
+      // in its own row, and a channel turn in its channel.
+      const ownLane = !taskTurn && this.#conversation.channelForThread(snapshot.threadId) === null;
+      if (ownLane && outcome === "failed") this.#failedTurns.set(agentId, turnId);
+      else if (ownLane) this.#failedTurns.delete(agentId);
       const failure = refusedFailure ?? reportedError;
       if (refused) {
         yield* this.#hooks.dropRefusedSession(agentId, threadId);

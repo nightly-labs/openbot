@@ -2731,6 +2731,12 @@ export class ChannelService {
       // part of its reply. After a restart, the Claude history import wrote old turns again with new
       // ids, and each such row showed as a new reply under a completed task.
       if (!original && !activeAssignment(assignment)) continue;
+      // A streaming row that has only the member's own label so far ("Ana:") waits for its text, so
+      // the label does not show for one update and then go.
+      if (message.author === "assistant") {
+        const text = withoutOwnNameLabel(message.text, name, !original && message.status === "streaming");
+        if (text !== message.text) message = { ...message, text };
+      }
       // An empty row has nothing to show or to give another member. A streaming row gets its row
       // when its first text arrives.
       if (
@@ -2741,10 +2747,6 @@ export class ChannelService {
         !message.questionPrompt
       )
         continue;
-      if (message.author === "assistant") {
-        const text = withoutOwnNameLabel(message.text, name);
-        if (text !== message.text) message = { ...message, text };
-      }
       // OpenCode's text before a tool call streams as the answer, and Pi's streams with no phase. Each
       // becomes a step only at that call. Copied while it streamed, each such note showed as the
       // member's message and then folded (#4844). The agent's own chat still streams it; the channel
@@ -3966,7 +3968,7 @@ const OWN_LABEL_WORDS = new Set([
  * "Name: task" form of handoffs into their answers (#5717), and the prompt rule against it did not
  * stop all models. Only the member's own name is a label: "Ana: can you check?" from Ben speaks to Ana.
  */
-function withoutOwnNameLabel(text: string, name: string): string {
+function withoutOwnNameLabel(text: string, name: string, streaming = false): string {
   const own = name.trim().toLocaleLowerCase();
   const match = /^\s*(?:\*\*|__)?([^\n:*_]{1,80}?)\s*(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*/u.exec(text);
   if (!own || !match?.[1]) return text;
@@ -3974,7 +3976,8 @@ function withoutOwnNameLabel(text: string, name: string): string {
   const word = label.startsWith(`${own} `) ? label.slice(own.length + 1).trim() : null;
   if (label !== own && !(word && OWN_LABEL_WORDS.has(word))) return text;
   const rest = text.slice(match[0].length);
-  return rest.trim() ? rest : text;
+  if (rest.trim()) return rest;
+  return streaming ? "" : text;
 }
 
 /** The id of the result that one assignment publishes with `channel_result`. */
