@@ -586,8 +586,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   /** Shows a failed save under the form, or outside the panel when the form shows something else now. */
-  function reportSaveError(agentId: string, error: unknown): void {
-    const message = errorMessage(error, t("agentSettings.saveFailed"));
+  function reportSaveError(agentId: string, error: unknown, fallback = t("agentSettings.saveFailed")): void {
+    const message = errorMessage(error, fallback);
     if (!disposed && props.agent.id === agentId) setSaveError(message, error);
     else props.onUnshownSaveError?.(message);
   }
@@ -726,11 +726,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       state.avatar.uploadBusy = true;
       state.saveError = null;
     });
+    const agentId = props.agent.id;
     try {
-      await props.onSetAgentAvatar(props.agent.id, image);
+      await props.onSetAgentAvatar(agentId, image);
       return true;
     } catch (error) {
-      setSaveError(errorMessage(error, t("agentSettings.avatar.saveFailed")), error);
+      reportSaveError(agentId, error, t("agentSettings.avatar.saveFailed"));
       return false;
     } finally {
       setDraft((state) => {
@@ -745,11 +746,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       state.avatar.uploadBusy = true;
       state.saveError = null;
     });
+    const agentId = props.agent.id;
     try {
       const image = await normalizeAvatarFile(file);
-      await props.onSetAgentAvatar(props.agent.id, image);
+      await props.onSetAgentAvatar(agentId, image);
     } catch (error) {
-      setSaveError(errorMessage(error, t("agentSettings.avatar.processFailed")), error);
+      reportSaveError(agentId, error, t("agentSettings.avatar.processFailed"));
     } finally {
       setDraft((state) => {
         state.avatar.uploadBusy = false;
