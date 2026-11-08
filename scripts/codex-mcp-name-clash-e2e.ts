@@ -1,6 +1,7 @@
 // Runs issue #2851 end to end on the real `codex app-server`: a server in the user's own
 // `config.toml` and an OpenBot server with the same name. Codex merges the two entries, so a stdio
-// `command` and an http `url` under one key stop it from loading its configuration. The payload is
+// `command` and an http `url` under one key stop it from loading its configuration, and the user's
+// `enabled_tools` hides the tools of a server with the same transport (#5786). The payload is
 // the one `readCodexMcpConfig`, `codexDisabledServers`, `codexMcpServers` and `codexThreadMcpServers`
 // build for a thread. A local server that speaks the Responses API stands in for the model and
 // records the MCP namespaces Codex offers, so no account or key is used.
@@ -299,6 +300,7 @@ const http = await startHttpMcp();
 const httpUrl = `http://127.0.0.1:${http.port}/mcp`;
 const userStdio = `[mcp_servers.github]${NL}command = "node"${NL}args = ["${script}"]${NL}enabled = true${NL}`;
 const userHttp = `[mcp_servers.github]${NL}url = "${httpUrl}"${NL}enabled = true${NL}`;
+const userFiltered = `[mcp_servers.github]${NL}command = "/unused-legacy-command"${NL}enabled_tools = ["legacy_tool"]${NL}`;
 const connector = row("github", { id: "openbot-github", transport: "http", url: httpUrl });
 
 try {
@@ -333,13 +335,28 @@ try {
     },
   );
   await step(
-    "same transport: the row keeps the github key",
+    "same transport: the row travels as openbot_github",
     { name: "same-transport", user: userStdio, rows: [row("github", { command: "node", args: [script] })] },
     (o) => {
       assert.equal(o.started, true, o.error ?? "");
-      assert.deepEqual(o.keys, ["github"]);
-      assert.ok(o.offered.includes("mcp__github"), `offered ${o.offered.join(", ")}`);
-      assert.deepEqual(table(o.file, "openbot_github"), []);
+      assert.deepEqual(o.keys, ["openbot_github"]);
+      assert.ok(o.offered.includes("mcp__openbot_github"), `offered ${o.offered.join(", ")}`);
+      assert.ok(!o.offered.includes("mcp__github"), "the user's turned-off server was offered");
+      assert.deepEqual(table(o.file, "github"), ['command = "node"', `args = ["${script}"]`, "enabled = true"]);
+      assert.deepEqual(table(o.file, "openbot_github"), ['command = "openbot-mcp"', "enabled = false"]);
+    },
+  );
+  await step(
+    "same transport, user enabled_tools of another server: the row keeps its tools",
+    { name: "same-transport-filter", user: userFiltered, rows: [row("github", { command: "node", args: [script] })] },
+    (o) => {
+      assert.equal(o.started, true, o.error ?? "");
+      assert.deepEqual(o.keys, ["openbot_github"]);
+      assert.ok(o.offered.includes("mcp__openbot_github"), `offered ${o.offered.join(", ") || "(none)"}`);
+      assert.deepEqual(table(o.file, "github"), [
+        'command = "/unused-legacy-command"',
+        'enabled_tools = ["legacy_tool"]',
+      ]);
     },
   );
   await step("no clash: the connector keeps the github key", { name: "no-clash", user: "", rows: [connector] }, (o) => {
@@ -375,6 +392,20 @@ try {
     },
   );
 
+  await step(
+    "same transport onto OpenBot's browser tools: the row keeps the browser key",
+    {
+      name: "reserved-same-transport",
+      user: `[mcp_servers.browser]${NL}command = "node"${NL}args = ["${script}"]${NL}enabled = true${NL}`,
+      rows: [row("browser", { command: "node", args: [script] })],
+    },
+    (o) => {
+      assert.equal(o.started, true, o.error ?? "");
+      assert.deepEqual(o.keys, ["browser"]);
+      assert.ok(o.offered.includes("mcp__browser"), `offered ${o.offered.join(", ")}`);
+      assert.deepEqual(table(o.file, "openbot_browser"), []);
+    },
+  );
   await writeFile(
     join(OUT, "report.json"),
     `${JSON.stringify({ ok: true, codex: { version: cli.version }, steps }, null, 2)}${NL}`,
