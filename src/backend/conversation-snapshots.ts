@@ -1,6 +1,10 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { isImageGenerationAspectRatio, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
+import {
+  AGENT_EXCHANGE_ITEM_TYPE,
+  isImageGenerationAspectRatio,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
 import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
@@ -161,6 +165,9 @@ export function promptMessage(
     text: delivery?.text ?? row.text,
     createdAt: delivery?.createdAt ?? row.createdAt,
     status: "completed",
+    // Marked as the mailbox marks it: a side thread reads no mailbox copy, and a message between
+    // agents does not make the chat unread (#5794).
+    ...(delivery?.sender.kind === "agent" ? { itemType: AGENT_EXCHANGE_ITEM_TYPE } : {}),
   };
 }
 
@@ -187,6 +194,7 @@ function teammateMessage(
     },
     text: teammate.text,
     status: "completed",
+    itemType: AGENT_EXCHANGE_ITEM_TYPE,
   };
 }
 
