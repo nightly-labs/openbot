@@ -1,3 +1,4 @@
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { QueueDelivery, QueueHold, QueueSteerFallback } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -365,10 +366,12 @@ export function QueuePanel(props: QueuePanelProps) {
   function messagePreview(delivery: QueueDelivery): string {
     const agentNames = new Map((props.agents ?? []).map((agent) => [agent.id, agent.name]));
     const skillNames = new Map((props.skills ?? []).map((skill) => [skill.skillId, skill.name]));
-    const text = expandChatTagReferences(delivery.text.trim(), (reference) => {
-      if (reference.kind === "quote") return `“${reference.name}”`;
-      return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
-    });
+    const text = expandAttachmentReferences(
+      expandChatTagReferences(delivery.text.trim(), (reference) => {
+        if (reference.kind === "quote") return `“${reference.name}”`;
+        return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
+      }),
+    );
     return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || t("queue.attachment");
   }
 

@@ -1,3 +1,4 @@
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -170,8 +171,10 @@ function isSearchTab(value: string): value is SearchTab {
 }
 
 function messagePreview(message: AgentMessage): string {
-  return expandChatTagReferences(message.body, (reference) =>
-    reference.kind === "quote" ? `“${reference.name}”` : undefined,
+  return expandAttachmentReferences(
+    expandChatTagReferences(message.body, (reference) =>
+      reference.kind === "quote" ? `“${reference.name}”` : undefined,
+    ),
   )
     .trim()
     .replace(/\s+/g, " ");
