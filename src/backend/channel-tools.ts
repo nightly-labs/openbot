@@ -39,7 +39,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   {
     name: "channel_assign",
     description:
-      "Give one specific subtask to another channel member, only when the person asks for that member or for help from others, or when a part clearly needs another member's role. Do not assign work that you can do yourself, or only to get a second opinion. You stay the owner: integrate the result and report to the user. End your turn while waiting for required results. Use only inside a channel task; for direct teammate work outside a channel use openbot.send_message.",
+      "Give a subtask to another member only when the person asks for that member or for help, or a part needs their role. You stay the owner: integrate the result and report. End your turn to wait for needed results. In a channel task only; else use openbot.send_message.",
     shape: handoff,
   },
   {
