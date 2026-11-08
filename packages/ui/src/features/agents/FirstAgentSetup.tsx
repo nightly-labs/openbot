@@ -271,10 +271,25 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       props.onCancel();
     };
     const list = suggestionList;
-    if (list) observer.observe(list);
+    // A vertical mouse wheel scrolls the row. At the end of the row, the wheel scrolls the page again.
+    const scrollOnWheel = (event: WheelEvent) => {
+      if (!list || props.submitting || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const rightToLeft = getComputedStyle(list).direction === "rtl";
+      const position = rightToLeft ? -list.scrollLeft : list.scrollLeft;
+      const maximumScroll = list.scrollWidth - list.clientWidth;
+      if (event.deltaY > 0 ? position >= maximumScroll - 1 : position <= 1) return;
+      event.preventDefault();
+      stopSuggestionMomentum();
+      list.scrollLeft += rightToLeft ? -event.deltaY : event.deltaY;
+    };
+    if (list) {
+      observer.observe(list);
+      list.addEventListener("wheel", scrollOnWheel, { passive: false });
+    }
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       observer.disconnect();
+      list?.removeEventListener("wheel", scrollOnWheel);
       document.removeEventListener("keydown", closeOnEscape);
       stopSuggestionMomentum();
     };
