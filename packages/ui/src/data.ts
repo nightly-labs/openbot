@@ -153,6 +153,8 @@ export type ChatActionMarkerModel =
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
   | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
+  /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
+  | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */

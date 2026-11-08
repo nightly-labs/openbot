@@ -430,4 +430,8 @@ export const messages = {
   "chat.reference.kind.thread": "스레드",
   "chat.reference.open.tab": "브라우저 탭 {name} 표시",
   "chat.reference.open.thread": "스레드 {name} 열기",
+  "chat.feedbackSent.title": "피드백 감사합니다 🙏",
+  "chat.feedbackSent.badge": "보냄",
+  "chat.feedbackSent.body": "OpenBot 팀이 읽고 처리합니다 💜",
+  "chat.feedbackSent.openNamed": "GitHub에서 이슈 #{number} 열기",
 } as const satisfies PartialTranslation<typeof source>;

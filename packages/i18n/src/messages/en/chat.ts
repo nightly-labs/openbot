@@ -430,4 +430,8 @@ export const messages = defineMessages("chat", {
   "chat.reference.kind.thread": "Thread",
   "chat.reference.open.tab": "Show browser tab {name}",
   "chat.reference.open.thread": "Open thread {name}",
+  "chat.feedbackSent.title": "Thank you for your feedback 🙏",
+  "chat.feedbackSent.badge": "Sent",
+  "chat.feedbackSent.body": "The OpenBot team will read it and take care of it 💜",
+  "chat.feedbackSent.openNamed": "Open issue #{number} on GitHub",
 });

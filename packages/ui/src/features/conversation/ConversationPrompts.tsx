@@ -6,7 +6,6 @@ import type {
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
-import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { classifyFailure } from "@openbot/telemetry";
 import {
   Badge,
@@ -26,6 +25,7 @@ import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { type FeedbackApproval, feedbackApproval } from "./feedback-approval";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "./send-shortcut";
 
 export function ChoiceCard(props: {
@@ -137,15 +137,22 @@ export function ApprovalCard(props: {
   onAlwaysAllow?: (() => Promise<boolean>) | undefined;
   /** The agent this grant would cover, for the confirmation the grant deserves. */
   agentName?: string | undefined;
+  /**
+   * Set while approved feedback is on its way. The approval is answered at once, so the chat keeps the
+   * card with its loader until the thank-you card arrives.
+   */
+  sending?: boolean | undefined;
 }) {
   const { t, errorMessage, sourceText } = useText();
   const [submitting, setSubmitting] = createSignal(false);
+  const [accepting, setAccepting] = createSignal(false);
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
-  const report = createMemo(() => feedback(props.approval));
+  const report = createMemo(() => feedbackApproval(props.approval));
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
+    setAccepting(decision === "accept");
     try {
       const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
       if (!completed) setSubmitting(false);
@@ -173,84 +180,153 @@ export function ApprovalCard(props: {
   };
 
   return (
-    <section
-      class="approval-card conversation-interaction-card"
-      aria-label={t("prompt.approval.label")}
-      aria-busy={submitting() ? "true" : undefined}
-    >
-      <header class="approval-card-header conversation-interaction-header">
-        <strong>{report()?.title ?? t(approvalTitle(props.approval))}</strong>
-        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          {t("prompt.approval.badge")}
-        </Badge>
-      </header>
-      <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{sourceText(reason())}</p>}</Show>
-      <div class="approval-card-content">
-        <Show when={!report() && props.approval.command}>
-          {(command) => (
-            <div class="approval-command-block">
-              <Show when={props.approval.cwd}>
-                <div class="approval-cwd">{props.approval.cwd}</div>
-              </Show>
-              <code>{command()}</code>
-            </div>
-          )}
-        </Show>
-        <Show when={props.approval.kind === "file-change"}>
-          <div class="approval-detail-row">
-            <span class="approval-detail-label">{t("prompt.approval.files")}</span>
-            <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
-          </div>
-        </Show>
-        <Show when={report()?.text}>{(text) => <p class="approval-report-text">{text()}</p>}</Show>
-        <Show when={!report() && props.approval.kind === "permissions"}>
-          <PermissionDetails permissions={props.approval.permissions} />
-        </Show>
-      </div>
-      <footer class="approval-card-footer">
-        <Button
-          variant="default"
-          type="button"
-          class="approval-button"
-          disabled={submitting()}
-          onClick={() => void submit("accept")}
+    <Show
+      when={report()}
+      fallback={
+        <section
+          class="approval-card conversation-interaction-card"
+          aria-label={t("prompt.approval.label")}
+          aria-busy={submitting() ? "true" : undefined}
         >
-          {submitting() ? t("common.sending") : t(report() ? "prompt.approval.report.send" : "prompt.approval.allow")}
-        </Button>
-        <Show when={!report() && props.onAlwaysAllow}>
-          <Button
-            ref={alwaysAllowButton}
-            variant="secondary"
-            type="button"
-            class="approval-button"
-            disabled={submitting()}
-            onClick={() => setConfirmingAlways(true)}
-          >
-            {t("prompt.approval.alwaysAllow")}
-          </Button>
-        </Show>
+          <header class="approval-card-header conversation-interaction-header">
+            <strong>{t(approvalTitle(props.approval))}</strong>
+            <Badge variant="warning-light" class="conversation-interaction-status" role="status">
+              <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
+              {t("prompt.approval.badge")}
+            </Badge>
+          </header>
+          <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{sourceText(reason())}</p>}</Show>
+          <div class="approval-card-content">
+            <Show when={props.approval.command}>
+              {(command) => (
+                <div class="approval-command-block">
+                  <Show when={props.approval.cwd}>
+                    <div class="approval-cwd">{props.approval.cwd}</div>
+                  </Show>
+                  <code>{command()}</code>
+                </div>
+              )}
+            </Show>
+            <Show when={props.approval.kind === "file-change"}>
+              <div class="approval-detail-row">
+                <span class="approval-detail-label">{t("prompt.approval.files")}</span>
+                <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
+              </div>
+            </Show>
+            <Show when={props.approval.kind === "permissions"}>
+              <PermissionDetails permissions={props.approval.permissions} />
+            </Show>
+          </div>
+          <footer class="approval-card-footer">
+            <Button
+              variant="default"
+              type="button"
+              class="approval-button"
+              disabled={submitting()}
+              onClick={() => void submit("accept")}
+            >
+              {submitting() ? t("common.sending") : t("prompt.approval.allow")}
+            </Button>
+            <Show when={props.onAlwaysAllow}>
+              <Button
+                ref={alwaysAllowButton}
+                variant="secondary"
+                type="button"
+                class="approval-button"
+                disabled={submitting()}
+                onClick={() => setConfirmingAlways(true)}
+              >
+                {t("prompt.approval.alwaysAllow")}
+              </Button>
+            </Show>
+            <Button
+              variant="secondary"
+              type="button"
+              class="approval-button"
+              disabled={submitting()}
+              data-cuelume-tap="close"
+              data-cuelume-emphasis="normal"
+              onClick={() => void submit("decline")}
+            >
+              {submitting() ? t("prompt.approval.waiting") : t("prompt.approval.deny")}
+            </Button>
+          </footer>
+          <StandingApprovalConfirmation
+            open={confirmingAlways()}
+            agentName={props.agentName}
+            onCancel={() => setConfirmingAlways(false)}
+            onConfirm={() => void alwaysAllow()}
+            restoreFocusTarget={alwaysAllowButton}
+          />
+        </section>
+      }
+    >
+      {(offer) => (
+        <FeedbackOffer
+          report={offer()}
+          submitting={submitting()}
+          sending={(submitting() && accepting()) || props.sending === true}
+          onSend={() => void submit("accept")}
+          onDismiss={() => void submit("decline")}
+        />
+      )}
+    </Show>
+  );
+}
+
+/**
+ * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
+ * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
+ */
+function FeedbackOffer(props: {
+  report: FeedbackApproval;
+  submitting: boolean;
+  sending: boolean;
+  onSend: () => void;
+  onDismiss: () => void;
+}) {
+  const { t } = useText();
+  const idea = () => props.report.kind === "idea";
+  return (
+    <section
+      class="approval-card conversation-interaction-card feedback-offer"
+      aria-label={t("prompt.approval.label")}
+      aria-busy={props.sending ? "true" : undefined}
+    >
+      <span class="feedback-offer-emoji" aria-hidden="true">
+        {idea() ? "💡" : "🐞"}
+      </span>
+      <strong class="feedback-offer-headline">
+        {t(idea() ? "prompt.approval.report.ideaHeadline" : "prompt.approval.report.bugHeadline")}
+      </strong>
+      <blockquote class="feedback-offer-quote">
+        <strong>{props.report.title}</strong>
+        <Show when={props.report.text}>{(text) => <p>{text()}</p>}</Show>
+      </blockquote>
+      <div class="feedback-offer-actions">
         <Button
           variant="secondary"
           type="button"
           class="approval-button"
-          disabled={submitting()}
+          disabled={props.submitting || props.sending}
           data-cuelume-tap="close"
           data-cuelume-emphasis="normal"
-          onClick={() => void submit("decline")}
+          onClick={() => props.onDismiss()}
         >
-          {submitting()
-            ? t("prompt.approval.waiting")
-            : t(report() ? "prompt.approval.report.dontSend" : "prompt.approval.deny")}
+          {t("prompt.approval.report.dontSend")}
         </Button>
-      </footer>
-      <StandingApprovalConfirmation
-        open={confirmingAlways()}
-        agentName={props.agentName}
-        onCancel={() => setConfirmingAlways(false)}
-        onConfirm={() => void alwaysAllow()}
-        restoreFocusTarget={alwaysAllowButton}
-      />
+        <Button
+          variant="default"
+          type="button"
+          class="approval-button"
+          disabled={props.submitting && !props.sending}
+          loading={props.sending}
+          loadingLabel={t("common.sending")}
+          onClick={() => props.onSend()}
+        >
+          {t("prompt.approval.report.send")}
+        </Button>
+      </div>
     </section>
   );
 }
@@ -512,18 +588,6 @@ function browserPageDetails(tab: BrowserTab | undefined, t: TextValue["t"]): { t
   } catch {
     return { title, host: tab.url };
   }
-}
-
-/**
- * A bug report or an idea from `openbot.send_feedback`, which reads as a message, not as a grant. Its
- * fixed notice marks it on every client: the notice is a source text, and the Team API carries it
- * unchanged. The first paragraph is the title.
- */
-function feedback(approval: AgentApproval): { title: string; text: string } | null {
-  if (approval.kind !== "permissions" || approval.permissions !== null || !approval.command) return null;
-  if (approval.reason !== englishSourceText("status.agent.reportProblem")) return null;
-  const [title = "", ...text] = approval.command.split("\n\n");
-  return { title, text: text.join("\n\n") };
 }
 
 function approvalTitle(approval: AgentApproval | undefined) {

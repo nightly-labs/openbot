@@ -1,4 +1,5 @@
 import type { AgentProviderId } from "./agent-providers";
+import type { ConversationMessage } from "./ipc-conversation-messages";
 import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 /**
@@ -348,4 +349,29 @@ export function parseFeedback(value: unknown): Feedback | null {
 /** A `@name` in the text would notify that GitHub user. A zero-width space after `@` keeps the text and stops it. */
 function noMentions(text: string): string {
   return text.replace(/@(?=[A-Za-z0-9])/gu, "@\u200b");
+}
+
+const FEEDBACK_SENT_ITEM_TYPE_PREFIX = "feedback-sent:";
+
+/** The issue that the account service opened for approved feedback. */
+export interface FeedbackIssue {
+  readonly number: number;
+  readonly url: string;
+}
+
+/** The item type of the chat card that thanks the user for sent feedback. It holds the issue number. */
+export function feedbackSentItemType(number: number): string {
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error("A valid issue number is required.");
+  return `${FEEDBACK_SENT_ITEM_TYPE_PREFIX}${number}`;
+}
+
+/** The issue of a thank-you card, or null for any other message. The URL comes from the number only. */
+export function feedbackSentIssue(message: ConversationMessage): FeedbackIssue | null {
+  if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
+  if (!message.itemType?.startsWith(FEEDBACK_SENT_ITEM_TYPE_PREFIX)) return null;
+  const digits = message.itemType.slice(FEEDBACK_SENT_ITEM_TYPE_PREFIX.length);
+  if (!/^[1-9][0-9]{0,15}$/u.test(digits)) return null;
+  const number = Number(digits);
+  if (!Number.isSafeInteger(number)) return null;
+  return { number, url: `https://github.com/${FEEDBACK_REPOSITORY}/issues/${number}` };
 }

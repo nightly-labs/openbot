@@ -121,18 +121,25 @@ const featureRequest: FeatureRequest = {
   proposal: "Let me save a whole chat as a PDF file, with the pictures in it.",
   problem: "I send the plans that my agent writes to my team, and I copy them by hand now.",
 };
-const feedbackApproval = (text: string): AgentApproval => ({
+const feedbackApproval = (text: string, reason = sourceText("status.agent.reportProblem")): AgentApproval => ({
   ...approval,
   kind: "permissions",
   command: text,
   cwd: null,
-  reason: sourceText("status.agent.reportProblem"),
+  reason,
 });
-/** `openbot.send_feedback` with a bug: the owner reads it in plain words before OpenBot sends it. */
+/** `openbot.send_feedback` with a bug: the agent offers to send it to the OpenBot team. */
 export const ReportProblem: Story = {
   args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(bugReport)) },
 };
 /** `openbot.send_feedback` with a feature idea: the same card, with what the user wants and why. */
 export const SendIdea: Story = {
-  args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(featureRequest)) },
+  args: {
+    agentName: "Chief",
+    approval: feedbackApproval(feedbackPreview(featureRequest), sourceText("status.agent.sendIdea")),
+  },
+};
+/** After Send: the card keeps its loader until GitHub opens the issue. */
+export const SendingFeedback: Story = {
+  args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(bugReport)), sending: true },
 };

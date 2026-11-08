@@ -15,6 +15,7 @@ import {
   type FeedbackFacts,
   featureRequestFormUrl,
   feedbackPreview,
+  feedbackSentItemType,
   parseFeedback,
 } from "@openbot/contracts/feedback";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -1021,7 +1022,7 @@ export class OpenBotToolRouter {
         kind: "permissions",
         command: feedbackPreview(feedback),
         cwd: null,
-        reason: sourceText("status.agent.reportProblem"),
+        reason: sourceText(idea ? "status.agent.sendIdea" : "status.agent.reportProblem"),
         grantRoot: null,
         permissions: null,
       },
@@ -1031,7 +1032,7 @@ export class OpenBotToolRouter {
     if (decision !== "accept")
       return openBotToolResult({
         status: "declined",
-        next: "The user did not send it. Do not send it another way. Ask the user what to change.",
+        next: "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
       });
     const sent = yield* Effect.result(sender.send(feedback));
     if (Result.isFailure(sent)) {
@@ -1044,11 +1045,32 @@ export class OpenBotToolRouter {
       return form(
         "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.",
       );
+    const issue = sent.success;
+    // The thank-you card in the chat links the issue. The issue is open also when the card fails.
+    const card = yield* Effect.result(
+      toolStep(() =>
+        this.#postSystemCard(
+          senderAgentId,
+          this.#conversation.publicThreadId(senderAgentId, params.threadId),
+          params.turnId,
+          {
+            itemType: feedbackSentItemType(issue.number),
+            text: sourceText("status.agent.feedbackSent", { title: feedback.title }),
+            eventType: "feedback.sent",
+            detail: {},
+          },
+        ),
+      ),
+    );
+    if (Result.isFailure(card))
+      logger.warn("The feedback card could not be added.", { error: toLogValue(card.failure.cause) });
     return openBotToolResult({
       status: "sent",
-      url: sent.success.url,
-      number: sent.success.number,
-      next: "The issue is open on GitHub. Give the user this link.",
+      url: issue.url,
+      number: issue.number,
+      next: Result.isFailure(card)
+        ? "The issue is open on GitHub. Give the user this link."
+        : "The issue is open on GitHub. A card in the chat thanks the user and links the issue, so do not repeat the link: thank the user in one short sentence.",
     });
   });
 
