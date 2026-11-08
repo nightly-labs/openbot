@@ -1,8 +1,5 @@
 import { isString } from "@openbot/contracts/runtime-values";
-import {
-  TEAM_PROTOCOL_V2_MAX_BINARY_FRAME_BYTES,
-  TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES,
-} from "@openbot/contracts/team-protocol/v2";
+import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
 
 const FRAME_MAGIC = 0x4f425732;
 const FRAME_HEADER_BYTES = 17;
@@ -11,6 +8,13 @@ const FRAME_TYPE_BINARY = 2;
 const MAXIMUM_ASSEMBLIES = 16;
 const MAXIMUM_BUFFERED_BYTES = 8 * 1024 * 1024;
 const ASSEMBLY_EXPIRY_MILLISECONDS = 30_000;
+/**
+ * The data channels of a connection share one SCTP association, which sends a message whole before
+ * it starts a message of another channel. Early in a connection over a far relay, a 64 KB frame
+ * takes several round trips, so a small reply on another channel waits behind it. Smaller frames
+ * let it through sooner. Receivers accept any frame size up to the protocol limit.
+ */
+const MAXIMUM_SEND_FRAME_BYTES = 16 * 1024;
 
 interface Assembly {
   type: number;
@@ -129,6 +133,6 @@ export class TeamWebRtcPayloadDecoder {
 }
 
 function normalizedMaximumMessageSize(maximumMessageSize: number): number {
-  if (!Number.isFinite(maximumMessageSize) || maximumMessageSize <= 0) return TEAM_PROTOCOL_V2_MAX_BINARY_FRAME_BYTES;
-  return Math.min(Math.floor(maximumMessageSize), TEAM_PROTOCOL_V2_MAX_BINARY_FRAME_BYTES);
+  if (!Number.isFinite(maximumMessageSize) || maximumMessageSize <= 0) return MAXIMUM_SEND_FRAME_BYTES;
+  return Math.min(Math.floor(maximumMessageSize), MAXIMUM_SEND_FRAME_BYTES);
 }
