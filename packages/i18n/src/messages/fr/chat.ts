@@ -433,4 +433,8 @@ export const messages = {
   "chat.reference.kind.thread": "Fil",
   "chat.reference.open.tab": "Afficher l’onglet du navigateur {name}",
   "chat.reference.open.thread": "Ouvrir le fil {name}",
+  "chat.feedbackSent.title": "Merci pour votre retour 🙏",
+  "chat.feedbackSent.badge": "Envoyé",
+  "chat.feedbackSent.body": "L'équipe OpenBot va le lire et s'en occuper 💜",
+  "chat.feedbackSent.openNamed": "Ouvrir l'issue #{number} sur GitHub",
 } as const satisfies PartialTranslation<typeof source>;

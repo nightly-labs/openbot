@@ -417,4 +417,8 @@ export const messages = {
   "chat.reference.kind.thread": "スレッド",
   "chat.reference.open.tab": "ブラウザーのタブ {name} を表示",
   "chat.reference.open.thread": "スレッド {name} を開く",
+  "chat.feedbackSent.title": "フィードバックありがとうございます 🙏",
+  "chat.feedbackSent.badge": "送信済み",
+  "chat.feedbackSent.body": "OpenBot チームが確認して対応します 💜",
+  "chat.feedbackSent.openNamed": "GitHub で issue #{number} を開く",
 } as const satisfies PartialTranslation<typeof source>;

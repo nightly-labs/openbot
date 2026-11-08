@@ -431,4 +431,8 @@ export const messages = {
   "chat.reference.kind.thread": "话题",
   "chat.reference.open.tab": "显示浏览器标签页 {name}",
   "chat.reference.open.thread": "打开话题 {name}",
+  "chat.feedbackSent.title": "感谢你的反馈 🙏",
+  "chat.feedbackSent.badge": "已发送",
+  "chat.feedbackSent.body": "OpenBot 团队会阅读并处理 💜",
+  "chat.feedbackSent.openNamed": "在 GitHub 上打开 issue #{number}",
 } as const satisfies PartialTranslation<typeof source>;

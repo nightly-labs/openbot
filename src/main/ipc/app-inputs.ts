@@ -390,6 +390,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "opencode-install" &&
     input !== "opencode-auth" &&
     input !== "feedback" &&
+    input !== "report-problem" &&
     input !== "message" &&
     input !== "changelog" &&
     input !== "guides" &&

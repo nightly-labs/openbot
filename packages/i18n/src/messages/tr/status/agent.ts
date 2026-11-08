@@ -25,6 +25,11 @@ export const messages = {
   "status.agent.screenCaptureWindow": "{name} penceresini yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureRegion":
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
+  "status.agent.reportProblem":
+    "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
+  "status.agent.sendIdea": "Bu, herkese açık bir GitHub issue'su olur. Adın gösterilmez.",
+  "status.agent.feedbackSent": "OpenBot ekibine gönderildi: {title}",
+  "status.agent.feedbackSending": "Geri bildiriminiz OpenBot ekibine gönderiliyor…",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",

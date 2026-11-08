@@ -6,6 +6,8 @@ import { useI18n } from "../../i18n-context";
 import { compareReleaseVersions } from "../updates/whats-new-history";
 import { loadWhatsNewReleases } from "../updates/whats-new-releases";
 
+type HelpLink = "changelog" | "guides" | "discord" | "report-problem" | "feedback";
+
 /** The newest releases that the Help menu lists, one line each. */
 const HELP_NEWS_COUNT = 3;
 
@@ -17,13 +19,13 @@ const HELP_NEWS_COUNT = 3;
 export function RailHelpMenu(props: {
   version: string | null;
   onOpenWhatsNew: () => void;
-  onOpenLink: (destination: "changelog" | "guides" | "discord" | "feedback") => void;
+  onOpenLink: (destination: HelpLink) => void;
 }) {
   const i18n = useI18n();
   const [news, setNews] = createSignal<readonly HelpMenuNews[]>([]);
   // The list is read again after a language change, so it never stays in the previous language.
   let newsLocale: string | null = null;
-  const openLink = (destination: "changelog" | "guides" | "discord" | "feedback") => {
+  const openLink = (destination: HelpLink) => {
     desktopAnalytics.track("help_link_opened", { destination });
     props.onOpenLink(destination);
   };
@@ -66,6 +68,7 @@ export function RailHelpMenu(props: {
       onOpenChangelog={() => openLink("changelog")}
       onOpenGuides={() => openLink("guides")}
       onOpenDiscord={() => openLink("discord")}
+      onReportProblem={() => openLink("report-problem")}
       onSendFeedback={() => openLink("feedback")}
     />
   );

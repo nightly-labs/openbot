@@ -1,6 +1,6 @@
 import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
@@ -19,6 +19,7 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { feedbackApproval } from "@openbot/ui/features/conversation/feedback-approval";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -351,6 +352,30 @@ export function ConversationTimeline() {
     props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
+
+  /**
+   * Send on a feedback card resolves the approval at once, but the tool still waits for GitHub. The
+   * card stays, with its loader, until the next row (the thank-you card) arrives or the turn ends.
+   */
+  const [sendingFeedback, setSendingFeedback] = createSignal<{
+    approval: AgentApproval;
+    rows: number;
+    turnId: string | null | undefined;
+  } | null>(null);
+  const heldFeedback = createMemo(() => {
+    const held = sendingFeedback();
+    if (!held || props.approval) return undefined;
+    if (props.messages.length !== held.rows || props.activeTurnId !== held.turnId) return undefined;
+    return held.approval;
+  });
+  async function approve(approval: AgentApproval) {
+    if (feedbackApproval(approval)) {
+      setSendingFeedback({ approval, rows: props.messages.length, turnId: props.activeTurnId });
+    }
+    const accepted = await props.onRespondToApproval("accept");
+    if (!accepted) setSendingFeedback(null);
+    return accepted;
+  }
   /**
    * The other person who wrote a message. The reader's own message, an agent message, and a message
    * from before senders were kept have none, so a chat with one person looks as it always did.
@@ -980,6 +1005,7 @@ export function ConversationTimeline() {
                                                 onOpenRoutine={openRoutineSettings}
                                                 openRoutineThread={openRoutineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                onOpenLink={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
                                                 agentMessageText={agentMessageText}
@@ -1604,13 +1630,14 @@ export function ConversationTimeline() {
                 registerComposerAnswer={registerPromptComposerAnswer}
               />
             </Show>
-            <Show keyed when={props.approval}>
+            <Show keyed when={props.approval ?? heldFeedback()}>
               {(approval) => (
                 <Loading>
                   <ApprovalCard
                     approval={approval}
                     agentName={interactionAgentName()}
-                    onApprove={() => props.onRespondToApproval("accept")}
+                    sending={heldFeedback() !== undefined}
+                    onApprove={() => approve(approval)}
                     onReject={() => props.onRespondToApproval("decline")}
                     onAlwaysAllow={props.onAlwaysAllowApproval}
                   />

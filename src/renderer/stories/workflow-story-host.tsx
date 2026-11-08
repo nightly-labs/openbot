@@ -221,6 +221,7 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
             onOpenChangelog={fn()}
             onOpenGuides={fn()}
             onOpenDiscord={fn()}
+            onReportProblem={fn()}
             onSendFeedback={fn()}
           />
         }
