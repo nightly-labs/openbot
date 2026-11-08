@@ -31,6 +31,7 @@ import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
+import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
@@ -222,6 +223,7 @@ export {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
@@ -483,6 +485,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_PERSONALITY_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -658,7 +661,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
     capability !== HOST_PERSONALITY_CAPABILITY &&
     capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
-    capability !== LIVE_VOICE_CAPABILITY,
+    capability !== LIVE_VOICE_CAPABILITY &&
+    capability !== AGENT_WELCOME_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -710,6 +714,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_PERSONALITY_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -844,6 +849,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
       capability !== HOST_PERSONALITY_CAPABILITY &&
       capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
-      capability !== LIVE_VOICE_CAPABILITY,
+      capability !== LIVE_VOICE_CAPABILITY &&
+      capability !== AGENT_WELCOME_CAPABILITY,
   );
 }

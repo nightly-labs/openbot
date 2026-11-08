@@ -55,7 +55,6 @@ import type {
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
-  CreateAgentInput,
   CreateRoutineInput,
   CreateWorkflowInput,
   DecideWorkflowStepInput,
@@ -186,6 +185,7 @@ import type {
   HostLocalServerList,
   MessagingConnectorPage,
 } from "@openbot/team-client/team-admin-requests";
+import type { NewAgentInput } from "@/features/agents/model/agent-initial-message";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -683,8 +683,11 @@ export interface MobileWorkspaceContextValue {
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
   signOutMcpServer: (mcpServerId: string, serverId: string) => Promise<McpSignInState[]>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
-  /** Creates an agent on the active server and returns its id. */
-  createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Creates an agent on the active server and returns its id. A host with `agent-welcome-v1` gets a
+   * hidden setup message, then the first task as the user's own message.
+   */
+  createAgent: (input: NewAgentInput) => Promise<string>;
   /**
    * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
    * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.

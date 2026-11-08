@@ -1,6 +1,7 @@
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+  AGENT_WELCOME_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -185,6 +186,8 @@ export function toAgentMessages(
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }
+    // A new agent's setup message is for the agent only: the chat starts with the agent's welcome.
+    if (message.itemType === AGENT_WELCOME_ITEM_TYPE) continue;
     if (message.author !== "assistant" || message.itemType !== "commentary") {
       result.push(convert(message, index));
       continue;

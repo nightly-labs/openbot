@@ -25,6 +25,7 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type CreateAgentInput, type DuplicateAgentResult, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_WELCOME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-welcome-v1";
 import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
@@ -238,7 +239,12 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input);
-    return json(201, await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member))));
+    // A client with `agent-welcome-v1` sends a setup message for the new agent, not a message from the member.
+    const welcome = capabilities.has(AGENT_WELCOME_CAPABILITY);
+    return json(
+      201,
+      await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member), welcome)),
+    );
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
