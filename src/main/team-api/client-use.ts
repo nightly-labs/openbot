@@ -20,6 +20,7 @@ import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { COMPUTER_ACTIVITY_ROUTES } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
@@ -126,6 +127,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDERS_ADMIN_ROUTES.apiKeyState,
   PROVIDERS_ADMIN_ROUTES.customList,
   CUSTOM_PROVIDER_HARNESS_ROUTES.customList,
+  CUSTOM_PROVIDER_EDIT_ROUTES.customList,
   CUSTOM_AGENTS_ROUTES.list,
   PROVIDERS_ADMIN_ROUTES.runtimesStatus,
   PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus,

@@ -146,6 +146,7 @@
     "./team-protocol/model-visibility-v1": "./src/team-protocol/model-visibility-v1.ts",
     "./team-protocol/server-audit-v1": "./src/team-protocol/server-audit-v1.ts",
     "./team-protocol/custom-agents-v1": "./src/team-protocol/custom-agents-v1.ts",
+    "./team-protocol/custom-provider-edit-v1": "./src/team-protocol/custom-provider-edit-v1.ts",
     "./team-protocol/custom-provider-harness-v1": "./src/team-protocol/custom-provider-harness-v1.ts",
     "./team-protocol/provider-default-v1": "./src/team-protocol/provider-default-v1.ts",
     "./team-protocol/discord-access-v1": "./src/team-protocol/discord-access-v1.ts",
