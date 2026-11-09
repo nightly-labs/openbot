@@ -22,6 +22,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   type TextStyle,
   View,
@@ -787,9 +788,14 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
             bottom: TABLE_INSET,
             borderRadius: 13,
             borderCurve: "continuous",
-            backgroundColor: rowsBackground,
+            overflow: "hidden",
+            // On a message color out of the bubble, the card has no layer, so the rows take both: they
+            // have the color of the code panel of a code block.
+            backgroundColor: presentation.outside && tone ? tone.panel : undefined,
           }}
-        />
+        >
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: rowsBackground }]} />
+        </View>
       ) : null}
       <ScrollView
         horizontal
