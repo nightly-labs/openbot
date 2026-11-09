@@ -39,6 +39,8 @@ export const messages = {
   "error.import.zipInvalid":
     "Seçilen dosya geçerli bir .zip değil. Grok Bot dosyayı hâlâ kaydediyorsa bekleyip yeniden seçin.",
   "error.import.entryDamaged": "Dosya, dışa aktarımda bozuk.",
+  "error.import.foldersSkipped":
+    ".git ve node_modules klasörlerindeki {number} dosya dışarıda bırakıldı. Bir araç bunları yeniden oluşturabilir.",
   "error.import.empty": "Dışa aktarım boş.",
   "error.import.remoteZipTooLarge":
     "Katılınan bir sunucuya içe aktarmak için dışa aktarım 100 MB altında bir .zip olmalıdır.",

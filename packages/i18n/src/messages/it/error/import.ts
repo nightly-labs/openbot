@@ -41,6 +41,8 @@ export const messages = {
   "error.import.zipInvalid":
     "Il file selezionato non è un .zip valido. Se Grok Bot lo sta ancora salvando, attendi e sceglilo di nuovo.",
   "error.import.entryDamaged": "Il file è danneggiato nell'esportazione.",
+  "error.import.foldersSkipped":
+    "{number} file nelle cartelle .git e node_modules sono esclusi. Uno strumento può ricrearli.",
   "error.import.empty": "L'esportazione è vuota.",
   "error.import.remoteZipTooLarge":
     "Per importare in un server a cui ti sei unito, l'esportazione deve essere un file .zip sotto i 100 MB.",

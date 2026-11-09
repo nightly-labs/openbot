@@ -524,6 +524,7 @@ export class InstanceTransferService {
     const manifestBytes =
       (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST]))[INSTANCE_TRANSFER_MANIFEST] ?? new Uint8Array();
     const { manifest, warnings } = yield* archiveSync(() => decodeTransferManifest(manifestBytes));
+    if (archive.skipped) warnings.push(sourceText("error.import.foldersSkipped", { number: archive.skipped }));
     // An agent whose skill has no SKILL.md cannot import, so it is not offered.
     const agents = manifest.agents.filter((agent) => {
       const missing = agent.skills.find((skill) => !entries.has(`${skill}/SKILL.md`));

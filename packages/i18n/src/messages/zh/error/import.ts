@@ -37,6 +37,7 @@ export const messages = {
   "error.import.remoteExpandedTooLarge": "解压后必须小于 500 MB 且文件数不超过 {limit}。",
   "error.import.zipInvalid": "所选文件不是有效的 .zip。如果 Grok Bot 仍在保存，请稍等后重新选择。",
   "error.import.entryDamaged": "导出中的该文件已损坏。",
+  "error.import.foldersSkipped": ".git 和 node_modules 文件夹中的 {number} 个文件不会导入，工具可以重新生成它们。",
   "error.import.empty": "该导出为空。",
   "error.import.remoteZipTooLarge": "导入到已加入的服务器时，导出文件必须是小于 100 MB 的 .zip。",
   "error.import.hostBusy": "服务器正在读取其他导出，请几分钟后重试。",

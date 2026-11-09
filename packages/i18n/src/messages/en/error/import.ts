@@ -39,6 +39,8 @@ export const messages = defineMessages("error.import", {
   "error.import.zipInvalid":
     "The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.",
   "error.import.entryDamaged": "The file is damaged in the export.",
+  "error.import.foldersSkipped":
+    "{number} files in .git and node_modules folders are left out. A tool can make them again.",
   "error.import.empty": "The export is empty.",
   "error.import.remoteZipTooLarge": "To import into a joined server, the export must be a .zip under 100 MB.",
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",

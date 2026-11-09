@@ -50,6 +50,8 @@ export interface ArchiveFile {
   entries: Map<string, ArchiveEntry>;
   /** The SHA-256 of the file size and the central directory. Any changed entry changes its CRC here. */
   fingerprint: string;
+  /** Files in `.git` and `node_modules` folders, which are left out. */
+  skipped: number;
 }
 
 const END = 0x06054b50;
@@ -64,6 +66,7 @@ const ZIP64_EXTRA = 0x0001;
 /** The end record can follow a comment of up to 65,535 bytes. */
 const TAIL_BYTES = ZIP64_LOCATOR_BYTES + END_BYTES + 0xffff;
 const READ_CHUNK_BYTES = 1024 * 1024;
+const SKIPPED_FOLDERS = new Set([".git", "node_modules"]);
 /** A central directory is about 100 bytes for each entry; more than this is not an export. */
 const MAX_DIRECTORY_BYTES = 256 * 1024 * 1024;
 
@@ -80,7 +83,7 @@ export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
   return yield* withArchive(path, (handle) =>
     Effect.gen(function* () {
       const directory = yield* readDirectoryEffect(handle, info.size, limits);
-      const entries = yield* Effect.try({
+      const { entries, skipped } = yield* Effect.try({
         try: () => directoryEntries(directory.bytes, directory.count, limits),
         catch: (error) =>
           archiveFailure(
@@ -94,7 +97,7 @@ export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
           ),
       });
       const fingerprint = createHash("sha256").update(`${info.size}\0`).update(directory.bytes).digest("hex");
-      return { path, entries, fingerprint };
+      return { path, entries, fingerprint, skipped };
     }),
   );
 });
@@ -196,10 +199,18 @@ const readDirectoryEffect = Effect.fn("Archive.readDirectory")(function* (
   return { bytes: yield* readAtEffect(handle, directoryOffset, directoryBytes, limits.invalid), count };
 });
 
-/** The checked file entries of a central directory. A folder entry holds no data and is left out. */
-function directoryEntries(directory: Buffer, count: number, limits: ArchiveLimits): Map<string, ArchiveEntry> {
+/**
+ * The checked file entries of a central directory. A folder entry holds no data and is left out.
+ * A tool makes `.git` and `node_modules` again, so their files are counted and left out too.
+ */
+function directoryEntries(
+  directory: Buffer,
+  count: number,
+  limits: ArchiveLimits,
+): { entries: Map<string, ArchiveEntry>; skipped: number } {
   const entries = new Map<string, ArchiveEntry>();
   let expanded = 0;
+  let skipped = 0;
   let offset = 0;
   for (let index = 0; index < count; index += 1) {
     if (offset + 46 > directory.length || directory.readUInt32LE(offset) !== CENTRAL) throw new Error("Invalid.");
@@ -227,6 +238,10 @@ function directoryEntries(directory: Buffer, count: number, limits: ArchiveLimit
     const crc = directory.readUInt32LE(offset + 16);
     offset = next;
     if (name.endsWith("/")) continue;
+    if (name.split("/").some((part) => SKIPPED_FOLDERS.has(part))) {
+      skipped += 1;
+      continue;
+    }
     if (isUnsafeEntry(name)) throw new UnsafeEntry(name);
     // Bit 0 marks an encrypted entry.
     if ((flags & 1) !== 0 || (method !== 0 && method !== 8)) throw new Error("Invalid.");
@@ -241,7 +256,7 @@ function directoryEntries(directory: Buffer, count: number, limits: ArchiveLimit
     });
   }
   if (!entries.size) throw new EmptyArchive();
-  return entries;
+  return { entries, skipped };
 }
 
 /** Each value that is `0xffffffff` in the directory comes, in this order, from the ZIP64 extra field. */

@@ -7,3 +7,7 @@
   space than the computer has is skipped, with a message that names both sizes. A damaged file in
   the export is skipped with a warning, and the agent still imports. An import into a joined server
   still accepts a file of 100 MB or less.
+- An agent import or a transfer file that has `.git` or `node_modules` folders now leaves those
+  folders out, with one warning that counts their files. Before, OpenBot refused the whole file. The
+  Grok Bot export agent also leaves out other folders that a tool makes again, such as `.venv`,
+  `dist`, and `build`.

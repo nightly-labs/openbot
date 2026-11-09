@@ -55,8 +55,9 @@ the format below exactly.
 5. **Remove secrets.** Do not copy `.env` files, private keys, API keys, tokens, passwords or
    cookies, in files or in text. Replace a secret in a persona or a memory with
    `<ask the user for …>`. OpenBot rejects the archive if it contains a file named `.env*` or
-   `*private*key*`, a nested archive (`.zip`, `.tar`, `.gz`, `.7z`, `.rar`), or a `.git` or
-   `node_modules` folder. A skill that has one of these is left out: tell the user.
+   `*private*key*`, or a nested archive (`.zip`, `.tar`, `.gz`, `.7z`, `.rar`). A skill that has one
+   of these is left out: tell the user. Leave out `.git`, `node_modules`, `.venv`, `venv`, and
+   `__pycache__` folders in a skill: a tool makes them again.
 
 6. **Build the folder** in a new temporary folder outside the Hermes folder (see Format). Write
    `openbot-import.json` last.
@@ -153,4 +154,5 @@ schedule and tells the user; the rest of the agent still imports.
 - [ ] Each `key` is unique and 64 characters or fewer, and each path starts with `agents/<key>/`.
 - [ ] Each skill folder has `SKILL.md` with frontmatter, and no skill is `openbot-export`.
 - [ ] No skill that comes with Hermes is in the export.
-- [ ] No secrets, `.env` files, `auth.json`, keys, nested archives, `.git` or `node_modules`.
+- [ ] No secrets, `.env` files, `auth.json`, keys or nested archives.
+- [ ] No `.git`, `node_modules`, `.venv`, `venv` or `__pycache__` folders.

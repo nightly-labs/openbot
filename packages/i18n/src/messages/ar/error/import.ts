@@ -36,6 +36,7 @@ export const messages = {
   "error.import.remoteExpandedTooLarge": "يجب أن يكون حجم التصدير بعد فك الضغط أقل من 500 MB وأقل من {limit} ملف.",
   "error.import.zipInvalid": "الملف المحدد ليس ملف .zip صالحًا. إذا كان Grok Bot لا يزال يحفظه، فانتظر واختره مرة أخرى.",
   "error.import.entryDamaged": "الملف تالف في التصدير.",
+  "error.import.foldersSkipped": "تُرك {number} ملف في مجلدات .git وnode_modules. يمكن لأداة إنشاؤها مرة أخرى.",
   "error.import.empty": "التصدير فارغ.",
   "error.import.remoteZipTooLarge": "للاستيراد إلى خادم منضم إليه، يجب أن يكون التصدير ملف .zip بحجم أقل من 100 MB.",
   "error.import.hostBusy": "يقرأ الخادم عمليات تصدير أخرى. حاول مرة أخرى بعد بضع دقائق.",

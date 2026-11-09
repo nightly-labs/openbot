@@ -43,6 +43,8 @@ export const messages = {
   "error.import.zipInvalid":
     "選択したファイルは有効な .zip ではありません。Grok Bot がまだ保存中の場合は、待ってからもう一度選択してください。",
   "error.import.entryDamaged": "エクスポート内のファイルが破損しています。",
+  "error.import.foldersSkipped":
+    ".git と node_modules フォルダー内の {number} 個のファイルは除外されます。ツールで再作成できます。",
   "error.import.empty": "エクスポートが空です。",
   "error.import.remoteZipTooLarge":
     "参加しているサーバーにインポートするには、エクスポートは 100 MB 未満の .zip である必要があります。",

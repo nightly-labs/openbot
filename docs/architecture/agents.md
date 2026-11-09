@@ -987,7 +987,8 @@ of meaning. The renderer never names a path: `agent-import:choose` opens the dia
 `AgentImportService` keeps the checked export under a single-use token, with the SHA-256 of its size
 and central directory; `apply` refuses a file that changed. `src/main/agent-archive.ts` reads only the
 central directory (ZIP64 too) and inflates one entry at a time from disk, with its size and CRC
-checked, so a local import has no size limit, only 200,000 files. `stage` rejects paths that
+checked, so a local import has no size limit, only 200,000 files. Files in `.git` and
+`node_modules` folders are left out with one warning, for this import and the transfer. `stage` rejects paths that
 `isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` skips an
 agent whose workspace files need more free disk space than there is, checks all
 skills of an agent, creates it through `AgentService` and publishes skills through the local skill

@@ -261,6 +261,7 @@ export class AgentImportService {
     const { manifest, warnings } = yield* archiveSync(() =>
       decodeImportManifest(manifestBytes, this.agents.memoryLimit()),
     );
+    if (archive.skipped) warnings.push(sourceText("error.import.foldersSkipped", { number: archive.skipped }));
 
     const avatarPaths = new Set(manifest.agents.flatMap((agent) => (agent.avatar ? [wrapper + agent.avatar] : [])));
     const avatarBytes = yield* readEntriesEffect(archive, avatarPaths);

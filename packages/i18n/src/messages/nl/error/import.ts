@@ -41,6 +41,8 @@ export const messages = {
   "error.import.zipInvalid":
     "Het gekozen bestand is geen geldige .zip. Als Grok Bot het nog opslaat, wacht dan en kies het opnieuw.",
   "error.import.entryDamaged": "Het bestand is beschadigd in de export.",
+  "error.import.foldersSkipped":
+    "{number} bestanden in .git- en node_modules-mappen worden weggelaten. Een tool kan ze opnieuw maken.",
   "error.import.empty": "De export is leeg.",
   "error.import.remoteZipTooLarge":
     "Om te importeren in een server waaraan je deelneemt, moet de export een .zip van minder dan 100 MB zijn.",

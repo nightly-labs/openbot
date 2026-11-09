@@ -36,6 +36,7 @@ export const messages = {
   "error.import.remoteExpandedTooLarge": "הייצוא חייב להתרחב לפחות מ-500 MB ומ-{limit} קבצים.",
   "error.import.zipInvalid": "הקובץ שנבחר אינו .zip תקין. אם Grok Bot עדיין שומר אותו, יש להמתין ולבחור אותו שוב.",
   "error.import.entryDamaged": "הקובץ פגום בייצוא.",
+  "error.import.foldersSkipped": "{number} קבצים בתיקיות .git ו-node_modules לא נכללים. כלי יכול ליצור אותם מחדש.",
   "error.import.empty": "הייצוא ריק.",
   "error.import.remoteZipTooLarge": "כדי לייבא לשרת שהצטרפת אליו, הייצוא חייב להיות קובץ .zip קטן מ-100 MB.",
   "error.import.hostBusy": "השרת קורא ייצואים אחרים. יש לנסות שוב בעוד כמה דקות.",

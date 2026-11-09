@@ -32,7 +32,13 @@ const BIG_BYTES = 600 * MiB;
 
 interface Report {
   status: "running" | "pass" | "fail";
-  infoZip?: { zip64End: boolean; files: number; skill: string | null; warnings: string[] };
+  infoZip?: {
+    zip64End: boolean;
+    files: number;
+    skill: string | null;
+    previewWarnings: string[];
+    warnings: string[];
+  };
   manyEntries?: { zip64End: boolean; previewFiles: number; written: number; seconds: number };
   hugeEntry?: { zipBytes: number; previewBytes: number; skipped: string | null; deleted: number };
   bigEntry?: { fileBytes: number; rssGrowthMiB: number };
@@ -186,20 +192,30 @@ try {
   await writeFile(join(files, "random.bin"), randomBytes(3 * MiB));
   await writeFile(join(files, "run.sh"), "#!/bin/sh\necho ok\n");
   await chmod(join(files, "run.sh"), 0o755);
+  const expected = await tree(files);
+  // A tool makes these again: the import leaves them out with one warning, and keeps the rest.
+  await mkdir(join(files, "node_modules/pkg"), { recursive: true });
+  await writeFile(join(files, "node_modules/pkg/index.js"), "module.exports = 1;\n");
+  await mkdir(join(files, ".git"), { recursive: true });
+  await writeFile(join(files, ".git/HEAD"), "ref: refs/heads/main\n");
+  await mkdir(join(source, "agents/alpha/skills/notes/node_modules"), { recursive: true });
+  await writeFile(join(source, "agents/alpha/skills/notes/node_modules/x.js"), "export {};\n");
   const infoZip = join(root, "export-fz.zip");
   const zipped = spawnSync("zip", ["-q", "-r", "-fz", infoZip, "."], { cwd: source, encoding: "utf8" });
   assert.equal(zipped.status, 0, `zip failed: ${zipped.stderr}`);
   const local = service();
   const preview = await run(local.stage(infoZip));
   assert.equal(preview.agents[0]?.fileCount, 4);
+  assert.deepEqual(preview.warnings, [sourceText("error.import.foldersSkipped", { number: 3 })]);
   const result = await run(local.apply({ token: preview.token, keys: ["alpha"], channelKeys: [] }));
   const written = await tree(importedFolder(result.agents[0]?.id));
-  assert.deepEqual(written, await tree(files), "The files arrive unchanged.");
+  assert.deepEqual(written, expected, "The files arrive unchanged, without .git and node_modules.");
   const skill = (await run(library.list())).find((candidate) => candidate.slug === "notes");
   report.infoZip = {
     zip64End: await hasZip64End(infoZip),
     files: written.size,
     skill: skill?.slug ?? null,
+    previewWarnings: preview.warnings,
     warnings: result.warnings,
   };
   assert.ok(report.infoZip.zip64End, "zip -fz writes a ZIP64 end record.");
