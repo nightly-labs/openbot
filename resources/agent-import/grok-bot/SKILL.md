@@ -155,7 +155,9 @@ Channel field rules:
 
 A channel has no folder in the archive. Up to 100 channels.
 
-The whole archive must be under 2 GB and 50,000 files or fewer.
+The whole archive must have 200,000 files or fewer. It has no size limit, but the computer that
+imports it needs free disk space for the workspace files. OpenBot versions before 0.66 accept only
+2 GB and 50,000 files: when the archive is larger, tell the user to update OpenBot before the import.
 
 ### Schedules
 
