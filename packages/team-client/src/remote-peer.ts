@@ -25,6 +25,7 @@ import {
   teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
@@ -90,6 +91,9 @@ import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 
 // A type, not an interface: the command crosses the native/DOM bridge as JSON.
+/** An event that the peer passes on: an agent or team event, or an event of the member's live voice session. */
+export type RemoteTeamEvent = AgentEvent | TeamRealtimeEvent | LiveVoiceEvent;
+
 export type RemoteLargeDownload = {
   maxBytes: number;
   /** Without a type, a larger file of any type can answer. */
@@ -310,7 +314,7 @@ export interface RemoteTeamPeerActions {
   onDiagnostic?: (diagnostic: RemoteTeamDiagnostic) => Promise<void>;
   /** The platform reported that the network came back. A consumer that waits to retry can retry now. */
   onNetworkRestored?: () => Promise<void>;
-  onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
+  onTeamEvent: (hostId: string, event: RemoteTeamEvent) => Promise<void>;
 }
 interface ActionsRef {
   current: RemoteTeamPeerActions;
@@ -452,7 +456,7 @@ class RemotePeerIO extends Context.Service<
       sessionId: string | null,
     ): Effect.Effect<RemoteTeamBootstrapPayload, RemotePeerError>;
     connectionUpdate(update: RemoteTeamConnectionUpdate): Effect.Effect<void, RemotePeerError>;
-    teamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): Effect.Effect<void, RemotePeerError>;
+    teamEvent(hostId: string, event: RemoteTeamEvent): Effect.Effect<void, RemotePeerError>;
   }
 >()("@openbot/team-client/RemotePeerIO") {
   static layer(actions: ActionsRef) {
@@ -465,7 +469,7 @@ class RemotePeerIO extends Context.Service<
         connectionUpdate: Effect.fn("RemotePeerIO.connectionUpdate")((update: RemoteTeamConnectionUpdate) =>
           peerCall(() => actions.current.onConnectionUpdate(update)),
         ),
-        teamEvent: Effect.fn("RemotePeerIO.teamEvent")((hostId: string, event: AgentEvent | TeamRealtimeEvent) =>
+        teamEvent: Effect.fn("RemotePeerIO.teamEvent")((hostId: string, event: RemoteTeamEvent) =>
           peerCall(() => actions.current.onTeamEvent(hostId, event)),
         ),
       }),

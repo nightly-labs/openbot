@@ -25,6 +25,9 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
+/** A phone number with its country code. */
+const PHONE_PLACEHOLDER = "+44 7700 900123";
+
 /** How often the page reads the link while it waits for the phone, as on the desktop. */
 const LINK_POLL_MS = 1_000;
 
@@ -344,6 +347,7 @@ export function ServerWhatsAppLinkScreen() {
       </SettingsSection>
       <SheetFormField
         label={t("mobile.server.connectors.whatsapp.phoneLabel")}
+        placeholder={PHONE_PLACEHOLDER}
         inputMode="tel"
         autoCorrect={false}
         isRequired

@@ -244,6 +244,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnsupported": "需要 6 GB 或以上内存的手机",
   "mobile.settings.voice.recognition.parakeetFooter":
     "Parakeet 与桌面版一样在此手机上运行。它会在 25 种欧洲语言中识别你说的语言，语音不会离开手机。模型下载完成前，由手机语音识别收听。",
+  "mobile.settings.voice.recognition.parakeetUnified": "Parakeet Unified（英语）",
+  "mobile.settings.voice.recognition.parakeetUnifiedReady": "在此手机上运行 · 仅英语",
+  "mobile.settings.voice.recognition.parakeetUnifiedFooter":
+    "Parakeet Unified 与桌面端一样在此手机上运行。它只识别英语，会加标点，错误比 Parakeet v3 更少，你的语音不会离开手机。在模型下载完成之前，由手机的语音识别来听。",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "90 多种语言 · 将你的语音发送给 ElevenLabs",
   "mobile.settings.voice.recognition.model": "语音模型",
@@ -254,6 +258,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "聆听",
   "mobile.settings.voice.tab.speaking": "朗读",
+  "mobile.settings.voice.tab.gptLive": "GPT 实时",
   "mobile.settings.voice.pause.title": "发送前的停顿",
   "mobile.settings.voice.pause.label": "等待新词",
   "mobile.settings.voice.pause.footer":
@@ -262,6 +267,47 @@ export const messages = {
   "mobile.settings.voice.speed.title": "回复速度",
   "mobile.settings.voice.speed.footer": "OpenBot 朗读回复的速度，语音对话中也适用。",
   "mobile.settings.voice.speed.value": "{speed}×",
+  "mobile.settings.voice.gptLive.title": "GPT Live Voice",
+  "mobile.settings.voice.gptLive.footer":
+    "在与智能体的语音对话中，GPT Live Voice 代替这部手机聆听和说话。它使用运行服务器的电脑上的 Codex（ChatGPT）登录。你的声音在这部手机和 OpenAI 之间传输，由 OpenAI 说出智能体的回复。需要支持它的服务器；其他服务器使用这部手机的语音。",
+  "mobile.settings.voice.gptLive.automatic": "自动",
+  "mobile.settings.voice.gptLive.choiceFooter":
+    "OpenAI 会在你的下一次语音对话中使用此声音。选择“自动”时由 OpenAI 选择声音。",
+  "mobile.settings.voice.gptLive.serversTitle": "服务器",
+  "mobile.settings.voice.gptLive.serversFooter":
+    "点按需要登录的服务器，即可将 Codex 连接到 ChatGPT 账户。只有所有者或管理员能看到服务器的登录状态。",
+  "mobile.settings.voice.gptLive.status.ready": "就绪",
+  "mobile.settings.voice.gptLive.status.supported": "支持",
+  "mobile.settings.voice.gptLive.status.offline": "离线",
+  "mobile.settings.voice.gptLive.status.update": "其电脑上需要更新版本的 OpenBot",
+  "mobile.settings.voice.gptLive.status.signIn": "使用 ChatGPT 登录 Codex",
+  "mobile.settings.voice.server.title": "语音服务器",
+  "mobile.settings.voice.server.row": "兼容 OpenAI 的服务器",
+  "mobile.settings.voice.server.notSetUp": "未设置",
+  "mobile.settings.voice.server.footer":
+    "与桌面端一样，这是你自己的、带有 OpenAI /v1/audio 路由的服务器，例如 Speaches 或 Kokoro-FastAPI。OpenBot 只会把你的录音和回复文本发送到它的地址，手机必须能访问该地址，例如在同一网络中。",
+  "mobile.settings.voice.server.choice": "你的语音服务器",
+  "mobile.settings.voice.server.dictationReady": "你的语音服务器 · {model}",
+  "mobile.settings.voice.server.dictationOff": "请在语音服务器上设置听写",
+  "mobile.settings.voice.server.speechReady": "你的语音服务器 · {model} · {voice}",
+  "mobile.settings.voice.server.speechOff": "请在语音服务器上设置语音回复",
+  "mobile.settings.voice.server.address": "地址",
+  "mobile.settings.voice.server.addressHint": "API 的基础地址，例如 http://studio.local:8000/v1。",
+  "mobile.settings.voice.server.apiKey": "API 密钥（可选）",
+  "mobile.settings.voice.server.apiKeySaved": "此服务器已保存密钥。留空即可继续使用。",
+  "mobile.settings.voice.server.connect": "连接",
+  "mobile.settings.voice.server.connecting": "正在连接…",
+  "mobile.settings.voice.server.connectFooter": "连接后可查看服务器为听写和语音回复提供的内容。",
+  "mobile.settings.voice.server.probeFailed": "无法连接到语音服务器。",
+  "mobile.settings.voice.server.dictation": "听写",
+  "mobile.settings.voice.server.speech": "语音回复",
+  "mobile.settings.voice.server.missing": "此服务器上没有",
+  "mobile.settings.voice.server.saveFailed": "无法保存语音服务器。",
+  "mobile.settings.voice.server.remove": "移除语音服务器",
+  "mobile.settings.voice.server.removeTitle": "要移除语音服务器吗？",
+  "mobile.settings.voice.server.removeBody":
+    "服务器原来负责的听写或朗读将改由手机的识别器和 Supertonic 3 完成，其 API 密钥也会从这部手机中删除。",
+  "mobile.settings.voice.server.removeFailed": "无法移除语音服务器。",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot 使用一次性令牌将你的语音流式传输给 ElevenLabs，费用由 ElevenLabs 从你的账户扣除。密钥保存在此手机上。",
 } as const satisfies PartialTranslation<typeof source>;

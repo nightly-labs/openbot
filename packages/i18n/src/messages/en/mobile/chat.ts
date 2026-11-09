@@ -187,6 +187,14 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "The ElevenLabs key is missing a permission. Check it in Settings > Voice.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs needs a network connection.",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "Your voice server could not read the reply. Check it in Settings > Voice.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "This server does not support GPT live voice. Update OpenBot on the computer that runs it.",
+  "mobile.chat.liveVoice.gptFailed": "GPT live voice could not start. Unmute to try again.",
+  "mobile.chat.liveVoice.gptEnded": "GPT live voice stopped. Unmute to start it again.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Allow OpenBot to use the microphone in Settings. Then unmute to try again.",
   "mobile.chat.composer.addAttachment": "Add attachment",
   "mobile.chat.composer.ask": "Ask {name}",
   "mobile.chat.composer.stopFailed": "Could not stop the agent. It may have finished already.",

@@ -30,6 +30,8 @@ export const messages = {
   "error.voice.live.timedOut": "La voz en directo de Codex no se inició a tiempo. Inténtalo de nuevo.",
   "error.voice.live.failed": "La voz en directo se detuvo: {reason}",
   "error.voice.live.disconnected": "La voz en directo se desconectó.",
+  "error.voice.live.hostFailed":
+    "Codex en el servidor no pudo iniciar la voz en directo. Pide a su propietario que actualice Codex en ese ordenador e inicie sesión con ChatGPT, y vuelve a intentarlo.",
   "error.voice.live.signIn": "Inicia sesión en Codex con tu cuenta de ChatGPT para usar la voz en directo.",
   "error.voice.live.off": "La voz en directo de Codex está desactivada. Actívala en Ajustes → Voz.",
 } as const satisfies PartialTranslation<typeof source>;

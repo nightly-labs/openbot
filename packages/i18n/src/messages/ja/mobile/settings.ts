@@ -260,6 +260,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnsupported": "6 GB 以上のメモリを搭載した端末が必要です",
   "mobile.settings.voice.recognition.parakeetFooter":
     "Parakeet はデスクトップと同じく、この端末で動作します。ヨーロッパの 25 言語から話している言語を判別し、音声は端末の外に出ません。モデルのダウンロードが終わるまでは、端末の音声認識を使います。",
+  "mobile.settings.voice.recognition.parakeetUnified": "Parakeet Unified（英語）",
+  "mobile.settings.voice.recognition.parakeetUnifiedReady": "この端末で動作 · 英語のみ",
+  "mobile.settings.voice.recognition.parakeetUnifiedFooter":
+    "Parakeet Unified はデスクトップと同じく、この端末で動作します。英語のみを認識し、句読点を付け、Parakeet v3 より誤りが少なくなります。音声は端末の外に出ません。モデルをダウンロードするまでは、端末の音声認識が聞き取ります。",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "90 以上の言語 · 音声を ElevenLabs に送信",
   "mobile.settings.voice.recognition.model": "音声モデル",
@@ -271,6 +275,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "聞き取り",
   "mobile.settings.voice.tab.speaking": "読み上げ",
+  "mobile.settings.voice.tab.gptLive": "GPT ライブ",
   "mobile.settings.voice.pause.title": "送信までの間",
   "mobile.settings.voice.pause.label": "新しい言葉を待つ時間",
   "mobile.settings.voice.pause.footer":
@@ -279,6 +284,48 @@ export const messages = {
   "mobile.settings.voice.speed.title": "返信の速度",
   "mobile.settings.voice.speed.footer": "OpenBot が読み上げる返信の速度です。音声会話にも適用されます。",
   "mobile.settings.voice.speed.value": "{speed}×",
+  "mobile.settings.voice.gptLive.title": "GPT Live Voice",
+  "mobile.settings.voice.gptLive.footer":
+    "エージェントとの音声会話では、このスマートフォンの代わりに GPT Live Voice が聞き取り、話します。サーバーを実行しているコンピューターの Codex（ChatGPT）のサインインを使います。あなたの声はこのスマートフォンと OpenAI の間で送られ、OpenAI がエージェントの返信を話します。対応したサーバーが必要です。ほかのサーバーではこのスマートフォンの音声を使います。",
+  "mobile.settings.voice.gptLive.automatic": "自動",
+  "mobile.settings.voice.gptLive.choiceFooter":
+    "次の音声会話で OpenAI がこの声で話します。「自動」では OpenAI が声を選びます。",
+  "mobile.settings.voice.gptLive.serversTitle": "サーバー",
+  "mobile.settings.voice.gptLive.serversFooter":
+    "サインインが必要なサーバーをタップすると、Codex を ChatGPT アカウントに接続できます。サーバーのサインインはオーナーと管理者にだけ表示されます。",
+  "mobile.settings.voice.gptLive.status.ready": "準備完了",
+  "mobile.settings.voice.gptLive.status.supported": "対応",
+  "mobile.settings.voice.gptLive.status.offline": "オフライン",
+  "mobile.settings.voice.gptLive.status.update": "そのコンピューターに新しい OpenBot が必要です",
+  "mobile.settings.voice.gptLive.status.signIn": "ChatGPT で Codex にサインイン",
+  "mobile.settings.voice.server.title": "音声サーバー",
+  "mobile.settings.voice.server.row": "OpenAI 互換サーバー",
+  "mobile.settings.voice.server.notSetUp": "未設定",
+  "mobile.settings.voice.server.footer":
+    "デスクトップと同じく、Speaches や Kokoro-FastAPI など、OpenAI の /v1/audio ルートを持つ自分のサーバーです。OpenBot は録音と返信のテキストをそのアドレスにだけ送ります。同じネットワークなど、電話からそのアドレスに接続できる必要があります。",
+  "mobile.settings.voice.server.choice": "自分の音声サーバー",
+  "mobile.settings.voice.server.dictationReady": "音声サーバー · {model}",
+  "mobile.settings.voice.server.dictationOff": "音声サーバーで音声入力を設定してください",
+  "mobile.settings.voice.server.speechReady": "音声サーバー · {model} · {voice}",
+  "mobile.settings.voice.server.speechOff": "音声サーバーで読み上げを設定してください",
+  "mobile.settings.voice.server.address": "アドレス",
+  "mobile.settings.voice.server.addressHint": "API のベースアドレス（例: http://studio.local:8000/v1）。",
+  "mobile.settings.voice.server.apiKey": "API キー（任意）",
+  "mobile.settings.voice.server.apiKeySaved":
+    "このサーバーのキーが保存されています。そのまま使うには空のままにしてください。",
+  "mobile.settings.voice.server.connect": "接続",
+  "mobile.settings.voice.server.connecting": "接続中…",
+  "mobile.settings.voice.server.connectFooter": "接続すると、サーバーで使える音声入力と読み上げを確認できます。",
+  "mobile.settings.voice.server.probeFailed": "音声サーバーに接続できませんでした。",
+  "mobile.settings.voice.server.dictation": "音声入力",
+  "mobile.settings.voice.server.speech": "読み上げ",
+  "mobile.settings.voice.server.missing": "このサーバーにはありません",
+  "mobile.settings.voice.server.saveFailed": "音声サーバーを保存できませんでした。",
+  "mobile.settings.voice.server.remove": "音声サーバーを削除",
+  "mobile.settings.voice.server.removeTitle": "音声サーバーを削除しますか？",
+  "mobile.settings.voice.server.removeBody":
+    "サーバーが聞き取りや読み上げをしていた所は、電話の音声認識と Supertonic 3 が引き継ぎます。API キーはこの電話から削除されます。",
+  "mobile.settings.voice.server.removeFailed": "音声サーバーを削除できませんでした。",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot は 1 回限りのトークンで音声を ElevenLabs にストリーミングし、料金は ElevenLabs のアカウントに請求されます。キーはこの端末に保存されます。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -187,6 +187,13 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs가 API 키를 받아들이지 않았어요.",
   "mobile.chat.liveVoice.elevenLabsPermission": "ElevenLabs 키에 권한이 없어요. 설정 > 음성에서 확인하세요.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs에는 네트워크 연결이 필요해요.",
+  "mobile.chat.liveVoice.voiceServerFailed": "음성 서버가 답장을 읽지 못했어요. 설정 > 음성에서 확인하세요.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "이 서버는 GPT Live Voice를 지원하지 않습니다. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
+  "mobile.chat.liveVoice.gptFailed": "GPT Live Voice를 시작할 수 없습니다. 음소거를 해제하여 다시 시도하세요.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice가 중지되었습니다. 음소거를 해제하면 다시 시작합니다.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "설정에서 OpenBot이 마이크를 사용하도록 허용하세요. 그런 다음 음소거를 해제하여 다시 시도하세요.",
   "mobile.chat.composer.addAttachment": "첨부 파일 추가",
   "mobile.chat.composer.ask": "{name}에게 물어보기",
   "mobile.chat.composer.stopFailed": "에이전트를 중지할 수 없어요. 이미 끝났을 수 있어요.",

@@ -120,6 +120,7 @@ import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -280,6 +281,8 @@ import {
   stageAgentImport,
   stageInstanceTransfer,
   startAgentTask,
+  startLiveVoice,
+  stopLiveVoice,
   type TeamApiRequest,
   TeamRequestError,
 } from "@openbot/team-client/team-api-requests";
@@ -386,6 +389,8 @@ type HostRequestActions = Pick<
   | "loadPlanLimits"
   | "setAgentProviderAccount"
   | "startNewChat"
+  | "startLiveVoice"
+  | "stopLiveVoice"
   | "compactContext"
   | "loadAgentSessionSettings"
   | "loadAgentFolders"
@@ -714,6 +719,7 @@ export function createHostRequestActions({
     canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
     canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
     canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
+    canUseLiveVoice: (serverId) => has(serverId, LIVE_VOICE_CAPABILITY),
     attachmentSupport: (serverId) => {
       const advertised = capabilities.get(serverId) ?? [];
       return {
@@ -1240,6 +1246,17 @@ export function createHostRequestActions({
       requireCapability(capabilities, serverId, CONTEXT_RESET_CAPABILITY, "mobile.agent.newChat.unsupported");
       await runTeamRequest(clearAgentContext(teamApi(serverId), agentId));
     },
+    startLiveVoice: async (input, serverId) =>
+      runTeamRequest(
+        startLiveVoice(capabilityApi(serverId, LIVE_VOICE_CAPABILITY, "mobile.chat.liveVoice.gptUnsupported"), input),
+      ),
+    stopLiveVoice: async (sessionId, serverId) =>
+      runTeamRequest(
+        stopLiveVoice(
+          capabilityApi(serverId, LIVE_VOICE_CAPABILITY, "mobile.chat.liveVoice.gptUnsupported"),
+          sessionId,
+        ),
+      ),
     compactContext: async (agentId, serverId) => {
       requireCapability(capabilities, serverId, CONTEXT_COMPACT_CAPABILITY, "mobile.agent.compact.unsupported");
       await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);

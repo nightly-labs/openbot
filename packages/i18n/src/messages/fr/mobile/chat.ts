@@ -199,6 +199,14 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Il manque une autorisation à la clé ElevenLabs. Vérifiez-la dans Réglages > Voix.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs a besoin d’une connexion réseau.",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "Votre serveur vocal n’a pas pu lire la réponse. Vérifiez-le dans Réglages > Voix.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Ce serveur ne prend pas en charge GPT Live Voice. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
+  "mobile.chat.liveVoice.gptFailed": "GPT Live Voice n’a pas pu démarrer. Réactivez le micro pour réessayer.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice s’est arrêté. Réactivez le micro pour le relancer.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Autorisez OpenBot à utiliser le micro dans Réglages. Puis réactivez le micro pour réessayer.",
   "mobile.chat.composer.addAttachment": "Ajouter une pièce jointe",
   "mobile.chat.composer.ask": "Demander à {name}",
   "mobile.chat.composer.stopFailed": "Impossible d’arrêter l’agent. Il a peut-être déjà terminé.",

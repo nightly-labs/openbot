@@ -24,6 +24,8 @@ import { useText } from "@/shared/lib/text";
 
 /** The hosted Bitwarden service. A self-hosted Vaultwarden server replaces it in the form. */
 const DEFAULT_SERVER_URL = "https://vault.bitwarden.com";
+/** A personal API key of Bitwarden: its client_id starts with `user.`. */
+const CLIENT_ID_PLACEHOLDER = "user.…";
 
 /**
  * Marketplace › Apps › Bitwarden of a joined server (`bitwarden-connector-v1`). The host
@@ -142,6 +144,7 @@ export function BitwardenConnectorPage({
           <SettingsNote>{t("mobile.server.connectors.bitwarden.howItWorks", { host })}</SettingsNote>
           <SheetFormField
             label={t("mobile.server.connectors.bitwarden.serverUrl")}
+            placeholder={DEFAULT_SERVER_URL}
             autoCapitalize="none"
             autoCorrect={false}
             inputMode="url"
@@ -153,6 +156,7 @@ export function BitwardenConnectorPage({
           />
           <SheetFormField
             label={t("mobile.server.connectors.bitwarden.clientId")}
+            placeholder={CLIENT_ID_PLACEHOLDER}
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={BITWARDEN_CONNECTOR_KEY_LIMIT}

@@ -1,9 +1,10 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -16,6 +17,7 @@ import {
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamDiagnostic,
+  type RemoteTeamEvent,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
@@ -98,13 +100,25 @@ interface RemoteTeamTransportProps {
   onMembershipChanged?: () => Promise<void>;
   /** The phone got a network again. */
   onNetworkRestored?: () => void;
-  onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => void;
+  onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
 }
 
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
   | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+
+function isLiveVoiceRoute(path: string): boolean {
+  return path === LIVE_VOICE_ROUTES.start || path === LIVE_VOICE_ROUTES.stop;
+}
+
+/**
+ * The host's sentence for a refused live voice start: no Codex sign-in with ChatGPT on the host, no
+ * event connection, or a timeout. The screen translates it and removes secrets from it.
+ */
+function hostErrorText(body: unknown): string | null {
+  return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
+}
 
 // One object, not a new one for each render.
 const BRIDGE_DOM: DOMProps = {
@@ -266,7 +280,10 @@ export const RemoteTeamTransport = memo(
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
-            throw referencedError(sourceText("error.remote.serverRequestFailed"), referenceFrom("http", result.status));
+            throw referencedError(
+              (isLiveVoiceRoute(path) && hostErrorText(result.body)) || sourceText("error.remote.serverRequestFailed"),
+              referenceFrom("http", result.status),
+            );
           return decode(result.body);
         },
         openBrowserView: (options, listener) => {
@@ -401,8 +418,7 @@ export const RemoteTeamTransport = memo(
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: AgentEvent | TeamRealtimeEvent) =>
-        latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
     }));
 
     return (

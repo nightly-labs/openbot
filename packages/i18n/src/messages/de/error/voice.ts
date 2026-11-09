@@ -31,6 +31,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",
   "error.voice.live.disconnected": "Live-Sprache wurde getrennt.",
+  "error.voice.live.hostFailed":
+    "Codex auf dem Server konnte Live-Sprache nicht starten. Bitte den Eigentümer, Codex auf diesem Computer zu aktualisieren und sich mit ChatGPT anzumelden. Versuche es dann noch einmal.",
   "error.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
   "error.voice.live.off": "Codex-Live-Sprache ist aus. Schalte sie unter Einstellungen → Diktat ein.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -29,6 +29,8 @@ export const messages = {
   "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
   "error.voice.live.failed": "הקול החי נעצר: {reason}",
   "error.voice.live.disconnected": "הקול החי התנתק.",
+  "error.voice.live.hostFailed":
+    "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
   "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
   "error.voice.live.off": "הקול החי של Codex כבוי. אפשר להפעיל אותו בהגדרות ← קול.",
   // The user's own voice server.

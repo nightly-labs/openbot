@@ -49,6 +49,9 @@ import { type RoutineTriggerChoice, RoutineTriggerPicker } from "./routine-trigg
 import { RoutineWebhookActivity } from "./routine-webhook-activity";
 import { type FilterDraft, filterDrafts, RoutineWebhookTrigger } from "./routine-webhook-trigger";
 
+/** An IANA time zone name. */
+const TIME_ZONE_PLACEHOLDER = "Europe/London";
+
 const DEFAULT_SCHEDULE: RoutineSchedule = { kind: "daily", time: "09:00" };
 
 const MISSED_POLICY_TEXT = {
@@ -646,6 +649,7 @@ export function RoutineEditor({
       {!routine ? (
         <SheetFormField
           label={t("mobile.agent.record.timeZone")}
+          placeholder={TIME_ZONE_PLACEHOLDER}
           value={timezone}
           editable={!disabled}
           onChangeText={setTimezone}

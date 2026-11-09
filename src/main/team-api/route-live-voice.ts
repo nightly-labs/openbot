@@ -84,6 +84,8 @@ export interface LiveVoiceRouteOptions {
   sessions: TeamLiveVoiceSessions;
   /** True while the member has an open `live-voice-v1` event connection in the logical session, which carries the transcript. */
   hasEventConnection(teamSessionId: string, memberId: string): boolean;
+  /** Records why Codex could not start a member's session. The member gets a fixed sentence only. */
+  logStartFailure(error: unknown): void;
 }
 
 /**
@@ -142,7 +144,10 @@ export async function routeLiveVoice(
   } catch (error) {
     // A missing Codex sign-in, a timeout or a refused call is a sentence for the member, not a host fault.
     if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
-    throw error;
+    // Any other Codex failure, such as a Codex too old for realtime voice, can name paths of this
+    // computer. The host log keeps it; the member learns where to look.
+    options.logStartFailure(error);
+    throw new HttpError(409, sourceText("error.voice.live.hostFailed"));
   }
   // The connection can close while Codex waits for OpenAI. The close then found no session to stop.
   if (!options.hasEventConnection(sessionId, member.id)) {
