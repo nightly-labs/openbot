@@ -73,6 +73,8 @@ export const messages = {
   "error.agent.endpointRemoved": "이 에이전트가 사용하던 엔드포인트가 제거되었어요. 다른 모델을 선택해 주세요.",
   "error.agent.turnStalled":
     "{provider}이(가) 응답하지 않아 OpenBot이 이 턴을 종료했어요. 메시지를 다시 보내거나 다른 모델을 선택해 주세요.",
+  "error.agent.compactionConnectionLost":
+    "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겨 작업이 멈췄어요. 인터넷 연결을 확인한 다음 메시지를 보내 계속해 주세요.",
   "error.agent.selectedGone": "선택한 에이전트가 더 이상 없어요.",
   "error.agent.profileEndpointsChanged": "생성하는 동안 사용자 지정 엔드포인트가 변경되었어요. 다시 시도해 주세요.",
   "error.agent.profileInvalid": "제공자가 올바르지 않은 프로필을 반환했어요. 프롬프트를 수정해 보세요.",

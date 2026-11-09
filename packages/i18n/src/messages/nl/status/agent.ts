@@ -119,5 +119,7 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.compactionContinues":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
 } as const satisfies PartialTranslation<typeof source>;
