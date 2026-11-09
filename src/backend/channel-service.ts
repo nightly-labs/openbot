@@ -936,15 +936,19 @@ export class ChannelService {
           !previous && referenced && !referenced.taskId && referenced.author.kind === "agent"
             ? eligible.find((agentId) => agentId === referenced.author.id)
             : undefined;
+        // A held reply task still answers the member that waits for it, as the Continue control
+        // keeps it: it keeps its reply message and its reply rules.
+        const heldReply = (item: ChannelTask) =>
+          !referenced && isReplyTask(item) && heldSubtasks.some((task) => task.id === item.id);
         const resumed = continued.map(
           (item, index): ChannelTask => ({
             ...item,
             // The task keeps the request it was made for. The new message is its request now, and the
             // dispatch and the packet give it as a follow-up: "continue" alone is no assignment.
             dependencies: [],
-            requestMessageId: id,
+            requestMessageId: heldReply(item) ? item.requestMessageId : id,
             // A resumed reply task answers the person now, not the member that replied.
-            expectedResult: isReplyTask(item) ? TASK_EXPECTED_RESULT : item.expectedResult,
+            expectedResult: isReplyTask(item) && !heldReply(item) ? TASK_EXPECTED_RESULT : item.expectedResult,
             sourceMessageIds: [...item.sourceMessageIds.slice(-30), id],
             revision: item.revision + 1,
             state: "queued",
