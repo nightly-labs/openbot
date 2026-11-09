@@ -233,6 +233,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "Sprawdzanie klucza",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot sprawdza pierwsze dwa uprawnienia przed zapisaniem klucza.",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs nie odpowiedział. Spróbuj ponownie.",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs odrzucił żądanie: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "Uzyskaj klucz API",
   "mobile.settings.voice.engine.supertonicReady": "Na tym telefonie · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "Wymaga pobrania · {size}",

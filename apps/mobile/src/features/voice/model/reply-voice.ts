@@ -13,6 +13,7 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { liveSpeechParts } from "@/features/chat/model/live-conversation";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
+import { currentText } from "@/shared/lib/text";
 import { ELEVENLABS_SAMPLE_RATE, ElevenLabsError, elevenLabsSpeech } from "./elevenlabs";
 import { speechNative } from "./speech-native";
 import { supertonicModel, useSupertonicModel } from "./supertonic-model";
@@ -24,8 +25,7 @@ const SUPERTONIC_THREADS = 4;
 /** Why a reply was not read to its end. */
 export type ReplyVoiceFailure = "not-ready" | "language" | "speech" | "invalid-key" | "permission" | "network";
 
-/** What a surface says when a reply or a sample is not read to its end. */
-export const REPLY_VOICE_FAILURE_TEXT = {
+const REPLY_VOICE_FAILURE_TEXT = {
   "not-ready": "mobile.chat.liveVoice.voiceNotReady",
   language: "mobile.chat.liveVoice.languageUnsupported",
   speech: "mobile.chat.liveVoice.speakFailed",
@@ -33,6 +33,15 @@ export const REPLY_VOICE_FAILURE_TEXT = {
   permission: "mobile.chat.liveVoice.elevenLabsPermission",
   network: "mobile.chat.liveVoice.networkNeeded",
 } as const satisfies Record<ReplyVoiceFailure, MobileTextKey>;
+
+/**
+ * What a surface says when a reply or a sample is not read to its end. The reason that ElevenLabs
+ * gave, such as a plan that does not allow the voice, replaces the general text.
+ */
+export function replyVoiceFailureText(failure: ReplyVoiceFailure, reason: string | null): string {
+  const { t } = currentText();
+  return reason ? t("mobile.settings.voice.elevenLabs.refused", { reason }) : t(REPLY_VOICE_FAILURE_TEXT[failure]);
+}
 
 /** A voice to read with in place of the one in the settings, such as a voice the user previews. */
 export type ReplyVoiceChoice =
@@ -53,7 +62,8 @@ type ReplyHandlers = {
   onPart: (text: string) => void;
   /** The reading ended: it played to its end, or a newer reading stopped it. */
   onDone: () => void;
-  onError: (failure: ReplyVoiceFailure) => void;
+  /** `reason` is the reason that ElevenLabs gave, when it gave one. */
+  onError: (failure: ReplyVoiceFailure, reason: string | null) => void;
 };
 
 /** The chosen voice can read now: Supertonic 3 is downloaded, or ElevenLabs has a key and a voice. */
@@ -148,7 +158,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   const release = () => {
     if (replaceActive === replace) replaceActive = null;
   };
-  const end = (failure?: ReplyVoiceFailure) => {
+  const end = (failure?: ReplyVoiceFailure, reason: string | null = null) => {
     if (ended) return;
     ended = true;
     release();
@@ -157,7 +167,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     wake?.();
     if (failure) {
       native?.stop();
-      handlers.onError(failure);
+      handlers.onError(failure, reason);
     } else handlers.onDone();
   };
   const listener: Listener = {
@@ -261,7 +271,8 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
       await (engine === "elevenlabs" ? playElevenLabs() : playSupertonic());
     } catch (error) {
       if (ended) return;
-      end(error instanceof ElevenLabsError ? elevenLabsFailure(error.code) : "speech");
+      if (error instanceof ElevenLabsError) end(elevenLabsFailure(error.code), error.reason);
+      else end("speech");
     }
   }
 

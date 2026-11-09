@@ -216,6 +216,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "正在测试密钥",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot 会在保存前测试前两项权限。",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs 没有响应，请重试。",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs 拒绝了请求：{reason}",
   "mobile.settings.voice.elevenLabs.getKey": "获取 API 密钥",
   "mobile.settings.voice.engine.supertonicReady": "在这部手机上 · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "需要下载 · {size}",

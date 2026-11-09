@@ -224,6 +224,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "בודק את המפתח",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot בודק את שתי ההרשאות הראשונות לפני שהוא שומר את המפתח.",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs לא ענה. אפשר לנסות שוב.",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs דחתה את הבקשה: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "קבלת מפתח API",
   "mobile.settings.voice.engine.supertonicReady": "בטלפון הזה · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "נדרשת הורדה · {size}",

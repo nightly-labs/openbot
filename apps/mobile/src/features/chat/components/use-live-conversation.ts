@@ -22,7 +22,7 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
+import { type ReplyReading, replyVoiceFailureText, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
@@ -376,10 +376,10 @@ function createController({
         onDone: () => {
           if (own === generation && open) listen();
         },
-        onError: (failure) => {
+        onError: (failure, reason) => {
           if (own !== generation || !open) return;
           listen();
-          update({ error: currentText().t(REPLY_VOICE_FAILURE_TEXT[failure]) });
+          update({ error: replyVoiceFailureText(failure, reason) });
         },
       });
     }

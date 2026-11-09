@@ -22,11 +22,36 @@ const MISSING_PERMISSION = {
 
 type ElevenLabsFailure = "invalid-key" | (typeof MISSING_PERMISSION)[ElevenLabsPermission] | "network" | "failed";
 
-/** Why a request failed. It never holds the key or the response text, which can echo the request. */
+/** The longest ElevenLabs reason that the phone shows. */
+const REASON_MAX_LENGTH = 300;
+
+/**
+ * Why a request failed. `reason` is the `detail.message` that ElevenLabs sends with a refusal, such
+ * as a plan that does not allow a voice, with the key removed. The message stays the code, so a log
+ * never holds the reason.
+ */
 export class ElevenLabsError extends Error {
-  constructor(readonly code: ElevenLabsFailure) {
+  constructor(
+    readonly code: ElevenLabsFailure,
+    readonly reason: string | null = null,
+  ) {
     super(code);
   }
+}
+
+/** The `detail` of an ElevenLabs error answer: `{ status, message }`, or one text. */
+function errorDetail(body: string, key: string): { status: string | null; reason: string | null } {
+  let answer: unknown;
+  try {
+    answer = JSON.parse(body);
+  } catch {
+    return { status: null, reason: null };
+  }
+  const detail = isDynamicRecord(answer) ? answer.detail : null;
+  const status = isDynamicRecord(detail) && isString(detail.status) ? detail.status : null;
+  const message = isString(detail) ? detail : isDynamicRecord(detail) && isString(detail.message) ? detail.message : "";
+  const reason = (key ? message.replaceAll(key, "…") : message).trim().slice(0, REASON_MAX_LENGTH);
+  return { status, reason: reason || null };
 }
 
 async function request(
@@ -42,16 +67,18 @@ async function request(
     if (init.signal?.aborted) throw error;
     throw new ElevenLabsError("network");
   }
+  if (response.ok) return response;
+  const body = await response.text().catch(() => "");
+  const { status, reason } = errorDetail(body, key);
   if (response.status === 401 || response.status === 403) {
-    // A restricted key without the permission answers `missing_permissions` and names it. Only the
-    // presence of that name is read; the text itself is not kept.
-    const body = await response.text().catch(() => "");
+    // A restricted key without the permission answers `missing_permissions` and names it.
     if (body.includes("missing_permissions") || body.includes(permission))
       throw new ElevenLabsError(MISSING_PERMISSION[permission]);
-    throw new ElevenLabsError("invalid-key");
+    // A valid key can also be refused, for example when ElevenLabs stops the free plan of an
+    // account. Its own reason is then more accurate than "invalid key".
+    if (status === "invalid_api_key" || !reason) throw new ElevenLabsError("invalid-key");
   }
-  if (!response.ok) throw new ElevenLabsError("failed");
-  return response;
+  throw new ElevenLabsError("failed", reason);
 }
 
 /** The voices of the account: premade, cloned and saved. A key that lists none is still valid. */
