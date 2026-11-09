@@ -184,8 +184,8 @@ export interface SaveCustomProviderInput {
 }
 
 /**
- * Renderer to main, on this computer only: the Team API has no edit route. The id names a saved
- * endpoint and does not change. A field that is absent keeps its stored value, so the form can send
+ * Renderer to main, for this computer or for a joined server's host with `custom-provider-edit-v1`.
+ * The id names a saved endpoint and does not change. A field that is absent keeps its stored value, so the form can send
  * a blank key without discarding the key that the user does not type again. `headers` replaces the
  * saved list: a header with a `null` value keeps its saved value, and a saved header that is not in
  * the list is removed. There is no way to clear a stored key here: remove the endpoint and add it
@@ -198,7 +198,7 @@ export interface UpdateCustomProviderInput {
   models: CustomProviderModel[];
   apiKey?: string;
   headers?: CustomProviderHeaderInput[];
-  /** Absent: the saved harness stays. */
+  /** Absent: the saved harness stays. This computer only: a host keeps the harness on a Team API edit. */
   harness?: CustomProviderHarness;
 }
 
@@ -214,7 +214,7 @@ export interface CustomProviderSummary {
   hasApiKey: boolean;
   /**
    * The names of the saved headers, so Edit can show them. The values never come back. Absent in a
-   * Team API list, which keeps its released fields.
+   * `providers-v1` or `custom-provider-harness-v1` list, which keeps its released fields.
    */
   headerNames?: string[];
   /**

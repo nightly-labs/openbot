@@ -326,6 +326,13 @@ export const messages = {
   "server.settings.memoryReviewOff": "Desactivada",
   "server.settings.memoryReviewTurns": { one: "Cada {count} turno", other: "Cada {count} turnos" },
   "server.settings.memoryReviewLoadFailed": "No se pudo cargar el ajuste de revisión de recuerdos.",
+  "server.settings.skillLearning": "Aprendizaje de habilidades",
+  "server.settings.skillLearningDescription":
+    "Si los agentes de este servidor guardan lo que aprenden como habilidades.",
+  "server.settings.skillLearningAutomatic": "Automático",
+  "server.settings.skillLearningAsk": "Preguntar antes",
+  "server.settings.skillLearningOff": "Desactivado",
+  "server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
   "server.settings.remoteOnline": "El host está en línea. Su propietario controla la publicación.",
   "server.settings.remoteOffline": "El host está sin conexión. Su propietario controla la publicación.",
   "server.settings.reachable": "Accesible en línea. Solo las personas invitadas pueden iniciar sesión.",

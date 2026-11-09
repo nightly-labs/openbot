@@ -40,12 +40,16 @@ function chatMessage(message: ConversationMessage): boolean {
 }
 
 /** The chat messages that fit the budget, newest last, each with the name of its writer. */
-export function chatTranscript(agent: AgentSummary, messages: readonly ConversationMessage[]) {
+export function chatTranscript(
+  agent: Pick<AgentSummary, "name">,
+  messages: readonly ConversationMessage[],
+  budget = CHAT_CHARACTERS,
+) {
   const entries: { from: string; text: string }[] = [];
   let characters = 0;
   for (const message of [...messages].filter(chatMessage).reverse()) {
     const text = message.text.slice(0, MESSAGE_CHARACTERS);
-    if (characters + text.length > CHAT_CHARACTERS) break;
+    if (characters + text.length > budget) break;
     characters += text.length;
     const from =
       message.author === "user"

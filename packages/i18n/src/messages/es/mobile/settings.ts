@@ -314,6 +314,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "En este teléfono · solo inglés",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified funciona en este teléfono, como en el escritorio. Solo entiende inglés, con puntuación y menos errores que Parakeet v3, y tu voz se queda en el teléfono. Hasta que se descargue el modelo, escucha el reconocedor del teléfono.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "En este teléfono · también chino mezclado con inglés",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR funciona en este teléfono. Reconoce el idioma que hablas, entre 30 idiomas y 22 dialectos chinos, también cuando mezclas chino e inglés en una frase. Tu voz se queda en el teléfono. Hasta que se descargue el modelo, escucha el reconocedor del teléfono.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "Más de 90 idiomas · envía tu voz a ElevenLabs",
   "mobile.settings.voice.recognition.model": "Modelo de voz",

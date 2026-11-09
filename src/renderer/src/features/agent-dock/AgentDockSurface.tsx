@@ -1,6 +1,18 @@
-import type { AgentDockAction, AgentDockPresentation } from "@openbot/contracts/ipc";
+import type {
+  AgentDockAction,
+  AgentDockChannel,
+  AgentDockPresentation,
+  AgentDockSeatRef as AgentDockSeatContract,
+} from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
-import { AgentDock, type AgentDockChatModel, type AgentDockSeat } from "@openbot/ui/features/agent-dock/AgentDock";
+import {
+  AgentDock,
+  type AgentDockChatModel,
+  type AgentDockSeat,
+  type AgentDockSeatRef,
+  type AgentDockChannel as AgentDockUiChannel,
+  agentDockSeatKey,
+} from "@openbot/ui/features/agent-dock/AgentDock";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { agentDockPort } from "./agent-dock-port";
@@ -41,8 +53,8 @@ export function AgentDockSurface() {
   let autoHide = false;
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
   let sent = { interactive: false, keyboard: false };
-  /** A retry of a failed draft keeps its id, so the agent gets the message once. */
-  let failed: { agentId: string; text: string; clientMessageId: string } | null = null;
+  /** A retry of a failed draft keeps its id, so the agent or the channel gets the message once. */
+  let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
     received = true;
@@ -144,33 +156,37 @@ export function AgentDockSurface() {
     presentation()?.edge === "left" ? event.clientX < EDGE_STRIP : event.clientX >= window.innerWidth - EDGE_STRIP;
 
   const seats = createMemo((): AgentDockSeat[] =>
-    (presentation()?.seats ?? []).map((seat) => ({
-      agent: seat.agent,
-      mood: seat.mood,
-      state: seat.state ?? undefined,
-    })),
+    (presentation()?.seats ?? []).map(
+      (seat): AgentDockSeat =>
+        seat.kind === "agent"
+          ? { kind: "agent", agent: seat.agent, mood: seat.mood, state: seat.state ?? undefined }
+          : { kind: "channel", channel: uiChannel(seat.channel), state: seat.state ?? undefined },
+    ),
   );
+  const availableChannels = createMemo(() => (presentation()?.availableChannels ?? []).map(uiChannel));
   const chats = createMemo(() => {
-    const byAgent = new Map<string, AgentDockChatModel>();
+    const bySeat = new Map<string, AgentDockChatModel>();
     for (const chat of presentation()?.chats ?? []) {
       const messages = chat.messages.map(
         (message): AgentMessage => ({
           id: message.id,
           author: message.author,
+          ...(message.senderAgentId ? { senderAgentId: message.senderAgentId } : {}),
+          ...(message.senderMember ? { senderMember: message.senderMember } : {}),
           kind: message.kind,
           body: message.body,
           time: "",
           attachments: message.attachments,
         }),
       );
-      byAgent.set(chat.agentId, { messages, working: chat.working, wait: chat.wait });
+      bySeat.set(agentDockSeatKey(chat.seat), { messages, working: chat.working, wait: chat.wait });
     }
-    return byAgent;
+    return bySeat;
   });
   const agents = createMemo(() => [...(presentation()?.agents ?? [])]);
   const results = createMemo(() => [...(presentation()?.results ?? [])]);
-  const chat = (agentId: string): AgentDockChatModel =>
-    chats().get(agentId) ?? { messages: [], working: false, wait: null };
+  const chat = (seat: AgentDockSeatRef): AgentDockChatModel =>
+    chats().get(agentDockSeatKey(seat)) ?? { messages: [], working: false, wait: null };
 
   const serverId = createMemo(() => presentation()?.serverId ?? null);
   const voice = createAgentDockVoice(() => serverId() ?? "local");
@@ -189,6 +205,7 @@ export function AgentDockSurface() {
         <AgentDock
           seats={seats()}
           available={presentation()?.available ?? []}
+          availableChannels={availableChannels()}
           chat={chat}
           closeRequest={closeRequest()}
           voice={voice}
@@ -201,29 +218,40 @@ export function AgentDockSurface() {
               .agentDock.drag(phase)
               .catch(() => undefined);
           }}
-          onOpenChange={(agentId) => {
-            chatOpen = agentId !== null;
+          onOpenChange={(seat) => {
+            chatOpen = seat !== null;
             sync();
-            void perform({ type: "open-chat", serverId: server, agentId }).catch(() => undefined);
+            void perform({ type: "open-chat", serverId: server, seat: seat && contractSeat(seat) }).catch(
+              () => undefined,
+            );
           }}
-          onAdd={(agentId) => void perform({ type: "add", serverId: server, agentId }).catch(() => undefined)}
-          onRemove={(agentId) => void perform({ type: "remove", serverId: server, agentId }).catch(() => undefined)}
-          onSend={async (agentId, text) => {
+          onAdd={(seat) =>
+            void perform({ type: "add", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
+          }
+          onRemove={(seat) =>
+            void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
+          }
+          onSend={async (seat, text) => {
+            const seatKey = agentDockSeatKey(seat);
             const clientMessageId =
-              failed && failed.agentId === agentId && failed.text === text
+              failed && failed.seatKey === seatKey && failed.text === text
                 ? failed.clientMessageId
                 : crypto.randomUUID();
             try {
-              await perform({ type: "send", serverId: server, agentId, text, clientMessageId });
+              await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
               failed = null;
               return { messageId: clientMessageId };
             } catch (error) {
-              failed = { agentId, text, clientMessageId };
+              failed = { seatKey, text, clientMessageId };
               return { error: errorMessage(error, t("chat.errorStatus.send")) };
             }
           }}
-          onOpenInMain={(agentId) =>
-            void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
+          onOpenInMain={(seat) =>
+            void perform(
+              seat.kind === "channel"
+                ? { type: "open-channel", serverId: server, channelId: seat.id }
+                : { type: "open-agent", serverId: server, agentId: seat.id },
+            ).catch(() => undefined)
           }
           onOpenWindow={(agentId) =>
             void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
@@ -244,4 +272,14 @@ export function AgentDockSurface() {
       )}
     </Show>
   );
+}
+
+/** The members of a channel as the shared channel avatar reads them. */
+function uiChannel(channel: AgentDockChannel): AgentDockUiChannel {
+  return { ...channel, members: channel.members.map((agentId) => ({ agentId })) };
+}
+
+/** A plain seat for the action: the dock state can hold a store copy. */
+function contractSeat(seat: AgentDockSeatRef): AgentDockSeatContract {
+  return seat.kind === "channel" ? { kind: "channel", id: seat.id } : { kind: "agent", id: seat.id };
 }

@@ -8,6 +8,12 @@ import { PluginIcon } from "../marketplace/PluginIcon";
 export type MarketplaceSuggestionKind = "app" | "skill";
 
 /**
+ * What the action of a skill card does: install a listing, save a new skill from the chat, or add
+ * the chat's lesson to a skill the agent has.
+ */
+export type MarketplaceSuggestionSkillAction = "install" | "save" | "update";
+
+/**
  * Where the suggested listing is for this user. `attention` is an app whose connection needs a new
  * sign-in. `unavailable` cannot be connected here, for example by a member of a joined server.
  */
@@ -16,8 +22,15 @@ export type MarketplaceSuggestionState = "available" | "busy" | "connected" | "a
 export interface MarketplaceSuggestionCardProps {
   kind: MarketplaceSuggestionKind;
   name: string;
-  /** The one line under the name: the listing tagline. */
+  /** The line under the name: the listing tagline. */
   description: string;
+  /**
+   * The description is a question that the user answers with the action. It shows in full under the
+   * name, and the action goes under it, so a long question keeps the width of the card.
+   */
+  fullDescription?: boolean;
+  /** The action of a skill card. Install when absent. */
+  skillAction?: MarketplaceSuggestionSkillAction;
   iconUrl: string | null;
   /** Drawn instead of the icon: the mark of an app with no listing icon, such as GitHub. */
   mark?: JSX.Element | undefined;
@@ -41,12 +54,19 @@ export interface MarketplaceSuggestionCardProps {
 export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
+  const questionId = createUniqueId();
+  const describedBy = () => (props.fullDescription ? questionId : undefined);
   /* Dismiss and Undo replace each other, so the focus moves to the control that is there now. */
   let dismissButton: HTMLButtonElement | undefined;
   let undoButton: HTMLButtonElement | undefined;
   /* The action animates only a change that the user started here. A card that opens connected, or
      that reads its state late, shows the state with no motion. */
   const [moving, setMoving] = createSignal(false);
+  const action = (placement: string) => (
+    <div class={placement} role="status">
+      <SuggestionAction {...props} onStart={() => setMoving(true)} />
+    </div>
+  );
   return (
     <Show
       when={!props.dismissed}
@@ -73,6 +93,7 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
       <article
         class="conversation-interaction-card marketplace-suggestion"
         aria-labelledby={titleId}
+        aria-describedby={describedBy()}
         data-state={props.state}
         data-motion={moving() ? "" : undefined}
       >
@@ -103,11 +124,11 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
                 </Button>
               </Show>
             </h3>
-            <span class="marketplace-suggestion-description">{props.description}</span>
+            <Show when={!props.fullDescription}>
+              <span class="marketplace-suggestion-description">{props.description}</span>
+            </Show>
           </div>
-          <div class="marketplace-suggestion-action" role="status">
-            <SuggestionAction {...props} onStart={() => setMoving(true)} />
-          </div>
+          <Show when={!props.fullDescription}>{action("marketplace-suggestion-action")}</Show>
           {/* A connected card has nothing to dismiss. The stylesheet folds the button away, so the
               action moves to the edge instead of a jump. */}
           <Show when={props.onDismiss}>
@@ -126,6 +147,12 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
             </IconButton>
           </Show>
         </header>
+        <Show when={props.fullDescription}>
+          <p id={questionId} class="marketplace-suggestion-question">
+            {props.description}
+          </p>
+          {action("marketplace-suggestion-action marketplace-suggestion-footer")}
+        </Show>
         <Show when={props.state === "unavailable" && props.unavailableText}>
           <p class="marketplace-suggestion-unavailable">
             <Lock aria-hidden="true" />
@@ -149,18 +176,32 @@ function SuggestionAction(props: MarketplaceSuggestionCardProps & { onStart: () 
   const startable = () => props.state === "available" || props.state === "attention";
   const shown = () => done() || Boolean(props.onConnect && props.state !== "unavailable");
   const variant = () => (props.state === "attention" ? "outline" : "default");
+  const skillAction = () => props.skillAction ?? "install";
   const label = () => {
     if (done()) return undefined;
-    if (!app()) return t("chat.suggestion.installNamed", { name: props.name });
+    if (!app()) {
+      if (skillAction() === "save") return t("chat.suggestion.saveNamed", { name: props.name });
+      if (skillAction() === "update") return t("chat.suggestion.updateNamed", { name: props.name });
+      return t("chat.suggestion.installNamed", { name: props.name });
+    }
     return props.state === "attention"
       ? t("marketplace.app.reconnectNamed", { name: props.name })
       : t("marketplace.app.connectNamed", { name: props.name });
   };
   const text = () => {
-    if (!app()) return t("chat.suggestion.install");
+    if (!app()) {
+      if (skillAction() === "save") return t("chat.suggestion.save");
+      if (skillAction() === "update") return t("chat.suggestion.update");
+      return t("chat.suggestion.install");
+    }
     return props.state === "attention" ? t("marketplace.app.reconnect") : t("marketplace.app.connect");
   };
-  const doneText = () => (app() ? t("marketplace.app.connected") : t("chat.suggestion.installed"));
+  const doneText = () => {
+    if (app()) return t("marketplace.app.connected");
+    if (skillAction() === "save") return t("chat.suggestion.saved");
+    if (skillAction() === "update") return t("chat.suggestion.updated");
+    return t("chat.suggestion.installed");
+  };
   const [widths, setWidths] = createStore({ start: 0, done: 0 });
   // `Show` builds the button again when it comes back, so a layer drops the observer of its old element.
   const observers: Partial<Record<"start" | "done", ResizeObserver>> = {};

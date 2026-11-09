@@ -9,6 +9,7 @@ export const messages = {
   "error.vault.valueTooLong": "אחד הערכים ארוך מדי.",
   "error.vault.websiteInvalid": "יש להזין כתובת אתר HTTPS.",
   "error.vault.passwordRequired": "יש להזין סיסמה.",
+  "error.vault.twoStepKeyInvalid": "זה לא מפתח אימות דו־שלבי. יש להזין את מפתח ההגדרה או את קישור otpauth:// של האתר.",
   "error.vault.cardNumberInvalid": "יש להזין מספר כרטיס תקין.",
   "error.vault.securityCodeInvalid": "יש להזין קוד אבטחה בן 3 או 4 ספרות.",
   "error.vault.expiryInvalid": "יש להזין חודש ושנה תקינים לתפוגה.",

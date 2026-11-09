@@ -60,9 +60,15 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
       : [];
   });
 
+  /** The list shows agents only. A change keeps the channel seats where they are. */
   function setOnDock(serverId: string, agentId: string, onDock: boolean): void {
     const current = seats();
-    setAgentDockSeats(serverId, onDock ? [...current, agentId] : current.filter((id) => id !== agentId));
+    setAgentDockSeats(
+      serverId,
+      onDock
+        ? [...current, { kind: "agent", id: agentId }]
+        : current.filter((seat) => seat.kind !== "agent" || seat.id !== agentId),
+    );
   }
 
   return (
@@ -164,7 +170,7 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
                 {(agent) => (
                   <DockAgentRow
                     agent={agent}
-                    onDock={seats().includes(agent.id)}
+                    onDock={seats().some((seat) => seat.kind === "agent" && seat.id === agent.id)}
                     disabled={!preference().shown}
                     onChange={(onDock) => setOnDock(server().id, agent.id, onDock)}
                   />
