@@ -100,6 +100,8 @@ import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   decodeChannel,
   IPC_ENDPOINTS,
+  isGroqVoiceModelId,
+  isLocalVoiceModelId,
   isManagedToolRuntime,
   isUpdateBusyPhase,
   LOCAL_SERVER_ID,
@@ -395,6 +397,7 @@ import {
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 import { VaultService } from "./vault-service";
 import { VaultStore } from "./vault-store";
+import { VideoReader } from "./video-reader";
 import { VoiceApiKeyStore } from "./voice-api-key-store";
 import { openScribeSocket } from "./voice-cloud-stream";
 import {
@@ -404,6 +407,7 @@ import {
   PARAKEET_UNIFIED_MODEL_DIRECTORY,
   removeLegacyWhisperCache,
   SUPERTONIC_MODEL_DIRECTORY,
+  VoiceOperationError,
   WHISPER_TURBO_MODEL_DIRECTORY,
 } from "./voice-model-service";
 import { VoicePreferenceStore } from "./voice-preference-store";
@@ -1966,6 +1970,27 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    videoReader: new VideoReader({
+      runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
+      target: runtimeTarget(process.platform, process.arch),
+      // The voice services start after the agents; an agent turn runs only later. The sound takes
+      // the route of dictation. A video never starts a model download: only a model that the user
+      // set up transcribes it. ElevenLabs takes a stream, not a recording.
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
+          Effect.flatMap((status) =>
+            status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId))
+              ? voice.transcribe(audio)
+              : Effect.fail(
+                  new VoiceOperationError({
+                    cause: new Error("No speech recognition model for recordings is set up in Settings → Voice."),
+                  }),
+                ),
+          ),
+        );
+      },
+    }),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),
     marketplaceAppServer: (appId) => {

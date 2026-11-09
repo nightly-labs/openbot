@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Espera a que termine la transcripción de voz y luego quita el modelo.",
   "error.voice.removeFailed": "No se pudo quitar el modelo de voz. Inténtalo de nuevo.",
   "error.voice.runtimeUnavailable": "La transcripción de voz local no está disponible en esta plataforma.",
-  "error.voice.busy": "Ya hay una transcripción de voz en curso.",
   "error.voice.modelUnavailable": "El modelo de voz no está disponible.",
   "error.voice.transcriptionTimedOut": "Se agotó el tiempo de la transcripción de voz.",
   "error.voice.prepareRequired":

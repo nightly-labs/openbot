@@ -8,7 +8,6 @@ export const messages = {
   "error.voice.removeBusy": "יש להמתין לסיום תמלול הקול ואז להסיר את המודל.",
   "error.voice.removeFailed": "לא ניתן להסיר את מודל הקול. יש לנסות שוב.",
   "error.voice.runtimeUnavailable": "תמלול קול מקומי אינו זמין בפלטפורמה הזו.",
-  "error.voice.busy": "תמלול קול כבר מתבצע.",
   "error.voice.modelUnavailable": "מודל הקול אינו זמין.",
   "error.voice.transcriptionTimedOut": "תמלול הקול חרג מהזמן המותר.",
   "error.voice.prepareRequired": "תמלול קול מקומי אינו זמין. יש להריץ `bun run voice:prepare` ולהפעיל מחדש את OpenBot.",

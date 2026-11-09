@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "음성 받아쓰기가 끝날 때까지 기다린 후 모델을 삭제해 주세요.",
   "error.voice.removeFailed": "음성 모델을 삭제할 수 없어요. 다시 시도해 주세요.",
   "error.voice.runtimeUnavailable": "이 플랫폼에서는 로컬 음성 받아쓰기를 사용할 수 없어요.",
-  "error.voice.busy": "음성 받아쓰기가 이미 진행 중이에요.",
   "error.voice.modelUnavailable": "음성 모델을 사용할 수 없어요.",
   "error.voice.transcriptionTimedOut": "음성 받아쓰기 시간이 초과되었어요.",
   "error.voice.prepareRequired":

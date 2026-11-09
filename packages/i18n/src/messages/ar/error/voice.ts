@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "انتظر حتى ينتهي التفريغ الصوتي، ثم أزل النموذج.",
   "error.voice.removeFailed": "تعذّرت إزالة نموذج الصوت. أعد المحاولة.",
   "error.voice.runtimeUnavailable": "التفريغ الصوتي المحلي غير متاح على هذا النظام.",
-  "error.voice.busy": "يوجد تفريغ صوتي قيد التنفيذ بالفعل.",
   "error.voice.modelUnavailable": "نموذج الصوت غير متاح.",
   "error.voice.transcriptionTimedOut": "انتهت مهلة التفريغ الصوتي.",
   "error.voice.prepareRequired": "التفريغ الصوتي المحلي غير متاح. شغّل `bun run voice:prepare` وأعد تشغيل OpenBot.",

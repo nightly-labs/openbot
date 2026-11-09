@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Дождитесь окончания расшифровки голоса, затем удалите модель.",
   "error.voice.removeFailed": "Не удалось удалить голосовую модель. Повторите попытку.",
   "error.voice.runtimeUnavailable": "Локальная расшифровка голоса недоступна на этой платформе.",
-  "error.voice.busy": "Расшифровка голоса уже выполняется.",
   "error.voice.modelUnavailable": "Голосовая модель недоступна.",
   "error.voice.transcriptionTimedOut": "Время расшифровки голоса истекло.",
   "error.voice.prepareRequired":
