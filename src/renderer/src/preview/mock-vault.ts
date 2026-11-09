@@ -5,7 +5,15 @@ import {
   type VaultSaveInput,
   type VaultSecretField,
   type VaultState,
+  type VaultTwoStepCode,
 } from "@openbot/contracts/ipc";
+import {
+  normalizeTwoStepKey,
+  parseTwoStepKey,
+  twoStepCode,
+  twoStepRemainingMs,
+} from "@openbot/contracts/two-step-code";
+import { sourceText } from "@openbot/i18n/source";
 
 function brandOf(number: string): "visa" | "mastercard" | "amex" | "discover" | null {
   if (number.startsWith("4")) return "visa";
@@ -22,6 +30,7 @@ function brandOf(number: string): "visa" | "mastercard" | "amex" | "discover" | 
 export function createMockVault(): OpenBotDesktopApi["vault"] {
   let state: VaultState = EMPTY_VAULT;
   const secrets = new Map<string, Partial<Record<VaultSecretField, string>>>();
+  const twoStepKeys = new Map<string, string>();
   const listeners = new Set<(state: VaultState) => void>();
   let nextId = 1;
   const change = (items: VaultItemSummary[]) => {
@@ -34,8 +43,14 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
     if (input.kind === "login") {
       if (input.password !== null) saved.password = input.password;
       secrets.set(id, saved);
-      const { password: _password, ...login } = input;
-      return { ...login, id, hasPassword: Boolean(saved.password) };
+      if (input.twoStepKey === "") twoStepKeys.delete(id);
+      else if (input.twoStepKey !== undefined) {
+        const key = normalizeTwoStepKey(input.twoStepKey);
+        if (!key) throw new Error(sourceText("error.vault.twoStepKeyInvalid"));
+        twoStepKeys.set(id, key);
+      }
+      const { password: _password, twoStepKey: _twoStepKey, ...login } = input;
+      return { ...login, id, hasPassword: Boolean(saved.password), hasTwoStep: twoStepKeys.has(id) };
     }
     if (input.kind === "card") {
       if (input.number !== null) saved.number = input.number.replace(/\D/gu, "");
@@ -61,11 +76,28 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
   };
   const remove = async (id: string) => {
     secrets.delete(id);
+    twoStepKeys.delete(id);
     return change(state.items.filter((item) => item.id !== id));
   };
   const reveal = async ({ id, field }: { id: string; field: VaultSecretField }) => secrets.get(id)?.[field] ?? "";
+  const codes = async () => {
+    const at = Date.now();
+    const list: VaultTwoStepCode[] = [];
+    for (const [id, text] of twoStepKeys) {
+      const key = parseTwoStepKey(text);
+      if (key)
+        list.push({
+          id,
+          code: await twoStepCode(key, at),
+          period: key.period,
+          remainingMs: twoStepRemainingMs(key.period, at),
+        });
+    }
+    return { codes: list };
+  };
   const reset = async () => {
     secrets.clear();
+    twoStepKeys.clear();
     return change([]);
   };
   return {
@@ -90,12 +122,14 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
       return { imported: 1, skipped: 0, state: change([...state.items, item]) };
     },
     reset,
+    codes,
     hostList: async () => state,
     hostSave: (input) => save(input),
     hostDelete: (id) => remove(id),
     hostReveal: (request) => reveal(request),
     hostCopy: async () => undefined,
     hostReset: () => reset(),
+    hostCodes: () => codes(),
     onChanged: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

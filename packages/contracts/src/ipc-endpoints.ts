@@ -560,7 +560,7 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
-import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
+import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
   SpeechApiKeyInput,
   SpeechAudio,
@@ -1423,7 +1423,8 @@ export const IPC_ENDPOINTS = {
   // The Vault of this computer. Lists carry no password, card number or security code: `reveal`
   // returns one when the user asks, and `copy` writes one to the clipboard in main. The `host*`
   // endpoints do the same for one server: a joined server answers through `vault-v1`, to an owner
-  // or admin. It has no CSV import, as the file is on this computer.
+  // or admin. It has no CSV import, as the file is on this computer. `codes` returns the current
+  // two-step code of each login that has a key; the key never comes to the renderer.
   vault: {
     list: request<undefined, VaultState>()("vault:list"),
     save: request<VaultSaveInput, VaultState>()("vault:save"),
@@ -1432,6 +1433,7 @@ export const IPC_ENDPOINTS = {
     copy: request<VaultSecretRequest, void>()("vault:copy"),
     importCsv: request<undefined, VaultImportResult>()("vault:import-csv"),
     reset: request<undefined, VaultState>()("vault:reset"),
+    codes: request<undefined, VaultTwoStepCodes>()("vault:codes"),
     changed: event<VaultState>()("vault:changed"),
     hostList: scopedQuery<VaultState, "required">()("vault:host-list"),
     hostSave: scopedRequest<VaultSaveInput, VaultState, "required">()("vault:host-save"),
@@ -1439,6 +1441,7 @@ export const IPC_ENDPOINTS = {
     hostReveal: scopedRequest<VaultSecretRequest, string, "required">()("vault:host-reveal"),
     hostCopy: scopedRequest<VaultSecretRequest, void, "required">()("vault:host-copy"),
     hostReset: scopedQuery<VaultState, "required">()("vault:host-reset"),
+    hostCodes: scopedQuery<VaultTwoStepCodes, "required">()("vault:host-codes"),
   },
   // The 1Password connection of this computer. The token goes from the renderer to main once, in
   // `connectWithToken`; every answer is the status only. The `host*` endpoints do the same for a
