@@ -22,14 +22,34 @@ export function skillSuggestionMessages(messages: readonly ConversationMessage[]
   return messages.filter((message) => skillSuggestionTarget(message) !== null);
 }
 
-/** True when a skill line after the suggestion at `index` shows the skill that it asks for. */
+/**
+ * True when a skill line after the suggestion at `index` shows the skill that it asks for. A new
+ * skill counts when it has the suggested name, or when the agent made it in answer to the first user
+ * message after the suggestion: only that message carries the suggestion to the agent.
+ */
 export function skillSuggestionSaved(messages: readonly ConversationMessage[], index: number): boolean {
-  const target = messages[index] ? skillSuggestionTarget(messages[index]) : null;
+  const suggestion = messages[index];
+  const target = suggestion ? skillSuggestionTarget(suggestion) : null;
   if (!target) return false;
-  return messages.slice(index + 1).some((later) => {
+  const name = suggestion?.skillSuggestion?.name;
+  let answers = 0;
+  for (const later of messages.slice(index + 1)) {
+    if (later.author === "user") answers += 1;
     const event = skillConversationEvent(later);
-    return target.action === "create" ? event?.action === "created" : event?.skillId === target.skillId;
-  });
+    if (!event) continue;
+    if (
+      target.action === "update"
+        ? event.skillId === target.skillId
+        : event.action === "created" && (answers === 1 || sameSkillName(event.skillName, name))
+    )
+      return true;
+  }
+  return false;
+}
+
+/** Two skill names that differ only in case or outer spaces are the same name. */
+function sameSkillName(a: string, b: string | undefined): boolean {
+  return b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 /** One tool step of a turn, as a review or a note reads it. */

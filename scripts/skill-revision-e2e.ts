@@ -183,6 +183,20 @@ async function main(): Promise<void> {
       // The draft in the workspace stays as the agent wrote it.
       assert.equal(await readFile(join(otherWorkspace, "drafts/colon/SKILL.md"), "utf8"), draft);
     });
+
+    await scenario("create saves a name with no Latin letter", async () => {
+      // A review writes the name in the user's language.
+      const name = "月次レポート";
+      await writeSkill(
+        otherWorkspace,
+        "drafts/japanese",
+        `---\nname: ${name}\ndescription: 月次レポートを書く\n---\n書く。\n`,
+      );
+      const created = await run("other", "create_skill", { sourcePath: "drafts/japanese" });
+      assert.ok(Exit.isSuccess(created));
+      const saved = await Effect.runPromise(library.get(report.events.at(-1)?.skillId ?? ""));
+      assert.equal(saved.name, name);
+    });
   } finally {
     await rm(base, { recursive: true, force: true }).catch((error: unknown) => {
       if (!isMissingFileError(error)) throw error;

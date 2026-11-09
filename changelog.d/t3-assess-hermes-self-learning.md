@@ -21,3 +21,5 @@
 
 - An agent can now create or revise a skill when its description has a colon, such as "Use when:
   ...". Before, the save failed and the agent had to try again.
+- A skill can now have a name with no Latin letter, such as a name in Japanese. Before, the save
+  failed.

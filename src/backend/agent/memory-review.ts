@@ -122,6 +122,11 @@ export class MemoryReview {
   #running: { key: string; agentId: string; fiber: Fiber.Fiber<void> } | null = null;
   /** The suggestions that a Save writes now, so a second Save does not write the skill again. */
   readonly #saving = new Set<string>();
+  /**
+   * The suggestions that a Save wrote. Their skill line can wait for the running turn, or fail to
+   * append, so the chat alone does not show that the skill is saved.
+   */
+  readonly #saved = new Set<string>();
   #scope = Scope.makeUnsafe();
 
   constructor(options: MemoryReviewOptions) {
@@ -225,9 +230,9 @@ export class MemoryReview {
   ) {
     const key = `${conversationKey(agentId, threadId)}:${messageId}`;
     // A second press, as from another client, returns at once: the first one shows the skill line or sends the yes.
-    if (this.#saving.has(key)) return true;
+    if (this.#saving.has(key) || this.#saved.has(key)) return true;
     this.#saving.add(key);
-    return yield* this.#saveSuggestion(agentId, threadId, messageId).pipe(
+    return yield* this.#saveSuggestion(agentId, threadId, messageId, () => this.#saved.add(key)).pipe(
       Effect.ensuring(Effect.sync(() => this.#saving.delete(key))),
     );
   }).bind(this);
@@ -237,6 +242,7 @@ export class MemoryReview {
     agentId: string,
     threadId: string | null,
     messageId: string,
+    saved: () => void,
   ) {
     const options = this.#options;
     const messages = yield* Effect.try(() => options.chat(agentId, threadId)).pipe(Effect.orElseSucceed(() => []));
@@ -258,11 +264,12 @@ export class MemoryReview {
     const turnId = `${REVIEW_TURN_PREFIX}${randomUUID()}`;
     const line = yield* this.#learn(agent, model, suggestion, reviewedChat(messages, index), turnId, true);
     if (!line) return false;
+    saved();
     const conversation = yield* this.#conversation(agentId, threadId);
     if (options.turnActive(agentId, threadId)) conversation.heldLines.push(line);
     else
       yield* Effect.try(() => options.appendSystemMessage(agentId, threadId, line)).pipe(
-        // The skill is saved, so the agent must not save it again: the line shows after a reload.
+        // The skill is saved and `#saved` keeps a second Save from writing it again.
         Effect.catchCause((cause) =>
           Effect.sync(() => logger.warn("Could not show the saved skill in the chat.", { error: cause })),
         ),
@@ -691,18 +698,19 @@ function skillSuggestionMessage(
   };
 }
 
-/**
- * The part of the chat that a review reads: after the last reviewed message and after the last clear
- * of the context. A clear that just happened is passed over, so its review reads the chat it ended.
- * A cursor that is not in the messages, as after a delete or with no saved cursor, makes the review
- * read the latest messages.
- */
 /** The turn id of the lines that a review writes. */
 const REVIEW_TURN_PREFIX = "memory-review-";
 
 function isReviewTurn(turnId: string | undefined): boolean {
   return turnId?.startsWith(REVIEW_TURN_PREFIX) === true;
 }
+
+/**
+ * The part of the chat that a review reads: after the last reviewed message and after the last clear
+ * of the context. A clear that just happened is passed over, so its review reads the chat it ended.
+ * A cursor that is not in the messages, as after a delete or with no saved cursor, makes the review
+ * read the latest messages.
+ */
 
 function reviewExcerpt(messages: readonly ConversationMessage[], cursor: string | null) {
   let end = messages.length;

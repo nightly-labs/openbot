@@ -6,9 +6,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { LearnedSkillDraft, SkillLearner } from "../backend/agent/skill-learning";
 import { LocalSkillFailure, type LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
-import { normalizedFiles } from "./skill-package";
-
-const FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
+import { normalizedFiles, SKILL_FRONTMATTER } from "./skill-package";
 
 /**
  * Saves the skills that a memory review learns in the local library, as `create_skill` and
@@ -64,7 +62,7 @@ function revisedBundle(library: LocalSkillLibrary, draft: Extract<LearnedSkillDr
     return yield* bundleSync(() => {
       const files = normalizedFiles(bytes);
       const text = new TextDecoder("utf-8", { fatal: true }).decode(files["SKILL.md"]);
-      const metadata = parseYaml(text.match(FRONTMATTER)?.[1] ?? "");
+      const metadata = parseYaml(text.match(SKILL_FRONTMATTER)?.[1] ?? "");
       if (!isDynamicRecord(metadata)) throw new Error("The skill has no frontmatter to keep.");
       return {
         ...files,

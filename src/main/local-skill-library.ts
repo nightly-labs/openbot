@@ -9,7 +9,7 @@ import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
-import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
+import { archiveDirectory, inspectArchive, normalizedFiles, SKILL_FRONTMATTER } from "./skill-package";
 
 /** Owns immutable local revisions. A revision exists only after its directory is published. */
 export class LocalSkillLibrary {
@@ -75,7 +75,7 @@ export class LocalSkillLibrary {
       const info = yield* localSync(() => inspectArchive(bytes));
       const files = yield* localSync(() => normalizedFiles(bytes));
       const text = new TextDecoder().decode(files["SKILL.md"]);
-      const match = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u);
+      const match = text.match(SKILL_FRONTMATTER);
       const metadata = yield* localSync(() => parseYaml(match?.[1] ?? ""));
       const example =
         isDynamicRecord(metadata) && isString(metadata["example-prompt"]) ? metadata["example-prompt"].trim() : "";
@@ -249,7 +249,6 @@ export class LocalSkillLibrary {
   }
 }
 
-const FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
 /** A top-level `key: value` line. */
 const TOP_LEVEL_VALUE = /^([A-Za-z][\w-]*):[ \t]+(\S.*)$/u;
 /** The first character of a value that is not plain YAML text. */
@@ -275,7 +274,7 @@ function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
   const skillFile = files["SKILL.md"];
   if (!skillFile) return bytes;
   const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
-  const match = FRONTMATTER.exec(text);
+  const match = SKILL_FRONTMATTER.exec(text);
   const frontmatter = match?.[1];
   if (!match || frontmatter === undefined || parsesAsYaml(frontmatter)) return bytes;
   const quoted = frontmatter

@@ -17,7 +17,8 @@ export type SkillSuggestionOutcome = "open" | "working" | "saved" | "answered";
 
 /**
  * The outcome from the messages after the suggestion. Only the first user message after it carries
- * the suggestion to the agent, so a later one cannot save it.
+ * the suggestion to the agent, so a later one cannot save it: a new skill after a later message counts
+ * only when it has the suggested name, as when the host saved it from the Save button.
  */
 export function skillSuggestionOutcome(
   messages: readonly AgentMessage[],
@@ -27,15 +28,20 @@ export function skillSuggestionOutcome(
 ): SkillSuggestionOutcome {
   const index = messages.findIndex((message) => message.id === messageId);
   if (index < 0) return "open";
-  let answered = false;
+  let answers = 0;
   for (const message of messages.slice(index + 1)) {
-    if (message.author === "you") answered = true;
+    if (message.author === "you") answers += 1;
     const marker = message.actionMarker;
     if (marker?.kind !== "skill-lifecycle") continue;
-    if (suggestion.action === "create" ? marker.action === "created" : marker.skillId === suggestion.skillId)
+    if (
+      suggestion.action === "create"
+        ? marker.action === "created" &&
+          (answers === 1 || marker.skillName.trim().toLowerCase() === suggestion.skillName.trim().toLowerCase())
+        : marker.skillId === suggestion.skillId
+    )
       return "saved";
   }
-  if (!answered) return "open";
+  if (answers === 0) return "open";
   return turnActive ? "working" : "answered";
 }
 
