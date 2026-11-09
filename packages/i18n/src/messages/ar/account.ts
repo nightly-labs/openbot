@@ -47,6 +47,7 @@ export const messages = {
   "account.usage.window.otherModels": "نماذج أخرى",
   "account.usage.window.total": "الإجمالي",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "متبقٍّ {percent}",
   "account.update.failedRetry": "فشل التحديث. حاول مرة أخرى.",
   "account.update.managedByHost": "يديره المضيف",
   "account.update.restart": "إعادة التشغيل",
