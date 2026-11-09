@@ -1481,8 +1481,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   // a computer that sleeps, the first server that is online opens instead. The saved order stays.
   // A selection by the user, or the start server online, ends this. A hosted server stays selected:
   // it starts only while it is selected, and a start takes longer than this wait. A start server that
-  // the phone shows from its cache looks online in its quiet first attempt; only `state` is the
-  // connection, so that look does not end this.
+  // the phone shows from its cache looks online in its quiet first attempt. That look does not end
+  // this, and the server keeps that attempt: the app opens another server only after it.
   const startupFallback = useRef(true);
   const [startupWaitOver, setStartupWaitOver] = useState(false);
   // The wait starts when the list of servers arrives, because the connections start then.
@@ -1499,6 +1499,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       startupFallback.current = false;
       return;
     }
+    if (active?.resuming === true) return;
     const activeFailed = active?.state === "offline" || active?.state === "error";
     if (!startupWaitOver && !activeFailed) return;
     const online = sortByPreference(servers).find((server) => server.state === "online");
