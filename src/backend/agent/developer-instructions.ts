@@ -485,7 +485,9 @@ export function developerInstructions(
       : []),
     // Claude gets no co-author line of its own: `claudeFlagSettings` empties its `attribution`.
     ...(agentDefaults.commitCoAuthor
-      ? [`End each git commit message you write with this trailer: ${OPENBOT_COMMIT_TRAILER}`]
+      ? [
+          `When you create or amend a git commit, also with a message from the user, end its message with this trailer once: ${OPENBOT_COMMIT_TRAILER}`,
+        ]
       : []),
     ...(options.memoriesInTurns
       ? [
