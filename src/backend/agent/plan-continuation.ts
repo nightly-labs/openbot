@@ -186,7 +186,8 @@ export class PlanContinuation {
     let kind: ContinuationKind;
     if (open.length > 0) {
       const signature = JSON.stringify(open.map(stepKey));
-      if (chained && previous.kind === "plan" && previous.openSteps === signature) return null;
+      // A continuation after a failed compaction keeps the plan of the turn before it.
+      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return null;
       kind = "plan";
     } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
     else return null;

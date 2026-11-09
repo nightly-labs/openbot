@@ -116,9 +116,9 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 
 /**
  * The provider errors during a turn's own compaction that end the turn but can pass when it continues:
- * a connection that failed or stopped answering (#5822).
+ * a connection that failed or stopped answering (#5822). A server error keeps the provider's text.
  */
-const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout", "provider_unavailable"]);
+const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
 
 /** A provider error held until the end of its turn, which runs the turn again on a backup model or shows it. */
 interface HeldProviderError {
@@ -556,6 +556,7 @@ export class TurnLifecycle {
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
+      const compactionFailure = this.#compactionFailures.get(turnId);
       this.#compactionFailures.delete(turnId);
       // A routine run's own session saves no history, so its turn ends now and closes the session.
       if (
@@ -574,6 +575,8 @@ export class TurnLifecycle {
         const failover = this.#failoverTurns.get(turnId);
         this.#failoverTurns.delete(turnId);
         if (failover) this.#showFailoverError(turn.agentId, turn.threadId, failover);
+        // A process that the compaction deadline could not stop ended, so its plain error shows now.
+        else if (compactionFailure) this.#showFailoverError(turn.agentId, turn.threadId, compactionFailure);
         continue;
       }
       this.#attention.clearForTurn(turn.threadId, turnId);
@@ -963,7 +966,11 @@ export class TurnLifecycle {
         const reported = getString(turn, "status") ?? "completed";
         // The compaction deadline stopped this turn, not the user: it failed.
         const status =
-          reported === "interrupted" && this.#compactionFailures.get(turnId)?.stalled ? "failed" : reported;
+          reported === "interrupted" &&
+          this.#compactionFailures.get(turnId)?.stalled &&
+          !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)
+            ? "failed"
+            : reported;
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -1155,7 +1162,9 @@ export class TurnLifecycle {
           errorTurnId !== null &&
           this.#runningTurns.has(errorTurnId) &&
           this.#observedCompactions.get(threadId) === errorTurnId &&
-          COMPACTION_RETRY_CAUSES.has(context.causeCode)
+          COMPACTION_RETRY_CAUSES.has(context.causeCode) &&
+          // A turn that did no work yet runs again on a backup model, as before.
+          !(this.#runningTurns.get(errorTurnId)?.acted === false && this.#hooks.mayFailOver(agentId))
         ) {
           logger.warn("A provider compaction failed.", {
             provider: source.provider,
@@ -1491,7 +1500,8 @@ export class TurnLifecycle {
       if (failover) this.#showFailoverError(agentId, threadId, failover);
       if (compactionFailure && compactionContinuation)
         this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...compactionFailure.context });
-      else if (compactionFailure && status === "failed") this.#showFailoverError(agentId, threadId, compactionFailure);
+      else if (compactionFailure && status === "failed" && !failover)
+        this.#showFailoverError(agentId, threadId, compactionFailure);
       if (limited) yield* this.#usageLimits.reached(agentId, resetsAt, model);
       else if (status === "completed") yield* this.#usageLimits.completed(agentId, model);
       // After the limit is recorded, so the channel does not assign the task to this agent again
