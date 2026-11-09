@@ -431,6 +431,7 @@ export const messages = {
   "server.roles.memberCount": { other: "멤버 {count}명" },
   "server.roles.agentList": "에이전트: {names}",
   "server.roles.agentLevel": "{agent}에 대한 {role}의 접근 권한",
+  "server.roles.changeInEveryone": "모든 사용자에서 변경",
   "server.roles.setAll": "모두 설정",
   "server.roles.setAllLabel": "모두 설정: 모든 에이전트에 대한 {role}의 접근 권한",
   "server.roles.loadFailed": "이 서버의 역할을 불러올 수 없었어요.",

@@ -1,6 +1,7 @@
 // What main answers for the Vault in Server settings. A list item never carries a password, a card
-// number, a security code or an API key: a summary that has one of those keys is refused, so a main-process bug
-// cannot put a secret in renderer state. Only `reveal` answers with a secret.
+// number, a security code, an API key or a two-step key: a summary that has one of those keys is refused, so a
+// main-process bug cannot put a secret in renderer state. Only `reveal` answers with a secret, and `codes`
+// with the current two-step codes, never with their keys.
 
 import type {
   VaultCardBrand,
@@ -8,6 +9,8 @@ import type {
   VaultItemSummary,
   VaultState,
   VaultStatus,
+  VaultTwoStepCode,
+  VaultTwoStepCodes,
 } from "@openbot/contracts/ipc";
 import {
   decodeList,
@@ -22,7 +25,7 @@ import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtim
 
 const STATUSES: readonly VaultStatus[] = ["ready", "unavailable", "unreadable"];
 const BRANDS: readonly VaultCardBrand[] = ["visa", "mastercard", "amex", "discover"];
-const SECRET_KEYS = ["password", "number", "securityCode", "key"] as const;
+const SECRET_KEYS = ["password", "number", "securityCode", "key", "twoStepKey"] as const;
 const decodeFillSites = guardedListDecoder(isString, "fillSites");
 
 function contactFields(item: DynamicRecord) {
@@ -59,6 +62,7 @@ function vaultItem(item: DynamicRecord): VaultItemSummary {
         username: requiredString(item, "username"),
         notes: requiredString(item, "notes"),
         hasPassword: requiredBoolean(item, "hasPassword"),
+        hasTwoStep: requiredBoolean(item, "hasTwoStep"),
       };
     case "card": {
       const brand = item.brand;
@@ -109,6 +113,22 @@ export function decodeVaultImportResult(value: unknown): VaultImportResult {
     skipped: requiredNumber(result, "skipped"),
     state: decodeVaultState(result.state),
   };
+}
+
+function twoStepCode(item: DynamicRecord): VaultTwoStepCode {
+  const code = requiredString(item, "code");
+  if (!/^\d{6,8}$/u.test(code)) throw new Error("Invalid two-step code.");
+  return {
+    id: requiredString(item, "id"),
+    code,
+    period: requiredNumber(item, "period"),
+    remainingMs: requiredNumber(item, "remainingMs"),
+  };
+}
+
+export function decodeVaultCodes(value: unknown): VaultTwoStepCodes {
+  const answer = decodeRecord(value, "Vault codes");
+  return { codes: decodeList(answer.codes, "Vault code", twoStepCode) };
 }
 
 export function decodeVaultSecret(value: unknown): string {

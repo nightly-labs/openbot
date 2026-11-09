@@ -75,13 +75,13 @@ export interface ProviderAccountsHost {
   signInTemp(provider: AgentProviderId): ProviderTempOptions | undefined;
   /**
    * Starts and checks a client that signs in to the account's folder. The caller stops it.
-   * `afterSignIn`: the check that ends a sign-in, which gets the long start wait.
+   * `longStart`: an account check, which gets the long start wait.
    */
   authenticate(
     provider: AgentProviderId,
     cli: AgentCliInfo,
     accountEnvironment: Readonly<Record<string, string>>,
-    afterSignIn?: boolean,
+    longStart?: boolean,
   ): Effect.Effect<{ client: AgentClient; account: NonNullable<AccountReadResult["account"]> }, ProviderAccountFailed>;
   stopClient(client: AgentClient): Effect.Effect<void>;
   /** The running process of an agent on this account, if there is one. */
@@ -599,7 +599,7 @@ export class ProviderAccounts {
     if (this.#states.get(account.id)?.state !== "connecting")
       this.#setState(account.id, { state: "checking", message: null });
     yield* Effect.acquireUseRelease(
-      this.#host.authenticate(provider, cli, this.environment(account), afterSignIn),
+      this.#host.authenticate(provider, cli, this.environment(account), true),
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;

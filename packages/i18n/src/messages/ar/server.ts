@@ -518,6 +518,7 @@ export const messages = {
   },
   "server.roles.agentList": "الوكلاء: {names}",
   "server.roles.agentLevel": "وصول {role} إلى {agent}",
+  "server.roles.changeInEveryone": "تغيير في الجميع",
   "server.roles.setAll": "تعيين للكل",
   "server.roles.setAllLabel": "تعيين للكل: وصول {role} إلى كل الوكلاء",
   "server.roles.loadFailed": "تعذّر تحميل أدوار هذا الخادم.",

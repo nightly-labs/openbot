@@ -500,6 +500,7 @@ export const messages = defineMessages("server", {
   "server.roles.memberCount": { one: "{count} member", other: "{count} members" },
   "server.roles.agentList": "Agents: {names}",
   "server.roles.agentLevel": "Access of {role} to {agent}",
+  "server.roles.changeInEveryone": "Change in Everyone",
   "server.roles.setAll": "Set all",
   "server.roles.setAllLabel": "Set all: access of {role} to all agents",
   "server.roles.loadFailed": "Could not load the roles of this server.",

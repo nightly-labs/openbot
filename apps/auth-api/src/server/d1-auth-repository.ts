@@ -1165,7 +1165,7 @@ export class D1AuthRepository implements AuthRepository {
 }
 
 /** Registers the new mobile session and replaces the earlier session of the same device. */
-function mobileSessionStatements(
+export function mobileSessionStatements(
   database: D1Database,
   input: { now: number; session: { id: string }; device: MobileAuthDeviceIdentity },
   linkHostId: string | null,
