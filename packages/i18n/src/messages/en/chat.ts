@@ -418,7 +418,6 @@ export const messages = defineMessages("chat", {
   "chat.suggestion.saveReply": "Yes, save it as a skill.",
   "chat.suggestion.updateReply": "Yes, add it to the skill.",
   "chat.suggestion.detailsNamed": "Open {name} in Marketplace",
-  "chat.suggestion.dismissNamed": "Dismiss {name}",
   "chat.suggestion.dismissed": "{name} suggestion dismissed.",
   "chat.suggestion.undo": "Undo",
   "chat.suggestion.localOnly": "Connect {name} in OpenBot on your own computer.",

@@ -434,7 +434,6 @@ export const messages = {
   "chat.suggestion.saveReply": "כן, שמור את זה כמיומנות.",
   "chat.suggestion.updateReply": "כן, הוסף את זה למיומנות.",
   "chat.suggestion.detailsNamed": "פתיחת {name} בחנות",
-  "chat.suggestion.dismissNamed": "סגירת {name}",
   "chat.suggestion.dismissed": "ההצעה {name} נסגרה.",
   "chat.suggestion.undo": "ביטול",
   "chat.suggestion.localOnly": "יש לחבר את {name} ב-OpenBot במחשב שלך.",

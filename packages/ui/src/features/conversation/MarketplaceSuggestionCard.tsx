@@ -1,8 +1,9 @@
-import { Button, Check, IconButton, Lock, Spinner, X } from "@openbot/ui";
+import { Button, Check, Lock, Spinner } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, createStore, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 import { PluginIcon } from "../marketplace/PluginIcon";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 /** An app connects to a service. A skill installs on the agent. */
 export type MarketplaceSuggestionKind = "app" | "skill";
@@ -53,20 +54,16 @@ export interface MarketplaceSuggestionCardProps {
  */
 export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps) {
   const { t } = useText();
-  const titleId = createUniqueId();
-  const questionId = createUniqueId();
-  const describedBy = () => (props.fullDescription ? questionId : undefined);
-  /* Dismiss and Undo replace each other, so the focus moves to the control that is there now. */
+  /* Skip and Undo replace each other, so the focus moves to the control that is there now. */
   let dismissButton: HTMLButtonElement | undefined;
   let undoButton: HTMLButtonElement | undefined;
   /* The action animates only a change that the user started here. A card that opens connected, or
      that reads its state late, shows the state with no motion. */
   const [moving, setMoving] = createSignal(false);
-  const action = (placement: string) => (
-    <div class={placement} role="status">
-      <SuggestionAction {...props} onStart={() => setMoving(true)} />
-    </div>
-  );
+  // Several suggestions can be in one chat: each Skip says which one it skips.
+  const nameId = createUniqueId();
+  // A question shows in full in the body, and its action goes to the footer under it.
+  const subtitle = () => (props.fullDescription ? undefined : props.description);
   return (
     <Show
       when={!props.dismissed}
@@ -90,68 +87,77 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
         </div>
       }
     >
-      <article
-        class="conversation-interaction-card marketplace-suggestion"
-        aria-labelledby={titleId}
-        aria-describedby={describedBy()}
-        data-state={props.state}
-        data-motion={moving() ? "" : undefined}
-      >
-        <header class="marketplace-suggestion-header">
+      <UiBlockCard
+        class="marketplace-suggestion"
+        // The action stays on the card when it is done: the same button turns into Connected.
+        status="pending"
+        inlineActions={!props.fullDescription}
+        title={
+          <Show when={props.onOpenDetails} fallback={props.name}>
+            <Button
+              variant="link"
+              type="button"
+              class="marketplace-suggestion-name"
+              aria-label={t("chat.suggestion.detailsNamed", { name: props.name })}
+              onClick={() => props.onOpenDetails?.()}
+            >
+              {props.name}
+            </Button>
+          </Show>
+        }
+        subtitle={subtitle()}
+        icon={
           <Show
             when={props.mark}
             fallback={
               <PluginIcon
                 iconUrl={props.iconUrl}
                 fallback={props.kind === "skill" ? "skill" : "plugin"}
-                class="marketplace-suggestion-icon"
+                class="ui-block-icon marketplace-suggestion-icon"
               />
             }
           >
-            {(mark) => <span class="skills-marketplace-icon marketplace-suggestion-icon">{mark()}</span>}
+            {(mark) => <span class="ui-block-icon skills-marketplace-icon marketplace-suggestion-icon">{mark()}</span>}
           </Show>
-          <div class="marketplace-suggestion-heading">
-            <h3 id={titleId} class="marketplace-suggestion-title">
-              <Show when={props.onOpenDetails} fallback={props.name}>
-                <Button
-                  variant="link"
-                  type="button"
-                  class="marketplace-suggestion-name"
-                  aria-label={t("chat.suggestion.detailsNamed", { name: props.name })}
-                  onClick={() => props.onOpenDetails?.()}
-                >
+        }
+        actions={
+          <Show when={suggestionControlsShown(props)}>
+            {/* The controls carry the state and the motion flag for the stylesheet; they add no box. */}
+            <span
+              class="marketplace-suggestion-controls"
+              data-state={props.state}
+              data-motion={moving() ? "" : undefined}
+            >
+              {/* A connected card has nothing to skip. The stylesheet folds the button away, so the
+                  action moves to the edge instead of a jump. */}
+              <Show when={props.onDismiss}>
+                <span id={nameId} hidden>
                   {props.name}
+                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="ui-block-skip marketplace-suggestion-dismiss"
+                  aria-describedby={nameId}
+                  ref={(element) => (dismissButton = element)}
+                  onClick={() => {
+                    props.onDismiss?.();
+                    onSettled(() => undoButton?.focus());
+                  }}
+                >
+                  {t("uiBlock.skip")}
                 </Button>
               </Show>
-            </h3>
-            <Show when={!props.fullDescription}>
-              <span class="marketplace-suggestion-description">{props.description}</span>
-            </Show>
-          </div>
-          <Show when={!props.fullDescription}>{action("marketplace-suggestion-action")}</Show>
-          {/* A connected card has nothing to dismiss. The stylesheet folds the button away, so the
-              action moves to the edge instead of a jump. */}
-          <Show when={props.onDismiss}>
-            <IconButton
-              label={t("chat.suggestion.dismissNamed", { name: props.name })}
-              variant="ghost"
-              size="icon-xs"
-              class="marketplace-suggestion-dismiss"
-              ref={(element) => (dismissButton = element)}
-              onClick={() => {
-                props.onDismiss?.();
-                onSettled(() => undoButton?.focus());
-              }}
-            >
-              <X />
-            </IconButton>
+              <span class="marketplace-suggestion-action" role="status">
+                <SuggestionAction {...props} onStart={() => setMoving(true)} />
+              </span>
+            </span>
           </Show>
-        </header>
+        }
+      >
         <Show when={props.fullDescription}>
-          <p id={questionId} class="marketplace-suggestion-question">
-            {props.description}
-          </p>
-          {action("marketplace-suggestion-action marketplace-suggestion-footer")}
+          <p class="marketplace-suggestion-question">{props.description}</p>
         </Show>
         <Show when={props.state === "unavailable" && props.unavailableText}>
           <p class="marketplace-suggestion-unavailable">
@@ -159,7 +165,7 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
             {props.unavailableText}
           </p>
         </Show>
-      </article>
+      </UiBlockCard>
     </Show>
   );
 }
@@ -174,7 +180,7 @@ function SuggestionAction(props: MarketplaceSuggestionCardProps & { onStart: () 
   const done = () => props.state === "connected";
   const busy = () => props.state === "busy";
   const startable = () => props.state === "available" || props.state === "attention";
-  const shown = () => done() || Boolean(props.onConnect && props.state !== "unavailable");
+  const shown = () => suggestionActionShown(props);
   const variant = () => (props.state === "attention" ? "outline" : "default");
   const skillAction = () => props.skillAction ?? "install";
   const label = () => {
@@ -269,4 +275,14 @@ function SuggestionAction(props: MarketplaceSuggestionCardProps & { onStart: () 
       </Button>
     </Show>
   );
+}
+
+/** The action shows when it is done, or when the user can start it here. */
+function suggestionActionShown(props: MarketplaceSuggestionCardProps): boolean {
+  return props.state === "connected" || Boolean(props.onConnect && props.state !== "unavailable");
+}
+
+/** The card has controls when it has Skip or an action: with none, a question card has no footer. */
+function suggestionControlsShown(props: MarketplaceSuggestionCardProps): boolean {
+  return Boolean(props.onDismiss) || suggestionActionShown(props);
 }

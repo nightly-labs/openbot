@@ -412,7 +412,6 @@ export const messages = {
   "chat.suggestion.saveReply": "はい、スキルとして保存して。",
   "chat.suggestion.updateReply": "はい、スキルに追加して。",
   "chat.suggestion.detailsNamed": "マーケットプレイスで {name} を開く",
-  "chat.suggestion.dismissNamed": "{name} を閉じる",
   "chat.suggestion.dismissed": "{name} の提案を閉じました。",
   "chat.suggestion.undo": "元に戻す",
   "chat.suggestion.localOnly": "{name} は自分のコンピューターの OpenBot で接続してください。",

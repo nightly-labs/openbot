@@ -190,6 +190,7 @@ function TasksPageStory(props: {
   approvals?: AgentApproval[];
   agents?: AgentProfile[];
   agentsToggle?: boolean;
+  waitsForAnswer?: (task: AgentTask) => boolean;
 }) {
   const previousApi = window.openbot;
   const [agentsOpen, setAgentsOpen] = createSignal(false);
@@ -219,6 +220,8 @@ function TasksPageStory(props: {
           onRespondApproval={fn(async () => true)}
           agentsOpen={agentsOpen()}
           onToggleAgents={props.agentsToggle ? () => setAgentsOpen((open) => !open) : undefined}
+          waitsForAnswer={props.waitsForAnswer}
+          onOpenInChat={fn()}
         />
       </div>
     </PlatformProvider>
@@ -257,4 +260,9 @@ const WAITING_APPROVAL: AgentApproval = {
 };
 export const WaitingForApproval: Story = {
   render: () => <TasksPageStory tasks={TASKS} approvals={[WAITING_APPROVAL]} />,
+};
+
+/** A running task asks a question. Open it: its panel sends you to the chat, which answers it. */
+export const WaitingForAnswer: Story = {
+  render: () => <TasksPageStory tasks={TASKS} waitsForAnswer={(task) => task.id === "task-papers"} />,
 };

@@ -239,6 +239,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       outcome={outcome()}
       danger={props.spec.danger}
       busy={props.busy}
+      waiting={props.disabled !== true}
       error={props.error}
       // The step that asks again has its own Cancel, so it has no Skip.
       onSkip={props.disabled || autoAnswer() || confirming() ? undefined : props.onSkip}

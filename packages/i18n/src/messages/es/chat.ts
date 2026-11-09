@@ -440,7 +440,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Sí, guárdalo como habilidad.",
   "chat.suggestion.updateReply": "Sí, añádelo a la habilidad.",
   "chat.suggestion.detailsNamed": "Abrir {name} en Marketplace",
-  "chat.suggestion.dismissNamed": "Descartar {name}",
   "chat.suggestion.dismissed": "Sugerencia de {name} descartada.",
   "chat.suggestion.undo": "Deshacer",
   "chat.suggestion.localOnly": "Conecta {name} en OpenBot en tu propio equipo.",

@@ -522,7 +522,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Да, сохрани это как навык.",
   "chat.suggestion.updateReply": "Да, добавь это в навык.",
   "chat.suggestion.detailsNamed": "Открыть {name} в каталоге",
-  "chat.suggestion.dismissNamed": "Скрыть {name}",
   "chat.suggestion.dismissed": "Предложение «{name}» скрыто.",
   "chat.suggestion.undo": "Отменить",
   "chat.suggestion.localOnly": "Подключите {name} в OpenBot на своём компьютере.",

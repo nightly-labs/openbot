@@ -425,7 +425,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Sim, salve como habilidade.",
   "chat.suggestion.updateReply": "Sim, adicione à habilidade.",
   "chat.suggestion.detailsNamed": "Abrir {name} na loja",
-  "chat.suggestion.dismissNamed": "Dispensar {name}",
   "chat.suggestion.dismissed": "Sugestão de {name} dispensada.",
   "chat.suggestion.undo": "Desfazer",
   "chat.suggestion.localOnly": "Conecte {name} no OpenBot do seu próprio computador.",

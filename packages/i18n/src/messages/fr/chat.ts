@@ -428,7 +428,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Oui, enregistre-le comme compétence.",
   "chat.suggestion.updateReply": "Oui, ajoute-le à la compétence.",
   "chat.suggestion.detailsNamed": "Ouvrir {name} dans la Marketplace",
-  "chat.suggestion.dismissNamed": "Ignorer {name}",
   "chat.suggestion.dismissed": "Suggestion {name} ignorée.",
   "chat.suggestion.undo": "Annuler",
   "chat.suggestion.localOnly": "Connectez {name} dans OpenBot sur votre propre ordinateur.",

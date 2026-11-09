@@ -2,6 +2,7 @@ import { defineMessages } from "../../message";
 
 export const messages = defineMessages("uiBlock", {
   "uiBlock.status.answered": "Answered",
+  "uiBlock.status.waiting": "Waiting for you",
   "uiBlock.outcome.expired": "No answer was given in time",
   "uiBlock.outcome.closed": "Closed without an answer",
   "uiBlock.outcome.autoAnswered": "{outcome} (nobody answered in time)",
@@ -16,9 +17,6 @@ export const messages = defineMessages("uiBlock", {
   "uiBlock.choice.submit": "Send",
   "uiBlock.choice.shortcutHint": "Press {first} to {last} to choose",
   "uiBlock.quick.label": "Quick replies",
-  "uiBlock.quick.textLabel": "Your own reply",
-  "uiBlock.quick.textPlaceholder": "Or type your own reply",
-  "uiBlock.quick.send": "Send",
   "uiBlock.form.submit": "Submit",
   "uiBlock.form.required": "This field is required",
   "uiBlock.form.choose": "Choose an option",

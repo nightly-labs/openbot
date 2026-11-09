@@ -578,7 +578,6 @@ export const messages = {
   "chat.suggestion.saveReply": "نعم، احفظه كمهارة.",
   "chat.suggestion.updateReply": "نعم، أضفه إلى المهارة.",
   "chat.suggestion.detailsNamed": "فتح {name} في المتجر",
-  "chat.suggestion.dismissNamed": "تجاهل {name}",
   "chat.suggestion.dismissed": "تم تجاهل اقتراح {name}.",
   "chat.suggestion.undo": "تراجع",
   "chat.suggestion.localOnly": "اربط {name} في OpenBot على حاسوبك.",
