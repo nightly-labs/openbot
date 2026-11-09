@@ -133,7 +133,30 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     current.frame = requestAnimationFrame(scrollStep);
   }
 
-  function finish(cancelled: boolean): void {
+  /** The release after a drag must not also click the file under the pointer. */
+  function swallowNextClick(): void {
+    const swallow = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    window.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+  }
+
+  /** After Escape the button is still down, and the click comes with the release. */
+  function swallowAfterRelease(pointerId: number): void {
+    const onRelease = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      window.removeEventListener("pointerup", onRelease, true);
+      window.removeEventListener("pointercancel", onRelease, true);
+      if (event.type === "pointerup") swallowNextClick();
+    };
+    window.addEventListener("pointerup", onRelease, true);
+    window.addEventListener("pointercancel", onRelease, true);
+  }
+
+  /** Ends the drag. `released` is false when Escape ends it while the button is still down. */
+  function finish(cancelled: boolean, released = true): void {
     const current = drag;
     if (!current) return;
     drag = null;
@@ -146,13 +169,8 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     scroller?.removeAttribute("data-marquee");
     setBox(null);
     if (cancelled) options.onCancel();
-    // The release after a drag must not also click the file under the pointer.
-    const swallow = (event: MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-    };
-    window.addEventListener("click", swallow, { capture: true, once: true });
-    setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+    if (released) swallowNextClick();
+    else swallowAfterRelease(current.pointerId);
   }
 
   function onPointerMove(event: PointerEvent): void {
@@ -180,7 +198,7 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     // The page's Escape would end the selection too; this Escape only stops the drag.
     event.preventDefault();
     event.stopPropagation();
-    finish(true);
+    finish(true, false);
   }
 
   function onPointerDown(event: PointerEvent): void {
