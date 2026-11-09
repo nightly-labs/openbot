@@ -252,6 +252,10 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.runForDelivery(deliveryId);
   }
 
+  silentRunForDelivery(deliveryId: string): boolean {
+    return this.#routines.runForDelivery(deliveryId)?.silent === true;
+  }
+
   /** The open waits that the run of this delivery continues. */
   wokenWaits(deliveryId: string): AgentWait[] {
     return this.#waits.wokenBy(deliveryId);
@@ -1240,6 +1244,9 @@ export class RoutineScheduler implements RoutineDueSource {
       createdAt: updated.updatedAt,
       status: "completed",
       itemType: routineRunConversationEventItemType(status, run.routineId, run.id),
+      ...(run.silent && error === null && (status === "running" || status === "succeeded")
+        ? { silentRoutineStatus: true }
+        : {}),
     };
     snapshot.messages.push(message);
     return { run: updated, message };

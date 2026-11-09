@@ -307,8 +307,8 @@ export function RoutineEditor({
   routine?: RoutineRecord;
   available: boolean;
   port?: {
-    create(input: Omit<CreateRoutineInput, "agentId">): Promise<void>;
-    update(input: Omit<UpdateRoutineInput, "agentId">): Promise<void>;
+    create(input: Omit<CreateRoutineInput, "agentId">): Promise<RoutineFields>;
+    update(input: Omit<UpdateRoutineInput, "agentId">): Promise<RoutineFields>;
     delete(id: string): Promise<void>;
     test(id: string): Promise<void>;
     queryKey: QueryKey;
@@ -372,6 +372,7 @@ export function RoutineEditor({
     eventType?: string;
     filters?: FilterDraft[];
     missedPolicy?: RoutineMissedPolicy;
+    silent?: boolean;
   }>({});
   const name = edits.name ?? routine?.name ?? "";
   const instruction = edits.instruction ?? routine?.instruction ?? "";
@@ -385,6 +386,10 @@ export function RoutineEditor({
   const eventsSupported = useMobileWorkspaceSelector((current) => current.canManageEvents(agent.serverId));
   // Such a host saves a scheduled routine through the event routes, which carry `missedPolicy`.
   const missedRuns = useMobileWorkspaceSelector((current) => current.canManageMissedRuns(agent.serverId));
+  const statusSupported = useMobileWorkspaceSelector((current) => current.supportsRoutineStatus(agent.serverId));
+  const silentSupported = statusSupported && (trigger === "schedule" || eventsSupported);
+  const silent = edits.silent ?? routine?.silent ?? false;
+  const silentChanged = silentSupported && silent !== (routine?.silent ?? false);
   const routineResults = useMobileWorkspaceSelector((current) => current.canManageRoutineResults(agent.serverId));
   const savedMissedPolicy = routine?.missedPolicy ?? "skip";
   const missedPolicy = edits.missedPolicy ?? savedMissedPolicy;
@@ -421,6 +426,7 @@ export function RoutineEditor({
     filters: eventFiltersFromDrafts(filters),
     timezone,
     missedPolicy,
+    silent,
     destination: newDestination,
   });
   const nameChanged = name.trim() !== (routine?.name ?? "");
@@ -436,7 +442,7 @@ export function RoutineEditor({
         JSON.stringify(eventFiltersFromDrafts(filters)) !== JSON.stringify(savedFilters)));
   const missedPolicyChanged = missedRuns && trigger === "schedule" && missedPolicy !== savedMissedPolicy;
   const dirty = routine
-    ? nameChanged || instructionChanged || scheduleChanged || webhookChanged || missedPolicyChanged
+    ? nameChanged || instructionChanged || scheduleChanged || webhookChanged || missedPolicyChanged || silentChanged
     : draft !==
       (savedDraft ??
         JSON.stringify({
@@ -448,6 +454,7 @@ export function RoutineEditor({
           filters: [],
           timezone: initialTimezone.current,
           missedPolicy: "skip",
+          silent: false,
           destination: null,
         }));
   useRecordDraftGuard(dirty && !finished, action.pending);
@@ -473,8 +480,11 @@ export function RoutineEditor({
         ...(routine?.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
         // An unchanged policy stays out, so the host keeps the one it has.
         ...(missedRuns && trigger === "schedule" && (!routine || missedPolicyChanged) ? { missedPolicy } : {}),
+        ...(silentSupported && (!routine || silentChanged) ? { silent } : {}),
       };
       const result = await workspace.saveEventRoutine(input, agent.serverId);
+      if (silentSupported && (result.routine.silent ?? false) !== silent)
+        Alert.alert(t("mobile.agent.record.silent"), t("mobile.agent.record.silentSaveFailed"));
       // A save that removes the webhook trigger also ends the secret that this screen shows.
       if (result.secret || result.routine.trigger.kind === "schedule") setSecret(result.secret);
       if (!routine && isWebhookRoutine(result.routine)) {
@@ -497,32 +507,52 @@ export function RoutineEditor({
       return;
     }
     if (port) {
-      if (routine)
-        await port.update({
-          routineId: routine.id,
-          ...(nameChanged ? { name: name.trim() } : {}),
-          ...(instructionChanged ? { instruction: instruction.trim() } : {}),
-          ...(scheduleChanged ? { schedule } : {}),
-        });
-      else await port.create({ name: name.trim(), instruction: instruction.trim(), schedule, timezone, active: true });
+      const saved = routine
+        ? await port.update({
+            routineId: routine.id,
+            ...(nameChanged ? { name: name.trim() } : {}),
+            ...(instructionChanged ? { instruction: instruction.trim() } : {}),
+            ...(scheduleChanged ? { schedule } : {}),
+            ...(silentSupported && silentChanged ? { silent } : {}),
+          })
+        : await port.create({
+            name: name.trim(),
+            instruction: instruction.trim(),
+            schedule,
+            timezone,
+            active: true,
+            ...(silentSupported ? { silent } : {}),
+          });
+      if (silentSupported && (saved.silent ?? false) !== silent)
+        Alert.alert(t("mobile.agent.record.silent"), t("mobile.agent.record.silentSaveFailed"));
       return;
     }
-    if (routine)
-      await workspace.updateAgentRoutine(
-        {
-          agentId: agent.id,
-          routineId: routine.id,
-          ...(nameChanged ? { name: name.trim() } : {}),
-          ...(instructionChanged ? { instruction: instruction.trim() } : {}),
-          ...(scheduleChanged ? { schedule } : {}),
-        },
-        agent.serverId,
-      );
-    else
-      await workspace.createAgentRoutine(
-        { agentId: agent.id, name: name.trim(), instruction: instruction.trim(), schedule, timezone, active: true },
-        agent.serverId,
-      );
+    const saved = routine
+      ? await workspace.updateAgentRoutine(
+          {
+            agentId: agent.id,
+            routineId: routine.id,
+            ...(nameChanged ? { name: name.trim() } : {}),
+            ...(instructionChanged ? { instruction: instruction.trim() } : {}),
+            ...(scheduleChanged ? { schedule } : {}),
+            ...(silentSupported && silentChanged ? { silent } : {}),
+          },
+          agent.serverId,
+        )
+      : await workspace.createAgentRoutine(
+          {
+            agentId: agent.id,
+            name: name.trim(),
+            instruction: instruction.trim(),
+            schedule,
+            timezone,
+            active: true,
+            ...(silentSupported ? { silent } : {}),
+          },
+          agent.serverId,
+        );
+    if (silentSupported && (saved.silent ?? false) !== silent)
+      Alert.alert(t("mobile.agent.record.silent"), t("mobile.agent.record.silentSaveFailed"));
   }
   const shownWebhook = webhookRoutine ?? created ?? undefined;
   // The URL and the secret belong to the saved trigger. An unsaved switch to a webhook has neither yet.
@@ -651,6 +681,25 @@ export function RoutineEditor({
           editable={!disabled}
           onChangeText={setTimezone}
         />
+      ) : null}
+      {silentSupported ? (
+        <SettingsSection>
+          <SettingsRow
+            trailing={
+              <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
+                <Switch
+                  label={t("mobile.agent.record.silent")}
+                  value={silent}
+                  disabled={disabled}
+                  modifiers={nativeLabelFont}
+                  onValueChange={(silent) => setEdits((current) => ({ ...current, silent }))}
+                />
+              </Host>
+            }
+          >
+            <Typography.Paragraph>{t("mobile.agent.record.silentHint")}</Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
       ) : null}
       <SheetSaveAction
         dirty={dirty}

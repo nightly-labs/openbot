@@ -11,6 +11,7 @@ import type { AgentStore } from "../agent-store";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "../conversation-read-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
+import { visibleRoutineStatusSnapshot } from "../routine-status-visibility";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MailboxSync } from "./mailbox-sync";
 
@@ -59,7 +60,7 @@ export class ConversationReader {
       const snapshot = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.setSnapshot(agentId, snapshot);
-      return structuredClone(snapshot);
+      return structuredClone(visibleRoutineStatusSnapshot(snapshot));
     });
   }, Effect.uninterruptible);
 

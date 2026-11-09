@@ -71,6 +71,7 @@ export function settleQuietRoutineTurn(
   snapshot: ConversationSnapshot,
   turnId: string,
   noUpdateCalled: boolean,
+  silent = false,
 ): boolean {
   const turnMessages = snapshot.messages.filter(
     (message) => message.author === "assistant" && message.turnId === turnId,
@@ -88,7 +89,11 @@ export function settleQuietRoutineTurn(
     if (!message) continue;
     if (dropped.has(message)) snapshot.messages.splice(index, 1);
     else if (!reported && message.turnId === turnId && message.author === "assistant") {
-      snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
+      snapshot.messages[index] = {
+        ...message,
+        itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        ...(silent ? { silentRoutineStatus: true } : {}),
+      };
     }
   }
   return !reported;

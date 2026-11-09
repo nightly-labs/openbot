@@ -55,6 +55,7 @@ import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/mess
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
@@ -864,6 +865,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookSenderSecretEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
     () => workspace.state.capabilities.includes(ROUTINE_RUN_PLACE_CAPABILITY),
+    () => workspace.state.capabilities.includes(ROUTINE_STATUS_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1418,6 +1420,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     routineRecoveryEnabled,
     webhookTestsEnabled,
     webhookSenderSecretEnabled,
+    () => workspace.state.capabilities.includes(ROUTINE_STATUS_CAPABILITY),
   );
   const channelsSupported = () =>
     workspace.state.status === "online" &&
@@ -2760,6 +2763,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         localHost: () => false,
                         eventsServerId: () => undefined,
                         routineRecovery: () => false,
+                        routineStatus: () => workspace.state.capabilities.includes(ROUTINE_STATUS_CAPABILITY),
                         webhookTests: () => false,
                         webhookSenderSecret: () => false,
                       },

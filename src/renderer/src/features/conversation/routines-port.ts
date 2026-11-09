@@ -28,6 +28,7 @@ interface RoutineSaveInput {
   missedPolicy?: RoutineMissedPolicy;
   /** Left out, an update keeps the saved place. */
   runIn?: RoutineRunPlace;
+  silent?: boolean;
   /** Only the event API reads it. Schedule-only adapters save `schedule`. */
   trigger?: EventRoutineTriggerInput;
 }
@@ -77,6 +78,7 @@ export interface RoutinesPort {
    * routes drop the field, so the remote adapters send it on that capability's routes.
    */
   runIn: boolean;
+  silent?: boolean;
   list: () => Promise<RoutineEditorRecord[]>;
   listRuns: (routineId: string, limit: number) => Promise<RoutineRunFields[]>;
   save: (input: RoutineSaveInput) => Promise<RoutineSaveResult>;
@@ -114,6 +116,7 @@ export function agentRoutinesPort(
   localHost = false,
   api: AgentRoutinesApi = window.openbot.agent,
   runPlace = localHost,
+  silentStatus = localHost,
 ): RoutinesPort {
   return {
     ownerId: agentId,
@@ -122,13 +125,15 @@ export function agentRoutinesPort(
     missedPolicy: localHost,
     onceSchedule: localHost,
     runIn: runPlace,
+    silent: silentStatus,
     list: () => api.listRoutines(agentId),
     listRuns: (routineId, limit) => api.listRoutineRuns({ agentId, routineId, limit }),
-    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy, runIn }) => {
+    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy, runIn, silent }) => {
       const policy = {
         ...(localHost && limitPolicy ? { limitPolicy } : {}),
         ...(localHost && missedPolicy ? { missedPolicy } : {}),
         ...(runPlace && runIn ? { runIn } : {}),
+        ...(silentStatus && silent !== undefined ? { silent } : {}),
       };
       return (
         routineId
@@ -167,6 +172,7 @@ export function channelRoutinesPort(
   channelId: string,
   api: ChannelRoutinesApi = window.openbot.agent,
   localHost = false,
+  silentStatus = localHost,
 ): RoutinesPort {
   return {
     ownerId: channelId,
@@ -175,12 +181,15 @@ export function channelRoutinesPort(
     missedPolicy: localHost,
     onceSchedule: localHost,
     runIn: false,
+    silent: silentStatus,
     list: () => api.listChannelRoutines(channelId),
     listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),
-    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy }) => {
-      const policy = localHost
-        ? { ...(limitPolicy ? { limitPolicy } : {}), ...(missedPolicy ? { missedPolicy } : {}) }
-        : {};
+    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy, silent }) => {
+      const policy = {
+        ...(localHost && limitPolicy ? { limitPolicy } : {}),
+        ...(localHost && missedPolicy ? { missedPolicy } : {}),
+        ...(silentStatus && silent !== undefined ? { silent } : {}),
+      };
       return (
         routineId
           ? api.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule, ...policy })
@@ -210,7 +219,7 @@ export function eventRoutinesPort(
   api: EventRoutinesApi,
   legacy: Pick<
     RoutinesPort,
-    "listRuns" | "subscribe" | "runCommand" | "missedPolicy" | "onceSchedule" | "runIn" | "results"
+    "listRuns" | "subscribe" | "runCommand" | "missedPolicy" | "onceSchedule" | "runIn" | "silent" | "results"
   >,
 ): RoutinesPort {
   const { runCommand, results } = legacy;
@@ -223,6 +232,7 @@ export function eventRoutinesPort(
     missedPolicy: missedPolicyKept,
     onceSchedule: legacy.onceSchedule,
     runIn: legacy.runIn,
+    silent: legacy.silent,
     list: () => api.listRoutines({ owner }),
     // The released run routes leave out the records of missed occurrences.
     // An agent run names its agent so that the history opens the message the run posted.
@@ -235,7 +245,19 @@ export function eventRoutinesPort(
         }
       : legacy.listRuns,
     events: { owner, api },
-    save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy, missedPolicy, runIn }) =>
+    save: ({
+      routineId,
+      name,
+      instruction,
+      active,
+      timezone,
+      schedule,
+      trigger,
+      limitPolicy,
+      missedPolicy,
+      runIn,
+      silent,
+    }) =>
       api.saveRoutine({
         ...(routineId ? { id: routineId } : {}),
         owner,
@@ -247,6 +269,7 @@ export function eventRoutinesPort(
         ...(limitPolicy ? { limitPolicy } : {}),
         ...(missedPolicyKept && missedPolicy ? { missedPolicy } : {}),
         ...(legacy.runIn && runIn ? { runIn } : {}),
+        ...(legacy.silent && silent !== undefined ? { silent } : {}),
       }),
     remove: (routineId) => api.deleteRoutine({ id: routineId, owner }),
     test: (routineId) => api.testRoutine({ id: routineId, owner }),

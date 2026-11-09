@@ -59,7 +59,9 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
     throw invalidEventInput();
   }
   if (input.runIn !== undefined && input.runIn !== "chat" && input.runIn !== "thread") throw invalidEventInput();
+  if (input.silent !== undefined && typeof input.silent !== "boolean") throw invalidEventInput();
   return {
+    ...(input.silent === undefined ? {} : { silent: input.silent }),
     ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
     owner: owner(input.owner),
     name: requiredString(input.name, 256),

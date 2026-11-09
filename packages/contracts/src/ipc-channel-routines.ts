@@ -87,6 +87,7 @@ export interface CreateChannelRoutineInput {
   limitPolicy?: RoutineLimitPolicy;
   /** `skip` when absent. */
   missedPolicy?: RoutineMissedPolicy;
+  silent?: boolean;
 }
 
 export interface UpdateChannelRoutineInput {
@@ -98,6 +99,7 @@ export interface UpdateChannelRoutineInput {
   schedule?: RoutineSchedule;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  silent?: boolean;
 }
 
 export interface DeleteChannelRoutineInput {

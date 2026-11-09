@@ -129,6 +129,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_STATUS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-status-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -144,6 +145,7 @@ import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/wor
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -274,7 +276,9 @@ import {
   readAgentMemories,
   readAgentMemorySelection,
   readAgentTask,
+  readRoutineStatuses,
   renameAgentThread,
+  saveRoutineStatus,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
   stageAgentImport,
@@ -893,9 +897,25 @@ export function createHostRequestActions({
     resetAgentSessionSetting: async (input, serverId) =>
       runTeamRequest(resetAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     listEventRoutines: (owner, serverId) =>
-      runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
+      runTeamRequest(
+        listEventRoutines(
+          eventsAdmin(serverId),
+          { owner },
+          recovery(serverId),
+          false,
+          has(serverId, ROUTINE_STATUS_CAPABILITY),
+        ),
+      ),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(
+        saveEventRoutine(
+          eventsAdmin(serverId),
+          input,
+          recovery(serverId),
+          false,
+          has(serverId, ROUTINE_STATUS_CAPABILITY),
+        ),
+      ),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -925,44 +945,89 @@ export function createHostRequestActions({
       await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
     },
     createAgentRoutine: async (input, serverId) => {
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "POST",
-          TEAM_API_ROUTES.agent.routines(input.agentId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
-          serverId,
-        ),
+      return saveAgentRecord(
+        queryClient,
+        queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"),
+        async () =>
+          saveRoutineStatus(
+            teamApi(serverId),
+            { kind: "agent", id: input.agentId },
+            await request(
+              "POST",
+              TEAM_API_ROUTES.agent.routines(input.agentId),
+              (value) => {
+                if (!isRoutine(value) || value.agentId !== input.agentId)
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              {
+                name: input.name,
+                instruction: input.instruction,
+                active: input.active,
+                timezone: input.timezone,
+                schedule: input.schedule,
+              },
+              serverId,
+            ),
+            input.silent,
+            has(serverId, ROUTINE_STATUS_CAPABILITY),
+            true,
+          ),
       );
     },
     updateAgentRoutine: async (input, serverId) => {
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
-        ),
+      return saveAgentRecord(
+        queryClient,
+        queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"),
+        async () => {
+          const routine =
+            input.silent !== undefined &&
+            input.name === undefined &&
+            input.instruction === undefined &&
+            input.active === undefined &&
+            input.schedule === undefined
+              ? (
+                  await request(
+                    "GET",
+                    TEAM_API_ROUTES.agent.routines(input.agentId),
+                    (value) => {
+                      if (
+                        !Array.isArray(value) ||
+                        !value.every(isRoutine) ||
+                        value.some((routine) => routine.agentId !== input.agentId)
+                      )
+                        throw new Error("The host returned invalid routines.");
+                      return value;
+                    },
+                    undefined,
+                    serverId,
+                  )
+                ).find((routine) => routine.id === input.routineId)
+              : await request(
+                  "PATCH",
+                  TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+                  (value) => {
+                    if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+                      throw new Error("The host returned an invalid saved record.");
+                    return value;
+                  },
+                  {
+                    ...(input.name === undefined ? {} : { name: input.name }),
+                    ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+                    ...(input.active === undefined ? {} : { active: input.active }),
+                    ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+                  },
+                  serverId,
+                );
+          if (!routine) throw new Error(sourceText("error.backend.routineGone"));
+          return saveRoutineStatus(
+            teamApi(serverId),
+            { kind: "agent", id: input.agentId },
+            routine,
+            input.silent,
+            has(serverId, ROUTINE_STATUS_CAPABILITY),
+          );
+        },
       );
     },
     deleteAgentRoutine: async (agentId, routineId, serverId) => {
@@ -1015,17 +1080,26 @@ export function createHostRequestActions({
     },
     loadAgentMemories: (agentId, serverId) =>
       runTeamRequest(readAgentMemories(memoryRequest(serverId), agentId, has(serverId, AGENT_MEMORIES_CAPABILITY))),
-    loadAgentRoutines: (agentId, serverId) =>
-      request(
-        "GET",
-        TEAM_API_ROUTES.agent.routines(agentId),
-        (value) => {
-          if (!Array.isArray(value) || !value.every(isRoutine) || value.some((routine) => routine.agentId !== agentId))
-            throw new Error("The host returned invalid routines.");
-          return value;
-        },
-        undefined,
-        serverId,
+    loadAgentRoutines: async (agentId, serverId) =>
+      readRoutineStatuses(
+        teamApi(serverId),
+        { kind: "agent", id: agentId },
+        await request(
+          "GET",
+          TEAM_API_ROUTES.agent.routines(agentId),
+          (value) => {
+            if (
+              !Array.isArray(value) ||
+              !value.every(isRoutine) ||
+              value.some((routine) => routine.agentId !== agentId)
+            )
+              throw new Error("The host returned invalid routines.");
+            return value;
+          },
+          undefined,
+          serverId,
+        ),
+        has(serverId, ROUTINE_STATUS_CAPABILITY),
       ),
     loadRoutineCalendar: (input, serverId, owners) =>
       runTeamRequest(

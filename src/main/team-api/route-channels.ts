@@ -143,10 +143,24 @@ function seesChannel(members: readonly { agentId: string }[], hiddenAgentIds: Re
 }
 
 /** A channel that the list leaves out answers as a channel that does not exist. */
-function requireVisibleChannel(channels: ChannelService, channelId: string, hiddenAgentIds: ReadonlySet<string>): void {
+function requireVisibleChannel(
+  channels: Pick<ChannelService, "store">,
+  channelId: string,
+  hiddenAgentIds: ReadonlySet<string>,
+): void {
   if (hiddenAgentIds.size === 0 || !channels.store.exists(channelId)) return;
   if (!seesChannel(channels.store.get(channelId).members, hiddenAgentIds))
     throw new HttpError(404, sourceText("error.backend.channelNotFound"));
+}
+
+export function requireChannelSettingsAccess(
+  context: Pick<TeamApiRequestContext, "member">,
+  channels: Pick<ChannelService, "store"> | undefined,
+  channelId: string,
+  hiddenAgentIds: ReadonlySet<string>,
+): void {
+  if (!channels) throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
+  requireVisibleChannel(channels, channelId, canAdministerServer(context.member.role) ? new Set() : hiddenAgentIds);
 }
 
 /**
@@ -213,7 +227,7 @@ async function routeChannelSettings(
   // `readJson` has already run the body through the channel wire codec, so every field below is
   // decoded and bounded before the IPC parsers see it.
   const body = await readJson(request);
-  requireVisibleChannel(channels, channelId(body), hiddenAgentIds);
+  requireChannelSettingsAccess(context, channels, channelId(body), hiddenAgentIds);
   switch (url.pathname) {
     case CHANNEL_ROUTES.memories:
       return json(200, agents.listChannelMemories(channelId(body)));

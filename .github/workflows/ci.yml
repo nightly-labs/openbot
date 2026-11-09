@@ -373,6 +373,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:routine-pause-resume
 
+      - name: Run the silent routine status E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:routine-silent-status
+
       - name: Run the routine time zone move E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-timezone-move
@@ -658,6 +662,11 @@ jobs:
             .openbot-build/computer-activity-e2e/
             .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/
+            .openbot-build/routine-silent-status-e2e/
+            .openbot-build/routine-silent-status-api-e2e/
+            .openbot-build/routine-silent-status-dom-e2e/
+            .openbot-build/routine-silent-mobile-e2e/
+            .openbot-build/routine-silent-thread-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/

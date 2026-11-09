@@ -48,6 +48,7 @@ function webHostAdmin(
   webhookTestsEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
+  routineStatusEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -56,6 +57,7 @@ function webHostAdmin(
     () => webhookTestsEnabled?.() === true,
     () => webhookSenderSecretEnabled?.() === true,
     () => routineRunPlaceEnabled?.() === true,
+    () => routineStatusEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -129,6 +131,7 @@ export function createWebConversationRuntime(
   webhookSenderSecretEnabled?: () => boolean,
   browserProxiesEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
+  routineStatusEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
@@ -395,6 +398,7 @@ export function createWebConversationRuntime(
           ...teamAgentRoutinesApi(
             (...args) => adminRequest()(...args),
             () => routineRunPlaceEnabled?.() === true,
+            () => routineStatusEnabled?.() === true,
           ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
@@ -412,6 +416,7 @@ export function createWebConversationRuntime(
           webhookTestsEnabled,
           webhookSenderSecretEnabled,
           routineRunPlaceEnabled,
+          routineStatusEnabled,
         )
       : undefined,
   };

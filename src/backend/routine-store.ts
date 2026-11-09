@@ -98,6 +98,8 @@ export interface RoutineInputFields {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
 }
 
 export interface RoutineUpdateFields {
@@ -109,6 +111,8 @@ export interface RoutineUpdateFields {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
 }
 
 interface RoutineWebhookFields {
@@ -141,6 +145,8 @@ export interface RoutineRecordInput {
   missedPolicy?: RoutineMissedPolicy;
   /** Left out, a save keeps the saved place, and a new routine runs in the chat. */
   runIn?: RoutineRunPlace;
+  /** Hides informational status rows for new automatic runs. Omitted updates keep the saved value. */
+  silent?: boolean;
   trigger:
     | { kind: "schedule"; schedule: RoutineSchedule }
     /** A null secret keeps the stored one. */
@@ -180,13 +186,13 @@ export class RoutineStore {
   ) {}
 
   protected get routineColumns(): string {
-    return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
+    return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy, silent,
             ${this.tables.runInColumn ? "run_in, " : ""}created_at, updated_at`;
   }
 
   protected get runColumns(): string {
     return `run_id, routine_id, ${this.tables.ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name,
-            instruction, ${this.tables.handleColumn}, status, error, missed_count, missed_until, run_source, created_at,
+            instruction, ${this.tables.handleColumn}, status, error, missed_count, missed_until, run_source, silent, created_at,
             updated_at`;
   }
 
@@ -279,6 +285,7 @@ export class RoutineStore {
           createdAt,
           sequence,
         );
+        this.#writeSilent(db, routineId, input.silent ?? false);
         this.#writeRunIn(db, routineId, input.runIn ?? "chat");
         this.#insertTrigger(db, routineId, input.timezone, schedule, createdAt, sequence, now);
         return this.#require(routineId, ownerId);
@@ -328,6 +335,7 @@ export class RoutineStore {
           input.routineId,
           ownerId,
         );
+        if (input.silent !== undefined) this.#writeSilent(db, input.routineId, input.silent);
         if (input.runIn) this.#writeRunIn(db, input.routineId, input.runIn);
         if (input.schedule) {
           db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(input.routineId);
@@ -409,6 +417,7 @@ export class RoutineStore {
             timezone: input.timezone,
             limitPolicy,
             missedPolicy,
+            silent: input.silent ?? current?.silent ?? false,
             ...(runIn ? { runIn } : {}),
             trigger: eventTrigger,
           },
@@ -439,6 +448,7 @@ export class RoutineStore {
           timestamp,
           sequence,
         );
+        this.#writeSilent(db, id, input.silent ?? current?.silent ?? false);
         if (runIn) this.#writeRunIn(db, id, runIn);
         if (schedule) {
           if (current?.trigger.kind === "webhook") {
@@ -683,7 +693,7 @@ export class RoutineStore {
         .prepare(
           `SELECT trigger.trigger_id, trigger.next_run_at, trigger.schedule_json, routine.routine_id,
                   routine.${ownerColumn}, routine.name, routine.instruction, routine.active, routine.timezone,
-                  routine.limit_policy, routine.missed_policy, ${this.tables.runInColumn ? "routine.run_in, " : ""}
+                  routine.limit_policy, routine.missed_policy, routine.silent, ${this.tables.runInColumn ? "routine.run_in, " : ""}
                   routine.created_at, routine.updated_at
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
@@ -981,11 +991,12 @@ export class RoutineStore {
     const { runTable, ownerColumn, handleColumn } = this.tables;
     const createdAt = new Date().toISOString();
     const { kind, source } = runStartColumns(start);
+    const silent = start !== "test" && this.getRecord(routine.ownerId, routine.id)?.silent === true;
     db.prepare(
       `INSERT INTO ${runTable} (
          run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, run_source, scheduled_for, routine_name,
-         instruction, ${handleColumn}, status, error, created_at, updated_at, last_event_sequence
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'queued', NULL, ?, ?, ?)`,
+         instruction, ${handleColumn}, status, error, silent, created_at, updated_at, last_event_sequence
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'queued', NULL, ?, ?, ?, ?)`,
     ).run(
       runId,
       routine.id,
@@ -996,6 +1007,7 @@ export class RoutineStore {
       scheduledFor,
       routine.name,
       routine.instruction,
+      silent ? 1 : 0,
       createdAt,
       createdAt,
       sequence,
@@ -1084,10 +1096,15 @@ export class RoutineStore {
       timezone: requiredStringColumn(row, "timezone"),
       limitPolicy,
       missedPolicy,
+      silent: requiredNumberColumn(row, "silent") === 1,
       ...this.#runIn(row),
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
     };
+  }
+
+  #writeSilent(db: OpenBotDatabase["connection"], routineId: string, silent: boolean): void {
+    db.prepare(`UPDATE ${this.tables.routineTable} SET silent = ? WHERE routine_id = ?`).run(silent ? 1 : 0, routineId);
   }
 
   #runIn(row: DynamicRecord): { runIn?: RoutineRunPlace } {
@@ -1147,6 +1164,7 @@ export class RoutineStore {
       ownerId: requiredStringColumn(row, this.tables.ownerColumn),
       triggerId: optionalStringColumn(row, "trigger_id"),
       kind,
+      silent: requiredNumberColumn(row, "silent") === 1,
       ...(source === null ? {} : { source }),
       scheduledFor: requiredStringColumn(row, "scheduled_for"),
       routineName: requiredStringColumn(row, "routine_name"),

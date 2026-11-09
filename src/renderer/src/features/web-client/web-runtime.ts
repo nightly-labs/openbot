@@ -780,7 +780,7 @@ export function createWebWorkspaceRuntime(
       revokeInvite: (inviteId) => runTeamEffect(directory.revokeInvite(inviteId)),
     },
   };
-  const channels = teamChannelsApi(teamApi);
+  const channels = teamChannelsApi(teamApi, () => capabilities.includes("routine-status-v1"));
   /** The routine flow routes, sent only to a host that negotiated them. */
   async function routineFlowsRequest<T>(
     method: string,

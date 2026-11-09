@@ -331,7 +331,7 @@ import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/w
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
 import { bytesToBase64 } from "./base64";
-import { type TeamApiRequest, withRoutineRunPlaces } from "./team-api-requests";
+import { readRoutineStatuses, saveRoutineStatus, type TeamApiRequest, withRoutineRunPlaces } from "./team-api-requests";
 
 export class TeamAdminRequestError extends Schema.TaggedError<TeamAdminRequestError>()("TeamAdminRequestError", {
   cause: Schema.Defect(),
@@ -508,16 +508,20 @@ export function listEventRoutines(
   input: ListEventRoutinesInput,
   recovery = false,
   runPlaces = false,
+  routineStatus = false,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
   const path = recovery ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines;
   const routines = adminCall(() => request("POST", path, decodeEventRoutines, eventBody(input)));
   const { owner } = input;
-  if (!runPlaces || owner.kind !== "agent") return routines;
+  const withStatus = (list: EventRoutine[]) =>
+    adminCall(() => readRoutineStatuses(request, owner, list, routineStatus));
+  if (!runPlaces || owner.kind !== "agent") return routines.pipe(Effect.flatMap(withStatus));
   const places = adminCall(() =>
     request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId: owner.id }),
   );
   return Effect.all([routines, places], { concurrency: "unbounded" }).pipe(
     Effect.map(([list, entries]) => withRoutineRunPlaces(list, entries)),
+    Effect.flatMap(withStatus),
   );
 }
 
@@ -532,9 +536,24 @@ export function saveEventRoutine(
   input: SaveEventRoutineInput,
   recovery = false,
   runPlaces = false,
+  routineStatus = false,
 ): Effect.Effect<SaveEventRoutineResult, TeamAdminRequestError> {
   const path = recovery ? ROUTINE_RECOVERY_ROUTES.saveRoutine : EVENTS_ROUTES.saveRoutine;
-  const saved = adminCall(() => request("POST", path, decodeSaveEventRoutineResult, eventBody(input)));
+  const saved = adminCall(() => request("POST", path, decodeSaveEventRoutineResult, eventBody(input))).pipe(
+    Effect.flatMap((result) =>
+      adminCall(async () => ({
+        ...result,
+        routine: await saveRoutineStatus(
+          request,
+          input.owner,
+          result.routine,
+          input.silent,
+          routineStatus,
+          input.id === undefined,
+        ),
+      })),
+    ),
+  );
   const { owner, runIn } = input;
   if (!runPlaces || owner.kind !== "agent" || runIn === undefined) return saved;
   return Effect.gen(function* () {

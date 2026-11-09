@@ -297,6 +297,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
     ...optionalMissedPolicy(value.missedPolicy),
+    ...optionalSilent(value.silent),
     ...optionalRunPlace(value.runIn),
   };
 }
@@ -320,6 +321,7 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed,
     optionalLimitPolicy(value.limitPolicy),
     optionalMissedPolicy(value.missedPolicy),
+    optionalSilent(value.silent),
     optionalRunPlace(value.runIn),
   );
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
@@ -336,6 +338,12 @@ function optionalMissedPolicy(value: unknown): { missedPolicy?: RoutineMissedPol
   if (value === undefined) return {};
   if (!isOneOf(ROUTINE_MISSED_POLICIES, value)) throw new Error("Invalid routine missed-run policy.");
   return { missedPolicy: value };
+}
+
+function optionalSilent(value: unknown): { silent?: boolean } {
+  if (value === undefined) return {};
+  if (!isBoolean(value)) throw new Error("silent must be a boolean.");
+  return { silent: value };
 }
 
 function optionalRunPlace(value: unknown): { runIn?: RoutineRunPlace } {
@@ -425,6 +433,7 @@ export function parseCreateChannelRoutine(value: unknown): CreateChannelRoutineI
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
     ...optionalMissedPolicy(value.missedPolicy),
+    ...optionalSilent(value.silent),
   };
 }
 
@@ -443,7 +452,12 @@ export function parseUpdateChannelRoutine(value: unknown): UpdateChannelRoutineI
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
-  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy), optionalMissedPolicy(value.missedPolicy));
+  Object.assign(
+    parsed,
+    optionalLimitPolicy(value.limitPolicy),
+    optionalMissedPolicy(value.missedPolicy),
+    optionalSilent(value.silent),
+  );
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }

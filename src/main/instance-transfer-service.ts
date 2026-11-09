@@ -314,6 +314,7 @@ export class InstanceTransferService {
           ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
           ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
           ...(routine.runIn ? { runIn: routine.runIn } : {}),
+          ...(routine.silent === undefined ? {} : { silent: routine.silent }),
         }));
       const oneTimeRoutines = routines.filter((routine) => routine.schedule.kind === "once");
 
@@ -916,6 +917,7 @@ export class InstanceTransferService {
                   ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
                   ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
                   ...(routine.runIn ? { runIn: routine.runIn } : {}),
+                  ...(routine.silent === undefined ? {} : { silent: routine.silent }),
                 },
                 { recordConversationEvent: false },
               ),

@@ -706,8 +706,8 @@ export interface MobileWorkspaceContextValue {
   duplicateAgent: (agentId: string) => Promise<void>;
   saveAgentMemory: (agentId: string, text: string, serverId: string, memoryId?: string) => Promise<void>;
   deleteAgentMemory: (agentId: string, memoryId: string, serverId: string) => Promise<void>;
-  createAgentRoutine: (input: CreateRoutineInput, serverId: string) => Promise<void>;
-  updateAgentRoutine: (input: UpdateRoutineInput, serverId: string) => Promise<void>;
+  createAgentRoutine: (input: CreateRoutineInput, serverId: string) => Promise<Routine>;
+  updateAgentRoutine: (input: UpdateRoutineInput, serverId: string) => Promise<Routine>;
   deleteAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   /** Event administration is available only to owners and admins on hosts with events-v1. */
@@ -717,6 +717,7 @@ export interface MobileWorkspaceContextValue {
    * what a scheduled routine does with the runs that came due while the host was off.
    */
   canManageMissedRuns: (serverId: string) => boolean;
+  supportsRoutineStatus: (serverId: string) => boolean;
   /** An owner or admin of a host with `routine-results-v1`: an agent routine can send its answers on. */
   canManageRoutineResults: (serverId: string) => boolean;
   /** The host's enabled messaging connections, with the places that each one can post in. */
@@ -1159,6 +1160,7 @@ type MobileWorkspaceStateKey =
   | "canSendNotifications"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "supportsRoutineStatus"
   | "canManageRoutineResults"
   | "canManageAgentSkills"
   | "canManageAgentAccess"

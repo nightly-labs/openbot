@@ -1134,6 +1134,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     limitPolicy?: Routine["limitPolicy"];
     missedPolicy?: Routine["missedPolicy"];
     runIn?: Routine["runIn"];
+    silent?: boolean;
   }): Routine {
     const now = new Date().toISOString();
     const routineId = crypto.randomUUID();
@@ -1147,6 +1148,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       limitPolicy: input.limitPolicy ?? "wait",
       missedPolicy: input.missedPolicy ?? "skip",
       runIn: input.runIn ?? "chat",
+      silent: input.silent ?? false,
       trigger: {
         id: crypto.randomUUID(),
         routineId,
@@ -2728,6 +2730,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
           ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
+          ...(input.silent === undefined ? {} : { silent: input.silent }),
           ...(input.schedule === undefined
             ? {}
             : {

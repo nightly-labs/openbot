@@ -254,6 +254,8 @@ export interface ConversationMessage {
    * `ipc-conversation-trace.ts`). It stays on this computer: the Team API projections drop it.
    */
   trace?: ConversationTurnTrace | undefined;
+  /** Host-owned visibility snapshot. The durable conversation keeps the message; chat projections omit it. */
+  silentRoutineStatus?: boolean;
 }
 
 export function isConversationMessage(value: unknown): value is ConversationMessage {
@@ -302,7 +304,8 @@ export function isConversationMessage(value: unknown): value is ConversationMess
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
-    (value.trace === undefined || isConversationTurnTrace(value.trace))
+    (value.trace === undefined || isConversationTurnTrace(value.trace)) &&
+    (value.silentRoutineStatus === undefined || isBoolean(value.silentRoutineStatus))
   );
 }
 

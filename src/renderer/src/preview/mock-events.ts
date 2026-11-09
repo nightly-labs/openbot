@@ -53,6 +53,7 @@ export function createMockEvents(
             ? { ...clone(input.trigger), url: `https://hooks.example.test/openbot/${id}` }
             : clone(input.trigger),
         ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
+        silent: input.silent ?? existing?.silent ?? false,
         ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
         // Only an agent routine has a place to run. A save that leaves it out keeps the saved place.
         ...(input.owner.kind === "agent" ? { runIn: input.runIn ?? existing?.runIn ?? "chat" } : {}),

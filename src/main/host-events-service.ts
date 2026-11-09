@@ -666,6 +666,7 @@ export class HostEventsService implements HostEventsApi {
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
           ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
+          ...(input.silent === undefined ? {} : { silent: input.silent }),
         }),
       );
       return { saved, secret };

@@ -12,6 +12,7 @@
     "src/renderer/**/*.tsx",
     "packages/contracts/src/**/*.ts",
     "packages/ui/src/**/*.ts",
-    "packages/ui/src/**/*.tsx"
+    "packages/ui/src/**/*.tsx",
+    "scripts/routine-silent-status-dom-fixture.tsx"
   ]
 }

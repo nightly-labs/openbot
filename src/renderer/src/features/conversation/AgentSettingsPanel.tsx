@@ -90,6 +90,7 @@ interface AgentSettingsPanelProps
   routines?: AgentRoutinesApi | undefined;
   /** A joined host that advertises `routine-run-place-v1` keeps where each routine runs. */
   routineRunPlace?: boolean | undefined;
+  routineStatus?: boolean | undefined;
   onCreateSkill?: (() => void) | undefined;
   onTrySkill?: ((skill: SkillDetail) => void) | undefined;
   /** Reads a file in the agent workspace, on the computer that runs the agent. */
@@ -221,6 +222,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       props.localHost === true,
       props.routines,
       props.localHost === true || props.routineRunPlace === true,
+      props.localHost === true || props.routineStatus === true,
     ),
   );
   const routinesPort = createMemo(() => {
