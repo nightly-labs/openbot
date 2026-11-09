@@ -313,6 +313,7 @@ export const messages = {
   "routine.settings.missedPolicy.skip": "Pular esta execução",
   "routine.settings.missedPolicy.runOnce": "Executar uma vez quando o OpenBot abrir",
   "routine.settings.runInThread": "Executar em um tópico separado",
+  "routine.settings.runInSaveFailed": "A rotina foi salva, mas a configuração de tópico separado não. Tente de novo.",
   "routine.settings.resultDestination": "Enviar respostas para",
   "routine.settings.resultDestination.none": "Somente este chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

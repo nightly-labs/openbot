@@ -32,6 +32,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
+import { setCompactMessageActions, useCompactMessageActions } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { webReportsEnabled } from "../../error-reports";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
@@ -94,6 +95,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const [taskSound, setTaskSoundChoice] = createSignal(readTaskSound());
   const sendShortcutMode = useSendShortcutMode();
   const showAgentSteps = useShowAgentSteps();
+  const compactMessageActions = useCompactMessageActions();
   // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
   const readSoundSettings = () => {
@@ -214,6 +216,12 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 onChange={(checked) => setShowAgentSteps(checked)}
                 label={t("settings.showAgentSteps.title")}
                 description={t("settings.showAgentSteps.description")}
+              />
+              <SwitchField
+                checked={compactMessageActions()}
+                onChange={(checked) => setCompactMessageActions(checked)}
+                label={t("settings.compactMessageActions.title")}
+                description={t("settings.compactMessageActions.description")}
               />
               <Item class="settings-modal-row">
                 <ItemContent>

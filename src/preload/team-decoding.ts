@@ -16,7 +16,9 @@ import {
   type InvitePreview,
   type InviteSummary,
   isAvatarColor,
+  isRemoteControlAccess,
   REMOTE_DESKTOP_ERROR_CODES,
+  type RemoteControlPolicy,
   type RemoteDesktopConnectResult,
   type RemoteDesktopDisplay,
   type RemoteDesktopSession,
@@ -111,6 +113,12 @@ export function decodeHostStatus(value: unknown): HostStatus {
     remoteDesktopMaxSessions: requiredNumber(status, "remoteDesktopMaxSessions"),
     message: nullableString(status, "message"),
   };
+}
+
+export function decodeRemoteControlPolicy(value: unknown): RemoteControlPolicy {
+  const policy = decodeRecord(value, "remote control policy");
+  if (!isRemoteControlAccess(policy.access)) throw new Error("Invalid remote control access.");
+  return { access: policy.access, askOnHost: requiredBoolean(policy, "askOnHost") };
 }
 
 export function decodeTeamMember(value: unknown): TeamMemberSummary {

@@ -37,6 +37,12 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
+  // CLDR Hebrew: one for 1 and for fractions below 1; two for 2; other for every other number.
+  he: (count) => {
+    const absolute = Math.abs(count);
+    if (absolute === 1 || (absolute > 0 && absolute < 1)) return "one";
+    return absolute === 2 ? "two" : "other";
+  },
   // CLDR Italian: one for 1; many for nonzero integer multiples of one million.
   it: (count) => {
     const absolute = Math.abs(count);

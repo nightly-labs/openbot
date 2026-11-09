@@ -40,7 +40,33 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
-module.exports = withUniwindConfig(config, {
+const uniwindConfig = withUniwindConfig(config, {
   cssEntryFile: "./global.css",
   dtsFile: "./src/uniwind-types.d.ts",
 });
+
+// The Uniwind component wrappers get `react-native` from `src/shims/uniwind-react-native.js`, so
+// `Text` and `TextInput` take the text size of the app. Metro caches a resolution from
+// `node_modules` per folder, not per file, so the whole wrapper folder gets the shim. The shims read
+// the real `react-native` through a name that only they use. This wraps the Uniwind resolver, which
+// sends each `react-native` import outside Uniwind to the wrappers.
+const SHIMS = path.resolve(__dirname, "src/shims");
+const UNIWIND_REACT_NATIVE = path.join(SHIMS, "uniwind-react-native.js");
+const ORIGINAL_REACT_NATIVE = "openbot-original-react-native";
+const UNIWIND_WRAPPERS = path.join("node_modules", "uniwind", "src", "components", "native");
+const uniwindResolveRequest = uniwindConfig.resolver.resolveRequest;
+uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === ORIGINAL_REACT_NATIVE && path.dirname(context.originModulePath) === SHIMS) {
+    return context.resolveRequest(context, "react-native", platform);
+  }
+  if (
+    moduleName === "react-native" &&
+    platform !== "web" &&
+    path.dirname(context.originModulePath).endsWith(UNIWIND_WRAPPERS)
+  ) {
+    return { filePath: UNIWIND_REACT_NATIVE, type: "sourceFile" };
+  }
+  return uniwindResolveRequest(context, moduleName, platform);
+};
+
+module.exports = uniwindConfig;

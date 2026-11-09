@@ -58,6 +58,17 @@ export const SIGNAL_TURN_CREDENTIAL_TTL_SECONDS = 60 * 60;
 // working for everyone except the users behind a symmetric NAT.
 export const SIGNAL_TURN_REFRESH_INTERVAL_MS = Math.floor(SIGNAL_TURN_CREDENTIAL_TTL_SECONDS * 0.75) * 1_000;
 
+// How long Signal keeps a client's connection after the client's socket closes, so the client can
+// resume it with its resume token. Then Signal tells the host to drop the connection. A Signal that
+// sends no `reconnectGraceMs` in `ready` uses the default. The client value is for a host that
+// multiplexes: an older host serves one session, and a kept connection would hold off the others.
+export const SIGNAL_DEFAULT_RECONNECT_GRACE_MS = 30_000;
+export const SIGNAL_CLIENT_RECONNECT_GRACE_MS = 10 * 60_000;
+
+// The code that the desktop's WebRTC window gives main in `signal-closed` when it replaced a host
+// socket that did not answer in time. It is not a WebSocket close code and never goes to Signal.
+export const SIGNAL_NO_READY_CLOSE_CODE = "no-ready";
+
 // Which side of the relay a socket is. Only a host may set `multiplex`. An `ingress` socket belongs
 // to a host too, but it only receives Slack and Discord deliveries: Signal never attaches a client
 // to it, so it can stay open while the host is not published.
@@ -223,6 +234,10 @@ export type SignalServerMessage =
       // `ingress` only, and optional: what this Signal can do beyond Slack, such as `telegram`. An
       // older Signal sends none.
       capabilities?: string[];
+      // `client` only, and optional: how long Signal keeps this connection after the client's socket
+      // closes, for a resume with the resume token. Then it tells the host to drop the connection.
+      // An older Signal sends none and uses `SIGNAL_DEFAULT_RECONNECT_GRACE_MS`.
+      reconnectGraceMs?: number;
     }
   // Answers a client hello with `waitForHost` while its host is offline. The socket stays open, and
   // Signal sends `ready` on it when the host connects. `resumeToken` lets the client renew the socket

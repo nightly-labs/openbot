@@ -130,8 +130,9 @@ export function useChatAttachments(
   // The same checks as desktop, named per file: one selection can hold several, and the user
   // needs to know which one to fix.
   function assertSupported(name: string) {
-    if (!isSupportedAttachmentName(name)) throw new Error(t("mobile.chat.attachment.unsupported", { name }));
-    if (support && !isSupportedAttachmentNameFor(name, support())) {
+    if (!support) {
+      if (!isSupportedAttachmentName(name)) throw new Error(t("mobile.chat.attachment.unsupported", { name }));
+    } else if (!isSupportedAttachmentNameFor(name, support())) {
       const type = attachmentFileExtension(name)?.toUpperCase();
       throw new Error(
         type

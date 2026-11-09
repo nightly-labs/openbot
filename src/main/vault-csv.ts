@@ -9,6 +9,8 @@ export interface CsvLogin {
   username: string;
   password: string;
   notes: string;
+  /** The two-step key or `otpauth:` link, or "" when the export has none. */
+  twoStepKey: string;
 }
 
 const COLUMNS = {
@@ -16,6 +18,8 @@ const COLUMNS = {
   username: ["username", "login_username", "user name", "login", "email"],
   password: ["password", "login_password"],
   notes: ["notes", "note", "extra", "comments"],
+  // Bitwarden, Proton Pass, and 1Password or Apple Passwords.
+  twoStepKey: ["login_totp", "totp", "otpauth"],
   type: ["type"],
 } as const;
 
@@ -66,6 +70,7 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
   // Proton Pass writes an email and a username column, and a login can fill only one of them.
   const userNames = names.flatMap((name, index) => (COLUMNS.username.some((choice) => choice === name) ? [index] : []));
   const notes = column(COLUMNS.notes);
+  const twoStepKey = column(COLUMNS.twoStepKey);
   const type = column(COLUMNS.type);
   const logins: CsvLogin[] = [];
   let otherRows = 0;
@@ -79,6 +84,7 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
       username: userNames.map((index) => cells[index]?.trim()).find(Boolean) ?? "",
       password: cells[password] ?? "",
       notes: notes < 0 ? "" : (cells[notes]?.trim() ?? ""),
+      twoStepKey: twoStepKey < 0 ? "" : (cells[twoStepKey]?.trim() ?? ""),
     });
   }
   return { logins, otherRows };

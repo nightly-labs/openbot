@@ -1,12 +1,10 @@
 import { LOCAL_SERVER_ID, type RemovableRuntimes, type TeamMemberSummary } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "@openbot/ui/data";
 import { MachineResources } from "@openbot/ui/features/files/MachineResources";
 import { StorageOverview } from "@openbot/ui/features/files/StorageOverview";
-import { createEffect, createSignal, Show, untrack } from "solid-js";
-import { toAgentProfile } from "../../app-message-projection";
+import { createEffect, createSignal, Show } from "solid-js";
 import { type FilesPort, filesPort } from "./files-port";
 import { createMachineResources } from "./machine-resources";
-import { createStorageUsage } from "./storage-usage";
+import { createServerAgents, createStorageUsage } from "./storage-usage";
 
 export interface ServerStorageOptions {
   /** The computer the numbers belong to, such as "This Mac" or the server name. */
@@ -30,23 +28,7 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
   const calls = () => props.calls ?? filesPort();
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), calls);
   const machine = createMachineResources(() => ({ serverId: props.serverId, canManage: props.canManage }), calls);
-  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
-  createEffect(
-    () => props.serverId,
-    (serverId) => {
-      let current = true;
-      untrack(calls)
-        .agent.listAgents(serverId)
-        .then((list) => {
-          if (current) setAgents(list.map(toAgentProfile));
-        })
-        // Without names the rows still show sizes; the storage read reports its own failure.
-        .catch(() => undefined);
-      return () => {
-        current = false;
-      };
-    },
-  );
+  const agents = createServerAgents(() => props.serverId, calls);
 
   // Only this computer: a server removes its own old versions, and its store is not reachable here.
   const runtimes = () => {

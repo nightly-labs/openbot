@@ -81,6 +81,37 @@ message tags the account with `@<row name>`.
 
 Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
 
+### Members and the MCP servers of a joined server
+
+A host with `mcp-member-access-v1` lets a member, not only an owner or admin, use the routes of
+`mcp-servers-v1`, `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`.
+The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api/mcp-member-access.ts).
+
+| Part | Rule |
+| --- | --- |
+| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer, and `canManageMcpServers` what the phone offers. |
+| Read and add | A member reads the whole list, with its `env` and header values, tests a server, and adds a server, a stdio command too. |
+| Change | A member changes, turns on or off, or removes only a server that the member added. Any other row gets 403 `error.team.mcpServerNotYours`. Owners and admins change every row. |
+| Owners | `McpServerOwnersStore` keeps the member ID of each row that a joined server added, in `openbot-mcp-server-owners-v1.json`. A row with no entry, such as one added on the host, counts as an admin's. A damaged file reads as empty. |
+| Sign-in | A sign-in belongs to an address (`mcpOAuthAccountKey`), not to a row. A member starts, cancels or signs out a sign-in, or changes a sign-in app, only when each row on that address is the member's. Each server keeps one sign-in, which every agent of the host uses. |
+| Providers | Provider sign-ins, account starts and agent links on the relay stay with owners and admins. |
+
+Run `bun run test:mcp-member-access` to check these rules on a real host.
+
+### How many MCP servers a host keeps
+
+A computer keeps up to 100 MCP servers (`INPUT_LIMITS.mcpServers`). Disabled rows count too. The
+released codecs of `mcp-servers-v1` and `mcp-sign-in-v1` read at most 32 rows in one list, and they
+are frozen. The protocol 9 capability `mcp-many-servers-v1`
+([`mcp-many-servers-v1.ts`](../../packages/contracts/src/team-protocol/mcp-many-servers-v1.ts)) lets a
+list hold 100 rows when both peers send it. The rows and the requests keep their frozen shapes.
+
+| Peer | Rule |
+| --- | --- |
+| Client with the capability | Reads lists of up to 100 rows. |
+| Client without it | Works while the host has 32 rows or fewer. When a route would answer with more, or a save would add the 33rd row, the host refuses it with 409 `error.team.mcpServerListNeedsUpdate` before it changes anything (`requireMcpListFits` in [`route-mcp.ts`](../../src/main/team-api/route-mcp.ts)). |
+| Transfer file | An export can hold up to 100 rows. An app before this change refuses the Settings section of a file with more than 32. |
+
 ### How an agent reaches a signed-in MCP server
 
 An agent never gets an OAuth token. `McpGateway.endpoint` gives a provider a route of
@@ -197,17 +228,19 @@ capability answers that the sign-in must be done on the host.
 
 ### Rules
 
-- Only an owner or admin can use a relay route. `requireAdmin` runs on every route.
+- Only an owner or admin can use a relay route. `requireAdmin` runs on every route. With
+  `mcp-member-access-v1`, a member also uses `mcp/start`, `status`, `complete` and `cancel`, under
+  the rules of [Members and the MCP servers of a joined server](#members-and-the-mcp-servers-of-a-joined-server).
 - `flowId` is 128 random bits. A flow completes once, only for the member who started it, and
   ends after `SIGN_IN_RELAY_TTL_MS` (10 minutes). An unknown flow, an expired flow and the flow of
   another member get the same `404`.
 - The client sends only the query of the callback. The host checks `state` against the page address
   that its own sign-in made. A client can never choose a host port, host name or path.
 - The host names a callback only for `http:` on `127.0.0.1`, `localhost` or `[::1]`, with a port.
-- The host chooses the page, so a host that is not honest could ask for a grant of another account
-  in the user's browser. The client therefore:
-  - opens only an `https:` page, and only when the user clicks "Open sign-in page" in the dialog
-    that shows the page's host name;
+- The host chooses the page. The client therefore:
+  - opens only an `https:` page. The desktop app opens it as soon as the sign-in waits, and the
+    dialog shows the page's host name, with "Open sign-in page" to open it again. The browser client
+    opens it only on that click, because a browser blocks a page that no click opened;
   - reads the callback port and path from the page's `redirect_uri`, not from the host's `callback`;
   - refuses a page with no `state`, so its listener hands on only the callback of this sign-in.
 - The client listener refuses a request whose `Host` header is not a loopback name, a method that
@@ -234,7 +267,7 @@ capability answers that the sign-in must be done on the host.
 
 - [ ] The host builds the full callback address from its own record. The client sends only a query.
 - [ ] The host checks `state` before it delivers. The client refuses a page with no `state`.
-- [ ] Nothing opens the page before the user sees its host name and asks.
+- [ ] The client opens only an `https:` page, and the dialog shows its host name.
 - [ ] One flow completes once, for one member, before its deadline.
 - [ ] The code is registered with `registerSecretValue` and never logged.
 - [ ] The route uses `requireAdmin`, and its codec is in an optional capability (not in bootstrap).
@@ -326,7 +359,8 @@ is one folder per plugin in [`marketplace/plugin-catalog/`](../../marketplace/pl
    names how the user connects:
    - `link`: a browser sign-in. OpenBot is the OAuth client (`McpOAuth` in
      [`mcp-oauth-provider.ts`](../../src/backend/mcp-oauth-provider.ts)): discovery, dynamic
-     registration, PKCE and refresh. The tokens stay in encrypted storage. No bridge program.
+     registration or a client metadata document, PKCE and refresh. The tokens stay in encrypted
+     storage. No bridge program.
    - `key`: one or two fields that go into a `header` (http) or an `env` value (stdio).
    - `local`: steps that the user does on the computer that runs the server.
 
@@ -357,11 +391,20 @@ only when the smoke passes for it:
 | `auth` | The server must |
 | --- | --- |
 | None | Answer `initialize` with no credential. |
-| `link` | Refuse `initialize` with a 401 and a `Bearer` challenge. Publish protected-resource metadata that names an authorization server. That server's metadata lists a `registration_endpoint`, `S256` in `code_challenge_methods_supported` and the `code` response type. Its endpoints use https and public addresses. |
+| `link` | Refuse `initialize` with a 401 and a `Bearer` challenge. Publish protected-resource metadata that names an authorization server. That server's metadata lists a `registration_endpoint` or sets `client_id_metadata_document_supported`, and lists `S256` in `code_challenge_methods_supported` and the `code` response type. Its endpoints use https and public addresses. |
 
-A `link` server with no `registration_endpoint` fails: each user would have to register a sign-in app
-first. Use a `key` flow for it, or leave it out. The smoke reads metadata only. It never registers a
-client and never sends a credential.
+A `link` server with neither fails: each user would have to register a sign-in app first. Use a `key`
+flow for it, or leave it out. The smoke reads metadata only. It never registers a client and never
+sends a credential.
+
+A server with no `registration_endpoint` that sets `client_id_metadata_document_supported` gets
+OpenBot's client metadata document (CIMD, SEP-991) as the `client_id`:
+`https://openbot.run/oauth/mcp-client.json`, which `apps/auth-api` serves
+([`mcp-client[.]json.ts`](../../apps/auth-api/src/routes/oauth/mcp-client%5B.%5Djson.ts)). Its
+`redirect_uris` holds only `http://127.0.0.1:28417/mcp-auth`: ElevenLabs refuses a document that
+also lists a custom scheme such as `openbot://mcp-auth` (#5748). A server that
+offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
+loopback address has another port, and a server that compares ports refuses it.
 
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the

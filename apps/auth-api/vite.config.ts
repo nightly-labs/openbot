@@ -3,7 +3,8 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
-import { defineConfig, normalizePath, type Plugin } from "vite";
+import { defineConfig, type Plugin } from "vite";
+import { lazyLanguageCatalogs } from "../../packages/i18n/src/vite-plugin";
 import { contentImages } from "./content-images";
 import { DEVELOPMENT_APNS_PATH, developmentApnsProxy } from "./dev-apns-proxy";
 import { developmentNetworkRequestAllowed } from "./dev-network-access";
@@ -66,7 +67,8 @@ export default defineConfig(({ command }) => {
           return { vars: { ...config.vars, ...localRuntimeVars } };
         },
       }),
-      lazyLanguageCatalogs(),
+      // The Worker keeps every language in its bundle.
+      lazyLanguageCatalogs({ applyToEnvironment: (environment) => environment.name === "client" }),
       bloubServerBuild(),
       tanstackStart(),
       solidPlugin({ ssr: true }),
@@ -100,26 +102,6 @@ function developmentLanGuard(): Plugin {
         response.statusCode = 404;
         response.end();
       });
-    },
-  };
-}
-
-const I18N_SOURCE = normalizePath(fileURLToPath(new URL("../../packages/i18n/src/", import.meta.url)));
-const EAGER_CATALOG_MODULES = new Set(["./app-catalogs", "./source-catalogs", "./format-catalogs", "./locale-loading"]);
-
-/**
- * The browser bundle loads each language other than English on first use (see
- * `packages/i18n/src/lazy-catalogs.ts`). The Worker keeps every language in its bundle.
- */
-function lazyLanguageCatalogs(): Plugin {
-  return {
-    name: "openbot-lazy-language-catalogs",
-    enforce: "pre",
-    applyToEnvironment: (environment) => environment.name === "client",
-    resolveId(source, importer) {
-      if (!importer || !EAGER_CATALOG_MODULES.has(source)) return null;
-      if (!normalizePath(importer).startsWith(I18N_SOURCE)) return null;
-      return `${I18N_SOURCE}lazy-catalogs.ts`;
     },
   };
 }

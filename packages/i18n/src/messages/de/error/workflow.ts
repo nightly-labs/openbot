@@ -26,6 +26,9 @@ export const messages = {
   "error.workflow.notRetryable": "Nur ein fehlgeschlagener oder gestoppter Schritt kann erneut laufen.",
   "error.workflow.noDecision": "Dieser Schritt wartet nicht auf eine Entscheidung.",
   "error.workflow.outputPlaceMissing": "Wähle einen Messaging-Ort für diese Ausgabe.",
+  "error.workflow.outputChannelMissing": "Wähle einen Kanal für diese Ausgabe.",
+  "error.workflow.outputChannelFailed":
+    "OpenBot konnte das Ergebnis nicht im Kanal posten. Führe den Schritt erneut aus.",
   "error.workflow.discordNoMessage":
     "Diese Ausgabe wirkt auf die Discord-Nachricht, die den Lauf gestartet hat. Starte den Lauf über eine Discord-Erwähnung oder wähle „Im Kanal posten“.",
   "error.workflow.slackNoMessage":

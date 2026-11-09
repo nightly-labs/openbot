@@ -8,8 +8,10 @@
 // below does not change which codec a route gets.
 import { withAgentTaskUiBlocks } from "./agent-task-ui-blocks-v1";
 import { isChannelAttentionRoute, withChannelAttention } from "./channel-attention-v1";
+import { withChannelDraftIsolation, withChannelIsolation } from "./channel-isolation-v1";
 import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
+import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
@@ -28,27 +30,45 @@ export interface TeamSideRouteOptions {
   channelAttention?: boolean;
   /** agent-task-ui-blocks-v1: a task conversation keeps its UI blocks. Passed as `channelAttention` is. */
   agentTaskUiBlocks?: boolean;
+  /**
+   * channel-isolation-v1: a channel keeps `isolated`, in a response and in the draft of a save. Passed
+   * as `channelAttention` is, for a request as for a response.
+   */
+  channelIsolation?: boolean;
+  /**
+   * mcp-many-servers-v1: a list of MCP servers or of their sign-ins holds up to 100 rows. Passed as
+   * `channelAttention` is.
+   */
+  mcpManyServers?: boolean;
 }
 
 export interface TeamSideRouteCodec {
-  request(path: string, value: unknown): TeamProtocolV2Json;
+  request(path: string, value: unknown, options?: TeamSideRouteOptions): TeamProtocolV2Json;
   response(path: string, status: number, value: unknown, options?: TeamSideRouteOptions): TeamProtocolV2Json;
 }
 
 const CHANNEL_CODEC: TeamSideRouteCodec = {
-  request: channelRequest,
+  request: (path, value, options) => {
+    const projected = channelRequest(path, value);
+    return options?.channelIsolation ? withChannelDraftIsolation(path, projected, value) : projected;
+  },
   response: (path, status, value, options) => {
     const projected = channelResponse(path, status, value);
     const extended =
       options?.historyExtent && status < 400 && isChannelHistoryExtentRoute(path)
         ? withChannelHistoryExtent(projected, value)
         : projected;
+    const isolated = options?.channelIsolation && status < 400 ? withChannelIsolation(path, extended, value) : extended;
     return options?.channelAttention && status < 400 && isChannelAttentionRoute(path)
-      ? withChannelAttention(path, extended, value)
-      : extended;
+      ? withChannelAttention(path, isolated, value)
+      : isolated;
   },
 };
-const MCP_CODEC: TeamSideRouteCodec = { request: mcpRequest, response: mcpResponse };
+const MCP_CODEC: TeamSideRouteCodec = {
+  request: mcpRequest,
+  response: (path, status, value, options) =>
+    options?.mcpManyServers ? mcpManyServersResponse(path, status, value) : mcpResponse(path, status, value),
+};
 const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: storageResponse };
 
 /** The side-protocol codec that owns `path`, or `null` when the negotiated protocol's adapter does. */
@@ -61,7 +81,10 @@ export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
     ? {
         request: (_path, value) => admin.request(value),
         response: (path, status, value, options) => {
-          const projected = admin.response(status, value);
+          const projected =
+            options?.mcpManyServers && status < 400 && isMcpSignInListRoute(path)
+              ? mcpManySignInsResponse(value)
+              : admin.response(status, value);
           return options?.agentTaskUiBlocks && status < 400 ? withAgentTaskUiBlocks(path, projected, value) : projected;
         },
       }

@@ -5,17 +5,28 @@ import {
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
   type LayoutChangeEvent,
-  useWindowDimensions,
+  type ScrollViewProps,
   View,
 } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-export function SettingsContent({ children }: PropsWithChildren) {
+/**
+ * `androidNativeHeader`: the page keeps the native Android header, for a `Stack.SearchBar`.
+ * `onScroll`: for a long list that adds its rows as the reader scrolls.
+ */
+export function SettingsContent({
+  children,
+  androidNativeHeader,
+  onScroll,
+}: PropsWithChildren<{ androidNativeHeader?: boolean; onScroll?: ScrollViewProps["onScroll"] }>) {
   return (
     <SheetScrollView
+      androidNativeHeader={androidNativeHeader}
+      onScroll={onScroll}
       scrollEdgeEffect={false}
       contentContainerClassName="gap-7 px-4 pb-safe-offset-5 pt-5"
       keyboardDismissMode="interactive"
@@ -81,18 +92,22 @@ const ROW_PADDING_X = 32;
 export function SettingsRow({
   children,
   supportingText,
+  value,
   onPress,
-  trailing,
+  trailing: trailingControl,
   disabled = false,
   leading,
   disclosure = true,
   accessibilityLabel,
   checked,
+  multiple = false,
   expanded,
   accessibilityActions,
   onAccessibilityAction,
 }: PropsWithChildren<{
   supportingText?: string;
+  /** A short value, such as a count, before the disclosure chevron. */
+  value?: string;
   onPress?: () => void;
   trailing?: ReactNode;
   disabled?: boolean;
@@ -102,6 +117,8 @@ export function SettingsRow({
   accessibilityLabel?: string;
   /** Makes the row one choice of a list. True when it is the selected choice. */
   checked?: boolean;
+  /** With `checked`: the row is one choice of a list where more than one can be on. */
+  multiple?: boolean;
   /** For a row that shows or hides the rows below it. */
   expanded?: boolean;
   /**
@@ -112,7 +129,17 @@ export function SettingsRow({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
-  const { fontScale } = useWindowDimensions();
+  const chevron =
+    onPress && disclosure ? <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} /> : null;
+  const trailing = value ? (
+    <View className="flex-row items-center gap-2">
+      <Typography.Paragraph className="text-grouped-secondary">{value}</Typography.Paragraph>
+      {chevron}
+    </View>
+  ) : (
+    trailingControl
+  );
+  const fontScale = useFontScale();
   const measures = Boolean(trailing) && fontScale >= STACKED_FONT_SCALE;
   const [rowWidth, setRowWidth] = useState(0);
   const [trailingWidth, setTrailingWidth] = useState(0);
@@ -145,19 +172,12 @@ export function SettingsRow({
         {title}
         {stacked ? measuredTrailing : null}
       </View>
-      {stacked
-        ? null
-        : measures
-          ? measuredTrailing
-          : trailing ||
-            (onPress && disclosure ? (
-              <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
-            ) : null)}
+      {stacked ? null : measures ? measuredTrailing : trailing || chevron}
     </>
   );
   return onPress ? (
     <ListGroup.Item
-      accessibilityRole={checked === undefined ? "button" : "radio"}
+      accessibilityRole={checked === undefined ? "button" : multiple ? "checkbox" : "radio"}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, checked, expanded }}
       accessibilityActions={accessibilityActions}

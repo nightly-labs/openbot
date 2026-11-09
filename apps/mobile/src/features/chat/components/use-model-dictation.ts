@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom } from "@openbot/user-errors";
 import { CodedError } from "expo";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -5,15 +6,18 @@ import { Linking } from "react-native";
 import { useSharedValue, withTiming } from "react-native-reanimated";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { ElevenLabsError, scribeToken } from "@/features/voice/model/elevenlabs";
-import { parakeetModel } from "@/features/voice/model/parakeet-model";
+import { type LocalRecognition, loadLocalRecognizer } from "@/features/voice/model/recognition-models";
 import { type ScribeFailure, ScribeRealtimeSession } from "@/features/voice/model/scribe-realtime";
 import { speechNative } from "@/features/voice/model/speech-native";
-import { readElevenLabsKey } from "@/features/voice/model/voice-settings";
+import { transcribeWithVoiceServer, useVoiceServer, VoiceServerError } from "@/features/voice/model/voice-server";
+import { readElevenLabsKey, useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
+import { base64Bytes } from "../model/base64-bytes";
 import {
   applyDictationResult,
   type DictationNotice,
@@ -28,15 +32,23 @@ import {
 import type { VoiceDictation } from "./use-voice-dictation";
 
 /** The engines that capture the microphone in the speech module, not in the phone's recognizer. */
-export type ModelRecognition = "parakeet" | "elevenlabs";
+export type ModelRecognition = LocalRecognition | "elevenlabs" | "voice-server";
 
-/** Parakeet decodes faster with more threads, and a phone has four or more cores. */
-const PARAKEET_THREADS = 4;
+/** A model on the phone decodes faster with more threads, and a phone has four or more cores. */
+const LOCAL_MODEL_THREADS = 4;
 /**
  * A finish that never reports its end must not hold the composer. Parakeet decodes the last segment
- * in about a second; ElevenLabs can take up to ten seconds for its last segment.
+ * in about a second; Qwen3-ASR writes the words one at a time, so it takes longer; ElevenLabs can
+ * take up to ten seconds for its last segment.
  */
-const STOP_TIMEOUT_MS = { parakeet: 8_000, elevenlabs: 12_000 } as const;
+const STOP_TIMEOUT_MS = {
+  parakeet: 8_000,
+  "parakeet-unified": 8_000,
+  "qwen3-asr": 20_000,
+  elevenlabs: 12_000,
+  // The whole recording goes at the end, and a server without a GPU can take two minutes.
+  "voice-server": 125_000,
+} as const;
 
 const SCRIBE_NOTICES: Record<ScribeFailure | ElevenLabsError["code"], DictationNotice> = {
   network: { title: "mobile.chat.dictation.stopped", message: "mobile.chat.liveVoice.networkNeeded" },
@@ -68,8 +80,12 @@ interface CaptureSession {
   engine: ModelRecognition;
   base: string;
   transcript: DictationTranscript;
-  /** The ElevenLabs session; null for Parakeet. */
+  /** The ElevenLabs session; null for a model on the phone. */
   scribe: ScribeRealtimeSession | null;
+  /** The voice server: the audio so far, as Base64 PCM chunks. It goes to the server at the end. */
+  recording: string[] | null;
+  /** When the user last spoke, for the end of a turn after a pause. Null before the first word. */
+  spokeAt: number | null;
   /** The token request, which a cancel stops. */
   abort: AbortController;
   /** The microphone is open for this session. Events before that belong to an earlier one. */
@@ -78,6 +94,36 @@ interface CaptureSession {
   listeningAt: number | null;
   stoppingAt: number | null;
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
+}
+
+/** The sentence of a failed voice server request names the host and what to change. */
+function showVoiceServerNotice(error: VoiceServerError): void {
+  void haptics.notification("error");
+  const text = currentText();
+  showFailureAlert(
+    error,
+    "voice",
+    text.t("mobile.chat.dictation.stopped"),
+    text.errorMessage(error, text.t("mobile.chat.dictation.tryAgain")),
+  );
+}
+
+/** The 16 kHz mono PCM of a recording, from the Base64 chunks of the speech module. */
+function joinRecording(chunks: readonly string[]): Uint8Array {
+  const parts = chunks.map(base64Bytes);
+  const pcm = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    pcm.set(part, offset);
+    offset += part.byteLength;
+  }
+  return pcm;
+}
+
+/** The language of the dictation for the server, or null to let the server find it. */
+function voiceServerLanguage(): string | null {
+  const chosen = useDictationLanguage.getState().value;
+  return chosen === AUTOMATIC_DICTATION_LANGUAGE ? null : (chosen.split(/[-_]/)[0]?.toLowerCase() ?? null);
 }
 
 function showNotice(notice: DictationNotice, error?: unknown): void {
@@ -103,7 +149,7 @@ function trackTurn(current: CaptureSession): void {
   const failed = current.ending === "permission_denied" || current.ending === "operation_failed";
   mobileAnalytics.track("voice_turn", {
     server_kind: "remote",
-    transcription: current.engine === "parakeet" ? "local" : "cloud",
+    transcription: current.engine === "elevenlabs" || current.engine === "voice-server" ? "cloud" : "local",
     result: failed ? "failed" : current.ending === "cancelled" || !current.heard ? "cancelled" : "succeeded",
     failure_code: !failed
       ? undefined
@@ -125,20 +171,23 @@ export const modelCaptureAvailable = (): boolean =>
 let owner: symbol | null = null;
 
 /**
- * Dictation with Parakeet on the phone or ElevenLabs Scribe, which both find the spoken language
- * themselves, as on desktop. The speech module opens the microphone: Parakeet recognizes each
- * segment there, and ElevenLabs gets the audio through a socket. The draft and the phases work as
+ * Dictation with Parakeet or Qwen3-ASR on the phone, or ElevenLabs Scribe, which all find the spoken
+ * language themselves. The speech module opens the microphone: the model on the phone recognizes
+ * each segment there, and ElevenLabs gets the audio through a socket. The draft and the phases work as
  * with the phone's recognizer, so the composer and the voice conversation use both the same way.
  */
 export function useModelDictation({
   engine,
   enabled,
   onDraft,
+  endsOnPause = false,
 }: {
   /** Null while the phone's recognizer is in use. */
   engine: ModelRecognition | null;
   enabled: boolean;
   onDraft: (text: string) => void;
+  /** The voice server ends the capture after the pause of a voice conversation. */
+  endsOnPause?: boolean;
 }): VoiceDictation {
   const [id] = useState(() => Symbol("model-dictation"));
   const available = engine !== null && modelCaptureAvailable();
@@ -149,8 +198,11 @@ export function useModelDictation({
   const finished = useRef<(() => void)[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDraftRef = useRef(onDraft);
+  const endsOnPauseRef = useRef(endsOnPause);
+  const finishRef = useRef<() => Promise<void>>(() => Promise.resolve());
   useEffect(() => {
     onDraftRef.current = onDraft;
+    endsOnPauseRef.current = endsOnPause;
   });
 
   const update = useCallback((next: DictationPhase) => {
@@ -191,16 +243,26 @@ export function useModelDictation({
     const module = speechNative;
     if (!module || typeof module.startCapture !== "function") return;
     const subscriptions = [
-      module.addListener("onCaptureLevel", ({ level: value }) => {
-        if (owner !== id || !session.current?.native) return;
+      module.addListener("onCaptureLevel", ({ level: value, speaking }) => {
+        const current = session.current;
+        if (owner !== id || !current?.native) return;
         level.set(withTiming(Math.min(1, Math.max(0, value)), { duration: 100 }));
+        // The server sends no text before the end, so the pause after the words ends the turn here.
+        if (!current.recording || !endsOnPauseRef.current || phaseRef.current !== "listening") return;
+        const now = performance.now();
+        if (speaking) current.spokeAt = now;
+        else if (current.spokeAt !== null && now - current.spokeAt >= useVoiceSettings.getState().turnPauseMs)
+          void finishRef.current();
       }),
       module.addListener("onCaptureAudio", ({ pcm }) => {
-        if (owner === id && session.current?.native) session.current.scribe?.append(pcm);
+        if (owner !== id || !session.current?.native) return;
+        session.current.scribe?.append(pcm);
+        session.current.recording?.push(pcm);
       }),
       module.addListener("onCaptureText", ({ text, final }) => {
         const current = session.current;
-        if (owner !== id || !current?.native || current.engine !== "parakeet") return;
+        if (owner !== id || !current?.native || current.engine === "elevenlabs" || current.engine === "voice-server")
+          return;
         current.transcript = applyDictationResult(current.transcript, { isFinal: final, text });
         showText(current, spokenText(current.transcript));
       }),
@@ -223,7 +285,29 @@ export function useModelDictation({
         }
         // ElevenLabs has the last audio now: wait for its last segment.
         if (current.scribe) void current.scribe.finish().then(() => session.current === current && settle());
-        else settle();
+        else if (current.recording) {
+          // The voice server gets the whole recording now. A cancel aborts the request.
+          const pcm = joinRecording(current.recording);
+          current.recording = [];
+          if (pcm.byteLength === 0) {
+            settle();
+            return;
+          }
+          void transcribeWithVoiceServer(pcm, voiceServerLanguage(), current.abort.signal).then(
+            (text) => {
+              if (session.current !== current) return;
+              showText(current, text);
+              settle();
+            },
+            (failure: unknown) => {
+              if (session.current !== current || current.abort.signal.aborted) return;
+              current.ending = "operation_failed";
+              settle();
+              if (failure instanceof VoiceServerError) showVoiceServerNotice(failure);
+              else showNotice(dictationFailedNotice, failure);
+            },
+          );
+        } else settle();
       }),
     ];
     return () => {
@@ -242,6 +326,8 @@ export function useModelDictation({
         base,
         transcript: emptyDictationTranscript,
         scribe: null,
+        recording: engine === "voice-server" ? [] : null,
+        spokeAt: null,
         abort: new AbortController(),
         native: false,
         heard: false,
@@ -263,12 +349,13 @@ export function useModelDictation({
             showNotice(microphoneOffNotice);
             return;
           }
-          if (engine === "parakeet") {
-            const directory = parakeetModel.uri();
+          if (engine === "voice-server") {
+            if (!useVoiceServer.getState().server?.routes.dictation)
+              throw new VoiceServerError("address", sourceText("error.voice.server.routeOff"));
+          } else if (engine !== "elevenlabs") {
             try {
-              if (!directory || !module.loadRecognizer) throw new Error("The model is not downloaded.");
-              // The first start loads about 650 MB, which takes a few seconds.
-              await module.loadRecognizer(directory, PARAKEET_THREADS);
+              // The first start loads about 650 MB, or 1 GB for Qwen3-ASR, which takes a few seconds.
+              await loadLocalRecognizer(engine, LOCAL_MODEL_THREADS);
             } catch (error) {
               if (!stillCurrent()) return;
               current.ending = "operation_failed";
@@ -295,7 +382,7 @@ export function useModelDictation({
             return;
           }
           current.native = true;
-          await module.startCapture?.(engine === "parakeet" ? "transcribe" : "stream");
+          await module.startCapture?.(engine === "elevenlabs" || engine === "voice-server" ? "stream" : "transcribe");
           if (!stillCurrent()) return;
           current.listeningAt = performance.now();
           update("listening");
@@ -308,6 +395,7 @@ export function useModelDictation({
           settle();
           if (error instanceof ElevenLabsError)
             showNotice(SCRIBE_NOTICES[error.code], { reference: referenceFrom("speech", error.code) });
+          else if (error instanceof VoiceServerError) showVoiceServerNotice(error);
           else if (error instanceof CodedError && error.code === "ERR_CAPTURE_PERMISSION")
             showNotice(microphoneOffNotice);
           else showNotice(dictationFailedNotice, error);
@@ -348,6 +436,8 @@ export function useModelDictation({
       }, STOP_TIMEOUT_MS[current.engine]);
     });
   }, [cancelNative, id, settle, update]);
+
+  finishRef.current = finish;
 
   const cancel = useCallback(() => {
     const current = session.current;

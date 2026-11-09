@@ -3,6 +3,8 @@ import {
   isAgentProvider,
   isInstallerProvider,
   isKeyOnlyProvider,
+  PROMPT_CACHE_TTLS,
+  type PromptCacheTtl,
   type ProviderAccountStatus,
 } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +12,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
+import { useUniwind } from "uniwind";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { PasteButton } from "@/features/servers/components/paste-button";
@@ -18,8 +21,10 @@ import {
   type ProviderAdmin,
   providerAccountStateKey,
   providerRuntimeBusy,
+  providerSignOutOffered,
 } from "@/features/servers/model/provider-admin";
 import { useOpenSignIn } from "@/features/servers/model/use-open-sign-in";
+import { useProviderModels } from "@/features/servers/model/use-provider-models";
 import { useServerProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
 import { providerStatusLabel } from "@/features/servers/screens/server-providers-screen";
 import {
@@ -28,6 +33,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -46,9 +52,11 @@ export function ServerProviderScreen() {
   const serverId = params.serverId;
   const provider = isAgentProvider(params.provider) ? params.provider : null;
   const providers = useServerProviders(serverId);
-  const { available, admin, status, rows, applyStatus, applyRuntimes } = providers;
+  const { available, admin, status, rows, applyStatus, applyRuntimes, refreshStatus } = providers;
   const accounts = useServerProviderAccounts(serverId, admin);
   const row = rows.find((candidate) => candidate.id === provider);
+  // A provider that is off has no Models row, so the page does not read its list.
+  const models = useProviderModels(serverId, row?.status?.off ? null : provider, admin);
   const locked = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +128,37 @@ export function ServerProviderScreen() {
   // The host lists only a provider that can hold more than one account.
   const providerAccounts = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts;
   const message = row.status?.message ?? row.status?.checkError ?? null;
+  const signOut = admin.signOut;
+  // With an accounts list, the provider's own account offers Disconnect on its page, as on desktop.
+  const disconnectable =
+    signOut !== null && providerSignOutOffered(row) && !(providerAccounts && providerAccounts.length > 0);
+  const off = row.status?.off === true;
+  const modelList = models.list.data;
+  // As on desktop, a provider that lists no model has no Models row.
+  const modelsShown = !off && models.available && ((modelList?.models.length ?? 0) > 0 || models.list.isError);
+
+  const providerName = row.name;
+  const signedInAs = row.status?.email ?? row.name;
+  function disconnect() {
+    if (!signOut || !provider) return;
+    const target = provider;
+    Alert.alert(
+      currentText().t("mobile.server.providers.disconnectTitle", { name: signedInAs }),
+      currentText().t("mobile.server.providers.disconnectBody", { provider: providerName }),
+      [
+        { text: currentText().t("common.cancel"), style: "cancel" },
+        {
+          text: currentText().t("mobile.server.providers.disconnect"),
+          style: "destructive",
+          onPress: () =>
+            void run("sign-out", async () => {
+              await signOut(target);
+              await Promise.all([refreshStatus(), accounts.refresh()]);
+            }),
+        },
+      ],
+    );
+  }
 
   return (
     <SettingsContent>
@@ -174,6 +213,37 @@ export function ServerProviderScreen() {
       {row.apiKey ? (
         <ProviderKeySection serverId={serverId} admin={admin} provider={provider} onStatus={applyStatus} />
       ) : null}
+      {modelsShown ? (
+        <SettingsSection
+          footer={
+            models.list.isError
+              ? errorMessage(models.list.error, t("mobile.server.providers.modelsLoadFailed"))
+              : undefined
+          }
+        >
+          <SettingsRow
+            disabled={!modelList}
+            trailing={
+              modelList ? (
+                <TrailingValue
+                  value={t("mobile.server.providers.modelsCount", {
+                    shown: modelList.shown.length,
+                    total: modelList.models.length,
+                  })}
+                />
+              ) : undefined
+            }
+            onPress={() =>
+              router.push({ pathname: "/server-settings/provider-models", params: { serverId, provider } })
+            }
+          >
+            <Typography.Paragraph>{t("mobile.server.providers.models")}</Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : null}
+      {provider === "claude" && !off && admin.promptCache ? (
+        <PromptCacheSection serverId={serverId} setting={admin.promptCache} />
+      ) : null}
       {/* The actions come last, after what the page shows about the provider. */}
       {connectable && connect ? (
         <SettingsSection
@@ -189,6 +259,15 @@ export function ServerProviderScreen() {
         </SettingsSection>
       ) : connectable && state !== "available" && !(row.apiKey && isKeyOnlyProvider(provider)) ? (
         <SettingsNote>{t("mobile.server.providers.connectOnComputer")}</SettingsNote>
+      ) : null}
+      {disconnectable ? (
+        <SettingsSection>
+          <SettingsRow disclosure={false} disabled={busy} onPress={disconnect}>
+            <Typography.Paragraph className="text-danger-text">
+              {t("mobile.server.providers.disconnect")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
       ) : null}
       {runtime && runtimeAction ? (
         <SettingsSection
@@ -237,6 +316,77 @@ export function ServerProviderScreen() {
         </SettingsSection>
       ) : null}
     </SettingsContent>
+  );
+}
+
+const PROMPT_CACHE_TTL_KEYS = {
+  "5m": "mobile.server.providers.promptCacheDefault",
+  "1h": "mobile.server.providers.promptCacheHour",
+} as const;
+
+/**
+ * How long Claude keeps the prompt cache of the host's agents (`prompt-cache-ttl-v1`), as the Cache
+ * section of the desktop Claude page. A change applies to the next Claude process on the host.
+ */
+function PromptCacheSection({
+  serverId,
+  setting,
+}: {
+  serverId: string;
+  setting: NonNullable<ProviderAdmin["promptCache"]>;
+}) {
+  const { t, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.providerPromptCache(queryScope, serverId);
+  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = t("mobile.server.providers.promptCache");
+  return (
+    <SettingsSection
+      footer={
+        error ??
+        (current.isError
+          ? errorMessage(current.error, t("mobile.server.providers.promptCacheLoadFailed"))
+          : t("mobile.server.providers.promptCacheHint"))
+      }
+    >
+      <SettingsRow
+        disclosure={false}
+        trailing={
+          current.data ? (
+            <SettingsPicker<PromptCacheTtl>
+              value={current.data.ttl}
+              options={PROMPT_CACHE_TTLS.map((ttl) => ({ value: ttl, label: t(PROMPT_CACHE_TTL_KEYS[ttl]) }))}
+              enabled={!saving}
+              dark={theme === "dark"}
+              label={label}
+              onChange={(ttl) => {
+                if (ttl === current.data?.ttl) return;
+                setSaving(true);
+                setError(null);
+                setting
+                  .set(ttl)
+                  .then(async (saved) => {
+                    await queryClient.cancelQueries({ queryKey, exact: true });
+                    queryClient.setQueryData(queryKey, saved);
+                    void haptics.notification("success");
+                  })
+                  .catch((cause: unknown) => {
+                    setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
+                    void haptics.notification("error");
+                  })
+                  .finally(() => setSaving(false));
+              }}
+            />
+          ) : null
+        }
+      >
+        <Typography.Paragraph>{label}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
   );
 }
 

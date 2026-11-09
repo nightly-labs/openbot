@@ -26,6 +26,9 @@ export const messages = {
   "error.workflow.notRetryable": "Alleen een stap die is mislukt of gestopt, kan opnieuw worden uitgevoerd.",
   "error.workflow.noDecision": "Deze stap wacht niet op een beslissing.",
   "error.workflow.outputPlaceMissing": "Kies een berichtenplek voor deze uitvoer.",
+  "error.workflow.outputChannelMissing": "Kies een kanaal voor deze uitvoer.",
+  "error.workflow.outputChannelFailed":
+    "OpenBot kon het resultaat niet in het kanaal plaatsen. Voer de stap opnieuw uit.",
   "error.workflow.discordNoMessage":
     "Deze uitvoer werkt op het Discord-bericht dat de run startte. Start de run vanuit een vermelding in Discord, of kies Posten in kanaal.",
   "error.workflow.slackNoMessage":

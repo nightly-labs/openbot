@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "Нужен ваш ответ",
   "uiBlock.status.answered": "Отвечено",
   "uiBlock.outcome.expired": "Ответ не пришёл вовремя",
   "uiBlock.outcome.closed": "Закрыто без ответа",
@@ -11,18 +10,12 @@ export const messages = {
   "uiBlock.confirm.prompt": "Подтвердить: {action}?",
   "uiBlock.confirm.accept": "Подтвердить",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds} с",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "Предпросмотр",
   "uiBlock.confirm.showFullPreview": "Показать всё",
   "uiBlock.confirm.hideFullPreview": "Свернуть",
   "uiBlock.choice.submit": "Отправить",
   "uiBlock.choice.shortcutHint": "Нажмите {first}–{last}, чтобы выбрать",
-  "uiBlock.choice.selectedCount": {
-    one: "Выбран {count}",
-    few: "Выбрано {count}",
-    many: "Выбрано {count}",
-    other: "Выбрано {count}",
-  },
-  "uiBlock.choice.noneSelected": "Ничего не выбрано",
   "uiBlock.quick.label": "Быстрые ответы",
   "uiBlock.quick.textLabel": "Свой ответ",
   "uiBlock.quick.textPlaceholder": "Или напишите свой ответ",

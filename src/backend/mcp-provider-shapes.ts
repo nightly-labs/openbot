@@ -15,7 +15,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
-import { isWindowsRunnable, runInLoginShell } from "./cli";
+import { agentLaunchPath, isExecutable, isWindowsRunnable } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
@@ -226,7 +226,7 @@ export const usableMcpServer = Effect.fnUntraced(function* (
   // is looked up in: `python` with a virtual environment's `PATH` names that interpreter, and the
   // absolute path a login shell answered with would silently be a different one.
   const configured = mcpEnvironment(config).PATH;
-  const path = appendToolRuntimes(configured ?? (yield* loginShellPath()), tools.binDirectories);
+  const path = appendToolRuntimes(configured ?? (yield* agentLaunchPath()), tools.binDirectories);
   const command = (yield* resolveMcpCommand(config.command, path)) ?? tools.commandAliases[config.command.trim()];
   if (!command)
     return {
@@ -288,25 +288,14 @@ function expandHomePath(value: string): string {
 }
 
 /**
- * One word for a POSIX shell, whatever it holds.
- *
- * The lookup below needs a shell, and the word it looks up is written by the user - and by a remote
- * administrator of this machine's host. Quoted, a name such as `node$(...)` is a name the machine
- * does not have; unquoted, the shell would run what is inside it while answering the question.
- */
-function shellWord(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-/**
  * An absolute path for a command name, or `null` when the given `PATH` holds none. A command the
  * user already wrote as a path is taken as written, after `~` is expanded: it is their statement of
  * which build to run. An absolute path that names no file is `null` too: the provider would fail to
  * start it and say so only in its own log (#4845).
  *
- * `path` is the list to search, which is the list the server will be launched with. Without one the
- * login shell's own is used, because a packaged app starts with a restricted `PATH` - the same
- * reason `collectCandidates` in `cli.ts` uses a login shell.
+ * `path` is the list to search, which is the list the server will be launched with. It is
+ * `agentLaunchPath` unless the configuration sets its own: the login shell's `PATH` and then this
+ * process's, because a packaged app starts with a restricted `PATH`.
  */
 /** Share one lookup per command and PATH. A miss is removed so new installs can be found. */
 const resolvedCommands = new Map<string, Deferred.Deferred<string | null, McpShapeFailed>>();
@@ -400,45 +389,21 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
       );
       return pickWindowsExecutable(stdout, process.env.PATHEXT);
     }
-    // The assignment goes inside the command, not into the shell's environment: a login shell reads
-    // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
-    const search = path === null ? "" : `PATH=${shellWord(path)} `;
-    const stdout = yield* runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`).pipe(
-      Effect.mapError(({ cause }) => new McpShapeFailed({ cause })),
-    );
-    // Only the last line: an interactive profile can print a greeting before the command runs. The
-    // line is kept as `command -v` gave it - a relative `PATH` entry gives a relative path, and a
-    // shell function, such as the `npx` of a lazy-loaded nvm, gives its bare name for spawn to find.
-    return stdout.trim().split(/\r?\n/u).at(-1)?.trim() || null;
-  },
-  Effect.catch(() => Effect.succeed(null)),
-);
-
-/**
- * This user's own `PATH`, as their login shell builds it, or `null` when it cannot be read.
- *
- * Read once per run and reused, because every hand-off and every test would otherwise start a login
- * shell of its own. Windows has no equivalent: `where.exe` runs against the process `PATH` already.
- */
-let loginShellPathOnce: Deferred.Deferred<string | null> | null = null;
-
-const loginShellPath = Effect.fn("McpShape.loginShellPath")(function* () {
-  if (loginShellPathOnce) return yield* Deferred.await(loginShellPathOnce);
-  const pending = Deferred.makeUnsafe<string | null>();
-  loginShellPathOnce = pending;
-  return yield* readLoginShellPath().pipe(
-    Effect.onExit((exit) => Deferred.done(pending, exit)),
-    Effect.uninterruptible,
-  );
-});
-
-const readLoginShellPath = Effect.fn("McpShape.readLoginShellPath")(
-  function* () {
-    if (process.platform === "win32") return null;
-    const stdout = yield* runInLoginShell('printf %s "$PATH"').pipe(
-      Effect.mapError(({ cause }) => new McpShapeFailed({ cause })),
-    );
-    return stdout.split(/\r?\n/u).pop()?.trim() || null;
+    // Searched here, in Node, as `resolveAgentCommand` does for a custom agent: no shell runs, so a
+    // slow or failing profile, or an alias of the same name, cannot turn a command on the `PATH` into
+    // "not found". A name with a separator is not a name to search for, and a relative folder would
+    // be read in this process's directory.
+    if (trimmed.includes("/")) return null;
+    for (const folder of (path ?? process.env.PATH ?? "").split(delimiter)) {
+      if (!isAbsolute(folder)) continue;
+      const candidate = join(folder, trimmed);
+      // The deadline of `isMissingCommandFile`: a dead network volume or a privacy prompt can hold it.
+      const found = yield* isExecutable(candidate).pipe(
+        Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
+      );
+      if (found) return candidate;
+    }
+    return null;
   },
   Effect.catch(() => Effect.succeed(null)),
 );
@@ -462,9 +427,9 @@ export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(fun
 /**
  * The environment a stdio MCP server is launched with, `PATH` included.
  *
- * The login shell that found the command holds the `PATH` that makes it run: an `npx` or `uvx`
- * installed by nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so it needs that same `PATH`
- * to find its own runtime. An app the user started from Finder or a launcher inherits none of it,
+ * The `PATH` the command was looked up in is the one that makes it run: an `npx` or `uvx` installed
+ * by nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so it needs that same `PATH` to find
+ * its own runtime. An app the user started from Finder or a launcher inherits none of it,
  * which is a server that tests green from a terminal and fails everywhere else.
  *
  * The resolved `server.path` wins over the configured pairs: it is what the command was looked up
@@ -604,8 +569,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * and gave a Codex agent no tools. Two names that become the same key keep the first; the second is
  * reported as a drop.
  *
- * **A key Codex's own files use with the other transport travels as `openbot_<key>`.** See
- * `codexMcpServerKey`.
+ * **A key Codex's own files already use travels as `openbot_<key>`.** See `codexMcpServerKey`.
  */
 export type CodexMcpServer =
   | {
@@ -632,6 +596,8 @@ export type CodexOwnTransports = Readonly<Record<string, McpTransport>>;
 export interface CodexOwnServers {
   disabled: Record<string, CodexDisabledMcpServer>;
   transports: CodexOwnTransports;
+  /** The `config/read` answer with its layers, or null without one. */
+  read: DynamicRecord | null;
 }
 
 export function codexOwnTransports(configured: DynamicRecord | null): CodexOwnTransports {
@@ -658,6 +624,7 @@ export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(f
       }),
     ),
     transports: codexOwnTransports(configured),
+    read: config,
   };
 });
 
@@ -674,18 +641,23 @@ export function providerMcpServerName(name: string): string {
 
 /**
  * The key one server travels under to Codex. Codex merges a thread entry with the entry of the same
- * key in its own files. A stdio `command` and an http `url` under one key stop Codex from loading
- * its configuration at all, and the chat cannot start. The server then travels as `openbot_<key>`,
- * and the user's own entry stays as written, turned off. A clash with the same transport keeps the
- * key.
+ * key in its own files, field by field, and a thread entry cannot remove a field. A stdio `command`
+ * and an http `url` under one key stop Codex from loading its configuration at all, and the chat
+ * cannot start (#2851). With the same transport, the user's `enabled_tools` and other fields stay on
+ * OpenBot's server: an `enabled_tools` list from another server hid all of its tools (#5786). So a
+ * key that Codex's own files use travels as `openbot_<key>`, and the user's own entry stays as
+ * written, turned off. OpenBot's placeholders are not the user's entries and keep the key. When
+ * `openbot_<key>` is reserved or the user's too, a server with the same transport keeps the key, as
+ * before: merged, it can still start, and renamed, it would be left out.
  *
  * Computer Use keeps its key: its tool consent and its instructions are found by that name.
  */
 export function codexMcpServerKey(config: McpServerConfig, own: CodexOwnTransports = {}): string {
   const name = providerMcpServerName(config.name);
-  return config.id !== COMPUTER_USE_MCP_SERVER_ID && Object.hasOwn(own, name) && own[name] !== config.transport
-    ? `openbot_${name}`
-    : name;
+  if (config.id === COMPUTER_USE_MCP_SERVER_ID || !Object.hasOwn(own, name)) return name;
+  const renamed = `openbot_${name}`;
+  const renamedTaken = Object.hasOwn(own, renamed) || isReservedMcpServerName(renamed);
+  return renamedTaken && own[name] === config.transport ? name : renamed;
 }
 
 /** Whether a key from `codexMcpServerKey` is taken by another server, or a renamed key by OpenBot's own tools. */

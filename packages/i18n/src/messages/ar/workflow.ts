@@ -171,6 +171,10 @@ export const messages = {
 
   "workflow.output.title": "المخرج",
   "workflow.output.name": "مخرج",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "ابحث في القنوات",
+  "workflow.output.postsAs": "يُنشر بصفته",
+  "workflow.output.postsAsNote": "ملاحظة؛ لا تبدأ أي مهمة",
   "workflow.output.target.file": "ملف",
   "workflow.output.target.notify": "إشعار",
   "workflow.output.path": "مسار الملف",

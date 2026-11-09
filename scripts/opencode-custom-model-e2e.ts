@@ -9,6 +9,9 @@
 // 32,000, and a small window must get half the window.
 // One more model saves its efforts (#4154): OpenCode must list exactly those efforts, and a turn at
 // `max` must send `reasoning_effort: "max"`. A model with no saved efforts keeps OpenCode's own set.
+// Input kinds (#5332): a model with none saved keeps OpenCode's default and gets an attached image;
+// a model saved as text-only does not. The read tool gives a PDF to a model saved with PDF input,
+// and refuses it for the others.
 // `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
 // Writes .openbot-build/opencode-custom-model/report.json.
 import assert from "node:assert/strict";
@@ -44,6 +47,22 @@ const GUESSED_MODEL = "guessed-model";
 /** #4154: an endpoint that accepts Low, High and Max for this model, and no other effort. */
 const EFFORT_MODEL = "effort-model";
 const SAVED_EFFORTS = ["low", "high", "max"] as const;
+/** #5332: a vision model behind the endpoint, saved with image and PDF input. */
+const VISION_MODEL = "vision-model";
+/** An endpoint that refuses images for this model, saved as text-only. */
+const TEXT_MODEL = "text-model";
+/** The prompt that makes the fake endpoint call the read tool on `report.pdf`. */
+const READ_PDF = "Read report.pdf.";
+/** A one-page PDF. */
+const PDF = Buffer.from(
+  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+    "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 10 10]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
+);
+/** A 1×1 PNG. */
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
 
 interface Request {
   path: string;
@@ -55,6 +74,14 @@ interface Request {
   maxCompletionTokens: number | null;
   /** The `reasoning_effort` that the request sent, or null. */
   reasoningEffort: string | null;
+  /** The `image_url` content parts of the request's messages. */
+  images: number;
+  /** The request carries PDF data. */
+  pdf: boolean;
+  /** The request carries OpenCode's refusal of a PDF. */
+  pdfRefused: boolean;
+  /** The text of the last message, when a user sent it. */
+  userText: string | null;
 }
 
 interface Report {
@@ -72,6 +99,8 @@ const report: Report = { passed: false, requests: [], turns: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-model-e2e-"));
 const clients: AgentClient[] = [];
 const run = promisify(execFile);
+/** The PDF that the fake endpoint asks the read tool for, in the agent's workspace. */
+const pdfPath = join(root, "workspace", "report.pdf");
 
 /** The model and the stream flag of one chat request. */
 async function readRequest(request: IncomingMessage): Promise<Omit<Request, "path" | "auth">> {
@@ -85,7 +114,41 @@ async function readRequest(request: IncomingMessage): Promise<Omit<Request, "pat
     stream: isRecord(value) && value.stream === true,
     maxCompletionTokens: typeof budget === "number" ? budget : null,
     reasoningEffort: getString(value, "reasoning_effort"),
+    images: getArray(value, "messages")
+      .flatMap((message) => getArray(message, "content"))
+      .filter((part) => getString(part, "type") === "image_url").length,
+    pdf: text.includes("application/pdf;base64") || text.includes(PDF.toString("base64").slice(0, 24)),
+    pdfRefused: text.includes("does not support pdf input"),
+    userText: userText(getArray(value, "messages").at(-1)),
   };
+}
+
+/** The text of a user message, whether its content is a string or a list of parts. */
+function userText(message: unknown): string | null {
+  if (getString(message, "role") !== "user") return null;
+  const content = isRecord(message) ? message.content : null;
+  if (typeof content === "string") return content;
+  return getArray(message, "content")
+    .map((part) => getString(part, "text") ?? "")
+    .join("");
+}
+
+/** A streamed call of OpenCode's read tool, as a model that wants to read a file sends it. */
+function readCall(model: string, path: string): string {
+  const call = {
+    index: 0,
+    id: "call_read_pdf",
+    type: "function",
+    function: { name: "read", arguments: JSON.stringify({ path }) },
+  };
+  const start = { index: 0, delta: { role: "assistant", tool_calls: [call] }, finish_reason: null };
+  const end = { index: 0, delta: {}, finish_reason: "tool_calls" };
+  return [start, end]
+    .map(
+      (choice) =>
+        `data: ${JSON.stringify({ id: "chatcmpl-e2e", object: "chat.completion.chunk", created: 0, model, choices: [choice] })}\n\n`,
+    )
+    .join("");
 }
 
 function chunk(model: string, content: string | null): string {
@@ -112,6 +175,12 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
         response.end(JSON.stringify({ error: { message: "The API key is invalid", type: "authentication_error" } }));
         return;
       }
+    }
+    if (stream && read.userText?.includes(READ_PDF)) {
+      response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+      response.write(readCall(model ?? "", pdfPath));
+      response.end("data: [DONE]\n\n");
+      return;
     }
     const reply = `reply from ${model}`;
     if (!stream) {
@@ -197,6 +266,8 @@ try {
       { id: WIDE_MODEL, name: "Wide model", contextWindow: 131_072 },
       { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
       { id: EFFORT_MODEL, name: "Effort model", reasoningEfforts: [...SAVED_EFFORTS] },
+      { id: VISION_MODEL, name: "Vision model", inputs: ["image", "pdf"] },
+      { id: TEXT_MODEL, name: "Text model", inputs: [] },
     ],
   };
 
@@ -266,8 +337,60 @@ try {
     assert.equal(request.reasoningEffort, "max", `${EFFORT_MODEL} must send the effort of the turn.`);
   }
 
+  // #5332: an attached image reaches a model saved with image input, and not a text-only model.
+  const image = join(workspace, "pixel.png");
+  await writeFile(image, PNG);
+  const visionThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${VISION_MODEL}` });
+  const visionTurn = await runTurn(client, visionThread, {
+    text: "What is in the image?",
+    images: [image],
+    timeoutMs: 120_000,
+  });
+  report.turns.push(visionTurn);
+  assert.equal(visionTurn.error, null, `The turn on ${VISION_MODEL} failed: ${visionTurn.error}`);
+  const visionRequests = report.requests.filter((request) => request.model === VISION_MODEL);
+  assert.ok(
+    visionRequests.some((request) => request.images === 1),
+    "OpenCode must send the image to a model saved with image input.",
+  );
+  /** The requests of one turn on `model`, with an image and the given text. */
+  const turnRequests = async (model: string, text: string) => {
+    const start = report.requests.length;
+    const modelThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${model}` });
+    const turn = await runTurn(client, modelThread, { text, images: [image], timeoutMs: 120_000 });
+    report.turns.push(turn);
+    const seen = report.requests.slice(start).filter((request) => request.model === model);
+    assert.ok(seen.length > 0, `The endpoint got no request for ${model}.`);
+    return seen;
+  };
+  const defaultRequests = await turnRequests(AGENT_MODEL, "What is in the image?");
+  assert.ok(
+    defaultRequests.some((request) => request.images === 1),
+    "A model with no saved input kinds must keep OpenCode's default and get the image.",
+  );
+  for (const request of await turnRequests(TEXT_MODEL, "What is in the image?")) {
+    assert.equal(request.images, 0, "OpenCode must not send an image to a model saved as text-only.");
+  }
+
+  // The read tool: a PDF reaches the model saved with PDF input, and OpenCode refuses it for the other.
+  await writeFile(pdfPath, PDF);
+  const visionPdf = await turnRequests(VISION_MODEL, READ_PDF);
+  assert.ok(visionPdf.length > 1, `${VISION_MODEL} did not get the result of the read tool.`);
+  assert.ok(
+    visionPdf.some((request) => request.pdf),
+    "OpenCode must give the PDF to a model saved with PDF input.",
+  );
+  assert.ok(!visionPdf.some((request) => request.pdfRefused), "OpenCode must not refuse the PDF.");
+  const defaultPdf = await turnRequests(AGENT_MODEL, READ_PDF);
+  assert.ok(defaultPdf.length > 1, `${AGENT_MODEL} did not get the result of the read tool.`);
+  assert.ok(!defaultPdf.some((request) => request.pdf), "OpenCode must not give a PDF to a model without PDF input.");
+  assert.ok(
+    defaultPdf.some((request) => request.pdfRefused),
+    "OpenCode must refuse the PDF for that model.",
+  );
+
   assert.ok(report.requests.length > 0, "The endpoint got no request.");
-  const known = new Set([AGENT_MODEL, EFFORT_MODEL, ...budgets.map(([model]) => model)]);
+  const known = new Set([AGENT_MODEL, EFFORT_MODEL, VISION_MODEL, TEXT_MODEL, ...budgets.map(([model]) => model)]);
   const others = report.requests.filter(
     (request) => request.auth === undefined && request.model !== null && !known.has(request.model),
   );

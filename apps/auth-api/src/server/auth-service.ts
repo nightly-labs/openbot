@@ -1019,7 +1019,7 @@ function newMobileSession(): { id: string; token: string; expiresAt: number } {
   return { id: crypto.randomUUID(), token: randomToken(), expiresAt: PERSISTENT_SESSION_EXPIRES_AT };
 }
 
-function normalizeMobileDevice(input: MobileAuthDeviceIdentity): MobileAuthDeviceIdentity {
+export function normalizeMobileDevice(input: MobileAuthDeviceIdentity): MobileAuthDeviceIdentity {
   if (!isUuidV4(input.id)) {
     throw new AuthServiceError(400, "invalid_mobile_device", "The mobile device ID is invalid.");
   }

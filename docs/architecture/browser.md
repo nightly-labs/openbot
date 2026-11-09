@@ -96,6 +96,15 @@ policy. The browser client shows an SVG thumbnail from a `data:` URL, never from
 object URL has the origin of the app. Remote support is additive through the
 `svg-attachments` capability, which only protocol 9 peers get.
 
+A file whose name has no known type is stored as `application/octet-stream` with `kind: "file"` and
+`previewKind: "none"`. Import drops a MIME type that the importer supplies for such a name, because a
+sent attachment takes its type from the name, and because a HEIC or TIFF must not become an image
+block that a provider refuses. Only the voice recording keeps its `audio/webm` type. Delivery sends
+the path as a mention. The desktop app
+never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
+additive through the `any-file-attachments` capability, which only protocol 9 peers get. Clients keep
+the extension list for a host without it.
+
 ## Browser tool execution
 
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
@@ -141,6 +150,143 @@ then verify authenticated navigation. This recovery does not run during secure h
 non-login work. The host does not rewrite site scripts or weaken cross-origin security policies.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
+
+An agent tab refuses cookie banners (`browser-consent.ts`). On `dom-ready`, the host runs a small
+script of its own in an isolated world of the main frame. For up to 15 seconds, it looks for one
+visible reject button: the button of a common consent platform, or a button whose whole label
+refuses optional cookies ("Reject all", "Only necessary", and the same in some other languages)
+inside a dialog, a fixed or sticky box, or a consent container that shows the word "cookie". Text
+such as "consent" alone does not count, because sign-in and terms dialogs show it too. It also
+looks in open shadow roots, because some platforms build the banner from web components. It clicks
+that button once and stops. It never accepts, so a banner with no reject button stays. A tab that a
+person opened keeps its banner, and so does a secret tab. A takeover, user control or secret entry
+stops the script of the current page. The site stores the refusal in the profile of the tab, so a
+later tab on that site in the same profile shows no banner either. Banners in frames (for example
+Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` covers it and writes
+`.openbot-build/browser-cookie-banner.json`.
+
+Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
+in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
+Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
+are human". A long page that only mentions a captcha does not count. A check that passes by itself
+(`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
+seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
+All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
+leaves the rest for the next read and reports `checking`, whose `next` asks for a snapshot. A
+check that stays after the full wait reads as `needs-user` at once.
+The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `needs-user` or `blocked`), the
+vendor, the wait, and `next`, the step that the agent takes. A check that needs a person asks for
+`request_takeover` (in a routine run, a report). A block asks for a report. Each `next` also tells
+the agent not to solve, reload, or retry the check, so the guidance needs no separate rule. The idea and the vendor
+list come from anomalyco/browse; the code is our own.
+
+`bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
+loopback pages (Haiku, 5 runs each, 2026-11-07). On a check that needs a person, the agent before
+clicked "I am human" and read the page again: median 7 tool calls, $0.033 for 5 runs. With the
+`challenge` field, it stopped at once in every run: median 2 calls, $0.016. On a check that passes
+after 4 seconds, the agent opens the page with `navigate`. Before, it waited and read again: median
+4 calls and 129k input tokens. After, `navigate` returned the page behind the check: median 2 calls
+and 75k tokens.
+
+When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
+or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
+go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).
+A page that keeps its marker for the full wait does not wait again until its next document. A
+document younger than 2.5 seconds with no controls waits for its first change: for up to 1 second
+while it loads, and only until 500 ms after its load event once it has loaded. A loaded static page
+without controls, or a document that already waited for its first change, does not wait. Each
+wait ends 1 second before the read's timeout.
+Without this wait, the agent read the placeholders and took a second snapshot. Chromium already
+leaves the content outside a modal dialog (`showModal()`) out of the accessibility tree, so the
+snapshot has no modal-first order.
+
+`bun run bench:browser-tools --tasks=spa-skeleton` opens a page that shows a skeleton for 1.5 seconds.
+Before, `navigate` returned only the heading, and the agent took a second snapshot in all 5 runs:
+3 calls and 101k input tokens. After, `navigate` returned the prices: 2 calls and 75k tokens in all
+5 runs.
+
+Three changes remove agent turns at the start of a browser task:
+
+- `open` returns the first snapshot of the new tab, as `navigate` does. A failed read returns the tab
+  and a redacted `snapshotError`.
+- The first browser result in a thread brings the schemas and guidance of `open`, `snapshot`,
+  `navigate`, `click`, `type`, `wait_for` and `run_script` (`browserToolsPrimer` in
+  `tool-catalog.ts`), unless a search or describe result already gave them. The developer
+  instructions show the exact `tool_call` form for `open`, `list_tabs` and `snapshot`, so the agent
+  can call one before any `tool_search`. Without the exact form, the agent guessed the argument shape.
+- The `run_script` helpers accept the forms that models write from other libraries:
+  `waitFor("text", "x")`, `waitFor({ selector })`, `waitFor(cond, 5000)`, `{ timeout }`, the states
+  `visible`, `attached` (a target wait already waits for a box) and `networkidle` (as `dom-quiet`),
+  and `role("button", { name })`. `sleep(ms)`, `setTimeout` and `waitFor(ms)` run a `sleep` step of
+  at most 25 seconds. An unknown form throws a message with the accepted forms.
+
+`bun run bench:browser-tools --tasks=open-order,open-quotes,click-wait,herokuapp-dynamic` measures
+them (Haiku, 5 runs each, 2026-11-07; `open-order` and `open-quotes` start with no tab). Medians:
+
+| Task | Before | `open` snapshot + helpers | + first-result schemas |
+| --- | --- | --- | --- |
+| open-order | 3 calls, 101k tokens | 2 calls, 74k | 1 call, 51k |
+| open-quotes | 4 calls, 129k | 2 calls, 76k | 1–2 calls, 52–76k |
+| click-wait | 4 calls, 129k | 4 calls, 129k | 5 calls, 138k |
+| herokuapp-dynamic | 4 calls, 131k | 4 calls, 131k | 3 calls, 104k |
+
+All 20 runs were correct in each column. With the schemas in the first result, 19 of 30 runs (with
+`consent-overlay` and `spa-skeleton`) made no `tool_search`; before, every run made one. On
+`click-wait`, `wait_for` with `dom-quiet` returns before the 3-second timer of the page, so the agent
+waits again; that cost did not change. The helpers did not change a median. The forms that they
+accept come from failed scripts in the bench transcripts.
+
+On the 10 default tasks (3 runs each), all 30 runs were correct before and after. Tool calls went
+from 97 to 84 and input tokens from 1.12M to 0.97M; 23 of 30 runs made no `tool_search`.
+
+### Repair argument forms that agents write
+
+Each refused call costs the agent one turn of about 27k input tokens. Before the decoder of a tool or
+a `run_script` step reads the arguments, `browser-tool-input.ts` rewrites the forms that agent
+transcripts show again and again. The advertised schemas do not change, and a form that can mean two
+things stays a refusal:
+
+- A target can be a ref string (`"3:main:12"`), a whole snapshot line (`3:main:12 link "Travel"`), a
+  role line (`link "Travel"`), `css #main`, or a CSS selector. The `run_script` helpers send a string
+  target as it is, so a step takes the same forms. An object without `kind` gets it from its fields (`ref`, `selector` or `css`, `role`, `text`,
+  or `x` and `y`). A ref target without `revision` takes it from the ref, and a top-level `ref` on an
+  action tool becomes its `target`.
+- `type` takes `replace` or `clear` as `mode`: `true` is `"replace"`, and `false` is `"append"`.
+- `wait_for` drops `snapshot` and a `condition` that names a field of the call
+  (`{ condition: "text", text }`), maps the Playwright and Puppeteer states (`networkidle`, `idle`,
+  `quiet` as `dom-quiet`; `complete` as `load`; `interactive` as `domcontentloaded`), and drops
+  `visible` and `attached` on a target wait.
+- `fill_fields` takes `value` as `text`, and takes `revision` from the refs when they all have the
+  same one.
+- `open` drops a `tabId` and opens a new tab, so the page in that tab stays. A call written as
+  `{ name: "openbot_browser.<tool>", arguments }` is unwrapped, and a snake_case field such as
+  `tab_id` takes its camelCase name when the call does not also give that name. The user-control
+  check reads the same repaired `tabId`.
+- The Vault, secret and payment tools (`submit_secret`, `fill_card`, `list_logins`,
+  `list_vault_items`, `save_vault_item`, `request_vault_item`, `delete_vault_item`,
+  `request_link_payment`) get no repair. Their targets must come from a snapshot, and
+  `save_vault_item` registers the raw `password` for redaction before the decoder runs.
+
+In `run_script`, `role(role, name, { exact })`, `waitFor(role(...))`, `waitFor("Done", "text")` and
+`waitFor("#done", "visible")` work. A `waitFor` function
+that calls `evaluate`, `snapshot` or `step` is written for the sandbox, so the script polls it once a
+second until its timeout; other `waitFor` functions, such as one that calls `document.evaluate`,
+still run in the page. A `ReferenceError`
+for `document`, `window`, `location`, `page` or `$` says that the script runs in a sandbox and reads
+the page with `evaluate`.
+
+A replay of the 173 failed calls since 2026-10-30 that the current tools can run again (from the
+desktop agent transcripts, against the current decoders and a fake page) gave 79 accepted calls
+before this change and 140 after. Most of the others read page globals in the sandbox, call removed
+tools, or fail on the fake page.
+
+`bun run bench:browser-tools --variants=S --tasks=herokuapp-dynamic,herokuapp-add-remove,books-travel,wikipedia-rust,spa-skeleton,click-wait,quotes-love-tag --repeats=3`
+(Haiku, 2026-11-08) counts failed calls in each run. All 21 runs were correct before and after.
+Tool calls went from 72 to 64 and input tokens from 2.07M to 1.95M; failed calls stayed at 6, because
+each run fails on different forms. `herokuapp-dynamic` went from 4–6 calls and 116k median input
+tokens to 2 calls and 63k in all 3 runs. The failures that stay are agent mistakes: an ambiguous
+target, which the tools refuse on purpose, `document` read in the sandbox, and the Playwright
+`>> nth=N` selector, which has no CSS form.
 
 ### Fill inspected ordinary fields
 
@@ -197,7 +343,9 @@ task takes fewer turns.
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
 `snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB.
+helper sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
+step gives its value to the script, not to the model, so it can return up to 1 MB, such as the whole
+text of a page.
 
 An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
 site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and
@@ -251,7 +399,8 @@ profile, so they share its sign-ins; a profile has no owner agent, and the tab r
 change. The name is a label only and never becomes a path or a partition, so a rename keeps the
 data. An agent with `browserProfileId` also has `ownBrowserSession: true`. After a downgrade, an
 older build thus opens such an agent in a session of its own, never in the shared one. A duplicate
-and an imported agent start with Shared. The user's tabs in an agent's panel use the agent's partition, so
+keeps the named profile of its source. Other duplicates and imported agents start with Shared, because
+an "Only this agent" copy would get a new, empty partition. The user's tabs in an agent's panel use the agent's partition, so
 the user can sign in for the agent there.
 
 `openPrivate` opens a sign-in page for another person in an in-memory partition. The tab is not
@@ -320,7 +469,7 @@ the address that the dialog opened with, and a delete sends the profiles that th
 The host refuses either one when the proxy is different now (`browserProxyChanged`), so a profile
 never changes to Automatic without an admin seeing it. Server settings > Browser profiles shows a
 Proxies section and a Proxy submenu in each named profile's menu when the host has
-`browser-proxies-v1`; the phone does not show proxies yet. For an owner or an admin, the agent's
+`browser-proxies-v1`. The phone shows the same proxy list, Edit page and Proxy choice (`server-browser-proxy-screen.tsx`), with the same checks of `previousAddress`, `keepPassword` and the profiles that a delete saw; it cannot share its own connection, because the phone app has no TCP sockets. For an owner or an admin, the agent's
 profile select and the toolbar label of a tab also show the proxy. The renderer matches the tab
 profile to the proxy list by name, so `BrowserTabProfile` of `browser-profiles-v1` does not change.
 
@@ -361,17 +510,29 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
 | Restart | Restored from the browser's own state file. |
-| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
+| Idle 15 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
+| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown, busy, held, recording, playing audio, or with a secret) does not count. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |
 | Takeover held | No agent tool touches that tab, `close_tab` included. |
+| Renderer crashed | Stays open. The next browser call loads the page again (see below). |
 
 Deleting an agent is the one sweep, and it exists because those tabs are otherwise unreachable: no
 agent passes the owner check for them, and the renderer lists tabs per agent, so they would hold a
 view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
 on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
 can never name a tab that took its place.
+
+When the renderer of an agent tab crashes (`render-process-gone`), the host adds a `load` diagnostic
+and keeps the tab. The next browser call on the tab loads the same address again with `loadURL`
+before it runs, because a CDP command to the crashed page gets no answer. The next snapshot reports
+the crash and says that refs from before it are stale. A `run_script` that runs during the crash
+stops at once with `page_crashed`, and its final snapshot loads the page again. Before, the step
+waited for its timeout. A tab with a secret, a typed card, a takeover or user control is not loaded
+again, because a reload could send a form again or lose the work of the person.
+`bun run test:browser-steps` covers the crash, the settle wait and the bot check, and writes
+`.openbot-build/browser-steps-e2e/report.json`.
 
 ### Page dialogs
 

@@ -25,6 +25,7 @@ import {
 } from "../model/chat-messages";
 import { requestComposerFocus, requestComposerText } from "../model/composer-requests";
 import { messageActionsOpen } from "../model/message-actions-sheet";
+import { useAgentMentionReferences } from "../model/use-agent-mention-references";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
@@ -315,6 +316,7 @@ export function MobileChatView({
     activeTurnId: conversation?.activeTurnId ?? null,
   });
   const mentionSkills = useAgentMentionSkills(agent.id, agent.serverId, showsOnline(server));
+  const mentionReferences = useAgentMentionReferences(agent.serverId, agent.id);
   const questionForm = useQuestionPrompt(
     agent.id,
     activePrompt?.kind === "question" ? activePrompt : undefined,
@@ -338,6 +340,7 @@ export function MobileChatView({
       agents={serverAgents}
       mentionAgents={mentionAgents}
       mentionSkills={mentionSkills}
+      mentionReferences={mentionReferences}
       projectedMessages={messages}
       referenceMessages={references}
       ready={Boolean(conversation)}

@@ -38,7 +38,12 @@ function channelConversationMessage(entry: ChannelMessage): AgentMessage {
       ...row,
       id: entry.id,
       kind: "action-marker",
-      actionMarker: { ...routing, kind: "channel-routing", timestamp: entry.message.createdAt },
+      actionMarker: {
+        kind: "channel-routing",
+        action: routing.action,
+        agentIds: [routing.agentId],
+        timestamp: entry.message.createdAt,
+      },
     };
   if (member)
     return { ...row, id: entry.id, author: "you", senderMember: { id: entry.author.id, name: entry.author.name } };
@@ -52,12 +57,14 @@ function foldedEntry(entry: ChannelMessage): boolean {
 
 /**
  * The rows of a channel page. The thinking and narration of a member's turn fold into one thinking
- * row, as in an agent chat, and show as the steps above the member's answer. Before, each part showed
+ * row, as in an agent chat, and show as the steps above the member's answer. With the Natural style
+ * the narration also shows as the member's progress updates (`narrationRows`) until the answer
+ * comes (`scroll-store`). Before, each part showed
  * as a message, and a model that streams its whole reasoning (DeepSeek through OpenCode) showed a
  * very long one.
  */
 export function channelConversationRows(entries: readonly ChannelMessage[]): AgentMessage[] {
-  return toAgentMessages(
+  const rows = toAgentMessages(
     entries.map((entry) => ({ ...entry.message, id: entry.id })),
     undefined,
     (message, index) => {
@@ -65,6 +72,38 @@ export function channelConversationRows(entries: readonly ChannelMessage[]): Age
       return entry ? channelConversationMessage(entry) : toAgentMessage(message);
     },
   );
+  // A thinking row names the member of its turn, so its progress updates show as that member's.
+  const turnAuthors = new Map<string, string>();
+  for (const entry of entries)
+    if (entry.message.turnId && foldedEntry(entry) && entry.author.kind !== "member")
+      turnAuthors.set(entry.message.turnId, entry.author.id);
+  return joinRoutingRows(
+    rows.map((row) => {
+      const author = row.kind === "thinking" && row.turnId ? turnAuthors.get(row.turnId) : undefined;
+      return author ? { ...row, senderAgentId: author } : row;
+    }),
+  );
+}
+
+/**
+ * Consecutive routing receipts of one action as one row. The lead often gives the parts of one request
+ * to several members at once, and a row for each read as a list of separate events. The row keeps the
+ * id of its first receipt, so a member that joins later adds a name to the row the reader sees.
+ */
+function joinRoutingRows(rows: AgentMessage[]): AgentMessage[] {
+  const joined: AgentMessage[] = [];
+  for (const row of rows) {
+    const marker = row.actionMarker?.kind === "channel-routing" ? row.actionMarker : undefined;
+    const previous = joined.at(-1);
+    const open = previous?.actionMarker?.kind === "channel-routing" ? previous.actionMarker : undefined;
+    if (!marker || !previous || !open || open.action !== marker.action) {
+      joined.push(row);
+      continue;
+    }
+    const agentIds = [...open.agentIds, ...marker.agentIds.filter((id) => !open.agentIds.includes(id))];
+    joined[joined.length - 1] = { ...previous, actionMarker: { ...open, agentIds, timestamp: marker.timestamp } };
+  }
+  return joined;
 }
 
 /**
@@ -171,9 +210,10 @@ export function channelWorkers(
  * A task the service stopped carries the reason, and an archived channel stops every task without
  * one, so the reason tells the two apart. A failed task belongs here too: its parent waits for it,
  * and only the reader starts it again. The assignment limit stops a whole tree at once, and `resume`
- * starts a task with everything under it, so the entry is the root.
+ * starts a task with everything under it, so the entry is the root. `runAgentIds` are the owners of
+ * the tasks of the run, so the assignment limit can name the members that passed the work around.
  */
-export function stoppedChannelTasks(page: ChannelPage): ChannelTask[] {
+export function stoppedChannelTasks(page: ChannelPage): (ChannelTask & { runAgentIds: string[] })[] {
   if (page.channel.archived) return [];
   const roots = new Map<string, ChannelTask>();
   for (const task of page.tasks) {
@@ -181,7 +221,16 @@ export function stoppedChannelTasks(page: ChannelPage): ChannelTask[] {
     const known = roots.get(task.rootTaskId);
     if (!known || task.id === task.rootTaskId) roots.set(task.rootTaskId, task);
   }
-  return [...roots.values()];
+  return [...roots.values()].map((root) => ({
+    ...root,
+    runAgentIds: [
+      ...new Set(
+        page.tasks.flatMap((task) =>
+          task.rootTaskId === root.rootTaskId && task.ownerAgentId ? [task.ownerAgentId] : [],
+        ),
+      ),
+    ],
+  }));
 }
 
 /**

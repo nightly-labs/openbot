@@ -9,6 +9,8 @@ interface TurnStepLine {
   text: string;
   /** When this window received the line, to place it between the turn's thoughts. */
   at: number;
+  /** On the line of a failed tool step: the error text that the host sent. */
+  error?: string | undefined;
 }
 
 export type TurnStepLines = Readonly<Record<string, readonly TurnStepLine[]>>;
@@ -16,17 +18,26 @@ export type TurnStepLines = Readonly<Record<string, readonly TurnStepLine[]>>;
 const TURN_LIMIT = 50;
 const LINE_LIMIT = 200;
 
-/** `lines` with `text` added to the turn. A line the same as the turn's last one is not added again. */
-export function appendTurnStepLine(lines: TurnStepLines, turnId: string, text: string, at = Date.now()): TurnStepLines {
+/**
+ * `lines` with `text` added to the turn. A line the same as the turn's last one is not added again,
+ * but two failed steps in a row with a different error are two lines.
+ */
+export function appendTurnStepLine(
+  lines: TurnStepLines,
+  turnId: string,
+  text: string,
+  error?: string,
+  at = Date.now(),
+): TurnStepLines {
   const turn = lines[turnId] ?? [];
   const last = turn.at(-1);
-  if (!text.trim() || last?.text === text) return lines;
+  if (!text.trim() || (last?.text === text && last.error === error)) return lines;
   const sequence = last ? Number(last.id.slice(last.id.lastIndexOf(":") + 1)) + 1 : 0;
   // The turn moves to the end, so the limit drops the turns that got no line for the longest time,
   // and not a long turn that started first.
   const next: Record<string, readonly TurnStepLine[]> = { ...lines };
   delete next[turnId];
-  next[turnId] = [...turn, { id: `${turnId}:${sequence}`, text, at }].slice(-LINE_LIMIT);
+  next[turnId] = [...turn, { id: `${turnId}:${sequence}`, text, at, ...(error ? { error } : {}) }].slice(-LINE_LIMIT);
   const turns = Object.keys(next);
   for (const old of turns.slice(0, Math.max(0, turns.length - TURN_LIMIT))) delete next[old];
   return next;

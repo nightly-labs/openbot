@@ -14,6 +14,7 @@ export const messages = defineMessages("mobile.share", {
   "mobile.share.action": "Share with {name}",
   "mobile.share.extension.send": "Send",
   "mobile.share.extension.footer": "OpenBot sends this to the agent now. The app does not open.",
+  "mobile.share.extension.message": "Add a message",
   "mobile.share.extension.sending": "Sending to {name}…",
   "mobile.share.extension.sent": "Sent to {name}",
   "mobile.share.extension.failed": "OpenBot could not send this. Open the app to send it from there.",

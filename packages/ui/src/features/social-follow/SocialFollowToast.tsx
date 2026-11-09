@@ -108,8 +108,8 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
                   <strong id={titleId}>{t("app.socialFollow.thanksTitle")}</strong>
                   <p role="status">{postedLabel(step().network, step().result)}</p>
                 </div>
-                <div class="social-follow-toast-follow">
-                  <Button type="button" variant="outline" size="sm" onClick={() => props.onFollow(step().network)}>
+                <div class="social-follow-toast-follow ui-toast-card-actions">
+                  <Button type="button" variant="default" size="sm" onClick={() => props.onFollow(step().network)}>
                     <SocialNetworkMark network={step().network.id} class="social-follow-mark" />
                     {followLabel(step().network)}
                   </Button>
@@ -137,7 +137,7 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
       </div>
 
       <IconButton
-        class="social-follow-toast-close"
+        class="ui-toast-card-close"
         size="icon-xs"
         variant="ghost"
         label={t("common.close")}

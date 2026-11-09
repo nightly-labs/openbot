@@ -26,6 +26,12 @@
   border-radius: var(--openbot-radius-md);
 }
 
+/* An agent in the agent dock list, at the size of the server marks. */
+.settings-agent-dock-avatar {
+  width: 32px;
+  height: 32px;
+}
+
 .settings-dynamic-island-preview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -69,16 +75,35 @@
   text-align: center;
 }
 
-.settings-voice-key {
+/* The Model and key rows of the Voice tab: the buttons stay before the menu or the key field. */
+.settings-voice-model-actions {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
-  margin-top: var(--openbot-space-2);
 }
 
-.settings-voice-key > .ui-input {
+.settings-voice-key-field > .ui-input {
+  width: 100%;
+}
+
+/* A cloud model needs a key: the text says so in the warning color, with no outline or fill. */
+.settings-modal-row .settings-voice-needs-key {
+  color: var(--openbot-warning-text);
+}
+
+.settings-voice-toast-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-1);
+}
+
+.settings-voice-toast-progress > .ui-progress {
   flex: 1;
-  min-width: 0;
+}
+
+.settings-voice-toast-percent {
+  font-variant-numeric: tabular-nums;
 }
 
 /* The voice server dialog is wider than the provider dialog, so each route fits on one line. */

@@ -90,6 +90,12 @@ export const messages = {
     "Her modelin kabul ettiği efor düzeylerini seçin. Seçim yoksa OpenCode Düşük, Orta ve Yüksek sunar.",
   "customProvider.model.effortsHintPi":
     "Her modelin kabul ettiği efor düzeylerini seçin. Seçim yoksa model akıl yürütmez.",
+  "customProvider.model.inputs": "Model {number} girdileri",
+  "customProvider.model.inputsLabel": "Kabul eder",
+  "customProvider.model.inputImage": "Görseller",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Her modelin metin dışında okuyabileceklerini seçin.",
+  "customProvider.model.foundValuesHint": "Bazı değerler uç noktadan geliyor. Bunları değiştirebilirsiniz.",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
   "customProvider.headers": "Başlıklar",

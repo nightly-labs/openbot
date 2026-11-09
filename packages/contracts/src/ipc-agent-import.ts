@@ -39,8 +39,11 @@ export const HERMES_EXPORT_PROMPT = "/openbot-export";
 export const AGENT_IMPORT_EXPORT_AGENT_NAME = "OpenBot export";
 
 export const AGENT_IMPORT_LIMITS = {
-  archiveBytes: 500 * 1024 * 1024,
-  files: 5_000,
+  /**
+   * Files in a local import. The archive is streamed from disk, so it has no size limit: an agent is
+   * skipped when the disk has less free space than its files need.
+   */
+  files: 200_000,
   /** One key names one agent in the archive: lowercase letters, digits and hyphens. */
   key: 64,
   sourceApp: 64,

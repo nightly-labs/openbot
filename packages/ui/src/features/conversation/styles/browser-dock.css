@@ -1,7 +1,7 @@
 /* The overlay view above a local page: the page shows through all of it but the dock. */
-html:has(.browser-dock-surface),
-body:has(.browser-dock-surface),
-#root:has(.browser-dock-surface) {
+:root[data-surface="browser-dock"],
+:root[data-surface="browser-dock"] body,
+:root[data-surface="browser-dock"] #root {
   width: 100%;
   height: 100%;
   overflow: hidden;

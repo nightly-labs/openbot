@@ -1,5 +1,6 @@
 import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentModelOption, isAgentModelOption } from "./ipc-agent-identity";
 import { isBoundedString, isFiniteNumber, isNullableBoundedString } from "./ipc-bounded-values";
 import type { McpSignInRelayPage } from "./ipc-mcp-servers";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
@@ -108,6 +109,12 @@ export interface ProviderAccountStatus {
   /** One of `ProviderAccountState`, open at the trust boundary like the provider `state`. */
   state: ProviderAccountState;
   message: string | null;
+  /**
+   * The models that an account after the first serves and the provider's catalogue does not, from its
+   * last check: a plan can serve more than the provider's own sign-in. Absent before a check listed
+   * them, and on the own sign-in.
+   */
+  models?: AgentModelOption[];
 }
 
 /** The longest name a user can give a provider account. */
@@ -120,7 +127,8 @@ export function isProviderAccountStatus(value: unknown): value is ProviderAccoun
     isNullableBoundedString(value.label, PROVIDER_ACCOUNT_LABEL_MAX_LENGTH) &&
     isNullableBoundedString(value.email, INPUT_LIMITS.email) &&
     isBoundedString(value.state, INPUT_LIMITS.identifier) &&
-    isNullableBoundedString(value.message, INPUT_LIMITS.messageText)
+    isNullableBoundedString(value.message, INPUT_LIMITS.messageText) &&
+    (value.models === undefined || (Array.isArray(value.models) && value.models.every(isAgentModelOption)))
   );
 }
 
@@ -163,6 +171,7 @@ export type AgentAuthState =
   | { kind: "kimi"; email: string | null }
   | { kind: "devin"; email: string | null }
   | { kind: "copilot"; email: string | null }
+  | { kind: "mistral"; email: string | null }
   | { kind: "pi"; email: string | null }
   | { kind: "muse"; email: string | null }
   | { kind: "inception"; email: string | null }
@@ -206,8 +215,10 @@ export interface AccountUsageLimit {
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
   /**
-   * OpenCode only: the weekly or monthly window that `secondary` does not hold. `secondary` is the one
-   * that stops work first, so only the usage list shows this one. The Team API does not send this field.
+   * OpenCode: the weekly or monthly window that `secondary` does not hold. `secondary` is the one that
+   * stops work first, so only the usage list shows this one. Cursor: the total of a plan split into
+   * Cursor's own models (`primary`) and the others (`secondary`), which the ring shows. No usage limit
+   * check reads this field. The Team API does not send it.
    */
   tertiary?: AccountUsageWindow;
   /**

@@ -104,7 +104,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Gdy {model} osiągnie limit użycia, zanim {name} zacznie pisać, {name} zapyta cię, którego modelu użyć.",
   "agentSettings.backupModels.introAutomatic":
-    "Gdy {model} osiągnie limit użycia lub zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać, {name} przełączy się na pierwszy dostępny model w kolejności.",
+    "Gdy {model} osiągnie limit użycia, {name} przełączy się na pierwszy dostępny model w kolejności. {name} przełączy się też, gdy {model} zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać.",
   "agentSettings.backupModels.ask": "Pytaj przed przełączeniem",
   "agentSettings.backupModels.order": "Kolejność",
   "agentSettings.backupModels.listLabel": "Modele zapasowe w kolejności",
@@ -203,6 +203,15 @@ export const messages = {
     "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
+  "agentSettings.deleteHistory.title": "Usuń historię",
+  "agentSettings.deleteHistory.description":
+    "Wiadomości tego czatu znikają, a agent o nich zapomina. Jego konfiguracja zostaje.",
+  "agentSettings.deleteHistory.button": "Usuń",
+  "agentSettings.deleteHistory.confirmTitle": "Usunąć historię czatu z {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
+  "agentSettings.deleteHistory.confirm": "Usuń historię",
+  "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",
   "agentSettings.fullAccess.askTitle": "Pozwolić temu agentowi pracować poza obszarem roboczym?",
   "agentSettings.fullAccess.description":
@@ -258,8 +267,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
-  "agentSettings.quickAcknowledgement.description":
-    "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",

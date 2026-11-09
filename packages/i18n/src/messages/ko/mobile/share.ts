@@ -15,6 +15,7 @@ export const messages = {
   "mobile.share.action": "{name}에게 공유",
   "mobile.share.extension.send": "보내기",
   "mobile.share.extension.footer": "OpenBot이 지금 이 내용을 에이전트에게 보냅니다. 앱은 열리지 않습니다.",
+  "mobile.share.extension.message": "메시지 추가",
   "mobile.share.extension.sending": "{name}에게 보내는 중…",
   "mobile.share.extension.sent": "{name}에게 보냄",
   "mobile.share.extension.failed": "OpenBot이 이 내용을 보내지 못했습니다. 앱을 열어 거기에서 보내세요.",

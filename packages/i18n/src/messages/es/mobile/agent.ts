@@ -133,7 +133,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "Vuelve a conectarte para guardar los cambios.",
   "mobile.agent.info.noMemories": "Aún no hay recuerdos.",
   "mobile.agent.info.addMemory": "Añadir recuerdo",
-  "mobile.agent.info.routineActive": "Activa",
   "mobile.agent.info.routinePaused": "En pausa",
   "mobile.agent.info.noRoutines": "Aún no hay rutinas.",
   "mobile.agent.info.addRoutine": "Añadir rutina",
@@ -351,7 +350,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "Cuando {model} alcanza su límite de uso antes de que {name} empiece a escribir, {name} te pregunta qué modelo usar.",
   "mobile.agent.backupModels.introAutomatic":
-    "Cuando {model} alcanza su límite de uso o falla con un error del proveedor antes de que {name} empiece a escribir, {name} cambia al primer modelo disponible del orden.",
+    "Cuando {model} alcanza su límite de uso, {name} cambia al primer modelo disponible del orden. {name} también cambia cuando {model} falla con un error del proveedor antes de que {name} empiece a escribir.",
   "mobile.agent.backupModels.ask": "Preguntar antes de cambiar",
   "mobile.agent.backupModels.order": "Orden",
   "mobile.agent.backupModels.empty": "Sin orden definido. {name} ofrece cada modelo disponible.",

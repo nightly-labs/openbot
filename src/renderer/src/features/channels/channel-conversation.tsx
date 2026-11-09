@@ -78,19 +78,32 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   /*
    * A row keeps its object while it does not change, so a streamed chunk draws one row again and not
    * the whole transcript.
+   *
+   * A row that comes after the rows this view already drew arrives live, so it enters as a new bubble
+   * of an agent chat does. Before, a channel message showed in one frame. The rows of the first page
+   * and of an older page do not enter. The reader's own message does not enter again: the row that
+   * the send drew at once entered already.
    */
   let rowsById = new Map<string, AgentMessage>();
+  let drawn = false;
+  const ownRow = (row: AgentMessage) =>
+    row.author === "you" && row.senderMember !== undefined && env.isOwnSender(row.senderMember.id);
   const messages = createMemo((): AgentMessage[] => {
     const current = page();
     if (!current) return [];
     const next = new Map<string, AgentMessage>();
-    const rows = channelConversationRows(entries()).map((mapped) => {
+    const mappedRows = channelConversationRows(entries());
+    const lastKnown = mappedRows.findLastIndex((mapped) => rowsById.has(mapped.id));
+    const rows = mappedRows.map((mapped, index) => {
       const known = rowsById.get(mapped.id);
-      const row = known && agentMessagesEqual(known, mapped) ? known : mapped;
+      const live = known ? known.animate === true : drawn && index > lastKnown && !ownRow(mapped);
+      const fresh = live ? { ...mapped, animate: true } : mapped;
+      const row = known && agentMessagesEqual(known, fresh) ? known : fresh;
       next.set(row.id, row);
       return row;
     });
     rowsById = next;
+    drawn = true;
     return rows;
   });
   const unreadCount = () => summary()?.unreadCount ?? 0;
@@ -220,6 +233,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     id: channelId,
     name: () => page()?.channel.name ?? summary()?.name ?? "",
     readOnly,
+    ownMessage: ownRow,
     author: (message) => {
       const id = message.senderAgentId ?? "";
       return {

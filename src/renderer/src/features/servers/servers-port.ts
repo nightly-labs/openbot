@@ -42,12 +42,15 @@ export interface ServersPort {
   host: Pick<
     OpenBotDesktopApi["host"],
     | "configure"
+    | "getRemoteControlPolicy"
     | "getStatus"
     | "onEvent"
     | "recheckScreenRecording"
     | "rotateIdentityKey"
+    | "setRemoteControlPolicy"
     | "start"
     | "stop"
+    | "stopRemoteControl"
     | "updateIdentity"
   >;
   notifications: Pick<OpenBotDesktopApi["notifications"], "onOpened">;

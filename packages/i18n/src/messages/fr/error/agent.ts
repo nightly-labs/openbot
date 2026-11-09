@@ -63,6 +63,8 @@ export const messages = {
     "Attendez la fin du tour actif et de la file d’attente avant de commencer une nouvelle discussion.",
   "error.agent.waitBeforeCompactContext":
     "Attendez la fin du tour actif et de la file d’attente avant de compacter le contexte.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Attendez la fin du tour actif et de la file d’attente avant de supprimer l’historique.",
   "error.agent.compactContextUnavailable": "Cet agent ne peut pas compacter son contexte maintenant.",
   "error.agent.unknown": "Agent inconnu : {id}",
   "error.agent.onlyUserWidensSettings":
@@ -82,6 +84,8 @@ export const messages = {
     "Le point de terminaison utilisé par cet agent a été supprimé. Choisissez un autre modèle pour lui.",
   "error.agent.turnStalled":
     "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
+  "error.agent.compactionConnectionLost":
+    "La connexion s’est interrompue pendant que l’agent compactait son contexte, la tâche s’est donc arrêtée. Vérifiez votre connexion internet, puis envoyez un message pour continuer.",
   "error.agent.selectedGone": "L’agent sélectionné n’existe plus.",
   "error.agent.profileEndpointsChanged":
     "Les points de terminaison personnalisés ont changé pendant la génération. Réessayez.",
@@ -116,6 +120,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Seul l’ordinateur qui exécute l’agent peut modifier ce réglage.",
   "error.agent.sideQuestionBusy": "Trop de questions annexes sont en cours. Réessayez dans un instant.",
   "error.agent.sideQuestionFailed": "L’agent n’a pas pu répondre à la question annexe. Réessayez.",
+  "error.agent.webSearchSignIn": "La recherche web nécessite une connexion à Codex avec un compte ChatGPT.",
+  "error.agent.webSearchBusy": "Trop de recherches et de questions annexes sont en cours. Réessayez dans un instant.",
+  "error.agent.webSearchFailed": "La recherche web n’a pas abouti. Réessayez.",
   "error.agent.busyMessageModeLocalOnly":
     "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
   "error.agent.backupModelsLocalOnly":

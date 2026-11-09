@@ -88,6 +88,12 @@ export const messages = defineMessages("customProvider", {
     "Select the efforts that each model accepts. With none selected, OpenCode offers Low, Medium and High.",
   "customProvider.model.effortsHintPi":
     "Select the efforts that each model accepts. With none selected, the model does not reason.",
+  "customProvider.model.inputs": "Model {number} accepts",
+  "customProvider.model.inputsLabel": "Accepts",
+  "customProvider.model.inputImage": "Images",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Select what each model can read beside text.",
+  "customProvider.model.foundValuesHint": "Some values come from the endpoint. You can change them.",
   "customProvider.model.remove": "Remove model {number}",
   "customProvider.model.add": "Add model",
   "customProvider.headers": "Headers",

@@ -57,6 +57,7 @@ export const messages = {
   "error.agent.waitBeforeClearContext":
     "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim rozpoczniesz nowy czat.",
   "error.agent.waitBeforeCompactContext": "Zanim skompaktujesz kontekst, poczekaj na koniec aktywnej tury i kolejki.",
+  "error.agent.waitBeforeDeleteHistory": "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim usuniesz historię.",
   "error.agent.compactContextUnavailable": "Ten agent nie może teraz skompaktować kontekstu.",
   "error.agent.unknown": "Nieznany agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -74,6 +75,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Endpoint używany przez tego agenta został usunięty. Wybierz dla niego inny model.",
   "error.agent.turnStalled":
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
+  "error.agent.compactionConnectionLost":
+    "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
   "error.agent.profileEndpointsChanged": "Własne endpointy zmieniły się w trakcie generowania. Spróbuj ponownie.",
   "error.agent.profileInvalid": "Dostawca zwrócił nieprawidłowy profil. Spróbuj zmienić prompt.",
@@ -104,6 +107,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Tylko komputer, na którym działa agent, może zmienić to ustawienie.",
   "error.agent.sideQuestionBusy": "Trwa zbyt wiele pytań pobocznych. Spróbuj ponownie za chwilę.",
   "error.agent.sideQuestionFailed": "Agent nie mógł odpowiedzieć na pytanie poboczne. Spróbuj ponownie.",
+  "error.agent.webSearchSignIn": "Wyszukiwanie w sieci wymaga zalogowania się do Codex kontem ChatGPT.",
+  "error.agent.webSearchBusy": "Działa zbyt wiele wyszukiwań i pytań pobocznych. Spróbuj ponownie za chwilę.",
+  "error.agent.webSearchFailed": "Wyszukiwanie w sieci nie zostało ukończone. Spróbuj ponownie.",
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",

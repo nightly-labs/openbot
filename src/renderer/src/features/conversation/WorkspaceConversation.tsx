@@ -49,6 +49,7 @@ import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -120,6 +121,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
+  const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -153,11 +155,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     cancelQueuedMessage,
     cancelWait,
     steerQueuedMessage,
+    sendQueuedMessageNow,
     updateQueuedMessage,
     reorderQueue,
     stopActiveTurn,
     usageLimits,
     usageLimitedModels,
+    failedModels,
     waitedUsageLimits,
     setWaitedUsageLimits,
     queues,
@@ -247,6 +251,19 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const server = activeServer();
     if (!agent || !server || !serverSupportsCapability(server, "context-reset-v1")) return undefined;
     return () => turnsPort().agent.clearContext(agent.id, server.id);
+  });
+
+  /** "Delete history" of the active agent's own chat. The Team API has no route for it. */
+  const deleteActiveAgentHistory = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || server?.kind !== "local") return undefined;
+    return async () => {
+      await turnsPort().agent.deleteHistory(agent.id, server.id);
+      // A window around a search result keeps the messages that an empty snapshot does not name, so
+      // the chat reads its latest page again.
+      await loadLatestAgentMessages(agent.id);
+    };
   });
 
   /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */
@@ -382,6 +399,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   /** Whether a usage limit holds this model and account now. */
   const usageLimited = (choice: AgentModelChoice) =>
     usageLimitedModels().some((limited) => sameAgentModelChoice(limited, choice));
+  /** Whether a provider error holds this model and account now, so that a switch passes over it. */
+  const providerFailed = (choice: AgentModelChoice) =>
+    failedModels().some((failed) => sameAgentModelChoice(failed, choice));
 
   /** Whether the reader is the sender `senderId`: a member on a joined server, or anyone on this computer. */
   const isOwnSender = (senderId: string) => {
@@ -610,6 +630,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         workspaceCovered={windowPage.conversationCovered()}
         browserControlState={browserControlState()}
         server={activeServer()}
+        responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
         isOwnSender={isOwnSender}
@@ -628,9 +649,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         approval={activeApproval()}
         usageLimitAsk={usageLimitAsk()}
         usageLimited={activeServer()?.kind === "local" ? usageLimited : undefined}
+        providerFailed={activeServer()?.kind === "local" ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
+        activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
+        activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
         mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
@@ -694,6 +718,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentDefaults={generalSettings().agentDefaults}
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
+        onDeleteAgentHistory={deleteActiveAgentHistory()}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}
@@ -701,6 +726,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         threads={threads()}
         onCancelWait={cancelWait}
         onSteerQueuedMessage={steerQueuedMessage}
+        onSendQueuedMessageNow={sendQueuedMessageNow}
         onUpdateQueuedMessage={updateQueuedMessage}
         onReorderQueue={reorderQueue}
         onActivateBrowserTab={activateBrowserTab}

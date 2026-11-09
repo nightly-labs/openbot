@@ -83,6 +83,25 @@
   white-space: nowrap;
 }
 
+/* A question to answer with the action: all of it, at the full width of the card, with the action under it. */
+.marketplace-suggestion-question {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.marketplace-suggestion .marketplace-suggestion-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* An answered question has no action. */
+.marketplace-suggestion .marketplace-suggestion-footer:empty {
+  display: none;
+}
+
 .marketplace-suggestion-action {
   display: inline-flex;
   flex: 0 0 auto;

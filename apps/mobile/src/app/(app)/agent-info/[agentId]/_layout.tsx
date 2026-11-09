@@ -53,6 +53,9 @@ export default function AgentInfoLayout() {
       {/* The page names its profile. */}
       <Stack.Screen name="browser-profile-edit" options={{ title: t("mobile.server.route.browserProfiles") }} />
       <Stack.Screen name="browser-profile-agents" options={{ title: t("mobile.server.browserProfiles.agentsTitle") }} />
+      <Stack.Screen name="browser-profile-proxy" options={{ title: t("mobile.server.browserProxies.menu") }} />
+      {/* The page names its proxy, or says Add proxy. */}
+      <Stack.Screen name="browser-proxy" options={{ title: t("mobile.server.browserProxies.title") }} />
       <Stack.Screen name="notifications" options={{ title: t("mobile.settings.notifications.title") }} />
       <Stack.Screen name="crop-photo" options={{ title: t("mobile.agent.route.cropPhoto") }} />
     </Stack>

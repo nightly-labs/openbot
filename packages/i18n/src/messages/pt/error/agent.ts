@@ -58,6 +58,7 @@ export const messages = {
     "Há tarefas deste agente em execução. Aguarde que terminem ou pare-as antes de trocar de provedor.",
   "error.agent.waitBeforeClearContext": "Aguarde o turno ativo e a fila terminarem antes de iniciar um novo chat.",
   "error.agent.waitBeforeCompactContext": "Aguarde o turno ativo e a fila terminarem antes de compactar o contexto.",
+  "error.agent.waitBeforeDeleteHistory": "Aguarde o turno ativo e a fila terminarem antes de excluir o histórico.",
   "error.agent.compactContextUnavailable": "Este agente não pode compactar o contexto agora.",
   "error.agent.unknown": "Agente desconhecido: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -76,6 +77,8 @@ export const messages = {
   "error.agent.endpointRemoved": "O endpoint usado por este agente foi removido. Escolha outro modelo para ele.",
   "error.agent.turnStalled":
     "{provider} parou de responder, então o OpenBot encerrou este turno. Envie a mensagem novamente ou escolha outro modelo.",
+  "error.agent.compactionConnectionLost":
+    "A conexão parou enquanto o agente compactava o contexto, então a tarefa parou. Verifique sua conexão com a internet e envie uma mensagem para continuar.",
   "error.agent.selectedGone": "O agente selecionado não existe mais.",
   "error.agent.profileEndpointsChanged": "Os endpoints personalizados mudaram durante a geração. Tente novamente.",
   "error.agent.profileInvalid": "O provedor retornou um perfil inválido. Tente reformular seu pedido.",
@@ -106,6 +109,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Só o computador que executa o agente pode alterar esta configuração.",
   "error.agent.sideQuestionBusy": "Há perguntas à parte demais em andamento. Tente novamente em instantes.",
   "error.agent.sideQuestionFailed": "O agente não conseguiu responder à pergunta à parte. Tente novamente.",
+  "error.agent.webSearchSignIn": "A pesquisa na web precisa de login no Codex com uma conta do ChatGPT.",
+  "error.agent.webSearchBusy": "Há pesquisas e perguntas paralelas demais em andamento. Tente de novo em instantes.",
+  "error.agent.webSearchFailed": "A pesquisa na web não terminou. Tente de novo.",
   "error.agent.busyMessageModeLocalOnly":
     "O que as mensagens fazem enquanto o agente trabalha só pode ser definido no computador que executa o agente.",
   "error.agent.backupModelsLocalOnly":

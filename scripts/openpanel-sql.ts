@@ -88,6 +88,8 @@ const PRESETS: Record<string, Preset> = {
       "main_loop_delay_ms_max",
       "total_rss_mb_p95",
       "total_cpu_pct_p95",
+      "window_rss_mb_p95",
+      "window_js_heap_mb_p95",
     ],
     by: ["platform"],
   },

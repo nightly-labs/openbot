@@ -73,4 +73,14 @@ export const messages = {
   "remoteDesktop.setup.seeDesktop": "내 데스크톱이 보여요",
   "remoteDesktop.setup.seeTestPanel": "테스트 패널이 보여요",
   "remoteDesktop.setup.finishTest": "테스트 완료",
+  "remoteDesktop.host.questionTitle": "{name}님이 이 컴퓨터를 제어하려고 해요",
+  "remoteDesktop.host.questionDetail":
+    "{name}님이 화면을 보고 마우스와 키보드를 사용할 수 있게 돼요. 30초 안에 응답하지 않으면 OpenBot이 요청을 거부해요.",
+  "remoteDesktop.host.allow": "허용",
+  "remoteDesktop.host.deny": "거부",
+  "remoteDesktop.host.startedTitle": "원격 제어 시작됨",
+  "remoteDesktop.host.startedBody": "{name}님이 지금 이 컴퓨터를 제어하고 있어요.",
+  "remoteDesktop.host.trayTooltip": "OpenBot: 원격 제어 중",
+  "remoteDesktop.host.trayControlledBy": "{name}님이 이 컴퓨터를 제어하는 중",
+  "remoteDesktop.host.stopAll": "모든 원격 제어 중지",
 } as const satisfies PartialTranslation<typeof source>;

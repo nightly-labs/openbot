@@ -19,6 +19,7 @@ import {
   isCustomProviderHarness,
   isCustomProviderHeaderName,
   isCustomProviderId,
+  isCustomProviderInputs,
   isCustomProviderMaxOutput,
   isCustomProviderReasoningEfforts,
   isNewCustomProviderId,
@@ -107,6 +108,11 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
       if (!isCustomProviderReasoningEfforts(entry.reasoningEfforts))
         throw new Error(sourceText("error.provider.reasoningEffortsInvalid"));
       model.reasoningEfforts = [...entry.reasoningEfforts];
+    }
+    if (entry.inputs !== undefined) {
+      // As for the efforts: the form sends a known list in order.
+      if (!isCustomProviderInputs(entry.inputs)) throw new Error(sourceText("error.provider.inputsInvalid"));
+      model.inputs = [...entry.inputs];
     }
     models.push(model);
   }

@@ -1,12 +1,12 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { userInitials } from "@openbot/ui";
 import {
   heatLevel,
   heatmapMonths,
   heatmapWeeks,
   type ProfileDay,
   type ProfileStats,
-} from "@openbot/ui/features/settings/profile-stats";
+} from "@openbot/team-client/profile-stats";
+import { userInitials } from "@openbot/ui";
 import { usageCompact } from "@openbot/ui/features/usage/usage-format";
 import { currentText } from "@openbot/ui/text";
 import { drawLogo, ellipsize, FONT } from "../agent-templates/agent-template-card";

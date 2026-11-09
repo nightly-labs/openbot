@@ -11,6 +11,7 @@
  * built, at the same position as `applyDevelopmentRemoteAccount`.
  */
 
+import { existsSync } from "node:fs";
 import { parseHostedServerList } from "@openbot/contracts/hosted-servers";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
@@ -41,6 +42,24 @@ export function takeHostedServerEnvironment(
   const hostId = environment.OPENBOT_HOSTED_HOST_ID?.trim().toLowerCase() ?? "";
   if (!HOST_ID_PATTERN.test(hostId)) return null;
   return { hostId, claim };
+}
+
+/** The markers of the host's snapshot restore. `openbot-hosted-update` reads the same two. */
+const RESTORE_ACTIVE = "/var/lib/ascii-lazy/active";
+const RESTORE_DONE = "/var/lib/ascii-lazy/hydration-done";
+
+/**
+ * Answers whether the host still restores this server's disk after a wake. A restore that ended does
+ * not start again in the same boot, and each wake is a new boot, so the end is kept and not read again.
+ * A missing `active` marker is read again, because the host can write it after the first probe.
+ */
+export function hostedDiskRestoreProbe(): () => boolean {
+  let done = false;
+  return () => {
+    if (done) return false;
+    done = existsSync(RESTORE_DONE);
+    return !done && existsSync(RESTORE_ACTIVE);
+  };
 }
 
 export interface HostedServerAccountOptions {

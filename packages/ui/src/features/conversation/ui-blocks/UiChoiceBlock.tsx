@@ -3,7 +3,7 @@ import {
   UI_CHOICE_VALUES_KEY,
   type UiChoiceBlock as UiChoiceSpec,
 } from "@openbot/contracts/ui-blocks";
-import { Button, Input, Kbd, Spinner } from "@openbot/ui";
+import { Button, Input, Kbd } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
@@ -65,11 +65,17 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec>) {
     <UiBlockCard
       class={cx("ui-block-choice", props.class)}
       title={props.spec.title}
+      subtitle={multiple() && !frozen() ? t("prompt.question.chooseAll") : undefined}
       status={state().status}
       outcome={state().outcome}
       busy={props.busy}
       error={props.error}
       onSkip={props.disabled ? undefined : props.onSkip}
+      actions={
+        <Button type="button" size="sm" disabled={locked() || picked().length === 0} onClick={submit}>
+          {props.spec.submit ?? t("uiBlock.choice.submit")}
+        </Button>
+      }
       elementRef={props.elementRef}
     >
       <fieldset class="ui-block-options" aria-label={props.spec.title} aria-describedby={frozen() ? undefined : hintId}>
@@ -102,25 +108,7 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec>) {
         </For>
       </fieldset>
       <Show when={!frozen()}>
-        <div class="ui-block-actions">
-          <Button type="button" disabled={locked() || picked().length === 0} onClick={submit}>
-            {props.spec.submit ?? t("uiBlock.choice.submit")}
-          </Button>
-          <span class="ui-block-counter" role="status">
-            {picked().length === 0
-              ? t("uiBlock.choice.noneSelected")
-              : multiple()
-                ? t("uiBlock.choice.selectedCount", { count: picked().length })
-                : ""}
-          </span>
-          <Show when={props.busy}>
-            <span class="ui-block-sending" role="status">
-              <Spinner size="sm" />
-              {t("common.sending")}
-            </span>
-          </Show>
-        </div>
-        <p id={hintId} class="ui-block-hint">
+        <p id={hintId} class="sr-only">
           {t("uiBlock.choice.shortcutHint", { first: optionLetter(0), last: lastLetter() })}
         </p>
       </Show>

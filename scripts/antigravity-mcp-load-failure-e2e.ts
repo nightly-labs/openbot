@@ -131,9 +131,16 @@ try {
   assert.ok(opened[1]?.names?.includes("higgsfield"), "A new session gets the server again.");
   const resumed = sessionsOf("session/resume");
   assert.deepEqual(
-    resumed.map((request) => request.sessionId),
+    resumed.slice(0, 2).map((request) => request.sessionId),
     [opened[0]?.sessionId, opened[1]?.sessionId],
     "Each failed turn resumes its own session once.",
+  );
+  // Only one idle thread keeps its process, so the first thread can stop when the second goes idle.
+  // Its next turn then resumes its session one more time.
+  assert.deepEqual(
+    resumed.slice(2).map((request) => request.sessionId),
+    resumed.length > 2 ? [opened[0]?.sessionId] : [],
+    "Only the released first thread resumes again.",
   );
   assert.ok(!resumed[0]?.names?.includes("higgsfield"), "The resumed session does not get the failed server.");
   assert.ok(resumed[0]?.names?.includes("docs"), "The resumed session keeps the other servers.");

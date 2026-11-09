@@ -16,6 +16,7 @@ export const messages = {
   "mobile.share.action": "{name} ile paylaş",
   "mobile.share.extension.send": "Gönder",
   "mobile.share.extension.footer": "OpenBot bunu şimdi ajana gönderir. Uygulama açılmaz.",
+  "mobile.share.extension.message": "Mesaj ekle",
   "mobile.share.extension.sending": "{name} adlı ajana gönderiliyor…",
   "mobile.share.extension.sent": "{name} adlı ajana gönderildi",
   "mobile.share.extension.failed": "OpenBot bunu gönderemedi. Oradan göndermek için uygulamayı aç.",

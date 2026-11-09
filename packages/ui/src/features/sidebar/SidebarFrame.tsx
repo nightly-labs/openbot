@@ -25,6 +25,8 @@ const SIDEBAR_PLUSH_RINGS = [
   { id: "sidebar-plush-ring", color: "var(--openbot-bg-sidebar)" },
   { id: "sidebar-plush-ring-raised", color: "var(--openbot-bg-control)" },
   { id: "sidebar-plush-ring-hover", color: "var(--openbot-bg-control-hover)" },
+  // Only the light theme gives the selected row its own fill, and sets this colour.
+  { id: "sidebar-plush-ring-selected", color: "var(--sidebar-row-selected)" },
 ] as const;
 
 /**

@@ -7,12 +7,17 @@
 //   Codex session. A revoked approval still replaces it. Before, a grant also replaced it.
 // - antigravity-channel-delta: a channel member on Antigravity gets only the unread channel messages
 //   in its next turn on the same session. Before, each turn got the complete channel packet.
+// - claude-release-ends-process-group, codex-stop-ends-process-group:
+//   each stand-in starts a child in its own process group and does not stop it, as an MCP server
+//   leaves its child. When OpenBot closes the provider process, the child must end too. Before, it
+//   stayed with no owner. Each child holds a socket to this check, and the check waits for it to close.
 // `bun scripts/provider-session-reuse-e2e.ts`. Writes .openbot-build/provider-session-reuse-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -44,6 +49,7 @@ const mcpScript = join(root, "echo-mcp.js");
 const agyInstall = join(root, "antigravity");
 const fakeAgy = join(agyInstall, "bin", "agy_acp_server");
 const agyLog = join(root, "agy.jsonl");
+const groupSocket = join(root, "group.sock");
 const CLAUDE_MODEL = defaultProviderModel("claude");
 
 // Before the service modules load: the stores and the CLI search read these.
@@ -63,6 +69,17 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { CODEX_PLACEHOLDER_COMMAND, codexMcpServerKey } = await import("../src/backend/mcp-provider-shapes");
 const { CURRENT_MESSAGE_SEPARATOR, HANDOFF_START } = await import("../src/backend/agent/delivery-content");
 
+/** A child that holds a socket to this check until it ends. It writes its process id. */
+const GROUP_CHILD = `const socket = require("node:net").connect(${JSON.stringify(groupSocket)});
+socket.on("error", () => process.exit(1));
+socket.write(String(process.pid));`;
+/**
+ * Each stand-in runs this line at start. While a process-group case listens, it starts a child in the
+ * stand-in's process group (not `detached`) and never stops it, as an MCP server leaves its child.
+ */
+const START_GROUP_CHILD = `if (require("node:fs").existsSync(${JSON.stringify(groupSocket)}))
+  require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(GROUP_CHILD)}], { stdio: "ignore" });`;
+
 /**
  * The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end. It
  * logs each start with its `--resume` session, and the text of each user message it gets.
@@ -75,6 +92,7 @@ if (args.includes("--version")) {
   process.stdout.write("2.1.302 (Claude Code)\\n");
   process.exit(0);
 }
+${START_GROUP_CHILD}
 const option = (name) => {
   const index = args.findIndex((arg) => arg === name || arg.startsWith(name + "="));
   if (index < 0) return null;
@@ -126,6 +144,7 @@ if (process.argv.includes("--version")) {
   process.stdout.write("codex-cli 0.160.1\\n");
   process.exit(0);
 }
+${START_GROUP_CHILD}
 const log = (entry) => fs.appendFileSync(${JSON.stringify(codexLog)}, JSON.stringify(entry) + "\\n");
 let buffer = "";
 let threads = 0;
@@ -192,6 +211,7 @@ process.stdin.on("data", (chunk) => {
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+${START_GROUP_CHILD}
 const log = (entry) => fs.appendFileSync(${JSON.stringify(agyLog)}, JSON.stringify({ pid: process.pid, ...entry }) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 const MODEL = "gemini-3-pro";
@@ -325,6 +345,7 @@ interface CaseDetails {
   afterRotation?: { sessionId: string; repeatsFirstRequest: boolean };
   channelPromptCount?: number;
   tasks?: string[];
+  groupChildren?: { pid: number; endedWithProvider: boolean }[];
 }
 
 interface CaseReport {
@@ -475,6 +496,92 @@ function sessionRows(sqlite: () => DatabaseSync, threadId: string) {
     .all(threadId)
     .map((row) => ({ session: String(row.external_session_id), state: String(row.state) }));
 }
+
+interface GroupChild {
+  pid: number;
+  socket: Socket;
+  ended: Promise<void>;
+}
+
+/** How long a child can stay after its provider closes. The group gets SIGKILL 2 seconds after SIGTERM. */
+const GROUP_CHILD_END_MS = 10_000;
+
+/**
+ * Runs `run` while the stand-ins start a group child (`START_GROUP_CHILD`). The socket of a child
+ * closes when the child ends, for any reason. A child that is still there at the end is stopped.
+ */
+async function withGroupChildren(run: (children: GroupChild[]) => Promise<void>): Promise<void> {
+  const children: GroupChild[] = [];
+  const server = createServer((socket) => {
+    const child: GroupChild = {
+      pid: 0,
+      socket,
+      ended: new Promise((done) => socket.once("close", () => done())),
+    };
+    socket.setEncoding("utf8");
+    socket.on("data", (text: string) => {
+      child.pid = Number(text);
+    });
+    socket.on("error", () => {});
+    children.push(child);
+  });
+  await new Promise<void>((done) => server.listen(groupSocket, done));
+  try {
+    await run(children);
+  } finally {
+    server.close();
+    await rm(groupSocket, { force: true });
+    for (const child of children) {
+      if (child.socket.closed) continue;
+      // A child that this check started, which the provider stop left.
+      if (child.pid > 0) process.kill(child.pid, "SIGKILL");
+      child.socket.destroy();
+    }
+  }
+}
+
+/** Waits for the first group child to connect and give its process id. */
+const firstGroupChild = (children: GroupChild[]) =>
+  waitFor("the stand-in's group child", () => (children[0]?.pid ? children[0] : null));
+
+/** Waits for each group child to end. True for a child that ended, false for one still there. */
+async function groupChildrenEnd(children: GroupChild[]): Promise<{ pid: number; endedWithProvider: boolean }[]> {
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<void>((done) => {
+    deadline = setTimeout(done, GROUP_CHILD_END_MS);
+  });
+  await Promise.race([Promise.all(children.map((child) => child.ended)), late]);
+  clearTimeout(deadline);
+  return children.map((child) => ({ pid: child.pid, endedWithProvider: child.socket.closed }));
+}
+
+/**
+ * Creates an agent, closes its provider process with `close`, and checks that each group child ended.
+ * The socket listens before the service starts, because the service starts Codex at once.
+ */
+const runGroupCase = (
+  name: string,
+  provider: AgentProviderId,
+  close: (profile: Profile) => Promise<void>,
+  options: { model?: string; clientFactory?: AgentClientFactory } = {},
+) =>
+  withGroupChildren((children) =>
+    runCase(
+      name,
+      provider,
+      async (profile, details) => {
+        await createAgent(profile.agents, `${provider} group`, provider, options.model);
+        await firstGroupChild(children);
+        await close(profile);
+        details.groupChildren = await groupChildrenEnd(children);
+        assert.ok(
+          details.groupChildren.every((child) => child.endedWithProvider),
+          "Each child in the provider's process group ends with the provider.",
+        );
+      },
+      options.clientFactory,
+    ),
+  );
 
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
@@ -653,7 +760,18 @@ try {
     assert.equal(prompts().length - beforeChannel, 5, "Each channel message is one prompt, with no summary prompts.");
   });
 
-  report.passed = report.cases.length === 3 && report.cases.every((entry) => entry.passed);
+  // The release that an MCP or skill change makes: the Claude CLI gets the end of its stdin and exits.
+  await runGroupCase(
+    "claude-release-ends-process-group",
+    "claude",
+    (profile) => runCauseEffect(profile.agents.refreshAllAgentRuntimes()),
+    { model: CLAUDE_MODEL, clientFactory: (_provider, cli) => new ClaudeStandIn(cli) },
+  );
+  // The stop of each client, as when the app quits. The release of an idle provider calls the same stop.
+  const stopService = (profile: Profile) => runCauseEffect(profile.agents.stop());
+  await runGroupCase("codex-stop-ends-process-group", "codex", stopService);
+
+  report.passed = report.cases.length === 5 && report.cases.every((entry) => entry.passed);
 } finally {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

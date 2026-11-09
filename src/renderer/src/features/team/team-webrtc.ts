@@ -1,6 +1,7 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
+  SIGNAL_NO_READY_CLOSE_CODE,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_REFRESH_INTERVAL_MS,
   type SignalClientMessage,
@@ -34,6 +35,8 @@ export interface BridgeCommand {
   iceTransportPolicy?: "all" | "relay";
   /** For a host: devices connect only over a private network, with no STUN or TURN. */
   privateNetwork?: boolean;
+  /** For a client: Signal holds the attempt while the host is offline, and sends `ready` when it connects. */
+  waitForHost?: boolean;
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
 }
@@ -76,6 +79,8 @@ interface PeerState {
   iceTransportPolicy: "all" | "relay";
   /** A host and its device connections use only private network candidates and no ICE servers. */
   privateNetwork: boolean;
+  /** A client hello asks Signal to wait for an offline host. Main asks for it while a hosted server starts. */
+  waitForHost: boolean;
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
   /**
@@ -92,6 +97,10 @@ interface PeerState {
   turnRefreshDueAt: number;
   /** Opens a new Signal socket when a lost path did not come back. */
   signalRenewTimer: number | null;
+  /** A host's wait for the `ready` that answers its hello or its probe. */
+  signalReadyTimer: number | null;
+  /** When a host asks a quiet socket for `ready` again. */
+  signalProbeTimer: number | null;
   /** Reports a lost path that did not come back as a disconnected peer. */
   disconnectedTimer: number | null;
   iceRestartPending: boolean;
@@ -111,6 +120,14 @@ interface PeerState {
 // connects again with a new ticket. Before this, main read the peer as connected until a restart.
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 const DISCONNECT_GRACE_MS = 15_000;
+// Signal can accept a host's hello and not answer, and a socket can become half-open. The host then
+// gets no close event, so it did not connect again, and devices got `host_unavailable` until a restart
+// (#3749). A host waits this long for each `ready`, and then opens a new socket.
+const SIGNAL_READY_DEADLINE_MS = 30_000;
+// A host asks a socket that received nothing for this long for `ready` with a `turn-refresh`. Signal
+// gives the same TURN credentials again for 5 minutes, so a probe makes new ones at most every 8
+// minutes. A socket with traffic is not probed and keeps the 45-minute refresh.
+const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
 
 const peers = new Map<string, PeerState>();
 // Main can replace a peer after an initial connection error. Keep the rate wait across that replacement.
@@ -183,6 +200,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         iceServers: [],
         iceTransportPolicy: command.iceTransportPolicy,
         privateNetwork: command.peer === "host" && command.privateNetwork === true,
+        waitForHost: command.peer === "client" && command.waitForHost === true,
         channels: {},
         payloadDecoders: {},
         egress: null,
@@ -192,6 +210,8 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         signalRenewTimer: null,
+        signalReadyTimer: null,
+        signalProbeTimer: null,
         disconnectedTimer: null,
         iceRestartPending: false,
         iceRestarting: false,
@@ -353,8 +373,10 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       peer: state.role,
       token: state.resumeToken ?? state.token,
       ...(state.role === "host" ? { multiplex: true } : {}),
+      ...(state.waitForHost ? { waitForHost: true } : {}),
     };
     socket.send(JSON.stringify(hello));
+    awaitSignalReady(state, socket);
   };
   // A prepared socket can be open already. It told main when it opened.
   const open = prepared?.readyState === WebSocket.OPEN;
@@ -368,6 +390,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     refusal = signalErrorCode(event.data) ?? refusal;
+    // Any frame shows that the socket works, also while earlier frames wait in the chain.
+    if (state.socket === socket) probeSignalLater(state);
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
@@ -387,6 +411,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("close", (event) => {
     if (state.socket !== socket) return;
     state.socket = null;
+    clearSignalLiveness(state);
     // Main logs a host's own socket that Signal or the network closed, so the journal shows why the
     // host left Signal. A socket this peer closed follows an error that main already logged.
     if (state.role === "host" && !state.closed)
@@ -405,10 +430,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
   // Signal sends Slack, Discord, webhook, GitHub and Telegram messages only to the main process's `ingress`
-  // socket, never to this peer. `host-waiting` answers only a hello with `waitForHost`, which this
-  // peer does not send.
+  // socket, never to this peer.
   if (
-    message.type === "host-waiting" ||
     message.type === "slack-delivery" ||
     message.type === "discord-session" ||
     message.type === "discord-delivery" ||
@@ -421,6 +444,14 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "queued-delivery"
   )
     return;
+  // Signal holds this attempt until the host says hello, and then sends `ready` on this socket. The
+  // resume token renews the socket with no new ticket. Main then waits longer for the connection.
+  if (message.type === "host-waiting") {
+    state.reconnectAttempt = 0;
+    state.resumeToken = message.resumeToken;
+    post({ type: "host-waiting", peerId: state.id });
+    return;
+  }
   if (message.type === "account-profile-changed") {
     post({ type: "account-profile-changed", peerId: state.id });
     return;
@@ -539,6 +570,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         signalRenewTimer: null,
+        signalReadyTimer: null,
+        signalProbeTimer: null,
         disconnectedTimer: null,
         pathLost: false,
         signalChain: Promise.resolve(),
@@ -979,6 +1012,7 @@ function replaceSignal(state: PeerState): void {
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   state.reconnectTimer = null;
   state.restartIceOnReady = true;
+  clearSignalLiveness(state);
   const socket = state.socket;
   state.socket = null;
   socket?.close(1000, "Network changed");
@@ -998,6 +1032,40 @@ function scheduleSignalReconnect(state: PeerState): void {
     state.reconnectTimer = null;
     connectSignal(state);
   }, delay);
+}
+
+/** A host socket that does not answer in time is replaced. Its close comes late or never. */
+function awaitSignalReady(state: PeerState, socket: WebSocket): void {
+  if (state.role !== "host") return;
+  clearSignalLiveness(state);
+  state.signalReadyTimer = window.setTimeout(() => {
+    state.signalReadyTimer = null;
+    if (state.closed || state.socket !== socket) return;
+    state.socket = null;
+    socket.close(1000, "No ready");
+    post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CLOSE_CODE, terminal: false });
+    scheduleSignalReconnect(state);
+  }, SIGNAL_READY_DEADLINE_MS);
+}
+
+function probeSignalLater(state: PeerState): void {
+  if (state.role !== "host") return;
+  clearSignalLiveness(state);
+  const socket = state.socket;
+  state.signalProbeTimer = window.setTimeout(() => {
+    state.signalProbeTimer = null;
+    if (state.closed || !socket || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+    // Null asks for this socket's own credentials, and Signal answers with a `ready`.
+    sendSignal(state, { type: "turn-refresh", version: SIGNAL_PROTOCOL_VERSION, connectionId: null });
+    awaitSignalReady(state, socket);
+  }, SIGNAL_PROBE_INTERVAL_MS);
+}
+
+function clearSignalLiveness(state: PeerState): void {
+  if (state.signalReadyTimer !== null) clearTimeout(state.signalReadyTimer);
+  if (state.signalProbeTimer !== null) clearTimeout(state.signalProbeTimer);
+  state.signalReadyTimer = null;
+  state.signalProbeTimer = null;
 }
 
 function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
@@ -1035,6 +1103,7 @@ function disconnect(peerId: string): void {
   }
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+  clearSignalLiveness(state);
   clearPathRecovery(state);
   disconnectPeerConnection(state);
   state.socket?.close(1000, "Peer stopped");

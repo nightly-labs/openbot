@@ -110,6 +110,32 @@ export function BrowserDock(props: BrowserDockProps) {
   };
   const editing = () => Boolean(props.editingDeliveryId);
   const queueOpen = () => props.deliveries.length > 0;
+  /**
+   * The rows that the queue shows. When the last message goes, the slot closes at once and keeps these
+   * rows, so the whole queue goes down on the island spring. Without them the slot had nothing to close.
+   */
+  const [queueRows, setQueueRows] = createSignal<QueueDelivery[]>(untrack(() => props.deliveries));
+  let queueCloseTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(
+    () => props.deliveries,
+    (deliveries) => {
+      if (deliveries.length > 0) {
+        clearTimeout(queueCloseTimer);
+        queueCloseTimer = undefined;
+        setQueueRows(deliveries);
+        return;
+      }
+      if (queueCloseTimer !== undefined || untrack(queueRows).length === 0) return;
+      if (prefersReducedMotion()) {
+        setQueueRows([]);
+        return;
+      }
+      queueCloseTimer = setTimeout(() => {
+        queueCloseTimer = undefined;
+        setQueueRows([]);
+      }, ISLAND_DURATION_MS);
+    },
+  );
   const fieldText = () => form?.querySelector(".composer-editor-surface") ?? undefined;
   const rowText = (id: string) =>
     dock?.querySelector<HTMLElement>(`[data-queue-delivery-id="${CSS.escape(id)}"] .agent-queue-message`) ?? undefined;
@@ -240,6 +266,7 @@ export function BrowserDock(props: BrowserDockProps) {
   onSettled(() => () => {
     mounted = false;
     clearTimeout(closeTimer);
+    clearTimeout(queueCloseTimer);
     settleIsland?.();
     takePending();
   });
@@ -308,10 +335,10 @@ export function BrowserDock(props: BrowserDockProps) {
           inert={queueOpen() ? undefined : true}
         >
           <div class="agent-queue-slot-inner">
-            <Show when={queueOpen()}>
+            <Show when={queueRows().length > 0}>
               <QueuePanel
                 variant="floating"
-                deliveries={props.deliveries}
+                deliveries={queueRows()}
                 hold={props.hold}
                 agents={props.agents}
                 skills={props.skills}

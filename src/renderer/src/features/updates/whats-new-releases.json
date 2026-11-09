@@ -1,5 +1,115 @@
 [
   {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "A Library page in the window rail shows every picture and file from the chats of a server.",
+          "Delete the history of a chat or a channel in its settings. The setup, memories and routines stay.",
+          "Read replies aloud with ElevenLabs or xAI, and dictate with Groq, with your own API key in Settings → Voice.",
+          "Add Mistral as a provider.",
+          "Open a page that an agent makes as a side panel tab next to the chat.",
+          "Choose a chat background color for the Light theme and another one for the Dark theme in Settings → General."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents use fewer tokens in each request on Claude, Codex, Pi, OpenCode, Grok and Hermes.",
+          "OpenBot uses less memory for browser tabs, idle agents and app windows.",
+          "Agent browser tabs wait for bot checks that pass by themselves, and finish short tasks in fewer steps.",
+          "Notifications have a new look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agents now use a login that you save in a password manager or the Vault after their chat started.",
+          "A server connects to Signal again when Signal does not answer, so devices no longer see \"The host is offline.\" until a restart.",
+          "The Dynamic Island and the agent dock no longer make other apps stutter while an agent works.",
+          "Claude agents on an Anthropic API key now use the key's promotional API credit."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Settings → Providers → Claude → Use my Claude Code setup."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Put your agents on the new agent dock at the edge of the screen on macOS. Turn it off in Settings → Agent dock.",
+          "Agents now write short updates while they work. To get the old style, choose Classic in Server settings → Personality.",
+          "Start a new conversation or compact the context of a channel from its settings.",
+          "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
+          "Choose who can control this computer with remote desktop in Server settings → Remote desktop.",
+          "Use OpenBot in Hebrew, and connect GitLab, Omnisend and ElevenLabs in the Marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Attach a file of any type to a chat, such as a certificate or a VPN profile.",
+          "The web app opens and sends files of up to 100 MB.",
+          "A message shows React, Reply and More when you hover it. Turn off Settings → General → Compact message actions to get the full row.",
+          "On a Mac, ⌘Q asks you to hold it only while an agent works."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Mentions in Slack, Discord, Telegram and WhatsApp posts now notify the person.",
+          "When a provider quota runs out, the agent continues the work on its first ready backup model.",
+          "A chat that compacted again after each turn now stops automatic compactions after 2 in a row.",
+          "OpenBot no longer closes when an agent's browser action waits on a page that navigates.",
+          "Proton Pass logins work after OpenBot restarts."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Choose when the plan card starts a long task by itself in Settings → Agents, or let it start only when you press Start.",
+          "Choose the provider account when you create an agent, if the provider has more than one account connected.",
+          "Change how many requests local scripts can send each agent in one hour in Settings → Agents → Local scripts.",
+          "The Usage page has a Skill tab that shows how often your agents load each skill and what it costs.",
+          "Connect Higgsfield in the Marketplace to make images, videos and audio."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "The chat color picker has 11 new preset colors, and code, tables and cards in a colored bubble take its color.",
+          "Cards where an agent asks for an answer, such as an API key form, look like the agent's questions.",
+          "Ask an agent in a channel to make a new channel or change another channel, and it does it there."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Claude stays signed in after OpenBot restarts or updates, and Claude agents use less of the 5-hour usage window.",
+          "Older messages that you load in a long chat stay loaded. The chat no longer jumps back to the latest messages.",
+          "Automatic compactions of a ChatGPT (Codex), Muse, Pi or Antigravity chat stop after 2 fail in a row, so the chat no longer uses up the plan limit.",
+          "GPT voice works with every agent, also when the agent uses a Codex model.",
+          "The browser fills saved logins from Proton Pass."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.62.0",
     "date": "2026-11-05",
     "notices": [],

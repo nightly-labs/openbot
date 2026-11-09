@@ -56,6 +56,62 @@ catalog, and the guidance in bytes, and fails when one of them grows. See
 later add context and can add model steps. Provider prompts, external plugins, caching, billing, and
 native model serialization are outside this measurement.
 
+Claude Code adds its own system prompt, tools, and skill listing to each Claude request.
+`claude-client.ts` turns off the bundled skills that cannot work in an OpenBot agent, lists the
+bundled coding skills by name only, and turns off Remote Control, commit attribution, and the tools and
+agent types made for a Claude Code host (`CLAUDE_HOST_TOOLS`). These flag settings come before the
+user, project and local settings, so the client leaves out a skill override for a user or project skill
+of the same name, and each key that a settings file that the query loads sets. Git instructions and the built-in
+`general-purpose`, `Explore`, `Plan` and `web-fetch` agents stay. `bun run bench:claude-prompt-settings`
+runs real Haiku turns and reports the prompt tokens, tools, and skills of each settings variant in
+`.openbot-build/claude-prompt-settings-bench/report.json`. `bun run smoke:claude-agent` runs one agent
+session through the core tools, a subagent, a skill, a deferred tool, and a commit, and writes
+`.openbot-build/claude-agent-smoke/report-setup-<on|off>.json`.
+
+Pi adds its own system prompt, tools, and skill listing to each request of the Pi-based providers
+(`pi`, `inception`, `deepseek`, `openrouter`). The MCP extension of `pi-mcp.ts` removes Pi's `<docs>`
+section, which gives the paths of Pi's own documentation, from the copy of the messages that each
+request gets (`context_with_system`). A prompt returned from `before_agent_start` would also drop the
+`<mcp_servers>` section that names the user's deferred servers. The OpenBot bridge hides
+`request_api_key` and `suggest_marketplace_app` from Pi (`PI_SEARCH_ONLY_OPENBOT_TOOLS`). The agent
+finds and runs these two tools through OpenBot's `tool_search` and `tool_call`. They are `hidden`, not
+`deferred`: a deferred tool adds Pi's own `tool_search` and an `<mcp_servers>` line. `ask_ui` stays
+declared for its confirm card. The user's Pi settings, extensions, and skills stay, and a user extension
+can still change the prompt. `bun run bench:pi-prompt-settings`
+runs real Mercury turns and reports the system prompt sections, tools, and prompt tokens of each
+variant in `.openbot-build/pi-prompt-settings-bench/report.json`. `bun run smoke:pi-agent` runs one
+agent session through the core tools, a commit, and a hidden tool, checks each request, and writes
+`.openbot-build/pi-agent-smoke/report.json`.
+
+Codex adds its own base prompt, tools, and skill listing to each Codex request.
+`agent/codex-prompt-settings.ts` turns off `features.tool_suggest`, whose `request_plugin_install` waits
+for a plugin install that OpenBot cannot do, and the skills about the Codex app (`CODEX_UNFIT_SKILLS`).
+The thread value of `skills.config` replaces the whole list, so the user's own entries go first and OpenBot
+adds only the skills that no entry names. A feature counts as the user's only when a file layer of
+`config/read` sets it, because the merged `features` table also holds defaults. On Codex 0.166 and GPT-6
+Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
+and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
+stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
+`.openbot-build/codex-prompt-settings-bench/report.json`. `bun run smoke:codex-agent` runs one thread
+through `update_plan`, the shell, `apply_patch`, a subagent, a skill, a deferred OpenBot tool, Codex's
+own web search, and a commit, and writes `.openbot-build/codex-agent-smoke/report.json`.
+
+Codex keeps its own inline web search (`web__run`, about 2,450 tokens in each request). Agents on a
+provider with no web search of its own (the Pi-based providers and custom ACP agents) get the deferred
+`openbot.web_search` instead (`AgentService.searchWeb`; `OWN_WEB_SEARCH_PROVIDERS` in
+`agent/tool-catalog.ts` lists the providers whose CLI searches). It
+runs one side Codex thread that can only search the web (`generateTextWithoutTools` in `webSearch` mode)
+on the Codex sign-in of this computer, and returns a short answer with source URLs. A search has two
+requests, about 13,500 input tokens on GPT-6 Luna. The side thread turns off the permissions,
+environment, collaboration and skill texts (about 2,060 tokens in each request), and all toolless
+threads set `agents.enabled = false`: the model catalog turns on the multi-agent tools for each GPT-6
+model, and only this key turns them off (about 1,560 tokens). `bun run bench:codex-web-search` (writes
+`.openbot-build/codex-web-search-bench/report.json`) compares both on a Codex agent, in a chat of seven
+turns with three searches: `openbot.web_search` used 7% fewer input tokens but 8% more uncached tokens,
+because the first request of each side thread misses the prompt cache, and each search turn took 9.5 to
+12 seconds against 4 to 6 seconds inline. Both gave the same answers. For that reason a Codex agent does
+not get `openbot.web_search`.
+
 ## History retrieval and replacement sessions
 
 A replacement provider session receives a handoff of at most 32,000 characters, including headers
@@ -103,9 +159,18 @@ own count: the agent's own chat and each side thread. A review starts after 20 c
 conversation, after 15 minutes with no turn in a conversation that has 3 or more new turns, when
 the user clears the chat, and when a side thread with new turns closes. Turns of channels,
 messaging threads and routine runs do not count. A turn in which the agent changes its memories
-itself starts the count again. A deleted side thread is not reviewed, and its running review ends.
+itself starts the count again. While skill learning is not Off, the next review still reads that
+turn, because a saved memory does not hold how the agent did the task; with Off, the turn moves the
+last reviewed message. A deleted side thread is not reviewed, and its running review ends.
 The counts and the last reviewed message are in memory only; after a restart, a review reads the
 latest messages.
+
+While reviews run (Memory review is not Off), the developer instructions tell the agent to apply a
+correction of how it does one kind of task without a memory call or a word about saving it, unless
+the user asks it to remember: the review keeps it, as a skill or, with skill learning Off, as a
+memory. `ThreadLifecycle` reads `memoryReview()` at each start and resume of a session. A smoke run
+measured the correction turn at about 20,000 input tokens in one request, against about 63,000 in
+five requests when the agent saved the memory itself.
 
 The number of turns is a setting of the server that runs the agents: Server settings > General >
 Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
@@ -141,6 +206,131 @@ and shows nothing. A usage limit is skipped silently and does not mark the model
 memory-changes line with its own `memory-review-` turn id, in the conversation that was reviewed.
 While a turn of that conversation runs, the line waits for the turn to end. Agent deletion and service stop end a running review.
 
+### Skill suggestions
+
+The same review can ask the user to save a skill. Main passes `reviewSkills` to the agent service:
+the local read of the agent's skills (`listInstalledForChatTags`), with no Marketplace request.
+Without it, or when it fails, the review suggests nothing. The prompt adds the agent's skills, with
+`canUpdate` true only for a skill of the local library (`local-skill-<uuid>`), the texts of the
+latest earlier skill questions in the chat, and the tool steps of the reviewed turns from their
+traces, failed steps and the step after each first, at most 80. Step text passes through the secret
+redaction too. The skill rules follow the background skill review of Hermes Agent (MIT): a signal
+must fire (a correction of how the agent does a class of task, a technique that is not obvious and
+worked, or a listed skill that was wrong), an update of a covering skill comes before a new skill,
+a new skill has a class-level name, and environment failures, claims that a tool does not work,
+errors that went away, tasks done once and attempts that never worked are not skills. The review
+suggests at most one skill, and only when a signal fired.
+
+Skill learning is a setting of the server that runs the agents: Server settings > General > Agents >
+Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
+sets it through `skill-learning-v1` (see [servers.md](servers.md)). Main owns
+`openbot-skill-learning-v1.json` (`SkillLearningPreferenceStore`) and passes `skillLearning()` to
+the agent service, which reads it at each review. Off sends no skill rules, skills or work steps to
+the review. Ask first shows the suggestion as a question, as below. Automatic saves the skill
+without a question, as Hermes does.
+
+In the Automatic mode, the review's message is the lesson in one to three sentences, not a question.
+After the review commits its memory changes, a second profile-client generation without tools
+writes the skill (`agent/skill-learning.ts`, after the Hermes skill review): the procedure first,
+pitfalls on their steps, general rules only, in the user's language. It reads the lesson, the
+redacted reviewed chat and its work steps, and for an update the current description and
+instructions; it keeps every part that the chat does not show is wrong. It answers
+`{description, instructions}` as JSON, at most 500 and 12,000 characters. Main's
+`localSkillLearner` saves it in the local library: a new skill gets a YAML-safe `SKILL.md`, and an
+update keeps the other files and frontmatter keys of the current revision, at that revision. The new
+revision is installed for the agent only; when the install fails, the revision is withdrawn. The
+chat then shows a "Created skill" or "Revised skill" line with the review's turn id, and a later
+review reads it as an earlier skill line, so it does not save the same lesson again. The review
+does not rewrite a skill whose text the redaction changes. When that is the case, when no
+profile-client slot is free, or when the writer, the save or the install fails, the review shows
+the question instead, so the lesson is not lost.
+
+The answer's optional `skill` field is decoded apart from the operations, so a bad suggestion is
+dropped and the memory changes still apply. The review also drops an update of a skill that is not
+in the local library or that the agent does not have, and a new skill with the name of one the agent
+has, and an update of a skill that has a skill line (created, revised or installed) in the reviewed
+turns, because the agent already changed it. A line with a `memory-review-` turn id does not
+count: after a clear, the line of the clear's review comes after the reset marker, so it is in the
+next reviewed turns, and the next lesson for that skill must still revise it. In the Ask first mode, an accepted suggestion is a system message with the item type `skill-suggestion:create` or
+`skill-suggestion:update:<skillId>` and the model's question as its text, shown after the
+memory-changes line, also when the review changed no memory. Clients that do not know the item type
+show it as the agent's message, and it counts as unread. The provider history does not have it, so
+`deliveryPromptInput` puts it, with the skill-writing rules, before the user's first message after
+it (`agent/skill-suggestion.ts`). When the user agrees, the agent saves the skill with
+`create_skill`, or with `read_local_skill` and `revise_skill`, and the usual skill line shows. A later user message gets no note. When a clear of the context comes between
+the reviewed chat and the user's answer, as when the clear started the review, the provider no
+longer has that chat. Then the note also repeats it: the transcript of the cleared chat, newest
+part first within 24,000 characters, and its tool steps.
+
+The message also carries `skillSuggestion: { name }`: the skill name, redacted, and for an update the
+name from the agent's skill list, not the model's. The field is in the stored message JSON, so it
+needs no migration. The frozen Team API projections drop it; under `skill-learning-v1` the host adds
+it back after the projection, and the team client copies it back after the decode (see
+[servers.md](servers.md)). The mobile app and older clients show the text. The renderer draws a message with the name as the skill variant of the Marketplace suggestion
+card (`SkillSuggestionChatCard`). Save, or Update, calls `agent.saveSkillSuggestion` with the agent
+and the message id. `MemoryReview.saveSuggestion` reads the question and the chat that its review
+read (`reviewedChat`), and runs the Automatic writer and save above, not a turn of the agent: about
+7,500 tokens instead of a full turn with the agent's tools and history. The skill line then comes
+with a `memory-review-` turn id; during a turn it waits, as a review's lines do. A second press, as
+from another window, returns at once; a press after the skill line saves nothing again. The note
+above is not added after a suggestion that a later skill line already saved. When the host saves
+nothing (the message is gone, no model, the writer or the save fails, or a joined host does not serve
+`skill-learning-v1`), the call returns `saved: false`, and the card sends a short yes as the user's
+message, which the note turns into the save. On a joined server and in the web client, Save sends
+`POST /v1/skill-suggestions/save` to the host, which runs the same save. The card is busy from the press, and done
+when a skill line for the same skill follows (created for a new skill; revised or installed with the
+same id for an update). After a user message that saved nothing, the card has no action, because a
+later message gets no note. Dismiss and undo use the local dismissals of Marketplace suggestions.
+
+### Skill fixes while the agent works
+
+When skill learning is Automatic, an agent can also fix one of its local skills in the turn, without
+a question first. This follows the skill patch of Hermes Agent: the developer instructions
+(`skillRevision`) tell the agent to revise a `local-skill-` skill when the user corrects how it
+follows that skill, or when a step fails and it finds the fix, and to change only that step. Not for
+a one-time preference. Ask first and Off leave the line out, so the agent changes a skill only when
+the user asks. The line is not in `tools/agent-context/budget.json`, because that fixture has no
+setting.
+
+`revise_skill` publishes the next revision and installs it for the calling agent when that agent has
+the skill (`installedRevision` is not null), so the chat shows one "Revised skill" line. Other agents
+keep their revision until an explicit install. When the installed copy has changes that are not in
+the lock file, the install is refused and the tool error says that the revision was saved and the
+copy was kept; the agent installs it with `install_local_skill` and does not revise again.
+
+There is no Undo control. Revisions are never deleted and a revision reaches only the agent that
+made it, so the user asks the agent to undo the change: the guidance tells it to read the revision
+before with `read_local_skill` and publish its files with `revise_skill`.
+
+## Idle provider sessions
+
+A loaded provider session holds processes: the CLI, its MCP servers and its background terminals.
+OpenBot unloads a session that has no turn, keeps its identity, and resumes it at the next turn.
+
+- Claude closes the `claude` process of an idle thread, and each ACP client closes an idle session
+  (`IdleThreadPool` in `src/backend/idle-thread-pool.ts`). The client opens it again from the session.
+- One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
+  when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
+  releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
+  each idle session of the same app server except the newest one. `ThreadLifecycle.releaseIdleSession`
+  keeps a session whose agent has a running, starting or compacting turn, a pending approval,
+  question or browser takeover, or whose thread has a background terminal (`thread/backgroundTerminals/list`). It drops
+  the routing before it sends `thread/unsubscribe`, so the next turn sends `thread/resume` after the
+  unsubscribe. Codex unloads a thread with no subscriber after `thread_unload_delay_secs` (60 s by
+  default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
+- When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
+- A routine session is ephemeral and is not released.
+- Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
+  (`src/backend/provider-process-group.ts`). When the CLI exits, OpenBot sends SIGTERM to what is
+  left of the group, then SIGKILL after 2 seconds. A child of an MCP server outlived the Claude CLI
+  without this. Shell commands run in groups of their own, so a server that the agent started keeps
+  running. Windows stops the tree with `taskkill /T`.
+
+`bun run test:codex-idle-thread-release` checks the Codex release with a fake app server.
+`scripts/provider-session-reuse-e2e.ts` checks that the group ends with the Claude and Codex CLIs.
+ACP agents get no group: some leave their shell commands in the agent's group, and the group stop
+would end a server that the user started from the agent.
+
 ## Compaction ownership
 
 Codex and Muse complete explicit compaction through turn events. Pi completes it through the request
@@ -175,12 +365,12 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, Pi, Kimi and GitHub Copilot, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+`releases/latest` for Codex, Pi, Kimi, GitHub Copilot and Mistral, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi, Kimi and GitHub Copilot, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi, Kimi, GitHub Copilot and Mistral, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -407,6 +597,40 @@ streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
+OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
+agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
+`question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
+`opencode_read_mcp_resource` tools (OpenBot's MCP servers serve no resources), and the `report` and
+`opencode` skills. These rules go in an `OPENCODE_CONFIG` file in the provider state folder, not in
+`OPENCODE_CONFIG_CONTENT`, so a rule in the project's `opencode.json` comes after them and wins. The
+global config (the XDG folder and `OPENCODE_CONFIG_DIR`) comes before that file, so the driver leaves
+out each rule that a global name or pattern matches, also in an agent's rules. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
+When the user sets `OPENCODE_CONFIG`, or a global config file cannot be decoded, OpenBot adds no rule.
+The `models` tool, the `explore` agent and all OpenBot tools stay; with two tools gone, the Code Mode
+catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the others. On OpenCode 2.2.6
+a one-reply request goes from 5,987 to 5,288 o200k tokens (−11.7%), and a read-then-reply task from
+12,130 to 10,732. `bun run bench:opencode-prompt-settings` runs the real driver and CLI against a fake
+model on loopback in temporary XDG folders and reports the tokens, tools, skills and catalog of each
+variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. `bun run smoke:opencode-agent`
+runs one agent turn with the core tools, a subagent and an OpenBot tool through `execute`, then checks
+that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+
+Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
+switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an
+OpenBot agent does not use: feedback (`GROK_FEEDBACK_ENABLED`), workflows (`GROK_WORKFLOWS`), the
+turn summary (`GROK_TURN_SUMMARY`) and the skills of `~/.claude/skills` (`GROK_CLAUDE_SKILLS_ENABLED`).
+An environment value wins over every Grok config layer, so OpenBot sets a switch only when the
+user's environment and the layers below it (`$GROK_HOME/managed_config.toml`, `$GROK_HOME/config.toml`,
+`GROK_CONFIG_PATH` and `GROK_CONFIG`) all leave its key unset. When a layer does not read or parse,
+OpenBot sets no switch. A user can turn each feature back on in `config.toml`. On Grok CLI 1.0.70
+and Grok Build Fast, feedback and workflows cost 1,707 prompt tokens in each request, the turn summary
+is one more request of about 1,600 after each turn, and one developer's Claude skills cost 2,811 in
+each request. The image, video, search, subagent and question tools stay: together they cost about
+6,100, but an agent can use each of them. The session title request (about 500) has no switch. `bun run bench:grok-prompt-settings` measures these features
+through a local proxy and a copy of the user's Grok login without its refresh token.
+`bun run smoke:grok-agent` checks that an agent can still use a skill, the file and terminal tools,
+a subagent and git, and that the user's `config.toml` value wins.
+
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
 `native-runtime.lock.json` names. Every OpenCode install on the computer shares
@@ -617,6 +841,12 @@ own folder (`antigravityReadsGeminiHome` gates the rows, the sign-in, the checks
 the agent start), and `antigravityStatePaths` confines its process to that folder. Each new session
 leaves a conversation database in that folder, so a usage read of an account with no agent process
 starts no process: the account shows its reading from the sign-in check. The sandbox cannot create folders in a new account's home, so OpenBot makes them.
+A plan can serve models that the first account's does not, so the account check also reads the account's own
+`model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as
+`models` only the ones that the provider's catalogue does not list: the picker shows the catalogue on the
+account's entry, with the models an admin turned off left out, and then these. `updateAgent` accepts a model
+of the agent's account. A failed list keeps the last one. `provider-accounts-v1` does not carry it, so a joined server
+still shows the provider's catalogue for each account.
 The account sign-in is the same ACP `authenticate` call as the first account's; a Reconnect calls
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
@@ -713,8 +943,12 @@ then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
 `~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
-`cursor` row, because both windows have the same length. A plan with only `totalPercentUsed` fills
-the primary window. The reader also sends `GetPlanInfo`: on a merged plan (`isMerged`), such as an X
+`cursor` row, because both windows have the same length. The total of that split plan
+(`totalPercentUsed`), which the Cursor CLI shows first as "Included", goes to `tertiary`: the dock
+lists it first as "Total", and the rail ring shows it, or a window that is used up, because the
+models of that window then stop. Only the usage list and the ring read `tertiary`; the usage limit
+check reads the two windows, and the Team API does not send it, so a peer shows the two windows. A
+plan with only `totalPercentUsed` fills the primary window. The reader also sends `GetPlanInfo`: on a merged plan (`isMerged`), such as an X
 subscription, the included usage covers Grok and Composer only, so `totalPercentUsed` alone fills the
 primary window and the dock shows no other models window, as the Cursor app does. The Cursor app
 keeps the split for a merged Enterprise team plan; the reader cannot see the membership type, so it
@@ -816,6 +1050,57 @@ renamed or removed, so the rules stay on those paths. The CLI reads `.github/ins
 
 No frozen Team API protocol knows `copilot`. The host hides Copilot agents, models, status, and
 sign-in state from peers below protocol 8, as for Devin.
+
+### Mistral
+
+The Mistral provider (id `mistral`) starts `vibe-acp`, the ACP server of Mistral Vibe. The runtime
+manager reads `releases/latest` of `mistralai/mistral-vibe` and downloads
+`vibe-acp-<triple>-<version>.tar.gz` (`.zip` on Windows). Each archive is a PyInstaller onedir build:
+`vibe-acp` and its `_internal` folder both go to `bin/`, and the macOS and Linux links stay links, as
+for Kimi. The licence is Apache-2.0. The archive holds it in
+`_internal/mistral_vibe-<version>.dist-info/licenses/LICENSE`, so the lock pins its hash in `files`.
+`OPENBOT_MISTRAL_PATH` selects another executable. The `vibe` command is the terminal app, not the
+ACP server, so the system search looks for `vibe-acp`.
+
+Every Mistral process gets `VIBE_ENABLE_TELEMETRY=false` (`MISTRAL_ENV` in `provider-drivers.ts`).
+In Vibe 3.1.0 this stops its usage events, its OpenTelemetry traces and its experiment fetch. An
+organization's managed configuration from Mistral is a higher layer, so it can turn telemetry on
+again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
+not confirmed in a run).
+
+Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
+has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
+`$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
+`config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers
+`session/new` with `-32000` and "Missing API key for mistral provider.". Sign out starts the ACP
+server and calls `_auth/signOut` (`acpLogout`). It cannot sign out a key from the environment:
+Vibe refuses with `-32602`. The keychain item is global, so Mistral has no added accounts.
+
+`mistralStatePaths` lets a confined process write `$VIBE_HOME` (`~/.vibe`) for its logs, locks,
+history and caches. Its settings stay read-only, because every other Vibe process loads them:
+`config.toml`, `.env`, `trusted_folders.toml`, `hooks.toml`, `AGENTS.md`, `tools`, `skills`,
+`skills.toml`, `skills-registry-cache`, `agents`, `prompts`, `plugins`, `projects.toml`,
+`local_projects.toml`, `managed_config_cache.json` and `connector_bootstrap_cache.json`. Vibe writes
+`trusted_folders.toml` at startup when it is missing, and stops when it cannot. So OpenBot makes an
+empty file first (`makeMistralTrustedFolders`), and never changes one that exists. `.vibe` in a
+workspace is project settings, so a confined process cannot write it.
+
+Vibe 3.1.0 reads `AGENTS.md`, `.vibe` and `.agents/skills` only in a trusted folder. Its ACP trust
+decision writes `trusted_folders.toml`, so OpenBot sends the workspace in the session's
+`additionalDirectories` instead (`workspaceAsAdditionalDirectory` in `MISTRAL_ACP_FLAVOR`). A folder
+there is trusted for that session only.
+
+A model or thinking change with `session/set_config_option` applies to the session, and then Vibe
+saves it as the default in `config.toml`. A confined process cannot write that file, and the save
+fails with `-32602` and "Layer 'user-toml': cannot write config file". `AcpFlavor.configSetUnsaved`
+reads that failure as a change that applied. A Full access Mistral agent saves the value, so it
+becomes the default of each new Vibe session, also in a terminal. Vibe answers a lost session with
+`-32602` and `{ session_id: <id> }`, which `MISTRAL_ACP_FLAVOR` reads as a missing session.
+
+No frozen Team API protocol knows `mistral`. The host hides Mistral agents, models, status, and
+sign-in state from peers below protocol 8, and `providers-v8` carries it.
 
 ### Kimi
 
@@ -951,6 +1236,26 @@ Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
 protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
+
+OpenBot gives its Hermes agents two `agent` settings, `HERMES_AGENT_SETTINGS` in
+`src/backend/hermes-settings.ts`: `coding_context: focus` shows the skills of non-coding categories
+by name only, and `disabled_toolsets: [browser]` removes the Hermes browser tools, because each agent
+has `openbot_browser`. `hermesSettingsEnvironment` writes them to a `config.yaml` in
+`<provider state>/hermes-settings/<hash>/` and sets `HERMES_MANAGED_DIR` to that folder. Hermes
+merges a managed `config.yaml` over the user's, and a Hermes process that saves its settings removes
+the managed keys from the user's file. So OpenBot sets only the keys that the user's `config.yaml`
+does not have, and sets nothing when `HERMES_MANAGED_DIR` is set, when `/etc/hermes` exists, or when
+it cannot read the user's file. The chat client and the profile client both get the folder. This has
+two limits. Commands that the agent runs keep `HERMES_MANAGED_DIR`, so in them
+`hermes config set` refuses the two keys as "managed by your administrator". OpenBot reads the
+user's file when the Hermes process starts, so a key that the user adds while an agent runs applies
+only after the next start, and a settings save of that process can remove it from the user's file.
+`bun run bench:hermes-prompt-settings` measures each setting with real
+turns on a free Nous Portal model in a temporary Hermes profile, and writes
+`.openbot-build/hermes-prompt-settings-bench/report.json`. On Hermes 0.21.5 the two settings take a
+reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.hermes` installs its
+own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
+user's runtime, and stops when the launchers change.
 
 ### Custom agents
 
@@ -1101,10 +1406,11 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse, Cursor, Devin and GitHub Copilot (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse, Cursor, Devin and GitHub Copilot have a driver `signOut` (`grok logout`, `muse logout`,
-`cursor-agent logout`, `devin auth logout`, and the ACP `logout` method of `copilot --acp`)
+Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`, the ACP `logout` method of `copilot --acp`, and the
+`_auth/signOut` extension method of `vibe-acp`)
 for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
 (`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a

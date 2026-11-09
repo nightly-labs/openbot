@@ -15,6 +15,7 @@ export const messages = {
   "mobile.share.action": "{name} と共有",
   "mobile.share.extension.send": "送信",
   "mobile.share.extension.footer": "OpenBot がこの内容を今すぐエージェントに送信します。アプリは開きません。",
+  "mobile.share.extension.message": "メッセージを追加",
   "mobile.share.extension.sending": "{name} に送信中…",
   "mobile.share.extension.sent": "{name} に送信しました",
   "mobile.share.extension.failed": "OpenBot はこれを送信できませんでした。アプリを開いて、そこから送信してください。",

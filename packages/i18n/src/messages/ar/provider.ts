@@ -116,6 +116,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "جارٍ بدء تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.pageOpening": "جارٍ فتح صفحة تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.linkStep": "سجّل الدخول إلى {name}. سيتابع OpenBot تلقائيًا.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "في ChatGPT على كمبيوتر، افتح إعدادات الأمان وفعّل تسجيل الدخول برمز الجهاز لـ Codex. في حساب العمل، يفعّله مسؤول مساحة العمل.",
   "provider.useApp.title": "توصيل {name} في تطبيق OpenBot",
   "provider.useApp.description":
     "يعود تسجيل الدخول إلى {name} إلى الحاسوب الذي بدأه، ولا يمكن لعلامة تبويب في المتصفح استقباله. وصّل {name} في تطبيق OpenBot. يُكمل التطبيق تسجيل الدخول تلقائيًا.",
@@ -175,11 +177,13 @@ export const messages = {
   "provider.geminiKey.label": "مفتاح Gemini API",
   "provider.claudeKey.title": "مفتاح Anthropic API",
   "provider.claudeKey.description":
-    "احفظ مفتاح Anthropic API على المضيف. تحتسب Anthropic كل طلب على المفتاح. لاستخدامه لوكيل، اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
+    "احفظ مفتاح Anthropic API على المضيف. تحتسب Anthropic كل طلب على رصيد API للمفتاح، وليس على خطة Claude. لاستخدامه لوكيل، اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.claudeKey.label": "مفتاح Anthropic API",
   "provider.codexKey.title": "تسجيل الدخول بمفتاح OpenAI API",
   "provider.codexKey.description":
     "يحفظ Codex المفتاح على هذا الحاسوب. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
+  "provider.codexKey.descriptionHost":
+    "يحفظ Codex المفتاح على المضيف. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
   "provider.codexKey.label": "مفتاح OpenAI API",
   "provider.inceptionKey.title": "مفتاح Inception API",
   "provider.inceptionKey.description":
@@ -297,7 +301,7 @@ export const messages = {
   "provider.settings.keyAlternative": "أو الصق مفتاح {name} API.",
   "provider.settings.geminiKeyInUse": "يستخدم Gemini هذا المفتاح، لا خطة Google AI. لا يُعرض استخدام الخطة.",
   "provider.settings.claudeKeyInUse":
-    "اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
+    "تحتسب Anthropic رصيد API للمفتاح، وليس خطة Claude. اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.settings.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "provider.settings.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
@@ -318,6 +322,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "ساعة واحدة",
   "provider.settings.promptCacheDefault": "الافتراضي في Claude Code",
   "provider.settings.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للموجّه لهذا الخادم.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
+  "provider.settings.claudeUserSetupDescription":
+    "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
+  "provider.settings.claudeUserSetupLoadFailed": "تعذّر تحميل إعداد Claude Code.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",

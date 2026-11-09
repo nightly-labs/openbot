@@ -23,9 +23,10 @@ export function redactMcpSecrets(text: string, config: McpServerConfig): string 
  * A provider process keeps the credentials it was given until it stops, and the user can edit or
  * disable a server while that process still runs. Its stderr then quotes the old value, which the
  * new configuration no longer names. The caller retains what it handed over and passes it here.
+ * `rules` is `redactSecrets` for text that the agent reads back.
  */
-export function redactMcpValues(text: string, values: Iterable<string>): string {
-  return redactText(maskValues(text, values));
+export function redactMcpValues(text: string, values: Iterable<string>, rules = redactText): string {
+  return rules(maskValues(text, values));
 }
 
 /**

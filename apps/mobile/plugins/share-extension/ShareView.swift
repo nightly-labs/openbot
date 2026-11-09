@@ -14,6 +14,8 @@ final class ShareModel: ObservableObject {
 
   @Published var phase: Phase = .choosing
   @Published var selected: String?
+  /// The user's own words. They go before the shared content, in the same message.
+  @Published var message = ""
   /// The servers whose agents show. The first server of the app's list and the server of the
   /// selected agent start open, so a long list of one server does not hide the others.
   @Published var expanded: Set<String>
@@ -43,6 +45,17 @@ final class ShareModel: ObservableObject {
 
   var selectedAgent: ShareDirectory.Agent? {
     directory.agents.first { $0.conversationId == selected }
+  }
+
+  /// The text of the message: the user's words, then the shared text.
+  var text: String {
+    [message.trimmingCharacters(in: .whitespacesAndNewlines), content.text]
+      .filter { !$0.isEmpty }
+      .joined(separator: "\n\n")
+  }
+
+  var canSend: Bool {
+    selectedAgent != nil && text.count <= ShareContent.maxTextLength
   }
 
   func avatar(of agent: ShareDirectory.Agent) -> UIImage? {
@@ -79,7 +92,7 @@ struct ShareView: View {
             Button(directory.t("mobile.share.extension.send")) {
               if let agent = model.selectedAgent { model.onSend(agent) }
             }
-            .disabled(model.selectedAgent == nil)
+            .disabled(!model.canSend)
           }
         }
       }
@@ -95,6 +108,8 @@ struct ShareView: View {
         ForEach(model.content.files.indices, id: \.self) { index in
           Label(model.content.files[index].name, systemImage: "doc").lineLimit(1)
         }
+        TextField(directory.t("mobile.share.extension.message"), text: $model.message, axis: .vertical)
+          .lineLimit(1...5)
       } header: {
         Text(directory.t("mobile.share.content"))
       } footer: {

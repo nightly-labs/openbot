@@ -89,6 +89,16 @@ export const Muse: Story = {
   args: { provider: "muse" },
 };
 
+/** Codex on this computer: Codex saves the key in its own login here. */
+export const Codex: Story = {
+  args: { provider: "codex", api: { ...keyApi(), readsCodexKey: true } },
+};
+
+/** Codex on a joined server with `codex-api-key-v1`: the key goes to the host. */
+export const CodexOnHost: Story = {
+  args: { provider: "codex", api: { ...keyApi(), readsCodexKey: true, onHost: true } },
+};
+
 /** Gemini does not show Reconnect: its reconnect is a Google sign-in. */
 export const GeminiSaved: Story = {
   args: { provider: "antigravity", api: keyApi({ status: "saved" }), onReconnect: fn(() => Promise.resolve()) },

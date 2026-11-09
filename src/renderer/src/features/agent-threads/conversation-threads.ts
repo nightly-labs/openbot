@@ -1,5 +1,6 @@
 import type { AgentApproval, AgentContextState, AgentEvent, AgentTask } from "@openbot/contracts/ipc";
 import { isAgentTaskActive, taskApproval } from "@openbot/team-client/agent-tasks";
+import type { AgentThreadOlderMessages } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import {
   activeThreadId,
   type ThreadListsInput,
@@ -79,6 +80,10 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
         : list.find((task) => task.id === activeId);
   const approval = open ? taskApproval(open, approvals) : undefined;
   const editable = tasks.editable();
+  const olderMessages = (taskId: string): AgentThreadOlderMessages | undefined => {
+    const older = tasks.olderMessages(taskId);
+    return older ? { loading: older.loading, onLoad: () => void tasks.loadOlderMessages(agentId, taskId) } : undefined;
+  };
   /** A thread in the side panel, with the actions of its own message box. */
   const sideThread = (id: string): SideThread | undefined => {
     const task = list.find((entry) => entry.id === id);
@@ -87,6 +92,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     return {
       task,
       conversation: tasks.conversation(task.id),
+      olderMessages: olderMessages(task.id),
       approval: sideApproval,
       onSend: (text, attachmentDraftIds, replyToMessageId) =>
         tabs.send(agentId, task.id, text, attachmentDraftIds, replyToMessageId),
@@ -156,6 +162,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     limit: snapshot?.limit ?? 1,
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,
+    olderMessages: open ? olderMessages(open.id) : undefined,
     approval,
     acceptsFiles: tasks.filesAccepted(),
     acceptsReplies: tasks.repliable(),
@@ -203,6 +210,20 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       const task = listed();
       if (task) tabs.open(agentId, task.id);
       return task !== undefined;
+    },
+    onOpenRoutineRun: async (routineId, messageId) => {
+      // An archived thread of the routine keeps its runs too. `openAt` restores it.
+      const listed = () =>
+        (tasks.snapshot(agentId)?.tasks ?? [])
+          .filter((task) => task.routineId === routineId)
+          .sort((left, right) => Number(left.state === "closed") - Number(right.state === "closed"));
+      if (listed().length === 0) await tasks.loadTasks(agentId);
+      for (const task of listed()) {
+        if (!(await tasks.taskHasMessage(agentId, task.id, messageId))) continue;
+        await tabs.openAt(agentId, task.id, messageId);
+        return true;
+      }
+      return false;
     },
     focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };

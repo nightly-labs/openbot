@@ -70,7 +70,7 @@ export interface EventRoutine {
   trigger: EventRoutineTrigger;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
-  /** Set only on an agent routine of this computer's host. */
+  /** Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`. */
   runIn?: RoutineRunPlace;
   createdAt: string;
   updatedAt: string;
@@ -86,7 +86,10 @@ export interface SaveEventRoutineInput {
   trigger: EventRoutineTriggerInput;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
-  /** Only an agent routine on this computer's host reads it. Left out, a save keeps the saved place. */
+  /**
+   * Only an agent routine reads it, on this computer's host or on a remote host with
+   * `routine-run-place-v1`. Left out, a save keeps the saved place.
+   */
   runIn?: RoutineRunPlace;
 }
 

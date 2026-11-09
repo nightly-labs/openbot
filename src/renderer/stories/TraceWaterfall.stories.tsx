@@ -1,6 +1,6 @@
 import { type AgentStep, AgentStepsDisclosure } from "@openbot/ui/features/conversation/AgentSteps";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
-import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageActions, MessageMenuItems } from "@openbot/ui/features/conversation/MessageRendering";
 import { type TraceSpan, TraceWaterfall } from "@openbot/ui/features/conversation/TraceWaterfall";
 import { createMemo, createSignal, onSettled } from "solid-js";
 import { fn } from "storybook/test";
@@ -123,6 +123,8 @@ const TURN: readonly FixtureSpan[] = [
     name: "read",
     detail: "Subagents.tsx",
     kind: "tool",
+    failed: true,
+    error: "ENOENT: no such file or directory, open 'src/renderer/src/Subagents.tsx'",
     from: 14_100,
     to: 14_800,
   },
@@ -166,6 +168,7 @@ const TURN: readonly FixtureSpan[] = [
     detail: "docs.solidjs.com",
     kind: "tool",
     failed: true,
+    error: "GET https://docs.solidjs.com/reference/stores failed: 503 Service Unavailable",
     from: 26_900,
     to: 28_300,
   },
@@ -319,12 +322,13 @@ function ChannelAnswer(props: { id: string; agent: number; body: string; first: 
               reactions={false}
               pickerOpen={false}
               expandedEmoji={false}
-              copied={false}
               onTogglePicker={fn()}
               onExpandEmoji={fn()}
               onReact={fn()}
               onReply={fn()}
-              onCopy={fn()}
+              menu={() => (
+                <MessageMenuItems message={message} reactions={false} onReact={fn()} onReply={fn()} onCopy={fn()} />
+              )}
             />
           }
           steps={

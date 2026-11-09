@@ -59,6 +59,14 @@ import type {
   UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
+import type {
+  AgentDockAction,
+  AgentDockDisplayInfo,
+  AgentDockDragPhase,
+  AgentDockOffset,
+  AgentDockPresentation,
+  SetAgentDockInteractiveInput,
+} from "./ipc-agent-dock";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
   AddAgentFolderInput,
@@ -120,10 +128,12 @@ import type {
 import type {
   AgentTask,
   AgentTaskInput,
+  AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
   BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
   StartAgentTaskInput,
@@ -263,6 +273,7 @@ import type {
   DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
+import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -333,6 +344,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type {
@@ -486,6 +498,7 @@ import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-l
 import type { SetSidebarPinsInput, SidebarPinsSnapshot } from "./ipc-sidebar-pins";
 import type {
   CreateLocalSkillInput,
+  HostSkillLearning,
   InstalledSkill,
   InstallLocalSkillInput,
   InstallSkillInput,
@@ -494,6 +507,8 @@ import type {
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
   ReviseLocalSkillInput,
+  SaveSkillSuggestionInput,
+  SaveSkillSuggestionResult,
   SetEnabledSkillInput,
   SkillPackagePreview,
   SkillSubmission,
@@ -527,6 +542,7 @@ import type {
   LoginServerInput,
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
+  RemoteControlPolicy,
   RemoteDesktopConnectInput,
   RemoteDesktopConnectResult,
   RemoteDesktopSelectDisplayInput,
@@ -547,8 +563,9 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
-import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
+import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
   SpeechModelStatus,
@@ -792,8 +809,9 @@ export const IPC_ENDPOINTS = {
     // The main window marks each chat that has a window, so main tells it when one opens or closes.
     chatWindows: event<ChatWindowTarget[]>()("app:chat-windows"),
     // Main reads `Cmd + Q` before the page does, so it tells the window when to show the hint that
-    // the key must be held or pressed twice. True shows the hint, and false removes it.
-    quitShortcutHint: event<boolean>()("app:quit-shortcut-hint"),
+    // the key must be held or pressed twice. The hint names the local agents that work, which a quit
+    // stops, and is empty when the user guards every quit and no agent works. Null removes it.
+    quitShortcutHint: event<ClientAgentSummary[] | null>()("app:quit-shortcut-hint"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),
@@ -865,6 +883,12 @@ export const IPC_ENDPOINTS = {
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     /** Spends one usage reset credit of an account. A reset ends the usage limit that holds its agents. */
     resetProviderUsage: request<ResetProviderUsageInput, ProviderUsageResetOutcome>()("app:reset-provider-usage"),
+    /**
+     * Whether the Claude agents of this computer load the user's own Claude Code setup. This computer
+     * only: a joined server has no route for it.
+     */
+    getClaudeUserSetup: request<undefined, ClaudeUserSetupSetting>()("app:get-claude-user-setup"),
+    setClaudeUserSetup: request<boolean, ClaudeUserSetupSetting>()("app:set-claude-user-setup"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
@@ -897,7 +921,10 @@ export const IPC_ENDPOINTS = {
     getSettings: request<undefined, VoiceSettings>()("voice:get-settings"),
     setSettings: request<VoiceSettings, VoiceSettings>()("voice:set-settings"),
     transcribe: request<VoiceTranscriptionInput, VoiceTranscriptionResult>()("voice:transcribe"),
-    /** Saves or removes the ElevenLabs API key. Answers the status of the ElevenLabs model. */
+    /**
+     * Saves or removes the API key of a dictation provider. Answers the status of that provider's
+     * model in use, or of its first model.
+     */
     setApiKey: request<VoiceApiKeyInput, VoiceModelStatus>()("voice:set-api-key"),
     /**
      * Opens a streamed dictation with the cloud model in use. Answers when the provider accepted it.
@@ -914,7 +941,13 @@ export const IPC_ENDPOINTS = {
     streamTranscript: event<VoiceStreamTranscript>()("voice:stream-transcript"),
     getSpeechSettings: request<undefined, SpeechSettings>()("voice:get-speech-settings"),
     setSpeechSettings: request<SpeechSettings, SpeechSettings>()("voice:set-speech-settings"),
+    /** The status of the model in the settings. A cloud model is ready when its provider's key is saved. */
     getSpeechModelStatus: request<undefined, SpeechModelStatus>()("voice:get-speech-model-status"),
+    /**
+     * Saves or removes (null) the key of a provider that reads replies aloud. The ElevenLabs key is
+     * the same key that ElevenLabs dictation uses. Answers the status of the model in the settings.
+     */
+    setSpeechApiKey: request<SpeechApiKeyInput, SpeechModelStatus>()("voice:set-speech-api-key"),
     /** Downloads the speech model. Answers when it is ready, failed, or cancelled. */
     downloadSpeechModel: request<undefined, SpeechModelStatus>()("voice:download-speech-model"),
     cancelSpeechModelDownload: request<undefined, SpeechModelStatus>()("voice:cancel-speech-model-download"),
@@ -940,10 +973,11 @@ export const IPC_ENDPOINTS = {
     setServer: request<VoiceServerSave, VoiceServerSettings | null>()("voice:set-server"),
     serverSettings: event<VoiceServerSettings | null>()("voice:server-settings"),
     /**
-     * Starts Codex live voice in the chat of a Codex agent on this computer. Answers the WebRTC answer
-     * when OpenAI accepted the offer. A new session ends the one before it.
+     * Starts Codex live voice in the chat of an agent on this computer, or on a joined server with
+     * `live-voice-v1`. Answers the WebRTC answer when OpenAI accepted the offer. A new session ends the
+     * one before it on the same server.
      */
-    startLive: request<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
+    startLive: scopedRequest<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
     /** Ends a live voice session. It does nothing when the session ended already. */
     stopLive: request<VoiceLiveStop, void>()("voice:stop-live"),
     liveEvent: event<VoiceLiveEvent>()("voice:live-event"),
@@ -979,6 +1013,27 @@ export const IPC_ENDPOINTS = {
     setFrame: request<BrowserDockFrame, void>()("browser-dock:set-frame"),
     /** Whether the overlay shows the dock over the page. While it does, the dock in the renderer is inert. */
     shown: event<boolean>()("browser-dock:shown"),
+  },
+  /**
+   * The agent dock in its own window at the right edge of the screen. The main renderer publishes it and
+   * does its actions; the dock window shows it and sends the actions back. Main sends the messages.
+   */
+  agentDock: {
+    /** Null hides the dock window. */
+    publishPresentation: request<AgentDockPresentation | null, void>()("agent-dock:publish-presentation"),
+    getPresentation: request<undefined, AgentDockPresentation | null>()("agent-dock:get-presentation"),
+    presentation: event<AgentDockPresentation | null>()("agent-dock:presentation"),
+    performAction: request<AgentDockAction, void>()("agent-dock:perform-action"),
+    action: event<AgentDockAction>()("agent-dock:action"),
+    setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
+    /** Closes the chat of a dock window, because the dock on another display opened a chat. */
+    closeChat: event<undefined>()("agent-dock:close-chat"),
+    /** The connected displays, for the display setting of the dock. */
+    listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
+    /** A drag of the dock body moves its window up or down the screen edge. */
+    drag: request<AgentDockDragPhase, void>()("agent-dock:drag"),
+    /** The position where a drag left the dock, for the main renderer to save. */
+    moved: event<AgentDockOffset>()("agent-dock:moved"),
   },
   computerUse: {
     getState: request<undefined, ComputerUseState>()("computer-use:get-state"),
@@ -1105,7 +1160,7 @@ export const IPC_ENDPOINTS = {
     signOut: scopedRequest<AgentProviderId, void, "required">()("provider-admin:sign-out"),
     // A sign-in that a joined server's host starts and that opens in this computer's browser
     // (`sign-in-relay-v1`). This computer takes the callback and sends its query to the host.
-    // `openRelaySignIn` opens the page when the user asks, and `pasteRelaySignIn` takes the address
+    // `openRelaySignIn` opens the page again, and `pasteRelaySignIn` takes the address
     // the browser shows when the callback cannot reach this computer.
     startRelaySignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:start-relay-sign-in"),
     // The relayed sign-in of an account after the first (`provider-account-relay-v1` or `-v2`). The
@@ -1137,6 +1192,9 @@ export const IPC_ENDPOINTS = {
     listCustomProviders: scopedQuery<CustomProviderSummary[], "required">()("provider-admin:list-custom-providers"),
     saveCustomProvider: scopedRequest<SaveCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:save-custom-provider",
+    ),
+    updateCustomProvider: scopedRequest<UpdateCustomProviderInput, CustomProviderResult, "required">()(
+      "provider-admin:update-custom-provider",
     ),
     deleteCustomProvider: scopedRequest<DeleteCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:delete-custom-provider",
@@ -1269,6 +1327,10 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    // The server personality: how the server's agents talk while they work. Any member can read it;
+    // only an owner or admin can set it.
+    getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
+    setPersonality: scopedRequest<HostPersonality, HostPersonality, "required">()("host-admin:set-personality"),
     // How many memories each agent of the server can keep, and the values its host permits.
     getAgentMemoryLimit: scopedQuery<HostAgentMemoryLimit, "required">()("host-admin:get-agent-memory-limit"),
     setAgentMemoryLimit: scopedRequest<number, HostAgentMemoryLimit, "required">()("host-admin:set-agent-memory-limit"),
@@ -1276,6 +1338,10 @@ export const IPC_ENDPOINTS = {
     // server's agents (`0` is off), and the values its host permits.
     getMemoryReview: scopedQuery<HostMemoryReview, "required">()("host-admin:get-memory-review"),
     setMemoryReview: scopedRequest<number, HostMemoryReview, "required">()("host-admin:set-memory-review"),
+    // What the background memory reviews of the server's agents do when a chat teaches a skill, and
+    // the values its host permits.
+    getSkillLearning: scopedQuery<HostSkillLearning, "required">()("host-admin:get-skill-learning"),
+    setSkillLearning: scopedRequest<string, HostSkillLearning, "required">()("host-admin:set-skill-learning"),
     // The machine alert levels and the member who gets the alert (`machine-resources-v1`).
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(
@@ -1367,7 +1433,8 @@ export const IPC_ENDPOINTS = {
   // The Vault of this computer. Lists carry no password, card number or security code: `reveal`
   // returns one when the user asks, and `copy` writes one to the clipboard in main. The `host*`
   // endpoints do the same for one server: a joined server answers through `vault-v1`, to an owner
-  // or admin. It has no CSV import, as the file is on this computer.
+  // or admin. It has no CSV import, as the file is on this computer. `codes` returns the current
+  // two-step code of each login that has a key; the key never comes to the renderer.
   vault: {
     list: request<undefined, VaultState>()("vault:list"),
     save: request<VaultSaveInput, VaultState>()("vault:save"),
@@ -1376,6 +1443,7 @@ export const IPC_ENDPOINTS = {
     copy: request<VaultSecretRequest, void>()("vault:copy"),
     importCsv: request<undefined, VaultImportResult>()("vault:import-csv"),
     reset: request<undefined, VaultState>()("vault:reset"),
+    codes: request<undefined, VaultTwoStepCodes>()("vault:codes"),
     changed: event<VaultState>()("vault:changed"),
     hostList: scopedQuery<VaultState, "required">()("vault:host-list"),
     hostSave: scopedRequest<VaultSaveInput, VaultState, "required">()("vault:host-save"),
@@ -1383,6 +1451,7 @@ export const IPC_ENDPOINTS = {
     hostReveal: scopedRequest<VaultSecretRequest, string, "required">()("vault:host-reveal"),
     hostCopy: scopedRequest<VaultSecretRequest, void, "required">()("vault:host-copy"),
     hostReset: scopedQuery<VaultState, "required">()("vault:host-reset"),
+    hostCodes: scopedQuery<VaultTwoStepCodes, "required">()("vault:host-codes"),
   },
   // The 1Password connection of this computer. The token goes from the renderer to main once, in
   // `connectWithToken`; every answer is the status only. The `host*` endpoints do the same for a
@@ -1565,6 +1634,12 @@ export const IPC_ENDPOINTS = {
     deleteChannelMessage: scopedRequest<DeleteChannelMessageInput, void>()("agent:channels:delete-message"),
     // Only this computer keeps a channel image. A joined server has no route for it.
     setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
+    /** "New conversation": the members of the channel forget its earlier messages. */
+    clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
+    /** "Delete history": the messages of the channel go, and its members forget them. */
+    deleteChannelHistory: scopedRequest<string, void>()("agent:channels:delete-history"),
+    /** Compacts the channel session of each member now. */
+    compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.
@@ -1583,6 +1658,10 @@ export const IPC_ENDPOINTS = {
     saveProfile: scopedRequest<SaveAgentProfileInput, SaveAgentProfileResult>()("agent:save-profile"),
     // Only the computer that runs the agent answers. A joined server has no route for it.
     askSideQuestion: scopedRequest<AskSideQuestionInput, string>()("agent:ask-side-question"),
+    // A joined server answers through `skill-learning-v1`; without it, `saved: false`.
+    saveSkillSuggestion: scopedRequest<SaveSkillSuggestionInput, SaveSkillSuggestionResult>()(
+      "agent:save-skill-suggestion",
+    ),
     createAgent: scopedRequest<CreateAgentInput, ClientAgentSummary>()("agent:create"),
     duplicateAgent: scopedRequest<string, DuplicateAgentResult>()("agent:duplicate"),
     updateAgent: scopedRequest<UpdateAgentInput, ClientAgentSummary>()("agent:update"),
@@ -1623,6 +1702,8 @@ export const IPC_ENDPOINTS = {
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
+    // A joined server takes this through `agent-thread-pages-v1`.
+    readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
     // A joined server takes this through `agent-thread-branches-v1`.
@@ -1644,6 +1725,8 @@ export const IPC_ENDPOINTS = {
     reorderQueue: scopedRequest<ReorderQueueInput, void>()("agent:reorder-queue"),
     interrupt: scopedRequest<InterruptTurnInput, void>()("agent:interrupt"),
     clearContext: scopedRequest<string, void>()("agent:clear-context"),
+    /** "Delete history": the messages of the agent's own chat go, and the agent forgets them. */
+    deleteHistory: scopedRequest<string, void>()("agent:delete-history"),
     compactContext: scopedRequest<string, void>()("agent:compact-context"),
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
@@ -1993,7 +2076,7 @@ export const IPC_ENDPOINTS = {
     mcpSignInPage: scopedRequest<CancelMcpSignInInput, string | null, "required">()("servers:mcp:sign-in-page"),
     // A host with `sign-in-relay-v1` opens no tab: the page opens in this computer's browser, and the
     // callback comes back here. `mcpSignInRelay` names the page while it waits, `openMcpSignInRelay`
-    // opens it when the user asks, and `completeMcpSignInRelay` takes the address the user pastes when
+    // opens it again, and `completeMcpSignInRelay` takes the address the user pastes when
     // no listener took the callback.
     mcpSignInRelay: scopedRequest<CancelMcpSignInInput, McpSignInRelayPage | null, "required">()(
       "servers:mcp:sign-in-relay",
@@ -2098,6 +2181,11 @@ export const IPC_ENDPOINTS = {
     removeMember: request<string, void>()("host:remove-member"),
     listSessions: request<undefined, TeamSessionSummary[]>()("host:list-sessions"),
     revokeSession: request<string, void>()("host:revoke-session"),
+    /** Who may control this computer through remote desktop, and whether its user must allow each session. */
+    getRemoteControlPolicy: request<undefined, RemoteControlPolicy>()("host:get-remote-control-policy"),
+    setRemoteControlPolicy: request<RemoteControlPolicy, RemoteControlPolicy>()("host:set-remote-control-policy"),
+    /** Ends every remote desktop session on this computer, and refuses the requests that wait for an answer. */
+    stopRemoteControl: request<undefined, HostStatus>()("host:stop-remote-control"),
     event: event<HostStatus>()("host:event"),
   },
   events: {
@@ -2144,6 +2232,7 @@ export const IPC_GROUP_PATHS = {
   voice: "voice",
   dynamicIsland: "dynamicIsland",
   browserDock: "browserDock",
+  agentDock: "agentDock",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
   backgroundProcesses: "backgroundProcesses",

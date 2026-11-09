@@ -11,6 +11,7 @@ import type {
   SentMessageStats,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_WELCOME_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
@@ -349,6 +350,29 @@ export class ConversationQueries {
     };
   }
 
+  /** The cursor of the page before a message of the thread, or null when the thread does not hold it. */
+  conversationCursorAt(threadId: string, messageId: string): string | null {
+    const row = this.#messageOrderRow(threadId, messageId);
+    return row ? encodePageCursor(conversationRowCursor(row)) : null;
+  }
+
+  /** How many messages the reader can see before a message of the thread. 0 when the thread does not hold it. */
+  conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
+    const row = this.#messageOrderRow(threadId, messageId);
+    return row ? this.#conversationRowsBefore(threadId, conversationRowCursor(row), options).count : 0;
+  }
+
+  #messageOrderRow(threadId: string, messageId: string): DynamicRecord | null {
+    return databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
+        )
+        .get(threadId, messageId),
+    );
+  }
+
   supportedConversationCursor(
     threadId: string,
     throughMessageId: string | null,
@@ -416,7 +440,7 @@ export class ConversationQueries {
              JOIN projection_threads thread ON thread.thread_id = message.thread_id
              WHERE ${textFilter}
                AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
-               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}')
+               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}')
                AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
@@ -751,8 +775,10 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
   ];
 }
 
+/** A new agent's setup message (`agent-welcome-v1`) is for the agent only, so no page or read state has it. */
 function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
+    `AND COALESCE(item_type, '') != '${AGENT_WELCOME_ITEM_TYPE}'`,
     exclusions.excludeRoutineEvents
       ? `AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'`
       : "",

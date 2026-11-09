@@ -93,9 +93,18 @@ each session start and resume, because most users have no vault. The agent servi
 uses it in two places: `openbot_browser.list_logins` returns the logins saved for the tab's HTTPS
 site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
-secure card, with no card. On an origin where an agent ran `evaluate` during this app session,
-`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because the agent's script
-could read the filled fields. A login matches by 1Password's autofill rule, on the registrable domain
+secure card, with no card. While agent code from `evaluate` can still run in the page,
+`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
+the filled fields. The mark is per document, and it stays until a main-frame navigation or a close.
+A script can also write Cache Storage that a service worker serves as page code, also to a page that
+the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
+page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
+connected popup or opener keeps that mark, each other open page of the origin must navigate before
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
+the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
+IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
+own code runs a stored value as code is not protected, as from any other script that the site
+loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
 with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
 password or a code.
 
@@ -143,7 +152,9 @@ external chat, a team member, a routine, another agent, or a web page cannot rep
 password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
 the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
-transcript because the agent sent it; OpenBot keeps no tool arguments in its trace.
+transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot
+delete a Vault key: for a name that only the Vault has, `remove_api_key` fails and tells the agent
+that the user deletes it in Server settings > Vault.
 
 `password-vault-router.ts` joins metadata from every manager and prefixes Bitwarden ids with
 `bitwarden:` and Proton Pass ids with `proton:`. Existing 1Password ids stay unchanged. The
@@ -205,6 +216,8 @@ person.
 ## Local skill library
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.
+
+`create_skill` and `revise_skill` publish a folder of the agent's workspace. An agent often writes a plain frontmatter value with a colon, such as `description: Use when: ...`, which YAML refuses. When the frontmatter does not parse, the library quotes each top-level plain value that has a colon and tries again. When that parses, the bundle gets the quoted `SKILL.md`; the folder in the workspace does not change. Otherwise the publish fails as before.
 
 The shared package validator handles local and marketplace bundles. The existing installer owns per-agent files, hashes, disabled storage, and both provider directories. Local installations skip marketplace downloads and receipt requests. Installation operations are serialized per agent; a library revision does not update installed copies.
 

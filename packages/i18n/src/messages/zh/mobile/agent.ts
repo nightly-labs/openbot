@@ -131,7 +131,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "请重新连接以保存更改。",
   "mobile.agent.info.noMemories": "还没有记忆。",
   "mobile.agent.info.addMemory": "添加记忆",
-  "mobile.agent.info.routineActive": "启用",
   "mobile.agent.info.routinePaused": "已暂停",
   "mobile.agent.info.noRoutines": "还没有自动化任务。",
   "mobile.agent.info.addRoutine": "添加自动化任务",
@@ -334,7 +333,7 @@ export const messages = {
   "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
   "mobile.agent.backupModels.intro": "如果 {model} 在 {name} 开始输出之前就用完了额度，{name} 会询问你要用哪个模型。",
   "mobile.agent.backupModels.introAutomatic":
-    "如果 {model} 在 {name} 开始输出之前就用完了额度或出现服务商错误，{name} 会按顺序切换到第一个可用模型。",
+    "如果 {model} 用完了额度，{name} 会按顺序切换到第一个可用模型。如果 {model} 在 {name} 开始输出之前出现服务商错误，{name} 也会切换。",
   "mobile.agent.backupModels.ask": "切换前询问",
   "mobile.agent.backupModels.order": "顺序",
   "mobile.agent.backupModels.empty": "未设置顺序。{name} 会列出每个可用模型供你选择。",

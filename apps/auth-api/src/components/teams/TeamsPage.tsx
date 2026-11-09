@@ -2,23 +2,15 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, lazy, onCleanup, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { LANDING_TEAM, type LandingTeammate } from "../../lib/landing-content";
-import {
-  TEAMS_AUDIENCE,
-  TEAMS_BENEFITS,
-  TEAMS_CLOSING,
-  TEAMS_CUSTOM,
-  TEAMS_HERO,
-  TEAMS_ROUTE,
-  TEAMS_SETUPS,
-  TEAMS_SETUPS_SECTION,
-  type TeamsSetupId,
-} from "../../lib/teams-page";
+import { TEAMS_BENEFIT_ICONS, TEAMS_ROUTE, TEAMS_SETUP_IDS, type TeamsSetupId } from "../../lib/teams-page";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingGlow } from "../landing/LandingGlow";
 import { LandingIcon, type LandingIconName } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
+import { useSitePath } from "../landing/SiteText";
 import { ButtonLink } from "../ui/button";
+import type { TeamsPageText } from "./teams-page-text";
 
 // Loaded after the page is in the browser, as in `FeaturesSection`: the avatar engine is large.
 const AgentAvatar = lazy(() =>
@@ -31,20 +23,17 @@ const SETUP_ICONS: Record<TeamsSetupId, LandingIconName> = {
   custom: "blocks",
 };
 
-/** One icon for each item of `TEAMS_CUSTOM.items`, in the same order. */
+/** One icon for each step of the custom project, in the order of the page text. */
 const CUSTOM_ICONS = ["cpu", "users", "puzzle", "blocks", "clock"] as const satisfies readonly LandingIconName[];
 
-/** One icon for each item of `TEAMS_AUDIENCE.items`, in the same order. */
+/** One icon for each audience item, in the order of the page text. */
 const AUDIENCE_ICONS = ["users", "globe", "clock", "puzzle", "contact"] as const satisfies readonly LandingIconName[];
 
-/** The two marquee rows, as indexes of `TEAMS_AUDIENCE.items`. Each row repeats its items, so the loop has no gap. */
+/** The two marquee rows, as indexes of the audience items. Each row repeats its items, so the loop has no gap. */
 const MARQUEE_ROWS = [
   [0, 1, 2, 0, 1, 2],
   [3, 4, 3, 4, 3, 4],
 ] as const;
-
-/** The words of the closing title that get the setup colours. */
-const ACCENT_WORDS = new Set(["AI", "coworkers"]);
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -54,49 +43,49 @@ const between = (min: number, max: number) => min + Math.random() * (max - min);
 // The page for companies: the team in the title, the setups in the colours of the Teams cards on the
 // landing page, what a server adds, the steps of a custom project, who it is for, and one closing call.
 // Each button opens the contact form.
-export function TeamsPage() {
+export function TeamsPage(props: { lang: string; text: TeamsPageText }) {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, TEAMS_ROUTE));
 
   return (
-    <div class="landing-page teams-page">
+    <div class="landing-page teams-page" lang={props.lang}>
       <SiteHeader page="content" />
 
       <main class="teams-main">
-        <TeamsHero />
+        <TeamsHero text={props.text} />
 
         <RevealSection id="setups" labelledBy="teams-setups-title">
           <header class="teams-heading teams-heading-center">
-            <h2 id="teams-setups-title">{TEAMS_SETUPS_SECTION.heading}</h2>
+            <h2 id="teams-setups-title">{props.text.setupsSection.heading}</h2>
           </header>
           <ol class="teams-setups">
-            <For each={TEAMS_SETUPS}>
-              {(setup) => (
-                <li class="teams-setup" data-setup={setup.id}>
+            <For each={TEAMS_SETUP_IDS}>
+              {(id) => (
+                <li class="teams-setup" data-setup={id}>
                   <div class="landing-download-card-top">
-                    <LandingIcon name={SETUP_ICONS[setup.id]} class="teams-setup-icon" />
-                    <span class="landing-download-status">{setup.label}</span>
+                    <LandingIcon name={SETUP_ICONS[id]} class="teams-setup-icon" />
+                    <span class="landing-download-status">{props.text.setups[id].label}</span>
                   </div>
                   <div class="landing-download-card-copy">
-                    <h3>{setup.title}</h3>
-                    <p>{setup.description}</p>
+                    <h3>{props.text.setups[id].title}</h3>
+                    <p>{props.text.setups[id].description}</p>
                   </div>
                 </li>
               )}
             </For>
           </ol>
           <p class="teams-help">
-            {TEAMS_SETUPS_SECTION.question}
-            <ContactButton label={TEAMS_SETUPS_SECTION.action} size="sm" variant="secondary" />
+            {props.text.setupsSection.question}
+            <ContactButton label={props.text.setupsSection.action} size="sm" variant="secondary" />
           </p>
         </RevealSection>
 
         <RevealSection id="benefits">
           <ul class="teams-bento">
-            <For each={TEAMS_BENEFITS}>
+            <For each={props.text.benefits}>
               {(benefit, index) => (
                 <li class="teams-tile" data-tile={index()}>
                   <div class="teams-tile-art" aria-hidden="true">
-                    <LandingIcon name={benefit.icon} />
+                    <LandingIcon name={TEAMS_BENEFIT_ICONS[index()] ?? "check"} />
                   </div>
                   <div class="teams-tile-copy">
                     <h2>{benefit.title}</h2>
@@ -108,11 +97,11 @@ export function TeamsPage() {
           </ul>
         </RevealSection>
 
-        <CustomTimeline />
+        <CustomTimeline text={props.text.custom} />
 
-        <AudienceMarquee />
+        <AudienceMarquee text={props.text.audience} />
 
-        <ClosingSection />
+        <ClosingSection text={props.text.closing} />
       </main>
 
       <LandingFooter />
@@ -122,8 +111,9 @@ export function TeamsPage() {
 }
 
 function ContactButton(props: { label: string; size?: "sm" | "lg"; variant?: "primary" | "secondary" }) {
+  const path = useSitePath();
   return (
-    <ButtonLink to="/contact" variant={props.variant ?? "primary"} size={props.size ?? "lg"} icon="contact">
+    <ButtonLink to={path("/contact")} variant={props.variant ?? "primary"} size={props.size ?? "lg"} icon="contact">
       {props.label}
     </ButtonLink>
   );
@@ -148,11 +138,11 @@ function RevealSection(props: { id: string; labelledBy?: string; children: JSX.E
 
 // The hero ----------------------------------------------------------------------------------------
 
-/** "Bring a team of AI coworkers …": the avatars go after "of". */
-const [titleLead, titleRest] = TEAMS_HERO.heading.split(" of ");
-
-/** As the home hero puts the logo in "Meet OpenBot", this title holds the team. Their eyes follow the pointer. */
-function TeamsHero() {
+/**
+ * As the home hero puts the logo in "Meet OpenBot", this title holds the team: "Bring a team of [avatars]
+ * AI coworkers …". The word before the avatars stays on their line. Their eyes follow the pointer.
+ */
+function TeamsHero(props: { text: TeamsPageText }) {
   return (
     <section class="landing-hero teams-hero" aria-labelledby="teams-title">
       <div class="landing-hero-grid" aria-hidden="true" />
@@ -162,25 +152,25 @@ function TeamsHero() {
       <div class="landing-hero-copy">
         <p class="teams-pill landing-hero-line" style={{ "--landing-hero-line": 0 }}>
           <span class="teams-pill-dots" aria-hidden="true">
-            <For each={TEAMS_SETUPS}>{(setup) => <span data-setup={setup.id} />}</For>
+            <For each={TEAMS_SETUP_IDS}>{(id) => <span data-setup={id} />}</For>
           </span>
-          <span class="teams-pill-label">OpenBot for Teams</span>
+          <span class="teams-pill-label">{props.text.title}</span>
         </p>
         <h1 id="teams-title" class="teams-title landing-hero-line" style={{ "--landing-hero-line": 1 }}>
-          <span>{titleLead}</span>{" "}
+          <span>{props.text.hero.lead}</span>{" "}
           <span class="teams-title-keep">
-            of{" "}
+            {props.text.hero.keep}{" "}
             <span class="teams-title-team" aria-hidden="true">
               <For each={LANDING_TEAM}>{(teammate) => <TitleAvatar teammate={teammate} />}</For>
             </span>
           </span>{" "}
-          <span>{titleRest}</span>
+          <span>{props.text.hero.rest}</span>
         </h1>
         <p class="landing-description landing-hero-line" style={{ "--landing-hero-line": 2 }}>
-          {TEAMS_HERO.intro}
+          {props.text.description}
         </p>
         <div class="landing-actions landing-hero-line" style={{ "--landing-hero-line": 3 }}>
-          <ContactButton label={TEAMS_CLOSING.action} />
+          <ContactButton label={props.text.closing.action} />
         </div>
       </div>
     </section>
@@ -333,15 +323,15 @@ function Cursor(props: { teammate: LandingTeammate; index: number }) {
 // The custom-deployment section ---------------------------------------------------------------
 
 /** The five items are the steps of one project. One time, a spark runs along the line and lights each step. */
-function CustomTimeline() {
+function CustomTimeline(props: { text: TeamsPageText["custom"] }) {
   let timeline: HTMLDivElement | undefined;
   const playing = createLandingReveal(() => timeline, { rootMargin: "0px 0px -25% 0px" });
 
   return (
     <RevealSection id="custom" labelledBy="teams-custom-title">
       <header class="teams-heading teams-heading-center">
-        <h2 id="teams-custom-title">{TEAMS_CUSTOM.heading}</h2>
-        <p>{TEAMS_CUSTOM.intro}</p>
+        <h2 id="teams-custom-title">{props.text.heading}</h2>
+        <p>{props.text.intro}</p>
       </header>
       <div ref={timeline} class="teams-timeline" data-play={playing() ? "true" : "false"}>
         <span class="teams-timeline-line" aria-hidden="true">
@@ -349,7 +339,7 @@ function CustomTimeline() {
           <span class="teams-timeline-spark" />
         </span>
         <ol class="teams-timeline-track">
-          <For each={TEAMS_CUSTOM.items}>
+          <For each={props.text.items}>
             {(item, index) => (
               <li class="teams-step" data-tile={index() % 4} style={{ "--teams-index": index() }}>
                 <span class="teams-step-node">
@@ -374,8 +364,8 @@ function splitLead(item: string) {
   return { lead: item.slice(0, space), rest: item.slice(space + 1) };
 }
 
-function AudienceChip(props: { index: number }) {
-  const parts = () => splitLead(TEAMS_AUDIENCE.items[props.index] ?? "");
+function AudienceChip(props: { item: string; index: number }) {
+  const parts = () => splitLead(props.item);
   return (
     <span class="teams-chip" data-tile={props.index % 4}>
       <span class="teams-chip-icon">
@@ -389,15 +379,15 @@ function AudienceChip(props: { index: number }) {
 }
 
 /** Two rows of chips that move in opposite directions. The pointer on a row stops it. */
-function AudienceMarquee() {
+function AudienceMarquee(props: { text: TeamsPageText["audience"] }) {
   return (
     <RevealSection id="audience" labelledBy="teams-audience-title">
       <header class="teams-heading teams-heading-center">
-        <h2 id="teams-audience-title">{TEAMS_AUDIENCE.heading}</h2>
+        <h2 id="teams-audience-title">{props.text.heading}</h2>
       </header>
       <div class="teams-marquee">
         <ul class="landing-visually-hidden">
-          <For each={TEAMS_AUDIENCE.items}>{(item) => <li>{item}</li>}</For>
+          <For each={props.text.items}>{(item) => <li>{item}</li>}</For>
         </ul>
         <For each={MARQUEE_ROWS}>
           {(row, rowIndex) => (
@@ -406,7 +396,9 @@ function AudienceMarquee() {
                 <For each={[0, 1]}>
                   {() => (
                     <div class="teams-marquee-group">
-                      <For each={row}>{(index) => <AudienceChip index={index} />}</For>
+                      <For each={row}>
+                        {(index) => <AudienceChip item={props.text.items[index] ?? ""} index={index} />}
+                      </For>
                     </div>
                   )}
                 </For>
@@ -422,11 +414,10 @@ function AudienceMarquee() {
 // The closing section ---------------------------------------------------------------------------
 
 /** Each word of the title becomes bright as you scroll. A coloured grid follows the pointer. */
-function ClosingSection() {
+function ClosingSection(props: { text: TeamsPageText["closing"] }) {
   let section: HTMLElement | undefined;
   let heading: HTMLHeadingElement | undefined;
   let spot: HTMLDivElement | undefined;
-  const words = TEAMS_CLOSING.heading.split(" ");
   let stop = () => {};
 
   onSettled(() => {
@@ -493,23 +484,23 @@ function ClosingSection() {
     >
       <div class="landing-hero-grid" aria-hidden="true" />
       <div ref={spot} class="landing-hero-grid teams-closing-spot" aria-hidden="true" />
-      <h2 ref={heading} id="teams-closing-title" style={{ "--teams-count": words.length }}>
-        <For each={words}>
+      <h2 ref={heading} id="teams-closing-title" style={{ "--teams-count": props.text.words.length }}>
+        <For each={props.text.words}>
           {(word, index) => (
             <>
               <span
                 class="teams-closing-word"
-                data-accent={ACCENT_WORDS.has(word) ? "true" : undefined}
+                data-accent={word.accent ? "true" : undefined}
                 style={{ "--teams-word": index() }}
               >
-                {word}
+                {word.word}
               </span>{" "}
             </>
           )}
         </For>
       </h2>
       <span class="teams-closing-action">
-        <ContactButton label={TEAMS_CLOSING.action} />
+        <ContactButton label={props.text.action} />
       </span>
     </section>
   );

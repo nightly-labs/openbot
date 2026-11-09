@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "연결 안 됨",
   "mcp.connect.close": "{name} 연결 닫기",
   "mcp.connect.getKey": "키 발급받기",
+  "mcp.connect.useKey": "대신 API 키 사용",
+  "mcp.connect.useSignIn": "대신 로그인",
   "mcp.connect.keyDescription":
     "{name} 계정의 인증 정보를 붙여넣으세요. OpenBot이 이 정보로 연결하고 {host}에 보관해요.",
   "mcp.connect.thisComputer": "이 컴퓨터",
@@ -139,11 +141,11 @@ export const messages = {
   "mcp.panel.appSaved": "앱이 저장되었어요. 로그인해서 사용하세요.",
   "mcp.panel.appRemoved": "앱이 삭제되었어요.",
   "mcp.signIn.relayDescription":
-    "로그인 페이지가 {page}에 있는지 확인한 다음 브라우저에서 여세요. 완료하면 OpenBot이 로그인 정보를 {host}로 보내요.",
+    "브라우저에서 {page}에 로그인하세요. 완료하면 OpenBot이 로그인 정보를 {host}로 보내요.",
   "mcp.signIn.relayOpenDescription":
-    "브라우저에서 {page}의 로그인 페이지를 여세요. 완료하면 브라우저에 표시되는 주소를 여기에 붙여넣으세요. 그러면 OpenBot이 로그인 정보를 {host}로 보내요.",
+    "브라우저에서 {page}에 로그인하세요. 완료하면 브라우저에 표시되는 주소를 여기에 붙여넣으세요. 그러면 OpenBot이 로그인 정보를 {host}로 보내요.",
   "mcp.signIn.relayDeviceDescription":
-    "로그인 페이지가 {page}에 있는지 확인한 다음 브라우저에서 열어 그곳에서 완료하세요. {host}가 로그인을 자동으로 인식해요.",
+    "브라우저에서 {page}에 로그인하고 그곳에서 완료하세요. {host}가 로그인을 자동으로 인식해요.",
   "mcp.signIn.relayOpen": "로그인 페이지 열기",
   "mcp.signIn.relayPasteHint":
     "브라우저가 OpenBot으로 돌아오지 않으면 브라우저에 표시되는 주소를 복사해 여기에 붙여넣으세요.",

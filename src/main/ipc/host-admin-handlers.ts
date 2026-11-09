@@ -18,17 +18,23 @@ import {
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
+  decodeHostPersonality,
+  decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
   decodeServerAuditLog,
+  type HostPersonality,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
   hostMemoryReview,
+  hostSkillLearning,
   isPromptCacheTtl,
+  isSkillLearningMode,
+  LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type PromptCacheTtl,
@@ -51,6 +57,10 @@ import {
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import {
+  HOST_PERSONALITY_CAPABILITY,
+  HOST_PERSONALITY_ROUTES,
+} from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
@@ -67,6 +77,7 @@ import {
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
@@ -79,7 +90,9 @@ import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preferen
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { ServerAuditStore } from "../server-audit-store";
+import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
+import type { SkillLearningPreferenceStore } from "../skill-learning-preference-store";
 import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -102,8 +115,10 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
+  skillLearning: SkillLearningPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
@@ -126,8 +141,10 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  serverPersonality,
   agentMemoryLimit,
   memoryReview,
+  skillLearning,
   machineAlerts,
   promptCacheTtl,
   modelVisibility,
@@ -154,6 +171,9 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
   }
+  function remotePersonality(serverId: string, route: string, body: Record<string, never> | HostPersonality) {
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostPersonality, { method: "POST", body }));
+  }
   function remoteMemoryLimit(serverId: string, route: string, body: { limit?: number }) {
     if (!remoteServers.supportsCapability(serverId, AGENT_MEMORY_LIMIT_CAPABILITY))
       throw new Error(sourceText("error.team.agentMemoryLimitUnsupported"));
@@ -163,6 +183,11 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, MEMORY_REVIEW_CAPABILITY))
       throw new Error(sourceText("error.team.memoryReviewUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostMemoryReview, { method: "POST", body }));
+  }
+  function remoteSkillLearning(serverId: string, route: string, body: { mode?: string }) {
+    if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY))
+      throw new Error(sourceText("error.team.skillLearningUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostSkillLearning, { method: "POST", body }));
   }
   function remoteMachineAlerts(serverId: string, route: string, body: MachineAlertSettings | Record<string, never>) {
     if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY))
@@ -281,6 +306,22 @@ export function hostAdminIpcHandlers({
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
       }),
+      // A host before host-personality-v1 uses the classic prompt.
+      getPersonality: scopedQueryHandler({
+        local: () => serverPersonality.get(),
+        remote: async (serverId) =>
+          remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY)
+            ? remotePersonality(serverId, HOST_PERSONALITY_ROUTES.settings, {})
+            : { responseStyle: LEGACY_RESPONSE_STYLE },
+      }),
+      setPersonality: scopedHandler(parseServerPersonality, {
+        local: (personality) => runCauseEffect(serverPersonality.set(personality)),
+        remote: (personality, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY))
+            throw new Error(sourceText("error.team.hostPersonalityUnsupported"));
+          return remotePersonality(serverId, HOST_PERSONALITY_ROUTES.update, personality);
+        },
+      }),
       getAgentMemoryLimit: scopedQueryHandler({
         local: () => hostAgentMemoryLimit(agentMemoryLimit.get()),
         remote: (serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.settings, {}),
@@ -300,6 +341,18 @@ export function hostAdminIpcHandlers({
         local: async (interval) =>
           hostMemoryReview(await runCauseEffect(memoryReview.set(parseMemoryReviewPreference({ interval })))),
         remote: (interval, serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.update, { interval }),
+      }),
+      getSkillLearning: scopedQueryHandler({
+        local: () => hostSkillLearning(skillLearning.get()),
+        remote: (serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.settings, {}),
+      }),
+      // The host checks the value against its own choices, so a remote value is any short text.
+      setSkillLearning: scopedHandler(parseSkillLearningText, {
+        local: async (mode) => {
+          if (!isSkillLearningMode(mode)) throw new Error("Skill learning mode is required.");
+          return hostSkillLearning(await runCauseEffect(skillLearning.set({ mode })));
+        },
+        remote: (mode, serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.update, { mode }),
       }),
       getMachineAlerts: scopedQueryHandler({
         local: () => machineAlerts.alerts(),
@@ -395,6 +448,11 @@ function parsePromptCacheTtl(value: unknown): PromptCacheTtl {
 function parseMemoryReviewCount(value: unknown): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
     throw new Error("Memory review interval is required.");
+  return value;
+}
+
+function parseSkillLearningText(value: unknown): string {
+  if (typeof value !== "string" || !value || value.length > 32) throw new Error("Skill learning mode is required.");
   return value;
 }
 

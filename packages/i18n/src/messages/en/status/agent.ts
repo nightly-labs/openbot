@@ -26,6 +26,11 @@ export const messages = defineMessages("status.agent", {
     "Capture the screen area at {x}, {y}, {width} × {height} points and send the image to the agent's model.",
   "status.agent.vaultCardFill":
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
+  "status.agent.reportProblem":
+    "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
+  "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
+  "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
+  "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":
@@ -58,7 +63,21 @@ export const messages = defineMessages("status.agent", {
   "status.agent.changesReviewing": "Reviewing the changes I made…",
   "status.agent.agentCoordinating": "Coordinating with another agent…",
   "status.agent.agentResponseReviewing": "Reviewing the other agent’s response…",
+  "status.agent.commandRunningUnnamed": "Running a command…",
   "status.agent.toolStepWorking": "Working through the next tool-assisted step…",
+  "status.agent.webSearching": "Searching the web for “{query}”…",
+  "status.agent.urlFetching": "Visiting {host}…",
+  "status.agent.fileReading": "Reading the file {name}…",
+  "status.agent.filesReading": "Reading files…",
+  "status.agent.filesListing": "Looking through the folder {path}…",
+  "status.agent.filesLooking": "Looking through files…",
+  "status.agent.textSearching": "Searching for “{query}”…",
+  "status.agent.filesSearchingText": "Searching the files…",
+  "status.agent.folderSizesMeasuring": "Measuring folder sizes…",
+  "status.agent.diskSpaceChecking": "Checking free disk space…",
+  "status.agent.processesChecking": "Checking running processes…",
+  "status.agent.gitChecking": "Checking the Git repository…",
+  "status.agent.commandRunning": "Running the {program} command…",
   "status.agent.memoryChanges": "Memory: {saved} saved, {updated} updated, {forgotten} forgotten.",
   "status.agent.memoryChangesWithConflicts":
     "Memory: {saved} saved, {updated} updated, {forgotten} forgotten, {notChanged} not changed because another thread changed it first.",
@@ -97,5 +116,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultField.email": "Email address",
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
+  "status.agent.compactionContinues":
+    "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
 });

@@ -86,6 +86,12 @@ export const messages = {
     "Selecione os níveis de esforço que cada modelo aceita. Sem seleção, o OpenCode oferece Baixo, Médio e Alto.",
   "customProvider.model.effortsHintPi":
     "Selecione os níveis de esforço que cada modelo aceita. Sem seleção, o modelo não raciocina.",
+  "customProvider.model.inputs": "Entradas do modelo {number}",
+  "customProvider.model.inputsLabel": "Aceita",
+  "customProvider.model.inputImage": "Imagens",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Selecione o que cada modelo pode ler além de texto.",
+  "customProvider.model.foundValuesHint": "Alguns valores vêm do endpoint. Você pode alterá-los.",
   "customProvider.model.remove": "Remover modelo {number}",
   "customProvider.model.add": "Adicionar modelo",
   "customProvider.headers": "Cabeçalhos",

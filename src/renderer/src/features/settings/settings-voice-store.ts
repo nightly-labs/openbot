@@ -1,7 +1,12 @@
 import {
   type CodexLiveVoice,
+  type DictationKeyProvider,
   ELEVENLABS_VOICE_MODEL_ID,
+  type ElevenLabsSpeechVoice,
   isSpeechLanguage,
+  SPEECH_MODEL_ID,
+  type SpeechKeyProvider,
+  type SpeechModelId,
   type SpeechModelStatus,
   type SpeechSettings,
   type SpeechVoice,
@@ -12,6 +17,7 @@ import {
   type VoiceServerInput,
   type VoiceServerSettings,
   type VoiceSettings,
+  type XaiSpeechVoice,
 } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
@@ -25,7 +31,10 @@ interface SettingsVoiceState {
   /** One status for each model in `VOICE_MODELS`, or null before main answers. */
   statuses: Record<VoiceModelId, VoiceModelStatus | null>;
   settings: VoiceSettings | null;
-  /** The model that reads replies aloud, and its settings, or null before main answers. */
+  /**
+   * The status of the model in the settings that reads replies aloud, and the settings, or null
+   * before main answers. A cloud model is "ready" when its key is saved.
+   */
   speech: { status: SpeechModelStatus | null; settings: SpeechSettings | null; listening: boolean };
   /** The user's own voice server, or null when none is set up or before main answers. */
   server: VoiceServerSettings | null;
@@ -38,6 +47,8 @@ const EMPTY_STATUSES: SettingsVoiceState["statuses"] = {
   "whisper-turbo": null,
   "cohere-transcribe-03-2026": null,
   [ELEVENLABS_VOICE_MODEL_ID]: null,
+  "groq-whisper-large-v3-turbo": null,
+  "groq-whisper-large-v3": null,
 };
 
 type FailureKey =
@@ -72,10 +83,14 @@ export function createSettingsVoiceStore(active: () => boolean) {
       draft.statuses[status.modelId] = status;
     });
 
-  const setSpeechStatus = (status: SpeechModelStatus) =>
+  /** A status of another model, such as a Supertonic download that ends after a change to xAI, is old. */
+  const setSpeechStatus = (status: SpeechModelStatus) => {
+    const chosen = state.speech.settings?.modelId;
+    if (chosen && status.modelId !== chosen) return;
     setState((draft) => {
       draft.speech.status = status;
     });
+  };
 
   // The tab listens only while it is open, and reads every status again each time it opens.
   createEffect(active, (isActive) => {
@@ -136,20 +151,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       .voice.removeModel({ modelId })
       .then(setStatus)
       .catch((error: unknown) => fail(error, "settings.voice.removeFailed"));
-  }
-
-  /** Saves or removes the ElevenLabs key. Main keeps the key; the answer is the cloud model's status. */
-  function setApiKey(key: string | null): Promise<boolean> {
-    return voicePort()
-      .voice.setApiKey({ key })
-      .then((status) => {
-        setStatus(status);
-        return true;
-      })
-      .catch((error: unknown) => {
-        fail(error, key === null ? "settings.voice.apiKey.removeFailed" : "settings.voice.apiKey.saveFailed");
-        return false;
-      });
   }
 
   function save(patch: Partial<VoiceSettings>): void {
@@ -244,9 +245,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
       .then((server) => {
         setServer(server);
         // Replies go back to Supertonic: download it now, as Read replies aloud does.
-        const phase = state.speech.status?.phase;
-        const missing = phase === "missing" || phase === "error";
-        if (spoke && !server?.routes.speech && state.speech.settings?.readReplies && missing) downloadSpeech();
+        if (spoke && !server?.routes.speech && state.speech.settings?.readReplies && supertonicMissing())
+          downloadSpeech();
         return true;
       })
       .catch((error: unknown) => {
@@ -272,6 +272,59 @@ export function createSettingsVoiceStore(active: () => boolean) {
     void saveSpeech({ codexLiveVoice });
   }
 
+  /** Supertonic is the model in the settings, and it is not on this computer. A cloud model downloads nothing. */
+  function supertonicMissing(): boolean {
+    const phase = state.speech.status?.phase;
+    return state.speech.settings?.modelId === SPEECH_MODEL_ID && (phase === "missing" || phase === "error");
+  }
+
+  /**
+   * Chooses the model that reads replies aloud. Main sends the status of the new model; a download
+   * of Supertonic that runs stops when another model is chosen.
+   */
+  function setSpeechModel(modelId: SpeechModelId): void {
+    void saveSpeech({ modelId }).then((saved) => {
+      if (!saved) return;
+      void voicePort()
+        .voice.getSpeechModelStatus()
+        .then((status) => {
+          setSpeechStatus(status);
+          // Back to Supertonic while replies are read aloud: download it, as Read replies aloud does.
+          if (state.speech.settings?.readReplies && !state.server?.routes.speech && supertonicMissing())
+            downloadSpeech();
+        })
+        .catch((error: unknown) => fail(error, "settings.voice.loadFailed"));
+    });
+  }
+
+  /** Saves or removes the key of a provider of spoken replies. The ElevenLabs key is also the dictation key. */
+  function setSpeechApiKey(provider: SpeechKeyProvider, key: string | null): Promise<boolean> {
+    return voicePort()
+      .voice.setSpeechApiKey({ provider, key })
+      .then((status) => {
+        setSpeechStatus(status);
+        return true;
+      })
+      .catch((error: unknown) => {
+        fail(error, key === null ? "settings.voice.apiKey.removeFailed" : "settings.voice.apiKey.saveFailed");
+        return false;
+      });
+  }
+
+  /** Saves or removes the key of a dictation provider. Main announces the status of each of its models. */
+  function setDictationApiKey(provider: DictationKeyProvider, key: string | null): Promise<boolean> {
+    return voicePort()
+      .voice.setApiKey({ provider, key })
+      .then((status) => {
+        setStatus(status);
+        return true;
+      })
+      .catch((error: unknown) => {
+        fail(error, key === null ? "settings.voice.apiKey.removeFailed" : "settings.voice.apiKey.saveFailed");
+        return false;
+      });
+  }
+
   /** Turning it on downloads the model, as the first dictation does, unless the server reads replies. */
   function setReadReplies(readReplies: boolean): void {
     void saveSpeech({ readReplies }).then((saved) => {
@@ -280,9 +333,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
         result: saved ? "succeeded" : "failed",
         ...(saved ? {} : { failure_code: "update_failed" }),
       });
-      const phase = state.speech.status?.phase;
       if (state.server?.routes.speech) return;
-      if (saved && readReplies && (phase === "missing" || phase === "error")) downloadSpeech();
+      if (saved && readReplies && supertonicMissing()) downloadSpeech();
     });
   }
 
@@ -312,13 +364,18 @@ export function createSettingsVoiceStore(active: () => boolean) {
     download,
     cancel,
     remove,
-    saveApiKey: (key: string) => setApiKey(key),
-    removeApiKey: () => setApiKey(null),
     useModel,
     setLanguage: (language: VoiceLanguage) => save({ language }),
     downloadSpeech,
     cancelSpeech,
     removeSpeech,
+    setSpeechModel,
+    saveSpeechApiKey: (provider: SpeechKeyProvider, key: string) => setSpeechApiKey(provider, key),
+    removeSpeechApiKey: (provider: SpeechKeyProvider) => setSpeechApiKey(provider, null),
+    saveDictationApiKey: (provider: DictationKeyProvider, key: string) => setDictationApiKey(provider, key),
+    removeDictationApiKey: (provider: DictationKeyProvider) => setDictationApiKey(provider, null),
+    setElevenLabsVoice: (elevenLabsVoice: ElevenLabsSpeechVoice) => void saveSpeech({ elevenLabsVoice }),
+    setXaiVoice: (xaiVoice: XaiSpeechVoice) => void saveSpeech({ xaiVoice }),
     setReadReplies,
     setCodexLive,
     setCodexLiveVoice,

@@ -42,6 +42,7 @@ import {
   decodeChannelPage,
   decodeChannelSummaries,
   decodeSaveAgentProfileResult,
+  decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
   isAgentModelOption,
   LOCAL_SERVER_ID,
@@ -54,6 +55,7 @@ import {
   parseLocalBrowserSecretResponse,
   parseResetAgentSessionSetting,
   parseSaveAgentProfile,
+  parseSaveSkillSuggestion,
   parseSetAgentHiddenInput,
   parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
@@ -77,6 +79,10 @@ import {
   AGENT_THREAD_FILES_CAPABILITY,
   AGENT_THREAD_FILES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import {
+  AGENT_THREAD_PAGES_CAPABILITY,
+  AGENT_THREAD_PAGES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import {
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_READS_ROUTES,
@@ -106,6 +112,7 @@ import {
   SIDE_QUESTION_CAPABILITY,
   SIDE_QUESTION_ROUTES,
 } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -134,6 +141,7 @@ import {
   decodeRemoteAgentTasks,
   decodeRemoteAgentThreadBranches,
   decodeRemoteTaskConversation,
+  decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
   decodeRemoteTaskReadStates,
   decodeSidebarLayoutSnapshot,
@@ -168,6 +176,7 @@ import {
   parsePasteMessageLink,
   parsePromptResponse,
   parseQueueEdit,
+  parseReadAgentTaskPage,
   parseReadConversationPage,
   parseRenameAgentTask,
   parseReorderQueue,
@@ -546,6 +555,26 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.team.channelPictureUnsupported"));
         },
       }),
+      // Team API has no route for these yet; the channel editor offers them only for this computer.
+      clearChannelContext: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.clearChannelContext(channelId, host.channelActor())),
+        remote: () => {
+          throw new Error(sourceText("error.team.channelContextUnsupported"));
+        },
+      }),
+      // Only this computer deletes a channel history. Team API has no route for it.
+      deleteChannelHistory: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.deleteChannelHistory(channelId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.historyDeleteUnsupported"));
+        },
+      }),
+      compactChannelContext: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.compactChannelContext(channelId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.channelContextUnsupported"));
+        },
+      }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>
@@ -623,6 +652,20 @@ export function agentIpcHandlers({
           );
         },
       }),
+      saveSkillSuggestion: scopedHandler(parseSaveSkillSuggestion, {
+        local: (input) => runCauseEffect(service.saveSkillSuggestion(input)),
+        remote: async (input, serverId) => {
+          // An older host has no route: the card then sends the user's yes to the agent.
+          if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY)) return { saved: false };
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+              method: "POST",
+              body: { agentId: input.agentId, messageId: input.messageId },
+              timeoutMs: 150_000,
+            }),
+          );
+        },
+      }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
         local: (input) => runCauseEffect(service.saveProfile(input, sidebarLayout, host.conversationSender())),
         remote: async (input, serverId) =>
@@ -637,10 +680,13 @@ export function agentIpcHandlers({
           ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
-        local: (parsed) => runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender())),
+        // The renderer always sends a setup message to its own host.
+        local: (parsed) =>
+          runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender(), true)),
         remote: async (parsed, serverId) => {
           // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
-          const { avatarColor, ...input } = parsed;
+          // The released route does not carry the account, so a remote agent starts on the provider's own sign-in.
+          const { avatarColor, providerAccountId: _localOnly, ...input } = parsed;
           const agent = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
               method: "POST",
@@ -741,12 +787,22 @@ export function agentIpcHandlers({
           const update = colors && avatarColor ? rest : fields;
           if (colors && avatarColor !== undefined)
             await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
-          const patched = await runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
-              method: "PATCH",
-              body: update,
-            }),
-          );
+          // The released agent route refuses a change without a profile field. When a colour went on its
+          // own route above and nothing else changed, the agent is read again instead (#5708).
+          const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
+          const profileChanged =
+            !colourRouted || Object.entries(update).some(([key, value]) => key !== "agentId" && value !== undefined);
+          const patched = profileChanged
+            ? await runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+                  method: "PATCH",
+                  body: update,
+                }),
+              )
+            : (
+                await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+              ).find((agent) => agent.id === input.agentId);
+          if (!patched) throw new Error(sourceText("error.team.agentNotFound"));
           // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
           if (colors && avatarColor === undefined && avatarHue !== undefined)
             await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
@@ -960,6 +1016,23 @@ export function agentIpcHandlers({
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
       }),
+      readTaskPage: scopedHandler(parseReadAgentTaskPage, {
+        local: (parsed) => service.readTaskPage(parsed),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_PAGES_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_PAGES_ROUTES.readOlder, decodeRemoteTaskPage, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                beforeMessageId: parsed.beforeMessageId,
+                limit: parsed.limit,
+              },
+            }),
+          );
+        },
+      }),
       startTask: scopedHandler(parseStartAgentTask, {
         local: (input) => runCauseEffect(service.startTask(input, host.conversationSender())),
         remote: (input, serverId) => {
@@ -1147,6 +1220,13 @@ export function agentIpcHandlers({
               body: { agentId },
             }),
           );
+        },
+      }),
+      // Only this computer deletes an agent's history. Team API has no route for it.
+      deleteHistory: scopedHandler(parseAgentId, {
+        local: (agentId) => runCauseEffect(service.deleteAgentHistory(agentId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.historyDeleteUnsupported"));
         },
       }),
       // A joined server compacts with `context-compact-v1`.

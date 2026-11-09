@@ -113,6 +113,8 @@ const Settings = Schema.Struct({
           maxOutput: Schema.optionalKey(Schema.Number),
           /** Added after `maxOutput`. The import drops a list with an unknown or repeated effort. */
           reasoningEfforts: Schema.optionalKey(Schema.Array(Schema.String).check(Schema.isMaxLength(16))),
+          /** Added after `reasoningEfforts`. The import drops a list with an unknown or repeated kind. */
+          inputs: Schema.optionalKey(Schema.Array(Schema.String).check(Schema.isMaxLength(16))),
         }),
       ).check(Schema.isMaxLength(256)),
       /** The provider had a saved key. The key itself is never in the file. */

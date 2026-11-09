@@ -4,9 +4,10 @@ import { createSignal, createUniqueId, For, onSettled } from "solid-js";
 import { SITE_NAVIGATION_LINKS, SITE_NAVIGATION_SECTIONS } from "../../lib/site-navigation";
 import { LandingIcon } from "./LandingIcon";
 import { SiteNavigationPanel } from "./SiteNavigationPanel";
+import { useSiteChrome, useSitePath } from "./SiteText";
 
 /** The width under which the header folds into the menu button. Matches the stylesheet. */
-const MOBILE_HEADER_QUERY = "(max-width: 900px)";
+const MOBILE_HEADER_QUERY = "(max-width: 1100px)";
 
 export interface SiteMobileMenuProps {
   /** Draws the header's own buttons again, at the foot of the sheet. A node can sit in one place only. */
@@ -20,6 +21,9 @@ export interface SiteMobileMenuProps {
 // past the breakpoint.
 export function SiteMobileMenu(props: SiteMobileMenuProps) {
   const sheetId = createUniqueId();
+  const chrome = useSiteChrome();
+  const text = () => chrome().text;
+  const path = useSitePath();
   const [open, setOpen] = createSignal(false);
   // Open, or still fading out. The featured artwork animates only then.
   const [live, setLive] = createSignal(false);
@@ -92,7 +96,7 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
         ref={button}
         class="site-menu-button"
         type="button"
-        aria-label={open() ? "Close menu" : "Open menu"}
+        aria-label={open() ? text().closeMenu : text().openMenu}
         aria-expanded={open() ? "true" : "false"}
         aria-controls={sheetId}
         onClick={() => setSheet(!open())}
@@ -101,12 +105,12 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
         <span class="site-menu-button-line" aria-hidden="true" />
       </button>
       <div ref={sheet} id={sheetId} class="site-sheet" data-state={open() ? "open" : "closed"} inert={!open()}>
-        <nav class="site-sheet-content" aria-label="Site menu">
+        <nav class="site-sheet-content" aria-label={text().siteMenu}>
           <For each={SITE_NAVIGATION_SECTIONS}>
             {(section, index) => (
               <section class="site-sheet-section" style={{ "--site-sheet-index": index() }}>
                 {/* Not a heading: the sheet is in every page's HTML before the page's own h1. */}
-                <p class="site-sheet-heading">{section.label}</p>
+                <p class="site-sheet-heading">{text().sections[section.id].label}</p>
                 <SiteNavigationPanel section={section} live={live()} />
               </section>
             )}
@@ -117,8 +121,8 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
                 class="site-sheet-section"
                 style={{ "--site-sheet-index": SITE_NAVIGATION_SECTIONS.length + index() }}
               >
-                <Link class="site-sheet-link" to={link.to}>
-                  {link.label}
+                <Link class="site-sheet-link" to={path(link.to)}>
+                  {text().links[link.id]}
                   <LandingIcon name="arrow-right" />
                 </Link>
               </div>

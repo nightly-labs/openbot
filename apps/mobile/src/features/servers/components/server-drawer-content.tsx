@@ -2,18 +2,32 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
-import Calendar from "lucide-react-native/icons/calendar";
-import ChartColumn from "lucide-react-native/icons/chart-column";
+import CalendarClock from "lucide-react-native/icons/calendar-clock";
+import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
+import GalleryVerticalEnd from "lucide-react-native/icons/gallery-vertical-end";
+import ListChecks from "lucide-react-native/icons/list-checks";
+import Monitor from "lucide-react-native/icons/monitor";
+import Pin from "lucide-react-native/icons/pin";
+import PinOff from "lucide-react-native/icons/pin-off";
 import Plus from "lucide-react-native/icons/plus";
 import Settings from "lucide-react-native/icons/settings";
 import Settings2 from "lucide-react-native/icons/settings-2";
-import ShoppingBag from "lucide-react-native/icons/shopping-bag";
-import SquareCheck from "lucide-react-native/icons/square-check";
+import Store from "lucide-react-native/icons/store";
 import UsersRound from "lucide-react-native/icons/users-round";
-import WorkflowIcon from "lucide-react-native/icons/workflow";
-import { memo, type PropsWithChildren, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import Waypoints from "lucide-react-native/icons/waypoints";
+import {
+  Fragment,
+  memo,
+  type PropsWithChildren,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Alert, Pressable, ScrollView, View, type ViewStyle } from "react-native";
 import Animated, {
   cubicBezier,
@@ -31,11 +45,18 @@ import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import {
+  type DrawerToolId,
+  isDrawerToolId,
+  reorderDrawerTools,
+  setDrawerToolPinned,
+  useDrawerToolLayout,
+} from "@/features/servers/model/drawer-tools";
+import {
   refreshHostedServerAvailability,
   useHostedServerAvailability,
 } from "@/features/servers/model/hosted-server-availability";
 import { DrawerPinnedWorkflows, useDrawerWorkflows } from "@/features/workflows/components/drawer-workflows";
-import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
+import { type MobileServer, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
@@ -65,6 +86,7 @@ const HEADER_EDGE = 16;
 const LIST_TOP_GAP = 8;
 const DRAWER_ROW_HEIGHT = 46;
 const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
+const UNPINNED_OPACITY = 0.5;
 
 interface ServerDrawerContentProps {
   activeServerId: string;
@@ -157,6 +179,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
   const [editing, setEditing] = useState(false);
+  const [editingTools, setEditingTools] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -242,13 +265,23 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const stopEditing = () => {
     void haptics.selection();
     setEditing(false);
+    setEditingTools(false);
     setDragging(false);
   };
+
+  // The server list closes, so the tools that the user edits stay in view.
+  const editTools = useCallback(() => {
+    void haptics.selection();
+    setEditing(false);
+    setListOpen(false);
+    setEditingTools(true);
+  }, []);
 
   // The drawer opens again on the tools of the open server.
   useEffect(() => {
     if (open) return;
     setEditing(false);
+    setEditingTools(false);
     setDragging(false);
     setListOpen(false);
   }, [open]);
@@ -363,7 +396,10 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         shouldOpenOnLongPress
         actions={actions}
         onPressAction={(event) => {
-          if (event.nativeEvent.event === "reorder") setEditing(true);
+          if (event.nativeEvent.event === "reorder") {
+            setEditingTools(false);
+            setEditing(true);
+          }
           if (isServerExit(event.nativeEvent.event)) confirmExit(serverItem, event.nativeEvent.event);
         }}
       >
@@ -399,7 +435,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
                 accessibilityHint={t("mobile.server.drawer.serverListHint")}
                 accessibilityState={{ expanded: showsList }}
                 className="min-w-0 shrink flex-row items-center gap-3"
-                disabled={editing}
+                disabled={editing || editingTools}
                 hitSlop={8}
                 style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
                 onPress={() => {
@@ -437,9 +473,11 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
                 {t("mobile.server.drawer.title")}
               </Typography.Heading>
             )}
-            {editing ? (
+            {editing || editingTools ? (
               <ServerDrawerIconButton
-                accessibilityLabel={t("mobile.server.drawer.doneEditing")}
+                accessibilityLabel={
+                  editingTools ? t("mobile.server.drawer.doneEditingSidebar") : t("mobile.server.drawer.doneEditing")
+                }
                 color={mutedColor}
                 fallbackVariant="filled"
                 systemName="checkmark"
@@ -502,7 +540,17 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
             {activeServer ? <DrawerDivider /> : null}
           </ServerListCollapse>
 
-          {activeServer ? <DrawerServerTools server={activeServer} open={open} onNavigate={onNavigate} /> : null}
+          {activeServer ? (
+            <DrawerServerTools
+              server={activeServer}
+              open={open}
+              editing={editingTools}
+              color={mutedColor}
+              onEdit={editTools}
+              onDragActive={setDragging}
+              onNavigate={onNavigate}
+            />
+          ) : null}
         </ScrollView>
       </View>
 
@@ -531,25 +579,48 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   );
 });
 
-type DrawerRoute = "tasks" | "routines" | "workflows" | "marketplace" | "usage" | "members" | "settings";
+type DrawerRoute = DrawerToolId | "settings";
+
+interface DrawerTool {
+  icon: LucideIcon;
+  label: string;
+  value?: string | null;
+  accentValue?: boolean;
+}
 
 /**
  * The tools of the open server with their values. Each answer from the host renders only this part
- * of the drawer, not the server list above it.
+ * of the drawer, not the server list above it. A long press opens a menu to edit the tools or unpin
+ * one. In edit mode all tools show: the handle moves a tool, and the pin button shows or hides it.
  */
 function DrawerServerTools({
   server,
   open,
+  editing,
+  color,
+  onEdit,
+  onDragActive,
   onNavigate,
 }: {
   server: MobileServer;
   open: boolean;
+  editing: boolean;
+  color: string;
+  onEdit: () => void;
+  onDragActive: (active: boolean) => void;
   onNavigate: (href: Href) => void;
 }) {
   const { t } = useText();
   const values = useDrawerServerValues(server, open);
   const serverId = server.id;
   const workflows = useDrawerWorkflows(serverId, open);
+  const layout = useDrawerToolLayout();
+  // The iOS menu host sizes to its content, so a row in a menu gets the width of the list.
+  const [rowWidth, setRowWidth] = useState<number>();
+  // A connected host that shares its screen. The host decides which members it lets in.
+  const remoteDesktop = useMobileWorkspaceSelector((current) => current.canControlComputer(serverId));
+  // An older host has no storage routes, so it has no Library, as on desktop.
+  const library = useMobileWorkspaceSelector((current) => current.canReadServerStorage(serverId));
   const routes = useMemo(
     (): Record<DrawerRoute, Href> => ({
       tasks: { pathname: "/server-tasks", params: { serverId } },
@@ -557,70 +628,248 @@ function DrawerServerTools({
       workflows: { pathname: "/server-workflows", params: { serverId } },
       marketplace: { pathname: "/server-marketplace", params: { serverId } },
       usage: { pathname: "/server-usage", params: { serverId } },
+      library: { pathname: "/server-library", params: { serverId } },
+      remoteDesktop: { pathname: "/remote-desktop/[serverId]", params: { serverId } },
       members: { pathname: "/server-settings/members", params: { serverId } },
       settings: { pathname: "/server-settings", params: { serverId } },
     }),
     [serverId],
   );
+  // A tool that this server does not have is null.
+  const tools: Record<DrawerToolId, DrawerTool | null> = {
+    tasks: values.tasks
+      ? {
+          icon: ListChecks,
+          label: t("mobile.app.route.threads"),
+          value: values.tasks.value,
+          accentValue: values.tasks.needsYou,
+        }
+      : null,
+    routines: { icon: CalendarClock, label: t("mobile.app.route.schedule"), value: values.nextRoutine },
+    workflows: workflows.supported
+      ? {
+          icon: Waypoints,
+          label: t("mobile.app.route.workflows"),
+          value: workflows.value,
+          accentValue: workflows.needsYou,
+        }
+      : null,
+    marketplace: { icon: Store, label: t("mobile.app.route.marketplace") },
+    usage: { icon: ChartArea, label: t("mobile.app.route.usage"), value: values.usage },
+    library: library ? { icon: GalleryVerticalEnd, label: t("mobile.app.route.library") } : null,
+    remoteDesktop: remoteDesktop ? { icon: Monitor, label: t("mobile.app.route.remoteDesktop") } : null,
+    members: { icon: UsersRound, label: t("mobile.app.route.members"), value: values.members },
+  };
+  const available = layout.order.filter((id) => tools[id] !== null);
+  const shown = available.filter((id) => !layout.hidden.includes(id));
+  const onToolAction = useCallback(
+    (action: string, toolId: DrawerToolId | null) => {
+      if (action === "editSidebar") onEdit();
+      if (action === "unpin" && toolId) {
+        void haptics.selection();
+        setDrawerToolPinned(toolId, false);
+      }
+    },
+    [onEdit],
+  );
+
   return (
-    <View className="pt-1.5">
-      {values.tasks ? (
-        <DrawerRow
-          icon={SquareCheck}
-          label={t("mobile.app.route.threads")}
-          value={values.tasks.value}
-          accentValue={values.tasks.needsYou}
-          href={routes.tasks}
-          onNavigate={onNavigate}
-        />
-      ) : null}
-      <DrawerRow
-        icon={Calendar}
-        label={t("mobile.app.route.routines")}
-        value={values.nextRoutine}
-        href={routes.routines}
-        onNavigate={onNavigate}
-      />
-      {workflows.supported ? (
+    <View className="pt-1.5" onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}>
+      {editing ? (
         <>
-          <DrawerRow
-            icon={WorkflowIcon}
-            label={t("mobile.app.route.workflows")}
-            value={workflows.value}
-            accentValue={workflows.needsYou}
-            href={routes.workflows}
-            onNavigate={onNavigate}
+          <SortableServerList
+            color={color}
+            ids={available}
+            rowHeight={DRAWER_ROW_HEIGHT}
+            renderRow={(id) => {
+              const toolId = available.find((candidate) => candidate === id);
+              const tool = toolId ? tools[toolId] : null;
+              if (!toolId || !tool) return null;
+              const index = available.indexOf(toolId);
+              return (
+                <DrawerEditRow
+                  icon={tool.icon}
+                  label={tool.label}
+                  pinned={!layout.hidden.includes(toolId)}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < available.length - 1}
+                  onMove={(step) =>
+                    reorderDrawerTools(moveServerId(available, toolId, index + step).filter(isDrawerToolId))
+                  }
+                  onPinnedChange={(pinned) => setDrawerToolPinned(toolId, pinned)}
+                />
+              );
+            }}
+            onDragActive={onDragActive}
+            onReorder={(ids) => {
+              reorderDrawerTools(ids.filter(isDrawerToolId));
+              return true;
+            }}
           />
-          <DrawerPinnedWorkflows serverId={serverId} pinned={workflows.pinned} onNavigate={onNavigate} />
+          <Typography.Paragraph className="px-3 pt-3 text-text-secondary" style={typeScale.caption}>
+            {t("mobile.server.drawer.toolsHint")}
+          </Typography.Paragraph>
         </>
-      ) : null}
-      <DrawerRow
-        icon={ShoppingBag}
-        label={t("mobile.app.route.marketplace")}
-        href={routes.marketplace}
-        onNavigate={onNavigate}
-      />
-      <DrawerRow
-        icon={ChartColumn}
-        label={t("mobile.app.route.usage")}
-        value={values.usage}
-        href={routes.usage}
-        onNavigate={onNavigate}
-      />
-      <DrawerRow
-        icon={UsersRound}
-        label={t("mobile.app.route.members")}
-        value={values.members}
-        href={routes.members}
-        onNavigate={onNavigate}
-      />
+      ) : (
+        shown.map((id) => {
+          const tool = tools[id];
+          if (!tool) return null;
+          return (
+            <Fragment key={id}>
+              <DrawerToolRow
+                toolId={id}
+                icon={tool.icon}
+                label={tool.label}
+                value={tool.value}
+                accentValue={tool.accentValue}
+                href={routes[id]}
+                width={rowWidth}
+                onAction={onToolAction}
+                onNavigate={onNavigate}
+              />
+              {id === "workflows" ? (
+                <DrawerPinnedWorkflows serverId={serverId} pinned={workflows.pinned} onNavigate={onNavigate} />
+              ) : null}
+            </Fragment>
+          );
+        })
+      )}
       <DrawerDivider />
-      <DrawerRow
+      {/* Server settings always shows, so its long press opens the edit mode when all tools are unpinned. */}
+      <DrawerToolRow
+        toolId={null}
         icon={Settings2}
         label={t("mobile.server.drawer.serverSettings")}
         href={routes.settings}
+        width={rowWidth}
+        // In edit mode a tap does not leave the drawer, as on the server rows.
+        disabled={editing}
+        onAction={editing ? undefined : onToolAction}
         onNavigate={onNavigate}
       />
+    </View>
+  );
+}
+
+/** A drawer row with the menu of the tools. `toolId` is null for Server settings, which cannot be unpinned. */
+const DrawerToolRow = memo(function DrawerToolRow({
+  toolId,
+  width,
+  onAction,
+  ...row
+}: DrawerRowProps & {
+  toolId: DrawerToolId | null;
+  width?: number;
+  /** Without it, the row has no menu. */
+  onAction?: (action: string, toolId: DrawerToolId | null) => void;
+}) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const menu = useRef<MenuComponentRef | null>(null);
+  if (!onAction) return <DrawerRow {...row} />;
+  const items = [
+    { name: "editSidebar", label: t("mobile.server.drawer.editSidebar") },
+    ...(toolId ? [{ name: "unpin", label: t("mobile.server.drawer.unpinTool") }] : []),
+  ];
+  const actions: MenuAction[] = [
+    { id: "editSidebar", title: t("mobile.server.drawer.editSidebar"), image: "arrow.up.arrow.down" },
+  ];
+  if (toolId) actions.push({ id: "unpin", title: t("mobile.server.drawer.unpinTool"), image: "pin.slash" });
+  return (
+    <View style={{ height: DRAWER_ROW_HEIGHT }}>
+      <MenuView
+        {...(isAndroid
+          ? {
+              ref: (instance: MenuComponentRef | null) => {
+                menu.current = instance;
+              },
+              colorScheme: theme === "dark" ? ("dark" as const) : ("light" as const),
+            }
+          : null)}
+        shouldOpenOnLongPress
+        actions={actions}
+        onPressAction={(event) => onAction(event.nativeEvent.event, toolId)}
+      >
+        <DrawerRow
+          {...row}
+          width={width}
+          accessibilityActions={items}
+          onAccessibilityAction={(name) => onAction(name, toolId)}
+          onLongPress={() => {
+            void haptics.longPress();
+            if (isAndroid) menu.current?.show();
+          }}
+        />
+      </MenuView>
+    </View>
+  );
+});
+
+/** A tool in edit mode. The list adds the handle; the pin button shows or hides the tool. */
+function DrawerEditRow({
+  icon: Icon,
+  label,
+  pinned,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+  onPinnedChange,
+}: {
+  icon: LucideIcon;
+  label: string;
+  pinned: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (step: -1 | 1) => void;
+  onPinnedChange: (pinned: boolean) => void;
+}) {
+  const { t } = useText();
+  const [secondary, foreground] = useCSSVariable(["--openbot-text-secondary", "--openbot-text-primary"]);
+  return (
+    <View className="flex-row items-center gap-3 pl-3" style={{ height: DRAWER_ROW_HEIGHT }}>
+      <View
+        accessible
+        accessibilityLabel={pinned ? label : t("mobile.server.drawer.unpinnedTool", { name: label })}
+        accessibilityActions={[
+          ...(canMoveUp ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
+          ...(canMoveDown ? [{ name: "moveDown", label: t("mobile.server.drawer.moveDown") }] : []),
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === "moveUp") onMove(-1);
+          if (event.nativeEvent.actionName === "moveDown") onMove(1);
+        }}
+        className="min-w-0 flex-1 flex-row items-center gap-3"
+        style={{ opacity: pinned ? 1 : UNPINNED_OPACITY }}
+      >
+        <Icon color={String(secondary)} size={20} strokeWidth={1.8} />
+        <Typography.Paragraph className="min-w-0 flex-1" numberOfLines={1} style={typeScale.rowTitle}>
+          {label}
+        </Typography.Paragraph>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          pinned
+            ? t("mobile.server.drawer.unpinToolNamed", { name: label })
+            : t("mobile.server.drawer.pinToolNamed", { name: label })
+        }
+        className="h-11 w-11 items-center justify-center"
+        hitSlop={4}
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+        onPress={() => {
+          void haptics.selection();
+          onPinnedChange(!pinned);
+        }}
+      >
+        {pinned ? (
+          <Pin color={String(foreground)} fill={String(foreground)} size={18} strokeWidth={1.8} />
+        ) : (
+          // Dimmed as the name of the unpinned tool.
+          <View style={{ opacity: UNPINNED_OPACITY }}>
+            <PinOff color={String(foreground)} size={18} strokeWidth={1.8} />
+          </View>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -692,6 +941,17 @@ function DrawerDivider() {
   return <View accessibilityElementsHidden className="mx-2.5 mt-2.5 mb-1 h-px bg-grouped-border" />;
 }
 
+interface DrawerRowProps {
+  icon: LucideIcon;
+  label: string;
+  value?: string | null;
+  /** A value that asks for the person, such as tasks that need them. */
+  accentValue?: boolean;
+  href: Href;
+  disabled?: boolean;
+  onNavigate: (href: Href) => void;
+}
+
 /** One tool of the open server, with its current value on the right. A new value renders only its row. */
 const DrawerRow = memo(function DrawerRow({
   icon: Icon,
@@ -699,27 +959,40 @@ const DrawerRow = memo(function DrawerRow({
   value,
   accentValue = false,
   href,
+  disabled = false,
   onNavigate,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value?: string | null;
-  /** A value that asks for the person, such as tasks that need them. */
-  accentValue?: boolean;
-  href: Href;
-  onNavigate: (href: Href) => void;
+  width,
+  accessibilityActions,
+  onAccessibilityAction,
+  onLongPress,
+}: DrawerRowProps & {
+  width?: number;
+  accessibilityActions?: { name: string; label: string }[];
+  onAccessibilityAction?: (name: string) => void;
+  onLongPress?: () => void;
 }) {
   const [secondary, control] = useCSSVariable(["--openbot-text-secondary", "--openbot-bg-control"]);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={value ? `${label}, ${value}` : label}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={(event) => onAccessibilityAction?.(event.nativeEvent.actionName)}
       className="flex-row items-center gap-3 rounded-2xl px-3"
-      style={({ pressed }) => ({ height: DRAWER_ROW_HEIGHT, backgroundColor: pressed ? String(control) : undefined })}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        height: DRAWER_ROW_HEIGHT,
+        width,
+        backgroundColor: pressed ? String(control) : undefined,
+      })}
       onPress={() => {
         void haptics.impact("soft");
         onNavigate(href);
       }}
+      // The native context menu does not cancel this touch. Without a long-press handler, lifting the
+      // finger after the menu opens counts as a tap and navigates under the open menu.
+      delayLongPress={longPressDelay}
+      onLongPress={onLongPress}
     >
       <Icon color={String(secondary)} size={20} strokeWidth={1.8} />
       <Typography.Paragraph className="min-w-0 flex-1" numberOfLines={1} style={typeScale.rowTitle}>

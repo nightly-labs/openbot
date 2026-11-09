@@ -71,6 +71,35 @@ export interface CustomProviderModel {
    * effort. This computer only, like `contextWindow`.
    */
   reasoningEfforts?: CustomProviderReasoningEffort[];
+  /**
+   * The input kinds that the model accepts in addition to text, in `CUSTOM_PROVIDER_INPUT_KINDS`
+   * order (#4154). Empty: text only. Absent: the harness's own default, `CUSTOM_PROVIDER_DEFAULT_INPUTS`.
+   * Pi takes images only, so it ignores `pdf`. This computer only, like `contextWindow`.
+   */
+  inputs?: CustomProviderInputKind[];
+}
+
+/** The input kinds that a custom model can declare: the `modalities.input` values of OpenCode beside text. */
+export const CUSTOM_PROVIDER_INPUT_KINDS = ["image", "pdf"] as const;
+export type CustomProviderInputKind = (typeof CUSTOM_PROVIDER_INPUT_KINDS)[number];
+
+/** The input kinds that each harness can send to a model. Pi's model `input` is `("text" | "image")[]`. */
+export const CUSTOM_PROVIDER_HARNESS_INPUT_KINDS: Readonly<
+  Record<CustomProviderHarness, readonly CustomProviderInputKind[]>
+> = { opencode: CUSTOM_PROVIDER_INPUT_KINDS, pi: ["image"] };
+
+/**
+ * What a model with no saved `inputs` accepts beside text. OpenCode 2.2.5 gives a configured model
+ * text and image input (`Capabilities.default` in `packages/schema/src/model.ts`); OpenBot gives a Pi
+ * model text only.
+ */
+export const CUSTOM_PROVIDER_DEFAULT_INPUTS: Readonly<
+  Record<CustomProviderHarness, readonly CustomProviderInputKind[]>
+> = { opencode: ["image"], pi: [] };
+
+/** A list of input kinds, maybe empty, each one time, in `CUSTOM_PROVIDER_INPUT_KINDS` order. */
+export function isCustomProviderInputs(value: unknown): value is CustomProviderInputKind[] {
+  return (Array.isArray(value) && value.length === 0) || isOrderedSubset(CUSTOM_PROVIDER_INPUT_KINDS, value);
 }
 
 /**
@@ -90,10 +119,15 @@ export type CustomProviderReasoningEffort = (typeof CUSTOM_PROVIDER_REASONING_EF
 
 /** A non-empty list of efforts, each one time, in `CUSTOM_PROVIDER_REASONING_EFFORTS` order. */
 export function isCustomProviderReasoningEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
+  return isOrderedSubset(CUSTOM_PROVIDER_REASONING_EFFORTS, value);
+}
+
+/** A non-empty list of known values, each one time, in the order of `known`. */
+function isOrderedSubset(known: readonly unknown[], value: unknown): boolean {
   if (!Array.isArray(value) || value.length === 0) return false;
   let previous = -1;
-  for (const effort of value) {
-    const index = CUSTOM_PROVIDER_REASONING_EFFORTS.indexOf(effort);
+  for (const item of value) {
+    const index = known.indexOf(item);
     if (index <= previous) return false;
     previous = index;
   }
@@ -150,8 +184,8 @@ export interface SaveCustomProviderInput {
 }
 
 /**
- * Renderer to main, on this computer only: the Team API has no edit route. The id names a saved
- * endpoint and does not change. A field that is absent keeps its stored value, so the form can send
+ * Renderer to main, for this computer or for a joined server's host with `custom-provider-edit-v1`.
+ * The id names a saved endpoint and does not change. A field that is absent keeps its stored value, so the form can send
  * a blank key without discarding the key that the user does not type again. `headers` replaces the
  * saved list: a header with a `null` value keeps its saved value, and a saved header that is not in
  * the list is removed. There is no way to clear a stored key here: remove the endpoint and add it
@@ -164,7 +198,7 @@ export interface UpdateCustomProviderInput {
   models: CustomProviderModel[];
   apiKey?: string;
   headers?: CustomProviderHeaderInput[];
-  /** Absent: the saved harness stays. */
+  /** Absent: the saved harness stays. This computer only: a host keeps the harness on a Team API edit. */
   harness?: CustomProviderHarness;
 }
 
@@ -180,7 +214,7 @@ export interface CustomProviderSummary {
   hasApiKey: boolean;
   /**
    * The names of the saved headers, so Edit can show them. The values never come back. Absent in a
-   * Team API list, which keeps its released fields.
+   * `providers-v1` or `custom-provider-harness-v1` list, which keeps its released fields.
    */
   headerNames?: string[];
   /**
@@ -265,7 +299,8 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
     (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput)) &&
-    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts))
+    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts)) &&
+    (value.inputs === undefined || isCustomProviderInputs(value.inputs))
   );
 }
 

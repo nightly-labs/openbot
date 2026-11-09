@@ -100,6 +100,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Empezando el inicio de sesión de {name} en {host}…",
   "provider.codeLogin.pageOpening": "Abriendo la página de inicio de sesión de {name} en {host}…",
   "provider.codeLogin.linkStep": "Inicia sesión en {name}. OpenBot continúa automáticamente.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "En ChatGPT en un ordenador, abre la configuración de seguridad y activa el inicio de sesión con código de dispositivo para Codex. En una cuenta de trabajo, lo activa el administrador del espacio de trabajo.",
   "provider.useApp.title": "Conecta {name} en la app de OpenBot",
   "provider.useApp.description":
     "El inicio de sesión de {name} vuelve al equipo que lo inició, y una pestaña del navegador no puede recibirlo. Conecta {name} en la app de OpenBot. La app termina el inicio de sesión sola.",
@@ -161,7 +163,7 @@ export const messages = {
   "provider.geminiKey.label": "Clave de API de Gemini",
   "provider.claudeKey.title": "Clave de API de Anthropic",
   "provider.claudeKey.description":
-    "Guarda una clave de API de Anthropic en el host. Anthropic factura cada solicitud a la clave. Para usarla en un agente, selecciona la cuenta «Clave de API» en el menú de modelos del agente. Si Claude no tiene sesión iniciada, todos los agentes usan la clave.",
+    "Guarda una clave de API de Anthropic en el host. Anthropic factura cada solicitud al crédito de API de la clave, no a tu plan de Claude. Para usarla en un agente, selecciona la cuenta «Clave de API» en el menú de modelos del agente. Si Claude no tiene sesión iniciada, todos los agentes usan la clave.",
   "provider.claudeKey.label": "Clave de API de Anthropic",
   "provider.inceptionKey.title": "Clave de API de Inception",
   "provider.inceptionKey.description":
@@ -232,6 +234,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 hora",
   "provider.settings.promptCacheDefault": "Predeterminado de Claude Code",
   "provider.settings.promptCacheLoadFailed": "No se pudo cargar la duración de la caché de prompts de este servidor.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Usar mi configuración de Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Los agentes cargan tu CLAUDE.md, skills, agentes, hooks y plugins de ~/.claude. Desactivado, cada turno envía un prompt más corto. Los archivos del espacio de trabajo se siguen cargando.",
+  "provider.settings.claudeUserSetupLoadFailed": "No se pudo cargar el ajuste de Claude Code.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece en el selector de modelos.",

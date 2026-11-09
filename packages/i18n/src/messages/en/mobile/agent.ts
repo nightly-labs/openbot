@@ -131,7 +131,6 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.info.reconnectToSave": "Reconnect to save changes.",
   "mobile.agent.info.noMemories": "No memories yet.",
   "mobile.agent.info.addMemory": "Add memory",
-  "mobile.agent.info.routineActive": "Active",
   "mobile.agent.info.routinePaused": "Paused",
   "mobile.agent.info.noRoutines": "No routines yet.",
   "mobile.agent.info.addRoutine": "Add routine",
@@ -343,7 +342,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.intro":
     "When {model} reaches its usage limit before {name} starts to write, {name} asks you which model to use.",
   "mobile.agent.backupModels.introAutomatic":
-    "When {model} reaches its usage limit or fails with a provider error before {name} starts to write, {name} switches to the first available model in the order.",
+    "When {model} reaches its usage limit, {name} switches to the first available model in the order. {name} also switches when {model} fails with a provider error before {name} starts to write.",
   "mobile.agent.backupModels.ask": "Ask before switching",
   "mobile.agent.backupModels.order": "Order",
   "mobile.agent.backupModels.empty": "No order set. {name} offers each available model.",

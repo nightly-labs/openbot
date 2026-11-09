@@ -59,6 +59,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
   "error.backend.contextCompactionIneffective":
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.contextCompactionStopped":
+    "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
   "error.backend.providerRetrying":
     "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
   "error.backend.providerRetryingLargeContext":
@@ -69,6 +71,12 @@ export const messages = defineMessages("error.backend", {
     "The channel has an unconfirmed assignment start. Check its outcome before deleting it.",
   "error.backend.channelNotFound": "Channel not found.",
   "error.backend.channelMemberUnavailable": "A channel member is unavailable.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Wait until the work in this channel stops, then start a new conversation.",
+  "error.backend.channelWaitBeforeCompact": "Wait until the work in this channel stops, then compact it.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
+  "error.backend.channelCompactUnavailable":
+    "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
@@ -140,6 +148,9 @@ export const messages = defineMessages("error.backend", {
     "Mailbox state is corrupt or from a newer OpenBot version; refusing to overwrite it.",
   "error.backend.recipientDeleting": "The recipient is being deleted. Retry after deletion finishes.",
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
+  "error.backend.replyReferenceUnknown":
+    "replyToMessageId {id} names no message. Use the Message ID of the message that you answer, or leave replyToMessageId out.",
+  "error.backend.replyReferenceRequests": "Messages from these recipients in this turn: {ids}.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
@@ -228,6 +239,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -314,6 +329,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
+  "error.backend.browserCertificateUntrusted":
+    "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
@@ -336,6 +353,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
   "error.backend.browserTypingFocusMoved":
     "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
+  "error.backend.browserTypingFocusMovedWhileTyping":
+    "The page moved focus away before all the text was typed. Only the first part of the text is in the field. Take a fresh snapshot and check the field before you type again.",
   "error.backend.browserTypingSubmitSkipped":
     "The text is in the field, but the page moved focus away, so Enter was not sent. Do not type the text again. Take a fresh snapshot.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",

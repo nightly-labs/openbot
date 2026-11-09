@@ -12,7 +12,7 @@ import type { sourceTranslation as SourceTranslation } from "./source-catalogs";
  * `format-catalogs.ts` and `locale-loading.ts` in one module, which `apps/auth-api/vite.config.ts`
  * puts in their place.
  *
- * The site shows the desktop app as a demo and as the web client. All fourteen languages are more than
+ * The site shows the desktop app as a demo and as the web client. All fifteen languages are more than
  * 1 MB compressed and block the page for about a second on a phone, so English is part of the
  * bundle and each other language is a chunk that loads on first use. Each export has the type of
  * the module it replaces, so the two builds cannot drift apart.
@@ -42,6 +42,10 @@ const loaders: Record<LoadableLocale, () => Promise<LocaleCatalogs>> = {
   fr: () =>
     Promise.all([import("./messages/fr/index"), import("./messages/fr/source"), import("./messages/fr/format")]).then(
       ([app, source, format]) => ({ app: app.fr, source: source.source, format: format.messages }),
+    ),
+  he: () =>
+    Promise.all([import("./messages/he/index"), import("./messages/he/source"), import("./messages/he/format")]).then(
+      ([app, source, format]) => ({ app: app.he, source: source.source, format: format.messages }),
     ),
   it: () =>
     Promise.all([import("./messages/it/index"), import("./messages/it/source"), import("./messages/it/format")]).then(

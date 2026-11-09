@@ -17,7 +17,7 @@ import type { AvatarHue, ChannelIcon, ChannelIconName, ChannelMember } from "@op
 import { UsersRound } from "@openbot/ui";
 import { avatarHueSwatch } from "@openbot/ui/bloub-avatar";
 import { createSignal, For, Show } from "solid-js";
-import type { AgentProfile } from "../../data";
+import type { ComposerAgent } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { CHANNEL_ICONS, knownChannelIcon } from "./channel-icons";
 
@@ -26,7 +26,7 @@ const CLUSTER_CELLS = 4;
 
 interface ChannelAvatarProps {
   members: ChannelMember[];
-  agents: AgentProfile[];
+  agents: readonly ComposerAgent[];
   layout?: "row" | "cluster";
   icon?: ChannelIcon | null | undefined;
   imageUrl?: string | null | undefined;

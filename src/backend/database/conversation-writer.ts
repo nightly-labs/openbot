@@ -5,7 +5,7 @@ import type { ConversationMessage, ConversationSnapshot } from "@openbot/contrac
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
-import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
+import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -16,11 +16,30 @@ import {
 import {
   deletedThreadMessageIds,
   isDeletedThreadMessage,
+  recordDeletedThreadHistory,
   recordDeletedThreadMessage,
   withoutDeletedMessages,
 } from "./deleted-thread-messages";
 import { currentConversationMessage } from "./legacy-conversation-message";
 import { readOrderInputs, refreshChangedOrder, refreshThreadOrder } from "./thread-message-order";
+
+/**
+ * The message as a write compares it, with no queue position. A position moves each time a delivery
+ * ahead of it starts or goes back, and each reader takes it from the mailbox again
+ * (`syncMailboxMessages`, `refreshQueuePositions`). Stored, each move wrote every queued message
+ * again in the recipient's chat and in each sender's chat.
+ */
+export function withoutQueuePositions(message: ConversationMessage): ConversationMessage {
+  const { delivery, exchange } = message;
+  if (!delivery && !exchange) return message;
+  return {
+    ...message,
+    ...(delivery ? { delivery: { ...delivery, position: null } } : {}),
+    ...(exchange
+      ? { exchange: { ...exchange, deliveries: exchange.deliveries.map((item) => ({ ...item, position: null })) } }
+      : {}),
+  };
+}
 
 export interface ConversationWriterOptions {
   core: DatabaseCore;
@@ -428,7 +447,10 @@ export class ConversationWriter {
       const existing = stored.get(message.id);
       if (!existing) return true;
       // The JSON round trip drops `undefined` keys, as the stored row does.
-      return !isDeepStrictEqual(JSON.parse(JSON.stringify(mergeLiveMessage(existing, message))), existing);
+      return !isDeepStrictEqual(
+        JSON.parse(JSON.stringify(withoutQueuePositions(mergeLiveMessage(existing, message)))),
+        withoutQueuePositions(existing),
+      );
     });
   }
 
@@ -617,7 +639,7 @@ export class ConversationWriter {
             (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `).run(
-          randomUUID(),
+          input.eventType === CONVERSATION_UPDATED ? updateActivityId(sequence) : randomUUID(),
           input.threadId,
           activityTurnId(input.eventType, input.detail, input.activeTurnId),
           input.eventType,
@@ -625,10 +647,64 @@ export class ConversationWriter {
           new Date().toISOString(),
           sequence,
         );
+        if (input.eventType === CONVERSATION_UPDATED && input.commandId === undefined)
+          supersedePreviousConversationUpdate(db, input.threadId, sequence, changedMessages, input.activeTurnId);
         return { revision: sequence };
       },
     );
     return result.revision;
+  }
+
+  /**
+   * Deletes every shown message of a thread, for "Delete history": each one is recorded as deleted,
+   * so no later write, import or replay brings it back, and goes with its attachments. The earlier
+   * events of the thread lose their messages, and the compaction summaries of the thread go, because
+   * they hold the text of the deleted messages. Returns the stored revision. Only a chat with no
+   * active turn can lose its history.
+   */
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
+    const eventType = "conversation.history-deleted";
+    return this.#core.dispatch(
+      `conversation:${eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType,
+          payload: { detail: {}, changedMessages: [], removedMessageIds: [], activeTurnId: null },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        const threadOwner = databaseRow(
+          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+        );
+        if (!threadOwner || requiredStringColumn(threadOwner, "agent_id") !== input.agentId)
+          throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
+        recordDeletedThreadHistory(db, input.threadId, new Date().toISOString());
+        deleteThreadAttachments(db, input.threadId);
+        db.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(input.threadId);
+        db.prepare("DELETE FROM projection_thread_summaries WHERE thread_id = ?").run(input.threadId);
+        // The receipt of a summary command holds the summary text too.
+        const summaryEvents =
+          "FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.summary-created'";
+        const summaryCommands = databaseRows(
+          db.prepare(`SELECT DISTINCT command_id ${summaryEvents}`).all(input.threadId),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        // After a replay, the activity row of a summary event holds the whole payload, summary text included.
+        db.prepare(
+          `DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence IN (SELECT sequence ${summaryEvents})`,
+        ).run(input.threadId, input.threadId);
+        db.prepare(`DELETE ${summaryEvents}`).run(input.threadId);
+        deleteReceiptsOf(db, summaryCommands);
+        db.prepare("UPDATE projection_threads SET updated_at = ?, last_event_sequence = ? WHERE thread_id = ?").run(
+          new Date().toISOString(),
+          sequence,
+          input.threadId,
+        );
+        return sequence;
+      },
+    );
   }
 
   /**
@@ -929,6 +1005,89 @@ function supersedeStreamedMessageEvents(
     messageId,
   );
   deleteReceiptsOf(db, supersededCommandIds);
+}
+
+const CONVERSATION_UPDATED = "conversation.snapshot-updated";
+/** The command id that a write gets when its caller gives none: new for each write. */
+const GENERATED_UPDATE_COMMAND =
+  /^conversation:conversation\.snapshot-updated:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The activity row of an update, found again by its key. `projection_thread_activities` has no
+ * index on the thread or the sequence, so a search by them reads the whole table.
+ */
+function updateActivityId(sequence: number): string {
+  return `${CONVERSATION_UPDATED}:${sequence}`;
+}
+
+/**
+ * Drops the thread's previous event when it is an update that the new one replaces whole, so a chat
+ * that changes the same messages again and again keeps one event, not one per change. A queue that
+ * moved every 0.4 s for a day wrote 1.7 million of them, 66 GB, into one database.
+ *
+ * A replay (`ThreadReplay`) gives the same thread without it: each message of the new event replaces
+ * the earlier one with `{ ...earlier, ...new }` and keeps the earlier author, and the earlier time when
+ * the new message has no delivery. So an earlier message leaves nothing behind when the new one has
+ * all its keys, its author and, with no delivery, its time, and the new event sets the same active
+ * turn. Only the event just before the new one is read, so no other event can depend on it, and its
+ * messages come first in the new event in the same order, so a replay adds them in the same order.
+ * Only an event with a generated command id goes: that id is new for each write, so no sender can
+ * send the command again and need its receipt.
+ */
+function supersedePreviousConversationUpdate(
+  db: DatabaseSync,
+  threadId: string,
+  sequence: number,
+  changedMessages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+): void {
+  // The type and the command first: a whole snapshot holds every message of the thread, and its
+  // payload is read only when the event can be superseded.
+  const previous = databaseRow(
+    db
+      .prepare(
+        `SELECT sequence, command_id, event_type FROM orchestration_events
+         WHERE aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
+         ORDER BY sequence DESC LIMIT 1`,
+      )
+      .get(threadId, sequence),
+  );
+  if (!previous || requiredStringColumn(previous, "event_type") !== CONVERSATION_UPDATED) return;
+  const commandId = requiredStringColumn(previous, "command_id");
+  if (!GENERATED_UPDATE_COMMAND.test(commandId)) return;
+  const previousSequence = requiredNumberColumn(previous, "sequence");
+  const payload = databaseRow(
+    db.prepare("SELECT payload_json FROM orchestration_events WHERE sequence = ?").get(previousSequence),
+  );
+  if (
+    !payload ||
+    !replacedUpdate(JSON.parse(requiredStringColumn(payload, "payload_json")), changedMessages, activeTurnId)
+  )
+    return;
+  // An update written before this key existed keeps its activity row: one row for each thread.
+  db.prepare("DELETE FROM projection_thread_activities WHERE activity_id = ?").run(updateActivityId(previousSequence));
+  db.prepare("DELETE FROM orchestration_events WHERE sequence = ?").run(previousSequence);
+  deleteReceiptsOf(db, [commandId]);
+}
+
+function replacedUpdate(
+  previous: unknown,
+  changedMessages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+): boolean {
+  if (!isDynamicRecord(previous) || previous.activeTurnId !== activeTurnId) return false;
+  if (!Array.isArray(previous.removedMessageIds) || previous.removedMessageIds.length > 0) return false;
+  const messages = previous.changedMessages;
+  if (!Array.isArray(messages) || messages.length > changedMessages.length) return false;
+  return messages.every((message, index) => {
+    const next = changedMessages[index];
+    if (!isDynamicRecord(message) || next === undefined || message.id !== next.id) return false;
+    if (message.author !== next.author || (next.delivery === undefined && message.createdAt !== next.createdAt))
+      return false;
+    // A key the new message leaves undefined is not in its stored JSON, so the earlier value would stay.
+    const nextKeys = new Set(Object.entries(next).flatMap(([key, value]) => (value === undefined ? [] : [key])));
+    return Object.keys(message).every((key) => nextKeys.has(key));
+  });
 }
 
 function pruneConversationSnapshots(db: DatabaseSync, threadId: string, retainedSequence: number): void {

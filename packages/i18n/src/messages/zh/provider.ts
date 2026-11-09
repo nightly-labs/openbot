@@ -105,6 +105,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
   // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "在 OpenBot 应用中连接 {name}",
@@ -273,6 +275,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 小时",
   "provider.settings.promptCacheDefault": "Claude Code 默认",
   "provider.settings.promptCacheLoadFailed": "无法加载该服务器的提示缓存时长。",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
+  "provider.settings.claudeUserSetupDescription":
+    "智能体会从 ~/.claude 加载你的 CLAUDE.md、技能、智能体、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
+  "provider.settings.claudeUserSetupLoadFailed": "无法加载 Claude Code 设置。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {
     one: "{count} 个模型中有 {shown} 个显示在模型选择器中。",

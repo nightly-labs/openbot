@@ -25,6 +25,8 @@ export const messages = {
   "error.workflow.notRetryable": "Ponownie można uruchomić tylko krok, który się nie powiódł lub został zatrzymany.",
   "error.workflow.noDecision": "Ten krok nie czeka na decyzję.",
   "error.workflow.outputPlaceMissing": "Wybierz miejsce w komunikatorze dla tego wyjścia.",
+  "error.workflow.outputChannelMissing": "Wybierz kanał dla tego wyjścia.",
+  "error.workflow.outputChannelFailed": "OpenBot nie mógł opublikować wyniku w kanale. Uruchom krok ponownie.",
   "error.workflow.discordNoMessage":
     "To wyjście działa na wiadomość z Discorda, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Discordzie albo wybierz Opublikuj na kanale.",
   "error.workflow.slackNoMessage":

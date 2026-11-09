@@ -61,6 +61,8 @@ export const messages = {
     "Aspetta che il turno attivo e la coda finiscano prima di iniziare una nuova chat.",
   "error.agent.waitBeforeCompactContext":
     "Attendi la fine del turno attivo e della coda prima di compattare il contesto.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Aspetta che il turno attivo e la coda finiscano prima di eliminare la cronologia.",
   "error.agent.compactContextUnavailable": "Questo agente non può compattare il suo contesto ora.",
   "error.agent.unknown": "Agente sconosciuto: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -79,6 +81,8 @@ export const messages = {
   "error.agent.endpointRemoved": "L'endpoint usato da questo agente è stato rimosso. Scegli un altro modello.",
   "error.agent.turnStalled":
     "{provider} ha smesso di rispondere, quindi OpenBot ha terminato questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
+  "error.agent.compactionConnectionLost":
+    "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet, poi invia un messaggio per continuare.",
   "error.agent.selectedGone": "L'agente selezionato non esiste più.",
   "error.agent.profileEndpointsChanged": "Gli endpoint personalizzati sono cambiati durante la generazione. Riprova.",
   "error.agent.profileInvalid": "Il provider ha restituito un profilo non valido. Prova a rivedere il prompt.",
@@ -110,6 +114,9 @@ export const messages = {
     "Solo il computer che esegue l'agente può modificare questa impostazione.",
   "error.agent.sideQuestionBusy": "Ci sono troppe domande a parte in corso. Riprova tra poco.",
   "error.agent.sideQuestionFailed": "L'agente non è riuscito a rispondere alla domanda a parte. Riprova.",
+  "error.agent.webSearchSignIn": "La ricerca web richiede l’accesso a Codex con un account ChatGPT.",
+  "error.agent.webSearchBusy": "Sono in corso troppe ricerche e domande laterali. Riprova tra poco.",
+  "error.agent.webSearchFailed": "La ricerca web non è terminata. Riprova.",
   "error.agent.busyMessageModeLocalOnly":
     "Cosa fanno i messaggi mentre l'agente lavora si può impostare solo sul computer che lo esegue.",
   "error.agent.backupModelsLocalOnly":

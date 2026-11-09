@@ -12,8 +12,9 @@
 //      The summary runs on the provider's smaller model, and the Lead's turns on its own model.
 //   5. A reply that continues a task marks its earlier turn superseded and keeps the channel summary,
 //      so the next turn does not summarize the channel again from the first message (#3761).
-//   6. Two compactions that leave a session at 84% of its window give one notice, and OpenBot asks
-//      for no more compactions of that session (#3905, #5150).
+//   6. Two compactions that leave a session at 76% of its window give one notice, and OpenBot asks
+//      for no more compactions of that session when it grows over 80% (#3905, #5150). A session
+//      that becomes smaller than 70% in another way compacts again when it grows over 80%.
 //   7. A provider that retries a request three times gives one notice, and a session at 60% of its
 //      window then compacts before its next turn (#4374). When no usage came after that compaction,
 //      a turn that retries again does not compact the session again (#4819).
@@ -25,6 +26,8 @@
 //      it. The packet says when isolation is on and when it is off (#4332).
 //  11. A reply that quotes a member's message and only mentions another member gives the quote in
 //      the assignment. The quote continues its task, and the packet does not show it superseded (#4841).
+//  12. Saved channel memories go in a delta only when they changed. A delta with the same memories says
+//      that the session has them.
 // `bun scripts/channel-context-e2e.ts`. Writes .openbot-build/channel-context-e2e/report.json.
 // `CHANNEL_CONTEXT_MEASURE=<label> bun scripts/channel-context-e2e.ts` runs no checks. It sends
 // MEASURE_TURNS requests to three members in turn, with long replies, and writes the size of each
@@ -72,12 +75,16 @@ const PACKET_STARTS = [
 ];
 const CHANNEL_RULE = "Use channel_history for earlier history";
 const SUMMARY_REQUEST = "Summarize shared facts";
+const UNCHANGED_MEMORIES = "The saved channel memories are the same as in your earlier channel message";
 const SUMMARY_TEXT = "Summary: the team discussed the release.";
 // The complete packet budget is 120,000 characters, and its transcript part is a quarter of that.
 const TRANSCRIPT_CHARACTERS = 30_000;
 const MEASURE = process.env.CHANNEL_CONTEXT_MEASURE?.replace(/[^\w-]/g, "") || null;
 const MEASURE_TURNS = 30;
 // A reply and a summary of about the size that a real member writes.
+const MEASURE_MEMORIES = 8;
+const measureMemory = (index: number) =>
+  `Memory ${index}: ${"The release checklist needs a signed build and a tested database backup. ".repeat(6)}`;
 const MEASURE_REPLY = `Reply: ${"I checked this step and wrote down what is left to do. ".repeat(36)}`;
 const MEASURE_SUMMARY = `${SUMMARY_TEXT} ${"The members checked one more step of the plan. ".repeat(85)}`;
 
@@ -151,15 +158,18 @@ const answer = (message) => {
         : assignment.startsWith("MEASURE") ? ${JSON.stringify(MEASURE_REPLY)} : "Done.";
       const steps = [];
       if (assignment.startsWith("STUCK")) {
-        // Codex compacts by itself twice, and each time the session stays at 84% of its window.
+        // Codex compacts by itself twice, and each time the session stays at 76% of its window.
+        // Then the turn grows it over the threshold again.
         for (let index = 0; index < 2; index++) {
           const item = { type: "contextCompaction", id: "compaction-" + turnId + "-" + index };
           steps.push(() => write({ method: "item/started", params: { threadId, turnId, item } }));
           steps.push(() => write({ method: "item/completed", params: { threadId, turnId, item } }));
-          steps.push(() => usage(threadId, turnId, 84000));
+          steps.push(() => usage(threadId, turnId, 76000));
         }
+        steps.push(() => usage(threadId, turnId, 84000));
       }
       if (assignment.startsWith("USAGE")) steps.push(() => usage(threadId, turnId, 60000));
+      if (assignment.startsWith("FULL")) steps.push(() => usage(threadId, turnId, 84000));
       if (assignment.startsWith("RETRY")) {
         // As in #4819, a compaction of this session and a turn that fails after retries report no usage.
         quietCompactions.add(threadId);
@@ -491,8 +501,11 @@ try {
   await save("Ship the release.", false);
 
   if (MEASURE) {
+    // Saved channel memories go in each packet that has a changed memory list.
+    for (let index = 0; index < MEASURE_MEMORIES; index++)
+      channels().memories.saveFromTool(channelId, measureMemory(index), randomUUID(), randomUUID());
     const members = [lead, tester, writer ?? lead];
-    const turns: { agent: string; threadId: string; characters: number; delta: boolean }[] = [];
+    const turns: { agent: string; threadId: string; characters: number; delta: boolean; memories: boolean }[] = [];
     for (let index = 0; index < MEASURE_TURNS; index++) {
       const member = members[index % members.length] ?? lead;
       const packet = await send(
@@ -506,6 +519,7 @@ try {
         threadId,
         characters: packet.length,
         delta: packet.includes("Shared messages after the ones you already have"),
+        memories: packet.includes("<channel_memories>"),
       });
     }
     const summaries = summaryInputs().map((entry) => entry.text.length);
@@ -525,6 +539,10 @@ try {
       label: MEASURE,
       turns: turns.length,
       replyCharacters: MEASURE_REPLY.length,
+      memoryCharacters: channels()
+        .memories.list(channelId)
+        .reduce((total, memory) => total + memory.text.length, 0),
+      packetsWithMemories: turns.filter((turn) => turn.memories).length,
       packetCharacters,
       largestPacket: Math.max(...turns.map((turn) => turn.characters)),
       deltaTurns: turns.filter((turn) => turn.delta).length,
@@ -533,7 +551,7 @@ try {
       // About four characters make one token.
       estimatedInputTokens: Math.round((packetCharacters + summaryCharacters) / 4),
       sessions,
-      perTurn: turns.map(({ agent, characters, delta }) => ({ agent, characters, delta })),
+      perTurn: turns.map(({ agent, characters, delta, memories }) => ({ agent, characters, delta, memories })),
     };
     mkdirSync(OUT, { recursive: true });
     writeFileSync(join(OUT, `measure-${MEASURE}.json`), `${JSON.stringify(measured, null, 2)}\n`);
@@ -603,6 +621,33 @@ try {
       facts(changed).channel?.instructions === "Ship the release on Friday.",
       JSON.stringify(facts(changed)),
     );
+
+    // 12. Saved channel memories go in a delta only when they changed. The delta says that the
+    // session has them, and a changed memory list goes again in full.
+    const remembered = "The release needs a signed build.";
+    channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
+    const withMemory = await send(channelId, lead.id, "Read the saved memory.");
+    pass(
+      "A delta after a new memory gives the memories",
+      withMemory.includes(`<channel_memories>\n${remembered}\n</channel_memories>`),
+      blocks(withMemory).find((entry) => entry.includes("channel memories")),
+    );
+    const sameMemory = await send(channelId, lead.id, "Check the build again.");
+    pass(
+      "A delta with the same memories does not give them again",
+      !sameMemory.includes("<channel_memories>") && sameMemory.includes(UNCHANGED_MEMORIES),
+      blocks(sameMemory).find((entry) => entry.includes("channel memories")),
+    );
+    const added = "The backup is tested on Thursday.";
+    channels().memories.saveFromTool(channelId, added, randomUUID(), randomUUID());
+    const changedMemory = await send(channelId, lead.id, "Read the new memory.");
+    pass(
+      "A delta after a memory change gives all memories again",
+      changedMemory.includes(remembered) && changedMemory.includes(added),
+      blocks(changedMemory).find((entry) => entry.includes("channel memories")),
+    );
+    channels().memories.deleteByText(channelId, remembered);
+    channels().memories.deleteByText(channelId, added);
 
     // 4. Grow the history over the start of the summary after a turn, but not over the packet
     // threshold. Only the summary after a turn summarizes it now: no packet is prepared.
@@ -706,8 +751,17 @@ try {
     const ineffective = await waitFor("the notice about compactions that do not help", () =>
       events.find((event) => event.code === "context_compaction_ineffective" && event.agentId === tester.id),
     );
-    pass("The notice gives the share of the window", ineffective.message.includes("84%"), ineffective.message);
+    pass("The notice gives the share of the window", ineffective.message.includes("76%"), ineffective.message);
     pass("OpenBot asks for no compaction of the full session", compactions(stuckThread) === 0);
+    // Tools that the agent no longer has leave the session at 60%, and it then grows over 80%.
+    const smaller = await send(channelId, tester.id, "USAGE: report the size.");
+    await send(channelId, tester.id, "FULL: report the size.");
+    pass(
+      "The same session gets the next turns",
+      packets().find((entry) => entry.text === smaller)?.threadId === stuckThread,
+    );
+    await waitFor("the compaction of the session that became smaller", () => compactions(stuckThread) > 0);
+    pass("A session that became smaller compacts again", compactions(stuckThread) === 1);
 
     // 7. Codex retries a request of the Lead three times while its session is at 60% of the window.
     const retried = await send(channelId, lead.id, "RETRY: run the release check.");

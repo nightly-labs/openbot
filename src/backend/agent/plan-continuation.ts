@@ -1,13 +1,16 @@
 import type { ConversationPlan, ConversationPlanStep } from "@openbot/contracts/ipc";
-import { nextStepContinuationPrompt, planContinuationPrompt } from "./delivery-content";
+import { compactionContinuationPrompt, nextStepContinuationPrompt, planContinuationPrompt } from "./delivery-content";
 
 export interface PlanContinuationOptions {
   /** The most automatic continuations of one request. */
   limit: number;
 }
 
-/** Why a turn continues: open steps in its plan, or a next step that it named but did not do. */
-type ContinuationKind = "plan" | "nextStep";
+/**
+ * Why a turn continues: open steps in its plan, a next step that it named but did not do, or a
+ * compaction that lost the connection and stopped the turn.
+ */
+type ContinuationKind = "plan" | "nextStep" | "compaction";
 
 /** The most next-step continuations of one request. Each one has no plan to measure progress. */
 const NEXT_STEP_LIMIT = 2;
@@ -15,10 +18,13 @@ const NEXT_STEP_LIMIT = 2;
 const NEXT_STEP_ANSWER_MAX = 400;
 /** Verbs that mean "go on with the same work". "Proceed" and "go ahead" ask for approval, so they block. */
 const CONTINUE_VERB = "(?:continue|keep going|go on|carry on|move on)";
-const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+(?:steps|work|plan|list)))?|remaining(?:\s+(?:steps|work|items|parts|ones))?|steps?\s+\d+))?`;
+/** Parts of the same work. A named action, such as "the rest of the deploy", is not in it, so it blocks. */
+const WORK_PARTS =
+  "(?:steps|work|items|parts|ones|tasks|files|tests|changes|fixes|edits|checks|pages|sections|list|plan)";
+const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+${WORK_PARTS}))?|remaining(?:\s+${WORK_PARTS})?|steps?\s+\d+))?`;
 /**
  * A last line that only asks whether to go on with the work, such as "Shall I continue?" or "Step
- * one is done. Want me to continue with the next step?". Text in front of the question must end a
+ * one is done. Want me to continue with the remaining files?". Text in front of the question must end a
  * statement, so another question in the line still blocks. A question about a named action, such as
  * "Should I continue with the deploy?" or "Proceed?", does not match: the user must answer it.
  */
@@ -26,12 +32,36 @@ const ASKS_TO_CONTINUE = new RegExp(
   String.raw`^(?:[^?？]*[.!]\s+)?(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
   "i",
 );
+/** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
+const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
+/**
+ * The rest of a next-step sentence must not wait for someone or something: an offer to the user
+ * ("… if you want"), the user's approval, a later time, or another person ("… get back to you").
+ */
+const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|get\s+back|once\s+approved|(?:your|the\s+user['’]s)\s+(?:approval|confirmation|permission)|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
 /**
  * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
  * answer that says the agent waits, holds or stops does not match.
  */
-const NAMES_NEXT_STEP =
-  /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
+const NAMES_NEXT_STEP = new RegExp(
+  String.raw`(?:\blet me now\b|\bnow let me\b|\bi['’]ll now\b|\bi will now\b|\bnow i(?:['’]ll| will)\b|\bnext,?\s+i(?:['’]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)${NOT_WAITING}[^.!?\n]{0,100}[.:…]?\s*$`,
+  "i",
+);
+
+/**
+ * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
+ * The continuation note does not approve a risky action in any case.
+ */
+const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch)`;
+/**
+ * A last sentence in which the agent says that it does the next work, such as "Let me run the tests."
+ * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …", "I'll keep an eye on
+ * it." and "I'll update you …" do not match.
+ */
+const ANNOUNCES_WORK = new RegExp(
+  String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
+  "i",
+);
 
 /** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
 const WAITS_FOR_USER =
@@ -60,7 +90,8 @@ export function waitsForUser(answer: string | undefined): boolean {
 function stoppedBeforeNextStep(answer: string | undefined): boolean {
   if (asksToContinue(answer)) return true;
   const text = answer?.trim() ?? "";
-  return text.length > 0 && text.length <= NEXT_STEP_ANSWER_MAX && NAMES_NEXT_STEP.test(text.slice(-160));
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX) return false;
+  return NAMES_NEXT_STEP.test(text.slice(-160)) || ANNOUNCES_WORK.test(text.replace(/[*_`>#]/g, "").trimEnd());
 }
 
 interface ContinuationCount {
@@ -76,6 +107,8 @@ interface Chain {
   shown: ContinuationCount;
   /** The next-step continuations of the chain. */
   nextSteps: number;
+  /** Whether a failed compaction continued the chain already. A second one ends it. */
+  compactionContinued: boolean;
   /** The plan of the last turn of the chain. A turn that sends no plan update keeps it. */
   plan: ConversationPlan | null;
   /** The open steps of that plan, by text and status, to see whether a turn made progress. */
@@ -153,7 +186,8 @@ export class PlanContinuation {
     let kind: ContinuationKind;
     if (open.length > 0) {
       const signature = JSON.stringify(open.map(stepKey));
-      if (chained && previous.kind === "plan" && previous.openSteps === signature) return null;
+      // A continuation after a failed compaction keeps the plan of the turn before it.
+      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return null;
       kind = "plan";
     } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
     else return null;
@@ -167,11 +201,53 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
+      compactionContinued: chained ? previous.compactionContinued : false,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
       earlierSteps,
     });
     return { kind, ...shown };
+  }
+
+  /**
+   * Decides whether a turn that a failed compaction stopped continues: the connection failed or
+   * stopped while the provider compacted the context of the turn (#5822). Once for each request, and
+   * within the limit of the chain. Returns null when it does not continue; null also ends the chain.
+   * `plan` and `earlierPlan` are as in `consider`, so a later plan continuation compares the same steps.
+   */
+  afterFailedCompaction(input: {
+    agentId: string;
+    taskId: string | null;
+    deliveryIds: readonly string[];
+    plan: ConversationPlan | null;
+    earlierPlan: ConversationPlan | null;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    const key = laneKey(input.agentId, input.taskId);
+    const previous = this.#chains.get(key);
+    this.#chains.delete(key);
+    const chained =
+      previous !== undefined && input.deliveryIds.some((deliveryId) => previous.deliveryIds.has(deliveryId));
+    const count = chained ? previous.count : 0;
+    if (count >= this.#limit || (chained && previous.compactionContinued)) return null;
+    const plan = input.plan ?? (chained ? previous.plan : null);
+    const earlierSteps = chained
+      ? previous.earlierSteps
+      : new Set(
+          (input.earlierPlan?.steps ?? []).filter((step) => step.status !== "completed").map((step) => stepKey(step)),
+        );
+    const shown = { current: 1, limit: 1 };
+    this.#chains.set(key, {
+      deliveryIds: new Set(input.deliveryIds),
+      count: count + 1,
+      kind: "compaction",
+      shown,
+      nextSteps: chained ? previous.nextSteps : 0,
+      compactionContinued: true,
+      plan,
+      openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),
+      earlierSteps,
+    });
+    return { kind: "compaction", ...shown };
   }
 
   /**
@@ -186,6 +262,7 @@ export class PlanContinuation {
       this.#chains.delete(key);
       return null;
     }
+    if (chain.kind === "compaction") return compactionContinuationPrompt();
     return chain.kind === "plan" && chain.plan
       ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.shown.current, chain.shown.limit)
       : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);

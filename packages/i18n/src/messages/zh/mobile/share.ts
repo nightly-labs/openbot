@@ -14,6 +14,7 @@ export const messages = {
   "mobile.share.action": "分享给{name}",
   "mobile.share.extension.send": "发送",
   "mobile.share.extension.footer": "OpenBot 现在会把这些内容发送给代理，不会打开应用。",
+  "mobile.share.extension.message": "添加消息",
   "mobile.share.extension.sending": "正在发送给 {name}…",
   "mobile.share.extension.sent": "已发送给 {name}",
   "mobile.share.extension.failed": "OpenBot 无法发送这些内容。请打开应用，从应用中发送。",

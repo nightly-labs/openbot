@@ -2,6 +2,7 @@ import { Effect } from "effect";
 // App identity, first-run setup, the analytics preference, external links and the data and
 // diagnostics exports.
 
+import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -30,6 +31,7 @@ import type { AppearanceService } from "../appearance-service";
 import type { ApprovalAutomation } from "../approval-automation-store";
 import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
 import type { ExternalLinkOpener, ExternalLinkPreferenceStore } from "../external-link-opener";
+import { feedbackFacts } from "../feedback";
 import type { InterfaceSizeService } from "../interface-size-service";
 import type { LanguageService } from "../language-service";
 import type { LogoColorService } from "../logo-color-service";
@@ -40,6 +42,7 @@ import type { RemoteNetworkRoutePreferenceStore } from "../remote-network-route-
 import type { RemoteSessionCache } from "../remote-session-cache";
 import type { RemoteSessionReusePreferenceStore } from "../remote-session-reuse-preference-store";
 import { readSetupState, writeSetupState } from "../setup-store";
+import { systemHourCycle } from "../system-hour-cycle";
 import type { UpdateService } from "../update-service";
 import {
   parseAgentDefaults,
@@ -85,6 +88,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   "claude-install": "https://code.claude.com/docs",
   "hermes-install": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
+  "report-problem": () => bugReportFormUrl(feedbackFacts()),
   message: "https://x.com/norbertbodziony",
   changelog: "https://openbot.run/changelog",
   guides: "https://openbot.run/guides",
@@ -208,6 +212,7 @@ export function appIpcHandlers({
         // composites on the CPU. This covers the GPU switch of `linux-gpu-mode.ts` and a GPU that
         // Chromium blocks, such as the llvmpipe driver of a server or a remote desktop.
         const softwareRendering = !app.getGPUFeatureStatus().gpu_compositing.startsWith("enabled");
+        const hourCycle = systemHourCycle();
         return {
           name: app.getName(),
           version,
@@ -216,6 +221,7 @@ export function appIpcHandlers({
           ...(analyticsCaptureUrl ? { analyticsCaptureUrl } : {}),
           ...(analyticsInstallId ? { analyticsInstallId } : {}),
           ...(softwareRendering ? { softwareRendering } : {}),
+          ...(hourCycle ? { hourCycle } : {}),
         };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),

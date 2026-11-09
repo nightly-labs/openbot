@@ -7,6 +7,7 @@ import type {
   HostStatus,
   InvitePreview,
   InviteSummary,
+  RemoteControlPolicy,
   RemoteDesktopConnectResult,
   RemoteDesktopSession,
   ScopedDirectMessageEvent,
@@ -30,6 +31,7 @@ import {
   decodeInviteSummary,
   decodeInviteUrl,
   decodePendingInvite,
+  decodeRemoteControlPolicy,
   decodeRemoteDesktopConnectResult,
   decodeRemoteDesktopSessions,
   decodeScopedDirectMessage,
@@ -278,6 +280,11 @@ describe("team decoders", () => {
     ["direct read state", decodeDirectReadState, readState],
     ["direct message event", decodeScopedDirectMessage, directEvent],
     ["direct typing event", decodeScopedDirectTyping, typingEvent],
+    [
+      "remote control policy",
+      decodeRemoteControlPolicy,
+      { access: "admins", askOnHost: true } satisfies RemoteControlPolicy,
+    ],
   ] as const)("keeps a valid %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(decode(value)).toEqual(value);
   });
@@ -304,6 +311,8 @@ describe("team decoders", () => {
       { status: "refused", errorCode: "busy", message: "No." },
     ],
     ["remote desktop connection with an unknown status", decodeRemoteDesktopConnectResult, { status: "pending" }],
+    ["remote control policy with an unknown access", decodeRemoteControlPolicy, { access: "guests", askOnHost: false }],
+    ["remote control policy without a question choice", decodeRemoteControlPolicy, { access: "owner" }],
     ["server with an unknown state", decodeServers, [{ ...localServer, state: "asleep" }]],
     ["server without a role", decodeServer, { ...localServer, role: undefined }],
     [

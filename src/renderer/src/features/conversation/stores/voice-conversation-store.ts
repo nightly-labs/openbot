@@ -1,4 +1,10 @@
-import { LOCAL_SERVER_ID, VOICE_AUDIO_LIMITS, VOICE_MODELS, VOICE_STREAM_LIMITS } from "@openbot/contracts/ipc";
+import {
+  type ConversationMessage,
+  LOCAL_SERVER_ID,
+  VOICE_AUDIO_LIMITS,
+  VOICE_MODELS,
+  VOICE_STREAM_LIMITS,
+} from "@openbot/contracts/ipc";
 import type { VoicePanelPhase } from "@openbot/ui/features/conversation/VoicePanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup } from "solid-js";
@@ -84,6 +90,8 @@ export interface VoiceConversationDeps {
   ) => Promise<boolean>;
   /** The server of the agent is connected. The local server always is. */
   serverOnline: () => boolean;
+  /** Whether a step of a reply is a progress update, which the conversation reads aloud before the answer. */
+  progressUpdate: (message: ConversationMessage) => boolean;
 }
 
 /**
@@ -129,6 +137,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let ready = false;
   let livePreview = false;
   let streamed = false;
+  /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
+  let cloud = false;
   // The logic reads these copies: a store read shows a write only after the next flush.
   let step: VoiceConversationStep = "starting";
   let muted = false;
@@ -141,7 +151,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let ownServer = false;
   const transcription = () => {
     if (ownServer) return "server";
-    return streamed ? "cloud" : "local";
+    return cloud ? "cloud" : "local";
   };
   const elapsedMs = (since: number) => Math.max(0, Math.round(performance.now() - since));
 
@@ -226,7 +236,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       const selected = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
       // The user's own server takes the whole recording once: it has no live preview or stream.
       ownServer = server?.routes.dictation === true;
-      streamed = !ownServer && selected?.kind === "cloud";
+      cloud = !ownServer && selected?.kind === "cloud";
+      // Only ElevenLabs streams. Groq takes the whole recording once, as the user's own server does.
+      streamed = selected?.kind === "cloud" && selected.provider === "elevenlabs" && !ownServer;
       livePreview = !ownServer && !streamed && (selected?.livePreview ?? true);
       ready = true;
       analytics.track("voice_conversation_action", {
@@ -542,7 +554,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       discardRecording(recordingId);
       return;
     }
-    noteDictatedMessage(target, text, { always: true });
+    noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
     // A send can fail after it is queued, so the wait for the reply ends there too.
     // A later failure, after a Retry, belongs to a turn that is over.
     const notSent = () => {
@@ -598,7 +610,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         .catch(() => {});
   }
 
-  /** A cloud model hears through a stream: the whole recording is sent, then the stream ends. */
+  /** ElevenLabs hears through a stream: the whole recording is sent, then the stream ends. */
   async function transcribeStreamed(recording: Blob): Promise<{ text: string }> {
     const pcm = encodePcm16(await recordingToSamples(recording));
     const { streamId } = await deps.voice.startStream();

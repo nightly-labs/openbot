@@ -166,8 +166,22 @@ export function isSecretName(name: string): boolean {
 }
 
 export function redactText(value: string): string {
+  return redact(value, true);
+}
+
+/**
+ * `redactText` without the email rule, for text that goes back to the agent that the user gave it
+ * to: its memories and its own chat history. An address there is user data that the agent needs to
+ * do its task, not a secret, and the provider already received it with the original message. Logs,
+ * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
+ */
+export function redactSecrets(value: string): string {
+  return redact(value, false);
+}
+
+function redact(value: string, emails: boolean): string {
   const marked = markRegisteredSecrets(value);
-  const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
+  const redacted = redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
@@ -200,22 +214,20 @@ function markRegisteredSecrets(value: string): string {
   return result + value.slice(copied);
 }
 
-function applyTextRules(value: string): string {
-  return (
-    value
-      .replace(PEM_PRIVATE_KEY, "[redacted]")
-      .replace(COOKIE_HEADER, "$1[redacted]")
-      .replace(AUTH_HEADER_SECRET, "$1[redacted]")
-      .replace(BEARER_SECRET, "[redacted]")
-      .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
-      .replace(JSON_BARE_KEY, redactAssignedValue)
-      // After the assignment rule: its value runs over `&`, and a query value redacted first would
-      // leave a `]` behind it.
-      .replace(QUERY_SECRET, "$1[redacted]")
-      .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
-      .replace(JSON_WEB_TOKEN, "[redacted]")
-      .replace(EMAIL, "[redacted-email]")
-  );
+function applyTextRules(value: string, emails: boolean): string {
+  const redacted = value
+    .replace(PEM_PRIVATE_KEY, "[redacted]")
+    .replace(COOKIE_HEADER, "$1[redacted]")
+    .replace(AUTH_HEADER_SECRET, "$1[redacted]")
+    .replace(BEARER_SECRET, "[redacted]")
+    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
+    .replace(JSON_BARE_KEY, redactAssignedValue)
+    // After the assignment rule: its value runs over `&`, and a query value redacted first would
+    // leave a `]` behind it.
+    .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
+    .replace(JSON_WEB_TOKEN, "[redacted]");
+  return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;
 }
 
 /**
@@ -239,7 +251,7 @@ const UNSCANNED = "[redacted-unscanned]";
  * `[…]` run that does parse is replaced by its redacted form, which gives an embedded payload the
  * same treatment as a structured param: `headers` values go, secret-named keys go, prose stays.
  */
-function redactEmbeddedJson(value: string): string {
+function redactEmbeddedJson(value: string, emails: boolean): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -260,7 +272,7 @@ function redactEmbeddedJson(value: string): string {
       // credential with no closing brace to parse, so the run is dropped rather than passed on.
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
-    const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
+    const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
         // A run a serializer wrote that does not parse: a trailing comma, a value cut short. Going on
@@ -280,9 +292,9 @@ function redactEmbeddedJson(value: string): string {
   return result + value.slice(index);
 }
 
-function parseRedacted(candidate: string): string | null {
+function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
-    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>())) ?? null;
+    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>(), emails)) ?? null;
   } catch {
     return null;
   }
@@ -346,14 +358,14 @@ function redactAssignedValue(_match: string, label: string, value: string): stri
 // an echoed response body, a spawn argument list, a serialized request. Once
 // it parses, the key rules apply to it exactly as they would to a structured
 // param, so `{"apiKey":"…"}` cannot pass as prose.
-function redactSerializedJson(value: string): string | null {
+function redactSerializedJson(value: string, emails: boolean): string | null {
   const trimmed = value.trim();
   // No size cap: a long payload is exactly where a secret hides, and the
   // truncation that follows keeps only the first characters - which would be
   // the unredacted ones.
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
   try {
-    return JSON.stringify(convertValue(JSON.parse(trimmed), new Set<object>())) ?? null;
+    return JSON.stringify(convertValue(JSON.parse(trimmed), new Set<object>(), emails)) ?? null;
   } catch {
     // Neither a parse failure nor a conversion failure may become the failure
     // the caller was trying to report: fall back to the regex rules, which
@@ -383,7 +395,7 @@ export function toLogValue(value: unknown): LogValue {
 // being logged.
 function convertSafely<T>(value: T): LogValue {
   try {
-    return convertValue(value, new Set<object>());
+    return convertValue(value, new Set<object>(), true);
   } catch {
     return UNSERIALIZABLE;
   }
@@ -395,8 +407,8 @@ function convertSafely<T>(value: T): LogValue {
 // shape worth reading in a log line.
 const MAX_CONVERSION_DEPTH = 32;
 
-function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
-  if (typeof value === "string") return redactText(value);
+function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0): LogValue {
+  if (typeof value === "string") return redact(value, emails);
   if (value === null) return null;
   if (value === undefined) return undefined;
   if (typeof value === "number" || typeof value === "boolean") return value;
@@ -406,17 +418,17 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
     // or a class named after the header it failed on - so it is no safer than
     // the message.
     const converted: { [key: string]: LogValue } = {
-      name: redactText(value.name),
-      message: redactText(value.message),
+      name: redact(value.name, emails),
+      message: redact(value.message, emails),
     };
-    if (typeof value.stack === "string") converted.stack = redactText(value.stack);
+    if (typeof value.stack === "string") converted.stack = redact(value.stack, emails);
     return converted;
   }
   if (Array.isArray(value)) {
     if (seen.has(value)) return "[circular]";
     if (depth >= MAX_CONVERSION_DEPTH) return "[too deep]";
     seen.add(value);
-    return value.map((entry: LogValue) => convertValue(entry, seen, depth + 1));
+    return value.map((entry: LogValue) => convertValue(entry, seen, emails, depth + 1));
   }
   if (typeof value === "object") {
     if (seen.has(value)) return "[circular]";
@@ -436,8 +448,8 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
         // A key is as caller-controlled as a value: a payload keyed by an
         // email address, or by the header that failed, leaks through a rule
         // that only looks at values.
-        redactText(key),
-        convertEntry(key, entry, seen, depth),
+        redact(key, emails),
+        convertEntry(key, entry, seen, emails, depth),
       ]),
     );
   }
@@ -446,15 +458,15 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
   // and `String()` itself can throw for a null-prototype object or a
   // throwing `toString`.
   try {
-    return redactText(String(value));
+    return redact(String(value), emails);
   } catch {
     return UNSERIALIZABLE;
   }
 }
 
-function convertEntry(key: string, entry: unknown, seen: Set<object>, depth: number): LogValue {
+function convertEntry(key: string, entry: unknown, seen: Set<object>, emails: boolean, depth: number): LogValue {
   if (SECRET_KEY.test(key)) return "[redacted]";
-  const converted = convertValue(entry, seen, depth + 1);
+  const converted = convertValue(entry, seen, emails, depth + 1);
   if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
   return redactHeaderStrings(converted);
 }

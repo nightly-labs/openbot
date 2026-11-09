@@ -165,6 +165,11 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   has no `.env.keys`; use the one in the main checkout. Never print the token: do not use
   `dotenvx get` or `echo`. Ask before a change that deletes data or affects production users.
   Deploy scripts remove the token, so Wrangler deploys keep the developer's `wrangler login`.
+- For provider harness tests and smoke checks, `apps/auth-api/.env.dev` holds `INCEPTION_API_KEY`
+  (Inception Labs, OpenAI-compatible, `https://api.inceptionlabs.ai/v1`, models such as `mercury-3`).
+  Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
+  <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
+  turns: the token budget is small.
 
 See [account service setup](apps/auth-api/README.md) for loading and deployment details.
 

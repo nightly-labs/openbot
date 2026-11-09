@@ -11,6 +11,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
+import { promptMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
@@ -322,6 +323,15 @@ export class QueueControls {
       );
     yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
+      // A side thread reads no mailbox copies, so the steered message joins it here, as its provider
+      // history gives it after a restart (#5263).
+      if (
+        this.#conversation.isExecutionThread(snapshot.threadId) &&
+        !snapshot.messages.some((message) => message.id === input.deliveryId)
+      ) {
+        snapshot.messages.push(promptMessage(context, { ...context.delivery, turnId }));
+        this.#mailboxSync.syncDeliveryMessage(snapshot, input.deliveryId);
+      }
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#mailboxSync.emitQueue(agent.id);
       this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });

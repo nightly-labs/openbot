@@ -102,6 +102,11 @@ export interface PluginHttpServer {
   name: string;
   transport: "http";
   url: string;
+  /**
+   * The addresses that an earlier version of the listing saved rows on. A row with the catalog name
+   * on one of these hosts, or on a subdomain, is still the app's row.
+   */
+  earlierUrls?: string[];
   auth?: PluginAuthFlow[];
 }
 
@@ -333,7 +338,20 @@ function parseServer(slug: string, value: unknown): PluginServer {
     if (!isString(url) || !(local ? isLoopbackHttpUrl(url) : url.startsWith("https://"))) {
       throw new Error(`Plugin ${slug} server needs ${local ? "a loopback http" : "an https"} url.`);
     }
-    return auth ? { name: value.name, transport: "http", url, auth } : { name: value.name, transport: "http", url };
+    const earlierUrls = value.earlierUrls;
+    if (
+      earlierUrls !== undefined &&
+      (!Array.isArray(earlierUrls) || earlierUrls.length === 0 || !earlierUrls.every(isHttpsUrl))
+    ) {
+      throw new Error(`Plugin ${slug} earlierUrls must be a list of https urls.`);
+    }
+    return {
+      name: value.name,
+      transport: "http",
+      url,
+      ...(earlierUrls ? { earlierUrls } : {}),
+      ...(auth ? { auth } : {}),
+    };
   }
   if (value.transport === "stdio") {
     if (!isString(value.command) || value.command.trim().length === 0 || !Array.isArray(value.args)) {
@@ -730,7 +748,7 @@ export type MobilePluginAuthFlow =
     };
 
 type MobilePluginServer =
-  | { name: string; transport: "http"; url: string; auth?: MobilePluginAuthFlow[] }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
 
 export interface MobilePluginApp {
@@ -809,7 +827,7 @@ export interface PluginCatalogApp {
 }
 
 export type PluginCatalogServer =
-  | { name: string; transport: "http"; url: string; auth?: unknown }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
 
 export interface PluginCatalogDetail {

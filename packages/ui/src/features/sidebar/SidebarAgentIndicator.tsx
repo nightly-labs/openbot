@@ -309,7 +309,7 @@ export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: 
 }
 
 export function SidebarPinnedAvatar(props: {
-  agent: AgentProfile;
+  agent: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl">;
   mood: AvatarMood;
   agentState: () => SidebarAgentState | undefined;
 }) {

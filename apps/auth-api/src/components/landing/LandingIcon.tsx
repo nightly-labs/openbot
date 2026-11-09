@@ -4,6 +4,7 @@ export type LandingIconName =
   | "arrow-right"
   | "arrow-up-right"
   | "blocks"
+  | "bot"
   | "check"
   | "chevron-down"
   | "clock"
@@ -24,7 +25,10 @@ export type LandingIconName =
   | "puzzle"
   | "refresh"
   | "tag"
-  | "users";
+  | "user-check"
+  | "user-plus"
+  | "users"
+  | "zap";
 
 export interface LandingIconProps {
   name: LandingIconName;
@@ -99,6 +103,28 @@ export function LandingIcon(props: LandingIconProps) {
           <rect width="14" height="14" x="5" y="5" rx="2" />
           <rect width="6" height="6" x="9" y="9" rx="1" />
           <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" />
+        </Match>
+        <Match when={props.name === "user-plus"}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M19 8v6" />
+          <path d="M22 11h-6" />
+        </Match>
+        <Match when={props.name === "user-check"}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="m16 11 2 2 4-4" />
+        </Match>
+        <Match when={props.name === "bot"}>
+          <path d="M12 8V4H8" />
+          <rect width="16" height="12" x="4" y="8" rx="2" />
+          <path d="M2 14h2" />
+          <path d="M20 14h2" />
+          <path d="M15 13v2" />
+          <path d="M9 13v2" />
+        </Match>
+        <Match when={props.name === "zap"}>
+          <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
         </Match>
         <Match when={props.name === "users"}>
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
