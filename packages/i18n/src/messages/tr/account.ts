@@ -38,6 +38,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} dk",
   "account.usage.window.cursorModels": "Cursor modelleri",
   "account.usage.window.otherModels": "Diğer modeller",
+  "account.usage.window.total": "Toplam",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "Güncelleme başarısız oldu. Tekrar deneyin.",
   "account.update.managedByHost": "Ana makine yönetiyor",

@@ -1,7 +1,8 @@
 // Reads the Cursor plan usage end to end on the real Cursor driver and ACP client, with a fake
 // `cursor-agent acp` and a local server in place of the Cursor backend (`CURSOR_API_ENDPOINT`). The
 // sign-in is a fake `auth.json` in a temporary home. Checks that a split plan gives the Cursor
-// models window and the other models window for the billing cycle, that a plan with only a total
+// models window and the other models window for the billing cycle, with its total as the third
+// window, that a plan with only a total
 // gives one window, that a merged plan gives the total alone and names Grok as sharing its quota, that
 // a plan info that fails to read keeps the split, and that a rejected token and a missing sign-in give
 // no reading.
@@ -186,6 +187,12 @@ try {
     primary: { usedPercent: 37.5, ...cycle },
     secondary: { usedPercent: 82, ...cycle },
   });
+  assert.deepEqual(split.reading.tertiary, { usedPercent: 60, ...cycle }, "a split plan sends its total");
+  assert.deepEqual(
+    normalizeAccountUsage(split.reading).limits[0]?.tertiary,
+    { usedPercent: 60, ...cycle },
+    "the dock limit keeps the total",
+  );
   assert.equal(split.reading.sharedQuotaWith, undefined, "a split plan shares no quota");
 
   // 2. A plan with only a total fills the first window with it.
@@ -200,6 +207,7 @@ try {
     primary: { usedPercent: 100, ...cycle },
     secondary: null,
   });
+  assert.equal(total.reading.tertiary, undefined, "the total of a plan with no split is its first window");
   assert.equal(total.reading.sharedQuotaWith, undefined, "a plan that is not merged shares no quota");
 
   // 3. A merged plan includes no other models: the total alone, with no other models window. That
@@ -219,6 +227,7 @@ try {
     primary: { usedPercent: 45, ...cycle },
     secondary: null,
   });
+  assert.equal(merged.reading.tertiary, undefined, "a merged plan shows its total once");
   assert.equal(merged.reading.sharedQuotaWith, "grok", "a merged plan shares the Grok quota");
   assert.equal(normalizeAccountUsage(merged.reading).limits[0]?.sharedQuotaWith, "grok", "the dock limit keeps it");
 
@@ -238,6 +247,7 @@ try {
     primary: { usedPercent: 37.5, ...cycle },
     secondary: { usedPercent: 82, ...cycle },
   });
+  assert.deepEqual(planInfoFailed.reading.tertiary, { usedPercent: 60, ...cycle }, "the split keeps its total");
   assert.equal(planInfoFailed.reading.sharedQuotaWith, undefined, "an unread plan info shares no quota");
 
   // 5. A token the backend rejects gives no reading.

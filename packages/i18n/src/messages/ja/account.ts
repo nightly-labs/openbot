@@ -38,6 +38,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} 分",
   "account.usage.window.cursorModels": "Cursor モデル",
   "account.usage.window.otherModels": "その他のモデル",
+  "account.usage.window.total": "合計",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "アップデートに失敗しました。もう一度お試しください。",
   "account.update.managedByHost": "ホストが管理しています",
