@@ -68,9 +68,19 @@ export const messages = {
   "mobile.settings.appearance.light": "浅色",
   "mobile.settings.appearance.dark": "深色",
   "mobile.settings.appearance.theme": "主题",
-  "mobile.settings.appearance.agentColorMessages": "我的消息使用助手颜色",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "助手对话中你的消息会使用该助手的颜色。若文字难以辨认可关闭该选项。",
+  "mobile.settings.appearance.textSize": "文字大小",
+  "mobile.settings.appearance.textSizeFooter":
+    "在手机设置的文字大小之上，调整应用内的文字大小。系统绘制的部分，如菜单、标签栏和导航栏，只使用手机设置。",
+  "mobile.settings.appearance.messageColor": "消息颜色",
+  "mobile.settings.appearance.messageColorNone": "无颜色",
+  "mobile.settings.appearance.messageColorAgent": "助手颜色",
+  "mobile.settings.appearance.messageColorCustom": "自定义颜色",
+  "mobile.settings.appearance.messageColorPick": "颜色",
+  "mobile.settings.appearance.messageColorHue": "色相",
+  "mobile.settings.appearance.messageColorSaturation": "饱和度",
+  "mobile.settings.appearance.messageColorLightness": "亮度",
+  "mobile.settings.appearance.messageColorFooter":
+    "选择助手颜色时，助手对话中你的消息使用该助手的颜色。选择自定义颜色时，所有对话中你的消息使用你选的颜色。文字颜色会自动调整，保持清晰可读。",
   "mobile.settings.animations.title": "动画",
   "mobile.settings.animations.footer":
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",

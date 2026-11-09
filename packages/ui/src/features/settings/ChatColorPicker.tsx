@@ -1,10 +1,9 @@
 /**
- * The chat color picker: the color picker primitive with 11 chat colors as presets. A bubble mixes
- * a part of its color into the surface, so the presets have one OKLCH lightness (0.68) and the most
- * chroma up to 0.19 that sRGB holds at each hue. Their tints then have the same weight in the light
- * and the dark theme. Yellow is lighter, because a yellow at that lightness is mustard.
+ * The chat color picker: the color picker primitive with the 11 chat colors of
+ * `@openbot/brand/chat-colors` as presets.
  */
 
+import { CHAT_COLOR_PRESETS as CHAT_COLORS, type ChatColorPresetId } from "@openbot/brand/chat-colors";
 import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { createMemo } from "solid-js";
@@ -18,19 +17,24 @@ export interface ChatColorPreset {
   label: AppTextKey;
 }
 
-export const CHAT_COLOR_PRESETS: readonly ChatColorPreset[] = [
-  { value: "#f75d59", label: "agent.color.red" },
-  { value: "#eb7007", label: "agent.color.orange" },
-  { value: "#e5a50a", label: "agent.color.yellow" },
-  { value: "#07b655", label: "agent.color.green" },
-  { value: "#0eafa2", label: "agent.color.cyan" },
-  { value: "#06a8d3", label: "agent.color.sky" },
-  { value: "#4699fe", label: "agent.color.blue" },
-  { value: "#8688ff", label: "agent.color.indigo" },
-  { value: "#b474f4", label: "agent.color.violet" },
-  { value: "#dc63c6", label: "agent.color.magenta" },
-  { value: "#f05b93", label: "agent.color.pink" },
-];
+const PRESET_LABELS = {
+  red: "agent.color.red",
+  orange: "agent.color.orange",
+  yellow: "agent.color.yellow",
+  green: "agent.color.green",
+  cyan: "agent.color.cyan",
+  sky: "agent.color.sky",
+  blue: "agent.color.blue",
+  indigo: "agent.color.indigo",
+  violet: "agent.color.violet",
+  magenta: "agent.color.magenta",
+  pink: "agent.color.pink",
+} as const satisfies Record<ChatColorPresetId, AppTextKey>;
+
+export const CHAT_COLOR_PRESETS: readonly ChatColorPreset[] = CHAT_COLORS.map((preset) => ({
+  value: preset.value,
+  label: PRESET_LABELS[preset.id],
+}));
 
 /** Earlier versions offered the agent colors as presets. A saved one keeps its name. */
 const NAMED_CHAT_COLORS: readonly ChatColorPreset[] = [

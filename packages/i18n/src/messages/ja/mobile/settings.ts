@@ -72,9 +72,19 @@ export const messages = {
   "mobile.settings.appearance.light": "ライト",
   "mobile.settings.appearance.dark": "ダーク",
   "mobile.settings.appearance.theme": "テーマ",
-  "mobile.settings.appearance.agentColorMessages": "自分のメッセージにエージェントの色を使う",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "エージェントとのチャットで、自分のメッセージにそのエージェントの色を使います。文字が読みにくい場合はオフにしてください。",
+  "mobile.settings.appearance.textSize": "文字サイズ",
+  "mobile.settings.appearance.textSizeFooter":
+    "アプリ内の文字サイズを、電話の設定の文字サイズに加えて変更します。メニュー、タブバー、ナビゲーションバーなど、システムが描く部分は電話の設定のみを使います。",
+  "mobile.settings.appearance.messageColor": "メッセージの色",
+  "mobile.settings.appearance.messageColorNone": "色なし",
+  "mobile.settings.appearance.messageColorAgent": "エージェントの色",
+  "mobile.settings.appearance.messageColorCustom": "カスタムの色",
+  "mobile.settings.appearance.messageColorPick": "色",
+  "mobile.settings.appearance.messageColorHue": "色相",
+  "mobile.settings.appearance.messageColorSaturation": "彩度",
+  "mobile.settings.appearance.messageColorLightness": "明度",
+  "mobile.settings.appearance.messageColorFooter":
+    "「エージェントの色」では、エージェントとのチャットで自分のメッセージにそのエージェントの色を使います。「カスタムの色」では、すべてのチャットで選んだ色を使います。文字の色は読みやすいように変わります。",
   "mobile.settings.animations.title": "アニメーション",
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",

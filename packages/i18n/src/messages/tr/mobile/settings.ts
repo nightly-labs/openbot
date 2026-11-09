@@ -71,9 +71,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Açık",
   "mobile.settings.appearance.dark": "Koyu",
   "mobile.settings.appearance.theme": "Tema",
-  "mobile.settings.appearance.agentColorMessages": "Mesajlarımda ajan rengi",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Metni okumak zorsa kapatın.",
+  "mobile.settings.appearance.textSize": "Metin boyutu",
+  "mobile.settings.appearance.textSizeFooter":
+    "Uygulamadaki metin boyutunu, telefon ayarlarındaki metin boyutuna ek olarak değiştirir. Menüler, sekme çubukları ve gezinme çubukları gibi sistemin çizdiği bölümler yalnızca telefon ayarını kullanır.",
+  "mobile.settings.appearance.messageColor": "Mesaj rengi",
+  "mobile.settings.appearance.messageColorNone": "Renk yok",
+  "mobile.settings.appearance.messageColorAgent": "Ajan rengi",
+  "mobile.settings.appearance.messageColorCustom": "Özel renk",
+  "mobile.settings.appearance.messageColorPick": "Renk",
+  "mobile.settings.appearance.messageColorHue": "Ton",
+  "mobile.settings.appearance.messageColorSaturation": "Doygunluk",
+  "mobile.settings.appearance.messageColorLightness": "Açıklık",
+  "mobile.settings.appearance.messageColorFooter":
+    "Ajan rengi ile bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Özel renk ile tüm sohbetlerdeki mesajlarınız seçtiğiniz rengi kullanır. Metin rengi okunaklı kalması için değişir.",
   "mobile.settings.animations.title": "Animasyonlar",
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",

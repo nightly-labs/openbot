@@ -71,9 +71,19 @@ export const messages = {
   "mobile.settings.appearance.light": "라이트",
   "mobile.settings.appearance.dark": "다크",
   "mobile.settings.appearance.theme": "테마",
-  "mobile.settings.appearance.agentColorMessages": "내 메시지에 에이전트 색상 사용",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "에이전트 채팅에서 내 메시지가 해당 에이전트의 색상을 사용해요. 글자가 읽기 어려우면 꺼 주세요.",
+  "mobile.settings.appearance.textSize": "글자 크기",
+  "mobile.settings.appearance.textSizeFooter":
+    "휴대폰 설정의 글자 크기에 더해 앱의 글자 크기를 바꿔요. 메뉴, 탭 바, 내비게이션 바처럼 시스템이 그리는 부분은 휴대폰 설정만 사용해요.",
+  "mobile.settings.appearance.messageColor": "메시지 색상",
+  "mobile.settings.appearance.messageColorNone": "색상 없음",
+  "mobile.settings.appearance.messageColorAgent": "에이전트 색상",
+  "mobile.settings.appearance.messageColorCustom": "사용자 지정 색상",
+  "mobile.settings.appearance.messageColorPick": "색상",
+  "mobile.settings.appearance.messageColorHue": "색조",
+  "mobile.settings.appearance.messageColorSaturation": "채도",
+  "mobile.settings.appearance.messageColorLightness": "밝기",
+  "mobile.settings.appearance.messageColorFooter":
+    "에이전트 색상을 선택하면 에이전트 채팅에서 내 메시지가 해당 에이전트의 색상을 사용해요. 사용자 지정 색상을 선택하면 모든 채팅에서 내 메시지가 선택한 색상을 사용해요. 글자 색은 읽기 쉽도록 바뀌어요.",
   "mobile.settings.animations.title": "애니메이션",
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",

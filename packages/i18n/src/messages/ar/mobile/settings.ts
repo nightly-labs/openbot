@@ -78,9 +78,19 @@ export const messages = {
   "mobile.settings.appearance.light": "فاتح",
   "mobile.settings.appearance.dark": "داكن",
   "mobile.settings.appearance.theme": "السمة",
-  "mobile.settings.appearance.agentColorMessages": "لون الوكيل على رسائلي",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. أوقف الخيار إذا كانت قراءة النص صعبة.",
+  "mobile.settings.appearance.textSize": "حجم النص",
+  "mobile.settings.appearance.textSizeFooter":
+    "يغيّر حجم النص في التطبيق، فوق حجم النص في إعدادات هاتفك. الأجزاء التي يرسمها النظام، مثل القوائم وأشرطة التبويب وأشرطة التنقل، تستخدم إعداد الهاتف فقط.",
+  "mobile.settings.appearance.messageColor": "لون الرسائل",
+  "mobile.settings.appearance.messageColorNone": "بلا لون",
+  "mobile.settings.appearance.messageColorAgent": "لون الوكيل",
+  "mobile.settings.appearance.messageColorCustom": "لون مخصص",
+  "mobile.settings.appearance.messageColorPick": "اللون",
+  "mobile.settings.appearance.messageColorHue": "درجة اللون",
+  "mobile.settings.appearance.messageColorSaturation": "التشبع",
+  "mobile.settings.appearance.messageColorLightness": "الإضاءة",
+  "mobile.settings.appearance.messageColorFooter":
+    "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
   "mobile.settings.animations.title": "الحركات",
   "mobile.settings.animations.footer":
     "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",

@@ -75,9 +75,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Hell",
   "mobile.settings.appearance.dark": "Dunkel",
   "mobile.settings.appearance.theme": "Design",
-  "mobile.settings.appearance.agentColorMessages": "Agentenfarbe für meine Nachrichten",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Deine Nachrichten in einem Agentenchat verwenden dessen Farbe. Deaktiviere dies, wenn der Text schwer lesbar ist.",
+  "mobile.settings.appearance.textSize": "Textgröße",
+  "mobile.settings.appearance.textSizeFooter":
+    "Ändert die Textgröße in der App, zusätzlich zur Textgröße in den Einstellungen deines Telefons. Teile, die das System zeichnet, wie Menüs, Tab-Leisten und Navigationsleisten, verwenden nur die Einstellung des Telefons.",
+  "mobile.settings.appearance.messageColor": "Nachrichtenfarbe",
+  "mobile.settings.appearance.messageColorNone": "Keine Farbe",
+  "mobile.settings.appearance.messageColorAgent": "Agentenfarbe",
+  "mobile.settings.appearance.messageColorCustom": "Eigene Farbe",
+  "mobile.settings.appearance.messageColorPick": "Farbe",
+  "mobile.settings.appearance.messageColorHue": "Farbton",
+  "mobile.settings.appearance.messageColorSaturation": "Sättigung",
+  "mobile.settings.appearance.messageColorLightness": "Helligkeit",
+  "mobile.settings.appearance.messageColorFooter":
+    "Mit Agentenfarbe verwenden deine Nachrichten in einem Agentenchat die Farbe dieses Agenten. Mit eigener Farbe verwenden deine Nachrichten in allen Chats die gewählte Farbe. Die Textfarbe passt sich an, damit der Text lesbar bleibt.",
   "mobile.settings.animations.title": "Animationen",
   "mobile.settings.animations.footer":
     "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",

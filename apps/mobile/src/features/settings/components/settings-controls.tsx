@@ -1,5 +1,5 @@
 import { Host, Picker, Switch } from "@expo/ui";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import type { SettingsPickerProps, SettingsSwitchProps } from "./settings-controls.types";
 
 export function SettingsPicker<T extends string | number>({
@@ -21,6 +21,7 @@ export function SettingsPicker<T extends string | number>({
 }
 
 export function SettingsSwitch({ value, disabled, label, dark, onValueChange }: SettingsSwitchProps) {
+  const nativeLabelFont = useNativeLabelFont();
   return (
     <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme={dark ? "dark" : "light"}>
       <Switch

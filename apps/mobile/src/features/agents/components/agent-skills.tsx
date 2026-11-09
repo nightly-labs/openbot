@@ -14,7 +14,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { haptics } from "@/shared/lib/haptics";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 
@@ -227,6 +227,7 @@ function ManagedSkill({
   onUninstall: () => void;
 }) {
   const { t } = useText();
+  const nativeLabelFont = useNativeLabelFont();
   const { theme } = useUniwind();
   return (
     <SettingsSection>

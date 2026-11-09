@@ -70,9 +70,19 @@ export const messages = {
   "mobile.settings.appearance.light": "בהיר",
   "mobile.settings.appearance.dark": "כהה",
   "mobile.settings.appearance.theme": "ערכת נושא",
-  "mobile.settings.appearance.agentColorMessages": "צבע הסוכן בהודעות שלי",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. אפשר לכבות אם הטקסט קשה לקריאה.",
+  "mobile.settings.appearance.textSize": "גודל טקסט",
+  "mobile.settings.appearance.textSizeFooter":
+    "משנה את גודל הטקסט באפליקציה, בנוסף לגודל הטקסט בהגדרות הטלפון. חלקים שהמערכת מציירת, כמו תפריטים, סרגלי לשוניות וסרגלי ניווט, משתמשים רק בהגדרת הטלפון.",
+  "mobile.settings.appearance.messageColor": "צבע ההודעות",
+  "mobile.settings.appearance.messageColorNone": "ללא צבע",
+  "mobile.settings.appearance.messageColorAgent": "צבע הסוכן",
+  "mobile.settings.appearance.messageColorCustom": "צבע מותאם",
+  "mobile.settings.appearance.messageColorPick": "צבע",
+  "mobile.settings.appearance.messageColorHue": "גוון",
+  "mobile.settings.appearance.messageColorSaturation": "רוויה",
+  "mobile.settings.appearance.messageColorLightness": "בהירות",
+  "mobile.settings.appearance.messageColorFooter":
+    "עם צבע הסוכן, ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. עם צבע מותאם, ההודעות שלך בכל הצ'אטים משתמשות בצבע שבחרת. צבע הטקסט משתנה כדי שיישאר קריא.",
   "mobile.settings.animations.title": "אנימציות",
   "mobile.settings.animations.footer":
     "כיבוי אנימציות מפחית תנועה בכל האפליקציה. כשהפחתת תנועה מופעלת בהגדרות הטלפון, האפליקציה גם מפחיתה תנועה. האנימציות שלהלן נשארות אז כבויות.",

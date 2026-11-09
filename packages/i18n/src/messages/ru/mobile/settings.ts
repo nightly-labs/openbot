@@ -76,9 +76,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Светлая",
   "mobile.settings.appearance.dark": "Тёмная",
   "mobile.settings.appearance.theme": "Тема",
-  "mobile.settings.appearance.agentColorMessages": "Цвет агента на моих сообщениях",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Отключите, если текст плохо читается.",
+  "mobile.settings.appearance.textSize": "Размер текста",
+  "mobile.settings.appearance.textSizeFooter":
+    "Меняет размер текста в приложении, в дополнение к размеру текста в настройках телефона. Части, которые рисует система, например меню, панели вкладок и панели навигации, используют только настройку телефона.",
+  "mobile.settings.appearance.messageColor": "Цвет сообщений",
+  "mobile.settings.appearance.messageColorNone": "Без цвета",
+  "mobile.settings.appearance.messageColorAgent": "Цвет агента",
+  "mobile.settings.appearance.messageColorCustom": "Свой цвет",
+  "mobile.settings.appearance.messageColorPick": "Цвет",
+  "mobile.settings.appearance.messageColorHue": "Оттенок",
+  "mobile.settings.appearance.messageColorSaturation": "Насыщенность",
+  "mobile.settings.appearance.messageColorLightness": "Светлота",
+  "mobile.settings.appearance.messageColorFooter":
+    "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
   "mobile.settings.animations.title": "Анимации",
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
