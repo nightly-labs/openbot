@@ -431,6 +431,7 @@ export const messages = {
   "server.roles.memberCount": { one: "{count} lid", other: "{count} leden" },
   "server.roles.agentList": "Agents: {names}",
   "server.roles.agentLevel": "Toegang van {role} tot {agent}",
+  "server.roles.changeInEveryone": "Wijzigen in Iedereen",
   "server.roles.setAll": "Alles instellen",
   "server.roles.setAllLabel": "Alles instellen: toegang van {role} tot alle agents",
   "server.roles.loadFailed": "Kan de rollen van deze server niet laden.",

@@ -4,6 +4,7 @@ import {
   type AgentAccessLevel,
   type AgentAccessLevels,
   type AgentAccessRole,
+  agentAccessRank,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -113,16 +114,40 @@ function RoleRow(props: { name: string; icon: JSX.Element; agents: RoleAgent[]; 
   );
 }
 
-/** One agent with the level that the open role gives it. */
+/** An item of the level menu: a level, or, on a role page, the step to the Everyone page. */
+type LevelOption = AgentAccessLevel | "everyone";
+// Constant arrays: a new options array on each render keeps Kobalte busy.
+const EVERYONE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS];
+const ROLE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS, "everyone"];
+
+/**
+ * One agent with the level that the open page gives it. On a role page, `everyone` is the level that
+ * Everyone gives the agent. A role only adds access, so when Everyone gives as much or more, the row
+ * shows that level with "· Everyone", the lower levels are off, and the last item opens Everyone.
+ */
 function AgentAccessRow(props: {
   agent: RoleAgent;
   label: string;
   level: AgentAccessLevel;
+  everyone: AgentAccessLevel | undefined;
   disabled: boolean;
   menuMount: HTMLElement | undefined;
   onChange: (level: AgentAccessLevel) => void;
+  onOpenEveryone: () => void;
 }) {
   const { t } = useText();
+  const fromEveryone = () => {
+    const everyone = props.everyone;
+    return everyone !== undefined && everyone !== "none" && agentAccessRank(everyone) >= agentAccessRank(props.level);
+  };
+  const shown = () => {
+    const everyone = props.everyone;
+    return everyone !== undefined && fromEveryone() ? everyone : props.level;
+  };
+  const below = (option: LevelOption) => {
+    const everyone = props.everyone;
+    return option !== "everyone" && everyone !== undefined && agentAccessRank(option) < agentAccessRank(everyone);
+  };
   return (
     <Item class="settings-modal-row">
       <ItemMedia>
@@ -134,20 +159,43 @@ function AgentAccessRow(props: {
         <ItemTitle>{props.agent.name}</ItemTitle>
       </ItemContent>
       <ItemActions>
-        <Select<AgentAccessLevel>
-          options={[...AGENT_ACCESS_LEVELS]}
-          value={props.level}
+        <Select<LevelOption>
+          options={props.everyone === undefined ? EVERYONE_OPTIONS : ROLE_OPTIONS}
+          value={shown()}
           disabled={props.disabled}
           placement="bottom-end"
-          onChange={(level) => {
-            if (level && level !== props.level) props.onChange(level);
+          optionDisabled={below}
+          onChange={(option) => {
+            if (option === "everyone") props.onOpenEveryone();
+            else if (option && option !== shown()) props.onChange(option);
           }}
-          itemComponent={(item) => <SelectItem item={item.item}>{t(LEVEL_LABELS[item.item.rawValue])}</SelectItem>}
+          itemComponent={(item) => {
+            const option = item.item.rawValue;
+            return option === "everyone" ? (
+              <SelectItem item={item.item} class="server-roles-open-everyone">
+                {t("server.roles.changeInEveryone")}
+              </SelectItem>
+            ) : (
+              <SelectItem item={item.item}>{t(LEVEL_LABELS[option])}</SelectItem>
+            );
+          }}
         >
           <SelectTrigger size="sm" class="server-roles-level" aria-label={props.label}>
-            <SelectValue<AgentAccessLevel>>{(state) => t(LEVEL_LABELS[state.selectedOption()])}</SelectValue>
+            <SelectValue<LevelOption>>
+              {() => (
+                <>
+                  {t(LEVEL_LABELS[shown()])}
+                  <Show when={fromEveryone()}>
+                    <span class="server-roles-level-source">
+                      {" · "}
+                      {t("server.roles.everyone")}
+                    </span>
+                  </Show>
+                </>
+              )}
+            </SelectValue>
           </SelectTrigger>
-          <SelectContent mount={props.menuMount} />
+          <SelectContent mount={props.menuMount} class="server-roles-level-menu" />
         </Select>
       </ItemActions>
     </Item>
@@ -265,6 +313,8 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
     title: string,
     level: (agentId: string) => AgentAccessLevel,
     onChange: (agentIds: readonly string[], level: AgentAccessLevel) => void,
+    // On a role page: the level that Everyone gives, so each row shows the access that members get.
+    everyone?: (agentId: string) => AgentAccessLevel,
   ) => (
     <SettingsSection
       title={t("server.roles.agents")}
@@ -301,9 +351,11 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
               agent={agent}
               label={t("server.roles.agentLevel", { role: title, agent: agent.name })}
               level={level(agent.id)}
+              everyone={everyone?.(agent.id)}
               disabled={props.disabled}
               menuMount={props.menuMount}
               onChange={(next) => onChange([agent.id], next)}
+              onOpenEveryone={() => props.onPage({ kind: "everyone" })}
             />
           )}
         </For>
@@ -392,6 +444,7 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
               role().name,
               (agentId) => roleLevel(role(), agentId),
               (agentIds, level) => props.onSetRoleLevel(role().id, agentIds, level),
+              (agentId) => everyoneLevel(props.everyone, agentId),
             )}
           </>
         )}

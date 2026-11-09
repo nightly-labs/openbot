@@ -425,6 +425,7 @@ export const messages = {
   "server.roles.memberCount": { other: "{count} 位成员" },
   "server.roles.agentList": "助手：{names}",
   "server.roles.agentLevel": "{role} 对 {agent} 的访问权限",
+  "server.roles.changeInEveryone": "在所有人中更改",
   "server.roles.setAll": "全部设置",
   "server.roles.setAllLabel": "全部设置：{role} 对所有助手的访问权限",
   "server.roles.loadFailed": "无法加载该服务器的角色。",

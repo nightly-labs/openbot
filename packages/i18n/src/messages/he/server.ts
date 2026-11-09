@@ -466,6 +466,7 @@ export const messages = {
   "server.roles.memberCount": { one: "חבר אחד", two: "שני חברים", other: "{count} חברים" },
   "server.roles.agentList": "סוכנים: {names}",
   "server.roles.agentLevel": "גישה של {role} אל {agent}",
+  "server.roles.changeInEveryone": "שינוי בכולם",
   "server.roles.setAll": "הגדרת הכול",
   "server.roles.setAllLabel": "הגדרת הכול: גישה של {role} לכל הסוכנים",
   "server.roles.loadFailed": "לא ניתן לטעון את התפקידים של השרת הזה.",
