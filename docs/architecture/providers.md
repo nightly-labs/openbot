@@ -284,11 +284,13 @@ later message gets no note. Dismiss and undo use the local dismissals of Marketp
 
 ### Skill fixes while the agent works
 
-An agent can also fix one of its local skills in the turn, without a question first. This follows
-the skill patch of Hermes Agent: the developer instructions and the `revise_skill` guidance tell the
-agent to revise an installed `local-skill-` skill when the user corrects how it follows that skill,
-or when a step fails and it finds the fix, and to change only the correction. Not for a one-time
-preference, a Marketplace skill or a workspace folder skill.
+When skill learning is Automatic, an agent can also fix one of its local skills in the turn, without
+a question first. This follows the skill patch of Hermes Agent: the developer instructions
+(`skillRevision`) tell the agent to revise a `local-skill-` skill when the user corrects how it
+follows that skill, or when a step fails and it finds the fix, and to change only that step. Not for
+a one-time preference. Ask first and Off leave the line out, so the agent changes a skill only when
+the user asks. The line is not in `tools/agent-context/budget.json`, because that fixture has no
+setting.
 
 `revise_skill` publishes the next revision and installs it for the calling agent when that agent has
 the skill (`installedRevision` is not null), so the chat shows one "Revised skill" line. Other agents

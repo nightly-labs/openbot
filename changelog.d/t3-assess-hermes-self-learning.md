@@ -7,7 +7,7 @@
   Off. With Ask first, the agent offers to save the skill; click Save on the offer, or answer yes.
   Save writes the skill in the background, so it costs a small part of a full agent reply. The offer
   and Save also work on a joined server and in the web client.
-- An agent now fixes its own skill while it works: when you correct how it follows the skill, or a
+- With Automatic, an agent now fixes its own skill while it works: when you correct how it follows the skill, or a
   step fails and it finds the fix, it saves a new revision and starts to use it. The chat shows
   "Revised skill". Ask the agent to undo the change, and it goes back to the revision before.
 

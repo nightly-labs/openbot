@@ -102,9 +102,6 @@ function openbotGuidance(namespace: string, tool: string): string {
         "For an avatar image, pass avatarPath, absolute or relative to your workspace. When needed, make a square PNG, JPEG, or WebP copy, best 512 by 512 pixels and up to 512 KB, and do not change the original. Do not combine avatarPath with avatarSeed or avatarHue; use those to go back to a generated avatar.",
         "To give an agent a local skill, call openbot.list_local_skills, then openbot.install_local_skill with its agentId. Use openbot.set_skill_enabled and openbot.uninstall_skill with the skillId from read_agent. update_profile can limit access to the workspace, turn Computer Use off, or change notifications. Only the user can give Full access, turn Computer Use on, or change auto-approve, so say when a task needs that. MCP servers apply to every agent: change them with the MCP server tools, and only when the user asks.",
       ].join("\n");
-    case "create_skill":
-    case "revise_skill":
-      return "Fix a local skill while you work. When you follow an installed skill whose id starts with local-skill- and the user corrects how you do that task, or a step of it fails and you find the fix, revise the skill in the same turn: openbot.read_local_skill, copy its files to a new folder in your workspace, change only what the correction or fix says, and call openbot.revise_skill with expectedRevision. Keep the name, the generic steps, and no personal data. Then tell the user in one sentence what you changed. When the user asks to undo it, read the revision before with openbot.read_local_skill and publish its files with openbot.revise_skill. Do not revise for a one-time preference, and do not revise a marketplace or workspace folder skill: tell the user instead. Create a new skill only when the user asks or agrees.";
     case "list_sections":
     case "create_section":
     case "assign_agent_section":

@@ -133,6 +133,8 @@ export interface DeveloperInstructionOptions {
    * a skill or a memory, so the agent does not save it in its own turn and the review does not undo it.
    */
   memoryReview?: boolean;
+  /** Skill learning is automatic, so the agent revises its own local skill when the user corrects it. */
+  skillRevision?: boolean;
 }
 
 /** The agent's instruction file, after its profile. */
@@ -420,7 +422,11 @@ export function developerInstructions(
       options.memoryReview
         ? " When the user corrects how you do one kind of task (its steps, format or tone), apply it without a memory call or a word about saving it, unless the user asks you to remember it: a background review keeps it."
         : ""
-    } Keep reusable procedures in skills, with generic steps and no personal data; when the user corrects how you follow one of your local skills, or you find the fix for a failed step, revise it in the same turn (describe openbot.revise_skill). Confirm before you uninstall a shared skill.`,
+    } Keep reusable procedures in skills, with generic steps and no personal data; confirm before you uninstall a shared skill.${
+      options.skillRevision
+        ? " When the user corrects how you follow one of your local skills (id local-skill-…), or you fix a failed step of one, revise it in the same turn with openbot.revise_skill: change only that step, keep it generic, and tell the user in one sentence. Not for a one-time preference; to undo, publish the revision before."
+        : ""
+    }`,
     "Use openbot.forget_memory when the user asks, or for stale or duplicate entries in requested maintenance. At the storage limit, merge related entries or remove outdated ones before you save; when the user set the limit below the saved count, keep all entries and report that the new one was not saved. Do not announce routine memory calls. Memory tools change only your own memories.",
     "Your user-configured profile:",
     "<agent_profile>",
