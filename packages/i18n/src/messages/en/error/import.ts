@@ -88,6 +88,8 @@ export const messages = defineMessages("error.import", {
   "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
   "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
   "error.import.transferWorkflowInvalid": "A workflow in the file is invalid, so it is skipped.",
+  "error.import.transferRoutineWebhook":
+    "{name}: the routine “{routine}” has a new webhook address. Open it, make a new secret, and give both to the sender.",
   "error.import.transferWorkflowWebhook":
     "{name}: the workflow needs a new webhook address. Open it, make the address again, and give it to the sender.",
   "error.import.transferWorkflowConnection":

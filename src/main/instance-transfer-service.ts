@@ -56,14 +56,26 @@ import {
   isCustomProviderMaxOutput,
   isCustomProviderReasoningEfforts,
   type McpServerConfig,
+  ROUTINE_LIMIT_POLICIES,
+  ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type Routine,
   type RoutineFlowLink,
+  type RoutineFlowPosition,
   type SaveCustomProviderInput,
+  type SaveRoutineFlowPositionInput,
   type SetAgentMemoryInclusionInput,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import {
+  type EventRoutine,
+  type EventRoutineOwner,
+  isEventRoutineTriggerInput,
+  type SaveEventRoutineInput,
+} from "@openbot/contracts/ipc-events";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Result } from "effect";
@@ -211,6 +223,22 @@ interface InstanceTransferSettings {
   signedInProviders(): AgentProviderId[];
   /** Absent where the server runs no workflows. */
   workflows?: TransferWorkflowPort;
+  routineFlowPositions?(agentId: string): Effect.Effect<RoutineFlowPosition[], unknown>;
+  saveRoutineFlowPosition?(input: SaveRoutineFlowPositionInput): Effect.Effect<unknown, unknown>;
+}
+
+/** A routine that a webhook starts, as the file keeps it. Its address and secret stay behind. */
+interface TransferWebhookRoutine {
+  key: string;
+  name: string;
+  instruction: string;
+  active: boolean;
+  timezone: string;
+  eventType: string | null;
+  filters: unknown[];
+  limitPolicy?: string;
+  missedPolicy?: string;
+  runIn?: string;
 }
 
 export interface InstanceTransferOptions {
@@ -223,6 +251,11 @@ export interface InstanceTransferOptions {
   channelActor: () => ChannelActor;
   /** The local owner's choices for agents. A member's import does not change them. */
   preferences?: TransferPreferencePort;
+  /** Routines that a webhook starts. Absent where the server has no events service. */
+  webhookRoutines?: {
+    list(owner: EventRoutineOwner): Effect.Effect<EventRoutine[], unknown>;
+    save(input: SaveEventRoutineInput): Effect.Effect<{ routine: Pick<EventRoutine, "id"> }, unknown>;
+  };
   appVersion: string;
   /** Where a file sent by a member of a joined client, or made for one, waits. */
   uploadDirectory?: string;
@@ -370,6 +403,7 @@ export class InstanceTransferService {
       const preferences = this.options.preferences
         ? yield* readPreferences(agent, this.options.preferences)
         : undefined;
+      const webhookRoutines = yield* this.#readWebhookRoutines({ kind: "agent", id: agent.id });
       let history: string | null = null;
       if (input.includeHistory) {
         const exported = yield* exportHistory(this.options.agents, agent.id, prefix, keys, entries);
@@ -402,6 +436,7 @@ export class InstanceTransferService {
         }),
         ...(preferences ? { preferences } : {}),
         ...(history ? { history } : {}),
+        ...(webhookRoutines.length > 0 ? { webhookRoutines } : {}),
       });
     }
 
@@ -443,6 +478,9 @@ export class InstanceTransferService {
         archived: channel.archived,
         memories: this.options.agents.listChannelMemories(channel.id).map((memory) => memory.text),
         routines: this.options.agents.listChannelRoutines(channel.id).map(transferRoutine),
+        ...(yield* this.#readWebhookRoutines({ kind: "channel", id: channel.id }).pipe(
+          Effect.map((webhookRoutines) => (webhookRoutines.length > 0 ? { webhookRoutines } : {})),
+        )),
         ...(input.includeHistory ? channelMessages(channelPort, channel.id, channelPrefix(key)) : {}),
       });
     }
@@ -510,12 +548,28 @@ export class InstanceTransferService {
   ): Effect.fn.Return<TransferSettings, ArchiveOperationError> {
     const settings = this.options.settings;
     const layout = settings.sidebar();
-    const routineKeys = new Set(agents.flatMap((agent) => transferRoutines(agent).map((routine) => routine.key)));
+    const routineKeys = new Set(
+      agents.flatMap((agent) => [
+        ...transferRoutines(agent).map((routine) => routine.key),
+        ...(agent.webhookRoutines ?? []).flatMap((routine) =>
+          isDynamicRecord(routine) && typeof routine.key === "string" ? [routine.key] : [],
+        ),
+      ]),
+    );
     const links = new Map<string, RoutineFlowLink>();
     for (const agentId of keys.keys())
       for (const link of yield* settings.routineFlowLinks(agentId).pipe(Effect.mapError(failure)))
         links.set(link.id, link);
     const redact = createRedaction();
+    const positions: NonNullable<TransferSettings["routineFlowPositions"]>[number][] = [];
+    if (settings.routineFlowPositions)
+      for (const [agentId, agentKey] of keys)
+        for (const position of yield* settings
+          .routineFlowPositions(agentId)
+          .pipe(Effect.orElseSucceed((): RoutineFlowPosition[] => []))) {
+          const nodeKey = filePositionKey(position.nodeKey, keys, routineKeys);
+          if (nodeKey) positions.push({ agentKey, nodeKey, x: position.x, y: position.y });
+        }
     const workflows = settings.workflows
       ? exportWorkflows(yield* settings.workflows.workflows().pipe(Effect.mapError(failure)), keys, channelKeys)
       : [];
@@ -565,6 +619,7 @@ export class InstanceTransferService {
       }),
       cleared: redact.cleared(),
       ...(workflows.length > 0 ? { workflows } : {}),
+      ...(positions.length > 0 ? { routineFlowPositions: positions } : {}),
     };
   });
 
@@ -949,6 +1004,18 @@ export class InstanceTransferService {
           sourceText("error.import.transferRoutineFlowSkipped", { reason: message(causeOf(connected.failure)) }),
         );
     }
+
+    // A place on a canvas only helps the user find a node again, so one that fails is left out.
+    for (const position of settings.routineFlowPositions ?? []) {
+      const agentId = agentIds.get(position.agentKey);
+      const [kind, key] = position.nodeKey.split(":", 2);
+      const id =
+        kind === "agent" ? agentIds.get(key ?? "") : kind === "routine" ? routineIds.get(key ?? "") : undefined;
+      if (!agentId || !id || !port.saveRoutineFlowPosition) continue;
+      yield* port
+        .saveRoutineFlowPosition({ agentId, nodeKey: `${kind}:${id}`, x: position.x, y: position.y })
+        .pipe(Effect.ignore);
+    }
   });
 
   /** Copies `~/OpenBot/Shared` files. A file that is already here is kept as it is. */
@@ -979,6 +1046,80 @@ export class InstanceTransferService {
         }),
       );
     if (kept > 0) warnings.push(sourceText("error.import.transferSharedKept", { number: kept }));
+  });
+
+  /** The routines of an agent or a channel that a webhook starts. */
+  readonly #readWebhookRoutines = Effect.fn("InstanceTransfer.readWebhookRoutines")(function* (
+    this: InstanceTransferService,
+    owner: EventRoutineOwner,
+  ) {
+    const port = this.options.webhookRoutines;
+    if (!port) return [];
+    const routines = yield* port.list(owner).pipe(Effect.orElseSucceed((): EventRoutine[] => []));
+    return routines.flatMap((routine): TransferWebhookRoutine[] =>
+      routine.trigger.kind === "webhook"
+        ? [
+            {
+              key: routine.id,
+              name: routine.name,
+              instruction: routine.instruction,
+              active: routine.active,
+              timezone: routine.timezone,
+              eventType: routine.trigger.eventType,
+              filters: routine.trigger.filters,
+              ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+              ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+              ...(routine.runIn ? { runIn: routine.runIn } : {}),
+            },
+          ]
+        : [],
+    );
+  });
+
+  /**
+   * Adds the routines that a webhook starts. Each one gets a new address and secret here, which the
+   * user gives to the sender, so each one is a warning that says so.
+   */
+  readonly #importWebhookRoutines = Effect.fn("InstanceTransfer.importWebhookRoutines")(function* (
+    this: InstanceTransferService,
+    owner: EventRoutineOwner,
+    values: readonly unknown[],
+    ownerName: string,
+    routineIds: Map<string, string>,
+    warnings: string[],
+    fallbackTimezone: string,
+  ) {
+    const port = this.options.webhookRoutines;
+    if (!port) return;
+    for (const value of values) {
+      const routine = decodeWebhookRoutine(value);
+      if (!routine) continue;
+      const saved = yield* Effect.result(
+        port.save({
+          owner,
+          name: routine.name,
+          instruction: routine.instruction,
+          active: routine.active,
+          timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
+          trigger: routine.trigger,
+          ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+          ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+          ...(owner.kind === "agent" && routine.runIn ? { runIn: routine.runIn } : {}),
+        }),
+      );
+      if (Result.isFailure(saved)) {
+        warnings.push(
+          sourceText("error.import.routineSkipped", {
+            name: ownerName,
+            routine: routine.name,
+            reason: message(causeOf(saved.failure)),
+          }),
+        );
+        continue;
+      }
+      routineIds.set(routine.key, saved.success.routine.id);
+      warnings.push(sourceText("error.import.transferRoutineWebhook", { name: ownerName, routine: routine.name }));
+    }
   });
 
   /** Creates a channel of the imported members. A step that fails deletes it, and the others go on. */
@@ -1022,7 +1163,7 @@ export class InstanceTransferService {
         .command({ type: "save", operationId: randomUUID(), channelId: randomUUID(), draft }, actor)
         .pipe(Effect.mapError(failure)),
       (channel) =>
-        Effect.gen(function* () {
+        Effect.gen({ self: this }, function* () {
           if (image) yield* port.channels.setImage(channel.id, image).pipe(Effect.mapError(failure));
           // A memory that this computer refuses, such as a repeated text, is left out.
           for (const text of source.memories)
@@ -1050,6 +1191,14 @@ export class InstanceTransferService {
                 }),
               );
           }
+          yield* this.#importWebhookRoutines(
+            { kind: "channel", id: channel.id },
+            source.webhookRoutines ?? [],
+            source.name,
+            routineIds,
+            warnings,
+            fallbackTimezone,
+          );
           if (source.messages?.length) {
             yield* importChannelMessages(archive, port.channels, {
               channelId: channel.id,
@@ -1184,6 +1333,15 @@ export class InstanceTransferService {
                 }),
               );
           }
+
+          yield* this.#importWebhookRoutines(
+            { kind: "agent", id: agent.id },
+            source.webhookRoutines ?? [],
+            source.name,
+            routineIds,
+            warnings,
+            fallbackTimezone,
+          );
 
           // The limit can be lower here than on the computer that made the file.
           const memoryLimit = this.options.agents.memoryLimit();
@@ -1403,6 +1561,48 @@ export function createRedaction() {
 /** The warning for an item of the settings that is not imported. */
 function named(name: string): (reason: string) => string {
   return (reason) => sourceText("error.import.transferSettingSkipped", { name, reason });
+}
+
+/** A routine that a webhook starts, checked as a save checks it. */
+function decodeWebhookRoutine(value: unknown) {
+  if (!isDynamicRecord(value)) return null;
+  const { key, name, instruction, active, timezone, eventType, filters, limitPolicy, missedPolicy, runIn } = value;
+  const trigger = { kind: "webhook" as const, eventType, filters };
+  if (
+    typeof key !== "string" ||
+    typeof name !== "string" ||
+    typeof instruction !== "string" ||
+    typeof active !== "boolean" ||
+    typeof timezone !== "string" ||
+    !isEventRoutineTriggerInput(trigger) ||
+    trigger.kind !== "webhook"
+  )
+    return null;
+  return {
+    key,
+    name,
+    instruction,
+    active,
+    timezone,
+    trigger,
+    limitPolicy: ROUTINE_LIMIT_POLICIES.find((known) => known === limitPolicy),
+    missedPolicy: ROUTINE_MISSED_POLICIES.find((known) => known === missedPolicy),
+    runIn: ROUTINE_RUN_PLACES.find((known) => known === runIn),
+  };
+}
+
+/** A canvas node key in the file: an agent by its key, a routine by its key. Others are left out. */
+function filePositionKey(
+  nodeKey: string,
+  agentKeys: ReadonlyMap<string, string>,
+  routineKeys: ReadonlySet<string>,
+): string | null {
+  const [kind, id] = nodeKey.split(":", 2);
+  if (kind === "agent" && id) {
+    const key = agentKeys.get(id);
+    return key ? `agent:${key}` : null;
+  }
+  return kind === "routine" && id && routineKeys.has(id) ? nodeKey : null;
 }
 
 /** A routine of an agent or a channel, as the file keeps it. */

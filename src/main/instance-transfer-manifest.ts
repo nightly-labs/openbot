@@ -101,6 +101,10 @@ const Agent = Schema.Struct({
   preferences: Schema.optionalKey(Schema.Unknown),
   /** Added after version 1 shipped: the archive path of the chat history index, inside `agents/<key>/history/`. */
   history: Schema.optionalKey(text(512)),
+  /** Added after version 1 shipped: routines that a webhook starts (`TransferWebhookRoutine`), checked on import. */
+  webhookRoutines: Schema.optionalKey(
+    Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  ),
 });
 
 const Settings = Schema.Struct({
@@ -165,6 +169,15 @@ const Settings = Schema.Struct({
    * so that one a newer app wrote cannot refuse the other settings.
    */
   workflows: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_WORKFLOWS))),
+  /**
+   * Added after version 1 shipped: where the user placed each routine and agent on an agent's routine
+   * canvas. `nodeKey` is `routine:<routine key>` or `agent:<agent key>`.
+   */
+  routineFlowPositions: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({ agentKey: Key, nodeKey: name(INPUT_LIMITS.identifier + 16), x: Schema.Number, y: Schema.Number }),
+    ).check(Schema.isMaxLength(5_000)),
+  ),
 });
 
 /**
@@ -187,6 +200,10 @@ const Channel = Schema.Struct({
   archived: Schema.Boolean,
   memories: Schema.Array(name(INPUT_LIMITS.agentMemoryText)).check(Schema.isMaxLength(INPUT_LIMITS.channelMemories)),
   routines: Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  /** Routines that a webhook starts, as for an agent. */
+  webhookRoutines: Schema.optionalKey(
+    Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  ),
   /** Added with the channels: the archive paths of the message parts, inside `channels/<key>/`. */
   messages: Schema.optionalKey(Schema.Array(text(512)).check(Schema.isMaxLength(10_000))),
 });

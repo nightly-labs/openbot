@@ -297,6 +297,22 @@
     "tr",
     "zh"
   ],
+  "error.import.transferRoutineWebhook": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.import.transferWorkflowConnection": [
     "ar",
     "de",

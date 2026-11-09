@@ -2769,6 +2769,10 @@ export async function createApplicationServices({
     skills: { library: () => skills.requireLocalLibrary(), installLocal: (input) => skills.installLocal(input) },
     sharedRoot: store.sharedRoot,
     channelActor: () => host.channelActor(),
+    webhookRoutines: {
+      list: (owner) => events.listRoutines({ owner }),
+      save: (input) => events.saveRoutine(input),
+    },
     preferences: {
       notificationLevel: (agentId) => agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY).get(agentId) ?? null,
       setNotificationLevel: (agentId, level) => agentNotificationLevels.set(OWNER_NOTIFICATION_KEY, { agentId, level }),
@@ -2798,6 +2802,9 @@ export async function createApplicationServices({
       mutateSidebar: (action) => sidebarLayout.mutate(action, service.sidebarChatIds()),
       routineFlowLinks: (agentId) => routineFlowRuntime.canvas(agentId).pipe(Effect.map((canvas) => canvas.links)),
       connectRoutineFlow: (input) => routineFlowRuntime.connect(input),
+      routineFlowPositions: (agentId) =>
+        routineFlowRuntime.canvas(agentId).pipe(Effect.map((canvas) => canvas.positions)),
+      saveRoutineFlowPosition: (input) => routineFlowRuntime.savePosition(input),
       workflows: {
         workflows: () =>
           workflowRuntime

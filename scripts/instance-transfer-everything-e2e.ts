@@ -40,6 +40,7 @@ const { InstanceTransferService } = await import("../src/main/instance-transfer-
 const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
 const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
 const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
+const { HostEventsService } = await import("../src/main/host-events-service");
 
 const HISTORY_MARK = "the blue notebook is on the second shelf";
 
@@ -187,6 +188,23 @@ function profile(name: string) {
   });
   const library = new LocalSkillLibrary(join(userData, "local-skills"), () => agents.listAgents());
   const workflows = new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") });
+  const events = new HostEventsService({
+    routines: agents.routineRecords,
+    cipher: {
+      encrypt: (value) => Buffer.from(`sealed:${Buffer.from(value).toString("base64")}`),
+      decrypt: (value) => Buffer.from(value.toString().slice("sealed:".length), "base64").toString(),
+    },
+    relay: {
+      connected: () => true,
+      setEnabled: () => {},
+      setAccountActive: () => {},
+      refresh: () => {},
+      registerRoute: (routeId) => Effect.succeed(`https://signal.example.test/v1/webhooks/${routeId}`),
+      revokeRoute: () => Effect.void,
+    },
+    accountPrincipal: () => "account-1",
+  });
+  const positions = new Map<string, { nodeKey: string; x: number; y: number }[]>();
   const pins = new Set<string>();
   const levels = new Map<string, "all" | "needs-me" | "nothing">();
   const approvals = new Map<string, boolean>();
@@ -195,6 +213,10 @@ function profile(name: string) {
     skills: { library: () => library, installLocal: () => Effect.void },
     sharedRoot: store.sharedRoot,
     channelActor: () => ({ id: "local", name: "You" }),
+    webhookRoutines: {
+      list: (owner) => events.listRoutines({ owner }),
+      save: (input) => events.saveRoutine(input),
+    },
     preferences: {
       notificationLevel: (agentId) => levels.get(agentId) ?? null,
       setNotificationLevel: (agentId, level) => Effect.sync(() => levels.set(agentId, level)),
@@ -217,6 +239,14 @@ function profile(name: string) {
       mutateSidebar: () => Effect.die("The check has no sidebar sections."),
       routineFlowLinks: () => Effect.succeed([]),
       connectRoutineFlow: () => Effect.die("The check has no routine flows."),
+      routineFlowPositions: (agentId) => Effect.succeed(positions.get(agentId) ?? []),
+      saveRoutineFlowPosition: (input) =>
+        Effect.sync(() =>
+          positions.set(input.agentId, [
+            ...(positions.get(input.agentId) ?? []),
+            { nodeKey: input.nodeKey, x: input.x, y: input.y },
+          ]),
+        ),
       workflows: {
         workflows: () =>
           Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
@@ -225,7 +255,7 @@ function profile(name: string) {
       signedInProviders: () => [],
     },
   });
-  return { database, store, mailbox, agents, transfer, pins, levels, approvals, workflows };
+  return { database, store, mailbox, agents, transfer, pins, levels, approvals, workflows, events, positions };
 }
 
 function idle(agents: InstanceType<typeof AgentService>, agentId: string) {
@@ -348,6 +378,23 @@ try {
     return messages.some((entry) => entry.author.kind === "agent" && entry.message.status === "completed") && messages;
   });
 
+  // A routine that a webhook starts, and the places of the routines on the writer's canvas.
+  const hooked = await runCauseEffect(
+    source.events.saveRoutine({
+      owner: { kind: "agent", id: writer.id },
+      name: "Breaking news",
+      instruction: "Write a short item.",
+      active: true,
+      timezone: "UTC",
+      trigger: { kind: "webhook", eventType: "news.breaking", filters: [] },
+    }),
+  );
+  source.positions.set(writer.id, [
+    { nodeKey: `routine:${routine.id}`, x: 120, y: 40 },
+    { nodeKey: `routine:${hooked.routine.id}`, x: 320, y: 40 },
+    { nodeKey: `agent:${editor.id}`, x: 520, y: 40 },
+  ]);
+
   // A workflow with an agent step, a channel output, a Slack trigger and a webhook trigger.
   const at = { x: 0, y: 0 };
   source.workflows.create({
@@ -418,6 +465,31 @@ try {
   pass(
     "routines move",
     target.agents.listRoutines(newWriter.id).some((item) => item.name === routine.name && item.active),
+  );
+  const newHooked = (
+    await runCauseEffect(target.events.listRoutines({ owner: { kind: "agent", id: newWriter.id } }))
+  ).find((item) => item.name === "Breaking news");
+  pass(
+    "the webhook routine moves with its event type and a new address",
+    newHooked?.trigger.kind === "webhook" &&
+      newHooked.trigger.eventType === "news.breaking" &&
+      hooked.routine.trigger.kind === "webhook" &&
+      newHooked.trigger.url !== hooked.routine.trigger.url,
+  );
+  pass(
+    "the user is told about the new webhook address",
+    result.warnings.some((warning) => warning.includes("Breaking news") && warning.includes("webhook")),
+  );
+  const newRoutineId = target.agents.listRoutines(newWriter.id).find((item) => item.name === routine.name)?.id;
+  pass(
+    "canvas places point to the new routines and agent",
+    JSON.stringify(target.positions.get(newWriter.id)) ===
+      JSON.stringify([
+        { nodeKey: `routine:${newRoutineId}`, x: 120, y: 40 },
+        { nodeKey: `routine:${newHooked?.id}`, x: 320, y: 40 },
+        { nodeKey: `agent:${newEditor.id}`, x: 520, y: 40 },
+      ]),
+    JSON.stringify(target.positions.get(newWriter.id)),
   );
   pass("a restriction moves: Computer Use off", newEditor.computerUse === false);
   pass("a permission does not move: Local scripts stay off", newEditor.allowAutomation !== true);
