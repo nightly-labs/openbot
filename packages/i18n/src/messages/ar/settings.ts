@@ -116,6 +116,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "تعيين {setting} لكل الوكلاء",
   "settings.agentDefaults.agentLabel": "{setting} لـ {agent}",
   "settings.agentDefaults.loadFailed": "تعذّرت قراءة الوكلاء.",
+  "settings.commitCoAuthor.sectionTitle": "إيداعات Git",
+  "settings.commitCoAuthor.title": "ذكر OpenBot في الإيداعات",
+  "settings.commitCoAuthor.description":
+    "يضيف الوكلاء OpenBot كمؤلف مشارك في الإيداعات التي يُنشئونها. وتبقى أنت المؤلف.",
   "settings.planStart.title": "بدء العمل",
   "settings.planStart.wait": "عند الضغط على «بدء»",
   "settings.planStart.after": "بعد {time}",

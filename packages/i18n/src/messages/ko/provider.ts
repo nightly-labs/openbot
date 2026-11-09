@@ -121,6 +121,8 @@ export const messages = {
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
   "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",
+  "provider.picker.museNoModels":
+    "Muse가 이 계정에 모델을 보내지 않았어요. 이 에이전트가 실행되는 국가에서는 Muse를 사용할 수 없을 수 있어요. 다른 제공자의 모델을 선택하세요.",
   "provider.picker.customEmpty":
     "OpenAI 호환 엔드포인트를 추가하세요. 이 컴퓨터의 모델 서버나 기본 URL과 키가 있는 서비스면 돼요.",
   "provider.picker.customPending":

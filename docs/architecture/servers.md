@@ -151,6 +151,17 @@ refuses with 409 while a turn runs or a message waits, or when the provider cann
 The progress and the result arrive in the `compaction` of `context-usage-v1`. Protocol 9 only. The web
 client shows no context meter, so it does not use the capability.
 
+### Delete history and channel context
+
+`chat-history-v1` (`team-protocol/chat-history-v1.ts`) adds `POST /v1/agent-history/delete` with
+`{ agentId }`, and `POST /v1/channels/context/clear`, `/v1/channels/context/compact` and
+`/v1/channels/history/delete` with `{ channelId }`. They run the same host operations as "Delete
+history" in agent settings, and "New conversation", "Compact now" and "Delete history" in channel
+settings. A member with manage access to the agent deletes its history. A member who sees a channel
+starts a new conversation or compacts it; only an owner or admin deletes the channel history, and the
+desktop hides that row from a member. A host without the capability does not show the rows. Protocol
+9 only.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who

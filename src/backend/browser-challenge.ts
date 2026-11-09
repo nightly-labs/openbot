@@ -64,11 +64,12 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
     return found("akamai", "block", "akamai-reference");
   if (has("#sec-if-cpt-container, #sec-cpt-if") || (short && has("#sec-container")))
     return found("akamai", "non-interactive", "akamai-sec-cpt");
-  if (short && has("script[src*='awswaf.com'], script[src*='captcha.awswaf']")) {
-    return has("#captcha-container, awswaf-captcha")
-      ? found("aws-waf", "interactive", "aws-waf-captcha")
-      : found("aws-waf", "non-interactive", "aws-waf-challenge");
-  }
+  // Sites that use the AWS WAF integration SDK load its scripts on each page. Only the interstitial
+  // counts: the script in the head and its container as a direct child of the body.
+  if (has("html:has(head > script[src*='.awswaf.com/'][src$='/captcha.js']) > body > #captcha-container"))
+    return found("aws-waf", "interactive", "aws-waf-captcha");
+  if (has("html:has(head > script[src*='.awswaf.com/'][src$='/challenge.js']) > body > #challenge-container"))
+    return found("aws-waf", "non-interactive", "aws-waf-challenge");
   if (!short) return null;
   if (frame(/challenges\.cloudflare\.com/)) return found("turnstile", "interactive", "turnstile-frame");
   if (frame(/hcaptcha\.com/)) return found("hcaptcha", "interactive", "hcaptcha-frame");

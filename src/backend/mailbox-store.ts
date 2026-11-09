@@ -2154,6 +2154,18 @@ export class MailboxStore {
     });
   }
 
+  /** Whether the turn sent another agent a request that waits for a reply. */
+  hasRequestFromTurn(agentId: string, turnId: string): boolean {
+    const turnIds = this.#sourceTurnIds();
+    return this.#state.messages.some(
+      (message) =>
+        message.sender.kind === "agent" &&
+        message.sender.agentId === agentId &&
+        message.expectsReply !== false &&
+        turnIds.get(message.id) === turnId,
+    );
+  }
+
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (
     this: MailboxStore,
     deliveryId: string,

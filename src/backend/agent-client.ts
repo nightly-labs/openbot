@@ -69,6 +69,11 @@ export interface AgentClient {
    */
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   /**
+   * Sets the title of a thread in the provider's own thread list. Optional, for the same reason as
+   * `archiveThread`.
+   */
+  nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
+  /**
    * Closes each thread that has no turn and can open again from its session, to free its processes
    * and MCP servers when the machine is low on memory. Optional, because a client that runs all its
    * threads in one process frees nothing this way.

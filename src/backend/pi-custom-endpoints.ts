@@ -117,6 +117,16 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
   };
 }
 
+/** The keys and non-empty header values of the endpoints with a model, which output must not show. */
+export function piCustomEndpointSecrets(endpoints: readonly CustomProviderConfig[]): string[] {
+  return endpoints
+    .filter((endpoint) => endpoint.models.length > 0)
+    .flatMap((endpoint) => [
+      ...(endpoint.apiKey ? [endpoint.apiKey] : []),
+      ...endpoint.headers.map((header) => header.value).filter((value) => value.length > 0),
+    ]);
+}
+
 /**
  * Owns one temporary extension file that registers the custom endpoints that run on Pi. The keys and
  * header values never reach the file. Null when no endpoint with a model runs on Pi.
@@ -134,14 +144,10 @@ export const createPiCustomEndpointExtension = Effect.fn("PiCustomEndpoints.crea
   yield* providerCall(() => writeFile(path, SOURCE, { mode: 0o600 })).pipe(
     Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)),
   );
-  const secrets = usable.flatMap((endpoint) => [
-    ...(endpoint.apiKey ? [endpoint.apiKey] : []),
-    ...endpoint.headers.map((header) => header.value).filter((value) => value.length > 0),
-  ]);
   return {
     path,
     environment: { [VARIABLE]: JSON.stringify(usable.map(payload)) },
-    secrets,
+    secrets: piCustomEndpointSecrets(usable),
     close: () => providerCall(() => rm(folder, { recursive: true, force: true })),
   } satisfies PiMcpExtension;
 });

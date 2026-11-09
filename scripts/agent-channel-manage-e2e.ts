@@ -584,8 +584,8 @@ try {
     text: fromRunText,
   });
   pass(
-    "A routine run cannot change the channel",
-    fromRun.result?.success !== true &&
+    "A routine run cannot change the channel, and the agent gets the reason as a tool result",
+    fromRun.result?.success === false &&
       fromRunText.includes("Only a person's request") &&
       channelOf(soloId).members.length === 1 &&
       notes(soloId).length === 0,
@@ -866,8 +866,8 @@ try {
     text: cancelRunText,
   });
   pass(
-    "A routine run cannot cancel a run",
-    cancelRun.result?.success !== true &&
+    "A routine run cannot cancel a run, and the agent gets the reason as a tool result",
+    cancelRun.result?.success === false &&
       cancelRunText.includes("Only a person's request in this channel can cancel a run") &&
       notes(soloId).length === 0,
     cancelRunText,

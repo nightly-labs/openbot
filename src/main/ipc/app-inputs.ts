@@ -156,6 +156,7 @@ export function parseAgentDefaults(input: unknown): AgentDefaults {
     quickAcknowledgement: input.quickAcknowledgement,
     planStartAfterMs: input.planStartAfterMs,
     automationRunsPerHour: input.automationRunsPerHour,
+    commitCoAuthor: input.commitCoAuthor,
   };
 }
 

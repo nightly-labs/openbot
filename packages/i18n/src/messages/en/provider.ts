@@ -132,6 +132,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.museNoModels":
+    "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":
     "Add an OpenAI-compatible endpoint — a model server on this computer, or any service with a base URL and a key.",
   "provider.picker.customPending":

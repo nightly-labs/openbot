@@ -122,6 +122,10 @@ export const messages = defineMessages("settings", {
   "settings.agentDefaults.setAllLabel": "Set {setting} for all agents",
   "settings.agentDefaults.agentLabel": "{setting} for {agent}",
   "settings.agentDefaults.loadFailed": "The agents could not be read.",
+  "settings.commitCoAuthor.sectionTitle": "Git commits",
+  "settings.commitCoAuthor.title": "Credit OpenBot in commits",
+  "settings.commitCoAuthor.description":
+    "Agents add OpenBot as a co-author to the commits they make. You stay the author.",
   // "Start the work", under the default of "Show the plan before long tasks".
   "settings.planStart.title": "Start the work",
   "settings.planStart.wait": "When I press Start",

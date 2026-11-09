@@ -120,6 +120,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "Definir {setting} para todos os agentes",
   "settings.agentDefaults.agentLabel": "{setting} para {agent}",
   "settings.agentDefaults.loadFailed": "Não foi possível ler os agentes.",
+  "settings.commitCoAuthor.sectionTitle": "Commits do Git",
+  "settings.commitCoAuthor.title": "Creditar o OpenBot nos commits",
+  "settings.commitCoAuthor.description":
+    "Os agentes adicionam o OpenBot como coautor dos commits que fazem. Você continua sendo o autor.",
   "settings.planStart.title": "Iniciar o trabalho",
   "settings.planStart.wait": "Quando eu tocar em Iniciar",
   "settings.planStart.after": "Após {time}",

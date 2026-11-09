@@ -118,6 +118,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "すべてのエージェントの {setting} を設定",
   "settings.agentDefaults.agentLabel": "{agent} の {setting}",
   "settings.agentDefaults.loadFailed": "エージェントを読み込めませんでした。",
+  "settings.commitCoAuthor.sectionTitle": "Git コミット",
+  "settings.commitCoAuthor.title": "コミットに OpenBot を記載",
+  "settings.commitCoAuthor.description":
+    "エージェントが作成するコミットに OpenBot を共同作成者として追加します。作成者はあなたのままです。",
   "settings.planStart.title": "作業の開始",
   "settings.planStart.wait": "開始を押したとき",
   "settings.planStart.after": "{time}後",

@@ -1,7 +1,8 @@
 // Changes each default in Settings › Agents of a running dev app, as a person does, and checks that
 // the window stays responsive (#5708). For each setting page it turns the Default switch off and on,
 // and waits until main saved each value. On Local scripts it chooses another "Requests an hour"; on
-// Quick acknowledgement it chooses another "Start the work". A Select reports its value again when
+// Quick acknowledgement it chooses another "Start the work". On the list it turns "Credit OpenBot in
+// commits" off and on. A Select reports its value again when
 // its options change. When the page saved that value as a new settings object, the settings and the
 // Select updated each other with no end, and the window froze in a release build. The dev build
 // stops such a loop with "Potential Infinite Loop Detected", so the check fails on that error, on
@@ -199,6 +200,21 @@ try {
     }
     await backToList().click();
     await open.waitFor();
+  }
+  const commitSwitch = agentsPanel().getByRole("switch", { name: t("settings.commitCoAuthor.title"), exact: true });
+  const commitStart = (await savedDefaults()).commitCoAuthor;
+  for (const next of [!commitStart, commitStart]) {
+    await commitSwitch.click({ force: true });
+    await page.waitForFunction(
+      async (value) => (await window.openbot.getAgentDefaults()).commitCoAuthor === value,
+      next,
+    );
+    assert.equal(await commitSwitch.isChecked(), next, "The commit co-author switch does not show the saved value.");
+    steps.push({
+      setting: "commitCoAuthor",
+      action: `switch ${next ? "on" : "off"}`,
+      responseMs: await rendererAnswers(),
+    });
   }
   assert.deepEqual(pageErrors, [], "The renderer reported an error while the defaults changed.");
 } finally {

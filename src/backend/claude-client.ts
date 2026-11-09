@@ -1167,9 +1167,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
     const configDirectory =
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
-    // A profile generation loads no settings at all; the user setup brings the whole user settings file.
-    const signInSettings: Settings =
-      config.profileGeneration || userSetup ? {} : yield* claudeSignInSettings(configDirectory);
+    // The user setup brings the whole user settings file. A profile generation loads no settings
+    // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
+    const signInSettings: Settings = userSetup ? {} : yield* claudeSignInSettings(configDirectory);
     const homeSkillPlugin =
       stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(

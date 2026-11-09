@@ -65,8 +65,7 @@ export interface DynamicIslandWindowControllerOptions {
   createWindow: (bounds: Rectangle, display: Display) => BrowserWindow;
   loadWindow: (window: BrowserWindow, display: Display) => Promise<void>;
   getDisplays: () => Display[];
-  /** X11: the display for the island when no display is built in. */
-  getPrimaryDisplay?: () => Display;
+  getPrimaryDisplay: () => Display;
   getMainWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
@@ -322,7 +321,14 @@ export class DynamicIslandWindowController {
       return;
     }
 
-    const displays = this.#islandDisplays();
+    const allDisplays = this.#options.getDisplays();
+    const builtInDisplays = allDisplays.filter((display) => display.internal);
+    // A computer with no built-in display, such as a desktop PC or a Mac mini, uses its primary display.
+    const displays = this.#preference.additionalDisplaysEnabled
+      ? allDisplays
+      : builtInDisplays.length > 0
+        ? builtInDisplays
+        : [this.#options.getPrimaryDisplay()];
     const displayIds = new Set(displays.map((display) => display.id));
     for (const [displayId, window] of this.#windows) {
       if (displayIds.has(displayId) && !window.isDestroyed()) continue;
@@ -368,19 +374,6 @@ export class DynamicIslandWindowController {
       );
     }
   }).bind(this);
-
-  /**
-   * The built-in display, and the other ones when the user chose them. A Linux computer often tells no
-   * built-in display: the island then shows on the primary display.
-   */
-  #islandDisplays(): Display[] {
-    const displays = this.#options.getDisplays();
-    if (this.#preference.additionalDisplaysEnabled) return displays;
-    const internal = displays.filter((display) => display.internal);
-    if (internal.length > 0 || this.#options.windowKind !== "x11") return internal;
-    const primary = this.#options.getPrimaryDisplay?.();
-    return primary ? displays.filter((display) => display.id === primary.id) : displays.slice(0, 1);
-  }
 
   #show(window: BrowserWindow): void {
     window.showInactive();
