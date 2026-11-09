@@ -405,7 +405,7 @@ export const messages = defineMessages("server", {
   "server.settings.memoryReviewOff": "Off",
   "server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
   "server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
-  "server.settings.rolesTitle": "Roles",
+  "server.settings.rolesTitle": "Permissions",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
   "server.settings.auditTitle": "Audit log",

@@ -339,7 +339,7 @@ export const messages = {
   "server.settings.memoryReviewOff": "끄기",
   "server.settings.memoryReviewTurns": { other: "{count}턴마다" },
   "server.settings.memoryReviewLoadFailed": "메모리 검토 설정을 불러올 수 없었어요.",
-  "server.settings.rolesTitle": "역할",
+  "server.settings.rolesTitle": "권한",
   "server.settings.rolesDescription":
     "멤버가 사용할 수 있는 에이전트를 선택하세요. 멤버는 모든 사용자와 자신의 역할 중 가장 높은 접근 권한을 받아요. 소유자와 관리자는 모든 에이전트를 사용할 수 있어요.",
   "server.settings.auditTitle": "감사 로그",

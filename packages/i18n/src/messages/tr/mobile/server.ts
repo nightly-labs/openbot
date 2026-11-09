@@ -1249,7 +1249,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Site açılamadı.",
   "mobile.server.sites.unsupported": "Sitelerini burada görmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.sites.offline": "Sitelerini görmek için bu sunucuya bağlanın.",
-  "mobile.server.route.roles": "Roller",
+  "mobile.server.route.roles": "İzinler",
   "mobile.server.route.role": "Rol",
   "mobile.server.roles.description":
     "Üyelerin kullanabileceği ajanları seçin. Sahipler ve yöneticiler tüm ajanları kullanabilir.",

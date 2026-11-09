@@ -334,7 +334,7 @@ export const messages = {
     other: "Co {count} tury",
   },
   "server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
-  "server.settings.rolesTitle": "Role",
+  "server.settings.rolesTitle": "Uprawnienia",
   "server.settings.rolesDescription":
     "Wybierz agentów, których mogą używać członkowie. Członek dostaje najwyższy dostęp spośród roli Wszyscy i swoich ról. Właściciele i administratorzy mogą używać wszystkich agentów.",
   "server.settings.remoteOnline": "Host jest online. Publikacją zarządza jego właściciel.",

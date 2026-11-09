@@ -1647,7 +1647,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.sites.openFailed": "Could not open the site.",
   "mobile.server.sites.unsupported": "Update OpenBot on this server to see its sites here.",
   "mobile.server.sites.offline": "Connect to this server to see its sites.",
-  "mobile.server.route.roles": "Roles",
+  "mobile.server.route.roles": "Permissions",
   "mobile.server.route.role": "Role",
   "mobile.server.roles.description": "Choose the agents that members can use. Owners and admins can use all agents.",
   "mobile.server.roles.unsupported": "Update OpenBot on this server to manage roles.",

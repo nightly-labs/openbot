@@ -1224,7 +1224,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Kan de site niet openen.",
   "mobile.server.sites.unsupported": "Werk OpenBot bij op deze server om de sites hier te zien.",
   "mobile.server.sites.offline": "Maak verbinding met deze server om de sites te zien.",
-  "mobile.server.route.roles": "Rollen",
+  "mobile.server.route.roles": "Machtigingen",
   "mobile.server.route.role": "Rol",
   "mobile.server.roles.description":
     "Kies de agents die leden kunnen gebruiken. Eigenaren en beheerders kunnen alle agents gebruiken.",

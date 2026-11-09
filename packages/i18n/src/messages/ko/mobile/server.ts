@@ -1201,7 +1201,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "사이트를 열지 못했어요.",
   "mobile.server.sites.unsupported": "여기에서 사이트를 보려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.sites.offline": "사이트를 보려면 이 서버에 연결하세요.",
-  "mobile.server.route.roles": "역할",
+  "mobile.server.route.roles": "권한",
   "mobile.server.route.role": "역할",
   "mobile.server.roles.description":
     "멤버가 사용할 수 있는 에이전트를 선택하세요. 소유자와 관리자는 모든 에이전트를 사용할 수 있어요.",

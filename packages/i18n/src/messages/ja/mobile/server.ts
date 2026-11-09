@@ -1227,7 +1227,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "サイトを開けませんでした。",
   "mobile.server.sites.unsupported": "ここでサイトを表示するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.sites.offline": "このサーバーに接続するとサイトが表示されます。",
-  "mobile.server.route.roles": "ロール",
+  "mobile.server.route.roles": "権限",
   "mobile.server.route.role": "ロール",
   "mobile.server.roles.description":
     "メンバーが使えるエージェントを選びます。オーナーと管理者はすべてのエージェントを使えます。",
