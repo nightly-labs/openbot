@@ -226,6 +226,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "키 확인 중",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot은 저장하기 전에 처음 두 권한을 확인해요.",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs가 응답하지 않았어요. 다시 시도하세요.",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs가 요청을 거부했어요: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "API 키 받기",
   "mobile.settings.voice.engine.supertonicReady": "이 휴대폰에서 · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "다운로드 필요 · {size}",

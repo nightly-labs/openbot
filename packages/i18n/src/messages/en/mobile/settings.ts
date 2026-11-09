@@ -226,6 +226,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.elevenLabs.testing": "Testing the key",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot tests the first two permissions before it saves the key.",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs did not answer. Try again.",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs refused the request: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "Get an API key",
   "mobile.settings.voice.engine.supertonicReady": "On this phone · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "Download needed · {size}",

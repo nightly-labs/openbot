@@ -231,6 +231,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "جارٍ اختبار المفتاح",
   "mobile.settings.voice.elevenLabs.keyHint": "يختبر OpenBot أول إذنين قبل حفظ المفتاح.",
   "mobile.settings.voice.elevenLabs.testFailed": "لم تستجب ElevenLabs. أعد المحاولة.",
+  "mobile.settings.voice.elevenLabs.refused": "رفضت ElevenLabs الطلب: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "الحصول على مفتاح API",
   "mobile.settings.voice.engine.supertonicReady": "على هذا الهاتف · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "يلزم التنزيل · {size}",

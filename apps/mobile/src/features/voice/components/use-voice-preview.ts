@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { currentText } from "@/shared/lib/text";
-import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, type ReplyVoiceChoice, readReply } from "../model/reply-voice";
+import { type ReplyReading, type ReplyVoiceChoice, readReply, replyVoiceFailureText } from "../model/reply-voice";
 
 /**
  * Plays a short sample with a voice. One sample plays at a time; `playing` names it, so each voice
@@ -28,9 +28,9 @@ export function useVoicePreview() {
       {
         onPart: () => undefined,
         onDone: () => setPlaying((current) => (current === id ? null : current)),
-        onError: (failure) => {
+        onError: (failure, reason) => {
           setPlaying((current) => (current === id ? null : current));
-          setError(currentText().t(REPLY_VOICE_FAILURE_TEXT[failure]));
+          setError(replyVoiceFailureText(failure, reason));
         },
       },
       choice,

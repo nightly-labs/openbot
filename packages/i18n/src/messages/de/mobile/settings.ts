@@ -235,6 +235,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "Schlüssel wird geprüft",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot prüft die ersten zwei Berechtigungen vor dem Speichern.",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs hat nicht geantwortet. Versuche es erneut.",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs hat die Anfrage abgelehnt: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "API-Schlüssel holen",
   "mobile.settings.voice.engine.supertonicReady": "Auf diesem Telefon · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "Download nötig · {size}",

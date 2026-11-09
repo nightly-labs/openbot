@@ -226,6 +226,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "Anahtar sınanıyor",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot anahtarı kaydetmeden önce ilk iki izni sınar.",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs yanıt vermedi. Yeniden dene.",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs isteği reddetti: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "API anahtarı al",
   "mobile.settings.voice.engine.supertonicReady": "Bu telefonda · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "İndirme gerekli · {size}",

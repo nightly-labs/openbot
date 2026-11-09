@@ -231,6 +231,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "キーを確認中",
   "mobile.settings.voice.elevenLabs.keyHint": "OpenBot は保存前に最初の 2 つの権限を確認します。",
   "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs から応答がありません。もう一度お試しください。",
+  "mobile.settings.voice.elevenLabs.refused": "ElevenLabs がリクエストを拒否しました: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "API キーを取得",
   "mobile.settings.voice.engine.supertonicReady": "このスマートフォン上 · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "ダウンロードが必要 · {size}",

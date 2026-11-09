@@ -228,6 +228,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.testing": "Testando a chave",
   "mobile.settings.voice.elevenLabs.keyHint": "O OpenBot testa as duas primeiras permissões antes de salvar a chave.",
   "mobile.settings.voice.elevenLabs.testFailed": "A ElevenLabs não respondeu. Tente de novo.",
+  "mobile.settings.voice.elevenLabs.refused": "A ElevenLabs recusou a solicitação: {reason}",
   "mobile.settings.voice.elevenLabs.getKey": "Obter uma chave de API",
   "mobile.settings.voice.engine.supertonicReady": "Neste celular · {voice}",
   "mobile.settings.voice.engine.supertonicMissing": "Download necessário · {size}",
