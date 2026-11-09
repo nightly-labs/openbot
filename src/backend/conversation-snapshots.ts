@@ -277,12 +277,15 @@ function mergeConversationMessages(
   const messages = new Map(stored.map((message) => [message.id, message]));
   for (const message of live) {
     const previous = messages.get(message.id);
+    // The row of a turn start has a short exchange with no deliveries. The stored mailbox copy has them.
+    const exchange = message.exchange?.deliveries.length ? message.exchange : (previous?.exchange ?? message.exchange);
     messages.set(
       message.id,
       previous
         ? {
             ...previous,
             ...message,
+            ...(exchange ? { exchange } : {}),
             attachments: message.attachments ?? previous.attachments,
             imageGeneration: message.imageGeneration ?? previous.imageGeneration,
           }

@@ -68,6 +68,7 @@ import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
+import { MAIN_THREAD_ID } from "./thread-types";
 
 const HOLD_TEXT = {
   "agent-restarting": "conversation.threads.hold.agentRestarting",
@@ -518,7 +519,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             showTime
             agents={props.agents}
             skills={props.skills}
-            onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+            // The sender's name opens the thread that sent the message, or else the sender's own chat, as in the chat.
+            onSelectAgent={(agentId) =>
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent?.(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent?.(agentId)
+            }
             onOpenTag={props.onOpenTag}
             onOpenLink={props.onOpenLink}
             onPreview={props.onPreview}
