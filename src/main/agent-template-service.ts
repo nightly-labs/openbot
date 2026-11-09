@@ -311,12 +311,16 @@ export class AgentTemplateService {
               yield* Effect.gen({ self: this }, function* () {
                 yield* templateIO(() => mkdir(target, { recursive: true }));
                 yield* templateIO(() => writeFile(join(target, "SKILL.md"), skill.markdown, { flag: "wx" }));
-                const revision = yield* (
-                  existing
-                    ? library.revise(agent.id, existing.id, existing.revision, folder)
-                    : library.create(agent.id, folder)
-                ).pipe(toAgentTemplateFailure);
-                published.push({ id: revision.id, revision: revision.version });
+                // Recorded in the same step, so a failed install can always withdraw what it published.
+                const revision = yield* Effect.gen(function* () {
+                  const revision = yield* (
+                    existing
+                      ? library.revise(agent.id, existing.id, existing.revision, folder)
+                      : library.create(agent.id, folder)
+                  ).pipe(toAgentTemplateFailure);
+                  published.push({ id: revision.id, revision: revision.version });
+                  return revision;
+                }).pipe(Effect.uninterruptible);
                 yield* this.skills
                   .installLocal({ agentId: agent.id, skillId: revision.id, revision: revision.version })
                   .pipe(toAgentTemplateFailure);
