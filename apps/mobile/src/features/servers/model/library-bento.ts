@@ -1,4 +1,4 @@
-export interface BentoTile {
+interface BentoTile {
   /** The place of the file in the list that the blocks lay out. */
   index: number;
   left: number;
