@@ -40,6 +40,7 @@ export const messages = {
   "account.usage.window.otherModels": "מודלים אחרים",
   "account.usage.window.total": "סך הכול",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "נותרו {percent}",
   "account.update.failedRetry": "העדכון נכשל. יש לנסות שוב.",
   "account.update.managedByHost": "מנוהל על ידי המארח",
   "account.update.restart": "הפעלה מחדש",

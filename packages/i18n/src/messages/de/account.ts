@@ -43,6 +43,7 @@ export const messages = {
   "account.usage.window.otherModels": "Andere Modelle",
   "account.usage.window.total": "Gesamt",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} übrig",
   "account.update.failedRetry": "Update fehlgeschlagen. Versuche es erneut.",
   "account.update.managedByHost": "Vom Host verwaltet",
   "account.update.restart": "Neu starten",

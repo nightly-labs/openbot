@@ -45,6 +45,7 @@ export const messages = {
   "account.usage.window.otherModels": "Другие модели",
   "account.usage.window.total": "Всего",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "осталось {percent}",
   "account.update.failedRetry": "Не удалось обновить. Повторите попытку.",
   "account.update.managedByHost": "Управляется хостом",
   "account.update.restart": "Перезапустить",

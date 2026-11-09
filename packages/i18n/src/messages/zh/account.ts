@@ -40,6 +40,7 @@ export const messages = {
   "account.usage.window.otherModels": "其他模型",
   "account.usage.window.total": "总计",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "剩余 {percent}",
   "account.update.failedRetry": "更新失败，请重试。",
   "account.update.managedByHost": "由主机管理",
   "account.update.restart": "重启",

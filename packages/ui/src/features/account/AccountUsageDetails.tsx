@@ -122,7 +122,9 @@ export function AccountUsageWindowList(props: { windows: readonly AccountUsageWi
               <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
             </span>
             <strong class="account-usage-window-remaining">
-              {text.format.percent(usageWindow.remainingPercent / 100)}
+              {t("account.usage.window.remaining", {
+                percent: text.format.percent(usageWindow.remainingPercent / 100),
+              })}
             </strong>
             <span
               class="account-usage-window-reset"
