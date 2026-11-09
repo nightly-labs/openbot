@@ -183,6 +183,7 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         role: host.role,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+        ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
         transport: "webrtc-v2",
       };
     });

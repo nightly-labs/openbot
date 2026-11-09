@@ -32,6 +32,12 @@ export const HOSTED_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>>
   pro: "large",
 };
 
+/**
+ * The disk of a hosted server that the system and the preinstalled tools use, in GB (measured on the
+ * running servers on 2026-11-09: 19 to 22 GB). The plan storage does not count it: it is on top of the plan.
+ */
+export const HOSTED_SERVER_BASE_IMAGE_GB = 22;
+
 export const HOSTED_SERVER_STATES = [
   /** The row exists, and the account server waits for Stripe to confirm the first payment. */
   "awaiting_payment",
