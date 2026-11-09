@@ -585,11 +585,16 @@ function ServerSettings() {
       },
       onAddCustomProvider: endpoints.saveCustomProvider,
       onDeleteCustomProvider: endpoints.deleteCustomProvider,
-      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`.
-      onUpdateCustomProvider:
-        local || serverSupportsCapability(server, "custom-provider-edit-v1")
-          ? endpoints.updateCustomProvider
-          : undefined,
+      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`. A list read
+      // before the host's capabilities arrived has no header names, and an edit from it would send no
+      // headers and delete the saved ones, so Edit waits for the list of that route.
+      get onUpdateCustomProvider() {
+        if (local) return endpoints.updateCustomProvider;
+        const editable =
+          serverSupportsCapability(server, "custom-provider-edit-v1") &&
+          endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
+        return editable ? endpoints.updateCustomProvider : undefined;
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },
