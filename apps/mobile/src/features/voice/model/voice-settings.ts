@@ -60,9 +60,9 @@ export interface ElevenLabsVoice {
 export const ELEVENLABS_SPEECH_MODEL_IDS = [
   "elevenlabs-flash-v2.5",
   "elevenlabs-multilingual-v2",
-  "elevenlabs-v3",
   "elevenlabs-v4-turbo",
   "elevenlabs-v4",
+  "elevenlabs-v3",
 ] as const satisfies readonly CloudSpeechModelId[];
 export type ElevenLabsSpeechModelId = (typeof ELEVENLABS_SPEECH_MODEL_IDS)[number];
 
