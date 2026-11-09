@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Los agentes aprenden nuevas habilidades por sí solos después de una corrección o de un método que funcionó. Elige Automático, Preguntar antes o Desactivado en Ajustes del servidor → General.",
+          "Los inicios de sesión del Vault pueden guardar un código de verificación en dos pasos, y los agentes pueden iniciar sesión con él.",
+          "En Windows, la Dynamic Island y el dock de agentes muestran tus agentes, como en un Mac. El dock de agentes también puede contener canales.",
+          "Los agentes pueden ver vídeos públicos en línea, como enlaces de YouTube o TikTok.",
+          "Selecciona varios archivos en la Biblioteca para descargarlos o eliminarlos a la vez.",
+          "Los agentes pueden enviar por ti un informe de error o una idea de función al equipo de OpenBot."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Los miembros de un canal responden mientras trabajan en su propio chat, y un saludo o un mensaje poco claro va al responsable del canal.",
+          "Un agente nuevo se abre con una breve bienvenida y tres primeras tareas que puedes elegir.",
+          "Conecta Composio iniciando sesión en el navegador. Ya no escribes una URL ni una clave de API.",
+          "Ajustes ahora se llama Tus ajustes, y Ajustes del servidor tiene un campo de búsqueda.",
+          "El icono de la app para macOS tiene un nuevo aspecto de cristal."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La cola de un agente ya no inicia el mismo mensaje una y otra vez mientras el agente espera la respuesta a su propia pregunta.",
+          "Un agente de ChatGPT ya no compacta el contexto una y otra vez, ni se queda sin fin en «Compactando el contexto».",
+          "Los agentes de Cursor y de otros proveedores conservan sus herramientas de OpenBot después de que OpenBot se reinicia.",
+          "Los agentes pueden usar un servidor MCP remoto en el que iniciaste sesión, como n8n, con la versión más reciente de MCP."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],
