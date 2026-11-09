@@ -152,7 +152,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "أعد الاتصال لحفظ التغييرات.",
   "mobile.agent.info.noMemories": "لا ذكريات بعد.",
   "mobile.agent.info.addMemory": "إضافة ذكرى",
-  "mobile.agent.info.routineActive": "نشطة",
   "mobile.agent.info.routinePaused": "متوقفة مؤقتًا",
   "mobile.agent.info.noRoutines": "لا مهام دورية بعد.",
   "mobile.agent.info.addRoutine": "إضافة مهمة دورية",

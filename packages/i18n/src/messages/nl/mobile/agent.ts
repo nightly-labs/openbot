@@ -135,7 +135,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "Maak opnieuw verbinding om wijzigingen op te slaan.",
   "mobile.agent.info.noMemories": "Nog geen herinneringen.",
   "mobile.agent.info.addMemory": "Herinnering toevoegen",
-  "mobile.agent.info.routineActive": "Actief",
   "mobile.agent.info.routinePaused": "Gepauzeerd",
   "mobile.agent.info.noRoutines": "Nog geen routines.",
   "mobile.agent.info.addRoutine": "Routine toevoegen",

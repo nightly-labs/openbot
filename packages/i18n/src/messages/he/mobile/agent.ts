@@ -131,7 +131,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "יש להתחבר מחדש כדי לשמור שינויים.",
   "mobile.agent.info.noMemories": "אין זיכרונות עדיין.",
   "mobile.agent.info.addMemory": "הוספת זיכרון",
-  "mobile.agent.info.routineActive": "פעילה",
   "mobile.agent.info.routinePaused": "מושהית",
   "mobile.agent.info.noRoutines": "אין שגרות עדיין.",
   "mobile.agent.info.addRoutine": "הוספת שגרה",

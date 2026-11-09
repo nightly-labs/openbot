@@ -131,7 +131,6 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.info.reconnectToSave": "Reconnect to save changes.",
   "mobile.agent.info.noMemories": "No memories yet.",
   "mobile.agent.info.addMemory": "Add memory",
-  "mobile.agent.info.routineActive": "Active",
   "mobile.agent.info.routinePaused": "Paused",
   "mobile.agent.info.noRoutines": "No routines yet.",
   "mobile.agent.info.addRoutine": "Add routine",
