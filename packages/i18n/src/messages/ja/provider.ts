@@ -185,6 +185,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "OpenRouter のモデルを使うには、このコンピューターに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.label": "OpenRouter API キー",
+  "provider.veniceKey.title": "Venice API キー",
+  "provider.veniceKey.description":
+    "Venice のモデルを使うには、このコンピューターに Venice API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.veniceKey.label": "Venice API キー",
 
   "provider.openCodeKey.title": "OpenCode Go にサインイン",
   "provider.openCodeKey.description": "無料モデルにアカウントは不要です。キーがあると有料の Go モデルを使えます。",

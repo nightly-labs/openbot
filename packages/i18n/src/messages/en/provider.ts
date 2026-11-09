@@ -201,6 +201,10 @@ export const messages = defineMessages("provider", {
   "provider.openrouterKey.description":
     "Save an OpenRouter API key on this computer to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.openrouterKey.label": "OpenRouter API key",
+  "provider.veniceKey.title": "Venice API key",
+  "provider.veniceKey.description":
+    "Save a Venice API key on this computer to use the models that Venice serves. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.veniceKey.label": "Venice API key",
 
   // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "Sign in to OpenCode Go",

@@ -498,6 +498,11 @@
   --openbot-provider-current: var(--openbot-text-primary);
 }
 
+/* venice.ai/brand allows the keys only in Deep Blue, Off White, white or black; never Venetian Blue. */
+[data-provider="venice"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

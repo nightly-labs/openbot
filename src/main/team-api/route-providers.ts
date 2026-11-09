@@ -443,7 +443,7 @@ function codeSubmitInputV4(body: DynamicRecord): { provider: SignInProviderIdV4;
   return { provider: signInProviderV4(body), code: pastedCode(body) };
 }
 
-// `providers-v5` does not name Inception, DeepSeek or OpenRouter; `providers-v8` sets their keys.
+// `providers-v5` does not name Inception, DeepSeek, OpenRouter or Venice; `providers-v8` sets their keys.
 function peerApiKeyInput(body: DynamicRecord) {
   const input = parseProviderApiKeyInput(body);
   if (isKeyOnlyProvider(input.provider)) throw new Error("Unknown provider.");

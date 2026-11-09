@@ -6518,6 +6518,24 @@ try {
         isDeepStrictEqual(callsOf("changeProviderCredential"), [["deepseek"]]),
       summary(pending),
     );
+    const veniceKey = ["vn", "e2e", "venice", "fake0000"].join("-");
+    const veniceSet = await call("POST", PROVIDERS_V8_ROUTES.apiKeySet, {
+      ...v8,
+      json: { provider: "venice", key: veniceKey },
+    });
+    const veniceState = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "venice" } });
+    const veniceCleared = await call("POST", PROVIDERS_V8_ROUTES.apiKeyClear, { ...v8, json: { provider: "venice" } });
+    check(
+      "an admin on providers-v8 saves and clears a Venice key, and the host restarts Venice on the Pi CLI",
+      veniceSet.status === 200 &&
+        isDeepStrictEqual(callsOf("setProviderKey").at(-1), ["venice", veniceKey]) &&
+        isDeepStrictEqual(callsOf("startKeyProviderCli").at(-1), ["venice"]) &&
+        isDeepStrictEqual(callsOf("changeProviderCredential").at(-1), ["venice"]) &&
+        field(veniceState.body, "status") === "saved" &&
+        veniceCleared.status === 200 &&
+        isDeepStrictEqual(callsOf("clearProviderKey").at(-1), ["venice"]),
+      [summary(veniceSet), summary(veniceState), summary(veniceCleared)],
+    );
     // codex-api-key-v1: an OpenAI key logs the host's Codex in and never reaches the key store.
     const openAiKey = ["sk", "e2e", "openai", "fake0000"].join("-");
     const keysBefore = callsOf("setProviderKey").length;

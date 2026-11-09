@@ -193,6 +193,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "Enregistrez une clé d’API OpenRouter sur cet ordinateur pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.openrouterKey.label": "Clé d’API OpenRouter",
+  "provider.veniceKey.title": "Clé d’API Venice",
+  "provider.veniceKey.description":
+    "Enregistrez une clé d’API Venice sur cet ordinateur pour utiliser les modèles de Venice. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.veniceKey.label": "Clé d’API Venice",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
     "Les modèles gratuits ne demandent pas de compte. Une clé donne accès aux modèles Go payants.",
