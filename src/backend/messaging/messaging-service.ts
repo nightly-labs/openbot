@@ -44,6 +44,7 @@ import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import { type DiscordAppPort, DiscordConnect, type DiscordConnectFailed } from "./discord/discord-connect";
 import { discordOrchestratorMemories, discordOrchestratorProfile } from "./discord/discord-orchestrator";
 import { mentionNames, withMentionNames } from "./messaging-mentions";
+import { QUIET_ANSWER } from "./messaging-prompt";
 import { MessagingStatusPosts, type PendingFinal, type StatusPost, type StopButton } from "./messaging-status-posts";
 import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store";
 import {
@@ -76,6 +77,7 @@ import {
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
 import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
+import { slackPingedUsers } from "./slack/slack-render";
 import { SlackApiError, SlackWebApi } from "./slack/slack-web-api";
 import { type TelegramAppPort, telegramLinkUrl } from "./telegram/telegram-connect";
 import { telegramOrchestratorMemories, telegramOrchestratorProfile } from "./telegram/telegram-orchestrator";
@@ -1348,8 +1350,16 @@ export class MessagingService {
     // files, before the mailbox holds its idempotency key. The mailbox key covers a restart.
     const store = this.#threads.store;
     const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
+    // In a thread that an agent's post pinged people in, a reply without a mention counts only from a
+    // pinged person: the first one starts the conversation. Other threads need a link, as before.
+    // A first reply with a mention, which comes only as `app_mention`, also gets the post that pinged its author.
+    const pings =
+      live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)
+        ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
+        : [];
+    const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;
     // Before the dedup key: a reply with a mention also arrives as `app_mention`, which must still run.
-    if (message.requiresLink && !existing) return;
+    if (message.requiresLink && (pings.length ? !ping : !existing)) return;
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
     if (this.#recent.has(dedupKey)) return;
     this.#recent.add(dedupKey);
@@ -1409,9 +1419,12 @@ export class MessagingService {
     );
     const named = withMentionNames(message.text, mentioned);
     const quote = message.replyTo;
+    // The context does not have OpenBot's own posts, so the post that the person answers comes as the quote.
     const replyTo = quote
       ? { authorName: quote.authorName, text: withMentionNames(quote.text, mentioned), sentAt: quote.sentAt }
-      : null;
+      : ping && !existing
+        ? { authorName: this.#pingAuthor(live.record, ping.agentId), text: ping.text, sentAt: ping.createdAt }
+        : null;
     // A new mention in a Discord server goes to the workflows first: a Discord trigger that takes it
     // starts a run, and no agent answers it. A conversation that has an agent keeps it.
     if (live.record.platform === "discord" && !message.isDirect && !existing) {
@@ -1453,8 +1466,9 @@ export class MessagingService {
           .pipe(Effect.catch(() => Effect.void));
       if (workflows !== "none") return;
     }
-    // A new mention in a Slack channel goes to the workflows first, in the same way.
-    if (live.record.platform === "slack" && !message.isDirect && !existing) {
+    // A new mention in a Slack channel goes to the workflows first, in the same way. A reply to a ping
+    // has no mention, so it goes to the orchestrator.
+    if (live.record.platform === "slack" && !message.isDirect && !existing && !ping) {
       const workflows = yield* this.#threads.slackWorkflowMention({
         connectionId: live.record.connectionId,
         workspaceName: live.record.workspaceName,
@@ -1595,6 +1609,13 @@ export class MessagingService {
     return allowed.some((role) => roles.has(role.id));
   }
 
+  /** Who the orchestrator reads as the author of a post that pinged a person: the agent that posted it. */
+  #pingAuthor(record: MessagingConnectionRecord, agentId: string): string {
+    if (agentId === this.#orchestrator(record)) return "OpenBot, a post of yours";
+    const name = this.#agents.listAgents().find((agent) => agent.id === agentId)?.name;
+    return name ? `OpenBot, a post by your teammate ${name}` : "OpenBot";
+  }
+
   #orchestrator(record: MessagingConnectionRecord): string | null {
     const id = this.#threads.store.connection(record.connectionId)?.orchestratorAgentId ?? null;
     return id && this.#agents.listAgents().some((agent) => agent.id === id) ? id : null;
@@ -1711,6 +1732,9 @@ export class MessagingService {
     const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
     // The place is outside this computer, so a secret in the text must not reach it.
     const text = redactText(markdown);
+    const botUserId = live.identity.botUserId;
+    const pinged =
+      live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
     const posted = yield* (
       postEmbeds && embeds.length
         ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
@@ -1720,6 +1744,7 @@ export class MessagingService {
         posted: true as const,
         messageId,
         ...(guildId ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${messageId}` } : {}),
+        ...(pinged.length ? { ping: { userIds: pinged, text } } : {}),
       })),
       Effect.catch((failure) =>
         Effect.succeed({
@@ -1884,6 +1909,20 @@ export class MessagingService {
     }
     this.#targets.delete(key);
     const final = finalPost(activity, this.#threads.awaitsTeammate(activity.link.linkId));
+    // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
+    if (final.answer && live?.record.platform === "slack") {
+      const botUserId = live.identity?.botUserId;
+      const userIds = slackPingedUsers(final.text).filter((userId) => userId !== botUserId);
+      if (userIds.length)
+        yield* this.#threads.recordPings({
+          connectionId: activity.link.connectionId,
+          platformChannelId: activity.link.platformChannelId,
+          threadKey: activity.link.threadKey,
+          userIds,
+          agentId: activity.link.agentId,
+          text: final.text,
+        });
+    }
     const ended: StatusPost = {
       connectionId: activity.link.connectionId,
       target,
@@ -1937,7 +1976,12 @@ export class MessagingService {
       }
       if (final.answer)
         yield* adapter.postAnswer(post.target, final.text, placeholder).pipe(toMessagingOperationFailed);
-      else yield* this.#say(adapter, post.target, placeholder, final.text);
+      else if (final.text) yield* this.#say(adapter, post.target, placeholder, final.text);
+      // A quiet answer: the status post goes, and the reaction shows that OpenBot read the message.
+      else if (placeholder && adapter.remove)
+        yield* adapter.remove(post.target, placeholder).pipe(toMessagingOperationFailed);
+      else if (placeholder)
+        yield* this.#say(adapter, post.target, placeholder, sourceText("status.messaging.noAnswer"));
     }).pipe(
       Effect.tapError(() =>
         Effect.gen({ self: this }, function* () {
@@ -2349,6 +2393,11 @@ function roleName(name: string): string {
   return /[\uD800-\uDBFF]$/u.test(cut) ? cut.slice(0, -1) : cut;
 }
 
+/** The answer is the quiet marker alone, also in code or quotes, or with a full stop. */
+function isQuietAnswer(answer: string): boolean {
+  return answer.trim().replace(/^[`*_"']+|[`*_"'.]+$/g, "") === QUIET_ANSWER;
+}
+
 function token(): string {
   return randomBytes(16).toString("hex");
 }
@@ -2366,6 +2415,8 @@ function finalPost(
   if (activity.status === "failed")
     return { answer: false, text: sourceText("status.messaging.failed"), reaction: reacts ? "failed" : null };
   const reaction = reacts ? "done" : null;
+  // A quiet answer posts nothing: an empty text takes back the status post.
+  if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
   // The platform is outside this computer, so a secret in the answer must not reach it.
   if (activity.answer) return { answer: true, text: redactText(activity.answer), reaction };
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.

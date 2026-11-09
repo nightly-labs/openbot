@@ -54,6 +54,26 @@ export interface MessagingAllowedSender {
   name: string;
 }
 
+/** People that an agent's post pinged in a Slack thread that has no link yet. */
+export interface MessagingPingInput {
+  connectionId: string;
+  platformChannelId: string;
+  threadKey: string;
+  userIds: readonly string[];
+  /** The agent that posted. */
+  agentId: string;
+  /** The redacted post. */
+  text: string;
+}
+
+/** The post that pinged one person in a thread. */
+export interface MessagingPing {
+  userId: string;
+  agentId: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface MessagingLinkInput {
   connectionId: string;
   agentId: string;
@@ -224,6 +244,55 @@ export class MessagingStore {
       .run(connectionId, senderId);
   }
 
+  /** Records each person that a post pinged. A newer post in the thread replaces the text and the agent. */
+  savePings(input: MessagingPingInput): void {
+    const db = this.#database.connection;
+    const ownsTransaction = !db.isTransaction;
+    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
+    try {
+      const upsert = db.prepare(
+        `INSERT INTO projection_messaging_pings
+           (connection_id, platform_channel_id, thread_key, user_id, agent_id, text, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(connection_id, platform_channel_id, thread_key, user_id)
+         DO UPDATE SET agent_id = excluded.agent_id, text = excluded.text, created_at = excluded.created_at`,
+      );
+      const now = new Date().toISOString();
+      for (const userId of input.userIds)
+        upsert.run(
+          input.connectionId,
+          input.platformChannelId,
+          input.threadKey,
+          userId,
+          input.agentId,
+          input.text,
+          now,
+        );
+      if (ownsTransaction) db.exec("COMMIT");
+    } catch (error) {
+      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
+      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /** The people that agents' posts pinged in a thread. Empty for a thread that no ping opened. */
+  pings(connectionId: string, platformChannelId: string, threadKey: string): MessagingPing[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT user_id, agent_id, text, created_at FROM projection_messaging_pings
+           WHERE connection_id = ? AND platform_channel_id = ? AND thread_key = ?`,
+        )
+        .all(connectionId, platformChannelId, threadKey),
+    ).map((row) => ({
+      userId: requiredStringColumn(row, "user_id"),
+      agentId: requiredStringColumn(row, "agent_id"),
+      text: requiredStringColumn(row, "text"),
+      createdAt: requiredStringColumn(row, "created_at"),
+    }));
+  }
+
   link(linkId: string): MessagingLink | null {
     const row = databaseRow(
       this.#database.connection.prepare("SELECT * FROM projection_messaging_threads WHERE link_id = ?").get(linkId),
@@ -365,6 +434,22 @@ export class MessagingStore {
           deleteAggregateHistory(db, "thread", [threadId]);
           deleteThreadAttachments(db, threadId);
         }
+        // The pings of the agent's threads go with them, and so do the agent's pings of threads that no
+        // reply opened. The pings of a thread that another agent answers stay: they decide who it hears.
+        db.prepare(
+          `DELETE FROM projection_messaging_pings WHERE EXISTS (
+             SELECT 1 FROM projection_messaging_threads AS link WHERE link.agent_id = ?
+               AND link.connection_id = projection_messaging_pings.connection_id
+               AND link.platform_channel_id = projection_messaging_pings.platform_channel_id
+               AND link.thread_key = projection_messaging_pings.thread_key)`,
+        ).run(agentId);
+        db.prepare(
+          `DELETE FROM projection_messaging_pings WHERE agent_id = ? AND NOT EXISTS (
+             SELECT 1 FROM projection_messaging_threads AS link
+             WHERE link.connection_id = projection_messaging_pings.connection_id
+               AND link.platform_channel_id = projection_messaging_pings.platform_channel_id
+               AND link.thread_key = projection_messaging_pings.thread_key)`,
+        ).run(agentId);
         db.prepare("DELETE FROM projection_messaging_threads WHERE agent_id = ?").run(agentId);
         for (const { threadId } of links)
           db.prepare("DELETE FROM projection_threads WHERE thread_id = ?").run(threadId);
