@@ -181,6 +181,8 @@ const Channel = Schema.Struct({
   archived: Schema.Boolean,
   memories: Schema.Array(name(INPUT_LIMITS.agentMemoryText)).check(Schema.isMaxLength(INPUT_LIMITS.channelMemories)),
   routines: Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+  /** Added with the channels: the archive paths of the message parts, inside `channels/<key>/`. */
+  messages: Schema.optionalKey(Schema.Array(text(512)).check(Schema.isMaxLength(10_000))),
 });
 
 const Manifest = Schema.Struct({
@@ -193,6 +195,8 @@ const Manifest = Schema.Struct({
   /** Providers that were signed in on the computer that made the file. Never a token. */
   signedIn: Schema.Array(Provider).check(Schema.isMaxLength(32)),
   channels: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_CHANNELS))),
+  /** Added with the channels: the channel member id of the person who exported, for their own messages. */
+  exporter: Schema.optionalKey(text(128)),
 });
 
 export type TransferAgent = typeof Agent.Type;
@@ -207,6 +211,7 @@ export interface TransferManifest {
   shared: string | null;
   signedIn: readonly (typeof Provider.Type)[];
   channels: TransferChannel[];
+  exporter: string | null;
 }
 
 /** What the export writes. The same shape that `decodeTransferManifest` reads. */
@@ -219,6 +224,7 @@ export interface TransferManifestFile {
   shared: typeof SHARED_FOLDER | null;
   signedIn: (typeof Provider.Type)[];
   channels?: TransferChannel[];
+  exporter?: string;
 }
 
 const decodeManifest = Schema.decodeUnknownResult(Manifest);
@@ -267,6 +273,7 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
       shared: file.shared,
       signedIn: file.signedIn,
       channels: decodeChannels(file.channels ?? [], keys, warnings),
+      exporter: file.exporter ?? null,
     },
     warnings,
   };
@@ -288,7 +295,8 @@ function decodeChannels(
       !channel ||
       keys.has(channel.key) ||
       !isAgentImportKey(channel.key) ||
-      (channel.image !== null && (!channel.image.startsWith(prefix) || isUnsafeArchivePath(channel.image)))
+      (channel.image !== null && (!channel.image.startsWith(prefix) || isUnsafeArchivePath(channel.image))) ||
+      (channel.messages ?? []).some((path) => !path.startsWith(prefix) || isUnsafeArchivePath(path))
     ) {
       warnings.push(sourceText("error.import.transferChannelInvalid", { number: index + 1 }));
       continue;

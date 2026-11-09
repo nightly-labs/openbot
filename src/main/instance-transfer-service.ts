@@ -87,7 +87,14 @@ import {
 import type { AgentImportSkills, ChannelActor } from "./agent-import-service";
 import { validTimezone } from "./agent-marketplace-service";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
-import { exportHistory, importHistory, type TransferHistoryAgents } from "./instance-transfer-history";
+import {
+  exportChannelMessages,
+  exportHistory,
+  importChannelMessages,
+  importHistory,
+  type TransferChannelHistory,
+  type TransferHistoryAgents,
+} from "./instance-transfer-history";
 import {
   agentPrefix,
   channelPrefix,
@@ -169,8 +176,12 @@ interface InstanceTransferAgents extends TransferPreferenceAgents, TransferHisto
   initializeMemorySelection(agentId: string): void;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, unknown>;
   deleteAgent(agentId: string): Effect.Effect<void, unknown>;
-  channels: {
-    store: { ids(): string[]; get(channelId: string): Channel };
+  channels: TransferChannelHistory & {
+    store: {
+      ids(): string[];
+      get(channelId: string): Channel;
+      markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): unknown;
+    };
     images: { resolve(channel: Channel): { path: string; mimeType: AvatarImageInput["mimeType"] } | null };
     command(command: ChannelCommand, actor: ChannelActor): Effect.Effect<Channel, unknown>;
     setImage(channelId: string, image: AvatarImageInput | null): Effect.Effect<unknown, unknown>;
@@ -393,6 +404,11 @@ export class InstanceTransferService {
 
     const channels: TransferChannel[] = [];
     const channelPort = this.options.agents.channels;
+    const channelMessages = (port: TransferChannelHistory, channelId: string, prefix: string) => {
+      const exported = exportChannelMessages(port, channelId, prefix, keys, entries);
+      bytes += exported.bytes;
+      return exported.parts.length > 0 ? { messages: exported.parts } : {};
+    };
     for (const channelId of channelPort.store.ids()) {
       const channel = channelPort.store.get(channelId);
       const members = channel.members.flatMap((member) => keys.get(member.agentId) ?? []);
@@ -422,6 +438,7 @@ export class InstanceTransferService {
         archived: channel.archived,
         memories: this.options.agents.listChannelMemories(channel.id).map((memory) => memory.text),
         routines: this.options.agents.listChannelRoutines(channel.id).map(transferRoutine),
+        ...(input.includeHistory ? channelMessages(channelPort, channel.id, channelPrefix(key)) : {}),
       });
     }
 
@@ -450,7 +467,7 @@ export class InstanceTransferService {
       settings: input.includeSettings ? yield* this.#readSettings(keys, manifestAgents) : null,
       shared,
       signedIn: this.options.settings.signedInProviders(),
-      ...(channels.length > 0 ? { channels } : {}),
+      ...(channels.length > 0 ? { channels, exporter: this.options.channelActor().id } : {}),
     };
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     entries.unshift({ name: INSTANCE_TRANSFER_MANIFEST, read: () => Promise.resolve(manifestBytes) });
@@ -761,6 +778,7 @@ export class InstanceTransferService {
           agentIds,
           routineIds,
           scratch: join(tmpdir(), "openbot-transfer-history"),
+          readerId: actor.id,
         },
         warnings,
       ).pipe(
@@ -771,7 +789,16 @@ export class InstanceTransferService {
     }
     for (const channel of staged.manifest.channels) {
       const result = yield* Effect.result(
-        this.#importChannel(archive, channel, agentIds, routineIds, actor, warnings, fallbackTimezone),
+        this.#importChannel(
+          archive,
+          channel,
+          agentIds,
+          routineIds,
+          actor,
+          staged.manifest.exporter,
+          warnings,
+          fallbackTimezone,
+        ),
       );
       if (Result.isFailure(result))
         warnings.push(
@@ -948,6 +975,7 @@ export class InstanceTransferService {
     agentIds: ReadonlyMap<string, string>,
     routineIds: Map<string, string>,
     actor: ChannelActor,
+    exporter: string | null,
     warnings: string[],
     fallbackTimezone: string,
   ): Effect.fn.Return<void, ArchiveOperationError> {
@@ -1007,6 +1035,20 @@ export class InstanceTransferService {
                   reason: message(created.failure.cause),
                 }),
               );
+          }
+          if (source.messages?.length) {
+            yield* importChannelMessages(archive, port.channels, {
+              channelId: channel.id,
+              parts: source.messages,
+              prefix: channelPrefix(source.key),
+              agentIds,
+              exporter,
+              actor,
+            });
+            // The history was read on the other computer, so it does not arrive unread.
+            const last = port.channels.store.messages(channel.id).at(-1);
+            if (last)
+              yield* archiveSync(() => port.channels.store.markRead(channel.id, actor.id, last.sequence, randomUUID()));
           }
           if (source.archived)
             yield* port.channels

@@ -100,12 +100,21 @@ function service(uploadDirectory: string): InstanceTransferService {
       throw unexpected("readTransferHistory");
     },
     resolveTransferFile: (_attachmentId) => Effect.die(unexpected("resolveTransferFile")),
-    importTransferHistory: (_input) => Effect.die(unexpected("importTransferHistory")),
+    importTransferHistory: (_input, _readerId) => Effect.die(unexpected("importTransferHistory")),
     channels: {
       store: {
         ids: () => [],
         get: (_channelId) => {
           throw unexpected("channels.get");
+        },
+        messages: (_channelId) => {
+          throw unexpected("channels.messages");
+        },
+        update: (_channel, _changes) => {
+          throw unexpected("channels.update");
+        },
+        markRead: (_channelId, _memberId, _sequence, _operationId) => {
+          throw unexpected("channels.markRead");
         },
       },
       images: {

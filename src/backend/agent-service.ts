@@ -6040,12 +6040,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#history.resolveFile(attachmentId);
   }
 
-  /** Writes one chat of an imported agent, then tells the open views to read the agent again. */
+  /**
+   * Writes one chat of an imported agent, then tells the open views to read the agent again. The
+   * history was read on the other computer, so it does not arrive unread for `readerId`.
+   */
   readonly importTransferHistory = Effect.fn("AgentService.importTransferHistory")(function* (
     this: AgentService,
     input: ImportHistoryThreadInput,
+    readerId: string,
   ): Effect.fn.Return<void, AgentHistoryTransferFailed> {
-    const threadId = yield* this.#history.importThread(input);
+    const { threadId, lastMessageId } = yield* this.#history.importThread(input);
+    if (lastMessageId) this.#reader.markThreadRead(readerId, threadId, lastMessageId);
     if (!input.thread.main) this.#tasks.changed(input.agentId);
     this.#emit({
       type: "conversation-invalidated",

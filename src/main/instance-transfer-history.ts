@@ -10,7 +10,13 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { type ConversationMessage, isConversationMessage } from "@openbot/contracts/ipc";
+import {
+  type Channel,
+  type ChannelMessage,
+  type ConversationMessage,
+  isChannelMessage,
+  isConversationMessage,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
@@ -37,7 +43,10 @@ export interface TransferHistoryAgents {
   resolveTransferFile(
     attachmentId: string,
   ): Effect.Effect<{ path: string; mimeType: string; name: string } | null, AgentHistoryTransferFailed>;
-  importTransferHistory(input: ImportHistoryThreadInput): Effect.Effect<void, AgentHistoryTransferFailed>;
+  importTransferHistory(
+    input: ImportHistoryThreadInput,
+    readerId: string,
+  ): Effect.Effect<void, AgentHistoryTransferFailed>;
 }
 
 /** An entry the export writes. */
@@ -140,6 +149,7 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
     agentIds: ReadonlyMap<string, string>;
     routineIds: ReadonlyMap<string, string>;
     scratch: string;
+    readerId: string;
   },
   warnings: string[],
 ) {
@@ -178,13 +188,16 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
               }
               if (messages.length === 0) return;
               yield* agents
-                .importTransferHistory({
-                  agentId: input.agentId,
-                  thread: { ...thread, routineId: thread.routineKey, messages },
-                  files,
-                  agentIds: input.agentIds,
-                  routineIds: input.routineIds,
-                })
+                .importTransferHistory(
+                  {
+                    agentId: input.agentId,
+                    thread: { ...thread, routineId: thread.routineKey, messages },
+                    files,
+                    agentIds: input.agentIds,
+                    routineIds: input.routineIds,
+                  },
+                  input.readerId,
+                )
                 .pipe(Effect.mapError((failure) => archiveFailure(failure.cause)));
             }),
           );
@@ -255,3 +268,112 @@ function parsed<T>(bytes: Uint8Array | undefined, decode: (value: unknown) => T,
     return fallback;
   }
 }
+
+/** The channel operations that read and write channel messages. */
+export interface TransferChannelHistory {
+  store: {
+    get(channelId: string): Channel;
+    messages(channelId: string): ChannelMessage[];
+    update(channel: Channel, changes: { messages: ChannelMessage[] }, operationId?: string): Channel;
+  };
+}
+
+/**
+ * Adds a channel's shown messages to the export, as JSON parts. An agent author is written as its key
+ * in the file. Files of channel messages stay on the other computer: only their cards would travel.
+ */
+export function exportChannelMessages(
+  channels: TransferChannelHistory,
+  channelId: string,
+  prefix: string,
+  agentKeys: ReadonlyMap<string, string>,
+  entries: HistoryEntry[],
+): { parts: string[]; bytes: number } {
+  const messages = channels.store.messages(channelId).flatMap((entry): ChannelMessage[] => {
+    if (entry.author.kind === "agent") {
+      const key = agentKeys.get(entry.author.id);
+      if (!key) return [];
+      entry = { ...entry, author: { ...entry.author, id: key } };
+    }
+    const { attachments: _attachments, voiceRecording: _voice, ...message } = exportedMessage(entry.message, agentKeys);
+    return [{ ...entry, taskId: null, message }];
+  });
+  const parts: string[] = [];
+  let bytes = 0;
+  for (let start = 0; start < messages.length; start += PART_MESSAGES) {
+    const name = `${prefix}messages-${parts.length + 1}.json`;
+    const data = new TextEncoder().encode(JSON.stringify(messages.slice(start, start + PART_MESSAGES)));
+    bytes += data.byteLength;
+    parts.push(name);
+    entries.push({ name, read: () => Promise.resolve(data) });
+  }
+  return { parts, bytes };
+}
+
+/**
+ * Writes the messages of an imported channel in batches of one part. Each message gets a new id and
+ * no task. An agent author points to its copy, and a message of an agent that the user did not import
+ * is left out. The person who exported is the person who imports.
+ */
+export const importChannelMessages = Effect.fn("InstanceTransfer.importChannelMessages")(function* (
+  archive: ArchiveFile,
+  channels: TransferChannelHistory,
+  input: {
+    channelId: string;
+    parts: readonly string[];
+    prefix: string;
+    agentIds: ReadonlyMap<string, string>;
+    exporter: string | null;
+    actor: { id: string; name: string };
+  },
+) {
+  const ids = new Map<string, string>();
+  for (const part of input.parts) {
+    if (!part.startsWith(input.prefix) || part.includes("..")) continue;
+    const bytes = (yield* readEntriesEffect(archive, [part], PART_MAX_BYTES))[part];
+    const batch = parsed(bytes, (value) => (Array.isArray(value) ? value.filter(isChannelMessage) : []), []).flatMap(
+      (entry): ChannelMessage[] => {
+        let author = entry.author;
+        if (author.kind === "agent") {
+          const agentId = input.agentIds.get(author.id);
+          if (!agentId) return [];
+          author = { ...author, id: agentId };
+        } else if (author.kind === "member" && author.id === input.exporter)
+          author = { kind: "member", ...input.actor };
+        const id = randomUUID();
+        ids.set(entry.id, id);
+        const {
+          delivery: _delivery,
+          reaction: _reaction,
+          reactions: _reactions,
+          exchange: _exchange,
+          ...message
+        } = entry.message;
+        const senderAgentId = message.senderAgentId ? input.agentIds.get(message.senderAgentId) : undefined;
+        const replyTo = message.replyToMessageId ? ids.get(message.replyToMessageId) : undefined;
+        const { senderAgentId: _sender, replyToMessageId: _reply, ...rest } = message;
+        return [
+          {
+            id,
+            channelId: input.channelId,
+            sequence: 0,
+            author,
+            taskId: null,
+            superseded: entry.superseded,
+            message: {
+              ...rest,
+              id,
+              status: rest.status === "streaming" ? "interrupted" : rest.status,
+              ...(senderAgentId ? { senderAgentId } : {}),
+              ...(replyTo ? { replyToMessageId: replyTo } : {}),
+            },
+          },
+        ];
+      },
+    );
+    if (batch.length === 0) continue;
+    yield* archiveCall(async () => {
+      channels.store.update(channels.store.get(input.channelId), { messages: batch });
+    });
+  }
+});

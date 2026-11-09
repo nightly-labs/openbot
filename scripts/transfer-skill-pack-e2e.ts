@@ -196,7 +196,13 @@ try {
     resolveTransferFile: () => Effect.succeed(null),
     importTransferHistory: () => Effect.die("The export has no chat history."),
     channels: {
-      store: { ids: () => [], get: () => assert.fail("The instance has no channels.") },
+      store: {
+        ids: () => [],
+        get: () => assert.fail("The instance has no channels."),
+        messages: () => [],
+        update: () => assert.fail("The instance has no channels."),
+        markRead: () => assert.fail("The instance has no channels."),
+      },
       images: { resolve: () => null },
       command: () => Effect.die("The instance has no channels."),
       setImage: () => Effect.die("The instance has no channels."),

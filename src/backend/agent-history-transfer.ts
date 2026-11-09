@@ -165,7 +165,7 @@ export class AgentHistoryTransfer {
         );
       }).pipe(Effect.onError(() => options.mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)));
     }
-    return threadId;
+    return { threadId, lastMessageId: messages.at(-1)?.id ?? null };
   });
 
   #messages(threadId: string): ConversationMessage[] {

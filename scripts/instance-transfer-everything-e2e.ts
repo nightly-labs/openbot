@@ -319,6 +319,27 @@ try {
     schedule: { kind: "daily", time: "17:00" },
   });
 
+  // A real message in the channel, which an agent answers.
+  await runCauseEffect(
+    source.agents.channels.command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId: channel.id,
+        text: "Plan the front page.",
+        // To one member, so no routing turn runs.
+        recipientAgentId: writer.id,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      { id: "local", name: "You" },
+    ),
+  );
+  const sourceChannelMessages = await waitFor("an agent answer in the channel", () => {
+    const messages = source.agents.channels.store.messages(channel.id);
+    return messages.some((entry) => entry.author.kind === "agent" && entry.message.status === "completed") && messages;
+  });
+
   // --- Export everything.
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
@@ -408,6 +429,28 @@ try {
     target.agents.listChannelRoutines(newChannel.id).some((item) => item.name === "Evening edition"),
   );
 
+  const newChannelMessages = target.agents.channels.store.messages(newChannel.id);
+  pass(
+    "channel messages move in order",
+    JSON.stringify(newChannelMessages.map((entry) => entry.message.text)) ===
+      JSON.stringify(sourceChannelMessages.map((entry) => entry.message.text)),
+    JSON.stringify(newChannelMessages.map((entry) => entry.message.text)),
+  );
+  pass(
+    "channel authors are the new agents and the importing person",
+    newChannelMessages.every((entry) =>
+      entry.author.kind === "agent"
+        ? [newWriter.id, newEditor.id].includes(entry.author.id)
+        : entry.author.kind !== "member" || entry.author.id === "local",
+    ),
+  );
+  const newSummary = target.agents.channels.store.list("local").find((item) => item.id === newChannel.id);
+  pass(
+    "imported channel messages are not unread",
+    newSummary !== undefined && newSummary.unreadCount === 0,
+    JSON.stringify(newSummary),
+  );
+
   // --- The chats.
   const page = await runCauseEffect(target.agents.readConversationPageFor(newWriter.id, "local"));
   const texts = (messages: readonly { text: string }[]) => messages.map((message) => message.text);
@@ -416,6 +459,7 @@ try {
     JSON.stringify(texts(page.messages)) === JSON.stringify(texts(sourceMain.messages)),
     JSON.stringify({ source: texts(sourceMain.messages), target: texts(page.messages) }),
   );
+  pass("the imported chat is not unread", page.readState?.unreadCount === 0, JSON.stringify(page.readState ?? null));
   const imported = page.messages.find((message) => message.attachments?.length);
   const attachment = imported?.attachments?.[0];
   assert.ok(attachment, "The imported message has no file.");
