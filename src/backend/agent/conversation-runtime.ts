@@ -12,6 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { withoutQueuePositions } from "../database/conversation-writer";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -1274,25 +1275,9 @@ function oldestMessagesToRemove(
   return removed;
 }
 
-/**
- * What a write must store of a message. A queue position is left out: it moves each time a delivery
- * ahead of it starts or goes back, and each reader takes it from the mailbox again
- * (`syncMailboxMessages`, and `reconcilePersistedMailboxMessages` before a page read). Stored, each
- * move wrote every queued message again in the recipient's chat and in each sender's chat.
- */
+/** What a write must store of a message: it with no queue position (`withoutQueuePositions`). */
 function messageSignature(message: ConversationMessage): string {
-  const { delivery, exchange } = message;
-  const stored =
-    delivery || exchange
-      ? {
-          ...message,
-          ...(delivery ? { delivery: { ...delivery, position: null } } : {}),
-          ...(exchange
-            ? {
-                exchange: { ...exchange, deliveries: exchange.deliveries.map((item) => ({ ...item, position: null })) },
-              }
-            : {}),
-        }
-      : message;
-  return createHash("sha256").update(JSON.stringify(stored)).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(withoutQueuePositions(message)))
+    .digest("hex");
 }

@@ -23,6 +23,24 @@ import {
 import { currentConversationMessage } from "./legacy-conversation-message";
 import { readOrderInputs, refreshChangedOrder, refreshThreadOrder } from "./thread-message-order";
 
+/**
+ * The message as a write compares it, with no queue position. A position moves each time a delivery
+ * ahead of it starts or goes back, and each reader takes it from the mailbox again
+ * (`syncMailboxMessages`, `refreshQueuePositions`). Stored, each move wrote every queued message
+ * again in the recipient's chat and in each sender's chat.
+ */
+export function withoutQueuePositions(message: ConversationMessage): ConversationMessage {
+  const { delivery, exchange } = message;
+  if (!delivery && !exchange) return message;
+  return {
+    ...message,
+    ...(delivery ? { delivery: { ...delivery, position: null } } : {}),
+    ...(exchange
+      ? { exchange: { ...exchange, deliveries: exchange.deliveries.map((item) => ({ ...item, position: null })) } }
+      : {}),
+  };
+}
+
 export interface ConversationWriterOptions {
   core: DatabaseCore;
   roster: AgentRoster;
@@ -429,7 +447,10 @@ export class ConversationWriter {
       const existing = stored.get(message.id);
       if (!existing) return true;
       // The JSON round trip drops `undefined` keys, as the stored row does.
-      return !isDeepStrictEqual(JSON.parse(JSON.stringify(mergeLiveMessage(existing, message))), existing);
+      return !isDeepStrictEqual(
+        JSON.parse(JSON.stringify(withoutQueuePositions(mergeLiveMessage(existing, message)))),
+        withoutQueuePositions(existing),
+      );
     });
   }
 
