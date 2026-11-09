@@ -139,6 +139,8 @@ export const messages = {
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.museNoModels":
+    "لم يرسل Muse أي نماذج لهذا الحساب. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل. اختر نموذجًا من مزوّد آخر.",
   "provider.picker.customEmpty":
     "أضف نقطة نهاية متوافقة مع OpenAI — خادم نماذج على هذا الحاسوب، أو أي خدمة لها عنوان URL أساسي ومفتاح.",
   "provider.picker.customPending": "لم يتم تحميل نماذج نقاط النهاية بعد. يقرأها المزوّد بعد توقف مهمته الحالية.",

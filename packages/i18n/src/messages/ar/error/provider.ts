@@ -392,6 +392,8 @@ export const messages = {
   "error.provider.museEmptyInput": "يحتاج Muse إلى نص أو صورة.",
   "error.provider.museMethodUnsupported": "لا يدعم Muse {method}.",
   "error.provider.museTurnFailed": "فشل دور Muse.",
+  "error.provider.museModelUnavailable":
+    "لا يمكن لـ Muse استخدام هذا النموذج. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل، أو قد لا يملك هذا الحساب إذنًا بالوصول إلى النموذج. اختر نموذجًا آخر، ثم حاول مرة أخرى.\n{detail}",
   "error.provider.museProfileUnsupported":
     "لا يستطيع Muse إنشاء ملف تعريف بدون الوصول إلى أدوات خارجية. استخدم مزوّدًا آخر لإنشاء ملف التعريف، ثم اختر Muse للوكيل.",
   "error.provider.museAuthUnverified": "لم يتم التحقق من مصادقة Muse. اتصل على الحاسوب المضيف، أو عيّن مفتاح Meta API.",

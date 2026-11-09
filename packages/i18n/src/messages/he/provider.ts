@@ -119,6 +119,8 @@ export const messages = {
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
   "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.museNoModels":
+    "Muse לא שלח מודלים עבור החשבון הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל. בחר מודל מספק אחר.",
   "provider.picker.customEmpty":
     "אפשר להוסיף נקודת קצה תואמת OpenAI — שרת מודלים במחשב הזה, או כל שירות עם כתובת בסיס ומפתח.",
   "provider.picker.customPending":

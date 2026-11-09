@@ -123,6 +123,8 @@ export const messages = {
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.museNoModels":
+    "Muse はこのアカウントにモデルを返しませんでした。このエージェントが動作している国では Muse を利用できない可能性があります。別のプロバイダーのモデルを選択してください。",
   "provider.picker.customEmpty":
     "OpenAI 互換のエンドポイントを追加してください。このコンピューター上のモデルサーバーでも、ベース URL とキーがあるサービスでも使えます。",
   "provider.picker.customPending":
