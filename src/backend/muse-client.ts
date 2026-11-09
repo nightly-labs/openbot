@@ -907,13 +907,17 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       const history = yield* this.#history(thread.id);
       for (const item of history) this.#publish(thread, item);
       if (terminal.terminal === "failed") {
+        const message = this.#redact(
+          terminal.error?.message ?? terminal.reason ?? sourceText("error.provider.museTurnFailed"),
+        );
         this.#emit("error", {
           threadId: thread.id,
           turnId: terminal.turnId,
           error: {
-            message: this.#redact(
-              terminal.error?.message ?? terminal.reason ?? sourceText("error.provider.museTurnFailed"),
-            ),
+            // Meta refuses a model this way also where Muse is not offered (#5983).
+            message: /\bdoes not exist or you lack access\b/iu.test(message)
+              ? sourceText("error.provider.museModelUnavailable", { detail: message })
+              : message,
           },
           willRetry: false,
         });

@@ -424,6 +424,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse ha bisogno di testo o di un'immagine.",
   "error.provider.museMethodUnsupported": "Muse non supporta {method}.",
   "error.provider.museTurnFailed": "Turno di Muse non riuscito.",
+  "error.provider.museModelUnavailable":
+    "Muse non può usare questo modello. Muse potrebbe non essere disponibile nel paese in cui viene eseguito questo agente, oppure questo account non ha accesso al modello. Scegli un altro modello, poi riprova.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse non può generare un profilo senza accesso a tool esterni. Usa un altro provider per generare il profilo, poi seleziona Muse per l'agente.",
   "error.provider.museAuthUnverified":
