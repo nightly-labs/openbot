@@ -261,9 +261,16 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   /* The channel that the chat shows. It stays after a close, so the chat keeps its rows while it fades. */
   const shownChannelId = createMemo((previous?: string | null) => openChannelId() ?? previous ?? null);
   /* The dock shows a message with no sender as the reader's own. A signed-in reader's messages carry their sender. */
+  const ownCopies = new WeakMap<AgentMessage, AgentMessage>();
   const asOwn = (message: AgentMessage): AgentMessage => {
     if (message.author !== "you" || !message.senderMember || !isOwnSender(message.senderMember.id)) return message;
+    /* A copy stays the same while the text, the kind and the files of its message stay: the chat reads it
+       again for each streamed word of an answer, and a new copy would draw the row again. */
+    const copy = ownCopies.get(message);
+    if (copy && copy.body === message.body && copy.kind === message.kind && copy.attachments === message.attachments)
+      return copy;
     const { senderMember: _own, ...own } = message;
+    ownCopies.set(message, own);
     return own;
   };
   /* The rows of the shown channel. */
