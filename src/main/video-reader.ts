@@ -199,11 +199,14 @@ interface Format {
   hasAudio: boolean;
   height: number;
   streamed: boolean;
+  /** HEVC, which Chromium decodes only with hardware or system support. */
+  hevc: boolean;
   m4a: boolean;
   bitrate: number;
 }
 
 const PROTOCOLS = new Set(["https", "http", "m3u8_native", "m3u8"]);
+const HEVC_CODEC = /^(?:hvc1|hev1|h265|hevc)/iu;
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -233,6 +236,7 @@ function formats(info: Info): Format[] {
         hasAudio,
         height: count(format.height) ?? 0,
         streamed: protocol.startsWith("m3u8"),
+        hevc: HEVC_CODEC.test(text(format.vcodec) ?? ""),
         m4a: format.ext === "m4a",
         bitrate: count(format.tbr) ?? count(format.abr) ?? 0,
       },
@@ -240,11 +244,18 @@ function formats(info: Info): Format[] {
   });
 }
 
-/** The highest picture up to 720 lines, or the smallest when every picture is larger. A direct file wins. */
+/**
+ * The highest picture up to 720 lines, or the smallest when every picture is larger. A direct file
+ * wins, and then a codec that every Chromium build decodes.
+ */
 function bestPicture(candidates: Format[]): Format | undefined {
   const score = (format: Format) => (format.height <= MAX_HEIGHT ? format.height : -format.height);
   return candidates.toSorted(
-    (a, b) => Number(a.streamed) - Number(b.streamed) || score(b) - score(a) || a.bitrate - b.bitrate,
+    (a, b) =>
+      Number(a.streamed) - Number(b.streamed) ||
+      Number(a.hevc) - Number(b.hevc) ||
+      score(b) - score(a) ||
+      a.bitrate - b.bitrate,
   )[0];
 }
 
@@ -386,17 +397,17 @@ export class VideoReader implements VideoReaderHost {
       try: () => readdir(directory),
       catch: () => failure("OpenBot could not find the downloaded video."),
     });
-    const fileOf = (id: string | null) => {
-      const name =
-        id === null
-          ? files.find((file) => file.startsWith("media."))
-          : files.find((file) => file.startsWith(`media.${id}.`));
+    /** The file of a format id, or, when yt-dlp chose the format, its only file. */
+    const fileOf = (prefix: string) => {
+      const name = files.find((file) => file.startsWith(prefix));
       return name ? join(directory, name) : null;
     };
+    const chosenFile = (id: string | null) => (id === null ? null : fileOf(`media.${id}.`));
+    // A format with no sound has no sound file: the picture file is not decoded for sound.
     const media: Media =
       ids.length > 0
-        ? { video: fileOf(chosen.video), audio: fileOf(chosen.audio) }
-        : { video: fileOf(null), audio: fileOf(null) };
+        ? { video: chosenFile(chosen.video), audio: chosenFile(chosen.audio) }
+        : { video: fileOf("media."), audio: fileOf("media.") };
     if (!media.video && !media.audio)
       return yield* failure("The video is larger than 500 MB, or the site gave no file to download.");
     const decoded = yield* this.#decode(media, request.frames, count(info.duration));
