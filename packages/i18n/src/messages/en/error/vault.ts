@@ -9,6 +9,8 @@ export const messages = defineMessages("error.vault", {
   "error.vault.valueTooLong": "A value is too long.",
   "error.vault.websiteInvalid": "Enter an HTTPS website address.",
   "error.vault.passwordRequired": "Enter a password.",
+  "error.vault.twoStepKeyInvalid":
+    "This is not a two-step key. Enter the setup key or the otpauth:// link of the site.",
   "error.vault.cardNumberInvalid": "Enter a valid card number.",
   "error.vault.securityCodeInvalid": "Enter a security code of 3 or 4 digits.",
   "error.vault.expiryInvalid": "Enter a valid expiry month and year.",

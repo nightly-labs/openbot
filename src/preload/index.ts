@@ -336,7 +336,7 @@ import {
   decodeTeamPresenceSnapshot,
   decodeTeamSessions,
 } from "./team-decoding";
-import { decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
+import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
   decodeWorkflowGitHubCatalog,
@@ -1049,6 +1049,7 @@ const openbotApi: OpenBotDesktopApi = {
     copy: decodeVoid,
     importCsv: decodeVaultImportResult,
     reset: decodeVaultState,
+    codes: decodeVaultCodes,
     changed: decodeVaultState,
     hostList: decodeVaultState,
     hostSave: decodeVaultState,
@@ -1056,6 +1057,7 @@ const openbotApi: OpenBotDesktopApi = {
     hostReveal: decodeVaultSecret,
     hostCopy: decodeVoid,
     hostReset: decodeVaultState,
+    hostCodes: decodeVaultCodes,
   }),
   onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
     status: decodeOnePasswordConnectorStatus,

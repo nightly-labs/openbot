@@ -10,6 +10,7 @@ import type {
   VaultSecretField,
   VaultSecretRequest,
   VaultState,
+  VaultTwoStepCodes,
 } from "@openbot/contracts/ipc";
 import {
   API_KEY_NAME_PATTERN,
@@ -21,6 +22,7 @@ import {
   VAULT_TEXT_LIMIT,
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
+import { normalizeTwoStepKey } from "@openbot/contracts/two-step-code";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -73,6 +75,15 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
+import {
+  createDraftTwoStepCode,
+  createSavedTwoStepCodes,
+  type LiveTwoStepCode,
+  TwoStepCheckStep,
+  TwoStepKeyStep,
+  TwoStepRow,
+  TwoStepRowCode,
+} from "./vault-two-step";
 
 export interface VaultPanelProps {
   state: VaultState;
@@ -85,8 +96,13 @@ export interface VaultPanelProps {
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   /** Puts the saved value on the clipboard. On desktop the value does not come to this window. */
   onCopy: (request: VaultSecretRequest) => Promise<void>;
-  /** Puts a username or an address on the clipboard. */
+  /** Puts a username, an address or a two-step code on the clipboard. */
   onCopyText: (value: string) => Promise<void>;
+  /**
+   * The current two-step code of each login with a key. Absent for a server that cannot keep two-step
+   * keys: the dialog does not offer them.
+   */
+  onCodes?: (() => Promise<VaultTwoStepCodes>) | undefined;
   /** Opens the file dialog. Null when the user closes it. Absent for a joined server: no import. */
   onImportCsv?: (() => Promise<VaultImportResult>) | undefined;
   /** Deletes the Vault file that cannot be read, and starts again with no items. */
@@ -152,7 +168,17 @@ function parseExpiry(text: string): { month: number; year: number } | null {
   return month >= 1 && month <= 12 ? { month, year } : null;
 }
 
-type LoginDraft = { kind: "login"; website: string; username: string; notes: string; password: string };
+type LoginDraft = {
+  kind: "login";
+  website: string;
+  username: string;
+  notes: string;
+  password: string;
+  /** A new two-step key that the user typed. The saved key never comes to this window. */
+  twoStepKey: string;
+  /** The user removed the saved two-step key. */
+  twoStepRemoved: boolean;
+};
 type CardDraft = {
   kind: "card";
   label: string;
@@ -185,8 +211,16 @@ const EMPTY_CONTACT: VaultContactFields = {
 function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
   if (kind === "login")
     return item?.kind === "login"
-      ? { kind, website: item.website, username: item.username, notes: item.notes, password: "" }
-      : { kind, website: "", username: "", notes: "", password: "" };
+      ? {
+          kind,
+          website: item.website,
+          username: item.username,
+          notes: item.notes,
+          password: "",
+          twoStepKey: "",
+          twoStepRemoved: false,
+        }
+      : { kind, website: "", username: "", notes: "", password: "", twoStepKey: "", twoStepRemoved: false };
   if (kind === "card")
     return item?.kind === "card"
       ? {
@@ -271,6 +305,13 @@ function draftReady(draft: Draft, saved: VaultItemSummary | null): boolean {
   return [draft.fullName, draft.address, draft.phone, draft.email].some((field) => field.trim() !== "");
 }
 
+/** A new key, an empty text that removes the saved key, or nothing, which keeps it. */
+function twoStepKeyInput(draft: LoginDraft): { twoStepKey?: string } {
+  const typed = normalizeTwoStepKey(draft.twoStepKey);
+  if (typed !== null) return { twoStepKey: typed };
+  return draft.twoStepRemoved ? { twoStepKey: "" } : {};
+}
+
 /** An empty secret field keeps the saved value. */
 function saveInput(draft: Draft, id: string | null): VaultSaveInput {
   if (draft.kind === "login")
@@ -281,6 +322,7 @@ function saveInput(draft: Draft, id: string | null): VaultSaveInput {
       username: draft.username.trim(),
       notes: draft.notes,
       password: draft.password === "" ? null : draft.password,
+      ...twoStepKeyInput(draft),
     };
   if (draft.kind === "card") {
     const expiry = parseExpiry(draft.expiry) ?? { month: 0, year: 0 };
@@ -377,6 +419,16 @@ export function VaultPanel(props: VaultPanelProps) {
   const itemSummary = (item: VaultItemSummary) =>
     [itemDetail(item), item.addedBy ? t("vault.addedBy", { agent: item.addedBy }) : ""].filter(Boolean).join(" · ");
 
+  // A new list after each saved change, so a replaced key loads its code again.
+  const keyedLogins = createMemo(() =>
+    props.state.items.filter((item) => item.kind === "login" && item.hasTwoStep).map((item) => item.id),
+  );
+  const twoStepCodes = createSavedTwoStepCodes(() => props.onCodes, keyedLogins);
+  const editingCode = () => {
+    const item = ui.editing?.item;
+    return item ? twoStepCodes.code(item.id) : undefined;
+  };
+  const copyCode = (code: string) => void run(() => props.onCopyText(code), "vault.copyFailed");
   const ready = () => props.state.status === "ready";
   const filters = () => FILTERS.filter((item) => item.value !== "apiKey" || props.apiKeys);
   const contacts = () => props.state.items.filter((item): item is VaultContactSummary => item.kind === "contact");
@@ -588,6 +640,16 @@ export function VaultPanel(props: VaultPanelProps) {
                                 <ItemDescription class="vault-truncate">{itemSummary(item)}</ItemDescription>
                               </ItemContent>
                               <ItemActions class="integrations-hub-actions">
+                                <Show when={twoStepCodes.code(item.id)}>
+                                  {(code) => (
+                                    <TwoStepRowCode
+                                      code={code()}
+                                      now={twoStepCodes.now()}
+                                      site={itemTitle(item)}
+                                      onCopy={copyCode}
+                                    />
+                                  )}
+                                </Show>
                                 <ItemMenu
                                   item={item}
                                   title={itemTitle(item)}
@@ -628,6 +690,9 @@ export function VaultPanel(props: VaultPanelProps) {
             countries={countries()}
             contactLine={contactLine}
             title={editingTitle(editing())}
+            twoStep={props.onCodes !== undefined}
+            savedCode={editingCode()}
+            onCopyCode={copyCode}
             onSave={(input) => props.onSave(input)}
             onReveal={props.onReveal}
             onClose={closeDialogs}
@@ -1022,6 +1087,11 @@ function ItemDialog(props: {
   prefill?: Readonly<Record<string, string>> | undefined;
   /** A request from the chat: no billing address and no notes, which it does not carry. */
   fromChat?: boolean | undefined;
+  /** The server keeps two-step keys, so a login offers one. */
+  twoStep?: boolean | undefined;
+  /** The current code of the saved key, from main. */
+  savedCode?: LiveTwoStepCode | undefined;
+  onCopyCode?: ((code: string) => void) | undefined;
   onSave: (input: VaultSaveInput) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
@@ -1037,6 +1107,39 @@ function ItemDialog(props: {
     const current = draft();
     return current.kind === "login" ? current : undefined;
   };
+  /** The setup of a two-step key replaces the fields: the key, then a check of its code on the site. */
+  const [step, setStep] = createSignal<"form" | "key" | "check">("form");
+  const typedKey = createDraftTwoStepCode(() => loginDraft()?.twoStepKey ?? "");
+  const savedTwoStep = () => props.item?.kind === "login" && props.item.hasTwoStep;
+  const twoStepOn = (login: LoginDraft) => typedKey.valid() || (savedTwoStep() && !login.twoStepRemoved);
+  const twoStepCode = () => (typedKey.valid() ? typedKey.code() : props.savedCode);
+  const siteName = (login: LoginDraft) =>
+    login.website
+      .trim()
+      .replace(/^https?:\/\//u, "")
+      .split("/")[0] || t("vault.twoStep.theSite");
+  const keyInvalid = (login: LoginDraft) => login.twoStepKey.trim() !== "" && !typedKey.valid();
+  const startSetup = () => {
+    const login = loginDraft();
+    if (login) set(login, { twoStepKey: "" });
+    setStep("key");
+  };
+  /** Back from the key step drops the typed key, so the login keeps what it had. */
+  const cancelSetup = () => {
+    const login = loginDraft();
+    if (login) set(login, { twoStepKey: "" });
+    setStep("form");
+  };
+  function finishSetup() {
+    const login = loginDraft();
+    if (login) set(login, { twoStepRemoved: false });
+    setStep("form");
+  }
+  const removeTwoStep = () => {
+    const login = loginDraft();
+    if (login) set(login, { twoStepKey: "", twoStepRemoved: true });
+  };
+  const dialogTitle = () => (step() === "form" ? props.title : t("vault.twoStep.setupTitle"));
   const cardDraft = () => {
     const current = draft();
     return current.kind === "card" ? current : undefined;
@@ -1066,6 +1169,14 @@ function ItemDialog(props: {
   });
 
   async function submit(): Promise<void> {
+    if (step() === "key") {
+      if (typedKey.valid()) setStep("check");
+      return;
+    }
+    if (step() === "check") {
+      finishSetup();
+      return;
+    }
     if (saving() || !draftReady(draft(), props.item)) return;
     setSaving(true);
     setFailure(null);
@@ -1109,6 +1220,16 @@ function ItemDialog(props: {
                 onChange={(password) => set(login(), { password })}
               />
             </Field>
+            <Show when={props.twoStep && !props.fromChat}>
+              <TwoStepRow
+                on={twoStepOn(login())}
+                code={twoStepCode()}
+                now={typedKey.now()}
+                onSetUp={startSetup}
+                onRemove={removeTwoStep}
+                onCopy={(code) => props.onCopyCode?.(code)}
+              />
+            </Show>
             <Show when={!props.fromChat}>
               <Field label={t("vault.field.notes")} class="vault-wide">
                 <Textarea
@@ -1348,14 +1469,30 @@ function ItemDialog(props: {
               <header class="vault-dialog-header">
                 <DraftLogo draft={draft()} saved={props.item} />
                 <Dialog.Title as="h2" class="vault-dialog-title">
-                  {props.title}
+                  {dialogTitle()}
                 </Dialog.Title>
                 <IconButton label={t("common.close")} variant="ghost" disabled={saving()} onClick={props.onClose}>
                   <X />
                 </IconButton>
               </header>
               <div class="vault-dialog-body">
-                {fields()}
+                <Switch fallback={fields()}>
+                  <Match when={step() === "key" && loginDraft()}>
+                    {(login) => (
+                      <TwoStepKeyStep
+                        site={siteName(login())}
+                        keyText={login().twoStepKey}
+                        invalid={keyInvalid(login())}
+                        onChange={(twoStepKey) => set(login(), { twoStepKey })}
+                      />
+                    )}
+                  </Match>
+                  <Match when={step() === "check" && loginDraft()}>
+                    {(login) => (
+                      <TwoStepCheckStep site={siteName(login())} code={typedKey.code()} now={typedKey.now()} />
+                    )}
+                  </Match>
+                </Switch>
                 <Show when={failure()}>
                   {(current) => (
                     <Text tone="danger" variant="caption" role="alert">
@@ -1365,17 +1502,38 @@ function ItemDialog(props: {
                 </Show>
               </div>
               <footer class="ui-confirm-dialog-actions">
-                <Button type="button" variant="ghost" disabled={saving()} onClick={props.onClose}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  loading={saving()}
-                  loadingLabel={t("common.saving")}
-                  disabled={!draftReady(draft(), props.item)}
+                <Switch
+                  fallback={
+                    <>
+                      <Button type="button" variant="ghost" disabled={saving()} onClick={props.onClose}>
+                        {t("common.cancel")}
+                      </Button>
+                      <Button
+                        type="submit"
+                        loading={saving()}
+                        loadingLabel={t("common.saving")}
+                        disabled={!draftReady(draft(), props.item)}
+                      >
+                        {t("common.save")}
+                      </Button>
+                    </>
+                  }
                 >
-                  {t("common.save")}
-                </Button>
+                  <Match when={step() === "key"}>
+                    <Button type="button" variant="ghost" onClick={cancelSetup}>
+                      {t("common.back")}
+                    </Button>
+                    <Button type="submit" disabled={!typedKey.valid()}>
+                      {t("common.continue")}
+                    </Button>
+                  </Match>
+                  <Match when={step() === "check"}>
+                    <Button type="button" variant="ghost" onClick={() => setStep("key")}>
+                      {t("common.back")}
+                    </Button>
+                    <Button type="submit">{t("common.done")}</Button>
+                  </Match>
+                </Switch>
               </footer>
             </form>
           </Dialog.Content>

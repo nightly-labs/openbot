@@ -60,6 +60,7 @@ import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -1615,17 +1616,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return store ? { store, listAgents: async () => workspace.profiles() } : undefined;
   });
   // The Vault section, for an owner or admin of a host with `vault-v1`. The store follows the host id.
-  // With `vault-v2` it also keeps API keys.
+  // With `vault-v2` it also keeps API keys, and with `vault-v3` two-step keys.
   const vaultHostId = createMemo(() => {
     const current = server();
     return serverCanAdminister(current, VAULT_CAPABILITY) ? current?.id : undefined;
   });
   // A host that updates or rolls back keeps its id, so the store follows this capability too.
-  const vaultV2 = createMemo(() => serverCanAdminister(server(), VAULT_V2_CAPABILITY));
+  const vaultVersion = createMemo((): 1 | 2 | 3 => {
+    const current = server();
+    if (serverCanAdminister(current, VAULT_V3_CAPABILITY)) return 3;
+    return serverCanAdminister(current, VAULT_V2_CAPABILITY) ? 2 : 1;
+  });
   const vaultSettings = createMemo((): ServerVaultOptions | undefined => {
     if (vaultHostId() === undefined) return undefined;
-    const v2 = vaultV2();
-    return { store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, v2)), apiKeys: v2 };
+    const version = vaultVersion();
+    return {
+      store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, version)),
+      apiKeys: version > 1,
+      twoStep: version === 3,
+    };
   });
   const openBrowserProfileSettings = (trigger: HTMLElement) => {
     const current = server();

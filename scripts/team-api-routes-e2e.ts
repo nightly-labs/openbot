@@ -182,11 +182,13 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbo
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -1126,6 +1128,9 @@ const vault = new VaultService({ store: new VaultStore(vaultFile, fakeCipher), c
 await Effect.runPromise(vault.load());
 const VAULT_PASSWORD = "e2e-vault-password-7f3c";
 const VAULT_API_KEY = "e2e-vault-api-key-91d2";
+/** A two-step setup key as a site shows it: grouped and in lower case. The host saves it in upper case. */
+const VAULT_TWO_STEP_KEY = "e2ev ault twos tepk ey23";
+const VAULT_TWO_STEP_SECRET = "E2EVAULTTWOSTEPKEY23";
 /** Resolves with the first status after a host sign-in started (`connecting`) and then ended. */
 function bitwardenSettled(connector: BitwardenConnectorService): Promise<BitwardenConnectorStatus> {
   return new Promise((resolveStatus) => {
@@ -6123,6 +6128,125 @@ try {
         isDeepStrictEqual(deletedLogin.body, { status: "ready", items: [] }) &&
         vault.state().items.length === 0,
       [summary(deletedKey), summary(deletedLogin)],
+    );
+  }
+
+  // ---- Two-step keys in the host's Vault (vault-v3), and vault-v2 on the same host ----
+  {
+    const v2Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V2_CAPABILITY] });
+    const v3Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V3_CAPABILITY] });
+    const key = parseTwoStepKey(VAULT_TWO_STEP_SECRET);
+    assert.ok(key, "the e2e two-step key does not parse.");
+    /** True when the text carries the key in any form that the user typed or the host saved. */
+    const hasKey = (text: string) =>
+      text.includes(VAULT_TWO_STEP_SECRET) || text.toLowerCase().includes(VAULT_TWO_STEP_KEY);
+    const login = {
+      kind: "login",
+      id: null,
+      website: "https://code.example.com",
+      username: "ada@example.com",
+      notes: "",
+      password: VAULT_PASSWORD,
+      twoStepKey: VAULT_TWO_STEP_KEY,
+    };
+    const unsupported = await v2Call(adaToken, VAULT_V3_ROUTES.codes);
+    const memberCodes = await v3Call(bobToken, VAULT_V3_ROUTES.codes);
+    const memberSave = await v3Call(bobToken, VAULT_V3_ROUTES.save, login);
+    check(
+      "the vault-v3 routes need vault-v3 and an owner or admin",
+      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
+        errorIs(memberCodes, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSave, 403, sourceText("error.team.adminRequired")) &&
+        vault.state().items.length === 0,
+      [summary(unsupported), summary(memberCodes), summary(memberSave)],
+    );
+    const badKey = await v3Call(adaToken, VAULT_V3_ROUTES.save, { ...login, twoStepKey: "not a key" });
+    check(
+      "a two-step key that is not a setup key is refused with catalog text, and no login is added",
+      errorIs(badKey, 400, sourceText("error.vault.twoStepKeyInvalid")) && vault.state().items.length === 0,
+      summary(badKey),
+    );
+    const saved = await v3Call(adaToken, VAULT_V3_ROUTES.save, login);
+    const loginId = field(saved.body, "items", 0, "id");
+    check(
+      "an admin adds a login with a two-step key; the answer says it has one and carries no key",
+      saved.status === 200 &&
+        field(saved.body, "items", 0, "hasTwoStep") === true &&
+        typeof loginId === "string" &&
+        !hasKey(saved.text) &&
+        !hasKey(readFileSync(vaultFile, "utf8")),
+      summary(saved),
+    );
+    assert.ok(typeof loginId === "string", "the vault-v3 save did not answer an item id.");
+    const before = Date.now();
+    const codes = await v3Call(adaToken, VAULT_V3_ROUTES.codes);
+    const after = Date.now();
+    const expected = new Set([await twoStepCode(key, before), await twoStepCode(key, after)]);
+    const code = field(codes.body, "codes", 0, "code");
+    const remainingMs = field(codes.body, "codes", 0, "remainingMs");
+    check(
+      "codes answers the current code of the login, its period and its time left, with no key",
+      codes.status === 200 &&
+        field(codes.body, "codes", 0, "id") === loginId &&
+        typeof code === "string" &&
+        expected.has(code) &&
+        field(codes.body, "codes", 0, "period") === 30 &&
+        typeof remainingMs === "number" &&
+        remainingMs > 0 &&
+        remainingMs <= 30_000 &&
+        !hasKey(codes.text),
+      summary(codes),
+    );
+    const revealKey = await v3Call(adaToken, VAULT_V3_ROUTES.reveal, { id: loginId, field: "twoStepKey" });
+    check("no reveal answers a two-step key", revealKey.status === 400 && !hasKey(revealKey.text), summary(revealKey));
+    const v2List = await v2Call(adaToken, VAULT_V2_ROUTES.list);
+    const v2Save = await v2Call(adaToken, VAULT_V2_ROUTES.save, {
+      kind: "login",
+      id: loginId,
+      website: "https://code.example.com",
+      username: "ada@code.example.com",
+      notes: "Changed from vault-v2",
+      password: null,
+    });
+    const keptCodes = await v3Call(adaToken, VAULT_V3_ROUTES.codes);
+    check(
+      "vault-v2 on the same host lists the login without hasTwoStep, and its save keeps the key",
+      v2List.status === 200 &&
+        field(v2List.body, "items", 0, "id") === loginId &&
+        field(v2List.body, "items", 0, "hasTwoStep") === undefined &&
+        v2Save.status === 200 &&
+        field(v2Save.body, "items", 0, "username") === "ada@code.example.com" &&
+        field(v2Save.body, "items", 0, "hasTwoStep") === undefined &&
+        field(keptCodes.body, "codes", 0, "id") === loginId,
+      [summary(v2List), summary(v2Save), summary(keptCodes)],
+    );
+    const kept = await v3Call(adaToken, VAULT_V3_ROUTES.save, {
+      ...login,
+      id: loginId,
+      password: null,
+      twoStepKey: undefined,
+    });
+    const removed = await v3Call(adaToken, VAULT_V3_ROUTES.save, {
+      ...login,
+      id: loginId,
+      password: null,
+      twoStepKey: "",
+    });
+    const noCodes = await v3Call(adaToken, VAULT_V3_ROUTES.codes);
+    check(
+      "a vault-v3 save without twoStepKey keeps the key, and an empty one removes it",
+      field(kept.body, "items", 0, "hasTwoStep") === true &&
+        field(removed.body, "items", 0, "hasTwoStep") === false &&
+        isDeepStrictEqual(noCodes.body, { codes: [] }),
+      [summary(kept), summary(removed), summary(noCodes)],
+    );
+    const deleted = await v3Call(adaToken, VAULT_V3_ROUTES.delete, { id: loginId });
+    check(
+      "an admin deletes the login through vault-v3",
+      isDeepStrictEqual(deleted.body, { status: "ready", items: [] }) && vault.state().items.length === 0,
+      summary(deleted),
     );
   }
 

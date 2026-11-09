@@ -52,6 +52,7 @@ import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-di
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 
 /**
@@ -116,6 +117,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   BROWSER_PROFILES_ROUTES.tabs,
   VAULT_ROUTES.list,
   VAULT_V2_ROUTES.list,
+  VAULT_V3_ROUTES.list,
+  VAULT_V3_ROUTES.codes,
   AGENT_MEMORIES_PAGE_ROUTE,
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
   SKILLS_ADMIN_ROUTES.list,
