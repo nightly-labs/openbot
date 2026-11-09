@@ -152,6 +152,8 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   onCleanup(() => {
     disposed = true;
   });
+  /** A send that failed. A retry of the same text keeps its operation, so the channel gets the message once. */
+  let failedSend: { channelId: string; text: string; operationId: string } | null = null;
 
   const saveSeats = (seats: readonly AgentDockSeatRef[]) => setAgentDockSeats(serverId, seats);
   const seated = (seat: AgentDockSeatRef) => seatRefs().some((item) => item.kind === seat.kind && item.id === seat.id);
@@ -226,9 +228,14 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       })
       .catch(() => undefined);
   };
-  createEffect(openChannelId, (channelId) => {
-    if (channelId && channels.state.page?.channel.id !== channelId) readChannel(channelId);
-  });
+  /* The main window that leaves the open channel stops updating its page, so the dock reads it again. */
+  const mainChannelId = createMemo(() => channels.state.page?.channel.id ?? null);
+  createEffect(
+    () => [openChannelId(), mainChannelId()] as const,
+    ([channelId, mainId]) => {
+      if (channelId && mainId !== channelId) readChannel(channelId);
+    },
+  );
   onCleanup(
     channels.onChange((changed) => {
       const channelId = openChannelId();
@@ -237,9 +244,11 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     }),
   );
 
-  /* The rows of the open channel. The reader's own messages carry no sender, so they show as their own. */
+  /* The channel that the chat shows. It stays after a close, so the chat keeps its rows while it fades. */
+  const shownChannelId = createMemo((previous?: string | null) => openChannelId() ?? previous ?? null);
+  /* The rows of the shown channel. The reader's own messages carry no sender, so they show as their own. */
   const channelMessages = createMemo((): AgentMessage[] => {
-    const channelId = openChannelId();
+    const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
     return channelConversationRows(page.messages.filter(channelMessageHasContent)).map((row) => {
@@ -253,7 +262,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     if (seat.kind === "channel") {
       const summary = shownChannels().find((channel) => channel.id === seat.id);
       return {
-        messages: openChannelId() === seat.id ? channelMessages() : [],
+        messages: shownChannelId() === seat.id ? channelMessages() : [],
         working: (summary?.activeTasks ?? 0) > 0,
         wait: channelWaits()[seat.id]?.reason ?? null,
       };
@@ -355,13 +364,18 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     remove(seat: AgentDockSeatRef) {
       saveSeats(seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id));
     },
-    /** The same send as in the channel view of the main window. A retry gets a new operation. */
+    /** The same send as in the channel view of the main window. A retry keeps the operation of the failed send. */
     async sendToChannel(channelId: string, text: string): Promise<AgentDockSendResult> {
       const sequenceBefore = channelPage(channelId)?.throughSequence ?? 0;
+      const operationId =
+        failedSend && failedSend.channelId === channelId && failedSend.text === text
+          ? failedSend.operationId
+          : crypto.randomUUID();
+      failedSend = { channelId, text, operationId };
       try {
         const after = await channels.send({
           type: "send",
-          operationId: crypto.randomUUID(),
+          operationId,
           channelId,
           text,
           // A message that opens with a member is addressed to that member.
@@ -372,7 +386,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
         if (!disposed && openChannelId() === channelId && channels.state.page?.channel.id !== channelId)
           setReadPage(after);
         const messageId = sentChannelMessageId(after, sequenceBefore, text, isOwnSender);
-        return messageId ? { messageId } : { error: t("channel.error.action") };
+        if (!messageId) return { error: t("channel.error.action") };
+        failedSend = null;
+        return { messageId };
       } catch (error) {
         return { error: errorMessage(error, t("channel.error.action")) };
       }

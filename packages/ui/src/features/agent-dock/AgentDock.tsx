@@ -245,6 +245,11 @@ export function AgentDock(props: AgentDockProps) {
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  /** The agent of a seat. The list of all agents can be shorter than the seats. */
+  const seatAgent = (agentId: string) => {
+    const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
+    return seat?.kind === "agent" ? seat.agent : undefined;
+  };
   /* The seats that shrink away. They stay in `state.seats` until the shrink ends. */
   const leaving = new Set<string>();
 
@@ -1030,7 +1035,7 @@ export function AgentDock(props: AgentDockProps) {
 
         <AgentDockShelf
           results={props.results ?? []}
-          agent={(id) => props.agents.find((agent) => agent.id === id)}
+          agent={(id) => seatAgent(id) ?? props.agents.find((agent) => agent.id === id)}
           hidden={state.open !== null}
           stage={() => stage}
           onOpen={(agentId) => openChat(agentDockSeatKey({ kind: "agent", id: agentId }))}

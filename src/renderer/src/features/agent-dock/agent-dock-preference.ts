@@ -5,6 +5,7 @@ import {
   type AgentDockOffset,
   type AgentDockSeatRef,
 } from "@openbot/contracts/ipc";
+import { agentDockSeatKey } from "@openbot/ui/features/agent-dock/AgentDock";
 import { createSignal } from "solid-js";
 import { z } from "zod";
 
@@ -85,7 +86,7 @@ function seatOf(saved: SavedSeat): AgentDockSeatRef {
 function uniqueSeats(seats: readonly AgentDockSeatRef[]): AgentDockSeatRef[] {
   const seen = new Set<string>();
   return seats.filter((seat) => {
-    const key = `${seat.kind}:${seat.id}`;
+    const key = agentDockSeatKey(seat);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
