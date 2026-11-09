@@ -372,7 +372,7 @@ export const messages = {
   "server.settings.memoryReviewOff": "כבוי",
   "server.settings.memoryReviewTurns": { one: "כל תור", two: "כל 2 תורות", other: "כל {count} תורות" },
   "server.settings.memoryReviewLoadFailed": "לא ניתן לטעון את הגדרת סקירת הזיכרון.",
-  "server.settings.rolesTitle": "תפקידים",
+  "server.settings.rolesTitle": "הרשאות",
   "server.settings.rolesDescription":
     "יש לבחור את הסוכנים שחברים יכולים להשתמש בהם. חבר מקבל את רמת הגישה הגבוהה ביותר מבין כולם ותפקידיו. בעלים ומנהלים יכולים להשתמש בכל הסוכנים.",
   "server.settings.auditTitle": "יומן ביקורת",

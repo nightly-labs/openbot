@@ -1710,7 +1710,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "تعذّر فتح الموقع.",
   "mobile.server.sites.unsupported": "حدّث OpenBot على هذا الخادم لرؤية مواقعه هنا.",
   "mobile.server.sites.offline": "اتصل بهذا الخادم لرؤية مواقعه.",
-  "mobile.server.route.roles": "الأدوار",
+  "mobile.server.route.roles": "الأذونات",
   "mobile.server.route.role": "الدور",
   "mobile.server.roles.description":
     "اختر الوكلاء الذين يمكن للأعضاء استخدامهم. يمكن للمالكين والمسؤولين استخدام كل الوكلاء.",

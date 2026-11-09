@@ -1680,7 +1680,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "לא ניתן לפתוח את האתר.",
   "mobile.server.sites.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לראות כאן את האתרים שלו.",
   "mobile.server.sites.offline": "יש להתחבר לשרת הזה כדי לראות את האתרים שלו.",
-  "mobile.server.route.roles": "תפקידים",
+  "mobile.server.route.roles": "הרשאות",
   "mobile.server.route.role": "תפקיד",
   "mobile.server.roles.description":
     "יש לבחור את הסוכנים שחברים יכולים להשתמש בהם. בעלים ומנהלים יכולים להשתמש בכל הסוכנים.",

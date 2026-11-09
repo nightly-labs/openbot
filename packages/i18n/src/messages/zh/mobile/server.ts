@@ -1172,7 +1172,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "无法打开该站点。",
   "mobile.server.sites.unsupported": "请更新该服务器上的 OpenBot，才能在此查看其站点。",
   "mobile.server.sites.offline": "请连接该服务器以查看其站点。",
-  "mobile.server.route.roles": "角色",
+  "mobile.server.route.roles": "权限",
   "mobile.server.route.role": "角色",
   "mobile.server.roles.description": "选择成员可以使用的助手。所有者和管理员可以使用所有助手。",
   "mobile.server.roles.unsupported": "请更新该服务器上的 OpenBot，才能管理角色。",

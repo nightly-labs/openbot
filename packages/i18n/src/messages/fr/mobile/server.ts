@@ -1274,7 +1274,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Impossible d’ouvrir le site.",
   "mobile.server.sites.unsupported": "Mettez à jour OpenBot sur ce serveur pour voir ses sites ici.",
   "mobile.server.sites.offline": "Connectez-vous à ce serveur pour voir ses sites.",
-  "mobile.server.route.roles": "Rôles",
+  "mobile.server.route.roles": "Autorisations",
   "mobile.server.route.role": "Rôle",
   "mobile.server.roles.description":
     "Choisissez les agents que les membres peuvent utiliser. Les propriétaires et les admins peuvent utiliser tous les agents.",

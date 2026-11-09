@@ -399,7 +399,7 @@ export const messages = {
     other: "كل {count} دور",
   },
   "server.settings.memoryReviewLoadFailed": "تعذّر تحميل إعداد مراجعة الذاكرة.",
-  "server.settings.rolesTitle": "الأدوار",
+  "server.settings.rolesTitle": "الأذونات",
   "server.settings.rolesDescription":
     "اختر الوكلاء الذين يمكن للأعضاء استخدامهم. يحصل العضو على أعلى وصول من «الجميع» ومن أدواره. يمكن للمالكين والمسؤولين استخدام كل الوكلاء.",
   "server.settings.auditTitle": "سجل التدقيق",
