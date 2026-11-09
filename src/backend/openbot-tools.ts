@@ -302,7 +302,7 @@ export const serverInstallCommandToolSchema = z.strictObject({
     .trim()
     .min(INPUT_LIMITS.serverNameMin)
     .max(INPUT_LIMITS.serverName)
-    .describe("The server name in the user's server list, such as the host name. Ask the user when unsure."),
+    .describe("The server name, such as the host name."),
 });
 
 export const sendToChannelToolSchema = z.strictObject({
@@ -399,7 +399,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_server_install_command",
     description:
-      'Make a one-time command that installs OpenBot on a Linux computer or VPS as a server and signs it in to the user\'s OpenBot account. Use it when the user asks to install or set up OpenBot on a server. Get the SSH address (user@host) from the user first. The user approves each command. Run the command as root over SSH; it asks no questions, takes a few minutes, and ends with the line "OpenBot is connected to your account." and exit code 0. It works once, for 15 minutes: never save it, show it, or give it to anyone. A card in the chat shows when the server connects.',
+      'Make a one-time command that installs OpenBot as a server on a Linux computer or VPS, signed in to the user\'s account. Get the SSH address from the user. Run it as root over SSH; it asks nothing and ends with "OpenBot is connected to your account." It works once, for 15 minutes: never save, show or share it.',
     shape: serverInstallCommandToolSchema.shape,
   },
   {
