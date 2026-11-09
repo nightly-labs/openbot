@@ -248,11 +248,64 @@
 }
 
 /* The add menu lists every agent that is not on the dock. With many agents it is taller than the dock
- * window, so it fits the space left and scrolls. The base class is named so that this rule outranks
- * the `overflow: hidden` of `.ui-action-menu`. */
+ * window, so it fits the space left and only the agent rows scroll. The search field and Dock
+ * settings stay in place. The rows fade at an edge with more agents behind it (the shared
+ * .scroll-fade-* masks). */
 .agent-dock-add-menu.ui-action-menu {
+  display: flex;
   max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
+  flex-direction: column;
+}
+
+/* A fixed width, so the menu does not change size while a search removes rows. */
+.agent-dock-add-menu-search.ui-action-menu {
+  width: 232px;
+}
+
+.agent-dock-add-list {
+  min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.agent-dock-add-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* The search field row, as in the shared search select: a full-width row with a line under it. */
+.agent-dock-add-search {
+  position: relative;
+  flex: none;
+  margin: calc(var(--openbot-space-1) * -1) calc(var(--openbot-space-1) * -1) var(--openbot-space-1);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-1);
+}
+
+.agent-dock-add-search > svg {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: var(--openbot-space-3);
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* The field takes the focus each time the menu opens, so it shows no border or focus ring. */
+.agent-dock-add-search .agent-dock-add-search-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-inline-start: var(--openbot-space-8);
+}
+
+.agent-dock-add-search .agent-dock-add-search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .agent-dock-menu-avatar.agent-avatar {

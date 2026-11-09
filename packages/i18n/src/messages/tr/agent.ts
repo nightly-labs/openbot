@@ -62,6 +62,8 @@ export const messages = {
   "agent.dock.writing": "{name} yazıyor",
   "agent.dock.empty": "Henüz mesaj yok. {name} adlı ajana yazın.",
   "agent.dock.settings": "Yuva ayarları",
+  "agent.dock.search": "Ajan ara",
+  "agent.dock.noMatch": "“{query}” adında ajan yok",
   "agent.dock.finished.label": "Biten işler",
   "agent.dock.finished.result": "{label}, {name} tarafından",
   "agent.dock.finished.more": { one: "+{count} daha", other: "+{count} daha" },

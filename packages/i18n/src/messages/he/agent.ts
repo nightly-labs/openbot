@@ -62,6 +62,8 @@ export const messages = {
   "agent.dock.writing": "{name} כותב",
   "agent.dock.empty": "אין הודעות עדיין. אפשר לכתוב ל-{name}.",
   "agent.dock.settings": "הגדרות המעגן",
+  "agent.dock.search": "חיפוש סוכנים",
+  "agent.dock.noMatch": "אין סוכן בשם „{query}”",
   "agent.dock.finished.label": "עבודה שהסתיימה",
   "agent.dock.finished.result": "{label}, מאת {name}",
   "agent.dock.finished.more": { one: "עוד אחד", two: "עוד שניים", other: "עוד {count}+" },

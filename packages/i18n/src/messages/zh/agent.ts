@@ -56,6 +56,8 @@ export const messages = {
   "agent.dock.writing": "{name} 正在输入",
   "agent.dock.empty": "还没有消息。给 {name} 写点什么吧。",
   "agent.dock.settings": "停靠栏设置",
+  "agent.dock.search": "搜索智能体",
+  "agent.dock.noMatch": "没有名为“{query}”的智能体",
   "agent.dock.finished.label": "已完成的工作",
   "agent.dock.finished.result": "{label}，来自 {name}",
   "agent.dock.finished.more": { one: "另外 {count} 项", other: "另外 {count} 项" },

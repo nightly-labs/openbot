@@ -184,6 +184,7 @@ function AgentDockStory(props: { seats: string[]; results?: AgentDockShelfResult
             draft.seats.splice(draft.seats.indexOf(agentId), 1);
           })
         }
+        onOpenSettings={() => undefined}
         onSend={async (agentId, text) => {
           const id = `story-${++nextId}`;
           setState((draft) => {
@@ -225,7 +226,9 @@ type Story = StoryObj<typeof meta>;
 /**
  * Five agents on the dock, each in a different state: working, waiting for an answer, unread answers,
  * a failed routine and a new answer. Click an agent to open its chat; click it again or press Escape
- * to close it. Use + to add an agent and the ⋯ menu in the chat to remove one.
+ * to close it. Use + to add an agent and the ⋯ menu in the chat to remove one. Ten agents are not on
+ * the dock, so the + menu starts with a search field: type part of a name and press Enter to add the
+ * first match. With 8 agents or fewer, the menu is a plain list.
  */
 export const States: Story = {
   render: () => <AgentDockStory seats={["chief", "research", "sales", "design", "support"]} />,

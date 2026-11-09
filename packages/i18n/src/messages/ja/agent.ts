@@ -61,6 +61,8 @@ export const messages = {
   "agent.dock.writing": "{name} が入力中",
   "agent.dock.empty": "まだメッセージはありません。{name} に書いてみましょう。",
   "agent.dock.settings": "ドックの設定",
+  "agent.dock.search": "エージェントを検索",
+  "agent.dock.noMatch": "「{query}」という名前のエージェントはありません",
   "agent.dock.finished.label": "完了した作業",
   "agent.dock.finished.result": "{label}（{name}）",
   "agent.dock.finished.more": { other: "ほか {count} 件" },

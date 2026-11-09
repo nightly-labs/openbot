@@ -62,6 +62,8 @@ export const messages = {
   "agent.dock.writing": "{name} está escribiendo",
   "agent.dock.empty": "Aún no hay mensajes. Escribe a {name}.",
   "agent.dock.settings": "Ajustes del dock",
+  "agent.dock.search": "Buscar agentes",
+  "agent.dock.noMatch": "Ningún agente se llama «{query}»",
   "agent.dock.finished.label": "Trabajo terminado",
   "agent.dock.finished.result": "{label}, de {name}",
   "agent.dock.finished.more": { one: "+{count} más", other: "+{count} más" },

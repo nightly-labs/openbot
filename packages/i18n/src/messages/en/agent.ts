@@ -61,6 +61,8 @@ export const messages = defineMessages("agent", {
   "agent.dock.writing": "{name} is writing",
   "agent.dock.empty": "No messages yet. Write to {name}.",
   "agent.dock.settings": "Dock settings",
+  "agent.dock.search": "Search agents",
+  "agent.dock.noMatch": "No agent named “{query}”",
   "agent.dock.finished.label": "Finished work",
   "agent.dock.finished.result": "{label}, from {name}",
   "agent.dock.finished.more": { one: "+{count} more", other: "+{count} more" },

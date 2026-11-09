@@ -8,7 +8,17 @@
  * change, such as the first load, places the seats at once.
  */
 
-import { AppWindow, ContextMenu, DropdownMenu, Maximize2, PanelRight, Plus, Settings } from "@openbot/ui";
+import {
+  AppWindow,
+  ContextMenu,
+  DropdownMenu,
+  Input,
+  Maximize2,
+  PanelRight,
+  Plus,
+  Search,
+  Settings,
+} from "@openbot/ui";
 import {
   createEffect,
   createMemo,
@@ -16,6 +26,7 @@ import {
   createStore,
   createUniqueId,
   For,
+  flush,
   onCleanup,
   onSettled,
   Show,
@@ -185,6 +196,11 @@ const SEAT_LAG = 0.3;
 const SHELF_GAP = 12;
 /** The faded edge of the seat view, where more seats are above or below. */
 const SEAT_FADE = 24;
+/** The add menu has a search field when this many agents or more are not on the dock. */
+const ADD_SEARCH_MIN = 9;
+/** The morph of the add list when the search changes its rows. The same move as the menu panels. */
+const ADD_MORPH_MS = 200;
+const ADD_MORPH_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
 export function AgentDock(props: AgentDockProps) {
   const { t } = useText();
@@ -405,6 +421,93 @@ export function AgentDock(props: AgentDockProps) {
 
   /** The add menu opens away from the screen edge. */
   const menuPlacement = (): "right-end" | "left-end" => (props.side === "left" ? "right-end" : "left-end");
+
+  // A long add menu starts with a search field. A short one stays a plain list.
+  const [addQuery, setAddQuery] = createSignal("");
+  const addSearch = () => props.available.length >= ADD_SEARCH_MIN;
+  const addMenuClass = () => (addSearch() ? "agent-dock-add-menu agent-dock-add-menu-search" : "agent-dock-add-menu");
+  const addMatches = createMemo(() => {
+    const text = addQuery().trim().toLocaleLowerCase();
+    return text ? props.available.filter((agent) => agent.name.toLocaleLowerCase().includes(text)) : props.available;
+  });
+  const addEmptyText = () =>
+    props.available.length === 0 ? t("agent.dock.allAdded") : t("agent.dock.noMatch", { query: addQuery().trim() });
+  const addFades = createScrollFades();
+  onCleanup(() => addFades.stop());
+  let addField: HTMLInputElement | undefined;
+  let addList: HTMLDivElement | undefined;
+  const addFirstRow = () => addList?.querySelector<HTMLElement>('[role="menuitem"]:not([data-disabled])');
+  const onAddSearchKey = (event: KeyboardEvent) => {
+    if (event.key === "Escape" || event.key === "Tab" || event.isComposing) return;
+    // The menu reads a letter as a jump to a row. In the field, letters are the search.
+    event.stopPropagation();
+    const enter = event.key === "Enter" && addQuery().trim() !== "";
+    if (!enter && event.key !== "ArrowDown") return;
+    const row = addFirstRow();
+    if (!row) return;
+    event.preventDefault();
+    row.focus();
+    // Enter adds the first match through its row, so the menu closes as it does for a click.
+    if (enter) row.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  };
+  /**
+   * Applies a new search, and morphs the list to its new rows: the height follows them, rows that
+   * stay slide to their new places, and new rows fade in. A row keeps its element while it matches.
+   */
+  const searchAdd = (value: string) => {
+    const list = addList;
+    if (!list || typeof list.animate !== "function" || prefersReducedMotion()) {
+      setAddQuery(value);
+      if (list) list.scrollTop = 0;
+      addFades.remeasure();
+      return;
+    }
+    const rows = () => Array.from(list.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    // Measured while an earlier morph still moves, so a fast typist sees one continuous move.
+    const listTop = list.getBoundingClientRect().top;
+    const fromHeight = list.getBoundingClientRect().height;
+    const fromTops = new Map(rows().map((row) => [row, row.getBoundingClientRect().top - listTop]));
+    for (const animation of list.getAnimations({ subtree: true })) animation.cancel();
+    setAddQuery(value);
+    flush();
+    list.scrollTop = 0;
+    addFades.remeasure();
+    const timing = { duration: ADD_MORPH_MS, easing: ADD_MORPH_EASE };
+    const toHeight = list.getBoundingClientRect().height;
+    if (Math.abs(toHeight - fromHeight) > 0.5)
+      list.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], timing);
+    const top = list.getBoundingClientRect().top;
+    for (const row of rows()) {
+      const from = fromTops.get(row);
+      if (from === undefined) {
+        row.animate(
+          [
+            { opacity: 0, filter: "blur(2px)", transform: "translateY(4px)" },
+            { opacity: 1, filter: "blur(0)", transform: "none" },
+          ],
+          timing,
+        );
+        continue;
+      }
+      const shift = from - (row.getBoundingClientRect().top - top);
+      if (Math.abs(shift) > 0.5) row.animate([{ transform: `translateY(${shift}px)` }, { transform: "none" }], timing);
+    }
+  };
+  const bindAddList = (element: HTMLDivElement) => {
+    addList = element;
+    addFades.bind(element);
+    // A letter typed on a row goes to the field, so typing always searches.
+    element.addEventListener(
+      "keydown",
+      (event) => {
+        if (!addField || event.key.length !== 1 || event.key === " ") return;
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        event.stopPropagation();
+        addField.focus();
+      },
+      true,
+    );
+  };
 
   /**
    * The pointer stays captured while the window moves under it. Main reads the pointer once a frame.
@@ -933,23 +1036,66 @@ export function AgentDock(props: AgentDockProps) {
             {/* The menu reads its placement once, so a change of edge makes a new menu. */}
             <Show when={menuPlacement()} keyed>
               {(placement) => (
-                <DropdownMenu.Root placement={placement} gutter={12}>
+                <DropdownMenu.Root
+                  placement={placement}
+                  gutter={12}
+                  onOpenChange={(open) => {
+                    if (open) setAddQuery("");
+                  }}
+                >
                   <DropdownMenu.Trigger class="agent-dock-seat-button agent-dock-add" aria-label={t("agent.dock.add")}>
                     <Plus aria-hidden="true" />
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content class="agent-dock-add-menu">
-                      <For
-                        each={props.available}
-                        fallback={<DropdownMenu.Item disabled>{t("agent.dock.allAdded")}</DropdownMenu.Item>}
+                    <DropdownMenu.Content
+                      class={addMenuClass()}
+                      onOpenAutoFocus={(event: Event) => {
+                        if (!addSearch()) return;
+                        event.preventDefault();
+                        addField?.focus();
+                      }}
+                      onFocusIn={(event: FocusEvent) => {
+                        // The menu takes the focus itself after a pointer opens it and when the
+                        // pointer leaves a row. With a field, the focus goes on to the field, so
+                        // typing searches and does not jump to a row.
+                        if (addSearch() && event.target === event.currentTarget) addField?.focus();
+                      }}
+                    >
+                      <Show when={addSearch()}>
+                        <div class="agent-dock-add-search">
+                          <Search aria-hidden="true" />
+                          <Input
+                            ref={(element: HTMLInputElement) => {
+                              addField = element;
+                            }}
+                            class="agent-dock-add-search-input"
+                            aria-label={t("agent.dock.search")}
+                            placeholder={t("agent.dock.search")}
+                            autocomplete="off"
+                            spellcheck={false}
+                            value={addQuery()}
+                            onValueChange={searchAdd}
+                            onKeyDown={onAddSearchKey}
+                          />
+                        </div>
+                      </Show>
+                      <div
+                        class={["agent-dock-add-list", addFades.classes()]}
+                        ref={bindAddList}
+                        onScroll={addFades.measure}
                       >
-                        {(agent) => (
-                          <DropdownMenu.Item onSelectAfterClose={() => props.onAdd(agent.id)}>
-                            <AgentAvatar agent={agent} motion="idle" class="agent-dock-menu-avatar" />
-                            {agent.name}
-                          </DropdownMenu.Item>
-                        )}
-                      </For>
+                        <For
+                          each={addMatches()}
+                          fallback={<DropdownMenu.Item disabled>{addEmptyText()}</DropdownMenu.Item>}
+                        >
+                          {(agent) => (
+                            <DropdownMenu.Item onSelectAfterClose={() => props.onAdd(agent.id)}>
+                              <AgentAvatar agent={agent} motion="idle" class="agent-dock-menu-avatar" />
+                              {agent.name}
+                            </DropdownMenu.Item>
+                          )}
+                        </For>
+                      </div>
                       <Show when={props.onOpenSettings}>
                         {(open) => (
                           <>

@@ -64,6 +64,8 @@ export const messages = {
   "agent.dock.writing": "{name} schrijft",
   "agent.dock.empty": "Nog geen berichten. Schrijf naar {name}.",
   "agent.dock.settings": "Dockinstellingen",
+  "agent.dock.search": "Agents zoeken",
+  "agent.dock.noMatch": "Geen agent met de naam ‘{query}’",
   "agent.dock.finished.label": "Klaar werk",
   "agent.dock.finished.result": "{label}, van {name}",
   "agent.dock.finished.more": { one: "+{count} meer", other: "+{count} meer" },
