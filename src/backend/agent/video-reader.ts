@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { z } from "zod";
 
 export const READ_VIDEO_DEFAULT_FRAMES = 6;
-export const READ_VIDEO_MAX_FRAMES = 12;
+const READ_VIDEO_MAX_FRAMES = 12;
 
 export const readVideoToolShape = {
   url: z
@@ -28,7 +28,7 @@ export interface VideoReadRequest {
   frames: number;
 }
 
-export interface VideoFrame {
+interface VideoFrame {
   /** The time of the frame in the video, in seconds. */
   seconds: number;
   /** A JPEG data URL, which the agent reads as an image. */

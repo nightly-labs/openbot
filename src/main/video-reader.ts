@@ -306,7 +306,7 @@ const FramesResult = Schema.Struct({
   frames: Schema.Array(Schema.Struct({ seconds: Schema.Number, imageUrl: Schema.String })),
 });
 
-export interface VideoReaderOptions {
+interface VideoReaderOptions {
   /** `<userData>/runtimes/yt-dlp`: the managed yt-dlp, one folder for each release. */
   runtimeDirectory: string;
   target: RuntimeTarget | null;

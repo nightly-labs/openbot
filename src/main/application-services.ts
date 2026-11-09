@@ -96,6 +96,8 @@ import {
   agentBrowserProfile,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   IPC_ENDPOINTS,
+  isGroqVoiceModelId,
+  isLocalVoiceModelId,
   isManagedToolRuntime,
   isUpdateBusyPhase,
   LOCAL_SERVER_ID,
@@ -1941,20 +1943,23 @@ export async function createApplicationServices({
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
-      // The voice service starts after the agents; an agent turn runs only later. A video never
-      // starts a model download: only a model that the user set up transcribes it.
-      transcribe: (audio) =>
-        voice.getModelStatus().pipe(
+      // The voice services start after the agents; an agent turn runs only later. The sound takes
+      // the route of dictation. A video never starts a model download: only a model that the user
+      // set up transcribes it. ElevenLabs takes a stream, not a recording.
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
           Effect.flatMap((status) =>
-            status.phase === "ready"
+            status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId))
               ? voice.transcribe(audio)
               : Effect.fail(
                   new VoiceOperationError({
-                    cause: new Error("No speech recognition model is set up in Settings → Voice."),
+                    cause: new Error("No speech recognition model for recordings is set up in Settings → Voice."),
                   }),
                 ),
           ),
-        ),
+        );
+      },
     }),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),
