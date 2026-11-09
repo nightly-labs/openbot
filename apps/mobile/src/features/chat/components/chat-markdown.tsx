@@ -714,6 +714,7 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
   const rowsBackground = tone?.deep ?? canvas;
   const rowLine = tone?.line ?? card;
   const [frameWidth, setFrameWidth] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const characterWidth = CHAT_TEXT_STYLES[presentation.type].fontSize * presentation.fontScale * TABLE_CHARACTER_WIDTH;
   const contentWidths = token.header.map((_, column) => {
     const longest = Math.max(...[token.header, ...token.rows].map((row) => graphemes(row[column]?.text ?? "").length));
@@ -764,43 +765,55 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
         backgroundColor: card,
       }}
     >
-      <ScrollView horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
+      {/* The panel of the rows stays in place under the content that scrolls, so the card always shows
+          its four sides and the table does not look cut at the edge. */}
+      {token.rows.length ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: headerHeight,
+            start: TABLE_INSET,
+            end: TABLE_INSET,
+            bottom: TABLE_INSET,
+            borderRadius: 13,
+            borderCurve: "continuous",
+            backgroundColor: rowsBackground,
+          }}
+        />
+      ) : null}
+      <ScrollView
+        horizontal
+        alwaysBounceHorizontal={false}
+        style={{
+          flexGrow: 0,
+          flexShrink: 0,
+          marginHorizontal: TABLE_INSET,
+          marginBottom: token.rows.length ? TABLE_INSET : 0,
+        }}
+      >
         <View style={{ direction: tableDirection }}>
-          {/* The header has the inset of the rows, so its columns line up with theirs. */}
-          <View className="flex-row" style={{ paddingHorizontal: TABLE_INSET }}>
+          <View className="flex-row" onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
             {sourceEntries(token.header, (item) => item.text).map(({ value: item, offset }, column) =>
               cell(item, offset, column, header),
             )}
           </View>
-          {token.rows.length ? (
-            <View
-              style={{
-                marginHorizontal: TABLE_INSET,
-                marginBottom: TABLE_INSET,
-                borderRadius: 13,
-                borderCurve: "continuous",
-                overflow: "hidden",
-                backgroundColor: rowsBackground,
-              }}
-            >
-              {sourceEntries(token.rows, (row) => row.map((item) => item.text).join("|")).map(
-                ({ value: row, offset: rowOffset }, rowIndex) => (
-                  <View
-                    key={rowOffset}
-                    className="flex-row"
-                    style={{
-                      borderBottomWidth: rowIndex < token.rows.length - 1 ? 1 : 0,
-                      borderColor: rowLine,
-                    }}
-                  >
-                    {sourceEntries(row, (item) => item.text).map(({ value: item, offset }, column) =>
-                      cell(item, offset, column, body),
-                    )}
-                  </View>
-                ),
-              )}
-            </View>
-          ) : null}
+          {sourceEntries(token.rows, (row) => row.map((item) => item.text).join("|")).map(
+            ({ value: row, offset: rowOffset }, rowIndex) => (
+              <View
+                key={rowOffset}
+                className="flex-row"
+                style={{
+                  borderBottomWidth: rowIndex < token.rows.length - 1 ? 1 : 0,
+                  borderColor: rowLine,
+                }}
+              >
+                {sourceEntries(row, (item) => item.text).map(({ value: item, offset }, column) =>
+                  cell(item, offset, column, body),
+                )}
+              </View>
+            ),
+          )}
         </View>
       </ScrollView>
     </View>
