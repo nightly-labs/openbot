@@ -1,6 +1,6 @@
 import { Button, Check, Lock, Spinner } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, createStore, onCleanup, onSettled, Show } from "solid-js";
+import { createSignal, createStore, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 import { PluginIcon } from "../marketplace/PluginIcon";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
@@ -47,6 +47,8 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
   /* The action animates only a change that the user started here. A card that opens connected, or
      that reads its state late, shows the state with no motion. */
   const [moving, setMoving] = createSignal(false);
+  // Several suggestions can be in one chat: each Skip says which one it skips.
+  const nameId = createUniqueId();
   return (
     <Show
       when={!props.dismissed}
@@ -113,11 +115,15 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
             {/* A connected card has nothing to skip. The stylesheet folds the button away, so the
                 action moves to the edge instead of a jump. */}
             <Show when={props.onDismiss}>
+              <span id={nameId} hidden>
+                {props.name}
+              </span>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 class="ui-block-skip marketplace-suggestion-dismiss"
+                aria-describedby={nameId}
                 ref={(element) => (dismissButton = element)}
                 onClick={() => {
                   props.onDismiss?.();

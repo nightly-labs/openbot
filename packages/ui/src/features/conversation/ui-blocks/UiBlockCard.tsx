@@ -12,7 +12,7 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createUniqueId, Match, Show, Switch, untrack } from "solid-js";
+import { children, createUniqueId, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
 
@@ -72,7 +72,7 @@ function outcomeText(status: UiBlockStatus, outcome: string | undefined, t: Retu
 }
 
 /** The line under a frozen block: the answer with a check, or why there is none. */
-export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
+function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
   const { t } = useText();
   const text = () => outcomeText(props.status, props.outcome, t);
   return (
@@ -95,6 +95,11 @@ export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string 
   );
 }
 
+/** Whether resolved JSX has something to show: a control that renders nothing gives no nodes. */
+function filled(nodes: unknown[]): boolean {
+  return nodes.some((node) => node !== undefined && node !== null && node !== false && node !== "");
+}
+
 /**
  * The frame of a blocking block, in the style of an agent question: a bubble with the title, the
  * body, and, while the block is open, a footer with Skip and the block's own buttons. Once the
@@ -103,6 +108,12 @@ export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string 
 export function UiBlockCard(props: UiBlockCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
+  // Each read of a JSX prop builds its nodes again, so the card resolves each one once.
+  const title = children(() => props.title);
+  const subtitle = children(() => props.subtitle);
+  const icon = children(() => props.icon);
+  const actions = children(() => props.actions);
+  const hasTitle = () => filled(title.toArray());
   const pending = () => props.status === "pending";
   const waiting = () => props.waiting === true && pending() && props.busy !== true;
   const headerOutcome = () => props.outcomeBadge === true && !pending();
@@ -123,20 +134,20 @@ export function UiBlockCard(props: UiBlockCardProps) {
       <BubbleContent
         as="article"
         class="ui-block-content"
-        aria-labelledby={props.title ? titleId : undefined}
+        aria-labelledby={hasTitle() ? titleId : undefined}
         aria-busy={props.busy ? "true" : undefined}
       >
-        <Show when={props.title || props.subtitle || props.icon || waiting() || headerOutcome()}>
+        <Show when={hasTitle() || filled(subtitle.toArray()) || filled(icon.toArray()) || waiting() || headerOutcome()}>
           <header class="ui-block-header">
-            {props.icon}
+            {icon()}
             <div class="ui-block-heading">
-              <Show when={props.title}>
+              <Show when={hasTitle()}>
                 <h3 id={titleId} class="ui-block-title">
-                  {props.title}
+                  {title()}
                 </h3>
               </Show>
-              <Show when={props.subtitle}>
-                <p class="ui-block-subtitle">{props.subtitle}</p>
+              <Show when={filled(subtitle.toArray())}>
+                <p class="ui-block-subtitle">{subtitle()}</p>
               </Show>
             </div>
             <Show when={waiting()}>
@@ -170,7 +181,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
             {props.error}
           </p>
         </Show>
-        <Show when={pending() && (props.actions || props.onSkip)}>
+        <Show when={pending() && (filled(actions.toArray()) || props.onSkip)}>
           <footer class="ui-block-card-footer">
             {props.footerStart}
             <Show when={props.busy}>
@@ -187,6 +198,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
                     variant="secondary"
                     size="sm"
                     class="ui-block-skip"
+                    aria-describedby={hasTitle() ? titleId : undefined}
                     disabled={props.busy === true}
                     onClick={() => skip()()}
                   >
@@ -194,7 +206,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
                   </Button>
                 )}
               </Show>
-              {props.actions}
+              {actions()}
             </span>
           </footer>
         </Show>

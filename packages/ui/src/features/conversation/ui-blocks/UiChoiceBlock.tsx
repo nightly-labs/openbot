@@ -43,6 +43,8 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec | UiQuickRepliesS
   );
   const [draft, setDraft] = createSignal("");
   let customInput: HTMLInputElement | undefined;
+  // An arrow key moves the radio selection with a click; that click must not send a reply.
+  let arrowMove = false;
   // A frozen block shows the stored answer, whatever the person had picked before.
   const chosen = (): string[] => {
     const response = state().response;
@@ -87,6 +89,10 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec | UiQuickRepliesS
 
   function handleKey(event: KeyboardEvent, id: string): void {
     if (locked() || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key.startsWith("Arrow")) {
+      arrowMove = true;
+      return;
+    }
     // Arrow keys only move the selection of a reply; Enter and Space send it.
     if (replies() && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
@@ -106,9 +112,14 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec | UiQuickRepliesS
     else toggle(option.id);
   }
 
-  /** A pointer click sends a reply. The click that an arrow key makes (`detail` 0) only selects. */
-  function handleClick(event: MouseEvent, id: string): void {
-    if (replies() && event.detail > 0) reply(id);
+  /**
+   * A click sends a reply: from a pointer, or from assistive technology, which clicks with no key.
+   * The click that an arrow key makes only selects.
+   */
+  function handleClick(id: string): void {
+    const fromArrow = arrowMove;
+    arrowMove = false;
+    if (replies() && !fromArrow) reply(id);
   }
 
   const lastLetter = () => optionLetter(Math.min(props.spec.options.length + (allowText() ? 1 : 0), 26) - 1);
@@ -154,8 +165,9 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec | UiQuickRepliesS
                 checked={isChosen(option.id)}
                 disabled={locked()}
                 onChange={() => toggle(option.id)}
-                onClick={(event) => handleClick(event, option.id)}
+                onClick={() => handleClick(option.id)}
                 onKeyDown={(event) => handleKey(event, option.id)}
+                onKeyUp={() => (arrowMove = false)}
                 aria-label={option.label}
               />
               <Kbd class="ui-block-option-key" aria-hidden="true">
