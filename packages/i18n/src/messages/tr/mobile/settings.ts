@@ -314,4 +314,10 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot sesini tek kullanımlık bir belirteçle ElevenLabs'e aktarır ve ElevenLabs bunu hesabından ücretlendirir. Anahtar bu telefonda kalır.",
+  "mobile.settings.voice.elevenLabs.model.title": "Model",
+  "mobile.settings.voice.elevenLabs.model.footer":
+    "ElevenLabs'te her modelin kendi fiyatı vardır. Değişiklik bir sonraki yanıttan itibaren geçerlidir.",
+  "mobile.settings.voice.elevenLabs.model.flash": "En hızlı",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "Daha doğal · daha yavaş",
+  "mobile.settings.voice.elevenLabs.model.v3": "En etkileyici · en yavaş",
 } as const satisfies PartialTranslation<typeof source>;

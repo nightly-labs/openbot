@@ -238,4 +238,10 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streamt je spraak met een eenmalige token naar ElevenLabs, en ElevenLabs brengt het in rekening op je account. De sleutel blijft op deze telefoon.",
+  "mobile.settings.voice.elevenLabs.model.title": "Model",
+  "mobile.settings.voice.elevenLabs.model.footer":
+    "Elk model heeft bij ElevenLabs een eigen prijs. De wijziging geldt vanaf het volgende antwoord.",
+  "mobile.settings.voice.elevenLabs.model.flash": "Snelst",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "Natuurlijker · trager",
+  "mobile.settings.voice.elevenLabs.model.v3": "Meest expressief · traagst",
 } as const satisfies PartialTranslation<typeof source>;

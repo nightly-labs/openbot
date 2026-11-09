@@ -1,9 +1,13 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import type { ElevenLabsVoice } from "./voice-settings";
+import type { ElevenLabsSpeechModelId, ElevenLabsVoice } from "./voice-settings";
 
 const API = "https://api.elevenlabs.io";
-/** Low latency for a conversation, in the languages that ElevenLabs reads. */
-const SPEECH_MODEL = "eleven_flash_v2_5";
+/** The `model_id` of each model, as desktop sends it. */
+const SPEECH_MODELS: Record<ElevenLabsSpeechModelId, string> = {
+  "elevenlabs-flash-v2.5": "eleven_flash_v2_5",
+  "elevenlabs-multilingual-v2": "eleven_multilingual_v2",
+  "elevenlabs-v3": "eleven_v3",
+};
 /** The sample rate of `pcm_24000`, which every ElevenLabs plan has. */
 export const ELEVENLABS_SAMPLE_RATE = 24_000;
 
@@ -97,6 +101,7 @@ export async function listElevenLabsVoices(key: string): Promise<ElevenLabsVoice
 export async function elevenLabsSpeech(
   key: string,
   voiceId: string,
+  model: ElevenLabsSpeechModelId,
   text: string,
   signal: AbortSignal,
 ): Promise<Uint8Array> {
@@ -107,7 +112,7 @@ export async function elevenLabsSpeech(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, model_id: SPEECH_MODEL }),
+      body: JSON.stringify({ text, model_id: SPEECH_MODELS[model] }),
       signal,
     },
   );
@@ -130,12 +135,12 @@ export async function scribeToken(key: string, signal: AbortSignal): Promise<str
 
 /**
  * Tests both permissions before the key is saved: it lists the voices, and reads one character with
- * the first of them, which costs one character of the account's quota.
+ * the first of them and Flash v2.5, which costs one character of the account's quota.
  */
 export async function testElevenLabsKey(key: string): Promise<ElevenLabsVoice[]> {
   const voices = await listElevenLabsVoices(key);
   const first = voices[0];
-  if (first) await elevenLabsSpeech(key, first.id, ".", new AbortController().signal);
+  if (first) await elevenLabsSpeech(key, first.id, "elevenlabs-flash-v2.5", ".", new AbortController().signal);
   return voices;
 }
 

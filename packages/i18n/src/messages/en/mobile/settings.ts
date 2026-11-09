@@ -316,4 +316,10 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streams your speech to ElevenLabs with a single-use token, and ElevenLabs bills your account. The key stays on this phone.",
+  "mobile.settings.voice.elevenLabs.model.title": "Model",
+  "mobile.settings.voice.elevenLabs.model.footer":
+    "Each model has its own price at ElevenLabs. The change applies to the next reply.",
+  "mobile.settings.voice.elevenLabs.model.flash": "Fastest",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "More natural · slower",
+  "mobile.settings.voice.elevenLabs.model.v3": "Most expressive · slowest",
 });

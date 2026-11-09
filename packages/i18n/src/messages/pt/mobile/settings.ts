@@ -320,4 +320,10 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "O OpenBot transmite sua fala para a ElevenLabs com um token de uso único, e a ElevenLabs cobra na sua conta. A chave fica neste celular.",
+  "mobile.settings.voice.elevenLabs.model.title": "Modelo",
+  "mobile.settings.voice.elevenLabs.model.footer":
+    "Cada modelo tem seu próprio preço no ElevenLabs. A mudança vale a partir da próxima resposta.",
+  "mobile.settings.voice.elevenLabs.model.flash": "O mais rápido",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "Mais natural · mais lento",
+  "mobile.settings.voice.elevenLabs.model.v3": "O mais expressivo · o mais lento",
 } as const satisfies PartialTranslation<typeof source>;

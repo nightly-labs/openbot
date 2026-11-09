@@ -207,6 +207,8 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   const settings = useVoiceSettings.getState();
   const engine = choice?.engine ?? settings.engine;
   const elevenLabsVoice = choice?.engine === "elevenlabs" ? choice.elevenLabsVoice : settings.elevenLabsVoice;
+  // One reading keeps one model, so its sentences do not change voice when the model changes.
+  const elevenLabsModel = settings.elevenLabsModel;
   const supertonicVoice = choice?.engine === "supertonic" ? choice.supertonicVoice : settings.supertonicVoice;
   const ready =
     engine === "elevenlabs" ? settings.hasElevenLabsKey && elevenLabsVoice !== null : replyVoiceReady("supertonic");
@@ -238,7 +240,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     for (let index = 0; ; index++) {
       const part = await nextPart(index);
       if (part === null) return;
-      const pcm = await elevenLabsSpeech(key, voice.id, part, abort.signal);
+      const pcm = await elevenLabsSpeech(key, voice.id, elevenLabsModel, part, abort.signal);
       if (ended) return;
       native?.playPcm(idOf(index), pcm, ELEVENLABS_SAMPLE_RATE);
     }

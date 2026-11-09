@@ -1,5 +1,5 @@
-import { SPEECH_SPEEDS, type SpeechVoice } from "@openbot/contracts/ipc";
-import type { MobileTranslate } from "@openbot/i18n/mobile";
+import { cloudSpeechModel, SPEECH_SPEEDS, type SpeechVoice } from "@openbot/contracts/ipc";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { isRunningInExpoGo } from "expo";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -28,6 +28,8 @@ import { canChangeReplySpeed } from "../model/reply-voice";
 import { speechNative } from "../model/speech-native";
 import { supertonicModel, useSupertonicModel } from "../model/supertonic-model";
 import {
+  ELEVENLABS_SPEECH_MODEL_IDS,
+  type ElevenLabsSpeechModelId,
   type RecognitionEngine,
   removeElevenLabsKey,
   saveVoiceSettings,
@@ -480,6 +482,47 @@ function ElevenLabsSection({
   );
 }
 
+const ELEVENLABS_MODEL_HINT = {
+  "elevenlabs-flash-v2.5": "mobile.settings.voice.elevenLabs.model.flash",
+  "elevenlabs-multilingual-v2": "mobile.settings.voice.elevenLabs.model.multilingual",
+  "elevenlabs-v3": "mobile.settings.voice.elevenLabs.model.v3",
+} as const satisfies Record<ElevenLabsSpeechModelId, MobileTextKey>;
+
+/** The ElevenLabs model that reads replies, with the same choices as desktop. */
+function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; onError: (message: string) => void }) {
+  const { t } = useText();
+  const ready = useVoiceSettings((state) => state.ready);
+  const chosen = useVoiceSettings((state) => state.elevenLabsModel);
+  const mark = useCheckMark();
+  const choose = (elevenLabsModel: ElevenLabsSpeechModelId) => {
+    if (elevenLabsModel === chosen) return;
+    void haptics.selection();
+    // A sample of the model before it does not go on.
+    onChange();
+    void saveVoiceSettings({ elevenLabsModel }).catch(() => onError(t("mobile.settings.saveFailed")));
+  };
+  return (
+    <SettingsSection
+      title={t("mobile.settings.voice.elevenLabs.model.title")}
+      footer={t("mobile.settings.voice.elevenLabs.model.footer")}
+    >
+      {ELEVENLABS_SPEECH_MODEL_IDS.map((id) => (
+        <SettingsRow
+          key={id}
+          checked={chosen === id}
+          disclosure={false}
+          disabled={!ready}
+          supportingText={t(ELEVENLABS_MODEL_HINT[id])}
+          trailing={mark(chosen === id)}
+          onPress={() => choose(id)}
+        >
+          <Typography.Paragraph>{cloudSpeechModel(id)?.name ?? id}</Typography.Paragraph>
+        </SettingsRow>
+      ))}
+    </SettingsSection>
+  );
+}
+
 /**
  * Settings > Voice, in two tabs. Listening: what recognizes the user's speech, the phone's
  * recognizer, Parakeet on the phone, or ElevenLabs Scribe, and the pause that sends the words in a
@@ -528,7 +571,10 @@ export function VoiceSettingsScreen() {
     <>
       <EngineSection onError={showError} />
       {engine === "elevenlabs" && hasKey ? (
-        <ElevenLabsSection preview={preview} readsReplies onError={showError} />
+        <>
+          <ElevenLabsSection preview={preview} readsReplies onError={showError} />
+          <ElevenLabsModelSection onChange={preview.stop} onError={showError} />
+        </>
       ) : (
         <SupertonicSection preview={preview} onError={showError} />
       )}

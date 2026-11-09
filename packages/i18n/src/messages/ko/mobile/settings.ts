@@ -308,4 +308,10 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot은 일회용 토큰으로 음성을 ElevenLabs에 스트리밍하고, ElevenLabs가 계정에 요금을 청구해요. 키는 이 휴대폰에 남아 있어요.",
+  "mobile.settings.voice.elevenLabs.model.title": "모델",
+  "mobile.settings.voice.elevenLabs.model.footer":
+    "ElevenLabs에서는 모델마다 가격이 달라요. 변경 사항은 다음 답변부터 적용돼요.",
+  "mobile.settings.voice.elevenLabs.model.flash": "가장 빠름",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "더 자연스러움 · 더 느림",
+  "mobile.settings.voice.elevenLabs.model.v3": "가장 표현력 있음 · 가장 느림",
 } as const satisfies PartialTranslation<typeof source>;

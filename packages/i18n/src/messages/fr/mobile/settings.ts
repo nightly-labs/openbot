@@ -324,4 +324,10 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot envoie votre voix en continu à ElevenLabs avec un jeton à usage unique, et ElevenLabs le facture sur votre compte. La clé reste sur ce téléphone.",
+  "mobile.settings.voice.elevenLabs.model.title": "Modèle",
+  "mobile.settings.voice.elevenLabs.model.footer":
+    "Chaque modèle a son propre prix chez ElevenLabs. Le changement s’applique à la prochaine réponse.",
+  "mobile.settings.voice.elevenLabs.model.flash": "Le plus rapide",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "Plus naturel · plus lent",
+  "mobile.settings.voice.elevenLabs.model.v3": "Le plus expressif · le plus lent",
 } as const satisfies PartialTranslation<typeof source>;

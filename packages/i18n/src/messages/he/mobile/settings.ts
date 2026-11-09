@@ -314,4 +314,9 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot משדר את הדיבור שלך ל-ElevenLabs עם אסימון חד-פעמי, ו-ElevenLabs מחייב את החשבון שלך. המפתח נשאר בטלפון הזה.",
+  "mobile.settings.voice.elevenLabs.model.title": "מודל",
+  "mobile.settings.voice.elevenLabs.model.footer": "לכל מודל יש מחיר משלו ב-ElevenLabs. השינוי חל על התשובה הבאה.",
+  "mobile.settings.voice.elevenLabs.model.flash": "המהיר ביותר",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "טבעי יותר · איטי יותר",
+  "mobile.settings.voice.elevenLabs.model.v3": "הכי אקספרסיבי · האיטי ביותר",
 } as const satisfies PartialTranslation<typeof source>;
