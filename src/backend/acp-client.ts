@@ -2297,12 +2297,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
           },
         });
-      // A flavor can fail a turn that ended with no answer (OpenCode). A turn told not to answer ends
-      // empty on purpose, and an error there costs no answer the user waits for.
-      const emptyAnswerFailure = this.#flavor.emptyAnswerFailure;
-      if (emptyAnswerFailure && response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional) {
+      // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
+      // to answer ends empty on purpose, and an error there costs no answer the user waits for.
+      const emptyAnswerFailure =
+        response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional
+          ? (this.#flavor.emptyAnswerFailure?.(turn.reasoned, this.#label) ?? null)
+          : null;
+      if (emptyAnswerFailure !== null) {
         turn.failureCause = "empty_answer";
-        yield* this.#completeTurn(thread, turn, "failed", emptyAnswerFailure(turn.reasoned));
+        yield* this.#completeTurn(thread, turn, "failed", emptyAnswerFailure);
         return;
       }
       const sdkHarness = this.#flavor.sdkHarness;
