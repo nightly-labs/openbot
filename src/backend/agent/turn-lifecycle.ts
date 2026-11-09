@@ -1608,14 +1608,9 @@ export class TurnLifecycle {
         }
         // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
         // that wants no answer, so only a teammate that asked for a result gets one.
-        if (
-          !continuation &&
-          !this.#conversation.isExecutionThread(snapshot.threadId) &&
-          terminal === "completed" &&
-          latestAssistant
-        ) {
+        if (!continuation && !this.#conversation.isExecutionThread(snapshot.threadId) && terminal === "completed") {
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant.text);
+            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
         if (!continuation && terminal === "failed") {
@@ -1956,7 +1951,7 @@ export class TurnLifecycle {
     turnId: string,
     delivery: DeliveryContext,
     turnDeliveries: readonly DeliveryContext[],
-    text: string,
+    text: string | undefined,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
     const messageId = delivery.delivery.messageId;
@@ -1980,7 +1975,9 @@ export class TurnLifecycle {
       // this the sender is woken for an echo of work it only wanted to know about.
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds)
+      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
+      // A turn with no answer that passed work on to a teammate waits for that answer: its result comes later.
+      (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId))
     )
       return;
 
@@ -1991,7 +1988,9 @@ export class TurnLifecycle {
       .enqueue({
         sender: { kind: "agent", agentId },
         recipientAgentIds: [recipientAgentId],
-        text,
+        // A turn that ended with no answer still answers, so the agent that asked does not wait for a
+        // result that never comes (#6044).
+        text: text ?? NO_RESULT_NOTE,
         replyToMessageId: messageId,
         ...(taskId ? { taskId } : {}),
         // The requested result, not a new request. The chain-origin guard above already stops a
@@ -2357,6 +2356,14 @@ export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>
 }) {}
 
 const { sync: turnStep, rewrap: toTurnOperationFailed } = causeHelpers(TurnOperationFailed);
+
+/** The answer for a teammate request when the turn ended with no answer, in the reply format. */
+const NO_RESULT_NOTE = [
+  "Status: blocked",
+  "Result: OpenBot note, not written by this teammate: the teammate's turn ended with no result and no error. The requested work can be unfinished.",
+  "Evidence: none",
+  "Unblock: Check what is done, then finish the rest yourself or send the teammate a narrower request.",
+].join("\n");
 
 /**
  * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
