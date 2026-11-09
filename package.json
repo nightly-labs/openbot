@@ -381,6 +381,7 @@
     "test:messaging-pause-resume": "bun scripts/messaging-pause-resume-e2e.ts",
     "test:messaging-discord-access": "bun scripts/messaging-discord-access-e2e.ts",
     "test:messaging-telegram-mentions": "bun scripts/messaging-telegram-mentions-e2e.ts",
+    "test:messaging-slack-ping-reply": "bun scripts/messaging-slack-ping-reply-e2e.ts",
     "test:turn-input": "bun scripts/turn-input-e2e.ts",
     "test:analytics-redaction": "bun scripts/analytics-redaction-e2e.ts",
     "test:remote-connect-analytics": "bun scripts/remote-connect-analytics-e2e.ts",

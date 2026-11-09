@@ -47,6 +47,8 @@ const MENTION_GUIDANCE: Partial<Record<MessagingPlatform, string>> = {
   whatsapp:
     "To mention a person so that WhatsApp notifies them, write @ and their WhatsApp user id, such as @15551234567.",
 };
+/** The whole answer of a turn that has nothing to say: nothing is posted. */
+export const QUIET_ANSWER = "NO_REPLY";
 const CONTEXT_MESSAGES = 30;
 const CONTEXT_CHARACTERS = 12_000;
 const REPLY_CHARACTERS = 4_000;
@@ -109,6 +111,11 @@ function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORD
   if (!input.isDirect)
     lines.push(
       `When a person gives a lasting fact or default of this ${words.workspace}, such as the repository or account to use or a person's role, save it with openbot.messaging_remember in the same turn. A new conversation, and a restart, keep only the saved facts.`,
+    );
+  // Only Slack takes back the "Working" post of a quiet answer.
+  if (input.platform === "slack" && !input.isDirect)
+    lines.push(
+      `A reply in this thread can reach you without a mention. When a message needs no answer, such as thanks or people talking to each other, answer only ${QUIET_ANSWER}: nothing is posted.`,
     );
   if (input.memories.length)
     lines.push(

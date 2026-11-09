@@ -113,7 +113,14 @@ export interface MessagingOutbound {
     markdown: string,
     files: MessagingAnswerFile[],
   ): Effect.Effect<
-    | { posted: true; messageId: string; url?: string; skippedFiles?: string[] }
+    | {
+        posted: true;
+        messageId: string;
+        url?: string;
+        skippedFiles?: string[];
+        /** The people that a Slack post pinged, and its redacted text. */
+        ping?: { userIds: string[]; text: string };
+      }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
   /** A Discord output of a workflow: a reply, a post or a reaction. */
@@ -251,6 +258,8 @@ const AUTHOR_QUEUE_LIMIT = 2;
 const CONTEXT_TIMEOUT_MS = 5_000;
 const HISTORY_TIMEOUT_MS = 15_000;
 const FINISHED_TURN_LIMIT = 256;
+/** The part of a pinging post that is kept: the prompt quotes no more of the message that a reply answers. */
+const MESSAGING_PING_TEXT_LIMIT = 4_000;
 /** What a messaging tool answers when its connection does not run. */
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
 const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
@@ -449,10 +458,12 @@ export class MessagingThreads {
   /**
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
    * place; only an enabled connection of this host can take a post. `openFiles` checks the files of a
-   * post under the calling agent's path rules, before the text is sent.
+   * post under the calling agent's path rules, before the text is sent. A Slack post that pings people
+   * in a thread with no link records them, so that a reply of theirs reaches the orchestrator.
    */
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
+    agentId: string,
     tool: string,
     args: unknown,
     openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
@@ -486,7 +497,25 @@ export class MessagingThreads {
             call.text,
             call.files.length ? yield* openFiles(call.files) : [],
           );
-    return "error" in answer ? openBotToolFailure(answer.error) : openBotToolResult(answer);
+    if ("error" in answer) return openBotToolFailure(answer.error);
+    if (!("ping" in answer)) return openBotToolResult(answer);
+    const { ping, ...result } = answer;
+    if (ping && call.tool === "messaging_post") {
+      const threadKey = call.replyTo ?? result.messageId;
+      // The post is sent already, so a failed record does not fail it: a reply then needs a mention.
+      if (!this.store.linkByKey(record.connectionId, call.place, threadKey))
+        yield* Effect.try(() =>
+          this.store.savePings({
+            connectionId: record.connectionId,
+            platformChannelId: call.place,
+            threadKey,
+            userIds: ping.userIds,
+            agentId,
+            text: ping.text.slice(0, MESSAGING_PING_TEXT_LIMIT),
+          }),
+        ).pipe(Effect.ignore);
+    }
+    return openBotToolResult(result);
   });
 
   /**

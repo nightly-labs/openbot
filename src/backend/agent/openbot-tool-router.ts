@@ -1228,7 +1228,7 @@ export class OpenBotToolRouter {
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     // Any agent can post on its own initiative, such as a routine that reports to a Discord channel.
     if (MESSAGING_OUTBOUND_TOOLS.has(params.tool))
-      return yield* this.#messaging.outboundTool(params.tool, params.arguments, (paths) =>
+      return yield* this.#messaging.outboundTool(senderAgentId, params.tool, params.arguments, (paths) =>
         // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
         // which holds the files the user attached. The adapters read each file again by its path.
         Effect.acquireUseRelease(

@@ -129,6 +129,14 @@ class SlackAdapter implements MessagingAdapter {
     });
   });
 
+  readonly remove = Effect.fnUntraced(function* (
+    this: SlackAdapter,
+    target: MessageTarget,
+    messageId: string,
+  ): Effect.fn.Return<void, MessagingAdapterError> {
+    yield* this.#api.call("chat.delete", { channel: target.platformChannelId, ts: messageId });
+  });
+
   readonly postPrivate = Effect.fnUntraced(function* (
     this: SlackAdapter,
     target: MessageTarget,

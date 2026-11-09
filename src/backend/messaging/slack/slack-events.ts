@@ -14,9 +14,9 @@ export const SLACK_ACTION_IDS = {
  * - `app_mention` in a channel starts or continues the thread it is in.
  * - A direct message always addresses OpenBot. OpenBot answers in a thread under it, so each
  *   top-level direct message is its own conversation, and the router picks its agent.
- * - A reply in a thread without a mention counts only in a thread that an agent already answers
- *   (`requiresLink`). A reply with a mention also arrives as `app_mention`, and both have the same
- *   dedup key, so it runs once.
+ * - A reply in a thread without a mention counts only in a thread that an agent already answers, or
+ *   that an agent's post pinged its author in (`requiresLink`). A reply with a mention also arrives as
+ *   `app_mention`, which takes it, so the order of the two events does not decide where it goes.
  * - Messages of bots, of OpenBot itself, edits, deletions and joins are ignored.
  */
 export function slackInboundMessage(payload: unknown, workspaceId: string, botUserId: string): InboundMessage | null {
@@ -61,6 +61,7 @@ export function slackInboundMessage(payload: unknown, workspaceId: string, botUs
     };
   }
   if (!threadTs || threadTs === ts) return null;
+  if (isString(event.text) && event.text.includes(`<@${botUserId}>`)) return null;
   return {
     ...base,
     threadKey: threadTs,
