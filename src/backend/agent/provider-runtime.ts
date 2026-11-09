@@ -51,6 +51,7 @@ import {
 import { readCursorUsage } from "./../cursor-usage";
 import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
 import { causeHelpers } from "../effect-boundary";
+import { type HermesRuntimeContext, listHermesProfiles, resolveHermesRuntime } from "../hermes-profiles";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
 import { McpHandoffLog } from "./../mcp-handoff-log";
@@ -266,6 +267,7 @@ export type AgentClientFactory = (
 interface OwnProcess {
   readonly confinement?: ProcessConfinement;
   readonly account?: StoredProviderAccount;
+  readonly hermesProfile?: HermesRuntimeContext;
 }
 
 /**
@@ -278,6 +280,7 @@ interface ConfinedClient {
   readonly key: string;
   /** The provider account it signed in to, or null for the provider's own sign-in. */
   readonly accountId: string | null;
+  readonly hermesProfileId?: string | undefined;
   lastUsed: number;
 }
 
@@ -340,7 +343,7 @@ export interface ProviderHooks {
  * status object.
  */
 export interface ProviderPort {
-  isReady(): boolean;
+  isReady(agent?: Pick<AgentSummary, "provider" | "hermesProfileId">): boolean;
   clientFor(provider: AgentProvider): AgentClient | null;
   clientForAgent(agent: AgentSummary): AgentClient | null;
   listModels(): AgentModelOption[];
@@ -379,6 +382,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
+  readonly #hermesModels = new Map<string, AgentModelOption[]>();
+  readonly #hermesModelGate = Semaphore.makeUnsafe(1);
   /** By agent id. See `ConfinedClient`. */
   readonly #confined = new Map<string, ConfinedClient>();
   readonly #confinedStarts = new Map<string, Deferred.Deferred<AgentClient, ProviderOperationFailed>>();
@@ -827,12 +832,19 @@ export class ProviderRuntime implements ProviderPort {
     );
   });
 
-  isReady(): boolean {
-    return this.#status.phase === "ready";
+  isReady(agent?: Pick<AgentSummary, "provider" | "hermesProfileId">): boolean {
+    return (
+      this.#status.phase === "ready" ||
+      (agent?.provider === "hermes" &&
+        agent.hermesProfileId !== undefined &&
+        this.#cli.has("hermes") &&
+        !this.#off.has("hermes"))
+    );
   }
 
   /** True while the provider waits for a sign-in: no turn can start on it until then. */
-  signInRequired(provider: AgentProvider): boolean {
+  signInRequired(provider: AgentProvider, hermesProfileId?: string): boolean {
+    if (provider === "hermes" && hermesProfileId !== undefined) return false;
     return (
       this.#status.providers?.some((status) => status.id === provider && status.state === "sign-in-required") ?? false
     );
@@ -876,7 +888,12 @@ export class ProviderRuntime implements ProviderPort {
    */
 
   readonly #releaseIdleProviders = Effect.fn("ProviderRuntime.releaseIdleProviders")(function* (this: ProviderRuntime) {
-    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    if (
+      this.#hooks.isStopping() ||
+      (this.#status.phase !== "ready" &&
+        ![...this.#confined.values()].some((client) => client.hermesProfileId !== undefined))
+    )
+      return;
     if (this.#customAgentsReloadPending && !this.#hooks.isProviderBusy("acp")) yield* this.reloadCustomAgents();
     for (const provider of this.#environmentReloadPending) {
       if (!this.#hooks.isProviderBusy(provider)) yield* this.#reloadAgentEnvironment(provider);
@@ -964,23 +981,98 @@ export class ProviderRuntime implements ProviderPort {
    * A client for one generation without tools. With `accountId`, it signs in as that provider account,
    * as the agent's own process does, so the generation does not spend the limit of the provider's own sign-in.
    */
-  createProfileClient(provider: AgentProvider, accountId?: string): AgentClient {
+  createProfileClient(provider: AgentProvider, accountId?: string, hermesProfileId?: string): AgentClient {
     this.requireProviderOn(provider);
     if (provider === "acp" && this.#removingCustomRuntime)
       throw new Error(sourceText("error.provider.registryRemoveBusy"));
     const cli = this.#cli.get(provider);
-    if (!cli || !this.#clients.has(provider)) throw new Error(sourceText("error.provider.connectBeforeProfile"));
+    if (!cli || (!(provider === "hermes" && hermesProfileId !== undefined) && !this.#clients.has(provider)))
+      throw new Error(sourceText("error.provider.connectBeforeProfile"));
     const account = this.#providerAccounts?.account(provider, accountId) ?? null;
     // A CLI that ignores the account's folder would run the generation on the provider's own sign-in.
     if (account && !this.#providerAccounts?.supported(provider))
       throw new Error(sourceText("error.provider.accountsUnsupported", { provider: providerLabel(provider) }));
     const accountEnvironment = account ? this.#providerAccounts?.environment(account) : undefined;
     if (this.#clientFactory) return this.#clientFactory(provider, cli, undefined, accountEnvironment);
-    const context = accountEnvironment ? { ...this.#credentials, accountEnvironment } : this.#credentials;
+    const context = {
+      ...this.#credentials,
+      ...(accountEnvironment ? { accountEnvironment } : {}),
+      ...(provider === "hermes" && hermesProfileId !== undefined
+        ? { hermesProfile: this.#hermesContext(hermesProfileId) }
+        : {}),
+    };
     const driver = requireProviderDriver(provider);
     if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, context);
     return driver.createClient(cli, this.#requestTimeoutMs, context);
   }
+
+  #hermesContext(profileId: string | undefined): HermesRuntimeContext {
+    return resolveHermesRuntime(profileId, { ...process.env, ...this.#credentials.agentEnvironment?.() });
+  }
+
+  readonly ensureAgentProvider = Effect.fn("ProviderRuntime.ensureAgentProvider")(function* (
+    this: ProviderRuntime,
+    agent: Pick<AgentSummary, "provider" | "hermesProfileId">,
+  ) {
+    if (agent.provider !== "hermes" || agent.hermesProfileId === undefined)
+      return yield* this.ensureProvider(agent.provider);
+    const profile = yield* providerStep(() => {
+      this.requireProviderOn("hermes");
+      return this.#hermesContext(agent.hermesProfileId);
+    });
+    if (!this.#hermesModels.has(profile.identity)) yield* this.readHermesModels(agent.hermesProfileId);
+    if (!this.#cli.has("hermes")) {
+      const cli = yield* this.#resolveProviderCli("hermes", { preferInstalled: true });
+      this.#cli.set("hermes", cli);
+    }
+  }).bind(this);
+
+  hermesModels(profileId: string): AgentModelOption[] {
+    try {
+      return structuredClone(this.#hermesModels.get(this.#hermesContext(profileId).identity) ?? []);
+    } catch {
+      return [];
+    }
+  }
+
+  readonly readHermesProfiles = Effect.fn("ProviderRuntime.readHermesProfiles")(function* (this: ProviderRuntime) {
+    return yield* providerStep(() => listHermesProfiles({ ...process.env, ...this.#credentials.agentEnvironment?.() }));
+  }).bind(this);
+
+  readonly readHermesModels = Effect.fn("ProviderRuntime.readHermesModels")(function* (
+    this: ProviderRuntime,
+    profileId: string | undefined,
+  ) {
+    return yield* this.#hermesModelGate.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const profile = yield* providerStep(() => {
+          this.requireProviderOn("hermes");
+          return this.#hermesContext(profileId);
+        });
+        const cli = yield* this.#resolveProviderCli("hermes", { preferInstalled: true });
+        this.#cli.set("hermes", cli);
+        return yield* Effect.acquireUseRelease(
+          providerStep(() => {
+            const client = requireProviderDriver("hermes").createProfileClient?.(cli, this.#requestTimeoutMs, {
+              ...this.#credentials,
+              hermesProfile: profile,
+            });
+            if (!client) throw new Error(sourceText("error.provider.connectBeforeProfile"));
+            return client;
+          }),
+          (client) =>
+            Effect.gen({ self: this }, function* () {
+              yield* providerStep(() => client.start());
+              yield* this.#initializeProviderClient(client).pipe(toProviderOperationFailed);
+              const { models } = yield* this.#modelCatalog.read(client).pipe(toProviderOperationFailed);
+              this.#hermesModels.set(profile.identity, models);
+              return models;
+            }),
+          (client) => client.stop().pipe(Effect.ignore),
+        );
+      }),
+    );
+  }).bind(this);
 
   preferredProvider(): AgentProvider {
     return this.#preferredProvider;
@@ -2351,6 +2443,7 @@ export class ProviderRuntime implements ProviderPort {
       confined.lastUsed = Date.now();
       return confined.client;
     }
+    if (providerForAgent(agent) === "hermes" && agent.hermesProfileId !== undefined) return null;
     return this.#ownProcessFor(agent) ? null : this.clientFor(providerForAgent(agent));
   }
 
@@ -2362,6 +2455,8 @@ export class ProviderRuntime implements ProviderPort {
   historyClientForAgent(agent: AgentSummary): AgentClient | null {
     const provider = providerForAgent(agent);
     const account = this.#providerAccounts?.account(provider, agent.providerAccountId);
+    if (provider === "hermes" && agent.hermesProfileId !== undefined)
+      return this.#confined.get(agent.id)?.client ?? null;
     if (!account) return this.clientFor(provider);
     const confined = this.#confined.get(agent.id);
     return confined?.accountId === account.id ? confined.client : null;
@@ -2417,16 +2512,24 @@ export class ProviderRuntime implements ProviderPort {
   agentClientCurrent(agent: AgentSummary): boolean {
     const current = this.#confined.get(agent.id);
     if (!current) return true;
-    const own = this.#ownProcessFor(agent);
-    return own !== null && current.key === this.#confinedKey(providerForAgent(agent), own);
+    try {
+      const own = this.#ownProcessFor(agent);
+      return own !== null && current.key === this.#confinedKey(providerForAgent(agent), own);
+    } catch {
+      return false;
+    }
   }
 
   /** True when `ensureAgentClient` would return a process that runs now, without starting one. */
   agentClientRunning(agent: AgentSummary): boolean {
     const provider = providerForAgent(agent);
-    if (!this.#clients.has(provider)) return false;
-    const own = this.#ownProcessFor(agent);
-    return own === null || this.#confined.get(agent.id)?.key === this.#confinedKey(provider, own);
+    if (!this.#clients.has(provider) && !(provider === "hermes" && agent.hermesProfileId !== undefined)) return false;
+    try {
+      const own = this.#ownProcessFor(agent);
+      return own === null || this.#confined.get(agent.id)?.key === this.#confinedKey(provider, own);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -2439,12 +2542,12 @@ export class ProviderRuntime implements ProviderPort {
     agent: AgentSummary,
   ) {
     const provider = providerForAgent(agent);
-    yield* this.ensureProvider(provider);
+    yield* this.ensureAgentProvider(agent);
     yield* this.#awaitConfinedStart(agent.id);
     if (provider === "acp" && this.#removingCustomRuntime)
       return yield* new ProviderOperationFailed({ cause: new Error(sourceText("error.provider.registryRemoveBusy")) });
     yield* checkAgentFolders(agent);
-    const own = this.#ownProcessFor(agent);
+    const own = yield* providerStep(() => this.#ownProcessFor(agent));
     const current = this.#confined.get(agent.id);
     const key = own ? this.#confinedKey(provider, own) : null;
     if (current && current.key === key) {
@@ -2474,7 +2577,11 @@ export class ProviderRuntime implements ProviderPort {
     const confined =
       workspaceAccessEnforced(agent) && agentProviderDescriptor(provider).workspaceEnforcement === "confined-process";
     const account = this.#providerAccounts?.account(provider, agent.providerAccountId) ?? null;
-    if (!confined && !account) return null;
+    const hermesProfile =
+      provider === "hermes" && agent.hermesProfileId !== undefined
+        ? this.#hermesContext(agent.hermesProfileId)
+        : undefined;
+    if (!confined && !account && !hermesProfile) return null;
     return {
       ...(confined
         ? {
@@ -2485,6 +2592,7 @@ export class ProviderRuntime implements ProviderPort {
           }
         : {}),
       ...(account ? { account } : {}),
+      ...(hermesProfile ? { hermesProfile } : {}),
     };
   }
 
@@ -2501,6 +2609,7 @@ export class ProviderRuntime implements ProviderPort {
       own.confinement?.writableRoots ?? null,
       own.confinement?.excludedFolders ?? null,
       own.account?.id ?? null,
+      own.hermesProfile?.identity ?? null,
     ]);
   }
 
@@ -2528,6 +2637,7 @@ export class ProviderRuntime implements ProviderPort {
       ...(slowStartTimeoutMs === undefined ? {} : { startTimeoutMs: slowStartTimeoutMs }),
       ...(own.confinement ? { confinement: own.confinement } : {}),
       ...(accountEnvironment ? { accountEnvironment } : {}),
+      ...(own.hermesProfile ? { hermesProfile: own.hermesProfile } : {}),
     });
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       yield* client.stop().pipe(Effect.catch(() => Effect.void));
@@ -2535,7 +2645,28 @@ export class ProviderRuntime implements ProviderPort {
         cause: new Error(sourceText("error.provider.stoppedBeforeAgentProcess", { provider: providerLabel(provider) })),
       });
     }
-    this.#confined.set(agentId, { client, key, accountId: own.account?.id ?? null, lastUsed: Date.now() });
+    if (own.hermesProfile) {
+      const { models } = yield* this.#modelCatalog.read(client).pipe(
+        toProviderOperationFailed,
+        Effect.onError(() => client.stop().pipe(Effect.ignore)),
+      );
+      if (disposals !== this.#disposals || this.#hooks.isStopping()) {
+        yield* client.stop().pipe(Effect.catch(() => Effect.void));
+        return yield* new ProviderOperationFailed({
+          cause: new Error(
+            sourceText("error.provider.stoppedBeforeAgentProcess", { provider: providerLabel(provider) }),
+          ),
+        });
+      }
+      this.#hermesModels.set(own.hermesProfile.identity, models);
+    }
+    this.#confined.set(agentId, {
+      client,
+      key,
+      accountId: own.account?.id ?? null,
+      hermesProfileId: own.hermesProfile?.profileId,
+      lastUsed: Date.now(),
+    });
     logger.info("Started an agent's own provider process.", {
       provider,
       agentId,
@@ -2978,8 +3109,10 @@ export class ProviderRuntime implements ProviderPort {
         startTimeoutMs,
         accountEnvironment,
         interruptibleStart,
+        hermesProfile,
       }: {
         confinement?: ProcessConfinement;
+        hermesProfile?: HermesRuntimeContext;
         startTimeoutMs?: number;
         /** The home folder of a provider account after the first. */
         accountEnvironment?: Readonly<Record<string, string>>;
@@ -2996,7 +3129,11 @@ export class ProviderRuntime implements ProviderPort {
             : driver.createClient(
                 cli,
                 this.#requestTimeoutMs,
-                accountEnvironment ? { ...this.#credentials, accountEnvironment } : this.#credentials,
+                {
+                  ...this.#credentials,
+                  ...(accountEnvironment ? { accountEnvironment } : {}),
+                  ...(hermesProfile ? { hermesProfile } : {}),
+                },
                 confinement,
               ),
         ),

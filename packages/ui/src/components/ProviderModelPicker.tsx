@@ -92,7 +92,7 @@ interface ProviderModelPickerProps {
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
-  /** A signed-out provider shows Connect only when this place has a way in. Without it, every one does. */
+  /** Connect is shown only when this place has a way in. Without this predicate, every provider does. */
   canConnectProvider?: ((provider: AgentProviderId) => boolean) | undefined;
   /** Endpoints the user named; served by OpenCode, separated out only by the picker. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
@@ -970,7 +970,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   if (available() || status().connectionState === "connecting") return undefined;
                   // An account after the first signs in again in Settings, beside its name.
                   if (accountId()) return undefined;
-                  if (runtime()?.phase === "ready") return "Connect" as const;
+                  if (runtime()?.phase === "ready")
+                    return (props.canConnectProvider?.(status().id) ?? true) ? ("Connect" as const) : undefined;
                   if (runtime()?.phase === "download-error") return "Retry" as const;
                   if (runtime()?.phase === "not-downloaded") return "Download" as const;
                   // No runtime snapshot here; signed-out/failed providers offer Connect if handled.

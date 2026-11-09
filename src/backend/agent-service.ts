@@ -679,9 +679,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       memories: this.#memories,
       profileClients: this.#profileClients,
       listAgents: () => this.listAgents(),
-      models: (agent) =>
-        this.#providers.ensureProvider(agent.provider).pipe(Effect.map(() => this.#agentModels(agent))),
-      createProfileClient: (agent) => this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
+      models: (agent) => this.#providers.ensureAgentProvider(agent).pipe(Effect.map(() => this.#agentModels(agent))),
+      createProfileClient: (agent) =>
+        this.#providers.createProfileClient(agent.provider, agent.providerAccountId, agent.hermesProfileId),
       usageObserver: (agent, model) =>
         sideSessionUsageObserver("memory-review", this.#store.database.usage, agent.id, agent.provider, model.id),
       chat: (agentId, sideThreadId) => {
@@ -1229,13 +1229,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ? backgroundModel(agent, this.#agentModels(agent))
               : this.#agentModels(agent).find((item) => item.provider === agent.provider && item.id === agent.model)) ??
             undefined;
-          const leadStarted = yield* Effect.result(this.#providers.ensureProvider(lead.provider));
+          const leadStarted = yield* Effect.result(this.#providers.ensureAgentProvider(lead));
           let selected = lead;
           let model = Result.isSuccess(leadStarted) ? modelOf(lead) : undefined;
           for (const fallback of fallbacks) {
             if (model) break;
             // A provider of a fallback that does not start leaves the next fallback to try.
-            if (Result.isFailure(yield* Effect.result(this.#providers.ensureProvider(fallback.provider)))) continue;
+            if (Result.isFailure(yield* Effect.result(this.#providers.ensureAgentProvider(fallback)))) continue;
             model = modelOf(fallback);
             selected = fallback;
           }
@@ -1266,7 +1266,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : model.id === selected.model
               ? { ...model, defaultReasoningEffort: selected.reasoningEffort }
               : model;
-          const client = this.#providers.createProfileClient(selected.provider, selected.providerAccountId);
+          const client = this.#providers.createProfileClient(
+            selected.provider,
+            selected.providerAccountId,
+            selected.hermesProfileId,
+          );
           return yield* this.#profileClients
             .run(client, (cancelled) => generateTextWithoutTools(client, turnModel, prompt, cancelled))
             .pipe(
@@ -2453,6 +2457,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.emit("workflowRun", end);
   }
 
+  listHermesProfiles() {
+    return this.#providers
+      .readHermesProfiles()
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "list Hermes profiles", cause: failure.cause }),
+        ),
+      );
+  }
+
+  listHermesModels(profileId: string | undefined) {
+    return this.#providers
+      .readHermesModels(profileId)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "list Hermes models", cause: failure.cause }),
+        ),
+      );
+  }
+
   listModels(): AgentModelOption[] {
     return this.#endpoints.available();
   }
@@ -2461,8 +2485,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * The models one agent can run: the catalogue, and the models that only the agent's account after
    * the first serves (#5217).
    */
-  #agentModels(agent: { provider: AgentProvider; providerAccountId?: string | undefined }): AgentModelOption[] {
+  #agentModels(agent: {
+    provider: AgentProvider;
+    providerAccountId?: string | undefined;
+    hermesProfileId?: string | undefined;
+  }): AgentModelOption[] {
     const models = this.#endpoints.available();
+    if (agent.provider === "hermes" && agent.hermesProfileId !== undefined)
+      return [
+        ...models.filter((model) => model.provider !== "hermes"),
+        ...this.#providers.hermesModels(agent.hermesProfileId),
+      ];
     const own = this.#providers
       .accountModels(agent.provider, agent.providerAccountId)
       .filter((option) => !models.some((model) => model.provider === option.provider && model.id === option.id));
@@ -2490,7 +2523,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           cause: new Error(sourceText("error.agent.profileGenerationBusy")),
         });
       const provider = agent?.provider ?? this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
-      yield* this.#providers.ensureProvider(provider);
+      yield* agent ? this.#providers.ensureAgentProvider(agent) : this.#providers.ensureProvider(provider);
       const models = agent ? this.#agentModels(agent) : this.#endpoints.available();
       const model = agent
         ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
@@ -2502,7 +2535,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return yield* new ProfileGenerationFailed({
           cause: new Error(sourceText("error.agent.profileGenerationBusy")),
         });
-      const client = this.#providers.createProfileClient(provider, agent?.providerAccountId);
+      const client = this.#providers.createProfileClient(provider, agent?.providerAccountId, agent?.hermesProfileId);
       return yield* this.#profileClients.run(client, (cancelled) =>
         generateProfile(client, withBackgroundEffort(model), input, sections, cancelled),
       );
@@ -2521,7 +2554,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!agent) return yield* failed(sourceText("error.agent.gone"));
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.sideQuestionBusy"));
-      yield* this.#providers.ensureProvider(agent.provider);
+      yield* this.#providers.ensureAgentProvider(agent);
       const model = this.#agentModels(agent).find(
         (candidate) => candidate.provider === agent.provider && candidate.id === agent.model,
       );
@@ -2536,7 +2569,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           { type: "latest" },
           SIDE_QUESTION_CHAT_MESSAGES,
         ).messages;
-      const client = this.#providers.createProfileClient(agent.provider, agent.providerAccountId);
+      const client = this.#providers.createProfileClient(
+        agent.provider,
+        agent.providerAccountId,
+        agent.hermesProfileId,
+      );
       return yield* this.#profileClients
         .run(client, (cancelled) =>
           generateTextWithoutTools(
@@ -2741,8 +2778,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
+          if (input.provider === "hermes" && input.hermesProfileId !== undefined)
+            yield* this.listHermesModels(input.hermesProfileId);
           const requested = yield* lifecycleStep("select requested model", () =>
-            creationModel(input, this.#endpoints.available(), this.#providers.status().providers),
+            creationModel(
+              input,
+              this.#agentModels({ ...agent, ...input, provider: input.provider ?? agent.provider }),
+              this.#providers.status().providers,
+            ),
           );
           if (requested) {
             yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requested.provider));
@@ -3102,6 +3145,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const refusal = idleRefusal(previous);
       if (refusal !== null) throw new AgentSettingsRefused(refusal);
     };
+    const saved = this.#store.list().find((agent) => agent.id === input.agentId);
+    const targetProvider = input.provider ?? saved?.provider;
+    const targetProfile =
+      input.hermesProfileId === null ? undefined : (input.hermesProfileId ?? saved?.hermesProfileId);
+    if (
+      targetProvider === "hermes" &&
+      (input.hermesProfileId !== undefined || input.provider !== undefined || input.model !== undefined)
+    ) {
+      const models = yield* this.listHermesModels(targetProfile);
+      if (input.hermesProfileId !== undefined && input.model === undefined) {
+        const model = models.find((candidate) => candidate.id === saved?.model) ?? models[0];
+        if (!model)
+          return yield* new AgentLifecycleFailed({
+            operation: "select Hermes model",
+            cause: new Error(sourceText("error.provider.noModel")),
+          });
+        input = {
+          ...input,
+          provider: "hermes",
+          model: model.id,
+          reasoningEffort:
+            input.reasoningEffort ??
+            (saved && model.supportedReasoningEfforts.includes(saved.reasoningEffort)
+              ? saved.reasoningEffort
+              : model.defaultReasoningEffort),
+        };
+      }
+    }
     const { previous, requestedModel, requestedProvider, previousAccount, requestedAccount } = yield* lifecycleStep(
       "validate agent update",
       () => {
@@ -3109,9 +3180,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const previous = this.#store.list().find((agent) => agent.id === input.agentId);
         const modelProvider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
         const requestedModel = input.model
-          ? (this.#endpoints
-              .available()
-              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider)) ??
+          ? (this.#agentModels({ provider: modelProvider ?? "codex", hermesProfileId: targetProfile }).find(
+              (model) => model.id === input.model && (!input.provider || model.provider === input.provider),
+            ) ??
             // A model that only the agent's account after the first serves (#5217).
             (modelProvider
               ? this.#providers
@@ -3190,6 +3261,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     );
     const accountChanged = previous !== undefined && requestedAccount !== previousAccount;
+    const hermesProfileChanged =
+      previous !== undefined && requestedProvider === "hermes" && previous.hermesProfileId !== targetProfile;
+    if (hermesProfileChanged) yield* lifecycleStep("check Hermes profile change", () => requireIdle(previous));
     const nextModelId = requestedModel?.id ?? previous?.model;
     const customAgentChanged = Boolean(
       previous &&
@@ -3201,13 +3275,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const handoverNeeded = Boolean(
       previous &&
         requestedProvider &&
-        (requestedProvider !== providerForAgent(previous) || accountChanged || customAgentChanged),
+        (requestedProvider !== providerForAgent(previous) ||
+          accountChanged ||
+          customAgentChanged ||
+          hermesProfileChanged),
     );
     const runtimeFields =
       input.provider !== undefined ||
       input.model !== undefined ||
       input.reasoningEffort !== undefined ||
-      input.providerAccountId !== undefined;
+      input.providerAccountId !== undefined ||
+      input.hermesProfileId !== undefined;
     // Only an update of the runtime alone waits for the next turn. An update with other fields is
     // refused while work runs, as before, and so is a move to a backup model: `pendingRuntime` does
     // not keep the model to go back to.
@@ -3266,7 +3344,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const wasHeld = !this.#usageLimits.mayDrain(input.agentId);
     const captures: Array<readonly [ProviderSession, string]> = [];
     if (handoverNeeded && requestedProvider && previous) {
-      yield* this.#providers.ensureProvider(requestedProvider);
+      yield* this.#providers.ensureAgentProvider({ provider: requestedProvider, hermesProfileId: targetProfile });
       // Before the sessions are retired below, while the previous provider still holds them. The
       // steps are saved only once the switch is stored: a switch that fails keeps the session.
       // A task is a conversation of the agent, so it moves to the new provider with the agent's chat.
@@ -3346,6 +3424,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // binds a session of the new provider, and a later retirement would close that one too.
       for (const threadId of handedOverThreads(previous)) this.#store.database.deactivateProviderSessions(threadId);
       for (const [session, steps] of captures) yield* this.#threads.saveWorkSteps(session, steps);
+      if (hermesProfileChanged) yield* this.#providers.stopAgentProcess(agent.id);
     } else if (activeSession && (input.model || input.reasoningEffort)) {
       this.#store.database.updateProviderSessionConfig(
         activeSession.id,
@@ -3418,7 +3497,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
     // The agent keeps its reasoning effort where the other model has it. It goes back with the effort it left.
     const move = (choice: AgentModelChoice, reasoningEffort = agent.reasoningEffort) => {
-      const model = this.#agentModels(choice).find(
+      const model = this.#agentModels({ ...choice, hermesProfileId: agent.hermesProfileId }).find(
         (option) => option.provider === choice.provider && option.id === choice.model,
       );
       return {
@@ -3432,7 +3511,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : reasoningEffort,
       };
     };
-    if (agent.usageLimitReturn && this.#usageLimitReady(agent.usageLimitReturn))
+    if (
+      agent.usageLimitReturn &&
+      this.#usageLimitReady({ ...agent.usageLimitReturn, hermesProfileId: agent.hermesProfileId })
+    )
       return { input: move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort), move: "return" };
     const limited = !this.#usageLimits.mayDrain(agentId);
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
@@ -3459,7 +3541,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return agent.backupModels.order.find(
       (choice) =>
         !sameAgentModelChoice(choice, current) &&
-        this.#usageLimitReady(choice) &&
+        this.#usageLimitReady({ ...choice, hermesProfileId: agent.hermesProfileId }) &&
         !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
     );
   }
@@ -3475,7 +3557,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /** Whether the model is ready, and no usage limit or provider error holds it. */
-  #usageLimitReady(choice: AgentModelChoice): boolean {
+  #usageLimitReady(choice: AgentModelChoice & Pick<AgentSummary, "hermesProfileId">): boolean {
     const limit = usageLimitOf(choice);
     return this.#modelChoiceReady(choice) && !this.#usageLimits.isLimited(limit) && !this.#usageLimits.isFailed(limit);
   }
@@ -3484,14 +3566,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * Whether the provider is on and signed in, the account is connected, and the model list has the
    * model. The same check as `backupModelOption` in the settings page and the chat card.
    */
-  #modelChoiceReady(choice: AgentModelChoice): boolean {
+  #modelChoiceReady(choice: AgentModelChoice & Pick<AgentSummary, "hermesProfileId">): boolean {
     const accountId = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const provider = this.getStatus().providers?.find((status) => status.id === choice.provider);
     const accounts = provider?.accounts;
     return (
       provider !== undefined &&
       provider.off !== true &&
-      provider.state === "available" &&
+      (choice.provider === "hermes" && choice.hermesProfileId !== undefined
+        ? this.#providers.isReady(choice)
+        : provider.state === "available") &&
       (accounts === undefined
         ? accountId === DEFAULT_PROVIDER_ACCOUNT_ID
         : accounts.some((account) => account.id === accountId && account.state === "connected")) &&
@@ -5488,7 +5572,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* this.#providers
-      .ensureProvider(providerForAgent(agent))
+      .ensureAgentProvider({ ...agent, provider: providerForAgent(agent) })
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
@@ -5841,13 +5925,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   readonly interruptAll = Effect.fn("AgentService.interruptAll")(function* (this: AgentService) {
-    if (!this.#providers.isReady()) return;
     const requests: Effect.Effect<unknown>[] = [];
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       const turnId = snapshot.activeTurnId;
       if (!snapshot.threadId || !turnId) continue;
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-      const client = agent ? this.#providers.clientForAgent(agent) : null;
+      if (!agent || !this.#providers.isReady(agent)) continue;
+      const client = this.#providers.clientForAgent(agent);
       const session = agent ? this.#runningSession(agent, snapshot.threadId) : undefined;
       if (!client || !session) continue;
       this.#images.interrupt(agentId, session, turnId);

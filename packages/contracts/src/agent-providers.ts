@@ -4,6 +4,14 @@ import type { AccountUsageLimit, AgentAuthState } from "./ipc-agent-status";
 import type { ExternalDestination } from "./ipc-app-auth";
 import { isOneOf, isString } from "./runtime-values";
 
+/** The total returned IDs, including the explicit `default` profile. */
+export const MAX_HERMES_PROFILE_IDS = 4096;
+
+/** Canonical Hermes profile IDs. `default` explicitly selects the root profile. */
+export function isHermesProfileId(value: unknown): value is string {
+  return isString(value) && /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(value);
+}
+
 /**
  * The coding agents OpenBot can drive, and everything about one that is the same wherever it is
  * named. A provider used to be written out by hand about twenty times - five copies of the same

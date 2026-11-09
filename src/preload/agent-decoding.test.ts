@@ -1,6 +1,6 @@
 import type { AgentModelOption } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { decodeAgentStatusFromMain, decodeQuitShortcutHint } from "./agent-decoding";
+import { decodeAgentStatusFromMain, decodeHermesProfiles, decodeQuitShortcutHint } from "./agent-decoding";
 
 const proModel = {
   provider: "antigravity",
@@ -10,6 +10,17 @@ const proModel = {
   defaultReasoningEffort: "medium",
   supportedReasoningEfforts: ["medium"],
 } satisfies AgentModelOption;
+
+describe("decodeHermesProfiles", () => {
+  it("keeps canonical default and named profile IDs", () => {
+    expect(decodeHermesProfiles(["default", "work-2"])).toEqual(["default", "work-2"]);
+  });
+
+  it("refuses invalid or unbounded profile responses", () => {
+    for (const value of [null, "default", ["../escape"], ["Work"], [null], Array(4097).fill("default")])
+      expect(() => decodeHermesProfiles(value)).toThrow("Invalid Hermes profile response.");
+  });
+});
 
 function statusWithAccountModels(models: unknown) {
   return {

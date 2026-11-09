@@ -1,3 +1,4 @@
+import { isHermesProfileId, MAX_HERMES_PROFILE_IDS } from "@openbot/contracts/agent-providers";
 import {
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
@@ -168,6 +169,12 @@ export function decodeHostProviderAccountsFromMain(value: unknown): HostProvider
     return { agentId: row.agentId, accountId: row.accountId };
   });
   return { providers, agents };
+}
+
+export function decodeHermesProfiles(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > MAX_HERMES_PROFILE_IDS || !value.every(isHermesProfileId))
+    throw new Error("Invalid Hermes profile response.");
+  return value;
 }
 
 // Fails closed on a member for the same reason as `decodeAgentModelOptions` in the main process, and

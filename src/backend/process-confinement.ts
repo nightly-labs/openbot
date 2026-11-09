@@ -260,15 +260,37 @@ export function hermesHome(
   home = homedir(),
   platform: NodeJS.Platform = process.platform,
 ): string {
-  const configured = env.HERMES_HOME?.trim();
-  const root = configured
-    ? configured === "~" || configured.startsWith("~/")
-      ? join(home, configured.slice(1))
-      : configured
-    : platform === "win32"
-      ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes")
-      : join(home, ".hermes");
-  return basename(dirname(root)) === "profiles" ? root : hermesActiveProfile(root);
+  const configured = hermesConfiguredHome(env, home, platform);
+  return basename(dirname(configured)) === "profiles" ? configured : hermesActiveProfile(configured);
+}
+
+function hermesConfiguredHome(env: NodeJS.ProcessEnv, home: string, platform: NodeJS.Platform): string {
+  const expanded = env.HERMES_HOME?.trim().replace(
+    /\$\{([^}]+)\}|\$([A-Za-z0-9_]+)/gu,
+    (match, braced, name) => env[braced ?? name] ?? match,
+  );
+  const configured =
+    platform === "win32" ? expanded?.replace(/%([^%]+)%/gu, (match, name) => env[name] ?? match) : expanded;
+  if (configured)
+    return resolve(
+      configured === "~" || configured.startsWith("~/") || (platform === "win32" && configured.startsWith("~\\"))
+        ? join(home, configured.slice(1))
+        : configured,
+    );
+  const suffix = env.HERMES_DATA_DIR_SUFFIX ?? "";
+  return platform === "win32"
+    ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), `hermes${suffix}`)
+    : join(home, `.hermes${suffix}`);
+}
+
+/** The root used by `hermes --profile`, independent of the sticky active profile. */
+export function hermesRoot(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const configured = hermesConfiguredHome(env, home, platform);
+  return basename(dirname(configured)) === "profiles" ? dirname(dirname(configured)) : configured;
 }
 
 /** Hermes 0.21.5 reads `<root>/active_profile` at each start and then uses that profile's folder. */
@@ -294,7 +316,10 @@ function hermesActiveProfile(root: string): string {
  * read-only.
  */
 export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const root = hermesHome(env, home);
+  return hermesStatePathsForHome(hermesHome(env, home));
+}
+
+export function hermesStatePathsForHome(root: string): ProviderStatePaths {
   return {
     writable: [root],
     protected: [

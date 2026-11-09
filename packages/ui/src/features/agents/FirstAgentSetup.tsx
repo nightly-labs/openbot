@@ -29,6 +29,7 @@ import { currentText, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "./AgentAvatar";
 import { avatarColorChoiceLabel } from "./avatar-hue-label";
+import { type HermesProfileOptions, HermesProfileSelect } from "./HermesProfileSelect";
 import { InstructionsLimit, instructionsTooLong } from "./InstructionsLimit";
 
 export interface FirstAgentDraft {
@@ -45,6 +46,7 @@ export interface FirstAgentDraft {
   reasoningEffort?: AgentReasoningEffort | undefined;
   /** The account of `provider` the agent starts on. Absent, the provider's own sign-in. */
   providerAccountId?: string | undefined;
+  hermesProfileId?: string | undefined;
 }
 
 /**
@@ -62,6 +64,7 @@ export interface FirstAgentSuggestion {
 }
 
 export interface FirstAgentSetupProps {
+  hermesProfiles?: HermesProfileOptions | undefined;
   value: FirstAgentDraft;
   suggestions: FirstAgentSuggestion[];
   mode?: "first" | "additional";
@@ -81,6 +84,7 @@ export interface FirstAgentSetupProps {
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  canConnectProvider?: ((provider: AgentProviderId) => boolean) | undefined;
   onAddCustomProvider?: ((trigger: HTMLElement) => void) | undefined;
   /** Opens the provider settings from a plus button in the model picker. */
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
@@ -219,7 +223,11 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   const [canScrollSuggestionsForward, setCanScrollSuggestionsForward] = createSignal(false);
   const [draggingSuggestions, setDraggingSuggestions] = createSignal(false);
   const canSubmit = () =>
-    Boolean(props.value.name.trim()) && !instructionsTooLong(props.value.purpose) && !props.submitting;
+    Boolean(props.value.name.trim()) &&
+    !instructionsTooLong(props.value.purpose) &&
+    !props.submitting &&
+    !(props.value.provider === "hermes" && props.hermesProfiles?.modelsUnavailable) &&
+    !(props.value.provider === "hermes" && props.hermesProfiles?.loading);
   const displayName = () => props.value.name.trim() || t("agent.setup.nameFallback");
 
   function updateSuggestionFades(): void {
@@ -369,6 +377,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       model: props.value.model,
       reasoningEffort: props.value.reasoningEffort,
       providerAccountId: props.value.providerAccountId,
+      hermesProfileId: props.value.hermesProfileId,
     });
   }
 
@@ -563,6 +572,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       onDownloadProvider={props.onDownloadProvider}
                       onCancelProviderDownload={props.onCancelProviderDownload}
                       onConnectProvider={props.onConnectProvider}
+                      canConnectProvider={props.canConnectProvider}
                       onAddCustomProvider={props.onAddCustomProvider}
                       onManageProviders={props.onManageProviders}
                       disabled={props.submitting}
@@ -575,6 +585,17 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
               )}
             </Show>
           </div>
+
+          <Show when={props.value.provider === "hermes" && props.hermesProfiles}>
+            {(options) => (
+              <HermesProfileSelect
+                value={props.value.hermesProfileId}
+                options={options()}
+                disabled={props.submitting}
+                onChange={(hermesProfileId) => updateDraft({ hermesProfileId })}
+              />
+            )}
+          </Show>
 
           <Show when={props.error}>
             {(error) => (

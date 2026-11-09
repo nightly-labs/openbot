@@ -272,6 +272,7 @@ export interface AgentProfile {
   reasoningEffort: AgentReasoningEffort;
   /** The provider account after the first. Absent for the provider's own sign-in. */
   providerAccountId?: string | undefined;
+  hermesProfileId?: string | undefined;
   /** Absent for an agent on a remote host, which does not share it; the host then decides. */
   access?: AgentAccess | undefined;
   /** Absent means on. Absent for an agent on a remote host too, which does not share it. */

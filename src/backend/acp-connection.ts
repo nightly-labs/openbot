@@ -1,7 +1,14 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { basename } from "node:path";
 import { Readable, Writable } from "node:stream";
-import { type Client, ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
+import {
+  type AnyMessage,
+  type Client,
+  ClientSideConnection,
+  ndJsonStream,
+  type Stream,
+} from "@agentclientprotocol/sdk";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
@@ -35,6 +42,7 @@ export interface AcpConnectionOptions {
   provider: string;
   cli: AgentCliInfo;
   argv: readonly string[];
+  sessionNamespace?: string | undefined;
   env: Record<string, string>;
   extraEnv?: (() => Record<string, string>) | undefined;
   confine?: ((target: SpawnTarget) => SpawnTarget) | undefined;
@@ -121,7 +129,10 @@ export class AcpConnection {
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
     );
-    this.#connection = new ClientSideConnection(() => this.options.client(), stream);
+    this.#connection = new ClientSideConnection(
+      () => this.options.client(),
+      this.options.sessionNamespace ? namespacedSessions(stream, this.options.sessionNamespace) : stream,
+    );
     // One record at a time, never one chunk at a time: a chunk can end inside a JSON record, and a
     // record read in halves keeps the credential in its second half.
     let lastDiagnostic: string | null = null;
@@ -217,3 +228,48 @@ const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: Chil
   child.stdin.end();
   yield* endProcessTree(child).pipe(Effect.mapError((failure) => providerFailure(failure.cause)));
 });
+
+/** Translate only ACP session identity fields. Content and provider payloads stay untouched. */
+function namespacedSessions(stream: Stream, prefix: string): Stream {
+  const sessionId = (id: string, incoming: boolean): string => {
+    if (!incoming && !id.startsWith(prefix)) throw new Error("ACP session not found.");
+    return incoming ? `${prefix}${id}` : id.slice(prefix.length);
+  };
+  const message = (value: AnyMessage, incoming: boolean): AnyMessage => {
+    if ("params" in value && isDynamicRecord(value.params) && typeof value.params.sessionId === "string")
+      return { ...value, params: { ...value.params, sessionId: sessionId(value.params.sessionId, incoming) } };
+    if ("result" in value && isDynamicRecord(value.result)) {
+      const result = value.result;
+      return {
+        ...value,
+        result: {
+          ...result,
+          ...(typeof result.sessionId === "string" ? { sessionId: sessionId(result.sessionId, incoming) } : {}),
+          ...(Array.isArray(result.sessions)
+            ? {
+                sessions: result.sessions.map((entry) =>
+                  isDynamicRecord(entry) && typeof entry.sessionId === "string"
+                    ? { ...entry, sessionId: sessionId(entry.sessionId, incoming) }
+                    : entry,
+                ),
+              }
+            : {}),
+        },
+      };
+    }
+    return value;
+  };
+  const writer = stream.writable.getWriter();
+  return {
+    readable: stream.readable.pipeThrough(
+      new TransformStream<AnyMessage, AnyMessage>({
+        transform: (value, controller) => controller.enqueue(message(value, true)),
+      }),
+    ),
+    writable: new WritableStream<AnyMessage>({
+      write: (value) => writer.write(message(value, false)),
+      close: () => writer.close(),
+      abort: (reason) => writer.abort(reason),
+    }),
+  };
+}

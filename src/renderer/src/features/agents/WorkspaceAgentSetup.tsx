@@ -10,6 +10,7 @@ import { useServers } from "../servers/servers-context";
 import { useAgentActions } from "./agent-actions";
 import { resolveCreationModel } from "./agent-creation-model";
 import { useAgents } from "./agents-context";
+import { createHermesProfiles } from "./hermes-profiles";
 
 /**
  * The create-an-agent form, which takes over the conversation pane instead of
@@ -43,6 +44,29 @@ export function WorkspaceAgentSetup() {
     activeCustomProviders,
   } = useProviders();
   const { openServerSettings } = useServerSettings();
+  const hermesProfiles = createHermesProfiles(
+    () =>
+      activeServer()?.kind === "local" &&
+      (agentSetupDraft().provider === "hermes" || agentSetupDraft().hermesProfileId !== undefined),
+    () => agentSetupDraft().hermesProfileId,
+    modelOptions,
+  );
+  const pickerStatus = createMemo(() => hermesProfiles.pickerStatus(agentStatus()));
+  createEffect(
+    () => ({ draft: agentSetupDraft(), options: hermesProfiles.models(), loading: hermesProfiles.options().loading }),
+    ({ draft, options, loading }) => {
+      if (draft.provider !== "hermes" || loading) return;
+      const selected = options.find((model) => model.provider === "hermes" && model.id === draft.model);
+      const model = selected ?? options.find((model) => model.provider === "hermes");
+      if (
+        !model ||
+        (selected &&
+          (draft.reasoningEffort === undefined || model.supportedReasoningEfforts.includes(draft.reasoningEffort)))
+      )
+        return;
+      setAgentSetupDraft({ ...draft, model: model.id, reasoningEffort: model.defaultReasoningEffort });
+    },
+  );
   const auth = useAuth();
   /**
    * The released Team API create route does not carry the account, so only an agent of this computer
@@ -109,8 +133,9 @@ export function WorkspaceAgentSetup() {
       mode={agentList().length === 0 ? "first" : "additional"}
       submitting={creatingAgent()}
       error={agentSetupError()}
-      modelOptions={createModelSupported() ? modelOptions() : undefined}
-      agentStatus={agentStatus()}
+      modelOptions={createModelSupported() ? hermesProfiles.models() : undefined}
+      hermesProfiles={accountChoice() ? hermesProfiles.options() : undefined}
+      agentStatus={pickerStatus()}
       accountChoice={accountChoice()}
       accountUsage={accountChoice() ? auth.accountUsage() : undefined}
       runtimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
@@ -120,6 +145,7 @@ export function WorkspaceAgentSetup() {
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
+      canConnectProvider={hermesProfiles.canConnectProvider}
       onAddCustomProvider={manageProviders() ? openProviderSettings : undefined}
       onManageProviders={manageProviders() ? openProviderSettings : undefined}
       onChange={(next) => {
@@ -128,7 +154,8 @@ export function WorkspaceAgentSetup() {
           next.provider !== current.provider ||
           next.model !== current.model ||
           next.reasoningEffort !== current.reasoningEffort ||
-          next.providerAccountId !== current.providerAccountId
+          next.providerAccountId !== current.providerAccountId ||
+          next.hermesProfileId !== current.hermesProfileId
         )
           setModelTouched(true);
         setAgentSetupDraft(next);

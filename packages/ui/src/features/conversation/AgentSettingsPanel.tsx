@@ -113,6 +113,7 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
+import { type HermesProfileOptions, HermesProfileSelect } from "../agents/HermesProfileSelect";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { AgentChatColorRow } from "../settings/ChatColorSetting";
 import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
@@ -132,6 +133,7 @@ export type AgentRuntimeSettingsPatch =
   | Pick<AgentRuntimeSettings, "reasoningEffort">;
 
 export interface AgentSettingsPanelProps {
+  hermesProfiles?: HermesProfileOptions | undefined;
   agent: AgentProfile;
   runtimeSettings: AgentRuntimeSettings;
   agentStatus: AgentStatus;
@@ -1372,6 +1374,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 />
                 <InstructionsLimit text={draft.fields.description} tooLong="agent.description.tooLong" />
               </SettingsField>
+              <Show when={draft.runtime.provider === "hermes" && props.hermesProfiles}>
+                {(options) => (
+                  <HermesProfileSelect
+                    value={props.agent.hermesProfileId}
+                    options={options()}
+                    disabled={props.working}
+                    onChange={(profileId) => void saveAgentPatch({ hermesProfileId: profileId ?? null })}
+                  />
+                )}
+              </Show>
               <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
                 <ProviderModelPicker
                   variant="field"

@@ -34,6 +34,7 @@ import { createEffect, createMemo, createSignal, createStore, Show, untrack } fr
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
+import { createHermesProfiles } from "../agents/hermes-profiles";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-store";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
@@ -126,6 +127,14 @@ function profilesWithProxies(
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
+  const hermesProfiles = createHermesProfiles(
+    () =>
+      props.localHost === true &&
+      (props.runtimeSettings.provider === "hermes" || props.agent.hermesProfileId !== undefined),
+    () => props.agent.hermesProfileId,
+    () => props.modelOptions,
+  );
+  const pickerStatus = createMemo(() => hermesProfiles.pickerStatus(props.agentStatus));
   const sessionSettings = createMemo((): AgentSessionSettingsApi | undefined => {
     if (!props.sessionSettingsEditable) return undefined;
     if (props.remoteClient) return props.adminCalls?.sessionSettings;
@@ -451,6 +460,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   return (
     <SharedAgentSettingsPanel
       {...props}
+      agentStatus={pickerStatus()}
+      canConnectProvider={(provider) =>
+        hermesProfiles.canConnectProvider(provider) && (props.canConnectProvider?.(provider) ?? true)
+      }
+      hermesProfiles={props.localHost ? hermesProfiles.options() : undefined}
+      modelOptions={hermesProfiles.models()}
       browserProfiles={browserProfileOptions()}
       notificationLevel={notificationLevelOptions()}
       width={panelWidth()}

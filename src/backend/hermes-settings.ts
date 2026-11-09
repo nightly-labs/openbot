@@ -42,11 +42,12 @@ const HERMES_SYSTEM_MANAGED_DIR = "/etc/hermes";
 export function hermesSettingsEnvironment(
   env: NodeJS.ProcessEnv,
   directory: string | undefined,
+  effectiveHome = hermesHome(env),
 ): Readonly<Record<string, string>> {
   if (!directory) return {};
   // An administrator scope: `HERMES_MANAGED_DIR` would replace it.
   if (env.HERMES_MANAGED_DIR?.trim() || existsSync(HERMES_SYSTEM_MANAGED_DIR)) return {};
-  const agent = unsetAgentSettings(join(hermesHome(env), "config.yaml"));
+  const agent = unsetAgentSettings(join(effectiveHome, "config.yaml"));
   if (agent === null || Object.keys(agent).length === 0) return {};
   const content = stringifyYaml({ agent });
   // One folder for each content: a running process keeps the file that it started with.

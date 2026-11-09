@@ -779,6 +779,26 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-directories
 
+      - name: Run the Hermes profiles E2E test
+        if: ${{ !cancelled() }}
+        run: bun scripts/hermes-profiles-e2e.ts
+
+      - name: Run the Hermes profile lifecycle and discovery regressions
+        if: ${{ !cancelled() }}
+        run: bun scripts/hermes-profile-regressions-e2e.ts
+
+      - name: Render the Hermes profile production forms
+        if: ${{ !cancelled() }}
+        run: bun scripts/hermes-profiles-dom-e2e.ts
+
+      - name: Run the Hermes profile production picker regressions
+        if: ${{ !cancelled() }}
+        run: bun scripts/hermes-profile-picker-e2e.ts
+
+      - name: Run the Hermes profile production create regressions
+        if: ${{ !cancelled() }}
+        run: bun scripts/hermes-create-e2e.ts
+
       - name: Run the ACP flavors E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-flavors
@@ -878,6 +898,11 @@ jobs:
             .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
+            .openbot-build/hermes-profiles-e2e/
+            .openbot-build/hermes-profile-regressions-e2e/
+            .openbot-build/hermes-profiles-dom-e2e/
+            .openbot-build/hermes-profile-picker-e2e/
+            .openbot-build/hermes-create-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
