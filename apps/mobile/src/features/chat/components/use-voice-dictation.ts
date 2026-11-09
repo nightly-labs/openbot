@@ -5,7 +5,13 @@ import { type SharedValue, useSharedValue, withTiming } from "react-native-reani
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
-import { parakeetSupported, useParakeetModel, useParakeetUnifiedModel } from "@/features/voice/model/parakeet-model";
+import {
+  isLocalRecognition,
+  localRecognitionSupported,
+  useParakeetModel,
+  useParakeetUnifiedModel,
+  useQwenModel,
+} from "@/features/voice/model/recognition-models";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceServer } from "@/features/voice/model/voice-server";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
@@ -413,19 +419,21 @@ function useSystemDictation({
 }
 
 /**
- * The recognizer that Settings > Voice chose, when it can run now. Parakeet needs its model and
- * enough memory, ElevenLabs needs a key, and both need a speech module with a microphone. Otherwise
- * the phone's recognizer listens, so the microphone always works.
+ * The recognizer that Settings > Voice chose, when it can run now. A model on the phone needs its
+ * download and enough memory, ElevenLabs needs a key, and both need a speech module with a
+ * microphone. Otherwise the phone's recognizer listens, so the microphone always works.
  */
 function useActiveRecognition(): "system" | ModelRecognition {
   const recognition = useVoiceSettings((state) => state.recognition);
   const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
   const parakeetReady = useParakeetModel((state) => state.phase === "ready");
   const unifiedReady = useParakeetUnifiedModel((state) => state.phase === "ready");
+  const qwenReady = useQwenModel((state) => state.phase === "ready");
   const serverDictates = useVoiceServer((state) => state.server?.routes.dictation === true);
   if (!modelCaptureAvailable()) return "system";
-  if (recognition === "parakeet" && parakeetReady && parakeetSupported()) return "parakeet";
-  if (recognition === "parakeet-unified" && unifiedReady && parakeetSupported()) return "parakeet-unified";
+  const ready = { parakeet: parakeetReady, "parakeet-unified": unifiedReady, "qwen3-asr": qwenReady };
+  if (isLocalRecognition(recognition) && ready[recognition] && localRecognitionSupported(recognition))
+    return recognition;
   if (recognition === "elevenlabs" && hasKey) return "elevenlabs";
   if (recognition === "voice-server" && serverDictates) return "voice-server";
   return "system";

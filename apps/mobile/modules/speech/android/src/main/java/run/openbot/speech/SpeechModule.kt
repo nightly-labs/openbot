@@ -68,7 +68,7 @@ class SpeechModule : Module() {
   /** The audio mode before GPT live voice set the call mode; null while no call runs. */
   private var callModeBefore: Int? = null
   /** Only the recognition executor reads and writes it. */
-  private var recognizer: ParakeetRecognizer? = null
+  private var recognizer: OfflineSpeechRecognizer? = null
   private val recognition = Executors.newSingleThreadExecutor()
   private val captureExecutor = Executors.newSingleThreadExecutor()
   private val capture = SpeechCapture(
@@ -140,21 +140,12 @@ class SpeechModule : Module() {
 
     /** Loads Parakeet from a downloaded model directory. The same directory keeps the loaded model. */
     AsyncFunction("loadRecognizer") { location: String, threads: Int, promise: Promise ->
-      recognition.execute {
-        val directory = pathOf(location)
-        if (recognizer?.directory == directory) {
-          promise.resolve(null)
-          return@execute
-        }
-        recognizer?.release()
-        recognizer = null
-        try {
-          recognizer = ParakeetRecognizer(directory, threads)
-          promise.resolve(null)
-        } catch (error: Throwable) {
-          promise.reject(SpeechModelException())
-        }
-      }
+      loadRecognizer(location, RecognizerModel.PARAKEET, threads, promise)
+    }
+
+    /** Loads Qwen3-ASR from a downloaded model directory. The same directory keeps the loaded model. */
+    AsyncFunction("loadQwenRecognizer") { location: String, threads: Int, promise: Promise ->
+      loadRecognizer(location, RecognizerModel.QWEN3_ASR, threads, promise)
     }
 
     /** Frees the recognizer, such as before its files are deleted. */
@@ -166,7 +157,7 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Opens the microphone: `transcribe` recognizes speech with Parakeet, `stream` sends the audio. */
+    /** Opens the microphone: `transcribe` recognizes speech with the loaded recognizer, `stream` sends the audio. */
     AsyncFunction("startCapture") { mode: String, promise: Promise ->
       val context = appContext.reactContext
       if (context?.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -316,6 +307,25 @@ class SpeechModule : Module() {
         recognizer = null
       }
       recognition.shutdown()
+    }
+  }
+
+  /** Loads a recognizer on the recognition executor. The same directory and model keep the loaded one. */
+  private fun loadRecognizer(location: String, model: RecognizerModel, threads: Int, promise: Promise) {
+    recognition.execute {
+      val directory = pathOf(location)
+      if (recognizer?.directory == directory && recognizer?.model == model) {
+        promise.resolve(null)
+        return@execute
+      }
+      recognizer?.release()
+      recognizer = null
+      try {
+        recognizer = OfflineSpeechRecognizer(directory, model, threads)
+        promise.resolve(null)
+      } catch (error: Throwable) {
+        promise.reject(SpeechModelException())
+      }
     }
   }
 

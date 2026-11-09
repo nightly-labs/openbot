@@ -1,4 +1,5 @@
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { joinSegments } from "@/features/chat/model/voice-dictation";
 
 const SCRIBE_REALTIME_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime";
 /** The microphone sends 16 kHz 16-bit mono PCM. */
@@ -23,20 +24,6 @@ function failureOf(category: string): ScribeFailure {
   if (category === "unaccepted_terms") return "terms";
   if (category === "closed" || category === "open-timeout") return "network";
   return "failed";
-}
-
-const NO_SPACE_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
-
-/** Joins segments with a space, except between two characters of a script that writes none, as on desktop. */
-function joinSegments(segments: readonly string[]): string {
-  let text = "";
-  for (const segment of segments) {
-    const next = segment.trim();
-    if (!next) continue;
-    const joint = text && !(NO_SPACE_SCRIPT.test(text.at(-1) ?? "") && NO_SPACE_SCRIPT.test(next[0] ?? ""));
-    text = joint ? `${text} ${next}` : `${text}${next}`;
-  }
-  return text;
 }
 
 /**
