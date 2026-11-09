@@ -356,6 +356,20 @@ try {
     return { status: extra.status };
   });
 
+  await step("a released client removes a server from 33, and gets the list of 32", async () => {
+    const added = currentList(
+      MCP_ROUTES.save,
+      await call("POST", MCP_ROUTES.save, { token, body: { config: httpServer(MCP_FROZEN_SERVERS_LIST_LIMIT + 1) } }),
+    );
+    assert.equal(added.length, MCP_FROZEN_SERVERS_LIST_LIMIT + 1);
+    needsUpdate(await call("GET", MCP_ROUTES.list, released), "list at 33");
+    const extra = added.find((server) => server.name === httpServer(MCP_FROZEN_SERVERS_LIST_LIMIT + 1).name);
+    assert.ok(extra, "The 33rd server is not in the list.");
+    const removed = await call("POST", MCP_ROUTES.remove, { ...released, body: { mcpServerId: extra.id } });
+    assert.equal(releasedList(MCP_ROUTES.remove, removed).length, MCP_FROZEN_SERVERS_LIST_LIMIT);
+    return { status: removed.status };
+  });
+
   const full = await step("a current client adds servers up to 100 and reads all of them", async () => {
     for (let index = MCP_FROZEN_SERVERS_LIST_LIMIT + 1; index <= MCP_MANY_SERVERS_LIST_LIMIT; index += 1) {
       currentList(MCP_ROUTES.save, await call("POST", MCP_ROUTES.save, { token, body: { config: httpServer(index) } }));

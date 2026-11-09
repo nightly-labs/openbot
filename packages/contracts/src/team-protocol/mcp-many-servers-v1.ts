@@ -10,7 +10,7 @@
 // capability string.
 import { boolean, fields, identifier, list } from "./admin-wire";
 import { MCP_SIGN_IN_ROUTES } from "./mcp-sign-in-v1";
-import { MCP_ROUTES, mcpResponse, mcpServerConfigWire } from "./mcp-v1";
+import { isMcpRoute, MCP_ROUTES, mcpResponse, mcpServerConfigWire } from "./mcp-v1";
 import type { TeamProtocolV2Json } from "./v2";
 
 export const MCP_MANY_SERVERS_CAPABILITY = "mcp-many-servers-v1";
@@ -29,7 +29,9 @@ function pathname(path: string): string {
 
 /** A response of `mcp-servers-v1` with the longer list. Every other response keeps its frozen codec. */
 export function mcpManyServersResponse(path: string, status: number, value: unknown): TeamProtocolV2Json {
-  return status < 400 && pathname(path) !== MCP_ROUTES.test ? configs(value) : mcpResponse(path, status, value);
+  return status < 400 && isMcpRoute(path) && pathname(path) !== MCP_ROUTES.test
+    ? configs(value)
+    : mcpResponse(path, status, value);
 }
 
 /** The `mcp-sign-in-v1` routes that answer with the list of sign-ins. */

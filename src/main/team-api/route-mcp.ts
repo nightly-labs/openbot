@@ -87,7 +87,9 @@ export async function routeMcpServers(
   if (remove) {
     const input = parseRemoveMcpServer(body);
     requireOwnMcpServer(access, input.mcpServerId);
-    requireMcpListFits(capabilities, mcpServers.listMcpServers().length);
+    // The reply is the list after the removal: a released client can bring a host back to 32.
+    const rows = mcpServers.listMcpServers();
+    requireMcpListFits(capabilities, rows.length - (rows.some((server) => server.id === input.mcpServerId) ? 1 : 0));
     const servers = await runCauseEffect(mcpServers.removeMcpServer(input));
     if (owners) await runCauseEffect(owners.remove(input.mcpServerId));
     return json(200, servers);
