@@ -954,6 +954,14 @@ once between the account service and the provider, and once between the app and 
   `__Host-openbot-company` cookie (10 minutes) and opens the provider in the same tab.
   `GET /api/browser/company/return` exchanges the code, sets the `__Host-openbot-web` session cookie,
   and answers 303 to `/app`. The cookie stops a login CSRF.
+- Phone (`signInMobileWithCompany` in `apps/mobile/src/features/auth/api/mobile-auth.ts`): the start
+  names the return `openbot://company-sign-in` (`MOBILE_COMPANY_SIGN_IN_RETURN`), which only a
+  sign-in start accepts, not a test. `openAuthSessionAsync` opens the provider page and takes the
+  return, and `+native-intent.tsx` ignores another copy of the link. The app gives the code, its
+  verifier and its device to `POST /v1/mobile-auth/company/exchange`, which makes a mobile session
+  (`mobile_auth_sessions`, no host) and replaces the earlier session of that device. The stored
+  session has the marker `signIn: "company"`. A custom scheme is not private on Android, so the
+  verifier, not the link, proves the app.
 
 The provider's subject is linked to an account (`company_sign_in_identities`). A first sign-in uses
 the account with the same email, or makes a new one. When the ID token has no `email`, the service
@@ -984,7 +992,7 @@ Known limits:
 - The local development host reads its members from its team file, not from D1, so the desktop
   Members list in `bun run dev` does not show a company sign-in join. Check D1 or the
   `/v2/remote/hosts` list of the person.
-- The mobile app has no company sign-in.
+- The mobile app signs in with a company account, but has no setup.
 - No full sign-in with a real Entra ID tenant has been made. Discovery, the authorize parameters and
   the token request were checked against the live Microsoft endpoints with a fake application.
 
