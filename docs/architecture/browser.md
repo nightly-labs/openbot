@@ -262,7 +262,10 @@ things stays a refusal:
   `{ name: "openbot_browser.<tool>", arguments }` is unwrapped, and a snake_case field such as
   `tab_id` takes its camelCase name when the call does not also give that name. The user-control
   check reads the same repaired `tabId`.
-- `submit_secret` and `fill_card` get no repair: their targets must come from a snapshot.
+- The Vault, secret and payment tools (`submit_secret`, `fill_card`, `list_logins`,
+  `list_vault_items`, `save_vault_item`, `request_vault_item`, `delete_vault_item`,
+  `request_link_payment`) get no repair. Their targets must come from a snapshot, and
+  `save_vault_item` registers the raw `password` for redaction before the decoder runs.
 
 In `run_script`, `role(role, name, { exact })`, `waitFor(role(...))`, `waitFor("Done", "text")` and
 `waitFor("#done", "visible")` work. A `waitFor` function

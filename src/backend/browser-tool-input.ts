@@ -26,10 +26,20 @@ const WAIT_STATES: Readonly<Record<string, string>> = {
 const TARGET_WAIT_STATES = new Set(["visible", "attached"]);
 
 /**
- * The tools that fill a secret or a card. Their targets must come from a snapshot, so their
- * arguments stay as the agent sent them.
+ * The Vault, secret and payment tools keep their arguments as the agent sent them. Their targets must
+ * come from a snapshot, and their handlers read some raw fields, such as a password to redact, before
+ * the decoder runs.
  */
-const SECRET_TOOLS = new Set(["submit_secret", "fill_card"]);
+const SECRET_TOOLS = new Set([
+  "submit_secret",
+  "fill_card",
+  "list_logins",
+  "list_vault_items",
+  "save_vault_item",
+  "request_vault_item",
+  "delete_vault_item",
+  "request_link_payment",
+]);
 
 /** `tab_id`, as Python libraries name it. No browser tool field has an underscore. */
 const SNAKE_CASE = /_([a-z])/gu;
