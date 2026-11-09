@@ -513,7 +513,6 @@ export const messages = {
   "chat.suggestion.install": "Установить",
   "chat.suggestion.installed": "Установлено",
   "chat.suggestion.detailsNamed": "Открыть {name} в каталоге",
-  "chat.suggestion.dismissNamed": "Скрыть {name}",
   "chat.suggestion.dismissed": "Предложение «{name}» скрыто.",
   "chat.suggestion.undo": "Отменить",
   "chat.suggestion.localOnly": "Подключите {name} в OpenBot на своём компьютере.",

@@ -409,7 +409,6 @@ export const messages = defineMessages("chat", {
   "chat.suggestion.install": "Install",
   "chat.suggestion.installed": "Installed",
   "chat.suggestion.detailsNamed": "Open {name} in Marketplace",
-  "chat.suggestion.dismissNamed": "Dismiss {name}",
   "chat.suggestion.dismissed": "{name} suggestion dismissed.",
   "chat.suggestion.undo": "Undo",
   "chat.suggestion.localOnly": "Connect {name} in OpenBot on your own computer.",

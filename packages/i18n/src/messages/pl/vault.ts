@@ -123,6 +123,5 @@ export const messages = {
   "vault.request.addLogin": "Dodaj login",
   "vault.request.addCard": "Dodaj kartę",
   "vault.request.addContact": "Dodaj adres",
-  "vault.request.notNow": "Nie teraz",
   "vault.request.saved": "Zapisano w Sejfie",
 } as const satisfies PartialTranslation<typeof source>;

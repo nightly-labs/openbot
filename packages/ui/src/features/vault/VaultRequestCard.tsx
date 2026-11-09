@@ -1,10 +1,10 @@
 import type { VaultSaveInput } from "@openbot/contracts/ipc";
 import type { UiBlockStatus, UiBlockValue, UiVaultRequestKind, UiVaultSavedItem } from "@openbot/contracts/ui-blocks";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, CircleCheck, CreditCard, IconButton, KeyRound, UserRound, X } from "@openbot/ui";
-import { createSignal, createUniqueId, Match, onCleanup, Show, Switch } from "solid-js";
+import { Button, CreditCard, KeyRound, UserRound } from "@openbot/ui";
+import { createSignal, Match, onCleanup, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { UiBlockOutcome } from "../conversation/ui-blocks/UiBlockCard";
+import { UiBlockCard } from "../conversation/ui-blocks/UiBlockCard";
 import { VAULT_BRAND_NAME, VaultCardLogo, VaultContactLogo, VaultRequestDialog, VaultSiteLogo } from "./VaultPanel";
 
 export interface VaultRequestCardProps {
@@ -81,13 +81,12 @@ function SavedLogo(props: {
 }
 
 /**
- * The chat card of an agent's request for a Vault item. One row: what the item is for, and a button
- * that opens the Vault dialog with the fields that the agent filled in. The user types the secrets,
- * which go to the Vault and never to the agent. Once saved, the row shows the item.
+ * The chat card of an agent's request for a Vault item: what the item is for, and a button that
+ * opens the Vault dialog with the fields that the agent filled in. The user types the secrets,
+ * which go to the Vault and never to the agent. Once saved, the card shows the item.
  */
 export function VaultRequestCard(props: VaultRequestCardProps) {
   const { t } = useText();
-  const titleId = createUniqueId();
   const [dialogOpen, setDialogOpen] = createSignal(false);
   onCleanup(() => props.elementRef?.(undefined));
   const pending = () => props.status === "pending";
@@ -117,70 +116,40 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
     }
   };
 
+  const subtitle = () => {
+    if (pending())
+      return props.agentName
+        ? t("vault.request.private", { agent: props.agentName })
+        : t("vault.request.privateUnnamed");
+    return props.saved ? savedDetail(props.saved) || undefined : undefined;
+  };
+
   return (
-    <article
-      ref={(element) => props.elementRef?.(element)}
-      class="conversation-interaction-card vault-request"
-      data-status={props.status}
-      aria-labelledby={titleId}
+    <UiBlockCard
+      elementRef={(element) => props.elementRef?.(element)}
+      class="vault-request"
+      status={props.status}
+      title={props.saved?.name || props.title}
+      subtitle={subtitle()}
+      icon={
+        <span class="ui-block-icon vault-request-logo" aria-hidden="true">
+          <Show when={props.saved} fallback={<KindTile kind={props.kind} />}>
+            {(saved) => <SavedLogo kind={props.kind} saved={saved()} values={props.values} />}
+          </Show>
+        </span>
+      }
+      outcome={props.status === "answered" && props.saved ? t("vault.request.saved") : undefined}
+      outcomeBadge
+      inlineActions
+      busy={props.busy}
+      error={props.error}
+      onSkip={props.onSkip}
+      actions={
+        <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
+          {t(ADD_LABEL[props.kind])}
+        </Button>
+      }
     >
-      <div class="vault-request-row">
-        <Show when={props.saved} fallback={<KindTile kind={props.kind} />}>
-          {(saved) => <SavedLogo kind={props.kind} saved={saved()} values={props.values} />}
-        </Show>
-        <div class="vault-request-text">
-          <h2 id={titleId} class="vault-request-title">
-            {props.saved?.name || props.title}
-          </h2>
-          <Switch>
-            <Match when={pending()}>
-              <p class="vault-request-detail">
-                {props.agentName
-                  ? t("vault.request.private", { agent: props.agentName })
-                  : t("vault.request.privateUnnamed")}
-              </p>
-            </Match>
-            <Match when={props.saved}>
-              {(saved) => (
-                <Show when={savedDetail(saved())}>{(detail) => <p class="vault-request-detail">{detail()}</p>}</Show>
-              )}
-            </Match>
-          </Switch>
-        </div>
-        <Switch>
-          <Match when={pending()}>
-            <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
-              {t(ADD_LABEL[props.kind])}
-            </Button>
-            <Show when={props.onSkip}>
-              {(skip) => (
-                <IconButton
-                  label={t("vault.request.notNow")}
-                  variant="ghost"
-                  disabled={props.busy}
-                  onClick={() => skip()()}
-                >
-                  <X />
-                </IconButton>
-              )}
-            </Show>
-          </Match>
-          <Match when={props.status === "answered" && props.saved}>
-            <span class="vault-request-done">
-              <CircleCheck aria-hidden="true" />
-              {t("vault.request.saved")}
-            </span>
-          </Match>
-        </Switch>
-      </div>
-      <Show when={props.status === "expired" || props.status === "closed"}>
-        <UiBlockOutcome status={props.status} />
-      </Show>
-      <Show when={pending() && props.error}>
-        <p class="ui-block-error" role="alert">
-          {props.error}
-        </p>
-      </Show>
       <Show when={dialogOpen() && pending() ? props.onSave : undefined}>
         {(save) => (
           <VaultRequestDialog
@@ -192,6 +161,6 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
           />
         )}
       </Show>
-    </article>
+    </UiBlockCard>
   );
 }

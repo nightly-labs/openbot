@@ -425,7 +425,6 @@ export const messages = {
   "chat.suggestion.install": "Installa",
   "chat.suggestion.installed": "Installato",
   "chat.suggestion.detailsNamed": "Apri {name} nel Marketplace",
-  "chat.suggestion.dismissNamed": "Ignora {name}",
   "chat.suggestion.dismissed": "Suggerimento {name} ignorato.",
   "chat.suggestion.undo": "Annulla",
   "chat.suggestion.localOnly": "Connetti {name} in OpenBot sul tuo computer.",

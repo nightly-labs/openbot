@@ -123,6 +123,5 @@ export const messages = defineMessages("vault", {
   "vault.request.addLogin": "Add login",
   "vault.request.addCard": "Add card",
   "vault.request.addContact": "Add address",
-  "vault.request.notNow": "Not now",
   "vault.request.saved": "Saved to Vault",
 });

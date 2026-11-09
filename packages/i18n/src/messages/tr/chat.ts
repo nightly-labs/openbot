@@ -426,7 +426,6 @@ export const messages = {
   "chat.suggestion.install": "Yükle",
   "chat.suggestion.installed": "Yüklendi",
   "chat.suggestion.detailsNamed": "{name} uygulamasını Pazaryerinde aç",
-  "chat.suggestion.dismissNamed": "{name} önerisini kapat",
   "chat.suggestion.dismissed": "{name} önerisi kapatıldı.",
   "chat.suggestion.undo": "Geri al",
   "chat.suggestion.localOnly": "{name} bağlantısını kendi bilgisayarınızdaki OpenBot'ta kurun.",

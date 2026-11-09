@@ -11,7 +11,6 @@ import { UI_API_KEY_SCOPE_FIELD_ID, uiBlockOutcomeText } from "@openbot/contract
 import { UiChoiceBlock } from "@openbot/ui/features/conversation/ui-blocks/UiChoiceBlock";
 import { UiConfirmBlock } from "@openbot/ui/features/conversation/ui-blocks/UiConfirmBlock";
 import { UiFormBlock } from "@openbot/ui/features/conversation/ui-blocks/UiFormBlock";
-import { UiQuickReplies } from "@openbot/ui/features/conversation/ui-blocks/UiQuickReplies";
 import type { JSX } from "@solidjs/web";
 import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
@@ -89,6 +88,7 @@ const singleChoiceSpec: UiChoiceSpec = {
   ],
 };
 
+// Agents no longer get quick replies; a stored or remote one shows as a choice.
 const quickSpec: UiQuickRepliesSpec = {
   type: "quick_replies",
   title: "Found 3 new emails. One is important: an invoice for 2 490, due 12 October.",
@@ -159,7 +159,7 @@ function live<Spec extends UiBlockSpec>(
 
 const LiveConfirm = live<UiConfirmSpec>(UiConfirmBlock);
 const LiveChoice = live<UiChoiceSpec>(UiChoiceBlock);
-const LiveQuick = live<UiQuickRepliesSpec>(UiQuickReplies);
+const LiveQuick = live<UiQuickRepliesSpec>(UiChoiceBlock);
 const LiveForm = live<UiFormSpec>(UiFormBlock);
 
 const meta = {

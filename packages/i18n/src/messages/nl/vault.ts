@@ -98,6 +98,5 @@ export const messages = {
   "vault.request.addLogin": "Login toevoegen",
   "vault.request.addCard": "Kaart toevoegen",
   "vault.request.addContact": "Adres toevoegen",
-  "vault.request.notNow": "Niet nu",
   "vault.request.saved": "Opgeslagen in de Kluis",
 } as const satisfies PartialTranslation<typeof source>;

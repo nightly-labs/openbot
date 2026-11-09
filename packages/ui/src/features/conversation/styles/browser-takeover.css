@@ -1,27 +1,8 @@
+/* The frame is a UiBlockCard (ui-blocks.css); the page preview is its body. */
 .browser-takeover-card {
-  display: flex;
   width: min(540px, 100%);
   margin: var(--openbot-space-3) 0 var(--openbot-space-6);
-  flex-direction: column;
-  gap: var(--openbot-space-4);
   animation: browser-takeover-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
-}
-
-.browser-takeover-copy {
-  margin-top: calc(-1 * var(--openbot-space-2));
-  display: grid;
-  gap: var(--openbot-space-1);
-}
-
-.browser-takeover-copy p {
-  margin: 0;
-}
-
-.browser-takeover-copy p {
-  max-width: 54ch;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-md);
 }
 
 .browser-takeover-preview {
@@ -29,7 +10,7 @@
   overflow: hidden;
   margin: 0;
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-canvas);
 }
 
@@ -40,7 +21,8 @@
   align-items: center;
   gap: var(--openbot-space-1-5);
   border-bottom: 1px solid var(--openbot-border);
-  background: var(--openbot-bg-control);
+  /* Raised over the card, as the details of an approval. */
+  background: var(--openbot-bg-surface-raised);
   padding: 0 var(--openbot-space-3);
   color: var(--openbot-text-secondary);
 }
@@ -173,32 +155,6 @@
   white-space: nowrap;
 }
 
-.browser-takeover-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-2);
-}
-
-.browser-takeover-finish {
-  display: flex;
-  min-width: 0;
-  margin-inline-start: auto;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--openbot-space-2);
-}
-
-.browser-takeover-actions .ui-button {
-  transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
-}
-
-.browser-takeover-actions .ui-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
 @keyframes browser-takeover-in {
   from {
     opacity: 0;
@@ -220,41 +176,21 @@
   animation: approval-card-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
-.approval-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--openbot-space-2);
-}
-
-.approval-card-footer > :last-child {
-  margin-inline-start: auto;
-}
-
 .approval-button {
   border-radius: var(--openbot-radius-pill);
   font-size: var(--openbot-text-lg);
   font-weight: var(--openbot-weight-regular);
 }
 
-.approval-card-content {
-  display: grid;
-  min-width: 0;
-  gap: var(--openbot-space-3);
-}
-
-.approval-card-content:empty {
-  display: none;
-}
-
+/* The details of a request, as the draft of a confirm block (ui-blocks.css): raised over the bubble. */
 .approval-command-block,
 .approval-detail-row,
 .approval-permissions {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-surface);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface-raised);
 }
 
 .approval-command-block code {
@@ -310,14 +246,6 @@
 .approval-permissions span {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  overflow-wrap: anywhere;
-}
-
-.approval-reason {
-  margin: calc(-1 * var(--openbot-space-2)) 0 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-lg);
-  line-height: var(--openbot-leading-lg);
   overflow-wrap: anywhere;
 }
 

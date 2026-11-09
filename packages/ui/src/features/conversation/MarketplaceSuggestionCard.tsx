@@ -1,8 +1,9 @@
-import { Button, Check, IconButton, Lock, Spinner, X } from "@openbot/ui";
+import { Button, Check, Lock, Spinner } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, createStore, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
+import { createSignal, createStore, onCleanup, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 import { PluginIcon } from "../marketplace/PluginIcon";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 /** An app connects to a service. A skill installs on the agent. */
 export type MarketplaceSuggestionKind = "app" | "skill";
@@ -40,8 +41,7 @@ export interface MarketplaceSuggestionCardProps {
  */
 export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps) {
   const { t } = useText();
-  const titleId = createUniqueId();
-  /* Dismiss and Undo replace each other, so the focus moves to the control that is there now. */
+  /* Skip and Undo replace each other, so the focus moves to the control that is there now. */
   let dismissButton: HTMLButtonElement | undefined;
   let undoButton: HTMLButtonElement | undefined;
   /* The action animates only a change that the user started here. A card that opens connected, or
@@ -70,69 +70,76 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
         </div>
       }
     >
-      <article
-        class="conversation-interaction-card marketplace-suggestion"
-        aria-labelledby={titleId}
-        data-state={props.state}
-        data-motion={moving() ? "" : undefined}
-      >
-        <header class="marketplace-suggestion-header">
+      <UiBlockCard
+        class="marketplace-suggestion"
+        // The action stays on the card when it is done: the same button turns into Connected.
+        status="pending"
+        inlineActions
+        title={
+          <Show when={props.onOpenDetails} fallback={props.name}>
+            <Button
+              variant="link"
+              type="button"
+              class="marketplace-suggestion-name"
+              aria-label={t("chat.suggestion.detailsNamed", { name: props.name })}
+              onClick={() => props.onOpenDetails?.()}
+            >
+              {props.name}
+            </Button>
+          </Show>
+        }
+        subtitle={props.description}
+        icon={
           <Show
             when={props.mark}
             fallback={
               <PluginIcon
                 iconUrl={props.iconUrl}
                 fallback={props.kind === "skill" ? "skill" : "plugin"}
-                class="marketplace-suggestion-icon"
+                class="ui-block-icon marketplace-suggestion-icon"
               />
             }
           >
-            {(mark) => <span class="skills-marketplace-icon marketplace-suggestion-icon">{mark()}</span>}
+            {(mark) => <span class="ui-block-icon skills-marketplace-icon marketplace-suggestion-icon">{mark()}</span>}
           </Show>
-          <div class="marketplace-suggestion-heading">
-            <h3 id={titleId} class="marketplace-suggestion-title">
-              <Show when={props.onOpenDetails} fallback={props.name}>
-                <Button
-                  variant="link"
-                  type="button"
-                  class="marketplace-suggestion-name"
-                  aria-label={t("chat.suggestion.detailsNamed", { name: props.name })}
-                  onClick={() => props.onOpenDetails?.()}
-                >
-                  {props.name}
-                </Button>
-              </Show>
-            </h3>
-            <span class="marketplace-suggestion-description">{props.description}</span>
-          </div>
-          <div class="marketplace-suggestion-action" role="status">
-            <SuggestionAction {...props} onStart={() => setMoving(true)} />
-          </div>
-          {/* A connected card has nothing to dismiss. The stylesheet folds the button away, so the
-              action moves to the edge instead of a jump. */}
-          <Show when={props.onDismiss}>
-            <IconButton
-              label={t("chat.suggestion.dismissNamed", { name: props.name })}
-              variant="ghost"
-              size="icon-xs"
-              class="marketplace-suggestion-dismiss"
-              ref={(element) => (dismissButton = element)}
-              onClick={() => {
-                props.onDismiss?.();
-                onSettled(() => undoButton?.focus());
-              }}
-            >
-              <X />
-            </IconButton>
-          </Show>
-        </header>
+        }
+        actions={
+          // The controls carry the state and the motion flag for the stylesheet; they add no box.
+          <span
+            class="marketplace-suggestion-controls"
+            data-state={props.state}
+            data-motion={moving() ? "" : undefined}
+          >
+            {/* A connected card has nothing to skip. The stylesheet folds the button away, so the
+                action moves to the edge instead of a jump. */}
+            <Show when={props.onDismiss}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                class="ui-block-skip marketplace-suggestion-dismiss"
+                ref={(element) => (dismissButton = element)}
+                onClick={() => {
+                  props.onDismiss?.();
+                  onSettled(() => undoButton?.focus());
+                }}
+              >
+                {t("uiBlock.skip")}
+              </Button>
+            </Show>
+            <span class="marketplace-suggestion-action" role="status">
+              <SuggestionAction {...props} onStart={() => setMoving(true)} />
+            </span>
+          </span>
+        }
+      >
         <Show when={props.state === "unavailable" && props.unavailableText}>
           <p class="marketplace-suggestion-unavailable">
             <Lock aria-hidden="true" />
             {props.unavailableText}
           </p>
         </Show>
-      </article>
+      </UiBlockCard>
     </Show>
   );
 }
