@@ -12,6 +12,7 @@ import {
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   MESSAGING_LIMITS,
 } from "@openbot/contracts/ipc";
+import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
@@ -112,6 +113,7 @@ export interface MessagingOutbound {
     target: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[],
+    embeds?: DiscordEmbed[],
   ): Effect.Effect<
     | { posted: true; messageId: string; url?: string; skippedFiles?: string[] }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
@@ -485,6 +487,7 @@ export class MessagingThreads {
             { platformChannelId: call.place, replyThreadId: call.replyTo },
             call.text,
             call.files.length ? yield* openFiles(call.files) : [],
+            call.embeds,
           );
     return "error" in answer ? openBotToolFailure(answer.error) : openBotToolResult(answer);
   });
