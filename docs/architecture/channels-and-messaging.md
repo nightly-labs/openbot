@@ -641,11 +641,12 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
-  A Slack post with live user mentions (`slackPingedUsers`) in a thread with no link stores one
-  `projection_messaging_pings` row for each person, with the calling agent and the redacted post.
-  A reply without a mention from one of them passes the `requiresLink` check, skips the workflows,
-  and goes to the orchestrator with the post as its `replyTo`. Creating the link deletes the thread's
-  pings, and deleting an agent deletes its pings. A thread `message` event that mentions OpenBot is
+  A Slack post with live user mentions (`slackPingedUsers`) stores one `projection_messaging_pings`
+  row for each person, with the calling agent and the redacted post, unless a person's mention opened
+  the thread. In a thread with pings, a reply without a mention counts only from a pinged person,
+  also after the link exists: the first one skips the workflows and goes to the orchestrator with the
+  post as its `replyTo`. Deleting an agent deletes the pings of its threads and its pings of threads
+  that no reply opened. A thread `message` event that mentions OpenBot is
   left to its `app_mention` event, so the order of the two events does not decide the route.
 - **Quiet answer.** In Slack threads the guidance lets the agent answer only `NO_REPLY` when a
   message needs no answer. `finalPost` then keeps the reaction and posts nothing, and the adapter's

@@ -1348,13 +1348,15 @@ export class MessagingService {
     // files, before the mailbox holds its idempotency key. The mailbox key covers a restart.
     const store = this.#threads.store;
     const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
-    // A reply of a person that an agent's post pinged starts the conversation of that thread.
-    const ping =
-      message.requiresLink && !existing && live.record.platform === "slack"
-        ? store.ping(live.record.connectionId, message.platformChannelId, message.threadKey, message.authorId)
-        : null;
+    // In a thread that an agent's post pinged people in, a reply without a mention counts only from a
+    // pinged person: the first one starts the conversation. Other threads need a link, as before.
+    const pings =
+      message.requiresLink && live.record.platform === "slack"
+        ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
+        : [];
+    const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;
     // Before the dedup key: a reply with a mention also arrives as `app_mention`, which must still run.
-    if (message.requiresLink && !existing && !ping) return;
+    if (message.requiresLink && (pings.length ? !ping : !existing)) return;
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
     if (this.#recent.has(dedupKey)) return;
     this.#recent.add(dedupKey);
@@ -1417,7 +1419,7 @@ export class MessagingService {
     // The context does not have OpenBot's own posts, so the post that the person answers comes as the quote.
     const replyTo = quote
       ? { authorName: quote.authorName, text: withMentionNames(quote.text, mentioned), sentAt: quote.sentAt }
-      : ping
+      : ping && !existing
         ? { authorName: this.#pingAuthor(ping.agentId), text: ping.text, sentAt: ping.createdAt }
         : null;
     // A new mention in a Discord server goes to the workflows first: a Discord trigger that takes it

@@ -68,6 +68,7 @@ export interface MessagingPingInput {
 
 /** The post that pinged one person in a thread. */
 export interface MessagingPing {
+  userId: string;
   agentId: string;
   text: string;
   createdAt: string;
@@ -275,23 +276,21 @@ export class MessagingStore {
     }
   }
 
-  /** The post that pinged `userId` in a thread that has no link yet, or null. */
-  ping(connectionId: string, platformChannelId: string, threadKey: string, userId: string): MessagingPing | null {
-    const row = databaseRow(
+  /** The people that agents' posts pinged in a thread. Empty for a thread that no ping opened. */
+  pings(connectionId: string, platformChannelId: string, threadKey: string): MessagingPing[] {
+    return databaseRows(
       this.#database.connection
         .prepare(
-          `SELECT agent_id, text, created_at FROM projection_messaging_pings
-           WHERE connection_id = ? AND platform_channel_id = ? AND thread_key = ? AND user_id = ?`,
+          `SELECT user_id, agent_id, text, created_at FROM projection_messaging_pings
+           WHERE connection_id = ? AND platform_channel_id = ? AND thread_key = ?`,
         )
-        .get(connectionId, platformChannelId, threadKey, userId),
-    );
-    return row
-      ? {
-          agentId: requiredStringColumn(row, "agent_id"),
-          text: requiredStringColumn(row, "text"),
-          createdAt: requiredStringColumn(row, "created_at"),
-        }
-      : null;
+        .all(connectionId, platformChannelId, threadKey),
+    ).map((row) => ({
+      userId: requiredStringColumn(row, "user_id"),
+      agentId: requiredStringColumn(row, "agent_id"),
+      text: requiredStringColumn(row, "text"),
+      createdAt: requiredStringColumn(row, "created_at"),
+    }));
   }
 
   link(linkId: string): MessagingLink | null {
@@ -380,10 +379,6 @@ export class MessagingStore {
           now,
           now,
         );
-        // The link routes every reply of the thread now, so its pings are not needed.
-        db.prepare(
-          "DELETE FROM projection_messaging_pings WHERE connection_id = ? AND platform_channel_id = ? AND thread_key = ?",
-        ).run(input.connectionId, input.platformChannelId, input.threadKey);
         return null;
       },
     );
@@ -439,8 +434,23 @@ export class MessagingStore {
           deleteAggregateHistory(db, "thread", [threadId]);
           deleteThreadAttachments(db, threadId);
         }
+        // The pings of the agent's threads go with them, and so do the agent's pings of threads that no
+        // reply opened. The pings of a thread that another agent answers stay: they decide who it hears.
+        db.prepare(
+          `DELETE FROM projection_messaging_pings WHERE EXISTS (
+             SELECT 1 FROM projection_messaging_threads AS link WHERE link.agent_id = ?
+               AND link.connection_id = projection_messaging_pings.connection_id
+               AND link.platform_channel_id = projection_messaging_pings.platform_channel_id
+               AND link.thread_key = projection_messaging_pings.thread_key)`,
+        ).run(agentId);
+        db.prepare(
+          `DELETE FROM projection_messaging_pings WHERE agent_id = ? AND NOT EXISTS (
+             SELECT 1 FROM projection_messaging_threads AS link
+             WHERE link.connection_id = projection_messaging_pings.connection_id
+               AND link.platform_channel_id = projection_messaging_pings.platform_channel_id
+               AND link.thread_key = projection_messaging_pings.thread_key)`,
+        ).run(agentId);
         db.prepare("DELETE FROM projection_messaging_threads WHERE agent_id = ?").run(agentId);
-        db.prepare("DELETE FROM projection_messaging_pings WHERE agent_id = ?").run(agentId);
         for (const { threadId } of links)
           db.prepare("DELETE FROM projection_threads WHERE thread_id = ?").run(threadId);
         db.prepare(

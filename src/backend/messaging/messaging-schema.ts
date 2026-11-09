@@ -103,10 +103,10 @@ export const MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL = `
 
 // Shared by migration v59 and the separate new-database schema. IF NOT EXISTS throughout.
 //
-// The people that an agent's `messaging_post` pinged in a Slack thread that has no link yet. A reply
-// of one of them in that thread reaches the orchestrator without a mention; a reply of anyone else
-// does not. `text` is the redacted post, which the orchestrator gets as the message that the reply
-// answers. A row goes when the thread gets its link. No CASCADE, as for roles: disconnect keeps the rows.
+// The people that an agent's `messaging_post` pinged in a Slack thread. A reply of one of them in that
+// thread reaches the orchestrator without a mention; a reply of anyone else needs a mention, also after
+// the first reply gives the thread its link. `text` is the redacted post, which the orchestrator gets
+// as the message that the first reply answers. No CASCADE, as for roles: disconnect keeps the rows.
 export const MESSAGING_PINGS_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_messaging_pings (
     connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),

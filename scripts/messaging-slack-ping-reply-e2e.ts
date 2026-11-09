@@ -6,7 +6,8 @@
 // 2. A reply without a mention from a person who was not pinged reaches no agent.
 // 3. A reply without a mention from the pinged person reaches the Slack Orchestrator, with the post
 //    and the agent that posted it as the message that the reply answers. The thread gets its link.
-// 4. After that, the thread is a linked conversation: a reply of anyone reaches the Orchestrator.
+// 4. After that, a reply without a mention still counts only from the pinged person. Another person
+//    reaches the Orchestrator only with a mention.
 // 5. A thread reply that mentions OpenBot is left to its `app_mention` event.
 // Writes .openbot-build/messaging-slack-ping-reply-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
@@ -306,18 +307,25 @@ try {
       sentAt: origin?.replyTo?.sentAt,
     });
     assert.ok(queued.delivery.text.includes("B, the blue one."), "The delivery does not have the reply.");
-    assert.deepEqual(pingRows(), [], "The pings of a linked thread were kept.");
+    assert.equal(pingRows().length, 1, "The link deleted the pings that decide who the thread hears.");
     return { agentId: link.agentId, replyTo: origin?.replyTo };
   });
 
-  await step("after the link, a reply of anyone in the thread reaches the Orchestrator", async () => {
-    const key = deliver(event("message", OTHER, thread, "Agreed, B."));
-    const queued = await waitFor("the delivery of a reply in the linked thread", () => delivery(key));
+  await step("after the link, only the pinged person or a mention reaches the Orchestrator", async () => {
     const link = agents.messaging.store.linkByKey(record.connectionId, CHANNEL, thread);
+    const before = calls.length;
+    const ignored = deliver(event("message", OTHER, thread, "Agreed, B."));
+    assert.equal(delivery(ignored), null, "A reply of a person who was not pinged reached the linked thread.");
+    assert.deepEqual(calls.slice(before), [], "OpenBot answered a reply that does not address it.");
+    const again = deliver(event("message", PINGED, thread, "Also make it bigger."));
+    const queued = await waitFor("the delivery of the pinged person's second reply", () => delivery(again));
     const origin = mailbox.messagingOrigin(queued.delivery.id);
     assert.equal(origin?.linkId, link?.linkId, "The reply did not go to the thread's conversation.");
     assert.equal(origin?.replyTo, undefined, "A later reply got the post again.");
-    return { linkId: origin?.linkId };
+    const mention = deliver(event("app_mention", OTHER, thread, `<@${BOT}> agreed, B.`));
+    const mentioned = await waitFor("the delivery of a mention in the thread", () => delivery(mention));
+    assert.equal(mailbox.messagingOrigin(mentioned.delivery.id)?.linkId, link?.linkId);
+    return { ignored: true, pingedReply: origin?.linkId, mention: "reached" };
   });
 
   await step("a thread reply that mentions OpenBot is left to its app_mention event", async () => {

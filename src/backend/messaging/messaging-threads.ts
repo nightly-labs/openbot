@@ -459,7 +459,7 @@ export class MessagingThreads {
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
    * place; only an enabled connection of this host can take a post. `openFiles` checks the files of a
    * post under the calling agent's path rules, before the text is sent. A Slack post that pings people
-   * in a thread with no link records them, so that a reply of theirs reaches the orchestrator.
+   * records them, so that a reply of theirs reaches the orchestrator without a mention.
    */
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
@@ -502,8 +502,12 @@ export class MessagingThreads {
     const { ping, ...result } = answer;
     if (ping && call.tool === "messaging_post") {
       const threadKey = call.replyTo ?? result.messageId;
+      // A thread that a person opened with a mention hears everyone, so a ping there changes nothing.
       // The post is sent already, so a failed record does not fail it: a reply then needs a mention.
-      if (!this.store.linkByKey(record.connectionId, call.place, threadKey))
+      if (
+        !this.store.linkByKey(record.connectionId, call.place, threadKey) ||
+        this.store.pings(record.connectionId, call.place, threadKey).length
+      )
         yield* Effect.try(() =>
           this.store.savePings({
             connectionId: record.connectionId,
