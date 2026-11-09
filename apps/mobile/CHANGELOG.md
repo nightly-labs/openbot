@@ -7,7 +7,7 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
-## [1.4.7] - 2026-11-06 (iOS)
+## [1.4.7] - 2026-11-06 (iOS), 2026-11-09 (Android)
 
 ### Added
 
@@ -307,7 +307,7 @@ the [root changelog](../../CHANGELOG.md).
 - On iPhone, the ⋯ button of a thread and of the browser opens its menu again. Before, the menu had
   no items, so a tap did nothing.
 
-## [1.4.5] - 2026-11-01 (iOS)
+## [1.4.5] - 2026-11-01 (iOS), Skipped (Android)
 
 ### Added
 
