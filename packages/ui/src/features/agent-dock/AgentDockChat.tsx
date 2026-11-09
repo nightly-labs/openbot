@@ -89,19 +89,27 @@ export function isDockMessage(message: AgentMessage): boolean {
   return message.body.trim().length > 0;
 }
 
-/** A message of the reader. In a channel, a message of another person carries its author. */
-function isOwn(message: AgentMessage): boolean {
-  return message.author === "you" && !message.senderMember;
+/**
+ * A message of the reader. A message of another person carries its author. The reader's own message can
+ * carry the reader as its author: `isOwnSender` knows the reader's ids.
+ */
+function isOwn(message: AgentMessage, isOwnSender: ((senderId: string) => boolean) | undefined): boolean {
+  if (message.author !== "you") return false;
+  return !message.senderMember || (isOwnSender?.(message.senderMember.id) ?? false);
 }
 
 /**
  * True when the host's copy of a pending message has arrived. An earlier message with the same text is
  * not the copy. When the mark is no longer in the list, all the messages are later.
  */
-function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
+function delivered(
+  pending: AgentDockPendingMessage,
+  messages: readonly AgentMessage[],
+  own: (message: AgentMessage) => boolean,
+): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
   const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
-  return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
+  return messages.slice(start).some((message) => own(message) && message.body.trim() === pending.text);
 }
 
 export function AgentDockChat(props: {
@@ -125,14 +133,17 @@ export function AgentDockChat(props: {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  /** True for an id of the reader. Without it, only a message with no author is the reader's. */
+  isOwnSender?: ((senderId: string) => boolean) | undefined;
 }) {
   const { t } = useText();
+  const own = (message: AgentMessage) => isOwn(message, props.isOwnSender);
   let log: HTMLDivElement | undefined;
   /* An edge with more messages behind it fades out. */
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
-  const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
+  const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages, own)));
   const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
   const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
   const name = () => (props.seat.kind === "agent" ? props.seat.agent.name : props.seat.channel.name);
@@ -143,7 +154,7 @@ export function AgentDockChat(props: {
   };
   /** The author shown over a message in a channel. The reader's own messages have no name. */
   const author = (message: AgentMessage): string | undefined => {
-    if (!channel() || isOwn(message)) return undefined;
+    if (!channel() || own(message)) return undefined;
     if (message.senderMember) return message.senderMember.name;
     return props.agents.find((agent) => agent.id === message.senderAgentId)?.name;
   };
@@ -336,8 +347,8 @@ export function AgentDockChat(props: {
               <For each={messages()}>
                 {(message) => (
                   <Bubble
-                    align={isOwn(message) ? "end" : "start"}
-                    variant={isOwn(message) ? "secondary" : "muted"}
+                    align={own(message) ? "end" : "start"}
+                    variant={own(message) ? "secondary" : "muted"}
                     class="agent-dock-bubble"
                     data-error={message.kind === "error" ? "" : undefined}
                   >

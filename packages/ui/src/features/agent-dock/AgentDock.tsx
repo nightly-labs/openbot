@@ -194,6 +194,8 @@ export interface AgentDockProps {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  /** True for an id of the reader, so that the reader's own messages with an author show as their own. */
+  isOwnSender?: ((senderId: string) => boolean) | undefined;
   /** Opens the dock settings. The add menu shows the item only when it is set. */
   onOpenSettings?: (() => void) | undefined;
   /** A change closes the chat, for example when the dock window loses the focus. */
@@ -1262,6 +1264,7 @@ export function AgentDock(props: AgentDockProps) {
                       props.onSelectAgent?.(agentId);
                     }}
                     onOpenLink={(url) => props.onOpenLink?.(url)}
+                    isOwnSender={props.isOwnSender}
                   />
                 )}
               </Show>

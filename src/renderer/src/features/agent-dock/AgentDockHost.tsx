@@ -366,6 +366,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     results,
     chat,
     channelMessages,
+    isOwnSender,
     openSeat,
     openChat(seat: AgentDockSeatRef | null) {
       setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
@@ -439,6 +440,7 @@ function WindowAgentDock(props: { serverId: string }) {
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
       onOpenLink={(url) => void appPort().openUrl(url)}
+      isOwnSender={dock.isOwnSender}
       onOpenSettings={() => openAppSettings(null, "agent-dock")}
       results={dock.results()}
     />
@@ -477,8 +479,11 @@ function ScreenAgentDock(props: { serverId: string }) {
       available: dock.available().slice(0, INPUT_LIMITS.agents).map(dockAgent),
       availableChannels: dock.availableChannels().slice(0, AGENT_DOCK_LIMITS.channels).map(plainChannel),
       agents: dock.agents().slice(0, INPUT_LIMITS.agents).map(dockAgent),
-      chats: openChats(dock.openSeat(), dock.chat, (seat) =>
-        seat.kind === "channel" ? dock.channelMessages() : (conversations[seat.id]?.messages ?? []),
+      chats: openChats(
+        dock.openSeat(),
+        dock.chat,
+        (seat) => (seat.kind === "channel" ? dock.channelMessages() : (conversations[seat.id]?.messages ?? [])),
+        dock.isOwnSender,
       ),
       results: dock.results(),
     }),
@@ -620,25 +625,31 @@ function openChats(
   seat: AgentDockSeatRef | null,
   chat: (seat: AgentDockSeatRef) => AgentDockChatModel,
   messages: (seat: AgentDockSeatRef) => readonly AgentMessage[],
+  isOwnSender: (senderId: string) => boolean,
 ): AgentDockChat[] {
   if (!seat) return [];
   const model = chat(seat);
   return [
     {
       seat: { kind: seat.kind, id: seat.id },
-      messages: messages(seat).filter(isDockMessage).slice(-AGENT_DOCK_LIMITS.messages).map(dockMessage),
+      messages: messages(seat)
+        .filter(isDockMessage)
+        .slice(-AGENT_DOCK_LIMITS.messages)
+        .map((message) => dockMessage(message, isOwnSender)),
       working: model.working,
       wait: model.wait,
     },
   ];
 }
 
-function dockMessage(message: AgentMessage): AgentDockMessage {
+/** The reader's own message goes without its author, so the dock window shows it as the reader's. */
+function dockMessage(message: AgentMessage, isOwnSender: (senderId: string) => boolean): AgentDockMessage {
+  const sender = message.senderMember && !isOwnSender(message.senderMember.id) ? message.senderMember : null;
   return {
     id: message.id.slice(0, INPUT_LIMITS.identifier),
     author: message.author,
     senderAgentId: message.senderAgentId ? message.senderAgentId.slice(0, INPUT_LIMITS.identifier) : null,
-    senderMember: message.senderMember ? { id: message.senderMember.id, name: message.senderMember.name } : null,
+    senderMember: sender ? { id: sender.id, name: sender.name } : null,
     kind: message.kind === "error" ? "error" : "text",
     body: message.body.slice(0, INPUT_LIMITS.messageText),
     attachments: (message.attachments ?? [])
