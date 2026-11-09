@@ -1788,6 +1788,7 @@ export function createRemoteTeamPeer(
                     channelAttention: true,
                     agentTaskUiBlocks: true,
                     channelIsolation: true,
+                    mcpManyServers: true,
                   }),
                 )
               : yield* peerDecode(() =>

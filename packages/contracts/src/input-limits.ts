@@ -113,7 +113,7 @@ export const INPUT_LIMITS = {
   // MCP server configuration. `identifier` covers the id and `path` covers the working directory.
   // The two value bounds are equal today and kept apart on purpose: an environment value and an
   // HTTP header are different things, and only one of them has a protocol that bounds it.
-  mcpServers: 32,
+  mcpServers: 100,
   mcpServerName: 80,
   mcpCommand: 4_096,
   mcpArgs: 64,

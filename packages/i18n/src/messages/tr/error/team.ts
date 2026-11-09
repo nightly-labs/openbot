@@ -120,6 +120,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "Canlı tarayıcı görünümü kullanılamıyor.",
   "error.team.browserSessionNotFound": "Tarayıcı görünümü oturumu bulunamadı.",
   "error.team.mcpUnsupported": "MCP sunucuları bu bağlantı tarafından desteklenmiyor.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Bu sunucuda {limit} sayısından fazla MCP sunucusu kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
   "error.team.storageUnsupported": "Depolama bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineResourcesUnsupported": "Makine kullanımı bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineAlertMemberInvalid": "Makine uyarılarını yalnızca bu sunucunun sahibi veya yöneticisi alabilir.",
