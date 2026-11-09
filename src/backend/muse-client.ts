@@ -12,6 +12,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Exit, Fiber, Option, Schema, Scope } from "effect";
+import { shownFailureDetail } from "./acp-flavor";
 import { secretElicitationField } from "./agent/prompts";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type AgentProvider, type DiagnosticOrigin, RequestTimeoutError } from "./agent-client";
@@ -915,8 +916,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
           turnId: terminal.turnId,
           error: {
             // Meta refuses a model this way also where Muse is not offered (#5983).
-            message: /\bdoes not exist or you lack access\b/iu.test(message)
-              ? sourceText("error.provider.museModelUnavailable", { detail: message })
+            message: /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu.test(message)
+              ? sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) })
               : message,
           },
           willRetry: false,
