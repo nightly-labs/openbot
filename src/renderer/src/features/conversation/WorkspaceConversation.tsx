@@ -89,7 +89,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const serverScope = useServerScope();
   const platform = usePlatform();
   const connectors = useConnectors();
-  const { servers, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { select: selectServer } = useServerActions();
   const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
     useServerSettings();
@@ -595,6 +595,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         serverInstall={{
           get servers() {
             return servers();
+          },
+          get loaded() {
+            return serversLoaded();
           },
           retryConnection: (serverId) => serversPort().servers.retryConnection(serverId),
           onOpenServer: selectServer,

@@ -6,6 +6,8 @@ import { retryNewServer } from "../servers/new-server-retry";
 /** The server list of this client, which an install card watches for the new server. */
 export interface ServerInstallWatch {
   readonly servers: readonly ServerSummary[];
+  /** The server list loaded once. Before that, it is empty. */
+  readonly loaded: boolean;
   /** Connects to a server again now. */
   retryConnection: (serverId: string) => Promise<unknown>;
   onOpenServer: (serverId: string) => void;
@@ -32,9 +34,16 @@ export interface ServerInstallChatCardProps {
  * signed in before the card showed, for example while another chat was open.
  */
 export function ServerInstallChatCard(props: ServerInstallChatCardProps) {
-  const known = untrack(() => {
-    const ids = knownServerIds.get(props.messageId) ?? new Set(props.watch.servers.map((server) => server.id));
-    knownServerIds.set(props.messageId, ids);
+  /** The servers in the list when the card showed, from when the list loaded. */
+  const known = createMemo<ReadonlySet<string> | undefined>((previous) => {
+    if (previous) return previous;
+    const saved = knownServerIds.get(untrack(() => props.messageId));
+    if (saved || !props.watch.loaded) return saved;
+    const ids = new Set(untrack(() => props.watch.servers).map((server) => server.id));
+    knownServerIds.set(
+      untrack(() => props.messageId),
+      ids,
+    );
     return ids;
   });
   const [expired, setExpired] = createSignal(untrack(() => Date.now() >= props.expiresAt));
@@ -47,15 +56,18 @@ export function ServerInstallChatCard(props: ServerInstallChatCardProps) {
 
   const named = (server: ServerSummary) => props.name !== null && server.name === props.name;
   const server = createMemo(() => {
+    const ids = known();
+    if (!ids) return undefined;
     const remote = props.watch.servers.filter((candidate) => candidate.kind === "remote");
-    const fresh = remote.filter((candidate) => !known.has(candidate.id));
-    const match = fresh.find(named) ?? (!expired() || props.name === null ? fresh[0] : undefined);
-    return match ?? remote.find(named);
+    const fresh = remote.filter((candidate) => !ids.has(candidate.id));
+    // With a name, only that name matches: another server can sign in while the card waits.
+    if (props.name !== null) return fresh.find(named) ?? remote.find(named);
+    return fresh[0];
   });
   retryNewServer(
     () => {
       const current = server();
-      return current && !known.has(current.id) ? current : undefined;
+      return current && !known()?.has(current.id) ? current : undefined;
     },
     (serverId) => props.watch.retryConnection(serverId),
   );
