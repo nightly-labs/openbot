@@ -124,7 +124,7 @@ function RoutineCard({
   const [success, muted] = useCSSVariable(["--openbot-success-text", "--openbot-text-grouped-secondary"]);
   const completed = routineCompleted(routine);
   const Icon = completed ? CircleCheck : isWebhookRoutine(routine) ? Webhook : AlarmClock;
-  const summary = routineSummary(routine, text);
+  const summary = routineSummary(routine, completed, text);
   return (
     <SettingsSection>
       {/* The switch is beside the card's button, not in it, so a press on the switch does not open the editor. */}
@@ -174,7 +174,7 @@ function routineCompleted(routine: RoutineRecord): boolean {
 }
 
 /** "Daily · 9:00 AM", "Weekly · Monday · 9:00 AM", "Webhook". The switch shows the state, so this does not. */
-function routineSummary(routine: RoutineRecord, { t, format }: MobileText): string {
+function routineSummary(routine: RoutineRecord, completed: boolean, { t, format }: MobileText): string {
   const schedule = routineSchedule(routine);
   if (!schedule) return t(TRIGGER_TEXT.webhook.title);
   const clock = (time: string) => {
@@ -195,6 +195,6 @@ function routineSummary(routine: RoutineRecord, { t, format }: MobileText): stri
   } else if (schedule.kind === "daily" || schedule.kind === "weekdays" || schedule.kind === "monthly") {
     parts.push(clock(schedule.time));
   }
-  if (routineCompleted(routine)) parts.unshift(t("mobile.server.routines.status.completed"));
+  if (completed) parts.unshift(t("mobile.server.routines.status.completed"));
   return parts.join(" · ");
 }
