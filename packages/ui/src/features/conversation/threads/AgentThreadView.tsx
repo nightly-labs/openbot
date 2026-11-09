@@ -50,6 +50,7 @@ import { ComposerReplyPreview } from "@openbot/ui/features/conversation/Composer
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { composerHistory } from "@openbot/ui/features/conversation/composer-history";
 import {
   DeleteMessageDialog,
   MessageActions,
@@ -413,6 +414,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     },
   );
   const messagesById = createMemo(() => new Map(props.messages.map((message) => [message.id, message])));
+  /** The prompts that Arrow Up and Arrow Down recall in this thread's message box. */
+  const threadHistory = createMemo(() => composerHistory(props.messages));
   /** The message that a reply quotes, when the thread has it. */
   const referenced = (message: AgentMessage) => {
     const id = message.replyToMessageId;
@@ -946,6 +949,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}
+              history={threadHistory()}
               skills={props.skills}
               skillsLoadFailed={props.skillsLoadFailed}
               mcpServers={props.mcpServers}

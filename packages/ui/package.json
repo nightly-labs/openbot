@@ -143,6 +143,7 @@
     "./features/conversation/ComposerAttachmentRow": "./src/features/conversation/ComposerAttachmentRow.tsx",
     "./features/conversation/ComposerSendControl": "./src/features/conversation/ComposerSendControl.tsx",
     "./features/conversation/ComposerEditor": "./src/features/conversation/ComposerEditor.tsx",
+    "./features/conversation/composer-history": "./src/features/conversation/composer-history.ts",
     "./features/conversation/ComposerErrorBanner": "./src/features/conversation/ComposerErrorBanner.tsx",
     "./features/conversation/VoiceRecordingMorph": "./src/features/conversation/VoiceRecordingMorph.tsx",
     "./features/conversation/send-shortcut": "./src/features/conversation/send-shortcut.ts",
