@@ -12,4 +12,17 @@ export const messages = defineMessages("status.provider", {
   "status.provider.retryServerError":
     "The {provider} server is busy or has an error. Retry {attempt} of {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} gets answers from its server again.",
+  // Claude Code ran a fast mode turn at the standard speed, with the reason.
+  "status.provider.claudeFastModeNeedsUsageCredits":
+    "Claude answered at the standard speed. Fast mode with a Claude subscription uses usage credits. Turn them on in your Claude account.",
+  "status.provider.claudeFastModeNotOnPlan":
+    "Claude answered at the standard speed. Your Claude plan does not include fast mode.",
+  "status.provider.claudeFastModeNotFirstParty":
+    "Claude answered at the standard speed. Fast mode works only with an Anthropic API key or a Claude subscription, not with Bedrock, Vertex, Foundry or a gateway.",
+  "status.provider.claudeFastModeModelNotAllowed":
+    "Claude answered at the standard speed. This model cannot use fast mode on your account.",
+  "status.provider.claudeFastModeTurnedOff":
+    "Claude answered at the standard speed. Fast mode is turned off in the Claude Code settings or by your organization.",
+  "status.provider.claudeFastModeUnavailable":
+    "Claude answered at the standard speed. Claude Code could not use fast mode for this turn.",
 });

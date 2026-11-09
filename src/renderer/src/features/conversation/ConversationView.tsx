@@ -1,5 +1,6 @@
 import { agentProviderDescriptor, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { DEFAULT_AGENT_ACCESS } from "@openbot/contracts/ipc";
+import { ConfirmDialog } from "@openbot/ui";
 import { AgentFolderDropOverlay, createAgentFolders } from "@openbot/ui/features/conversation/AgentFolders";
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
 import { useText } from "@openbot/ui/text";
@@ -40,6 +41,9 @@ export function ConversationView(props: ConversationProps) {
     settingsPanelWidth,
     submitting,
     sideThreadOpen,
+    fastModeConfirmationOpen,
+    confirmFastMode,
+    cancelFastModeConfirmation,
   } = scope;
   const { t } = useText();
   /** Each view of the side panel has the width of the browser panel, except Agent settings, which has its own. */
@@ -139,6 +143,15 @@ export function ConversationView(props: ConversationProps) {
         </Show>
 
         <ConversationPanels onOpenUsage={props.onOpenUsage} />
+        <ConfirmDialog
+          open={fastModeConfirmationOpen()}
+          tone="default"
+          title={t("composer.fastMode.confirmTitle")}
+          description={t("composer.fastMode.confirmDescription")}
+          confirmLabel={t("composer.fastMode.confirm")}
+          onConfirm={confirmFastMode}
+          onCancel={cancelFastModeConfirmation}
+        />
       </main>
     </ConversationViewScopeContext>
   );

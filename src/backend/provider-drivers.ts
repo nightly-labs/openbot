@@ -30,7 +30,7 @@ import type { AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import {
   claudeModelName,
-  codexFastServiceTier,
+  fastServiceTier,
   isOpencodeModelUnusableWithStoredKey,
   modelsAfterOpenCodeDiscoveryFailure,
 } from "./agent/provider-models";
@@ -836,7 +836,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: codexFastServiceTier },
+    catalog: { paged: true, modelFields: fastServiceTier },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new CodexAppServerClient(cli.executable, requestTimeoutMs, {
@@ -872,7 +872,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
-    catalog: { modelName: claudeModelName },
+    catalog: { modelName: claudeModelName, modelFields: fastServiceTier },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new ClaudeAgentClient(

@@ -116,6 +116,10 @@ export const messages = {
   "composer.error.changeModel": "Impossibile cambiare modello. Riprova.",
   "composer.error.changeEffort": "Impossibile cambiare l'impegno. Riprova.",
   "composer.error.changeFastMode": "Impossibile cambiare la modalità veloce. Riprova.",
+  "composer.fastMode.confirmTitle": "Attivare la modalità veloce?",
+  "composer.fastMode.confirmDescription":
+    "Claude risponde più velocemente, ma ogni token costa di più. Con un abbonamento Claude, la modalità veloce usa sempre i crediti di utilizzo, anche quando il tuo piano ha ancora utilizzo disponibile.",
+  "composer.fastMode.confirm": "Attiva",
   "composer.context.label": "Contesto pieno al {percent}",
   "composer.context.labelEstimated": "Contesto pieno al {percent} circa",
   "composer.context.labelCompacting": "Compattazione del contesto",

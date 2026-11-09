@@ -322,7 +322,7 @@ export interface AgentSummary {
    */
   browserProfileId?: string;
   /**
-   * Whether the agent asks Codex for the fast service tier of its model. Local-only, like `access`.
+   * Whether the agent asks its provider (Codex or Claude) for the fast service tier of its model. Local-only, like `access`.
    * Absent means that OpenBot leaves the tier to Codex.
    */
   fastMode?: boolean;

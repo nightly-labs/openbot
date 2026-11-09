@@ -1401,14 +1401,39 @@ export function createConversationViewScope(props: ConversationProps) {
     return draft && draft.agentId === props.agent?.id ? draft.fastMode : props.agent?.fastMode === true;
   };
   /**
-   * The Fast switch of the model pickers, in the chat header and in the agent settings. Codex only
-   * for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
+   * The Fast switch of the model pickers, in the chat header and in the agent settings: on this
+   * computer, or on a joined server with `agent-fast-mode-v1`. The picker shows it only for a model
+   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`).
    */
   const fastModeChange = () =>
-    settingsProvider() === "codex" &&
-    (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
-      ? (next: boolean) => void changeFastMode(next)
+    props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)
+      ? (next: boolean) => requestFastMode(next)
       : undefined;
+  /**
+   * The agent that waits for the user to confirm fast mode. Claude fast mode costs more per token, and
+   * a Claude subscription pays for it from usage credits also when the plan has usage left.
+   */
+  const [fastModeConfirmation, setFastModeConfirmation] = createSignal<string>();
+  function requestFastMode(next: boolean): void {
+    const agentId = props.agent?.id;
+    if (next && agentId && settingsProvider() === "claude") {
+      setFastModeConfirmation(agentId);
+      return;
+    }
+    void changeFastMode(next);
+  }
+  const fastModeConfirmationOpen = () => {
+    const agentId = fastModeConfirmation();
+    return agentId !== undefined && agentId === props.agent?.id;
+  };
+  function confirmFastMode(): void {
+    if (!fastModeConfirmationOpen()) return;
+    setFastModeConfirmation(undefined);
+    void changeFastMode(true);
+  }
+  function cancelFastModeConfirmation(): void {
+    setFastModeConfirmation(undefined);
+  }
   async function changeFastMode(next: boolean): Promise<void> {
     const agentId = props.agent?.id;
     if (!agentId) return;
@@ -2642,6 +2667,9 @@ export function createConversationViewScope(props: ConversationProps) {
     changeFastMode,
     fastMode,
     fastModeChange,
+    fastModeConfirmationOpen,
+    confirmFastMode,
+    cancelFastModeConfirmation,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,

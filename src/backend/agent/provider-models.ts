@@ -270,10 +270,11 @@ export function modelsAfterOpenCodeDiscoveryFailure(previous: AgentModelOption[]
 }
 
 /**
- * The tier that Codex names "Fast". Codex lists it in `serviceTiers` (`priority` in 0.163); an older
- * release lists only the deprecated `additionalSpeedTiers`, where it is `fast`.
+ * The tier that a provider names "Fast". Codex lists it in `serviceTiers` (`priority` in 0.163); an
+ * older release lists only the deprecated `additionalSpeedTiers`, where it is `fast`. The Claude
+ * client lists `fast` for a model that Claude Code can run in fast mode.
  */
-export function codexFastServiceTier(server: ModelListResponse["data"][number]): { fastServiceTier?: string } {
+export function fastServiceTier(server: ModelListResponse["data"][number]): { fastServiceTier?: string } {
   const tier =
     server.serviceTiers?.find((candidate) => candidate.name?.trim().toLowerCase() === "fast")?.id ??
     (server.additionalSpeedTiers?.includes("fast") ? "fast" : undefined);
