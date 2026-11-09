@@ -959,6 +959,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           orElse: () => Effect.fail(providerFailure(new RequestTimeoutError("Claude", "account/rateLimits/read"))),
         }),
       );
+      // When the CLI cannot get a subscriber's limits, such as after HTTP 429, it sends no limits. That is a
+      // failed read, not a login with no plan usage, so the last reading stays and the next read waits (#5922).
+      if (isDynamicRecord(usage) && usage.rate_limits_available === true && !isDynamicRecord(usage.rate_limits))
+        return yield* providerFailure(new Error("Claude could not read the plan usage."));
       if (model === defaultProviderModel("claude") && isDynamicRecord(usage) && isDynamicRecord(usage.rate_limits))
         this.#weeklyLimitKey = claudeWeeklyKey(usage.rate_limits, model);
       return yield* providerSync(() => claudeRateLimits(usage, model));
