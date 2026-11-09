@@ -129,6 +129,22 @@ export interface AccountRateLimitWindowResult {
   resetsAt?: number | null | undefined;
 }
 
+/**
+ * The weekly or the monthly window, whichever is closer to its limit, since that is the one that stops
+ * a turn first. When both are spent, the one that resets later, since turns stay stopped until then.
+ */
+export function bindingWindow<T extends { usedPercent: number; resetsAt?: number | null | undefined }>(
+  weekly: T,
+  monthly: T,
+): T {
+  if (weekly.usedPercent >= 100 && monthly.usedPercent >= 100) {
+    return (monthly.resetsAt ?? Number.POSITIVE_INFINITY) >= (weekly.resetsAt ?? Number.POSITIVE_INFINITY)
+      ? monthly
+      : weekly;
+  }
+  return monthly.usedPercent > weekly.usedPercent ? monthly : weekly;
+}
+
 export interface AccountRateLimitResult {
   limitId?: string | null | undefined;
   limitName?: string | null | undefined;
@@ -150,7 +166,7 @@ export interface AccountRateLimitsReadResult {
   /** Antigravity only: every quota group of the plan. `rateLimits` is one of them. */
   groups?: AccountRateLimitGroupResult[] | undefined;
   /**
-   * OpenCode: the weekly or monthly window that `rateLimits.secondary` does not hold. Cursor: the total
+   * OpenCode and Kimi: the weekly or monthly window that `rateLimits.secondary` does not hold. Cursor: the total
    * of a plan split into Cursor's own models and the others.
    */
   tertiary?: AccountRateLimitWindowResult | undefined;
