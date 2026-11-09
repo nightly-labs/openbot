@@ -744,13 +744,19 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
   const [frameWidth, setFrameWidth] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const characterWidth = CHAT_TEXT_STYLES[presentation.type].fontSize * presentation.fontScale * TABLE_CHARACTER_WIDTH;
-  const contentWidths = token.header.map((_, column) => {
-    const longest = Math.max(...[token.header, ...token.rows].map((row) => graphemes(row[column]?.text ?? "").length));
-    return Math.min(
-      TABLE_COLUMN_MAX_WIDTH,
-      Math.max(TABLE_COLUMN_MIN_WIDTH, longest * characterWidth + TABLE_CELL_PADDING),
-    );
-  });
+  const contentWidths = useMemo(
+    () =>
+      token.header.map((_, column) => {
+        const longest = Math.max(
+          ...[token.header, ...token.rows].map((row) => graphemes(row[column]?.text ?? "").length),
+        );
+        return Math.min(
+          TABLE_COLUMN_MAX_WIDTH,
+          Math.max(TABLE_COLUMN_MIN_WIDTH, longest * characterWidth + TABLE_CELL_PADDING),
+        );
+      }),
+    [token, characterWidth],
+  );
   // The rows are inset by `TABLE_INSET` on each side.
   const contentTotal = contentWidths.reduce((total, width) => total + width, 0);
   const grow = Math.max(1, (frameWidth - TABLE_INSET * 2) / Math.max(1, contentTotal));
@@ -1255,6 +1261,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => ({ ...presentation, outside: true, tableFrame }),
     [presentation, tableFrame],
   );
+  const groups = useMemo(() => (renderText ? blockGroups(visibleTokens) : []), [renderText, visibleTokens]);
   if (!renderText) {
     return (
       <StreamRevealProvider>
@@ -1264,7 +1271,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   }
   return (
     <StreamRevealProvider>
-      {blockGroups(visibleTokens).map((group) =>
+      {groups.map((group) =>
         group.table ? (
           renderTable ? (
             renderTable(

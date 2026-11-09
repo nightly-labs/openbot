@@ -818,47 +818,58 @@ const MessageRow = memo(function MessageRow({
     animationEnabled: shared.animationActive && arriving,
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
   };
-  const bubbleFor = (children: ReactNode, key?: string) =>
-    message.kind === "message" ? (
-      <ChatBubble
-        key={key}
-        agent={message.author === "agent"}
-        collapsed={waiting}
-        animateSize={shared.textReveal}
-        className={
-          message.author === "user"
-            ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
-            : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
-        }
-        style={[
-          { borderCurve: "circular", overflow: "hidden" },
-          // A row with files is as wide as the list, and its column takes the width of its widest
-          // child. A percentage would be of that column: the text wraps after the row has its
-          // height, and the bubble covers the next row. The width in points does not depend on it.
-          message.author === "user" && message.attachments?.length
-            ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
-            : undefined,
-          message.author === "user"
-            ? memberColor
-              ? { backgroundColor: `${memberColor}38` }
-              : userBubbleStyle
-            : undefined,
-        ]}
-      >
-        {children}
-      </ChatBubble>
-    ) : null;
+  // The wrappers keep their identity while their inputs stay, so `ChatMarkdown` and its table blocks
+  // keep their memo when the row renders again for another reason, such as its actions.
+  const bubbleFor = useCallback(
+    (children: ReactNode, key?: string) =>
+      message.kind === "message" ? (
+        <ChatBubble
+          key={key}
+          agent={message.author === "agent"}
+          collapsed={waiting}
+          animateSize={shared.textReveal}
+          className={
+            message.author === "user"
+              ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
+              : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
+          }
+          style={[
+            { borderCurve: "circular", overflow: "hidden" },
+            // A row with files is as wide as the list, and its column takes the width of its widest
+            // child. A percentage would be of that column: the text wraps after the row has its
+            // height, and the bubble covers the next row. The width in points does not depend on it.
+            message.author === "user" && message.attachments?.length
+              ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
+              : undefined,
+            message.author === "user"
+              ? memberColor
+                ? { backgroundColor: `${memberColor}38` }
+                : userBubbleStyle
+              : undefined,
+          ]}
+        >
+          {children}
+        </ChatBubble>
+      ) : null,
+    [message, waiting, shared.textReveal, shared.listWidth, userBubbleStyle, memberColor],
+  );
   // A table out of the user's bubble is as wide as the widest bubble and on its side.
-  const sentTable = (table: ReactNode, key: string) => (
-    <View key={key} className="self-end" style={{ width: shared.listWidth * USER_BUBBLE_WIDTH }}>
-      {table}
-    </View>
+  const sentTable = useCallback(
+    (table: ReactNode, key: string) => (
+      <View key={key} className="self-end" style={{ width: shared.listWidth * USER_BUBBLE_WIDTH }}>
+        {table}
+      </View>
+    ),
+    [shared.listWidth],
   );
   // With a message color, the card of the table stands on that color, with the corners of the table.
-  const tableOnColor = (card: ReactNode) => (
-    <Animated.View style={[{ borderRadius: 16, borderCurve: "continuous", overflow: "hidden" }, userBubbleStyle]}>
-      {card}
-    </Animated.View>
+  const tableOnColor = useCallback(
+    (card: ReactNode) => (
+      <Animated.View style={[{ borderRadius: 16, borderCurve: "continuous", overflow: "hidden" }, userBubbleStyle]}>
+        {card}
+      </Animated.View>
+    ),
+    [userBubbleStyle],
   );
   const rendered =
     message.kind === "routine" ? (
