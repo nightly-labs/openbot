@@ -671,8 +671,17 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
   );
 }
 
-/** The width of a column. A narrow message scrolls the table sideways; a wide one widens the columns. */
-const TABLE_COLUMN_WIDTH = 176;
+/**
+ * The narrowest and the widest column. A column is as wide as its longest text in these limits, so
+ * a column of marks stays narrow and a long note wraps. The columns of a narrow table grow to fill
+ * the card; a wide table scrolls sideways.
+ */
+const TABLE_COLUMN_MIN_WIDTH = 56;
+const TABLE_COLUMN_MAX_WIDTH = 240;
+/** The horizontal padding of a cell, both sides. */
+const TABLE_CELL_PADDING = 24;
+/** The mean width of a character, as a part of the font size. */
+const TABLE_CHARACTER_WIDTH = 0.55;
 /** The space between the edge of the table card and its panel of rows. */
 const TABLE_INSET = 3;
 
@@ -700,21 +709,28 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
   const rowsBackground = tone?.deep ?? canvas;
   const rowLine = tone?.line ?? card;
   const [frameWidth, setFrameWidth] = useState(0);
-  // A column is at least `TABLE_COLUMN_WIDTH` wide; the columns of a narrow table share the width of
-  // the card. The rows are inset by `TABLE_INSET` on each side.
-  const columns = Math.max(1, token.header.length);
-  const columnWidth = Math.max(TABLE_COLUMN_WIDTH, (frameWidth - TABLE_INSET * 2) / columns);
+  const characterWidth = CHAT_TEXT_STYLES[presentation.type].fontSize * presentation.fontScale * TABLE_CHARACTER_WIDTH;
+  const contentWidths = token.header.map((_, column) => {
+    const longest = Math.max(...[token.header, ...token.rows].map((row) => graphemes(row[column]?.text ?? "").length));
+    return Math.min(
+      TABLE_COLUMN_MAX_WIDTH,
+      Math.max(TABLE_COLUMN_MIN_WIDTH, longest * characterWidth + TABLE_CELL_PADDING),
+    );
+  });
+  // The rows are inset by `TABLE_INSET` on each side.
+  const contentTotal = contentWidths.reduce((total, width) => total + width, 0);
+  const grow = Math.max(1, (frameWidth - TABLE_INSET * 2) / Math.max(1, contentTotal));
   // The columns run in the direction of the header, so an English table in an Arabic chat keeps
   // its first column at the left. Each cell reads in the direction of its own text.
   const tableDirection = textDirection(token.header.map((cell) => cell.text).join(" "), presentation.direction);
   const cellPresentation = withDirection(presentation, tableDirection);
   const header = { ...cellPresentation, style: { ...cellPresentation.style, color: tone?.muted ?? headerText } };
   const body = { ...cellPresentation, style: { ...cellPresentation.style, color: tone?.foreground ?? text } };
-  const cell = (item: Tokens.TableCell, offset: number, rowPresentation: TextPresentation) => (
+  const cell = (item: Tokens.TableCell, offset: number, column: number, rowPresentation: TextPresentation) => (
     <View
       key={offset}
       className={rowPresentation === header ? "px-3 py-2" : "px-3 py-3"}
-      style={{ width: columnWidth }}
+      style={{ width: (contentWidths[column] ?? TABLE_COLUMN_MIN_WIDTH) * grow }}
     >
       <Text
         selectable={presentation.selectable}
@@ -747,8 +763,8 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
         <View style={{ direction: tableDirection }}>
           {/* The header has the inset of the rows, so its columns line up with theirs. */}
           <View className="flex-row" style={{ paddingHorizontal: TABLE_INSET }}>
-            {sourceEntries(token.header, (item) => item.text).map(({ value: item, offset }) =>
-              cell(item, offset, header),
+            {sourceEntries(token.header, (item) => item.text).map(({ value: item, offset }, column) =>
+              cell(item, offset, column, header),
             )}
           </View>
           {token.rows.length ? (
@@ -772,7 +788,9 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
                       borderColor: rowLine,
                     }}
                   >
-                    {sourceEntries(row, (item) => item.text).map(({ value: item, offset }) => cell(item, offset, body))}
+                    {sourceEntries(row, (item) => item.text).map(({ value: item, offset }, column) =>
+                      cell(item, offset, column, body),
+                    )}
                   </View>
                 ),
               )}
