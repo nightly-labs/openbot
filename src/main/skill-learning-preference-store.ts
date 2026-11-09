@@ -15,6 +15,7 @@ export class SkillLearningPreferenceStore {
   readonly #path: string;
   #preference: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
   #writes = Semaphore.makeUnsafe(1);
+  readonly #listeners = new Set<(preference: SkillLearningPreference) => void>();
 
   constructor(path: string) {
     this.#path = path;
@@ -40,6 +41,12 @@ export class SkillLearningPreferenceStore {
     return { ...this.#preference };
   }
 
+  /** Calls `listener` after each saved change. Returns the function that removes it. */
+  onChange(listener: (preference: SkillLearningPreference) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
   readonly set = Effect.fn("SkillLearningPreference.set")(function* (
     this: SkillLearningPreferenceStore,
     { mode }: SkillLearningPreference,
@@ -49,7 +56,10 @@ export class SkillLearningPreferenceStore {
         writePreferenceFile(this.#path, { version: 1, mode }).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
+              const changed = this.#preference.mode !== mode;
               this.#preference = { mode };
+              const current = this.get();
+              if (changed) for (const listener of this.#listeners) listener(current);
             }),
           ),
         ),

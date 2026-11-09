@@ -2088,6 +2088,13 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
   // The next turn of each agent uses the instructions of the new personality.
   serverPersonality.onChange(() => service.responseStyleChanged());
+  // The skill revision line is in the instructions only when skill learning is Automatic.
+  let skillRevision = skillLearning.get().mode === "automatic";
+  skillLearning.onChange(({ mode }) => {
+    if ((mode === "automatic") === skillRevision) return;
+    skillRevision = mode === "automatic";
+    service.skillRevisionChanged();
+  });
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
   promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.

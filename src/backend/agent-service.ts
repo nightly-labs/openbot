@@ -1912,6 +1912,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * Skill learning moved into or out of Automatic, which adds or removes the skill revision line.
+   * Each agent's next turn opens its session again with the new instructions.
+   */
+  skillRevisionChanged(): void {
+    for (const agent of this.#store.list()) this.#conversation.unloadAgentThreads(agent.id);
+  }
+
+  /**
    * The other agents in the agent's sidebar section, in sidebar order, for its instructions. Null when
    * the agent has no section of the user's, or is in the Integrations section: the orchestrators there
    * serve unrelated integrations and choose teammates by fit.
