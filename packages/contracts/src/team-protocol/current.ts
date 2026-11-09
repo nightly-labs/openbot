@@ -63,6 +63,7 @@ import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
@@ -248,6 +249,7 @@ export {
   CONVERSATION_FILE_SEARCH_CAPABILITY,
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -493,6 +495,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
 ] as const;
@@ -673,6 +676,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== LIVE_VOICE_CAPABILITY &&
     capability !== AGENT_WELCOME_CAPABILITY &&
     capability !== SKILL_LEARNING_CAPABILITY &&
+    capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
     capability !== VAULT_V3_CAPABILITY,
 );
@@ -728,6 +732,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
 ]);
@@ -867,6 +872,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== LIVE_VOICE_CAPABILITY &&
       capability !== AGENT_WELCOME_CAPABILITY &&
       capability !== SKILL_LEARNING_CAPABILITY &&
+      capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
       capability !== VAULT_V3_CAPABILITY,
   );

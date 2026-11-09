@@ -150,6 +150,7 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -2451,7 +2452,8 @@ export class TeamApiServer {
             capability === PROVIDERS_V4_CAPABILITY ||
             capability === PROVIDERS_V5_CAPABILITY ||
             capability === PROVIDERS_V8_CAPABILITY ||
-            capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY
+            capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY ||
+            capability === CUSTOM_PROVIDER_EDIT_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
           if (capability === CLAUDE_API_KEY_CAPABILITY || capability === CODEX_API_KEY_CAPABILITY)

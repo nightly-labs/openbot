@@ -19,6 +19,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import {
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -51,7 +55,11 @@ import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
-import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
+import {
+  parseDeleteCustomProvider,
+  parseSaveCustomProvider,
+  parseUpdateCustomProvider,
+} from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput, signInCodexWithApiKey } from "../ipc/provider-handlers";
 import { isObject } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
@@ -79,19 +87,21 @@ export async function routeProviders(
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
-  const capability = HARNESS_ROUTES.has(url.pathname)
-    ? CUSTOM_PROVIDER_HARNESS_CAPABILITY
-    : V8_ROUTES.has(url.pathname)
-      ? PROVIDERS_V8_CAPABILITY
-      : V5_ROUTES.has(url.pathname)
-        ? PROVIDERS_V5_CAPABILITY
-        : V4_ROUTES.has(url.pathname)
-          ? PROVIDERS_V4_CAPABILITY
-          : V3_ROUTES.has(url.pathname)
-            ? PROVIDERS_SIGN_IN_V3_CAPABILITY
-            : V2_ROUTES.has(url.pathname)
-              ? PROVIDERS_RUNTIMES_V2_CAPABILITY
-              : PROVIDERS_ADMIN_CAPABILITY;
+  const capability = EDIT_ROUTES.has(url.pathname)
+    ? CUSTOM_PROVIDER_EDIT_CAPABILITY
+    : HARNESS_ROUTES.has(url.pathname)
+      ? CUSTOM_PROVIDER_HARNESS_CAPABILITY
+      : V8_ROUTES.has(url.pathname)
+        ? PROVIDERS_V8_CAPABILITY
+        : V5_ROUTES.has(url.pathname)
+          ? PROVIDERS_V5_CAPABILITY
+          : V4_ROUTES.has(url.pathname)
+            ? PROVIDERS_V4_CAPABILITY
+            : V3_ROUTES.has(url.pathname)
+              ? PROVIDERS_SIGN_IN_V3_CAPABILITY
+              : V2_ROUTES.has(url.pathname)
+                ? PROVIDERS_RUNTIMES_V2_CAPABILITY
+                : PROVIDERS_ADMIN_CAPABILITY;
   if (!providers || !capabilities.has(capability))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
@@ -260,13 +270,24 @@ export async function routeProviders(
         return json(200, customProviders.list().map(wireCustomProvider));
       case CUSTOM_PROVIDER_HARNESS_ROUTES.customList:
         return json(200, customProviders.list().map(wireHarnessCustomProvider));
+      case CUSTOM_PROVIDER_EDIT_ROUTES.customList:
+        return json(200, customProviders.list().map(wireEditCustomProvider));
+      case CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate: {
+        // The endpoint keeps its harness and the settings of each kept model: the wire has neither.
+        const result = await runCauseEffect(
+          customProviders.peerUpdate(parsed(parseUpdateCustomProvider, releasedSaveBody(body))),
+        );
+        return json(200, wireResult(url.pathname, result));
+      }
       case PROVIDERS_ADMIN_ROUTES.customSave:
-      case CUSTOM_PROVIDER_HARNESS_ROUTES.customSave: {
+      case CUSTOM_PROVIDER_HARNESS_ROUTES.customSave:
+      case CUSTOM_PROVIDER_EDIT_ROUTES.customSave: {
         const result = await runCauseEffect(
           customProviders.save(parsed(parseSaveCustomProvider, releasedSaveBody(body))),
         );
         return json(200, wireResult(url.pathname, result));
       }
+      // The delete route of `providers-v1`, `custom-provider-harness-v1` and `custom-provider-edit-v1`.
       default:
         return json(
           200,
@@ -291,6 +312,7 @@ const V5_ROUTES = new Set<string>(Object.values(PROVIDERS_V5_ROUTES));
 const V4_ROUTES = new Set<string>(Object.values(PROVIDERS_V4_ROUTES));
 const V8_ROUTES = new Set<string>(Object.values(PROVIDERS_V8_ROUTES));
 const HARNESS_ROUTES = new Set<string>(Object.values(CUSTOM_PROVIDER_HARNESS_ROUTES));
+const EDIT_ROUTES = new Set<string>(Object.values(CUSTOM_PROVIDER_EDIT_ROUTES));
 const ROUTES = new Set<string>([
   ...Object.values(PROVIDERS_ADMIN_ROUTES),
   ...V2_ROUTES,
@@ -299,6 +321,7 @@ const ROUTES = new Set<string>([
   ...V5_ROUTES,
   ...V8_ROUTES,
   ...HARNESS_ROUTES,
+  ...EDIT_ROUTES,
 ]);
 
 function isProvidersRoute(pathname: string): boolean {
@@ -318,9 +341,9 @@ function wireCustomProvider({
 }
 
 /**
- * A `providers-v1` or `custom-provider-harness-v1` save names the endpoint and each model by its
- * released fields only. A field that the protocol does not have is removed before the parse, so that
- * it cannot refuse a save the host used to accept, and a peer always adds an endpoint on OpenCode.
+ * A Team API save or edit names the endpoint and each model by its released fields only. A field
+ * that the protocol does not have is removed before the parse, so that it cannot refuse a save the
+ * host used to accept, and a peer always adds an endpoint on OpenCode.
  */
 function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): DynamicRecord {
   if (!Array.isArray(body.models)) return body;
@@ -349,9 +372,21 @@ function wireHarnessCustomProvider(provider: CustomProviderSummary): CustomProvi
   return { ...wireCustomProvider(provider), harness: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS };
 }
 
-/** A save or a delete answers with the summaries of the protocol that the route belongs to. */
+/**
+ * The `custom-provider-edit-v1` summary: the `custom-provider-harness-v1` one, and the header names,
+ * so an edit can keep the headers. The header values stay on this computer.
+ */
+function wireEditCustomProvider(provider: CustomProviderSummary): CustomProviderSummary {
+  return { ...wireHarnessCustomProvider(provider), headerNames: provider.headerNames ?? [] };
+}
+
+/** A save, an edit or a delete answers with the summaries of the protocol that the route belongs to. */
 function wireResult(route: string, result: CustomProviderResult): CustomProviderResult {
-  const wire = HARNESS_ROUTES.has(route) ? wireHarnessCustomProvider : wireCustomProvider;
+  const wire = EDIT_ROUTES.has(route)
+    ? wireEditCustomProvider
+    : HARNESS_ROUTES.has(route)
+      ? wireHarnessCustomProvider
+      : wireCustomProvider;
   return { ...result, providers: result.providers.map(wire) };
 }
 

@@ -8,11 +8,10 @@ export interface CustomProvidersPort {
 }
 
 /**
- * The endpoint calls of one host. `update` is local only: the Team API has no update, so the list of
- * a joined server offers no Edit.
+ * The endpoint calls of one host. A joined server's host edits only with `custom-provider-edit-v1`,
+ * so the settings page offers Edit by that capability.
  */
-export type CustomProvidersEndpointApi = Omit<CustomProvidersDesktopApi, "update"> &
-  Partial<Pick<CustomProvidersDesktopApi, "update">>;
+export type CustomProvidersEndpointApi = CustomProvidersDesktopApi;
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function customProvidersPort(): CustomProvidersPort {
@@ -27,6 +26,7 @@ export function hostCustomProvidersApi(
   return {
     list: () => admin().listCustomProviders(serverId),
     save: (input) => admin().saveCustomProvider(input, serverId),
+    update: (input) => admin().updateCustomProvider(input, serverId),
     delete: (input) => admin().deleteCustomProvider(input, serverId),
   };
 }

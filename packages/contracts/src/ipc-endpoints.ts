@@ -1193,6 +1193,9 @@ export const IPC_ENDPOINTS = {
     saveCustomProvider: scopedRequest<SaveCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:save-custom-provider",
     ),
+    updateCustomProvider: scopedRequest<UpdateCustomProviderInput, CustomProviderResult, "required">()(
+      "provider-admin:update-custom-provider",
+    ),
     deleteCustomProvider: scopedRequest<DeleteCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:delete-custom-provider",
     ),
