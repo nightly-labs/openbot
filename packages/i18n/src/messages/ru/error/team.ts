@@ -111,6 +111,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
+  "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",

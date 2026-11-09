@@ -57,6 +57,7 @@ import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/ro
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
@@ -81,6 +82,7 @@ import {
   getHostPersonality,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
+  getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
   getStorageUsage,
@@ -91,6 +93,7 @@ import {
   setHostModelVisibility,
   setHostPersonality,
   setHostPromptCacheTtl,
+  setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
   startHostUpdate,
@@ -210,6 +213,7 @@ import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
+import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import {
@@ -865,6 +869,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookSenderSecretEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
     () => workspace.state.capabilities.includes(ROUTINE_RUN_PLACE_CAPABILITY),
+    () => workspace.state.capabilities.includes(SKILL_LEARNING_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1285,6 +1290,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostMemoryReview(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setMemoryReview: async (interval, serverId) =>
       runTeamEffect(setHostMemoryReview(hostRequest(serverId), interval).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostSkillLearningCalls: HostSkillLearningCalls = {
+    getSkillLearning: async (serverId) =>
+      runTeamEffect(getHostSkillLearning(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setSkillLearning: async (mode, serverId) =>
+      runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
   };
   const hostPromptCacheTtlCalls: HostPromptCacheTtlCalls = {
     getPromptCacheTtl: async (serverId) =>
@@ -2575,6 +2586,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
+                        skillLearning={{ calls: hostSkillLearningCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}

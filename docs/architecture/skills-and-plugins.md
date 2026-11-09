@@ -217,6 +217,8 @@ person.
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.
 
+`create_skill` and `revise_skill` publish a folder of the agent's workspace. An agent often writes a plain frontmatter value with a colon, such as `description: Use when: ...`, which YAML refuses. When the frontmatter does not parse, the library quotes each top-level plain value that has a colon and tries again. When that parses, the bundle gets the quoted `SKILL.md`; the folder in the workspace does not change. Otherwise the publish fails as before.
+
 The shared package validator handles local and marketplace bundles. The existing installer owns per-agent files, hashes, disabled storage, and both provider directories. Local installations skip marketplace downloads and receipt requests. Installation operations are serialized per agent; a library revision does not update installed copies.
 
 A pack is one bundle that holds skills of its own in `skills/<slug>-<name>/SKILL.md`. The installer writes each one as the sibling folder `<slug>-<name>` in both provider directories, so a provider finds it and `$<slug>-<name>` lists it, and keeps them all under the pack's one lock entry: install, update, disable, enable and removal act on every folder together, with one download and one install receipt.

@@ -115,6 +115,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Diese Verbindung unterstützt die Ordner der Agenten nicht.",
   "error.team.folderUnavailable": "Dieser Ordner ist auf dem Host-Computer nicht verfügbar.",
   "error.team.memoryReviewUnsupported": "Diese Verbindung unterstützt die Erinnerungsprüfung nicht.",
+  "error.team.skillLearningUnsupported": "„Fähigkeiten lernen“ wird von dieser Verbindung nicht unterstützt.",
   "error.team.promptCacheTtlUnsupported": "Diese Verbindung unterstützt die Prompt-Cache-Dauer nicht.",
   "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",

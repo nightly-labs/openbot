@@ -216,6 +216,14 @@ export class SkillMarketplaceService {
     });
   }
 
+  /** The revision of a skill in the agent's lock file, or null when the agent does not have it. */
+  installedRevision(agentId: string, skillId: string): Effect.Effect<number | null, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<number | null, SkillMarketplaceFailure> {
+      const agent = yield* skillSync(() => this.requireAgent(agentId));
+      return (yield* readLock(agent.workspacePath)).skills[skillId]?.version ?? null;
+    });
+  }
+
   /** A local skill is read from this computer each time; a catalog skill comes from the short cache. */
   #availableVersion(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
     return skillId.startsWith("local-skill-")
@@ -434,7 +442,7 @@ export class SkillMarketplaceService {
       }
       if (existing) {
         const state = yield* installedState(agent.workspacePath, existing);
-        if (state === "modified" && !replaceModified)
+        if (state === "modified" && !replaceModified && !(yield* onlyNewFiles(agent.workspacePath, existing, folders)))
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.replaceModified")) });
       }
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
@@ -857,6 +865,46 @@ const installedState = Effect.fn("SkillMarketplace.installedState")(function* (
     if (folderState === "needs-repair") state = folderState;
   }
   return state;
+});
+
+/**
+ * True when each installed copy has the files of its lock entry or exactly the files of the install.
+ * An agent that edits its copy and publishes that folder as a new revision changed nothing that the
+ * install then loses.
+ */
+const onlyNewFiles = Effect.fn("SkillMarketplace.onlyNewFiles")(function* (
+  workspace: string,
+  entry: LockEntry,
+  next: ReadonlyMap<string, Record<string, Uint8Array>>,
+): Effect.fn.Return<boolean, SkillMarketplaceFailure> {
+  const enabled = entry.enabled !== false;
+  for (const [folder, files] of skillFolders(entry.slug, entry.files, entry.folders ?? [])) {
+    const nextFiles = next.get(folder);
+    const nextHashes = nextFiles
+      ? Object.fromEntries(Object.entries(nextFiles).map(([name, bytes]) => [name, sha256(bytes)]))
+      : null;
+    for (const target of enabled ? targetDirectories(workspace, folder) : [disabledDirectory(workspace, folder)]) {
+      if (!(yield* pathExists(target))) continue;
+      if (yield* copyHas(target, files)) continue;
+      if (nextHashes && (yield* copyHas(target, nextHashes))) continue;
+      return false;
+    }
+  }
+  return true;
+});
+
+/** True when the folder has exactly these files with these hashes. */
+const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
+  target: string,
+  files: Record<string, string>,
+): Effect.fn.Return<boolean, SkillMarketplaceFailure> {
+  const unexpected = yield* Effect.result(hasUnexpectedSkillFiles(target, files));
+  if (Result.isFailure(unexpected) || unexpected.success) return false;
+  for (const [name, hash] of Object.entries(files)) {
+    const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
+    if (Result.isFailure(content) || sha256(new Uint8Array(content.success)) !== hash) return false;
+  }
+  return true;
 });
 
 const installedFolderState = Effect.fn("SkillMarketplace.installedFolderState")(function* (

@@ -107,6 +107,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "תיקיות סוכנים אינן נתמכות בחיבור הזה.",
   "error.team.folderUnavailable": "התיקייה הזו אינה זמינה במחשב המארח.",
   "error.team.memoryReviewUnsupported": "סקירת הזיכרון אינה נתמכת בחיבור הזה.",
+  "error.team.skillLearningUnsupported": "החיבור הזה אינו תומך בלמידת מיומנויות.",
   "error.team.promptCacheTtlUnsupported": "זמן מטמון ההנחיות אינו נתמך בחיבור הזה.",
   "error.team.modelVisibilityUnsupported": "רשימת המודלים אינה נתמכת בחיבור הזה.",
   "error.team.providerDefaultUnsupported": "ספק ברירת המחדל אינו נתמך בחיבור הזה.",

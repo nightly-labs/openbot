@@ -112,6 +112,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
+  "error.team.skillLearningUnsupported": "Esta conexión no admite el aprendizaje de habilidades.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",

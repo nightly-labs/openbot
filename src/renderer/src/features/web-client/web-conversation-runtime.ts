@@ -1,12 +1,15 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentEvent,
-  AskSideQuestionInput,
-  AttachmentImportEvent,
-  AttachmentSummary,
-  TeamRealtimeEvent,
+import {
+  type AgentEvent,
+  type AskSideQuestionInput,
+  type AttachmentImportEvent,
+  type AttachmentSummary,
+  decodeSaveSkillSuggestionResult,
+  type SaveSkillSuggestionInput,
+  type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -129,6 +132,7 @@ export function createWebConversationRuntime(
   webhookSenderSecretEnabled?: () => boolean,
   browserProxiesEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
+  skillLearningEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
@@ -374,6 +378,15 @@ export function createWebConversationRuntime(
           agentId: input.agentId,
           question: input.question,
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+        });
+    },
+    // A member who can chat with the agent can press Save; the host checks the level.
+    get saveSkillSuggestion() {
+      if (!adminRequest || skillLearningEnabled?.() !== true) return undefined;
+      return async (input: SaveSkillSuggestionInput) =>
+        adminRequest()("POST", SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
         });
     },
     // Any member keeps an own level for each agent. The panel asks only a host with the capability.

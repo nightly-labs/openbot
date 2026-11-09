@@ -498,6 +498,7 @@ import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-l
 import type { SetSidebarPinsInput, SidebarPinsSnapshot } from "./ipc-sidebar-pins";
 import type {
   CreateLocalSkillInput,
+  HostSkillLearning,
   InstalledSkill,
   InstallLocalSkillInput,
   InstallSkillInput,
@@ -506,6 +507,8 @@ import type {
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
   ReviseLocalSkillInput,
+  SaveSkillSuggestionInput,
+  SaveSkillSuggestionResult,
   SetEnabledSkillInput,
   SkillPackagePreview,
   SkillSubmission,
@@ -1335,6 +1338,10 @@ export const IPC_ENDPOINTS = {
     // server's agents (`0` is off), and the values its host permits.
     getMemoryReview: scopedQuery<HostMemoryReview, "required">()("host-admin:get-memory-review"),
     setMemoryReview: scopedRequest<number, HostMemoryReview, "required">()("host-admin:set-memory-review"),
+    // What the background memory reviews of the server's agents do when a chat teaches a skill, and
+    // the values its host permits.
+    getSkillLearning: scopedQuery<HostSkillLearning, "required">()("host-admin:get-skill-learning"),
+    setSkillLearning: scopedRequest<string, HostSkillLearning, "required">()("host-admin:set-skill-learning"),
     // The machine alert levels and the member who gets the alert (`machine-resources-v1`).
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(
@@ -1651,6 +1658,10 @@ export const IPC_ENDPOINTS = {
     saveProfile: scopedRequest<SaveAgentProfileInput, SaveAgentProfileResult>()("agent:save-profile"),
     // Only the computer that runs the agent answers. A joined server has no route for it.
     askSideQuestion: scopedRequest<AskSideQuestionInput, string>()("agent:ask-side-question"),
+    // A joined server answers through `skill-learning-v1`; without it, `saved: false`.
+    saveSkillSuggestion: scopedRequest<SaveSkillSuggestionInput, SaveSkillSuggestionResult>()(
+      "agent:save-skill-suggestion",
+    ),
     createAgent: scopedRequest<CreateAgentInput, ClientAgentSummary>()("agent:create"),
     duplicateAgent: scopedRequest<string, DuplicateAgentResult>()("agent:duplicate"),
     updateAgent: scopedRequest<UpdateAgentInput, ClientAgentSummary>()("agent:update"),

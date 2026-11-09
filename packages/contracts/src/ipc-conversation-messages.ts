@@ -14,6 +14,7 @@ import {
 import { type ConversationTurnTrace, isConversationTurnTrace } from "./ipc-conversation-trace";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type ConversationSkillSuggestion, isConversationSkillSuggestion } from "./skill-suggestion-events";
 import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
@@ -244,6 +245,8 @@ export interface ConversationMessage {
   memoryChanges?: ConversationMemoryChange[] | undefined;
   /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
+  /** Set on a `skill-suggestion:*` message: the skill that the review asks to save. */
+  skillSuggestion?: ConversationSkillSuggestion | undefined;
   /**
    * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
    * beside `questionPrompt`. Absent on a message from an older host.
@@ -301,6 +304,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
+    (value.skillSuggestion === undefined || isConversationSkillSuggestion(value.skillSuggestion)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );

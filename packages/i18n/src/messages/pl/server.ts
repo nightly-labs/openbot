@@ -334,6 +334,13 @@ export const messages = {
     other: "Co {count} tury",
   },
   "server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
+  "server.settings.skillLearning": "Uczenie się umiejętności",
+  "server.settings.skillLearningDescription":
+    "Czy agenci na tym serwerze zapisują to, czego się nauczą, jako umiejętności.",
+  "server.settings.skillLearningAutomatic": "Automatycznie",
+  "server.settings.skillLearningAsk": "Najpierw zapytaj",
+  "server.settings.skillLearningOff": "Wyłączone",
+  "server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
   "server.settings.rolesTitle": "Uprawnienia",
   "server.settings.rolesDescription":
     "Wybierz agentów, których mogą używać członkowie. Członek dostaje najwyższy dostęp spośród roli Wszyscy i swoich ról. Właściciele i administratorzy mogą używać wszystkich agentów.",

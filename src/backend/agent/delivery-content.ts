@@ -15,6 +15,7 @@ import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
 import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
+import { pendingSkillSuggestionNote } from "./skill-suggestion";
 
 export function responseAttachmentMessageId(threadId: string, turnId: string, callId: string): string {
   const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
@@ -333,6 +334,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
     if (waits) text += `\n\n${waits}`;
   }
+  const skillSuggestion = pendingSkillSuggestionNote(
+    delivery,
+    snapshot.messages,
+    agentNames.get(delivery.recipientAgentId) ?? "Agent",
+  );
+  if (skillSuggestion) text = `${skillSuggestion}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   if (managedAttachments.length) {
     text += `${ATTACHED_FILES_HEADER}${managedAttachments.map((item) => `- ${item.name}: ${item.path}`).join("\n")}`;
   }

@@ -176,6 +176,7 @@ import {
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -223,6 +224,7 @@ import type { PasswordManagerDriver } from "../src/main/password-managers/driver
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
+import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
@@ -644,6 +646,10 @@ const fakeAgents: TeamApiAgents = {
       );
     return Effect.succeed(`Answer to ${input.question}`);
   },
+  saveSkillSuggestion: (input) => {
+    record("saveSkillSuggestion", input);
+    return Effect.succeed({ saved: input.messageId === "suggestion-1" });
+  },
   saveProfile: unused("saveProfile"),
   createAgent: unused("createAgent"),
   committedAgentDuplication: unused("committedAgentDuplication"),
@@ -720,6 +726,10 @@ const fakeAgents: TeamApiAgents = {
                 text: "Reply",
                 createdAt: "2026-11-05T08:00:00.000Z",
                 status: "completed",
+                // A memory review's skill question, for the skill-learning-v1 projection.
+                ...(anchor.messageId === "skill-question"
+                  ? { itemType: "skill-suggestion:create", skillSuggestion: { name: "Weekly report" } }
+                  : {}),
               },
             ]
           : [],
@@ -1191,6 +1201,9 @@ let refuseHostKeyRotation = false;
 /** The servers that the stand-in of `LocalServers` runs. */
 const localServerList: { serverId: string; name: string; published: boolean }[] = [];
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
+// The real skill learning store on a temporary file, as the host keeps it.
+const skillLearningFile = join(root, "skill-learning.json");
+const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
 const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
@@ -1372,6 +1385,7 @@ try {
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
       }),
       memoryReview,
+      skillLearning,
       // A stand-in for `HostService.rotateIdentityKey`; `host-key-rotation-e2e.ts` checks the real
       // signing. This checks the gate and that a refused request never reaches the host.
       hostKey: {
@@ -3686,6 +3700,161 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Skill learning (skill-learning-v1) ----
+  {
+    const capabilities = [SKILL_LEARNING_CAPABILITY];
+    const choices = ["automatic", "ask", "off"];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises skill-learning-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(SKILL_LEARNING_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SKILL_LEARNING_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const adminRead = await call("POST", SKILL_LEARNING_ROUTES.settings, { token: adaToken, json: {}, capabilities });
+    check(
+      "an admin reads the default automatic skill learning and the values the host permits",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, { mode: "automatic", choices }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", SKILL_LEARNING_ROUTES.settings, { token: adaToken, json: {} });
+    check(
+      "the skill learning routes without the capability get 400 skillLearningUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.skillLearningUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", SKILL_LEARNING_ROUTES.settings, { token: bobToken, json: {}, capabilities });
+    const memberSet = await call("POST", SKILL_LEARNING_ROUTES.update, {
+      token: bobToken,
+      json: { mode: "off" },
+      capabilities,
+    });
+    const invalid = await call("POST", SKILL_LEARNING_ROUTES.update, {
+      token: adaToken,
+      json: { mode: "always" },
+      capabilities,
+    });
+    check(
+      "a member cannot read or set skill learning, the host refuses a value it does not permit, and nothing is saved",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        skillLearning.get().mode === "automatic" &&
+        !existsSync(skillLearningFile),
+      [summary(memberRead), summary(memberSet), summary(invalid)],
+    );
+    const off = await call("POST", SKILL_LEARNING_ROUTES.update, {
+      token: adaToken,
+      json: { mode: "off" },
+      capabilities,
+    });
+    const reloaded = new SkillLearningPreferenceStore(skillLearningFile);
+    await runCauseEffect(reloaded.load());
+    check(
+      "an admin turns skill learning off; the host saves it and a restart reads it",
+      off.status === 200 &&
+        isDeepStrictEqual(off.body, { mode: "off", choices }) &&
+        skillLearning.get().mode === "off" &&
+        reloaded.get().mode === "off",
+      summary(off),
+    );
+    const ask = await call("POST", SKILL_LEARNING_ROUTES.update, {
+      token: adaToken,
+      json: { mode: "ask" },
+      capabilities,
+    });
+    check(
+      "an admin sets skill learning to ask first",
+      ask.status === 200 && field(ask.body, "mode") === "ask" && skillLearning.get().mode === "ask",
+      summary(ask),
+    );
+
+    // The skill name of a skill question reaches only a client with the capability.
+    const skillPagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=skill-question`;
+    const namedPage = await call("GET", skillPagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9, capabilities });
+    const plainPage = await call("GET", skillPagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    const pageQuestion = (reply: Reply) => list(field(reply.body, "messages"))[0];
+    check(
+      "a conversation page carries the skill name of a skill question only with skill-learning-v1",
+      namedPage.status === 200 &&
+        isDeepStrictEqual(field(pageQuestion(namedPage), "skillSuggestion"), { name: "Weekly report" }) &&
+        field(pageQuestion(namedPage), "itemType") === "skill-suggestion:create" &&
+        plainPage.status === 200 &&
+        field(pageQuestion(plainPage), "itemType") === "skill-suggestion:create" &&
+        field(pageQuestion(plainPage), "skillSuggestion") === undefined,
+      [summary(namedPage), summary(plainPage)],
+    );
+
+    // A member presses Save on a suggestion card. The host writes the skill in the background.
+    const saveUnsupported = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "suggestion-1" },
+    });
+    const saveMalformed = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "" },
+      capabilities,
+    });
+    // Protocol 6 does not know Pi, so the host hides `agent-pi`.
+    const saveHidden = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      protocol: 6,
+      json: { agentId: "agent-pi", messageId: "suggestion-1" },
+      capabilities,
+    });
+    const saveMissing = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-gone", messageId: "suggestion-1" },
+      capabilities,
+    });
+    accessLevels = { revision: 6, everyone: { "agent-ada": "view" }, roles: [] };
+    const saveViewer = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "suggestion-1" },
+      capabilities,
+    });
+    accessLevels = { revision: 7, everyone: {}, roles: [] };
+    check(
+      "a skill save without the capability, with a bad body, to a hidden or missing agent, or from a viewer reaches no agent",
+      errorIs(saveUnsupported, 400, sourceText("error.team.skillLearningUnsupported")) &&
+        saveMalformed.status === 400 &&
+        errorIs(saveHidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(saveMissing, 404, sourceText("error.team.agentNotFound")) &&
+        saveViewer.status === 403 &&
+        callsOf("saveSkillSuggestion").length === 0,
+      [
+        summary(saveUnsupported),
+        summary(saveMalformed),
+        summary(saveHidden),
+        summary(saveMissing),
+        summary(saveViewer),
+      ],
+    );
+    const saved = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "suggestion-1" },
+      capabilities,
+    });
+    const notSaved = await call("POST", SKILL_LEARNING_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "suggestion-2" },
+      capabilities,
+    });
+    check(
+      "a member with chat level saves a suggestion; the host gets the agent and message, and a host that cannot save says so",
+      saved.status === 200 &&
+        isDeepStrictEqual(saved.body, { saved: true }) &&
+        notSaved.status === 200 &&
+        isDeepStrictEqual(notSaved.body, { saved: false }) &&
+        isDeepStrictEqual(callsOf("saveSkillSuggestion"), [
+          [{ agentId: "agent-ada", messageId: "suggestion-1" }],
+          [{ agentId: "agent-ada", messageId: "suggestion-2" }],
+        ]),
+      [summary(saved), summary(notSaved)],
     );
   }
 

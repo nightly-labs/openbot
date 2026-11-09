@@ -96,6 +96,7 @@ import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
+import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
@@ -137,6 +138,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...LOCAL_SERVERS_CODECS,
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
+  ...SKILL_LEARNING_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
   ...MODEL_VISIBILITY_CODECS,
   ...SERVER_AUDIT_CODECS,

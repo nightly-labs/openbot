@@ -13,10 +13,26 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
         const detail = yield* library.get(input.skillId, input.revision).pipe(toToolOperationFailed);
         return { ...detail, archivePath: join(library.root, detail.id, String(detail.version), "bundle.zip") };
       }),
+    // The calling agent gets its own revision, as `create` does. Other agents keep their copies.
     revise: (input) =>
-      library
-        .revise(input.agentId, input.skillId, input.expectedRevision, input.sourcePath)
-        .pipe(toToolOperationFailed),
+      Effect.gen(function* () {
+        const installed = yield* skills.installedRevision(input.agentId, input.skillId).pipe(toToolOperationFailed);
+        const skill = yield* library
+          .revise(input.agentId, input.skillId, input.expectedRevision, input.sourcePath)
+          .pipe(toToolOperationFailed);
+        if (installed === null) return skill;
+        yield* skills.installLocal({ agentId: input.agentId, skillId: skill.id, revision: skill.version }).pipe(
+          Effect.mapError(
+            (failure) =>
+              new ToolOperationFailed({
+                cause: new Error(
+                  `Skill ${skill.id} was saved as revision ${skill.version}, but your installed copy was not replaced${failure.cause instanceof Error ? `: ${failure.cause.message}` : "."} Install revision ${skill.version} with install_local_skill. Do not revise it again.`,
+                ),
+              }),
+          ),
+        );
+        return skill;
+      }),
     install: (input) => skills.installLocal(input).pipe(toToolOperationFailed),
     listInstalled: (agentId) => skills.listInstalled(agentId).pipe(toToolOperationFailed),
     setEnabled: (input) => skills.setEnabled(input).pipe(toToolOperationFailed),

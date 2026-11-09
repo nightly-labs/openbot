@@ -159,9 +159,18 @@ own count: the agent's own chat and each side thread. A review starts after 20 c
 conversation, after 15 minutes with no turn in a conversation that has 3 or more new turns, when
 the user clears the chat, and when a side thread with new turns closes. Turns of channels,
 messaging threads and routine runs do not count. A turn in which the agent changes its memories
-itself starts the count again. A deleted side thread is not reviewed, and its running review ends.
+itself starts the count again. While skill learning is not Off, the next review still reads that
+turn, because a saved memory does not hold how the agent did the task; with Off, the turn moves the
+last reviewed message. A deleted side thread is not reviewed, and its running review ends.
 The counts and the last reviewed message are in memory only; after a restart, a review reads the
 latest messages.
+
+While reviews run (Memory review is not Off), the developer instructions tell the agent to apply a
+correction of how it does one kind of task without a memory call or a word about saving it, unless
+the user asks it to remember: the review keeps it, as a skill or, with skill learning Off, as a
+memory. `ThreadLifecycle` reads `memoryReview()` at each start and resume of a session. A smoke run
+measured the correction turn at about 20,000 input tokens in one request, against about 63,000 in
+five requests when the agent saved the memory itself.
 
 The number of turns is a setting of the server that runs the agents: Server settings > General >
 Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
@@ -196,6 +205,102 @@ clear's review that waits for longer reads the new chat, not the chat that the c
 and shows nothing. A usage limit is skipped silently and does not mark the model. The changes show as a
 memory-changes line with its own `memory-review-` turn id, in the conversation that was reviewed.
 While a turn of that conversation runs, the line waits for the turn to end. Agent deletion and service stop end a running review.
+
+### Skill suggestions
+
+The same review can ask the user to save a skill. Main passes `reviewSkills` to the agent service:
+the local read of the agent's skills (`listInstalledForChatTags`), with no Marketplace request.
+Without it, or when it fails, the review suggests nothing. The prompt adds the agent's skills, with
+`canUpdate` true only for a skill of the local library (`local-skill-<uuid>`), the texts of the
+latest earlier skill questions in the chat, and the tool steps of the reviewed turns from their
+traces, failed steps and the step after each first, at most 80. Step text passes through the secret
+redaction too. The skill rules follow the background skill review of Hermes Agent (MIT): a signal
+must fire (a correction of how the agent does a class of task, a technique that is not obvious and
+worked, or a listed skill that was wrong), an update of a covering skill comes before a new skill,
+a new skill has a class-level name, and environment failures, claims that a tool does not work,
+errors that went away, tasks done once and attempts that never worked are not skills. The review
+suggests at most one skill, and only when a signal fired.
+
+Skill learning is a setting of the server that runs the agents: Server settings > General > Agents >
+Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
+sets it through `skill-learning-v1` (see [servers.md](servers.md)). Main owns
+`openbot-skill-learning-v1.json` (`SkillLearningPreferenceStore`) and passes `skillLearning()` to
+the agent service, which reads it at each review. Off sends no skill rules, skills or work steps to
+the review. Ask first shows the suggestion as a question, as below. Automatic saves the skill
+without a question, as Hermes does.
+
+In the Automatic mode, the review's message is the lesson in one to three sentences, not a question.
+After the review commits its memory changes, a second profile-client generation without tools
+writes the skill (`agent/skill-learning.ts`, after the Hermes skill review): the procedure first,
+pitfalls on their steps, general rules only, in the user's language. It reads the lesson, the
+redacted reviewed chat and its work steps, and for an update the current description and
+instructions; it keeps every part that the chat does not show is wrong. It answers
+`{description, instructions}` as JSON, at most 500 and 12,000 characters. Main's
+`localSkillLearner` saves it in the local library: a new skill gets a YAML-safe `SKILL.md`, and an
+update keeps the other files and frontmatter keys of the current revision, at that revision. The new
+revision is installed for the agent only; when the install fails, the revision is withdrawn. The
+chat then shows a "Created skill" or "Revised skill" line with the review's turn id, and a later
+review reads it as an earlier skill line, so it does not save the same lesson again. The review
+does not rewrite a skill whose text the redaction changes. When that is the case, when no
+profile-client slot is free, or when the writer, the save or the install fails, the review shows
+the question instead, so the lesson is not lost.
+
+The answer's optional `skill` field is decoded apart from the operations, so a bad suggestion is
+dropped and the memory changes still apply. The review also drops an update of a skill that is not
+in the local library or that the agent does not have, and a new skill with the name of one the agent
+has, and an update of a skill that has a skill line (created, revised or installed) in the reviewed
+turns, because the agent already changed it. A line with a `memory-review-` turn id does not
+count: after a clear, the line of the clear's review comes after the reset marker, so it is in the
+next reviewed turns, and the next lesson for that skill must still revise it. In the Ask first mode, an accepted suggestion is a system message with the item type `skill-suggestion:create` or
+`skill-suggestion:update:<skillId>` and the model's question as its text, shown after the
+memory-changes line, also when the review changed no memory. Clients that do not know the item type
+show it as the agent's message, and it counts as unread. The provider history does not have it, so
+`deliveryPromptInput` puts it, with the skill-writing rules, before the user's first message after
+it (`agent/skill-suggestion.ts`). When the user agrees, the agent saves the skill with
+`create_skill`, or with `read_local_skill` and `revise_skill`, and the usual skill line shows. A later user message gets no note. When a clear of the context comes between
+the reviewed chat and the user's answer, as when the clear started the review, the provider no
+longer has that chat. Then the note also repeats it: the transcript of the cleared chat, newest
+part first within 24,000 characters, and its tool steps.
+
+The message also carries `skillSuggestion: { name }`: the skill name, redacted, and for an update the
+name from the agent's skill list, not the model's. The field is in the stored message JSON, so it
+needs no migration. The frozen Team API projections drop it; under `skill-learning-v1` the host adds
+it back after the projection, and the team client copies it back after the decode (see
+[servers.md](servers.md)). The mobile app and older clients show the text. The renderer draws a message with the name as the skill variant of the Marketplace suggestion
+card (`SkillSuggestionChatCard`). Save, or Update, calls `agent.saveSkillSuggestion` with the agent
+and the message id. `MemoryReview.saveSuggestion` reads the question and the chat that its review
+read (`reviewedChat`), and runs the Automatic writer and save above, not a turn of the agent: about
+7,500 tokens instead of a full turn with the agent's tools and history. The skill line then comes
+with a `memory-review-` turn id; during a turn it waits, as a review's lines do. A second press, as
+from another window, returns at once; a press after the skill line saves nothing again. The note
+above is not added after a suggestion that a later skill line already saved. When the host saves
+nothing (the message is gone, no model, the writer or the save fails, or a joined host does not serve
+`skill-learning-v1`), the call returns `saved: false`, and the card sends a short yes as the user's
+message, which the note turns into the save. On a joined server and in the web client, Save sends
+`POST /v1/skill-suggestions/save` to the host, which runs the same save. The card is busy from the press, and done
+when a skill line for the same skill follows (created for a new skill; revised or installed with the
+same id for an update). After a user message that saved nothing, the card has no action, because a
+later message gets no note. Dismiss and undo use the local dismissals of Marketplace suggestions.
+
+### Skill fixes while the agent works
+
+When skill learning is Automatic, an agent can also fix one of its local skills in the turn, without
+a question first. This follows the skill patch of Hermes Agent: the developer instructions
+(`skillRevision`) tell the agent to revise a `local-skill-` skill when the user corrects how it
+follows that skill, or when a step fails and it finds the fix, and to change only that step. Not for
+a one-time preference. Ask first and Off leave the line out, so the agent changes a skill only when
+the user asks. The line is not in `tools/agent-context/budget.json`, because that fixture has no
+setting.
+
+`revise_skill` publishes the next revision and installs it for the calling agent when that agent has
+the skill (`installedRevision` is not null), so the chat shows one "Revised skill" line. Other agents
+keep their revision until an explicit install. When the installed copy has changes that are not in
+the lock file, the install is refused and the tool error says that the revision was saved and the
+copy was kept; the agent installs it with `install_local_skill` and does not revise again.
+
+There is no Undo control. Revisions are never deleted and a revision reaches only the agent that
+made it, so the user asks the agent to undo the change: the guidance tells it to read the revision
+before with `read_local_skill` and publish its files with `revise_skill`.
 
 ## Idle provider sessions
 
