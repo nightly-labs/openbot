@@ -5,3 +5,8 @@
   Claude uses an Anthropic API key, or a Claude subscription with usage credits. Before it turns on,
   OpenBot asks you to confirm the price: a subscription pays for fast mode from usage credits, also
   when the plan has usage left. When Claude answers at the standard speed, the chat tells you why.
+
+### Changed
+
+- A provider change turns off Fast mode for the agent. The first start of this version turns off
+  Fast mode one time for each Claude agent, because an earlier version did not send it to Claude.
