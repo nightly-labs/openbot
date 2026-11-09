@@ -27,6 +27,11 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           ? `<form method="get" action="/search"><label>Search password<input id="get-password" name="password" type="password"></label></form>
       <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
       <form method="post" action="/search"><label>Override password<input id="override-password" name="password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
+      <label>One-time code<input id="otp" name="otp" type="text" autocomplete="off"></label>
+      <label>MFA code<input id="totpmfa" name="totpmfa" type="text"></label>
+      <label>Recovery code<input id="recovery-otp" name="recoveryOtp" type="text"></label>
+      <label>SMS code<input id="sms-otp" name="smsOtp" type="text"></label>
+      <label>Phone<input id="two-factor-phone" name="twoFactorPhone" type="tel"></label>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
       <form method="post" action="/session"><label>Masked password<input id="masked-password" type="text" style="-webkit-text-security: disc"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
@@ -156,6 +161,42 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           throw new Error(
             `A vault password in ${selector} reached ${snapshot.url} (${result}), not ${path} (${outcome}).`,
           );
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    // A vault code goes only to a code field. An older Keycloak page names it otp with no
+    // autocomplete="one-time-code"; a recovery, SMS, or phone field or a plain numeric field does not take it.
+    for (const [selector, fillable] of [
+      ["#otp", true],
+      ["#totpmfa", true],
+      ["#recovery-otp", false],
+      ["#sms-otp", false],
+      ["#two-factor-phone", false],
+      ["#code", false],
+    ] as const) {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
+      );
+      try {
+        const handoff = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `vault-code-${selector}`,
+            arguments: {
+              tabId: tab.id,
+              method: "authenticator",
+              targets: [{ kind: "css", selector }],
+              submission: "enter",
+            },
+          }),
+        );
+        handoff.cancel();
+        if (handoff.vaultFillable !== fillable) throw new Error(`${selector} was classified wrongly for a vault code.`);
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
