@@ -191,6 +191,7 @@ try {
     initializeMemorySelection: () => undefined,
     setAvatar: () => Effect.die("The agent has no avatar."),
     deleteAgent: () => Effect.die("A successful import deletes no agent."),
+    setAgentHidden: () => Effect.die("The agent is not hidden."),
     channels: {
       store: { ids: () => [], get: () => assert.fail("The instance has no channels.") },
       images: { resolve: () => null },

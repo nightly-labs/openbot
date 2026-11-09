@@ -101,6 +101,12 @@ import {
   type TransferManifestFile,
   type TransferSettings,
 } from "./instance-transfer-manifest";
+import {
+  applyPreferences,
+  readPreferences,
+  type TransferPreferenceAgents,
+  type TransferPreferencePort,
+} from "./instance-transfer-preferences";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
 import { isUnsafeArchivePath } from "./skill-package";
@@ -116,6 +122,11 @@ const ARCHIVE: ArchiveLimits = {
  * its owner records name agent ids of this computer, so a transfer never copies it.
  */
 const SHARED_DATA = "data";
+/**
+ * `Transfers/` in `~/OpenBot/Shared` holds the files of chat messages. Only a message names such a
+ * file, so the files travel with the chat history, not with the Shared folder.
+ */
+const SHARED_TRANSFERS = "transfers";
 /** A file sent to or from a member of a joined client: one WebRTC file transfer. */
 const REMOTE_ARCHIVE: ArchiveLimits = {
   files: INSTANCE_TRANSFER_LIMITS.files,
@@ -138,7 +149,7 @@ const AVATAR_EXTENSIONS: Record<AvatarImageInput["mimeType"], string> = {
 };
 
 /** The agent operations a transfer uses, as `AgentService` offers them. */
-interface InstanceTransferAgents {
+interface InstanceTransferAgents extends TransferPreferenceAgents {
   listAgents(): AgentSummary[];
   listRoutines(agentId: string): Routine[];
   listMemories(agentId: string): AgentMemory[];
@@ -194,6 +205,8 @@ export interface InstanceTransferOptions {
   sharedRoot: string;
   /** Who creates an imported channel when the local user imports. */
   channelActor: () => ChannelActor;
+  /** The local owner's choices for agents. A member's import does not change them. */
+  preferences?: TransferPreferencePort;
   appVersion: string;
   /** Where a file sent by a member of a joined client, or made for one, waits. */
   uploadDirectory?: string;
@@ -336,6 +349,9 @@ export class InstanceTransferService {
           .selections.filter((selection) => selection.userControlled)
           .map((selection) => [selection.memoryId, selection.inclusion] as const),
       );
+      const preferences = this.options.preferences
+        ? yield* readPreferences(agent, this.options.preferences)
+        : undefined;
       manifestAgents.push({
         key,
         name: agent.name,
@@ -360,6 +376,7 @@ export class InstanceTransferService {
           const inclusion = selections.get(memory.id);
           return { text: memory.text, ...(inclusion ? { inclusion } : {}) };
         }),
+        ...(preferences ? { preferences } : {}),
       });
     }
 
@@ -1113,6 +1130,14 @@ export class InstanceTransferService {
               ...(isAvatarColor(source.chatColor) ? { chatColor: source.chatColor } : {}),
             })
             .pipe(Effect.mapError(failure));
+          // Every step here is a warning when it fails, so the agent stays.
+          yield* applyPreferences(
+            agent,
+            source.preferences,
+            this.options.agents,
+            staged.owner === LOCAL_OWNER ? (this.options.preferences ?? null) : null,
+            warnings,
+          );
           completed = true;
           return agent;
         }),
@@ -1309,9 +1334,10 @@ function transferRoutines(agent: TransferAgent): TransferAgent["routines"] {
   return [...agent.routines, ...(agent.oneTimeRoutines ?? [])];
 }
 
+/** The Shared folders that a transfer never copies as files. */
 function isSharedData(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower === SHARED_DATA || lower.startsWith(`${SHARED_DATA}/`);
+  return [SHARED_DATA, SHARED_TRANSFERS].some((folder) => lower === folder || lower.startsWith(`${folder}/`));
 }
 
 interface ZipEntry {

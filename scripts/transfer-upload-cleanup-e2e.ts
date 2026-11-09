@@ -95,6 +95,7 @@ function service(uploadDirectory: string): InstanceTransferService {
     },
     setAvatar: (_agentId, _image) => Effect.fail(unexpected("setAvatar")),
     deleteAgent: (_agentId) => Effect.fail(unexpected("deleteAgent")),
+    setAgentHidden: (_input) => Effect.fail(unexpected("setAgentHidden")),
     channels: {
       store: {
         ids: () => [],

@@ -92,6 +92,12 @@ const Agent = Schema.Struct({
    */
   oneTimeRoutines: Schema.optionalKey(Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines))),
   memories: Schema.Array(Memory).check(Schema.isMaxLength(512)),
+  /**
+   * Added after version 1 shipped: access, Computer Use, defaults, backup models, hidden state, the
+   * owner's notification level, pin and approval choice (`TransferPreferences`). It is not checked
+   * here: the import checks each value on its own, so that a newer value cannot refuse the agent.
+   */
+  preferences: Schema.optionalKey(Schema.Unknown),
 });
 
 const Settings = Schema.Struct({
