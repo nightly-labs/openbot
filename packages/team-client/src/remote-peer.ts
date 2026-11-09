@@ -428,6 +428,8 @@ interface PeerState {
   offerPending: boolean;
   /** When the connection of `offerPending` was made. */
   preparedAt: number;
+  /** When the cached ICE servers of that connection arrived, in an earlier `ready`. */
+  preparedIceServersAt: number;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
@@ -1130,6 +1132,7 @@ export function createRemoteTeamPeer(
         preparedSocket: usableSocket,
         offerPending: false,
         preparedAt: 0,
+        preparedIceServersAt: 0,
       };
       peer = state;
       const connected = Deferred.makeUnsafe<void, RemotePeerError>();
@@ -1139,7 +1142,9 @@ export function createRemoteTeamPeer(
       // Signal machine names its own TURN relays, so only the ICE servers of the same machine count.
       if (known && known.signalUrl === bootstrap.signalUrl && Date.now() - known.at < ICE_SERVERS_REUSE_MS)
         yield* Effect.forkIn(
-          state.signalLock.withPermit(prepareConnection(state, known.iceServers, actions)).pipe(Effect.ignore),
+          state.signalLock
+            .withPermit(prepareConnection(state, known.iceServers, known.at, actions))
+            .pipe(Effect.ignore),
           workScope,
           { startImmediately: true },
         );
@@ -1164,12 +1169,13 @@ export function createRemoteTeamPeer(
   }
 
   /** Makes the connection, its channels and its first offer before `ready`, so ICE gathering starts. */
-  function prepareConnection(state: PeerState, iceServers: RTCIceServer[], actions: ActionsRef) {
+  function prepareConnection(state: PeerState, iceServers: RTCIceServer[], iceServersAt: number, actions: ActionsRef) {
     return Effect.fn("RemotePeer.prepareConnection")(function* () {
       if (state.closed || peer !== state || state.connection) return;
       const connection = yield* peerDecode(() => createPeerConnection(state, iceServers, actions));
       state.offerPending = true;
       state.preparedAt = Date.now();
+      state.preparedIceServersAt = iceServersAt;
       for (const kind of CHANNELS)
         bindChannel(state, kind, connection.createDataChannel(channelLabel(kind), { ordered: true }), actions);
       yield* Effect.gen(function* () {
@@ -1463,7 +1469,12 @@ export function createRemoteTeamPeer(
               ),
             );
             yield* notify(diagnosticCall(state, "signal-ready", `${state.iceServers.length} ICE servers`));
-            scheduleTurnRefresh(state);
+            // The relay candidates use the cached credentials, which `setConfiguration` does not
+            // replace until the next gathering, so their refresh is due from when they arrived.
+            scheduleTurnRefresh(
+              state,
+              Math.max(0, state.preparedIceServersAt + SIGNAL_TURN_REFRESH_INTERVAL_MS - Date.now()),
+            );
             return;
           }
         }
