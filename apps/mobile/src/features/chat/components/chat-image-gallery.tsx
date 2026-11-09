@@ -446,8 +446,10 @@ export function ChatGalleryTile({
             : t("mobile.chat.attachment.preview", { name: attachment.name })
         }
         accessibilityState={{ disabled: pending || (!uri && !failed), busy: !failed && !loaded }}
-        disabled={pending || (!uri && !failed)}
+        // A tile with a menu keeps its long press while the image loads; only the tap waits for it.
+        disabled={!onLongPress && (pending || (!uri && !failed))}
         onPress={() => {
+          if (pending || (!uri && !failed)) return;
           if (!failed) {
             source.open?.(attachment);
             return;
