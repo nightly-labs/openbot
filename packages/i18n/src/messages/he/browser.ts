@@ -108,6 +108,7 @@ export const messages = {
   "browser.error.navigateForward": "לא ניתן להתקדם קדימה.",
   "browser.userControl.status": "הדף הזה בשליטתך",
   "browser.dock.messageTo": "הודעה אל {name}",
+  "browser.dock.hide": "הסתרת תיבת ההודעה",
   "browser.dock.needsYou": "{name} צריך אותך בדף הזה",
   "browser.dock.needsAnswer": "{name} צריך את תשובתך",
   "browser.dock.needsApproval": "{name} צריך את אישורך",

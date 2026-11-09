@@ -98,6 +98,7 @@ export const messages = {
   "browser.error.navigateForward": "앞으로 이동할 수 없어요.",
   "browser.userControl.status": "내가 이 페이지를 제어 중",
   "browser.dock.messageTo": "{name}에게 보낼 메시지",
+  "browser.dock.hide": "메시지 입력란 숨기기",
   "browser.dock.needsYou": "{name}이(가) 이 페이지에서 도움이 필요해요",
   "browser.dock.needsAnswer": "{name}이(가) 답변을 기다리고 있어요",
   "browser.dock.needsApproval": "{name}이(가) 승인을 기다리고 있어요",

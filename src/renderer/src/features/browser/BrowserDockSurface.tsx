@@ -1,6 +1,7 @@
 import {
   BROWSER_DOCK_LIMITS,
   type BrowserDockAction,
+  type BrowserDockFrame,
   type BrowserDockGlass,
   type BrowserDockPresentation,
   LOCAL_SERVER_ID,
@@ -65,7 +66,7 @@ export function BrowserDockSurface() {
     );
   }
 
-  function measure(): { height: number; glass: BrowserDockGlass[] } {
+  function measure(): Omit<BrowserDockFrame, "seq"> {
     const dock = surface?.firstElementChild;
     if (!(dock instanceof HTMLElement)) return { height: 0, glass: [] };
     const viewport = window.innerHeight;
@@ -79,8 +80,15 @@ export function BrowserDockSurface() {
       }
     }
     // A menu needs room above the dock, so the overlay takes the whole page while one is open.
-    const needed = open.length > 0 ? BROWSER_DOCK_LIMITS.frameSize : viewport - dock.getBoundingClientRect().top;
-    return { height: clamp(Math.ceil(needed + SHADOW_ROOM), 0, BROWSER_DOCK_LIMITS.frameSize), glass };
+    const box = dock.getBoundingClientRect();
+    const needed = open.length > 0 ? BROWSER_DOCK_LIMITS.frameSize : viewport - box.top;
+    const height = clamp(Math.ceil(needed + SHADOW_ROOM), 0, BROWSER_DOCK_LIMITS.frameSize);
+    if (!dock.hasAttribute("data-tucked")) return { height, glass };
+    // A hidden dock is a tab in a bottom corner. The overlay needs only the space from that side.
+    const side = box.left + box.width / 2 < window.innerWidth / 2 ? "left" : "right";
+    const reach = side === "left" ? box.right : window.innerWidth - box.left;
+    const width = clamp(Math.ceil(reach + SHADOW_ROOM), 0, BROWSER_DOCK_LIMITS.frameSize);
+    return { height, glass, tucked: { side, width } };
   }
 
   function report() {

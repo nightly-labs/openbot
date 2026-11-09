@@ -103,6 +103,7 @@ export const messages = {
   "browser.error.navigateForward": "Не удалось перейти вперёд.",
   "browser.userControl.status": "Вы управляете этой страницей",
   "browser.dock.messageTo": "Сообщение для {name}",
+  "browser.dock.hide": "Скрыть поле сообщения",
   "browser.dock.needsYou": "{name}: нужна ваша помощь на этой странице",
   "browser.dock.needsAnswer": "{name}: нужен ваш ответ",
   "browser.dock.needsApproval": "{name}: нужно ваше одобрение",

@@ -1,5 +1,5 @@
 import type { LocalBrowserSecretResponse, QueueDelivery, QueueHold } from "@openbot/contracts/ipc";
-import { ArrowUp, Button } from "@openbot/ui";
+import { ArrowUp, Button, ChevronDown } from "@openbot/ui";
 import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { BrowserSecretVault } from "@openbot/ui/features/conversation/BrowserSecretCard";
@@ -136,7 +136,36 @@ export function BrowserDock(props: BrowserDockProps) {
       }, ISLAND_DURATION_MS);
     },
   );
-  const fieldText = () => form?.querySelector(".composer-editor-surface") ?? undefined;
+  /**
+   * The user hid the dock to reach the page under it. A small tab with the agent stays in a bottom corner.
+   * Text in the field, a queued message, or the island shows the dock again.
+   */
+  const [tucked, setTucked] = createSignal(false);
+  const busy = () => Boolean(props.island) || props.value.trim() !== "" || props.deliveries.length > 0;
+  let tab: HTMLButtonElement | undefined;
+  createEffect(busy, (isBusy) => {
+    if (isBusy) setTucked(false);
+  });
+  let focusSeen = untrack(() => props.focusRequest);
+  createEffect(
+    () => props.focusRequest,
+    (request) => {
+      if (request === focusSeen) return;
+      focusSeen = request;
+      if (untrack(tucked)) show();
+    },
+  );
+  function tuck() {
+    setTucked(true);
+    flush();
+    tab?.focus();
+  }
+  function show() {
+    setTucked(false);
+    flush();
+    fieldText()?.focus({ preventScroll: true });
+  }
+  const fieldText = () => form?.querySelector<HTMLElement>(".composer-editor-surface") ?? undefined;
   const rowText = (id: string) =>
     dock?.querySelector<HTMLElement>(`[data-queue-delivery-id="${CSS.escape(id)}"] .agent-queue-message`) ?? undefined;
 
@@ -279,6 +308,7 @@ export function BrowserDock(props: BrowserDockProps) {
   return (
     <div
       class="browser-dock"
+      data-tucked={tucked() ? "" : undefined}
       style={{
         "--browser-dock-island-easing": ISLAND_EASING,
         "--browser-dock-island-duration": `${ISLAND_DURATION_MS}ms`,
@@ -287,6 +317,21 @@ export function BrowserDock(props: BrowserDockProps) {
         dock = element;
       }}
     >
+      <Show when={tucked()}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="browser-dock-glass browser-dock-tab"
+          ref={(element: HTMLButtonElement) => {
+            tab = element;
+          }}
+          onClick={show}
+        >
+          <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
+          <span>{t("composer.placeholder.message", { name: props.agent.name })}</span>
+        </Button>
+      </Show>
       <Show when={shown()}>
         {(content) => (
           <div
@@ -387,6 +432,19 @@ export function BrowserDock(props: BrowserDockProps) {
               onValueChange={props.onValueChange}
             />
           </div>
+          <Show when={!busy()}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              class="browser-dock-hide"
+              aria-label={t("browser.dock.hide")}
+              title={t("browser.dock.hide")}
+              onClick={tuck}
+            >
+              <ChevronDown aria-hidden="true" />
+            </Button>
+          </Show>
           {/* As in the conversation: while the agent works and the field is empty, Send is Stop. */}
           <Show
             when={props.working && !editing() && !props.value.trim()}

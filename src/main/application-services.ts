@@ -1350,7 +1350,6 @@ export async function createApplicationServices({
     preloadPath: join(__dirname, "../preload/index.cjs"),
     load: loadBrowserDockRenderer,
     forwardShortcut: (input) => windows.handleQuitShortcut(mainWindow, input) || browser.forwardDockShortcut(input),
-    setPageRoom: (height) => browser.setMainPageDockRoom(height),
   });
   browser.setMainPageListener((page) => browserDock.setPage(page));
   teardown.push(TEARDOWN_ORDER.browserDock, "the browser dock", () => {

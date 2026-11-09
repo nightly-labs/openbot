@@ -137,6 +137,19 @@ describe("browser dock handlers", () => {
     expect(frames).toEqual([]);
   });
 
+  it("takes the corner of a hidden dock, and refuses an unknown side or too large a width", () => {
+    const { frames, call } = register();
+    const tucked = { ...FRAME, tucked: { side: "right", width: 180 } };
+    expect(() => call("setFrame", OVERLAY_ID, { ...FRAME, tucked: { side: "top", width: 180 } })).toThrow(
+      "frame is invalid",
+    );
+    expect(() => call("setFrame", OVERLAY_ID, { ...FRAME, tucked: { side: "left", width: 16_385 } })).toThrow(
+      "frame is invalid",
+    );
+    call("setFrame", OVERLAY_ID, tucked);
+    expect(frames).toEqual([tucked]);
+  });
+
   it("rejects a renderer outside the app", () => {
     const { published } = register();
     const listener = registrations.get("browserDock:publishPresentation");

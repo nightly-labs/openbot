@@ -48,6 +48,7 @@
 }
 
 .browser-dock-composer svg,
+.browser-dock-tab svg,
 .browser-dock-island-activity svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -248,6 +249,29 @@
   width: 20px;
   height: 20px;
   flex: none;
+}
+
+/* The user hid the dock: a small tab with the agent stays in the bottom corner, clear of the page. */
+.browser-dock[data-tucked] {
+  left: auto;
+  width: auto;
+  inset-inline-end: var(--openbot-space-4);
+  translate: none;
+}
+
+.browser-dock[data-tucked] > :not(.browser-dock-tab) {
+  display: none;
+}
+
+.browser-dock-hide {
+  border-radius: var(--openbot-radius-pill);
+}
+
+.browser-dock .browser-dock-tab {
+  padding-inline: var(--openbot-space-1) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  gap: var(--openbot-space-2);
 }
 
 .browser-dock-editor {

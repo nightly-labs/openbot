@@ -101,6 +101,7 @@ export const messages = {
   "browser.error.navigateForward": "No se pudo avanzar.",
   "browser.userControl.status": "Controlas esta página",
   "browser.dock.messageTo": "Mensaje para {name}",
+  "browser.dock.hide": "Ocultar el cuadro de mensaje",
   "browser.dock.needsYou": "{name} te necesita en esta página",
   "browser.dock.needsAnswer": "{name} necesita tu respuesta",
   "browser.dock.needsApproval": "{name} necesita tu aprobación",
