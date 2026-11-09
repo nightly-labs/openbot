@@ -121,6 +121,11 @@ import {
   CUSTOM_AGENTS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CODECS,
+  CUSTOM_PROVIDER_EDIT_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
@@ -208,6 +213,8 @@ import { AgentNotificationLevelStore } from "../src/main/agent-notification-leve
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
+import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
+import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
@@ -1505,6 +1512,15 @@ try {
                   harness: harness ?? "opencode",
                 },
               ];
+              return customEndpointResult();
+            }),
+          // Records the input that the route gives to the merge, which the real changes run.
+          peerUpdate: (input) =>
+            Effect.sync(() => {
+              record("peerUpdateCustomProvider", input);
+              customEndpoints = customEndpoints.map((endpoint) =>
+                endpoint.id === input.id ? { ...endpoint, name: input.name } : endpoint,
+              );
               return customEndpointResult();
             }),
           remove: (id) =>
@@ -5226,6 +5242,157 @@ try {
           restart: "not-running",
         }),
       summary(deleted),
+    );
+  }
+
+  // ---- Custom endpoint edit (custom-provider-edit-v1) ----
+  {
+    const edit = { token: adaToken, capabilities: [CUSTOM_PROVIDER_EDIT_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const decoded = (route: string, reply: Reply) => CUSTOM_PROVIDER_EDIT_CODECS.get(route)?.response(200, reply.body);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises custom-provider-edit-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CUSTOM_PROVIDER_EDIT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CUSTOM_PROVIDER_EDIT_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const spark = {
+      id: "spark",
+      name: "DGX Spark",
+      baseUrl: "http://spark.local:8080/v1",
+      hasApiKey: false,
+      models: [{ id: "qwen3-coder", name: "Qwen3 Coder" }],
+      harness: "pi",
+      headerNames: ["X-Tenant"],
+    };
+    const listed = await call("POST", CUSTOM_PROVIDER_EDIT_ROUTES.customList, { ...edit, json: {} });
+    check(
+      "an admin lists the endpoint with its harness and header names, without the model limits",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, [spark]) &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_EDIT_ROUTES.customList, listed), [spark]),
+      summary(listed),
+    );
+    const updated = await call("POST", CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, {
+      ...edit,
+      json: {
+        id: "spark",
+        name: "Spark Lab",
+        baseUrl: "http://spark.local:8080/v1",
+        models: [
+          { id: "qwen3-coder", name: "Qwen3 Coder" },
+          { id: "gpt-oss", name: "GPT-OSS" },
+        ],
+        headers: [{ name: "X-Tenant", value: null }],
+      },
+    });
+    check(
+      "an edit reaches the host with no key, the header kept by name, and the model names only",
+      updated.status === 200 &&
+        isDeepStrictEqual(callsOf("peerUpdateCustomProvider"), [
+          [
+            {
+              id: "spark",
+              name: "Spark Lab",
+              baseUrl: "http://spark.local:8080/v1",
+              models: [
+                { id: "qwen3-coder", name: "Qwen3 Coder" },
+                { id: "gpt-oss", name: "GPT-OSS" },
+              ],
+              headers: [{ name: "X-Tenant", value: null }],
+            },
+          ],
+        ]) &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, updated), {
+          providers: [{ ...spark, name: "Spark Lab" }],
+          restart: "not-running",
+        }),
+      [summary(updated), callsOf("peerUpdateCustomProvider")],
+    );
+    const unsupported = await call("POST", CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, {
+      token: adaToken,
+      capabilities: [CUSTOM_PROVIDER_HARNESS_CAPABILITY],
+      json: { id: "spark", name: "Spark", baseUrl: "http://spark.local:8080/v1", models: [] },
+    });
+    const member = await call("POST", CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, {
+      ...edit,
+      token: bobToken,
+      json: { id: "spark", name: "Spark", baseUrl: "http://spark.local:8080/v1", models: [] },
+    });
+    check(
+      "the edit route without the capability gets 400 providersUnsupported, and a member gets 403",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("peerUpdateCustomProvider").length === 1,
+      [summary(unsupported), summary(member)],
+    );
+
+    // The real merge, over the real store on a temporary file: an edit from a joined admin keeps
+    // the harness, the key, the header value and the limits of each model that it keeps.
+    const store = new CustomProviderStore({
+      path: join(root, "custom-providers.json"),
+      cipher: { ...fakeCipher, canPersist: () => true },
+    });
+    await Effect.runPromise(
+      store.save({
+        id: "spark",
+        name: "DGX Spark",
+        baseUrl: "http://spark.local:8080/v1",
+        apiKey: "sk-spark-host",
+        models: [{ id: "qwen3-coder", name: "Qwen3 Coder", contextWindow: 131072, maxOutput: 8192 }],
+        headers: [{ name: "X-Tenant", value: "acme" }],
+        harness: "pi",
+      }),
+    );
+    const harnesses: string[] = [];
+    const changes = createCustomProviderChanges({
+      service: {
+        saveCustomProvider: (_id, _harness, persist) => persist(),
+        updateCustomProvider: (_id, harness, _removed, persist) => {
+          harnesses.push(harness);
+          return persist();
+        },
+        removeCustomProvider: (_id, persist) => persist(),
+        reloadCustomProviderConfig: () => Effect.succeed("not-running"),
+        startHarnessForMovedAgents: () => Effect.void,
+      },
+      customProviders: store,
+      providerRuntimes: { startCustomProviderHarness: () => Effect.void },
+    });
+    await Effect.runPromise(
+      changes.peerUpdate({
+        id: "spark",
+        name: "Spark Lab",
+        baseUrl: "http://spark.local:8080/v1",
+        // A harness and a model limit that a peer cannot send over the wire are dropped all the same.
+        harness: "opencode",
+        models: [
+          { id: "qwen3-coder", name: "Qwen3", contextWindow: 1 },
+          { id: "gpt-oss", name: "GPT-OSS" },
+        ],
+        headers: [{ name: "X-Tenant", value: null }],
+      }),
+    );
+    const merged = store.configs();
+    check(
+      "a joined admin's edit keeps the harness, the key, the header value and the kept model's limits",
+      isDeepStrictEqual(harnesses, ["pi"]) &&
+        isDeepStrictEqual(merged, [
+          {
+            id: "spark",
+            name: "Spark Lab",
+            baseUrl: "http://spark.local:8080/v1",
+            apiKey: "sk-spark-host",
+            models: [
+              { id: "qwen3-coder", name: "Qwen3", contextWindow: 131072, maxOutput: 8192 },
+              { id: "gpt-oss", name: "GPT-OSS" },
+            ],
+            headers: [{ name: "X-Tenant", value: "acme" }],
+            harness: "pi",
+          },
+        ]),
+      [harnesses, store.list()],
     );
   }
 

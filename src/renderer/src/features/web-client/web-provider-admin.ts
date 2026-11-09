@@ -7,11 +7,16 @@ import type {
   HostDefaultProvider,
   ProviderAdminDesktopApi,
   ServerSummary,
+  UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { decodeRegistryEntries, decodeRegistryInstallResult, decodeRegistryOperations } from "@openbot/contracts/ipc";
 import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
+import {
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
@@ -69,6 +74,7 @@ import {
   startProviderCodeLogin,
   startProviderHostSignIn,
   submitProviderCodeLogin,
+  updateCustomProvider,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
@@ -207,6 +213,14 @@ function webProviderAdmin(
       runTeamEffect(
         saveCustomProvider(request(serverId), input, customRoutes()).pipe(Effect.mapError((error) => error.cause)),
       ),
+    updateCustomProvider: async (input, serverId) => {
+      const routes = customRoutes();
+      // A host without `custom-provider-edit-v1` has no edit route, and the page offers no Edit.
+      if (!("customUpdate" in routes)) throw new Error(currentText().t("error.provider.localOnly"));
+      return runTeamEffect(
+        updateCustomProvider(request(serverId), input, routes).pipe(Effect.mapError((error) => error.cause)),
+      );
+    },
     deleteCustomProvider: async (input, serverId) =>
       runTeamEffect(
         deleteCustomProvider(request(serverId), input, customRoutes()).pipe(Effect.mapError((error) => error.cause)),
@@ -300,9 +314,11 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
           ? PROVIDERS_V5_ROUTES
           : PROVIDERS_ADMIN_ROUTES,
     () =>
-      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
-        ? CUSTOM_PROVIDER_HARNESS_ROUTES
-        : PROVIDERS_ADMIN_ROUTES,
+      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY)
+        ? CUSTOM_PROVIDER_EDIT_ROUTES
+        : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
+          ? CUSTOM_PROVIDER_HARNESS_ROUTES
+          : PROVIDERS_ADMIN_ROUTES,
     accountRelayOfServer,
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
@@ -494,6 +510,11 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       remove: (registryId) => send("POST", ACP_REGISTRY_ROUTES.remove, empty, { registryId }),
     };
   });
+  const updateEndpoint = async (value: UpdateCustomProviderInput) => {
+    const store = customProviders();
+    if (!store) throw new Error(currentText().t("webClient.error.saveEndpointOffline"));
+    return store.updateCustomProvider(value);
+  };
   const settings: HostProviderSettings = {
     get acpRegistry() {
       return registry();
@@ -544,6 +565,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       const store = customProviders();
       if (!store) throw new Error(currentText().t("webClient.error.removeEndpointOffline"));
       return store.deleteCustomProvider(id);
+    },
+    get onUpdateCustomProvider() {
+      return serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY) ? updateEndpoint : undefined;
     },
     get providerKeys() {
       return providerKeys();

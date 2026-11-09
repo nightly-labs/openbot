@@ -585,8 +585,11 @@ function ServerSettings() {
       },
       onAddCustomProvider: endpoints.saveCustomProvider,
       onDeleteCustomProvider: endpoints.deleteCustomProvider,
-      // The Team API has no edit route, so only this computer's endpoints have Edit.
-      onUpdateCustomProvider: local ? localEndpoints.updateCustomProvider : undefined,
+      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`.
+      onUpdateCustomProvider:
+        local || serverSupportsCapability(server, "custom-provider-edit-v1")
+          ? endpoints.updateCustomProvider
+          : undefined,
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },

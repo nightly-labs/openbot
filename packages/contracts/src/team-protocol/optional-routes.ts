@@ -45,6 +45,7 @@ import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CODECS } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_CODECS } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
@@ -123,6 +124,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_V5_CODECS,
   ...PROVIDERS_V8_CODECS,
   ...CUSTOM_PROVIDER_HARNESS_CODECS,
+  ...CUSTOM_PROVIDER_EDIT_CODECS,
   ...CUSTOM_AGENTS_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,

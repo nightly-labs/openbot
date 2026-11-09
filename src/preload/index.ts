@@ -1161,6 +1161,7 @@ const openbotApi: OpenBotDesktopApi = {
     checkRuntimeUpdates: decodeProviderRuntimeSnapshot,
     listCustomProviders: decodeCustomProviders,
     saveCustomProvider: decodeCustomProviderResult,
+    updateCustomProvider: decodeCustomProviderResult,
     deleteCustomProvider: decodeCustomProviderResult,
   }),
   messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {

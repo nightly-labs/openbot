@@ -1835,6 +1835,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       checkRuntimeUpdates: () => api.providerRuntimes.checkForUpdates(),
       listCustomProviders: () => api.customProviders.list(),
       saveCustomProvider: (input) => api.customProviders.save(input),
+      updateCustomProvider: (input) => api.customProviders.update(input),
       deleteCustomProvider: (input) => api.customProviders.delete(input),
     },
     agentTemplates: {
