@@ -252,6 +252,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939",
     },
+    {
+      slug: "bird",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "e1e5c93176b8581853759b7c089b7dff2a189c5454fb46a855625a35b88013be",
+    },
   ],
 };
 
@@ -1786,6 +1792,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://robinhood.com",
     privacyPolicyUrl: "https://robinhood.com/us/en/support/articles/privacy-policy/",
     termsUrl: "https://robinhood.com/us/en/about/legal/",
+    skills: [],
+  },
+  bird: {
+    slug: "bird",
+    name: "Bird",
+    tagline: "Connectivity for agents",
+    description:
+      "Bird is the communications infrastructure AI agents operate. Connect Bird and OpenBot sends email, SMS, and WhatsApp Business on Bird's own sending infrastructure, places calls on Bird SIP trunks, and reports a delivery timestamp or the exact failure reason instead of a guess. You sign in with Bird when you connect, so there is no API key to paste, and OpenBot gets only the permissions you already hold.",
+    category: "automation",
+    creatorName: "Bird",
+    iconUrl: "https://www.bird.com/favicon-light.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-test-email", text: "Send me a test email and tell me the moment it's delivered." },
+      { id: "prompt-audit", text: "Audit the email authentication of my domain." },
+      { id: "prompt-bounces", text: "Which of last week's emails bounced, and why?" },
+    ],
+    apps: [
+      {
+        id: "app-bird-mcp",
+        name: "Bird",
+        description:
+          "Email, SMS, WhatsApp Business, voice, contacts and webhooks, over Bird's MCP server with browser sign-in.",
+        iconUrl: "https://www.bird.com/favicon-light.png",
+        server: {
+          name: "bird",
+          transport: "http",
+          url: "https://mcp.bird.com",
+          auth: [{ id: "bird-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.bird.com",
+    privacyPolicyUrl: "https://bird.com/en-gb/legal/privacy",
+    termsUrl: "https://bird.com/en-gb/legal/website-terms-of-use",
     skills: [],
   },
 };

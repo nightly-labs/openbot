@@ -235,6 +235,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939"
+    },
+    {
+      "slug": "bird",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "e1e5c93176b8581853759b7c089b7dff2a189c5454fb46a855625a35b88013be"
     }
   ]
 }

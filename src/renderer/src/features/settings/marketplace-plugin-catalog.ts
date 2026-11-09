@@ -1752,6 +1752,47 @@ const ROBINHOOD: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/robinhood",
 };
 
+const BIRD: MarketplacePluginDetail = {
+  id: "plugin-bird",
+  slug: "bird",
+  name: "Bird",
+  tagline: "Connectivity for agents",
+  description:
+    "Bird is the communications infrastructure AI agents operate. Connect Bird and OpenBot sends email, SMS, and WhatsApp Business on Bird's own sending infrastructure, places calls on Bird SIP trunks, and reports a delivery timestamp or the exact failure reason instead of a guess. You sign in with Bird when you connect, so there is no API key to paste, and OpenBot gets only the permissions you already hold.",
+  category: "automation",
+  creatorName: "Bird",
+  iconUrl: "https://www.bird.com/favicon-light.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-test-email", text: "Send me a test email and tell me the moment it's delivered." },
+    { id: "prompt-audit", text: "Audit the email authentication of my domain." },
+    { id: "prompt-bounces", text: "Which of last week's emails bounced, and why?" },
+  ],
+  apps: [
+    {
+      id: "app-bird-mcp",
+      name: "Bird",
+      description:
+        "Email, SMS, WhatsApp Business, voice, contacts and webhooks, over Bird's MCP server with browser sign-in.",
+      iconUrl: "https://www.bird.com/favicon-light.png",
+      server: {
+        name: "bird",
+        transport: "http",
+        url: "https://mcp.bird.com",
+        auth: [{ id: "bird-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.bird.com",
+  privacyPolicyUrl: "https://bird.com/en-gb/legal/privacy",
+  termsUrl: "https://bird.com/en-gb/legal/website-terms-of-use",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/bird",
+};
+
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   AAVE,
   CANVA,
@@ -1792,4 +1833,5 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   CLICKUP,
   COINBASE,
   ROBINHOOD,
+  BIRD,
 ];
