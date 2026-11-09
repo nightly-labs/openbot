@@ -893,6 +893,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * instructions, and the channel messages that the session read, so the next turn sends both again.
    */
   #compacted(thread: AcpThread): void {
+    // A compaction is the whole answer of a `/compact` turn.
+    if (thread.activeTurn) thread.activeTurn.answered = true;
     thread.instructionsSent = null;
     this.#turnContext.resend(thread.id);
     this.emit("notification", {
@@ -2298,10 +2300,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           },
         });
       // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
-      // to answer ends empty on purpose, and an error there costs no answer the user waits for.
+      // to answer ends empty on purpose, and an error there costs no answer the user waits for. A
+      // stopped turn ends as interrupted, also when the agent answers the cancel with `end_turn`.
       const emptyAnswerFailure =
-        response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional
-          ? (this.#flavor.emptyAnswerFailure?.(turn.reasoned, this.#label) ?? null)
+        response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
+          ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
           : null;
       if (emptyAnswerFailure !== null) {
         turn.failureCause = "empty_answer";

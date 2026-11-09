@@ -49,7 +49,7 @@ export interface AcpFlavor {
    * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
    * Absent: such a turn succeeds.
    */
-  emptyAnswerFailure?(reasoned: boolean, label: string): string | null;
+  emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
   /**
    * What to do when `session/load` or `session/resume` fails: wait once for a process that still
    * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
@@ -299,12 +299,12 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
 }
 
 /**
- * A custom agent can end a turn as done with no text, no tool call and no reasoning, for example when
- * its context is full. The chat then showed nothing at all (#5110). A turn with reasoning shows its
- * steps, so it still succeeds.
+ * A custom agent can end a turn as done and send nothing for it, for example when its context is full.
+ * The chat then showed nothing at all (#5110). A turn that sent any update, such as a thought, a plan
+ * or a compaction, shows it, so it still succeeds.
  */
-function customEmptyAnswerFailure(reasoned: boolean, label: string): string | null {
-  return reasoned ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
+function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
+  return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
 
 /** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
