@@ -260,16 +260,12 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
 
   /* The channel that the chat shows. It stays after a close, so the chat keeps its rows while it fades. */
   const shownChannelId = createMemo((previous?: string | null) => openChannelId() ?? previous ?? null);
-  /* The rows of the shown channel. The reader's own messages carry no sender, so they show as their own. */
+  /* The rows of the shown channel. */
   const channelMessages = createMemo((): AgentMessage[] => {
     const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
-    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map((row) => {
-      if (row.author !== "you" || !row.senderMember || !isOwnSender(row.senderMember.id)) return row;
-      const { senderMember: _own, ...own } = row;
-      return own;
-    });
+    return channelConversationRows(page.messages.filter(channelMessageHasContent));
   });
 
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel => {
