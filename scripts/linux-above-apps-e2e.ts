@@ -46,6 +46,13 @@ export const RectSchema = Schema.Struct({
 export type Rect = typeof RectSchema.Type;
 export const decodeNumber = Schema.decodeUnknownSync(Schema.Number);
 export const decodeBoolean = Schema.decodeUnknownSync(Schema.Boolean);
+
+/** True when no CSS motion with an end runs in the page. A motion that repeats with no end does not count. */
+export const MOTION_DONE =
+  "document.getAnimations().every((motion) => motion.playState !== 'running' || !Number.isFinite(motion.effect?.getComputedTiming().endTime ?? Infinity))";
+
+/** A script that resolves after the renderer draws two frames. */
+export const TWO_FRAMES = "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))";
 export const decodeBox = Schema.decodeUnknownSync(Schema.NullOr(RectSchema));
 export const decodePage = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String, html: Schema.String }));
 const decodeAnswer = Schema.decodeUnknownSync(
@@ -418,15 +425,28 @@ export function screenshot(session: Session, name: string): void {
   spawnSync("import", ["-window", "root", file], { env: session.environment });
 }
 
-/** The window type, state and workspace that the window manager reads. */
-export function windowManagerProperties(session: Session, xid: number): string {
-  const properties = run(session, "xprop", [
-    "-id",
-    String(xid),
-    "_NET_WM_WINDOW_TYPE",
-    "_NET_WM_STATE",
-    "_NET_WM_DESKTOP",
-  ]);
+/** True when the window manager put the window above the others and on all workspaces. */
+function placedByWindowManager(properties: string): boolean {
+  return (
+    /_NET_WM_WINDOW_TYPE_DOCK/u.test(properties) &&
+    /_NET_WM_STATE_ABOVE/u.test(properties) &&
+    (/_NET_WM_STATE_STICKY/u.test(properties) || /_NET_WM_DESKTOP\(CARDINAL\) = 4294967295/u.test(properties))
+  );
+}
+
+/**
+ * The window type, state and workspace that the window manager reads. The window manager sets the state
+ * some time after the window shows, so this waits for it until the deadline.
+ */
+export async function windowManagerProperties(session: Session, xid: number): Promise<string> {
+  const read = () =>
+    run(session, "xprop", ["-id", String(xid), "_NET_WM_WINDOW_TYPE", "_NET_WM_STATE", "_NET_WM_DESKTOP"]);
+  const deadline = Date.now() + STATE_TIMEOUT_MS;
+  let properties = read();
+  while (!placedByWindowManager(properties) && Date.now() < deadline) {
+    await sleep(100);
+    properties = read();
+  }
   assert.match(properties, /_NET_WM_WINDOW_TYPE_DOCK/u, "the window is a DOCK window");
   assert.match(properties, /_NET_WM_STATE_ABOVE/u, "the window is above other windows");
   assert.ok(

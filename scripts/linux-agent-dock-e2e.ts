@@ -27,6 +27,7 @@ import {
   firstClick,
   fromPixels,
   type Harness,
+  MOTION_DONE,
   NO_WINDOW_MODES,
   NO_WINDOW_WAIT_MS,
   openSession,
@@ -38,6 +39,7 @@ import {
   screenshot,
   startDesktopAndRecorder,
   startHarness,
+  TWO_FRAMES,
   until,
   windowManagerProperties,
 } from "./linux-above-apps-e2e";
@@ -96,7 +98,7 @@ try {
   await settle(app);
 
   // 1. Placement.
-  const properties = windowManagerProperties(session, dock.xid);
+  const properties = await windowManagerProperties(session, dock.xid);
   assert.equal(dock.bounds.x + dock.bounds.width, SCREEN.width / SCALE, "the dock touches the right edge");
   assert.equal(dock.visible, true);
   steps.push({ step: "placement", detail: { bounds: dock.bounds, properties: properties.trim().split("\n") } });
@@ -283,14 +285,11 @@ function dockApp(harness: Harness<Command>): App {
   };
 }
 
-/** The motion of the dock ends, and the renderer draws a frame. */
+/** The renderer applies the last change, its motion ends, and it draws a frame. */
 async function settle(app: App): Promise<void> {
-  await sleep(400);
-  await app.eval(
-    "dock",
-    "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))",
-    () => undefined,
-  );
+  await app.eval("dock", TWO_FRAMES, () => undefined);
+  await until(async () => await app.eval("dock", MOTION_DONE, decodeBoolean), "the end of the dock motion");
+  await app.eval("dock", TWO_FRAMES, () => undefined);
 }
 
 /** The screen centre of the first element that matches `selector` in the dock window. */

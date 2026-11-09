@@ -31,6 +31,7 @@ import {
   firstClick,
   fromPixels,
   type Harness,
+  MOTION_DONE,
   NO_WINDOW_MODES,
   NO_WINDOW_WAIT_MS,
   openSession,
@@ -40,6 +41,7 @@ import {
   screenshot,
   startDesktopAndRecorder,
   startHarness,
+  TWO_FRAMES,
   until,
   windowManagerProperties,
 } from "./linux-above-apps-e2e";
@@ -185,7 +187,7 @@ try {
   const island = await app.island();
 
   // 1. Placement: centred in the work area, at its top edge, below a top panel.
-  const properties = windowManagerProperties(session, island.xid);
+  const properties = await windowManagerProperties(session, island.xid);
   const centre = island.bounds.x + island.bounds.width / 2;
   assert.ok(
     Math.abs(centre - (island.workArea.x + island.workArea.width / 2)) <= 1,
@@ -428,14 +430,11 @@ async function leave(app: App, desktop: Desktop): Promise<void> {
   await sleep(1_000);
 }
 
-/** The motion of the island ends, and the renderer draws a frame. */
+/** The renderer applies the last change, its motion ends, and it draws a frame. */
 async function settle(app: App): Promise<void> {
-  await sleep(500);
-  await app.eval(
-    "island",
-    "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))",
-    () => undefined,
-  );
+  await app.eval("island", TWO_FRAMES, () => undefined);
+  await until(async () => await app.eval("island", MOTION_DONE, decodeBoolean), "the end of the island motion");
+  await app.eval("island", TWO_FRAMES, () => undefined);
 }
 
 /** A script that gives the box of the first button whose text is `text`. */

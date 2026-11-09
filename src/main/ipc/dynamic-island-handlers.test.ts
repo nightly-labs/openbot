@@ -70,6 +70,7 @@ function register() {
       Effect.sync(() => {
         xwayland.push(enabled);
       }),
+    keepXWayland: () => Effect.void,
   });
   for (const [name, bind] of Object.entries(dynamicIsland)) bind(`dynamicIsland:${name}`);
   const call = (name: string, senderId: number, payload?: unknown) => {
@@ -111,14 +112,6 @@ describe("dynamic island handlers", () => {
     expect(() => call("setXWayland", MAIN_ID, { enabled: "yes" })).toThrow("XWayland state is required");
     await call("setXWayland", MAIN_ID, { enabled: true });
     expect(xwayland).toEqual([true]);
-  });
-
-  it("stops the XWayland start when the user turns the island off", async () => {
-    const { xwayland, saved, call } = register();
-    await call("setPreference", MAIN_ID, PREFERENCE);
-    await call("setPreference", MAIN_ID, { ...PREFERENCE, enabled: false });
-    expect(saved.map((preference) => preference.enabled)).toEqual([true, false]);
-    expect(xwayland).toEqual([false]);
   });
 
   it("rejects a renderer outside the app", () => {

@@ -216,12 +216,34 @@ export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" |
  */
 export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
   if (process.platform !== "linux" || usesX11Windows()) return undefined;
-  return app.isPackaged && process.env.DISPLAY ? "restart" : "unsupported";
+  // An explicit `--ozone-platform=wayland` stays on each start, so a restart would come back to Wayland.
+  return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
+}
+
+/** True when this process draws its windows on XWayland in a Wayland session. */
+function onXWayland(): boolean {
+  return usesX11Windows() && Boolean(process.env.WAYLAND_DISPLAY?.trim() || process.env.XDG_SESSION_TYPE === "wayland");
 }
 
 /**
- * On: each start on Wayland goes to XWayland, and OpenBot starts again now. Off: when the other feature
- * does not need it, the next start uses Wayland again. The window stays on XWayland until then.
+ * Keeps the start on XWayland for a feature that the user turned on again on XWayland, after a turn-off
+ * removed the restart file. Elsewhere it changes nothing and does not restart.
+ */
+export const keepAboveAppsXWayland = Effect.fn("keepAboveAppsXWayland")(function* (
+  userDataPath: string,
+  feature: AboveAppsFeature,
+) {
+  if (process.platform !== "linux" || !onXWayland()) return;
+  yield* Effect.tryPromise({
+    try: () => writeFile(join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]), ""),
+    catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
+  });
+});
+
+/**
+ * On: each start on Wayland goes to XWayland, and OpenBot starts again now. Already on XWayland, it only
+ * keeps that for the next start. Off: when the other feature does not need it, the next start uses
+ * Wayland again. The window stays on XWayland until then.
  */
 export const setAboveAppsXWayland = Effect.fn("setAboveAppsXWayland")(function* (
   userDataPath: string,
@@ -237,13 +259,15 @@ export const setAboveAppsXWayland = Effect.fn("setAboveAppsXWayland")(function* 
     });
     return;
   }
-  if (aboveAppsScreenSupport() !== "restart") return;
+  if (aboveAppsScreenSupport() !== "restart") return yield* keepAboveAppsXWayland(userDataPath, feature);
   yield* Effect.tryPromise({
     try: () => writeFile(file, ""),
     catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
   });
   logger.info(`The ${feature} shows above other apps, so OpenBot starts again on XWayland.`);
-  app.relaunch({ args: process.argv.slice(1) });
+  // An AppImage mounts itself for each start, and the mount of this process goes away with it.
+  const execPath = process.env.APPIMAGE;
+  app.relaunch(execPath ? { execPath, args: process.argv.slice(1) } : { args: process.argv.slice(1) });
   app.quit();
 });
 

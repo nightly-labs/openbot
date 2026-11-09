@@ -32,11 +32,14 @@ export interface DynamicIslandIpcDependencies {
   >;
   /** On Wayland, starts OpenBot again on XWayland at each start, or stops that. */
   setXWayland: (enabled: boolean) => Effect.Effect<void, { readonly cause: unknown }>;
+  /** Already on XWayland in a Wayland session: keeps that for the next start. Does not restart. */
+  keepXWayland: () => Effect.Effect<void, { readonly cause: unknown }>;
 }
 
 export function dynamicIslandIpcHandlers({
   dynamicIsland,
   setXWayland,
+  keepXWayland,
 }: DynamicIslandIpcDependencies): Pick<IpcGroupHandlers, "dynamicIsland"> {
   const fromMainRenderer = (event: IpcMainInvokeEvent) =>
     requireDynamicIslandSender(event.sender.id, dynamicIsland.mainRendererIds, "main renderer");
@@ -57,8 +60,8 @@ export function dynamicIslandIpcHandlers({
         runCauseEffect(
           dynamicIsland.setPreference(preference).pipe(
             // Linux: an island that is off does not need XWayland, so the next start on a Wayland
-            // session uses Wayland again. Without the restart file, this changes nothing.
-            Effect.tap((saved) => (saved.enabled ? Effect.void : setXWayland(false).pipe(Effect.ignore))),
+            // session uses Wayland again. An island turned on again on XWayland keeps it.
+            Effect.tap((saved) => (saved.enabled ? keepXWayland() : setXWayland(false)).pipe(Effect.ignore)),
           ),
         ),
       ),

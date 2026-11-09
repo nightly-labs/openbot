@@ -125,6 +125,7 @@ import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
 import {
+  keepAboveAppsXWayland,
   restartOnXWaylandForAboveApps,
   restartOnXWaylandWithoutMonitor,
   setAboveAppsXWayland,
@@ -853,6 +854,7 @@ function registerIpcHandlers({
     ...dynamicIslandIpcHandlers({
       dynamicIsland,
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
+      keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
     }),
     ...agentDockIpcHandlers({
       agentDock,

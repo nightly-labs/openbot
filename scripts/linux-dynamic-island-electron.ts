@@ -229,6 +229,7 @@ async function start(): Promise<void> {
       },
     },
     setXWayland: () => Effect.void,
+    keepXWayland: () => Effect.void,
   });
   registerIpcGroup("dynamicIsland", handlers.dynamicIsland);
   await Effect.runPromise(controller.initialize());
