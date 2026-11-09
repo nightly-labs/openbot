@@ -25,6 +25,16 @@ export const NO_WINDOW_MODES: readonly ("server" | "wayland")[] = GNOME ? ["serv
 export const NO_WINDOW_WAIT_MS = 3_000;
 export const STATE_TIMEOUT_MS = 20_000;
 export const SCREEN = { width: 1600, height: 1000 };
+/**
+ * The screen scale of a HiDPI desktop, such as `2` or `1.25` (`OPENBOT_E2E_SCALE`). Electron takes it as the
+ * scale that GNOME or KDE give it. `SCREEN` stays in screen pixels; `Desktop.move` takes DIP.
+ */
+export const SCALE = Number(process.env.OPENBOT_E2E_SCALE ?? "1");
+
+/** The point in DIP, as Electron gives positions, of a point in screen pixels. */
+export function fromPixels(x: number, y: number): { x: number; y: number } {
+  return { x: x / SCALE, y: y / SCALE };
+}
 const CLOCK_TICKS = 100;
 
 export const RectSchema = Schema.Struct({
@@ -65,7 +75,12 @@ export async function openSession(name: string): Promise<Session> {
     process.stdout.write("SKIP: Linux only\n");
     process.exit(0);
   }
-  const out = join(ROOT, ".openbot-build", name, GNOME ? "gnome-xwayland" : "x11");
+  const out = join(
+    ROOT,
+    ".openbot-build",
+    name,
+    `${GNOME ? "gnome-xwayland" : "x11"}${SCALE === 1 ? "" : `-scale-${SCALE}`}`,
+  );
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
   return {
@@ -152,6 +167,7 @@ export function startHarness<Command extends { op: string }>(
       `--user-data-dir=${join(session.root, `user-data-${mode}`)}`,
       "--no-sandbox",
       `--ozone-platform=${mode === "wayland" ? "wayland" : "x11"}`,
+      ...(SCALE === 1 ? [] : [`--force-device-scale-factor=${SCALE}`]),
     ],
     {
       env: mode === "server" ? { ...session.environment, OPENBOT_E2E_SERVER: "1" } : session.environment,
@@ -278,6 +294,7 @@ export function run(session: Session, command: string, args: string[]): string {
 }
 
 export interface Desktop {
+  /** Moves the pointer to a point in DIP, as Electron and the renderer give positions. */
   move: (x: number, y: number) => void;
   button: (pressed: boolean) => void;
   click: () => void;
@@ -290,7 +307,8 @@ export interface Desktop {
 
 function x11Desktop(session: Session): Desktop {
   return {
-    move: (x, y) => run(session, "xdotool", ["mousemove", String(Math.round(x)), String(Math.round(y))]),
+    move: (x, y) =>
+      run(session, "xdotool", ["mousemove", String(Math.round(x * SCALE)), String(Math.round(y * SCALE))]),
     button: (pressed) => run(session, "xdotool", [pressed ? "mousedown" : "mouseup", "1"]),
     click: () => run(session, "xdotool", ["click", "1"]),
     type: async (text) => void run(session, "xdotool", ["type", "--delay", "40", text]),
@@ -319,7 +337,7 @@ function gnomeDesktop(session: Session): Desktop {
       `(() => { const [x, y] = global.get_pointer(); return x === ${x} && y === ${y} ? 'yes' : 'no'; })()`,
     ).includes("yes");
   const move = (x: number, y: number) => {
-    const point = { x: Math.round(x), y: Math.round(y) };
+    const point = { x: Math.round(x * SCALE), y: Math.round(y * SCALE) };
     for (let attempt = 0; attempt < 50; attempt += 1) {
       input(`global.e2ePointer.notify_absolute_motion(now, ${point.x}, ${point.y})`);
       if (pointerAt(point.x, point.y)) return;

@@ -25,6 +25,7 @@ import {
   decodeNumber,
   decodePage,
   firstClick,
+  fromPixels,
   type Harness,
   NO_WINDOW_MODES,
   NO_WINDOW_WAIT_MS,
@@ -32,6 +33,7 @@ import {
   pointOutside,
   type Rect,
   RectSchema,
+  SCALE,
   SCREEN,
   screenshot,
   startDesktopAndRecorder,
@@ -95,14 +97,14 @@ try {
 
   // 1. Placement.
   const properties = windowManagerProperties(session, dock.xid);
-  assert.equal(dock.bounds.x + dock.bounds.width, SCREEN.width, "the dock touches the right edge");
+  assert.equal(dock.bounds.x + dock.bounds.width, SCREEN.width / SCALE, "the dock touches the right edge");
   assert.equal(dock.visible, true);
   steps.push({ step: "placement", detail: { bounds: dock.bounds, properties: properties.trim().split("\n") } });
   screenshot(session, "01-placement");
 
   // 2. Click-through: a point of the dock window outside its shape. A first click away from the dock
   // shows that the pointer of the test reaches the window under it.
-  await firstClick(desktop, { x: 300, y: 600 }, () => app.eval("main", "clicks.length", decodeNumber));
+  await firstClick(desktop, fromPixels(300, 600), () => app.eval("main", "clicks.length", decodeNumber));
   const region = latestRegion(await app.stats());
   const outside = pointOutside(dock.bounds, region);
   const clicksBefore = await app.eval("main", "clicks.length", decodeNumber);
@@ -169,31 +171,41 @@ try {
     "the closed chat",
   );
 
-  // 5. Drag the handle up.
-  const handle = await screenPoint(app, ".agent-dock-handle-hit");
+  // 5. Drag the handle 150 DIP to the side with more room. The dock stays on the screen: it moves as far
+  // as the room lets it. A dock as tall as the screen (a small screen in DIP) has no room.
   const startY = dock.bounds.y;
-  desktop.move(handle.x, handle.y);
-  await settle(app);
-  desktop.button(true);
-  for (let step = 1; step <= 10; step += 1) {
-    desktop.move(handle.x, handle.y - step * 15);
-    await sleep(30);
+  const roomAbove = startY;
+  const roomBelow = SCREEN.height / SCALE - (startY + dock.bounds.height);
+  const direction = roomAbove >= roomBelow ? -1 : 1;
+  const expected = Math.min(100, Math.max(roomAbove, roomBelow));
+  if (expected < 20) {
+    steps.push({ step: "drag: no room on this screen", detail: { roomAbove, roomBelow } });
+  } else {
+    const handle = await screenPoint(app, ".agent-dock-handle-hit");
+    desktop.move(handle.x, handle.y);
+    await settle(app);
+    desktop.button(true);
+    for (let step = 1; step <= 10; step += 1) {
+      desktop.move(handle.x, handle.y + direction * step * 15);
+      await sleep(30);
+    }
+    desktop.button(false);
+    dock = await until(async () => {
+      const next = await app.dock();
+      return (next.bounds.y - startY) * direction >= expected - 1 ? next : undefined;
+    }, "the dragged dock");
+    await settle(app);
+    screenshot(session, "05-dragged");
+    steps.push({ step: "drag moves the dock", detail: { from: startY, to: dock.bounds.y } });
   }
-  desktop.button(false);
-  dock = await until(async () => {
-    const next = await app.dock();
-    return next.bounds.y < startY - 100 ? next : undefined;
-  }, "the dragged dock");
-  await settle(app);
-  screenshot(session, "05-dragged");
-  steps.push({ step: "drag moves the dock", detail: { from: startY, to: dock.bounds.y } });
 
   // 6. Another workspace.
   await checkOtherWorkspace(session, desktop, dock.xid, "06-workspace-2");
   steps.push({ step: "all workspaces" });
 
   // 7. Idle CPU, with the pointer away from the dock.
-  desktop.move(200, 500);
+  const away = fromPixels(200, 500);
+  desktop.move(away.x, away.y);
   await sleep(2_000);
   const regionsBefore = (await app.stats()).regions.length;
   const usage = await cpuOf(dock.mainPid, IDLE_SECONDS);

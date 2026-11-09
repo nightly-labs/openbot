@@ -29,6 +29,7 @@ import {
   decodeNumber,
   decodePage,
   firstClick,
+  fromPixels,
   type Harness,
   NO_WINDOW_MODES,
   NO_WINDOW_WAIT_MS,
@@ -75,7 +76,7 @@ const GREETING_COLOR_PIXELS = `(async () => {
 })()`;
 const EXPANDED = 'document.querySelector(\'[data-slot="dynamic-island"][data-state="expanded"]\') !== null';
 const REPLY = ".dynamic-island-reply-input";
-const AWAY = { x: 300, y: 700 };
+const AWAY = fromPixels(300, 700);
 
 const AGENT: DynamicIslandAgentIdentity = {
   id: "agent-1",
