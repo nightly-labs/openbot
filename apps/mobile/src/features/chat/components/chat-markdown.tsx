@@ -191,9 +191,17 @@ function textContainerStyle(source: string, presentation: TextPresentation): Tex
     : presentation.style;
 }
 
+/**
+ * The line of an inline code chip: as tall as its letters, not as the line of code, so the chip does
+ * not touch the chips on the lines above and below it. A mention chip has the same rule.
+ */
+function codeChipLineHeight(presentation: TextPresentation): number {
+  return Math.round(CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].fontSize * 1.2);
+}
+
 /** The height of an inline code chip: its line and one point above and below. */
 function codeChipHeight(presentation: TextPresentation): number {
-  return CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].lineHeight + 2;
+  return codeChipLineHeight(presentation) + 2;
 }
 
 /**
@@ -375,7 +383,7 @@ function CodeSpan({
         style={[
           presentation.style,
           CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"],
-          { color: presentation.codeColor },
+          { color: presentation.codeColor, lineHeight: codeChipLineHeight(presentation) },
         ]}
       >
         {piece}
