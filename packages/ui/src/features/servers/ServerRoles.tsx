@@ -167,6 +167,7 @@ function AgentAccessRow(props: {
           placement="bottom-end"
           optionDisabled={below}
           disallowEmptySelection={true}
+          allowDuplicateSelectionEvents={true}
           onChange={(option) => {
             if (option === "everyone") props.onOpenEveryone();
             else if (option) props.onChange(option);
