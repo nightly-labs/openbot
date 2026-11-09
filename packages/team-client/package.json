@@ -35,6 +35,7 @@
     "./live-activity-seal": "./src/live-activity-seal.ts",
     "./push-notification-seal": "./src/push-notification-seal.ts",
     "./usage-series": "./src/usage-series.ts",
+    "./profile-stats": "./src/profile-stats.ts",
     "./plan-limits": "./src/plan-limits.ts",
     "./agent-tasks": "./src/agent-tasks.ts",
     "./workflow-decoding": "./src/workflow-decoding.ts"

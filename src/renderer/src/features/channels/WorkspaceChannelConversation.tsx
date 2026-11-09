@@ -17,6 +17,7 @@ import {
   serverSendsWebhookTests,
   serverSetsWebhookSenderSecret,
 } from "../servers/server-capabilities";
+import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -97,6 +98,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   // composer reads this prop in an effect, where Solid cannot make a memo.
   const shownAgentStatus = (): AgentStatus =>
     scope.loaded() ? agentStatus() : { ...agentStatus(), phase: "starting" };
+  const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
   return (
     <Conversation
       channel={view.source}
@@ -121,6 +123,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       workspaceCovered={windowPage.conversationCovered()}
       browserControlState={browserControlState()}
       server={activeServer()}
+      responseStyle={responseStyle()}
       presence={teamPresence()}
       currentUserEmail={props.account().email}
       isOwnSender={isOwnSender}

@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider}가 제시간에 응답하지 않아 OpenBot이 프로세스를 종료했습니다.",
   "error.provider.acpSignInLost":
     "{provider}의 로그인이 끊어져 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpPlanUsedUp":
+    "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",
   "error.provider.acpMcpNotLoaded":
     "{provider}가 OpenBot 도구를 불러오지 않아 이 에이전트는 도구를 사용하거나 팀원에게 연락할 수 없습니다. {provider} 팀 정책이 로컬 MCP 서버를 차단할 수 있습니다. 팀 관리자에게 허용을 요청한 다음 다시 시도하세요.",
   "error.provider.endpointsReadOnly":
@@ -308,6 +310,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "브라우저에서는 HTTPS 로그인 링크만 열 수 있어요.",
   "error.provider.geminiKeyRefused":
     "Gemini가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 연결하세요.",
+  "error.provider.geminiVerificationRequired":
+    "Gemini가 답하려면 Google에서 계정을 인증해야 해요. 브라우저에서 Google 계정을 인증한 후 메시지를 다시 보내세요.",
   "error.provider.keyProviderRefused":
     "{provider}가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 시도하세요.",
   "error.provider.keyProviderNoBalance":

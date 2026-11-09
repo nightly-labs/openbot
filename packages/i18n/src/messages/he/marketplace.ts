@@ -361,14 +361,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "איך הקמפיינים של השבוע שעבר הצליחו בהשוואה לשבוע שלפניו?",
   "marketplace.plugin.omnisend.prompt.segment": "כמה אנשי קשר יש בפלח VIP, ואיך זה השתנה החודש?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "נסח קמפיין לקולקציה החדשה, אבל אל תשלח אותו.",
-  "marketplace.plugin.composio.tagline": "אפליקציות רבות דרך הקישור שלך ל-Composio",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ועוד יותר מ-1,000 אפליקציות",
   "marketplace.plugin.composio.description":
-    "Composio מחבר סוכנים ל-Gmail, Slack, GitHub ולמאות אפליקציות אחרות דרך שרת MCP אחד. יש לחבר את האפליקציות הרצויות בחשבון Composio שלך, ואז להדביק כאן את כתובת ה-MCP שלו ואת מפתח ה-API.",
-  "marketplace.plugin.composio.app": "האפליקציות שאתה מוסיף לשרת MCP שלך ב-Composio, דרך הקישור מחשבון Composio שלך.",
+    "Composio מחבר את הסוכנים שלך ל-Gmail, Slack, GitHub ולעוד יותר מ-1,000 אפליקציות אחרות דרך שרת MCP אחד. יש להתחבר עם חשבון Composio שלך. כשסוכן צריך אפליקציה, הוא מבקש ממך לחבר אותה.",
+  "marketplace.plugin.composio.app":
+    "האפליקציות שחיברת בחשבון Composio שלך. סוכן מבקש ממך לחבר אפליקציה כשהוא צריך אותה.",
   "marketplace.plugin.composio.prompt.inbox": "סכם את האימיילים שלא נקראו וצור טיוטות תשובה לדחופים.",
   "marketplace.plugin.composio.prompt.handoff": "פרסם סיכום של בקשת המשיכה הזו בערוץ הצוות שלנו.",
   "marketplace.plugin.composio.prompt.apps": "באילו אפליקציות ופעולות אתה יכול להשתמש דרך Composio?",
-  "marketplace.plugin.composio.hint.url": "כתובת שרת MCP בחשבון Composio שלך",
   "marketplace.plugin.composio.hint.apiKey": "אפשר למצוא אותו בחשבון Composio שלך, ב-Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "פרויקטי Postgres, ענפים ומיגרציות",
   "marketplace.plugin.neon.description":
@@ -469,7 +469,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "מצא מערך נתונים של סדרות זמן של מזג אוויר והצג את העמודות שלו.",
   "marketplace.auth.apiKey": "מפתח API",
   "marketplace.auth.personalApiKey": "מפתח API אישי",
-  "marketplace.auth.mcpUrl": "כתובת MCP",
   "marketplace.auth.createKey": "יצירת מפתח",
 
   "marketplace.skill.doc": "SKILL.md",

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createOpenBotLogger,
   type LogValue,
+  redactSecrets,
   redactText,
   redactValue,
   registerSecretValue,
@@ -156,6 +157,17 @@ describe("redactText", () => {
     // assignment is the only thing a rule can match, and it has to match under the provider prefix.
     expect(redactText("OPENCODE_API_KEY=abc123def")).not.toContain("abc123def");
     expect(redactText("contact jan@example.com please")).toBe("contact [redacted-email] please");
+  });
+
+  // The agent's own memories and history keep an address the user gave it, but never a secret (#5820).
+  it("keeps emails and redacts secrets for the agent", () => {
+    expect(redactSecrets("account jan@example.com, password=hunter2")).toBe(
+      "account jan@example.com, password=[redacted]",
+    );
+    expect(redactSecrets('note {"email":"jan@example.com","apiKey":"pk_live_9f2b3c4d5e"}')).toBe(
+      'note {"email":"jan@example.com","apiKey":"[redacted]"}',
+    );
+    expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
   });
 
   it("redacts secrets inside a payload that arrives as one string", () => {

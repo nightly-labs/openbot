@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "当前活动",
   "chat.steps.show": "显示步骤",
   "chat.steps.hide": "隐藏步骤",
+  "chat.steps.showError": "显示错误",
+  "chat.steps.hideError": "隐藏错误",
   "chat.steps.list": "助手步骤",
   "chat.steps.count": { other: "{count} 个步骤" },
   "chat.steps.failed": { other: "{count} 个失败" },
@@ -429,4 +431,8 @@ export const messages = {
   "chat.reference.kind.thread": "话题",
   "chat.reference.open.tab": "显示浏览器标签页 {name}",
   "chat.reference.open.thread": "打开话题 {name}",
+  "chat.feedbackSent.title": "感谢你的反馈 🙏",
+  "chat.feedbackSent.badge": "已发送",
+  "chat.feedbackSent.body": "OpenBot 团队会阅读并处理 💜",
+  "chat.feedbackSent.openNamed": "在 GitHub 上打开 issue #{number}",
 } as const satisfies PartialTranslation<typeof source>;

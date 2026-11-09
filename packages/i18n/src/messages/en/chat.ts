@@ -21,6 +21,8 @@ export const messages = defineMessages("chat", {
   "chat.activity.current": "Current activity",
   "chat.steps.show": "Show steps",
   "chat.steps.hide": "Hide steps",
+  "chat.steps.showError": "Show error",
+  "chat.steps.hideError": "Hide error",
   "chat.steps.list": "Agent steps",
   "chat.steps.count": { one: "{count} step", other: "{count} steps" },
   "chat.steps.failed": { one: "{count} failed", other: "{count} failed" },
@@ -428,4 +430,8 @@ export const messages = defineMessages("chat", {
   "chat.reference.kind.thread": "Thread",
   "chat.reference.open.tab": "Show browser tab {name}",
   "chat.reference.open.thread": "Open thread {name}",
+  "chat.feedbackSent.title": "Thank you for your feedback 🙏",
+  "chat.feedbackSent.badge": "Sent",
+  "chat.feedbackSent.body": "The OpenBot team will read it and take care of it 💜",
+  "chat.feedbackSent.openNamed": "Open issue #{number} on GitHub",
 });

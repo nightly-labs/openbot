@@ -95,6 +95,8 @@ export const messages = {
   "error.team.conversationFileSearchUnsupported":
     "La recherche de fichiers n’est pas prise en charge par cette connexion.",
   "error.team.sideQuestionUnsupported": "Les questions annexes ne sont pas prises en charge par cette connexion.",
+  "error.team.liveVoiceUnsupported":
+    "Ce serveur ne prend pas en charge la voix en direct Codex. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.routineFlowsUnsupported":
     "Ce serveur ne prend pas en charge les flux de routines. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.routineCanvasTooLarge":

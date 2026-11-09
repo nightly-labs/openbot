@@ -166,9 +166,10 @@ export function collectProviderUsage(
   // carries tokens spent before analytics existed. Pi also reports its `get_session_stats` cost, a
   // session total at the rates of Pi's model list. Its checkpoint is the token counter, so a session
   // that ran before costs were kept prices its turns only from its second report. A turn that adds 0
-  // ran on a model with no rates in that list, not a free turn, so it stays unpriced.
-  const piCost = session.provider === "pi" || isKeyOnlyProvider(session.provider);
-  const reportedCost = piCost && isDynamicRecord(params) ? cost(params.cost) : null;
+  // ran on a model with no rates in that list, not a free turn, so it stays unpriced. A custom agent
+  // reports its session total in the `cost` of `usage_update`, which is kept the same way (#4181).
+  const sessionCost = session.provider === "pi" || session.provider === "acp" || isKeyOnlyProvider(session.provider);
+  const reportedCost = sessionCost && isDynamicRecord(params) ? cost(params.cost) : null;
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -179,7 +180,7 @@ export function collectProviderUsage(
     baseline: session.createdAt < usage.collectionStartedAt(),
     tokens: acpTokens(value),
     reportedCost,
-    zeroCostUnpriced: piCost,
+    zeroCostUnpriced: sessionCost,
   });
 }
 
@@ -203,30 +204,35 @@ export function workflowUsageObserver(
 }
 
 /**
- * Collects the usage of one background memory review under its agent. The review is its own session,
- * so its counters never meet those of the agent's turns.
+ * Collects the usage of one background side session under its agent: a memory review, or an
+ * `openbot.web_search` turn. The side session has its own id, so its counters never meet those of
+ * the agent's turns.
  */
-export function memoryReviewUsageObserver(
+export function sideSessionUsageObserver(
+  kind: "memory-review" | "web-search",
   usage: AgentUsage,
   agentId: string,
   provider: ProviderSession["provider"],
   model: AgentSummary["model"],
 ): (notification: { method: string; params?: unknown }) => void {
-  const session = { id: `memory-review:${randomUUID()}`, provider, createdAt: new Date().toISOString() };
+  const session = { id: `${kind}:${randomUUID()}`, provider, createdAt: new Date().toISOString() };
   return ({ method, params }) => {
     try {
       collectProviderUsage(usage, { id: agentId, model }, session, method, params);
     } catch (error) {
-      logger.warn("Could not save the usage of a memory review.", { provider, error });
+      logger.warn("Could not save the usage of a side session.", { kind, provider, error });
     }
   };
 }
 
-/** An ACP `Usage`, whose `inputTokens` include the cache reads and writes. */
+/**
+ * An ACP `Usage`, whose `inputTokens` include the cache reads and writes. The cache fields are
+ * optional, and agents leave them out when they are 0 (#4181).
+ */
 function acpTokens(value: DynamicRecord): UsageTokens {
   const input = count(value.inputTokens);
-  const cached = count(value.cachedReadTokens);
-  const creation = count(value.cachedWriteTokens);
+  const cached = count(value.cachedReadTokens ?? 0);
+  const creation = count(value.cachedWriteTokens ?? 0);
   return {
     uncachedInput:
       input !== null && cached !== null && creation !== null && input >= cached + creation

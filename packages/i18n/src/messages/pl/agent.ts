@@ -79,7 +79,6 @@ export const messages = {
   "agent.error.restoreFailed": "Nie udało się przywrócić agenta",
   "agent.error.hiddenFailed": "Nie zapisano zmiany. Spróbuj ponownie.",
   "agent.error.settingsFailed": "Nie udało się zapisać ustawień agenta",
-  "agent.error.avatarFailed": "Nie udało się zaktualizować awatara",
   "agent.error.adminOnly": "Ustawienia agenta może zmienić tylko administrator serwera.",
   "agent.error.continueFailed": "Agent nie mógł kontynuować. Spróbuj ponownie.",
   "agent.error.mcpNotStarted": "Serwer MCP nie został uruchomiony",

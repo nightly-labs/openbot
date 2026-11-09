@@ -24,6 +24,11 @@ Rules for a new entry:
   credential goes (`header` for http, `env` for stdio); the user types the
   value in the connect dialog.
 - `http` servers take a `url`. `stdio` servers take a `command` and `args`.
+- When a new version moves an `http` server to a different address, list the
+  earlier address in `earlierUrls`. A row with the catalog name on one of these
+  hosts, or on a subdomain, is then still the app's row. Composio lists
+  `https://composio.dev/`, because versions 1.0.0 and 1.1.0 saved the user's
+  own link on any Composio host.
   No `workingDirectory`: the provider drops such servers.
 - A `command` can start with `~/` to name a program that a desktop app installs
   in the home folder, as the Paper listing does. OpenBot expands `~` on the

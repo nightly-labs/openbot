@@ -35,8 +35,18 @@ export type LocalVoiceModelId = (typeof LOCAL_VOICE_MODEL_IDS)[number];
  */
 export const ELEVENLABS_VOICE_MODEL_ID = "elevenlabs-scribe-v2-realtime";
 
+/**
+ * Whisper at Groq. The whole recording goes to Groq after Stop, with the user's own API key, so
+ * neither is the default. Saved in `voice-preference.json`; never rename one.
+ */
+export const GROQ_VOICE_MODEL_IDS = ["groq-whisper-large-v3-turbo", "groq-whisper-large-v3"] as const;
+export type GroqVoiceModelId = (typeof GROQ_VOICE_MODEL_IDS)[number];
+
+/** The dictation models that run at a provider. */
+export type CloudVoiceModelId = typeof ELEVENLABS_VOICE_MODEL_ID | GroqVoiceModelId;
+
 /** Every dictation model, local ones first. */
-export const VOICE_MODEL_IDS = [...LOCAL_VOICE_MODEL_IDS, ELEVENLABS_VOICE_MODEL_ID] as const;
+export const VOICE_MODEL_IDS = [...LOCAL_VOICE_MODEL_IDS, ELEVENLABS_VOICE_MODEL_ID, ...GROQ_VOICE_MODEL_IDS] as const;
 export type VoiceModelId = (typeof VOICE_MODEL_IDS)[number];
 export const DEFAULT_VOICE_MODEL_ID: VoiceModelId = "parakeet-tdt-0.6b-v3";
 
@@ -73,10 +83,14 @@ export interface LocalVoiceModelInfo extends VoiceModelCapabilities {
   retired?: true;
 }
 
-/** A model that runs at a provider. It is ready when its API key is saved. */
+/**
+ * A model that runs at a provider. It is ready when its provider's API key is saved. ElevenLabs
+ * takes a stream while the user speaks; Groq takes the whole recording after Stop.
+ */
 export interface CloudVoiceModelInfo extends VoiceModelCapabilities {
   kind: "cloud";
-  id: typeof ELEVENLABS_VOICE_MODEL_ID;
+  id: CloudVoiceModelId;
+  provider: DictationKeyProvider;
 }
 
 export type VoiceModelInfo = LocalVoiceModelInfo | CloudVoiceModelInfo;
@@ -147,9 +161,26 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
   {
     kind: "cloud",
     id: ELEVENLABS_VOICE_MODEL_ID,
+    provider: "elevenlabs",
     name: "ElevenLabs Scribe v2 Realtime",
     supportsLanguage: true,
     livePreview: true,
+  },
+  {
+    kind: "cloud",
+    id: "groq-whisper-large-v3-turbo",
+    provider: "groq",
+    name: "Groq Whisper large-v3 turbo",
+    supportsLanguage: true,
+    livePreview: false,
+  },
+  {
+    kind: "cloud",
+    id: "groq-whisper-large-v3",
+    provider: "groq",
+    name: "Groq Whisper large-v3",
+    supportsLanguage: true,
+    livePreview: false,
   },
 ];
 
@@ -264,8 +295,9 @@ export interface VoiceModelRequest {
   modelId: VoiceModelId;
 }
 
-/** The ElevenLabs API key, or null to remove it. Main never sends a saved key back. */
+/** The API key of a dictation provider, or null to remove it. Main never sends a saved key back. */
 export interface VoiceApiKeyInput {
+  provider: DictationKeyProvider;
   key: string | null;
 }
 
@@ -306,6 +338,14 @@ export function isLocalVoiceModelId(value: unknown): value is LocalVoiceModelId 
   return isOneOf(LOCAL_VOICE_MODEL_IDS, value);
 }
 
+export function isGroqVoiceModelId(value: unknown): value is GroqVoiceModelId {
+  return isOneOf(GROQ_VOICE_MODEL_IDS, value);
+}
+
+export function isDictationKeyProvider(value: unknown): value is DictationKeyProvider {
+  return isOneOf(DICTATION_KEY_PROVIDERS, value);
+}
+
 export function isVoiceLanguage(value: unknown): value is VoiceLanguage {
   return value === AUTOMATIC_VOICE_LANGUAGE || isOneOf(WHISPER_LANGUAGES, value);
 }
@@ -331,8 +371,19 @@ export type LocalSpeechModelId = typeof SPEECH_MODEL_ID;
 export const SPEECH_KEY_PROVIDERS = ["elevenlabs", "xai"] as const;
 export type SpeechKeyProvider = (typeof SPEECH_KEY_PROVIDERS)[number];
 
+/** The providers that transcribe dictation with the user's own API key. ElevenLabs has one key for both routes. */
+export const DICTATION_KEY_PROVIDERS = ["elevenlabs", "groq"] as const;
+export type DictationKeyProvider = (typeof DICTATION_KEY_PROVIDERS)[number];
+
+/** Each provider whose API key the Voice settings keep. */
+export type VoiceKeyProvider = SpeechKeyProvider | DictationKeyProvider;
+
 /** The product names of the providers. They are not translated. */
-export const SPEECH_KEY_PROVIDER_NAMES: Record<SpeechKeyProvider, string> = { elevenlabs: "ElevenLabs", xai: "xAI" };
+export const VOICE_KEY_PROVIDER_NAMES: Record<VoiceKeyProvider, string> = {
+  elevenlabs: "ElevenLabs",
+  xai: "xAI",
+  groq: "Groq",
+};
 
 /**
  * The models that read replies aloud at a provider. The reply text goes to the provider with the

@@ -9,6 +9,7 @@ export const messages = {
   "error.provider.codexUnresponsive": "توقف Codex عن الاستجابة، لذا أنهى OpenBot عمليته.",
   "error.provider.acpUnresponsive": "لم يستجب {provider} في الوقت المحدد، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSignInLost": "فقد {provider} تسجيل دخوله، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
     "لم يحمّل {provider} أدوات OpenBot، لذا لا يمكن لهذا الوكيل استخدامها أو الوصول إلى زملائه. قد تحظر سياسة فريق {provider} خوادم MCP المحلية. اطلب من مسؤول فريقك السماح بها، ثم أعد المحاولة.",
   "error.provider.endpointsReadOnly":
@@ -293,6 +294,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",
   "error.provider.geminiKeyRefused":
     "رفض Gemini مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم اتصل مرة أخرى.",
+  "error.provider.geminiVerificationRequired":
+    "يجب أن يتحقق Google من حسابك قبل أن يتمكن Gemini من الرد. تحقق من حساب Google في متصفح، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.keyProviderRefused":
     "رفض {provider} مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم أعد المحاولة.",
   "error.provider.keyProviderNoBalance":

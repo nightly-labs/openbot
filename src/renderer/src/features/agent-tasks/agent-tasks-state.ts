@@ -55,6 +55,12 @@ interface TaskHistory {
 const OLDER_PAGE_SIZE = 50;
 
 /**
+ * The most loaded conversations of threads that no tab shows. The conversation of a thread that was
+ * shown longer ago goes, and the thread reads it again when its tab opens.
+ */
+const HIDDEN_CONVERSATION_LIMIT = 5;
+
+/**
  * A new conversation of a thread that read older pages keeps the messages before its first message.
  * The newest messages move on as messages arrive, so without them a gap opens between the pages. Null
  * when the new conversation does not start inside the held messages: the pages no longer join it.
@@ -131,6 +137,50 @@ export function createAgentTasks(options: AgentTasksOptions) {
   const readMarks = new Map<string, string>();
   /** The threads whose mark move did not answer yet. A list read can be older than the move. */
   const marking = new Set<string>();
+  /** The threads that a tab shows now. Their conversations stay loaded. */
+  let shown: ReadonlySet<string> = new Set();
+  /** The threads with a loaded conversation that no tab shows, the one shown longest ago first. */
+  const hidden = new Set<string>();
+
+  /** Removes the conversations of the hidden threads over the limit, the one shown longest ago first. */
+  function dropHiddenConversations(): void {
+    const dropped = [...hidden].slice(0, Math.max(0, hidden.size - HIDDEN_CONVERSATION_LIMIT));
+    if (dropped.length === 0) return;
+    for (const taskId of dropped) {
+      hidden.delete(taskId);
+      // A read in progress no longer stores the conversation.
+      readRequests.set(taskId, (readRequests.get(taskId) ?? 0) + 1);
+    }
+    setState((current) => {
+      for (const taskId of dropped) {
+        delete current.conversations[taskId];
+        delete current.history[taskId];
+      }
+    });
+  }
+
+  /** Counts a loaded conversation that no tab shows. An event can load the conversation of such a thread. */
+  function keepHiddenConversation(taskId: string): void {
+    if (shown.has(taskId) || hidden.has(taskId) || !untrack(() => state.conversations[taskId])) return;
+    hidden.add(taskId);
+    dropHiddenConversations();
+  }
+
+  /**
+   * Sets the threads that a tab shows. A thread that a tab no longer shows keeps its conversation until
+   * more than the limit of other hidden threads were shown after it.
+   */
+  function showConversations(taskIds: readonly string[]): void {
+    const next = new Set(taskIds);
+    for (const taskId of shown) {
+      if (next.has(taskId) || !untrack(() => state.conversations[taskId])) continue;
+      hidden.delete(taskId);
+      hidden.add(taskId);
+    }
+    for (const taskId of next) hidden.delete(taskId);
+    shown = next;
+    dropHiddenConversations();
+  }
 
   /**
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
@@ -157,6 +207,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
         if (conversation.agentId === snapshot.agentId && !ids.has(taskId)) {
           delete current.conversations[taskId];
           delete current.history[taskId];
+          hidden.delete(taskId);
         }
       }
     });
@@ -194,6 +245,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       if (history) history.hasOlder = true;
       else current.history[taskId] = { hasOlder: true, loading: false, paged: false };
     });
+    keepHiddenConversation(taskId);
   }
 
   /**
@@ -593,6 +645,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       delete current.conversations[taskId];
       delete current.history[taskId];
     });
+    hidden.delete(taskId);
     return true;
   }
 
@@ -704,6 +757,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     reload,
     loadTasks,
     openTask,
+    showConversations,
     startTask,
     runQueuedMessageAsTask,
     canBranch,

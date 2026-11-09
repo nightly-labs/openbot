@@ -2,9 +2,9 @@ import {
   type CloudSpeechModelId,
   type CloudSpeechModelInfo,
   type ElevenLabsSpeechVoice,
-  SPEECH_KEY_PROVIDER_NAMES,
   type SpeechAudio,
   type SpeechLanguage,
+  VOICE_KEY_PROVIDER_NAMES,
   type XaiSpeechVoice,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -177,7 +177,7 @@ function exchange(
 }
 
 function failure(request: CloudSpeechRequest, key: CloudSpeechErrorKey): VoiceOperationError {
-  const provider = SPEECH_KEY_PROVIDER_NAMES[request.model.provider];
+  const provider = VOICE_KEY_PROVIDER_NAMES[request.model.provider];
   return new VoiceOperationError({ cause: new Error(sourceText(key, { provider })) });
 }
 

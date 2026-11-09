@@ -150,6 +150,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun run check:agent-context
 
+          - name: Check translated What's new notes
+            if: env.CODE == 'true'
+            run: bun scripts/whats-new-translations.ts
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where
@@ -445,6 +449,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-missing-rollout
 
+      - name: Run the Codex idle thread release E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-idle-thread-release
+
       - name: Run the Codex usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-metering
@@ -492,6 +500,14 @@ jobs:
       - name: Run the Claude usage after a resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-usage-resume
+
+      - name: Run the Claude background hold at low memory E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-background-hold
+
+      - name: Run the Claude turn context after a runtime refresh E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-turn-context
 
       - name: Run the Claude late steer E2E test
         if: ${{ !cancelled() }}
@@ -577,6 +593,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-slack
 
+      - name: Run the workflow channel output E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-channel-output
+
       - name: Run the workflow agent tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-agent-tools
@@ -656,6 +676,7 @@ jobs:
             .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
             .openbot-build/codex-missing-rollout-e2e/
+            .openbot-build/codex-idle-thread-release-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
             .openbot-build/usage-read-pacing-e2e/
@@ -668,6 +689,8 @@ jobs:
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/
+            .openbot-build/claude-background-hold-e2e/
+            .openbot-build/claude-turn-context-e2e/
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/
@@ -686,6 +709,7 @@ jobs:
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
+            .openbot-build/workflow-channel-output-e2e/
             .openbot-build/workflow-agent-tools-e2e/
             .openbot-build/workflow-join-e2e/
             .openbot-build/discord-github-files-e2e/
@@ -786,6 +810,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:pi-steer
 
+      - name: Run the Pi idle release E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:pi-idle-release
+
       - name: Run the Muse instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:muse-instructions-once
@@ -853,6 +881,7 @@ jobs:
             .openbot-build/grok-steer-e2e/
             .openbot-build/grok-partial-model-list-e2e/
             .openbot-build/pi-steer-e2e/
+            .openbot-build/pi-idle-release-e2e/
             .openbot-build/muse-instructions-once-e2e/
             .openbot-build/provider-conformance-e2e/
             .openbot-build/opencode-expired-key-e2e/

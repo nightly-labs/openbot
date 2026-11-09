@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Huidige activiteit",
   "chat.steps.show": "Stappen tonen",
   "chat.steps.hide": "Stappen verbergen",
+  "chat.steps.showError": "Fout tonen",
+  "chat.steps.hideError": "Fout verbergen",
   "chat.steps.list": "Stappen van de agent",
   "chat.steps.count": { one: "{count} stap", other: "{count} stappen" },
   "chat.steps.failed": { one: "{count} mislukt", other: "{count} mislukt" },
@@ -438,4 +440,8 @@ export const messages = {
   "chat.reference.kind.thread": "Thread",
   "chat.reference.open.tab": "Browsertabblad {name} tonen",
   "chat.reference.open.thread": "Thread {name} openen",
+  "chat.feedbackSent.title": "Bedankt voor je feedback 🙏",
+  "chat.feedbackSent.badge": "Verzonden",
+  "chat.feedbackSent.body": "Het OpenBot-team leest het en pakt het op 💜",
+  "chat.feedbackSent.openNamed": "Issue #{number} openen op GitHub",
 } as const satisfies PartialTranslation<typeof source>;

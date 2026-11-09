@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Geçerli etkinlik",
   "chat.steps.show": "Adımları göster",
   "chat.steps.hide": "Adımları gizle",
+  "chat.steps.showError": "Hatayı göster",
+  "chat.steps.hideError": "Hatayı gizle",
   "chat.steps.list": "Ajan adımları",
   "chat.steps.count": { one: "{count} adım", other: "{count} adım" },
   "chat.steps.failed": { one: "{count} başarısız", other: "{count} başarısız" },
@@ -438,4 +440,8 @@ export const messages = {
   "chat.reference.kind.thread": "Mesaj dizisi",
   "chat.reference.open.tab": "{name} tarayıcı sekmesini göster",
   "chat.reference.open.thread": "{name} mesaj dizisini aç",
+  "chat.feedbackSent.title": "Geri bildirimin için teşekkürler 🙏",
+  "chat.feedbackSent.badge": "Gönderildi",
+  "chat.feedbackSent.body": "OpenBot ekibi okuyup ilgilenecek 💜",
+  "chat.feedbackSent.openNamed": "GitHub'da #{number} numaralı issue'yu aç",
 } as const satisfies PartialTranslation<typeof source>;

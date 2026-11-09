@@ -4,6 +4,7 @@ import {
   type AgentStepActivity,
   agentProviderName,
   COMPUTER_USE_MCP_SERVER_NAME,
+  CONVERSATION_TRACE_TEXT_LIMIT,
   DEFAULT_PROVIDER_ACCOUNT_ID,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -35,7 +36,11 @@ export function isNonActionableCodexWarning(message: string): boolean {
     message.startsWith("Skill descriptions were shortened to fit") ||
     // Codex sends this when it changes transport, and the same turn continues over HTTPS
     // (`codex-rs/core/src/responses_retry.rs`). A final failure comes as an `error` (#2559).
-    message.startsWith("Falling back from WebSockets to HTTPS transport.")
+    message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
+    // Codex sends this on each thread start when the user turned on a feature such as
+    // `async_compaction` in `config.toml` (`codex-rs/features/src/lib.rs`). The turn continues, and
+    // the text has the config path, so the banner replaced it with "could not continue".
+    message.startsWith("Under-development features enabled:")
   );
 }
 
@@ -402,6 +407,69 @@ export function toolFailed(item: ThreadItem): boolean {
   return status === "failed" || status === "declined" || (typeof exitCode === "number" && exitCode !== 0);
 }
 
+/** The fields that hold the text of a tool result, in the order a failure is read from them. */
+const RESULT_TEXT_KEYS = [
+  "error",
+  "aggregatedOutput",
+  "stderr",
+  "message",
+  "output",
+  "text",
+  "content",
+  "contentItems",
+  "result",
+] as const;
+
+/** The readable text in a provider's tool result. Records and lists are read a few levels deep. */
+function resultText(value: unknown, depth = 0): string | null {
+  if (depth > 4) return null;
+  if (isString(value)) return value.trim() || null;
+  if (Array.isArray(value)) {
+    const parts = value.map((entry) => resultText(entry, depth + 1)).filter(isString);
+    return parts.length > 0 ? parts.join("\n") : null;
+  }
+  if (!isRecord(value)) return null;
+  for (const key of RESULT_TEXT_KEYS) {
+    const text = resultText(value[key], depth + 1);
+    if (text) return text;
+  }
+  return null;
+}
+
+/**
+ * The part of a failed result that is redacted. It is much longer than the kept text, so a secret
+ * that this first cut divides stays out of the kept text, and a large output is not read in full.
+ */
+const FAILURE_WINDOW = CONVERSATION_TRACE_TEXT_LIMIT * 16;
+
+/** Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool. */
+function isShellCommand(item: ThreadItem): boolean {
+  return (
+    toolUsage(item)?.kind === "command" ||
+    (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash")
+  );
+}
+
+/**
+ * The error text of a tool step that failed, for the step's "Show error" output. `redact` runs before
+ * the cut, because a cut through a secret leaves a part that no rule recognizes. A command keeps the
+ * end of its output, where the error is; other tools keep the start.
+ */
+export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
+  if (getString(item, "status") !== "failed") return null;
+  const raw = resultText(item);
+  if (!raw) return null;
+  const tail = isShellCommand(item);
+  const window = raw.length <= FAILURE_WINDOW ? raw : tail ? raw.slice(-FAILURE_WINDOW) : raw.slice(0, FAILURE_WINDOW);
+  const text = redact(window).trim();
+  const limit = CONVERSATION_TRACE_TEXT_LIMIT;
+  if (text.length <= limit) return text || null;
+  // A cut between the two halves of a surrogate pair leaves half a character, which goes.
+  return tail
+    ? `…${text.slice(1 - limit).replace(/^[\uDC00-\uDFFF]/u, "")}`
+    : `${text.slice(0, limit - 1).replace(/[\uD800-\uDBFF]$/u, "")}…`;
+}
+
 /** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */
 export function isToolItem(item: ThreadItem): boolean {
   return /(tool.*call|commandexecution|filechange|websearch|computeraction)/u.test(item.type.toLowerCase());
@@ -439,6 +507,8 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
+  // Its name has `send`, a word of the agent words below.
+  if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");
   const skill = getString(item, "name") === "Skill" ? getString(item, "skill") : null;
   if (skill) return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillUsing", { name: skill });
   if (descriptor.includes("capture_screen")) {
@@ -475,11 +545,7 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   }
   // Last, so that a command with a title such as "Run the tests" keeps the text above. A command that
   // never returns then reads as a command, not as an unknown step (#5485). Pi names its shell tool `bash`.
-  if (
-    !completed &&
-    (toolUsage(item)?.kind === "command" ||
-      (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash"))
-  ) {
+  if (!completed && isShellCommand(item)) {
     return sourceText("status.agent.commandRunningUnnamed");
   }
   return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.toolStepWorking");
@@ -516,6 +582,7 @@ export function toolActivity(item: ThreadItem, completed: boolean): AgentStepAct
   if (browserTool(item) !== null) return "browsing";
   const openBot = openBotTool(item);
   if (openBot === "send_message") return "delegating";
+  if (openBot === "web_search") return "searching";
   if (READING_OPENBOT_TOOLS.has(openBot ?? "")) return "reading";
   return TOOL_USAGE_ACTIVITIES[toolUsage(item)?.kind ?? "other"];
 }

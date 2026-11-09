@@ -918,7 +918,10 @@ export const IPC_ENDPOINTS = {
     getSettings: request<undefined, VoiceSettings>()("voice:get-settings"),
     setSettings: request<VoiceSettings, VoiceSettings>()("voice:set-settings"),
     transcribe: request<VoiceTranscriptionInput, VoiceTranscriptionResult>()("voice:transcribe"),
-    /** Saves or removes the ElevenLabs API key. Answers the status of the ElevenLabs model. */
+    /**
+     * Saves or removes the API key of a dictation provider. Answers the status of that provider's
+     * model in use, or of its first model.
+     */
     setApiKey: request<VoiceApiKeyInput, VoiceModelStatus>()("voice:set-api-key"),
     /**
      * Opens a streamed dictation with the cloud model in use. Answers when the provider accepted it.
@@ -967,10 +970,11 @@ export const IPC_ENDPOINTS = {
     setServer: request<VoiceServerSave, VoiceServerSettings | null>()("voice:set-server"),
     serverSettings: event<VoiceServerSettings | null>()("voice:server-settings"),
     /**
-     * Starts Codex live voice in the chat of a Codex agent on this computer. Answers the WebRTC answer
-     * when OpenAI accepted the offer. A new session ends the one before it.
+     * Starts Codex live voice in the chat of an agent on this computer, or on a joined server with
+     * `live-voice-v1`. Answers the WebRTC answer when OpenAI accepted the offer. A new session ends the
+     * one before it on the same server.
      */
-    startLive: request<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
+    startLive: scopedRequest<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
     /** Ends a live voice session. It does nothing when the session ended already. */
     stopLive: request<VoiceLiveStop, void>()("voice:stop-live"),
     liveEvent: event<VoiceLiveEvent>()("voice:live-event"),

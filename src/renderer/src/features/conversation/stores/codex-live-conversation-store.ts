@@ -47,11 +47,11 @@ function loudness(analyser: AnalyserNode, samples: Float32Array<ArrayBuffer>): n
 
 /**
  * A voice conversation with a Codex agent through Codex live voice. The microphone and the reply go
- * over WebRTC between this window and OpenAI; Codex App Server opens the call with the user's own
- * Codex sign-in and runs the agent's turns in its chat. It has the same shape as the conversation
+ * over WebRTC between this window and OpenAI; the Codex App Server of the agent's server opens the
+ * call with that server's Codex sign-in and runs the agent's turns in its chat. It has the same shape as the conversation
  * that transcribes on this computer, so the same pane shows it. It ends with its owner.
  */
-export function createCodexLiveConversation(deps: { agentId: string; port?: CodexLivePort }) {
+export function createCodexLiveConversation(deps: { agentId: string; serverId: string; port?: CodexLivePort }) {
   const port = deps.port ?? codexLivePort();
   const [state, setState] = createStore<LiveState>({
     step: "starting",
@@ -229,7 +229,7 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
       if (!offer.sdp) throw new Error(currentText().t("conversation.voice.error"));
       starting = true;
       endedEarly.clear();
-      const session = await port.startLive({ agentId: deps.agentId, sdp: offer.sdp }).finally(() => {
+      const session = await port.startLive({ agentId: deps.agentId, sdp: offer.sdp }, deps.serverId).finally(() => {
         starting = false;
       });
       if (disposed) {

@@ -102,7 +102,7 @@ export const messages = {
     "Показывает «Реакция», «Ответить» и «Ещё» рядом с сообщением, а время — между сообщениями. Если выключено, все действия и время показываются под каждым сообщением.",
   "settings.busyMessage.title": "Направлять агентов, пока они работают",
   "settings.busyMessage.description":
-    "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. Работает с ChatGPT и Claude.",
+    "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. У агентов, которые этого не поддерживают, они ждут в очереди.",
   "settings.agentDefaults.title": "По умолчанию",
   "settings.agentDefaults.description": "Агенты следуют этим настройкам, если вы не измените их для агента.",
   "settings.agentDefaults.value": "По умолчанию: {value}",
@@ -261,7 +261,7 @@ export const messages = {
   "settings.tab.notifications.description": "Выберите, как OpenBot сообщает вам о событиях.",
   "settings.tab.voice.title": "Голос",
   "settings.tab.voice.description":
-    "Диктовка в поле сообщения. Локальные модели работают на этом компьютере, ElevenLabs — в облаке.",
+    "Диктовка в поле сообщения. Локальные модели работают на этом компьютере, ElevenLabs и Groq — в облаке.",
   "settings.tab.computerUse.title": "Управление ПК",
   "settings.tab.computerUse.description":
     "Разрешите агентам OpenBot на этом компьютере видеть его приложения и работать с ними. Агенты на другом сервере используют компьютер этого сервера.",
@@ -651,6 +651,10 @@ export const messages = {
   "settings.voice.removeFailed": "Не удалось удалить модель. Повторите попытку.",
   "settings.voice.model.elevenlabs.description":
     "Передаёт ваш голос в ElevenLabs. Текст появляется во время речи и не меняется. Использует ваш API-ключ, а ElevenLabs списывает плату за каждое использование.",
+  "settings.voice.model.groqTurbo.description":
+    "Отправляет каждую запись в Groq после остановки. Быстрый и знает много языков. Использует ваш API-ключ, а Groq списывает плату за каждое использование.",
+  "settings.voice.model.groqLarge.description":
+    "Отправляет каждую запись в Groq после остановки. Точнее, чем turbo, но медленнее. Использует ваш API-ключ, а Groq списывает плату за каждое использование.",
   "settings.voice.apiKey.placeholder": "Вставьте ключ",
   "settings.voice.apiKey.save": "Сохранить ключ",
   "settings.voice.apiKey.remove": "Удалить ключ",

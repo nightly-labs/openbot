@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} nie odpowiedział na czas, więc OpenBot zakończył jego proces.",
   "error.provider.acpSignInLost":
     "{provider} utracił logowanie, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
+  "error.provider.acpPlanUsedUp":
+    "{provider} zgłasza, że limit Twojego planu się wyczerpał. Wybierz inny model lub przejdź na wyższy plan {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} nie załadował narzędzi OpenBot, więc ten agent nie może ich używać ani kontaktować się z członkami zespołu. Zasady zespołu {provider} mogą blokować lokalne serwery MCP. Poproś administratora zespołu o ich dopuszczenie, a potem spróbuj ponownie.",
   "error.provider.endpointsReadOnly":
@@ -306,6 +308,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "W przeglądarce można otworzyć tylko linki logowania HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie połącz ponownie.",
+  "error.provider.geminiVerificationRequired":
+    "Google musi zweryfikować twoje konto, zanim Gemini będzie mógł odpowiedzieć. Zweryfikuj konto Google w przeglądarce, a następnie wyślij wiadomość ponownie.",
   "error.provider.keyProviderRefused":
     "{provider} odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie spróbuj ponownie.",
   "error.provider.keyProviderNoBalance":

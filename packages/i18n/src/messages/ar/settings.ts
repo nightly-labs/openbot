@@ -99,7 +99,7 @@ export const messages = {
     "يعرض التفاعل والرد والمزيد بجانب الرسالة، والوقت بين الرسائل. عند إيقافه تظهر كل الإجراءات والوقت تحت كل رسالة.",
   "settings.busyMessage.title": "توجيه الوكلاء أثناء عملهم",
   "settings.busyMessage.description":
-    "تنضم الرسائل الجديدة إلى العمل الحالي للوكيل، لا إلى قائمة الانتظار. يعمل مع ChatGPT وClaude.",
+    "تنضم الرسائل الجديدة إلى العمل الحالي للوكيل، لا إلى قائمة الانتظار. مع الوكلاء الذين لا يدعمون ذلك، تنتظر الرسائل في قائمة الانتظار.",
   "settings.agentDefaults.title": "الإعدادات الافتراضية",
   "settings.agentDefaults.description": "يتبع الوكلاء هذه الإعدادات الافتراضية، ما لم تغيّرها لوكيل.",
   "settings.agentDefaults.value": "الافتراضي: {value}",
@@ -256,7 +256,7 @@ export const messages = {
   "settings.tab.notifications.description": "اختر كيف ينبّهك OpenBot.",
   "settings.tab.voice.title": "الصوت",
   "settings.tab.voice.description":
-    "الإملاء في مربع الرسالة. تعمل النماذج المحلية على هذا الحاسوب؛ ويعمل ElevenLabs في السحابة.",
+    "الإملاء في مربع الرسالة. تعمل النماذج المحلية على هذا الحاسوب؛ ويعمل ElevenLabs وGroq في السحابة.",
   "settings.tab.computerUse.title": "التحكم في الحاسوب",
   "settings.tab.computerUse.description":
     "السماح للوكلاء في OpenBot على هذا الحاسوب برؤية تطبيقاته واستخدامها. يستخدم الوكلاء على خادم آخر حاسوب ذلك الخادم.",
@@ -648,6 +648,10 @@ export const messages = {
   "settings.voice.removeFailed": "تعذّرت إزالة النموذج. حاول مرة أخرى.",
   "settings.voice.model.elevenlabs.description":
     "يبث صوتك إلى ElevenLabs. يظهر النص أثناء حديثك ويبقى ثابتًا. يستخدم مفتاح API الخاص بك، وتحتسب ElevenLabs كل استخدام.",
+  "settings.voice.model.groqTurbo.description":
+    "يرسل كل تسجيل إلى Groq عند الإيقاف. سريع ويدعم لغات كثيرة. يستخدم مفتاح API الخاص بك، وتحتسب Groq كل استخدام.",
+  "settings.voice.model.groqLarge.description":
+    "يرسل كل تسجيل إلى Groq عند الإيقاف. أدق من turbo لكنه أبطأ. يستخدم مفتاح API الخاص بك، وتحتسب Groq كل استخدام.",
   "settings.voice.apiKey.placeholder": "الصق المفتاح",
   "settings.voice.apiKey.save": "حفظ المفتاح",
   "settings.voice.apiKey.remove": "إزالة المفتاح",

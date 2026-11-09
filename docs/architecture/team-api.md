@@ -339,6 +339,17 @@ message is in a running turn), with the host's sentence. A delete removes the me
 history, search and attachments; the provider session can still remember it. The host sends its
 usual change events (`conversation-invalidated` and `channels-changed`), so other members refresh.
 
+The optional `agent-welcome-v1` capability (protocol 9 only) changes no route shape. A client that
+sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The
+host stores that message with `welcome: true` in its mailbox JSON and the item type `agent_welcome`.
+No conversation page, live snapshot, read state, search result, queue, runtime `work` item or preview
+shows it, for any member. While it waits or runs, the host's local queue snapshot has `welcome: true`, so
+the host's own window shows that the agent works and not the empty chat. `GET /v1/agents/:id/queue`
+keeps its released keys and does not send the flag: a remote member sees the empty chat until the
+welcome turn starts. The agent answers it, and that answer shows as usual. A client sends a setup message only to
+a host that advertises the capability; an older host still gets the released role text, which stays
+a visible user message there.
+
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.

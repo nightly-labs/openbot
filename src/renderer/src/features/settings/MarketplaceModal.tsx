@@ -211,7 +211,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
         {(pending) => (
           <McpConnectDialog
             subject={pending.subject}
-            flow={pending.flow}
+            flows={pending.flows}
             onTest={controller.testPluginApp}
             onSignIn={controller.signInPluginApp}
             onConnected={(config) => pending.settle(config)}

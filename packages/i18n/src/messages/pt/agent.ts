@@ -74,7 +74,6 @@ export const messages = {
   "agent.error.restoreFailed": "Não foi possível restaurar o agente",
   "agent.error.hiddenFailed": "A alteração não foi salva. Tente novamente.",
   "agent.error.settingsFailed": "Não foi possível salvar as configurações do agente",
-  "agent.error.avatarFailed": "Não foi possível atualizar o avatar",
   "agent.error.adminOnly": "Somente um administrador do servidor pode alterar as configurações do agente.",
   "agent.error.continueFailed": "O agente não conseguiu continuar. Tente novamente.",
   "agent.error.mcpNotStarted": "Servidor MCP não iniciado",

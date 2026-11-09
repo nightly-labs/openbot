@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Переназначить остановленную задачу {name}",
   "channel.stoppedTask.reassign": "Переназначить",
   "channel.stoppedTask.cancel": "Отменить задачу",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} передавали эту задачу друг другу слишком много раз. Она остановлена, чтобы не зациклиться.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Участники передавали эту задачу друг другу слишком много раз. Она остановлена, чтобы не зациклиться.",
   "channel.conversation.noMembers": "Добавьте агентов в настройках канала, чтобы начать работу.",
   "channel.conversation.archivedNotice": "Канал удалён. Только просмотр.",
   "channel.composer.label": "Сообщение в канал",

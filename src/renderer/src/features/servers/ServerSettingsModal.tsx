@@ -52,7 +52,7 @@ import {
   type HostedSiteDeleteResult,
 } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
@@ -266,6 +266,12 @@ export interface ServerSettingsModalProps {
   initialSection?: ServerSettingsSection | null;
   /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
+  /** The search of the settings page. The section list shows only the sections whose title or description holds it. */
+  sectionQuery?: string | undefined;
+  /** A new number opens the first section that the search finds. */
+  openFirstSectionRequest?: number | undefined;
+  /** Called when a request opened a section. The page then clears its search. */
+  onFirstSectionOpened?: (() => void) | undefined;
 }
 
 export interface ServerHostedSitesOptions {
@@ -315,6 +321,26 @@ const sections = {
   routines: { title: "server.settings.routinesTitle", description: "server.settings.routinesDescription" },
   "browser-profiles": { title: "browser.profiles.title", description: "browser.profiles.subtitle" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
+
+/** The section list, in its order. A section shows only when the server and the caller support it. */
+const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings }> = [
+  { value: "general", icon: Settings },
+  { value: "personality", icon: Smile },
+  { value: "vault", icon: KeyRound },
+  { value: "members", icon: UsersRound },
+  { value: "roles", icon: ShieldCheck },
+  { value: "audit", icon: History },
+  { value: "desktop", icon: Monitor },
+  { value: "mcp", icon: Blocks },
+  { value: "storage", icon: HardDrive },
+  { value: "sites", icon: Globe2 },
+  { value: "providers", icon: Sparkles },
+  { value: "updates", icon: RefreshCw },
+  { value: "import", icon: Download },
+  { value: "transfer", icon: ArrowLeftRight },
+  { value: "routines", icon: CalendarClock },
+  { value: "browser-profiles", icon: AppWindow },
+];
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const { t, errorMessage } = useText();
@@ -417,6 +443,82 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const general = createServerGeneralSection(host);
   const roles = createServerRolesSection(host, () => section() === "roles" || section() === "members");
   const audit = createServerAuditSection(host, () => section() === "audit");
+
+  /** Whether this server and the caller support the section. */
+  const sectionSupported = (value: Section): boolean => {
+    switch (value) {
+      case "general":
+      case "members":
+        return true;
+      case "personality":
+        return Boolean(personalityOptions());
+      case "vault":
+        return Boolean(props.vault);
+      case "roles":
+        return roles.available();
+      case "audit":
+        return audit.available();
+      case "desktop":
+        return remoteDesktopSection();
+      case "mcp":
+        return Boolean(props.mcpServers);
+      case "storage":
+        return Boolean(props.storage);
+      case "sites":
+        return Boolean(props.hostedSites);
+      case "providers":
+        return Boolean(props.providers || props.onSwitchToManageProviders);
+      case "updates":
+        return Boolean(props.hostUpdate);
+      case "import":
+        return Boolean(props.agentImport);
+      case "transfer":
+        return Boolean(props.instanceTransfer);
+      case "routines":
+        return Boolean(props.routineFeed);
+      case "browser-profiles":
+        return Boolean(props.browserProfiles);
+    }
+  };
+  /** Whether the title or the description of the section holds the search of the page. */
+  const sectionMatches = (value: Section): boolean => {
+    const needle = props.sectionQuery?.trim().toLocaleLowerCase();
+    if (!needle) return true;
+    const { title, description } = sections[value];
+    return t(title).toLocaleLowerCase().includes(needle) || t(description).toLocaleLowerCase().includes(needle);
+  };
+  /** The sections that the search finds. Without a search, each section that this server supports. */
+  const matchingSections = createMemo(() =>
+    NAV_SECTIONS.filter((item) => sectionSupported(item.value) && sectionMatches(item.value)),
+  );
+  /**
+   * The section list. The open section stays in it, so the search does not open a different section
+   * while the user types.
+   */
+  const navSections = createMemo(() =>
+    NAV_SECTIONS.filter(
+      (item) => matchingSections().includes(item) || (item.value === section() && sectionSupported(item.value)),
+    ),
+  );
+  /** Each new request of the page opens the first section that the search finds, and the page clears its search. */
+  let handledOpenFirstRequest = untrack(() => props.openFirstSectionRequest ?? 0);
+  createEffect(
+    () => props.openFirstSectionRequest ?? 0,
+    (request) => {
+      if (request === handledOpenFirstRequest) return;
+      handledOpenFirstRequest = request;
+      const first = untrack(matchingSections)[0];
+      if (!first) return;
+      setSection(first.value);
+      untrack(() => props.onFirstSectionOpened?.());
+    },
+  );
+  /** What a screen reader hears while the user types a search. */
+  const searchStatus = () => {
+    if (!props.sectionQuery?.trim()) return "";
+    const count = matchingSections().length;
+    return count > 0 ? t("app.settingsPage.resultCount", { count }) : t("app.settingsPage.noResults");
+  };
   const members = createServerMembersSection(
     host,
     {
@@ -701,100 +803,27 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           </>
         }
         sidebar={
-          <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
-            <Tabs.Trigger class="settings-modal-nav-item" value="general">
-              <Settings aria-hidden="true" />
-              <span>{t(sections.general.title)}</span>
-            </Tabs.Trigger>
-            <Show when={personalityOptions()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="personality">
-                <Smile aria-hidden="true" />
-                <span>{t(sections.personality.title)}</span>
-              </Tabs.Trigger>
+          <>
+            <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
+              <For each={navSections()}>
+                {(item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
+                      <Icon aria-hidden="true" />
+                      <span>{t(sections[item.value].title)}</span>
+                    </Tabs.Trigger>
+                  );
+                }}
+              </For>
+            </Tabs.List>
+            <Show when={matchingSections().length === 0}>
+              <p class="settings-page-empty">{t("app.settingsPage.noResults")}</p>
             </Show>
-            <Show when={props.vault}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="vault">
-                <KeyRound aria-hidden="true" />
-                <span>{t(sections.vault.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Tabs.Trigger class="settings-modal-nav-item" value="members">
-              <UsersRound aria-hidden="true" />
-              <span>{t(sections.members.title)}</span>
-            </Tabs.Trigger>
-            <Show when={roles.available()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="roles">
-                <ShieldCheck aria-hidden="true" />
-                <span>{t(sections.roles.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={audit.available()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="audit">
-                <History aria-hidden="true" />
-                <span>{t(sections.audit.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={remoteDesktopSection()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="desktop">
-                <Monitor aria-hidden="true" />
-                <span>{t(sections.desktop.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.mcpServers}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="mcp">
-                <Blocks aria-hidden="true" />
-                <span>{t(sections.mcp.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.storage}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="storage">
-                <HardDrive aria-hidden="true" />
-                <span>{t(sections.storage.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.hostedSites}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="sites">
-                <Globe2 aria-hidden="true" />
-                <span>{t(sections.sites.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.providers || props.onSwitchToManageProviders}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="providers">
-                <Sparkles aria-hidden="true" />
-                <span>{t(sections.providers.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.hostUpdate}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="updates">
-                <RefreshCw aria-hidden="true" />
-                <span>{t(sections.updates.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.agentImport}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="import">
-                <Download aria-hidden="true" />
-                <span>{t(sections.import.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.instanceTransfer}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="transfer">
-                <ArrowLeftRight aria-hidden="true" />
-                <span>{t(sections.transfer.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.routineFeed}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="routines">
-                <CalendarClock aria-hidden="true" />
-                <span>{t(sections.routines.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.browserProfiles}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="browser-profiles">
-                <AppWindow aria-hidden="true" />
-                <span>{t(sections["browser-profiles"].title)}</span>
-              </Tabs.Trigger>
-            </Show>
-          </Tabs.List>
+            <span class="sr-only" role="status">
+              {searchStatus()}
+            </span>
+          </>
         }
       >
         <Tabs.Content value="general" class="settings-modal-tab-panel server-settings-panel" data-tab="general">

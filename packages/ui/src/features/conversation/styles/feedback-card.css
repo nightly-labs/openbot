@@ -1,0 +1,155 @@
+/* The agent's offer to send feedback to the OpenBot team, and the thank-you after Send. */
+.feedback-offer {
+  align-items: center;
+  gap: var(--openbot-space-3);
+  text-align: center;
+}
+
+.feedback-offer-emoji {
+  font-size: var(--openbot-text-display);
+  line-height: 1;
+  animation: feedback-offer-wiggle 900ms var(--openbot-ease-out) 200ms both;
+}
+
+.feedback-offer-headline {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.feedback-offer-quote {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  border-inline-start: 3px solid var(--openbot-border);
+  color: var(--openbot-text-secondary);
+  padding-inline-start: var(--openbot-space-3);
+  text-align: start;
+}
+
+.feedback-offer-quote strong {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.feedback-offer-quote p {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.feedback-offer-actions {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.feedback-offer-actions > :last-child {
+  flex: 1;
+}
+
+.feedback-sent {
+  gap: var(--openbot-space-3);
+}
+
+.feedback-sent > * {
+  animation: feedback-sent-in 320ms var(--openbot-ease-out) 80ms both;
+}
+
+.feedback-sent-badge {
+  animation: feedback-sent-pop 420ms var(--openbot-ease-out) 260ms both;
+}
+
+.feedback-sent-body {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.feedback-sent-footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  border-top: 1px solid var(--openbot-border);
+  padding-top: var(--openbot-space-3);
+}
+
+.feedback-sent-footer > a {
+  margin-inline-start: auto;
+}
+
+.feedback-sent-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes feedback-offer-wiggle {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) rotate(0);
+  }
+
+  40% {
+    opacity: 1;
+    transform: scale(1.1) rotate(-10deg);
+  }
+
+  70% {
+    transform: rotate(8deg);
+  }
+
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes feedback-sent-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes feedback-sent-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedback-offer-emoji,
+  .feedback-sent > *,
+  .feedback-sent-badge {
+    animation: none;
+  }
+}

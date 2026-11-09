@@ -568,7 +568,9 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
 
-  function forwardVoiceLiveEvent(event: VoiceLiveEvent): void {
+  /** `memberId` is null for a session of this computer. A member's session never goes to these windows. */
+  function forwardVoiceLiveEvent(event: VoiceLiveEvent, memberId: string | null = null): void {
+    if (memberId !== null) return;
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.liveEvent, event);
   }
 

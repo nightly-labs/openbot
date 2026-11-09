@@ -671,6 +671,62 @@
   padding-bottom: var(--openbot-space-3);
 }
 
+/* An edge of the list fades when more sections are past it, so the footer row does not cut a
+   section in half. The fade follows the scroll position. */
+@property --settings-page-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --settings-page-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@supports (animation-timeline: scroll()) {
+  .settings-page-sections,
+  .settings-page-results {
+    --settings-page-fade-size: var(--openbot-space-6);
+
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      var(--openbot-text-primary) var(--settings-page-fade-start),
+      var(--openbot-text-primary) calc(100% - var(--settings-page-fade-end)),
+      transparent
+    );
+    animation:
+      settings-page-fade-start linear both,
+      settings-page-fade-end linear both;
+    animation-timeline: scroll(self block), scroll(self block);
+    animation-range:
+      0 var(--settings-page-fade-size),
+      calc(100% - var(--settings-page-fade-size)) 100%;
+  }
+}
+
+@keyframes settings-page-fade-start {
+  from {
+    --settings-page-fade-start: 0px;
+  }
+
+  to {
+    --settings-page-fade-start: var(--settings-page-fade-size);
+  }
+}
+
+@keyframes settings-page-fade-end {
+  from {
+    --settings-page-fade-end: var(--settings-page-fade-size);
+  }
+
+  to {
+    --settings-page-fade-end: 0px;
+  }
+}
+
 .settings-page-title {
   margin: 0 0 var(--openbot-space-3);
   padding: 0 var(--openbot-space-2);
@@ -686,8 +742,10 @@
 }
 
 /* A capsule search field */
+/* The search has more space below it than the gap of the nav, so it does not look like a section row. */
 .settings-page-search {
   flex: none;
+  margin-bottom: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
   padding: 0 var(--openbot-space-3);
 }
@@ -726,6 +784,69 @@
 .settings-page-server .server-menu-mark {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
+}
+
+/* The row to the other settings page: below the section list, apart from it, at the end of the column. */
+.settings-page-footer {
+  flex: none;
+  margin-inline: calc(-1 * var(--openbot-space-3));
+  --settings-page-switch-radius: calc(var(--openbot-radius-card) - var(--openbot-space-1));
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-1);
+}
+
+.settings-page-footer:empty {
+  display: none;
+}
+
+/* The row fills the footer with the same space on each side. Its corners are concentric with the
+   corner of the window below it. The space around the icons is the same on all sides: the chevron
+   glyph leaves a third of its box empty at its end, so the end padding is that much smaller. */
+.settings-page-footer > .settings-page-switch {
+  min-height: var(--openbot-control-xl);
+  border-radius: var(--settings-page-switch-radius);
+  padding-inline: var(--openbot-space-3) calc(var(--openbot-space-3) - var(--openbot-icon-md) / 3);
+  /* A section row, not a button: the text of the shared button is larger and heavier. */
+  font-size: var(--openbot-text-md);
+  font-weight: inherit;
+}
+
+.settings-page-switch .server-menu-mark,
+.settings-page-switch-avatar {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.settings-page-switch-avatar {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-pill);
+}
+
+.settings-page-switch-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  outline: 1px solid var(--openbot-image-outline);
+  outline-offset: -1px;
+}
+
+.settings-page-switch-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-page-switch-chevron {
+  color: var(--openbot-text-muted);
+}
+
+/* The chevron points to the reading direction. */
+.settings-page-switch-chevron:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 .settings-page-nav-group .settings-modal-nav-item {

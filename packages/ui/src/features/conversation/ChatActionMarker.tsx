@@ -35,6 +35,7 @@ import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 import { formatChatTimestamp } from "./chat-timestamp";
+import { FeedbackSentCard } from "./FeedbackSentCard";
 import { InstructionsChangeActions } from "./InstructionsChangeActions";
 import { MAIN_THREAD_ID } from "./threads/thread-types";
 
@@ -52,6 +53,8 @@ interface ChatActionMarkerProps {
    */
   openRoutineThread?: ((routineId: string) => (() => void) | undefined) | undefined;
   onOpenHostedSite?: ((url: string) => void) | undefined;
+  /** Opens a web link outside the app, such as the issue of sent feedback. */
+  onOpenLink?: ((url: string) => void) | undefined;
   /** Opens or closes the messages of a run, or the runs of a group, whose marker sets `expanded`. */
   onToggleRoutineRun?: ((marker: RoutineRunToggleMarkerModel) => void) | undefined;
   /** Opens or closes the text of an agent message whose marker sets `expanded`, by its `messageId`. */
@@ -81,8 +84,9 @@ const STATUS_LABELS = {
 
 type SingleChatActionMarkerModel = Exclude<
   ChatActionMarkerModel,
-  { kind: "agent-message-group" } | { kind: "routine-run-group" }
+  { kind: "agent-message-group" } | { kind: "routine-run-group" } | { kind: "feedback-sent" }
 >;
+type FeedbackSentMarkerModel = Extract<ChatActionMarkerModel, { kind: "feedback-sent" }>;
 type AgentMessageGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "agent-message-group" }>;
 type RoutineRunGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "routine-run-group" }>;
 export type RoutineRunToggleMarkerModel = Extract<ChatActionMarkerModel, { kind: "routine-run" | "routine-run-group" }>;
@@ -95,8 +99,14 @@ function routineRunGroup(marker: ChatActionMarkerModel): RoutineRunGroupMarkerMo
   return marker.kind === "routine-run-group" ? marker : undefined;
 }
 
+function feedbackSent(marker: ChatActionMarkerModel): FeedbackSentMarkerModel | undefined {
+  return marker.kind === "feedback-sent" ? marker : undefined;
+}
+
 function singleMarker(marker: ChatActionMarkerModel): SingleChatActionMarkerModel | undefined {
-  return marker.kind === "agent-message-group" || marker.kind === "routine-run-group" ? undefined : marker;
+  return marker.kind === "agent-message-group" || marker.kind === "routine-run-group" || marker.kind === "feedback-sent"
+    ? undefined
+    : marker;
 }
 
 export function ChatActionMarker(props: ChatActionMarkerProps) {
@@ -116,23 +126,38 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
         <Show
           when={routineRunGroup(props.marker)}
           fallback={
-            <Show when={singleMarker(props.marker)}>
-              {(marker) => (
-                <SingleChatActionMarker
-                  marker={marker()}
-                  agents={props.agents}
-                  announce={props.announce}
-                  onOpenSkill={props.onOpenSkill}
-                  routineAvailable={props.routineAvailable}
-                  onSelectAgent={props.onSelectAgent}
-                  onOpenRoutine={props.onOpenRoutine}
-                  openRoutineThread={props.openRoutineThread}
-                  onOpenHostedSite={props.onOpenHostedSite}
-                  onToggleRoutineRun={props.onToggleRoutineRun}
-                  onToggleAgentMessage={props.onToggleAgentMessage}
-                  agentMessageText={props.agentMessageText}
-                  instructions={props.instructions}
-                  onOpenInstructions={props.onOpenInstructions}
+            <Show
+              when={feedbackSent(props.marker)}
+              fallback={
+                <Show when={singleMarker(props.marker)}>
+                  {(marker) => (
+                    <SingleChatActionMarker
+                      marker={marker()}
+                      agents={props.agents}
+                      announce={props.announce}
+                      onOpenSkill={props.onOpenSkill}
+                      routineAvailable={props.routineAvailable}
+                      onSelectAgent={props.onSelectAgent}
+                      onOpenRoutine={props.onOpenRoutine}
+                      openRoutineThread={props.openRoutineThread}
+                      onOpenHostedSite={props.onOpenHostedSite}
+                      onOpenLink={props.onOpenLink}
+                      onToggleRoutineRun={props.onToggleRoutineRun}
+                      onToggleAgentMessage={props.onToggleAgentMessage}
+                      agentMessageText={props.agentMessageText}
+                      instructions={props.instructions}
+                      onOpenInstructions={props.onOpenInstructions}
+                    />
+                  )}
+                </Show>
+              }
+            >
+              {(sent) => (
+                <FeedbackSentCard
+                  title={sent().title}
+                  number={sent().number}
+                  url={sent().url}
+                  onOpenLink={props.onOpenLink}
                 />
               )}
             </Show>
@@ -196,7 +221,7 @@ function MarkerGroup(
     summary: (control: MarkerGroupToggle) => JSX.Element;
   },
 ) {
-  const { t, sourceText } = useText();
+  const { t, format, sourceText } = useText();
   const [listExpanded, setListExpanded] = createSignal(false);
   const expanded = () => (props.onToggle ? props.expanded === true : listExpanded());
   // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
@@ -260,7 +285,7 @@ function MarkerGroup(
       </div>
       <span class="sr-only" role="status" aria-live="polite">
         <For each={joinedEntries()} keyed={(entry) => entry.id}>
-          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t, sourceText)}</span>}
+          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, format.list, t, sourceText)}</span>}
         </For>
       </span>
     </Marker>
@@ -467,7 +492,7 @@ function SingleChatActionMarker(
       class={`chat-action-marker chat-action-marker-${props.marker.kind}`}
       role={props.announce ? "status" : "group"}
       aria-live={props.announce ? "polite" : "off"}
-      aria-label={markerAccessibleLabel(props.marker, props.agents, t, sourceText)}
+      aria-label={markerAccessibleLabel(props.marker, props.agents, format.list, t, sourceText)}
     >
       <div class="chat-action-marker-summary">
         <MarkerContent class="chat-action-marker-content">
@@ -499,9 +524,10 @@ function SingleChatActionMarker(
           </Show>
           <Show when={props.marker.kind === "channel-routing" && props.marker}>
             {(marker) => (
-              <AgentButton
-                agent={props.agents.find((agent) => agent.id === marker().agentId)}
-                fallbackId={marker().agentId}
+              <RoutingTargets
+                agentIds={marker().agentIds}
+                agents={props.agents}
+                list={format.list}
                 onSelectAgent={props.onSelectAgent}
               />
             )}
@@ -815,17 +841,67 @@ function AgentTarget(props: {
   );
 }
 
+const LIST_ITEM_MARKER = /(\u{E000}\d+\u{E001})/u;
+
+/**
+ * The members of a routing row as one list in the interface language ("Chief, Builder and Launch").
+ * The list is written with a marker for each name, so the words and their order stay those of the
+ * locale, and each name stays its own button. A member that joins the row after it shows enters
+ * with the pop of a new message, so the reader sees who was added.
+ */
+function RoutingTargets(props: {
+  agentIds: string[];
+  agents: AgentProfile[];
+  list: AppFormat["list"];
+  onSelectAgent: (agentId: string) => void;
+}) {
+  const shownFirst = new Set(untrack(() => props.agentIds));
+  const parts = () => {
+    const markers = props.agentIds.map((_, index) => `\u{E000}${index}\u{E001}`);
+    return props
+      .list(markers)
+      .split(LIST_ITEM_MARKER)
+      .flatMap((part): Array<{ agentId: string } | { text: string }> => {
+        const agentId = props.agentIds[markers.indexOf(part)];
+        if (agentId) return [{ agentId }];
+        return part ? [{ text: part }] : [];
+      });
+  };
+  return (
+    <span class="chat-action-routing-targets">
+      <For each={parts()}>
+        {(part) =>
+          "agentId" in part ? (
+            <AgentButton
+              agent={props.agents.find((agent) => agent.id === part.agentId)}
+              fallbackId={part.agentId}
+              onSelectAgent={props.onSelectAgent}
+              class={shownFirst.has(part.agentId) ? undefined : "chat-action-target-entering"}
+            />
+          ) : (
+            <span class="chat-action-routing-separator">{part.text}</span>
+          )
+        }
+      </For>
+    </span>
+  );
+}
+
 function AgentButton(props: {
   agent: AgentProfile | undefined;
   fallbackId: string | undefined;
   onSelectAgent: (agentId: string) => void;
+  class?: string | undefined;
 }) {
   const { t } = useText();
   return (
     <Show
       when={props.agent}
       fallback={
-        <span class="chat-action-target chat-action-target-unavailable" title={props.fallbackId}>
+        <span
+          class={`chat-action-target chat-action-target-unavailable${props.class ? ` ${props.class}` : ""}`}
+          title={props.fallbackId}
+        >
           <AgentAvatar class="chat-action-agent-avatar" />
           <span>{t("chat.marker.unavailableAgent")}</span>
         </span>
@@ -835,7 +911,7 @@ function AgentButton(props: {
         <Button
           variant="ghost"
           type="button"
-          class="chat-action-target"
+          class={`chat-action-target${props.class ? ` ${props.class}` : ""}`}
           style={agentTargetStyle(agent())}
           aria-label={t("chat.marker.openChat", { name: agent().name })}
           data-cuelume-tap="navigate"
@@ -1033,6 +1109,7 @@ function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | un
 function markerAccessibleLabel(
   marker: SingleChatActionMarkerModel,
   agents: AgentProfile[],
+  list: AppFormat["list"],
   t: AppTranslate,
   sourceText: (text: string) => string,
 ): string {
@@ -1056,8 +1133,8 @@ function markerAccessibleLabel(
     return t("chat.marker.accessible.message", { label, agent, status: t(STATUS_LABELS[marker.status]) });
   }
   if (marker.kind === "channel-routing") {
-    const agent = agents.find((candidate) => candidate.id === marker.agentId)?.name ?? unavailable;
-    return t("chat.marker.accessible.routing", { label, agent });
+    const names = marker.agentIds.map((id) => agents.find((candidate) => candidate.id === id)?.name ?? unavailable);
+    return t("chat.marker.accessible.routing", { label, agent: list(names) });
   }
   if (marker.kind === "hosted-site")
     return t("chat.marker.accessible.named", { label, name: marker.hostname ?? marker.title });

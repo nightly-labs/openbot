@@ -107,6 +107,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Изменить этот параметр можно только на компьютере, где работает агент.",
   "error.agent.sideQuestionBusy": "Выполняется слишком много побочных вопросов. Повторите попытку чуть позже.",
   "error.agent.sideQuestionFailed": "Агенту не удалось ответить на побочный вопрос. Повторите попытку.",
+  "error.agent.webSearchSignIn": "Для веб-поиска нужен вход в Codex с аккаунтом ChatGPT.",
+  "error.agent.webSearchBusy": "Выполняется слишком много поисков и побочных вопросов. Повторите попытку чуть позже.",
+  "error.agent.webSearchFailed": "Веб-поиск не завершился. Повторите попытку.",
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",

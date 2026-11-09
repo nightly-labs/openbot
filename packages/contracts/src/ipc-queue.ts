@@ -164,6 +164,11 @@ export interface QueueSnapshot {
    * key list, so a remote server drops this field instead of reporting it.
    */
   hold?: QueueHold | null;
+  /**
+   * The setup message of a new agent (`agent-welcome-v1`) waits or runs. No delivery shows it, so a
+   * client shows that the agent prepares its welcome. Absent on every other queue.
+   */
+  welcome?: true;
 }
 
 export function isQueueSnapshot(value: unknown): value is QueueSnapshot {
@@ -172,7 +177,8 @@ export function isQueueSnapshot(value: unknown): value is QueueSnapshot {
     isIdentifier(value.agentId) &&
     Array.isArray(value.deliveries) &&
     value.deliveries.every(isQueueDelivery) &&
-    (value.hold === undefined || value.hold === null || isQueueHold(value.hold))
+    (value.hold === undefined || value.hold === null || isQueueHold(value.hold)) &&
+    (value.welcome === undefined || value.welcome === true)
   );
 }
 

@@ -26,6 +26,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  AGENT_WELCOME_ITEM_TYPE,
   isConversationMessageSender,
   isMessageReaction,
   QUEUE_STEER_FALLBACKS,
@@ -59,6 +60,8 @@ import { recordRestartActivity } from "./restart-activity";
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 /** How much of a delivery's error the note for a failed request quotes. */
 const FAILED_REQUEST_REASON_LIMIT = 2_000;
+/** A welcome in these states is still to come, so the queue reports it (`QueueSnapshot.welcome`). */
+const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 /**
  * The external conversation a message came from. Such a message runs in the execution thread of
  * that conversation, so the queue and the public chat do not show it, like channel work.
@@ -113,6 +116,11 @@ interface StoredMessage {
    * what every message stored before this field existed meant.
    */
   expectsReply?: false;
+  /**
+   * The setup message that a client sent to a new agent (`agent-welcome-v1`). The agent answers it,
+   * but no chat, queue or preview shows it. Absent on every other message.
+   */
+  welcome?: true;
   createdAt: string;
 }
 
@@ -200,6 +208,8 @@ interface EnqueueInput {
   replyToMessageId?: string | null;
   /** False marks information the recipient must not answer. Defaults to an expected answer. */
   expectsReply?: boolean | undefined;
+  /** The setup message of a new agent, which the user does not see. */
+  welcome?: boolean;
   draftIds?: string[];
   /** An audio draft of what the user said. Kept with the message, not sent to the recipient. */
   voiceRecordingDraftId?: string;
@@ -252,6 +262,21 @@ export interface CommittedChannelAttachments {
 
 /** The most completed messages that one `conversationMessages` read returns. */
 export const MAILBOX_CONVERSATION_MESSAGE_LIMIT = 100;
+
+/**
+ * A lane id for the channel thread of one channel. A task id never starts with this control
+ * character, so a lane id names a task or a channel without a second field.
+ */
+const CHANNEL_LANE_PREFIX = "\u0001channel:";
+
+export function channelLane(channelId: string): string {
+  return `${CHANNEL_LANE_PREFIX}${channelId}`;
+}
+
+/** The channel of a channel lane, or null for a task lane or the agent's own chat. */
+export function laneChannelId(lane: string | null): string | null {
+  return lane?.startsWith(CHANNEL_LANE_PREFIX) ? lane.slice(CHANNEL_LANE_PREFIX.length) : null;
+}
 
 export class MailboxStore {
   readonly #statePath: string;
@@ -621,6 +646,7 @@ export class MailboxStore {
         ...(voiceRecording ? { voiceRecording } : {}),
         replyToMessageId: input.replyToMessageId ?? null,
         ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
+        ...(input.welcome ? { welcome: true as const } : {}),
         createdAt,
       };
       const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
@@ -790,8 +816,15 @@ export class MailboxStore {
     const executionMessageIds = this.#executionMessageIds();
     const positions = this.#queuedPositions();
     const messages = this.#messagesById();
+    const welcome = this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        WELCOME_PENDING_STATUSES.has(delivery.status) &&
+        messages.get(delivery.messageId)?.welcome === true,
+    );
     return {
       agentId,
+      ...(welcome ? { welcome: true as const } : {}),
       // Queue order, not storage order: a restart reads the deliveries back sorted by their
       // creation time and identity, which would otherwise reorder rows a client already saw.
       deliveries: [...this.#state.deliveries]
@@ -804,7 +837,7 @@ export class MailboxStore {
   }
 
   /**
-   * The queued channel, messaging and task work of this agent, in queue order. `listQueue` hides it, so a
+   * The queued channel, messaging, task and welcome work of this agent, in queue order. `listQueue` hides it, so a
    * caller that reorders the queue the user sees has to put these ids back before the mailbox reads
    * the order.
    */
@@ -843,7 +876,7 @@ export class MailboxStore {
   #executionMessageIds(): Set<string> {
     const ids = new Set<string>();
     for (const message of this.#state.messages)
-      if (message.channelId || message.messaging || message.taskId) ids.add(message.id);
+      if (message.channelId || message.messaging || message.taskId || message.welcome) ids.add(message.id);
     return ids;
   }
 
@@ -858,11 +891,57 @@ export class MailboxStore {
     return delivery ? this.#taskIdOf(delivery) : null;
   }
 
+  /** Whether the delivery carries a new agent's setup message (`agent-welcome-v1`). */
+  isWelcomeDelivery(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    return delivery
+      ? this.#state.messages.some((message) => message.id === delivery.messageId && message.welcome === true)
+      : false;
+  }
+
   #taskIdOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
     const message = messages
       ? messages.get(delivery.messageId)
       : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
     return message?.taskId ?? null;
+  }
+
+  /**
+   * The lane a delivery runs in: its task, the channel thread of its channel, or null for the
+   * agent's own chat. Each lane runs one turn at a time, beside the other lanes.
+   */
+  #laneOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
+    const message = messages
+      ? messages.get(delivery.messageId)
+      : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    return message?.taskId ?? (message?.channelId ? channelLane(message.channelId) : null);
+  }
+
+  /** The lane a delivery runs in, as {@link nextQueued} takes it. */
+  laneIdForDelivery(deliveryId: string): string | null {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    return delivery ? this.#laneOf(delivery) : null;
+  }
+
+  /**
+   * The channel lanes of this agent that have work, in queue order of their first delivery. With
+   * `queuedOnly`, only the lanes with a queued delivery.
+   */
+  channelLanes(agentId: string, queuedOnly = false): string[] {
+    const deliveries = queuedOnly
+      ? this.#queuedFor(agentId)
+      : this.#state.deliveries.filter(
+          (delivery) => delivery.recipientAgentId === agentId && isActiveDelivery(delivery),
+        );
+    // The scheduler asks on each check, and an idle agent has no delivery: skip the message index.
+    if (deliveries.length === 0) return [];
+    const messages = this.#messagesById();
+    const lanes = new Set<string>();
+    for (const delivery of deliveries) {
+      const lane = this.#laneOf(delivery, messages);
+      if (lane !== null && laneChannelId(lane) !== null) lanes.add(lane);
+    }
+    return [...lanes];
   }
 
   /**
@@ -929,7 +1008,7 @@ export class MailboxStore {
       (delivery) =>
         delivery.recipientAgentId === agentId &&
         (delivery.status === "starting" || delivery.status === "running") &&
-        this.#taskIdOf(delivery) === taskId,
+        this.#laneOf(delivery) === taskId,
     );
   }
 
@@ -937,7 +1016,7 @@ export class MailboxStore {
   laneQueuedIds(agentId: string, taskId: string | null): string[] {
     const messages = this.#messagesById();
     return this.#queuedFor(agentId)
-      .filter((delivery) => !waitsForPlanContinuation(delivery) && this.#taskIdOf(delivery, messages) === taskId)
+      .filter((delivery) => !waitsForPlanContinuation(delivery) && this.#laneOf(delivery, messages) === taskId)
       .map((delivery) => delivery.id);
   }
 
@@ -1305,8 +1384,14 @@ export class MailboxStore {
     const failed: StoredDelivery[] = [];
     const workingAgentIds = new Set<string>();
     const failedAgentIds = new Set<string>();
+    // The welcome's setup message is not for the user. A client shows a work item as the user's
+    // message, so the welcome turn reports its work through `QueueSnapshot.welcome` only.
+    const welcomeMessageIds = new Set(
+      this.#state.messages.filter((message) => message.welcome).map((message) => message.id),
+    );
     for (const delivery of this.#state.deliveries) {
       if (!targetAgentIds.has(delivery.recipientAgentId)) continue;
+      if (welcomeMessageIds.has(delivery.messageId)) continue;
       const isWorking = delivery.status === "starting" || delivery.status === "running";
       const isCurrentFailure =
         delivery.status === "failed" && delivery.turnId === failedTurns.get(delivery.recipientAgentId);
@@ -1487,7 +1572,9 @@ export class MailboxStore {
               ? AGENT_EXCHANGE_ITEM_TYPE
               : message.sender.kind === "routine"
                 ? "routine"
-                : undefined,
+                : message.welcome
+                  ? AGENT_WELCOME_ITEM_TYPE
+                  : undefined,
         });
       }
     }
@@ -1595,7 +1682,7 @@ export class MailboxStore {
     if (this.laneActive(agentId, taskId)) return null;
     const messages = this.#messagesById();
     const delivery = this.#queuedFor(agentId).find(
-      (candidate) => this.#taskIdOf(candidate, messages) === taskId && !this.#isHeldReply(candidate),
+      (candidate) => this.#laneOf(candidate, messages) === taskId && !this.#isHeldReply(candidate),
     );
     return delivery && this.#mayStart(delivery) ? this.#context(delivery, undefined, messages) : null;
   }
@@ -1612,11 +1699,11 @@ export class MailboxStore {
     const requestId = isAnswer(message) ? message.replyToMessageId : null;
     if (message.sender.kind !== "user" && !requestId) return [];
     // One turn runs in one lane: the agent's own chat, or the side thread that sent the request.
-    const lane = message.taskId ?? null;
     const messages = this.#messagesById();
+    const lane = this.#laneOf(next, messages);
     return this.#contexts(
       this.#queuedFor(next.recipientAgentId).filter((candidate) => {
-        if (candidate.id === next.id || !this.#mayStart(candidate) || this.#taskIdOf(candidate, messages) !== lane)
+        if (candidate.id === next.id || !this.#mayStart(candidate) || this.#laneOf(candidate, messages) !== lane)
           return false;
         if (!requestId) return this.#isHeldReply(candidate);
         const reply = this.#requireMessage(candidate.messageId, messages);
@@ -1637,9 +1724,9 @@ export class MailboxStore {
     const messages = this.#messagesById();
     const first = this.#requireMessage(next.messageId, messages);
     if (!isChatMessageFromPerson(first)) return [];
-    const lane = first.taskId ?? null;
+    const lane = this.#laneOf(next, messages);
     const queued = this.#queuedFor(next.recipientAgentId).filter(
-      (candidate) => this.#taskIdOf(candidate, messages) === lane && !this.#isHeldReply(candidate),
+      (candidate) => this.#laneOf(candidate, messages) === lane && !this.#isHeldReply(candidate),
     );
     const start = queued.findIndex((candidate) => candidate.id === next.id);
     if (start < 0) return [];
@@ -1664,13 +1751,11 @@ export class MailboxStore {
     const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!next || !waitsForPlanContinuation(next)) return [];
     const messages = this.#messagesById();
-    const lane = this.#taskIdOf(next, messages);
+    const lane = this.#laneOf(next, messages);
     return this.#contexts(
       this.#queuedFor(next.recipientAgentId).filter(
         (candidate) =>
-          candidate.id !== next.id &&
-          waitsForPlanContinuation(candidate) &&
-          this.#taskIdOf(candidate, messages) === lane,
+          candidate.id !== next.id && waitsForPlanContinuation(candidate) && this.#laneOf(candidate, messages) === lane,
       ),
     );
   }
@@ -1831,7 +1916,7 @@ export class MailboxStore {
       delivery.recipientAgentId === agentId &&
       delivery.status === "starting" &&
       delivery.turnId === null &&
-      (taskId === undefined || this.#taskIdOf(delivery) === taskId)
+      (taskId === undefined || this.#laneOf(delivery) === taskId)
     );
   }
 
@@ -2046,11 +2131,21 @@ export class MailboxStore {
     return requesterId;
   }, Effect.uninterruptible).bind(this);
 
-  hasAgentMessageFromTurnTo(agentId: string, turnId: string, recipientAgentId: string): boolean {
+  /**
+   * Whether the turn sent the recipient a message. A reply to one of `turnRequestIds`, the recipient's
+   * requests that the turn read, answers only that request, so it does not count for the others (#5804).
+   */
+  hasAgentMessageFromTurnTo(
+    agentId: string,
+    turnId: string,
+    recipientAgentId: string,
+    turnRequestIds: ReadonlySet<string>,
+  ): boolean {
     const turnIds = this.#sourceTurnIds();
     return this.#state.messages.some((message) => {
       if (message.sender.kind !== "agent" || message.sender.agentId !== agentId) return false;
       if (turnIds.get(message.id) !== turnId) return false;
+      if (message.replyToMessageId !== null && turnRequestIds.has(message.replyToMessageId)) return false;
       return this.#state.deliveries.some(
         (delivery) => delivery.messageId === message.id && delivery.recipientAgentId === recipientAgentId,
       );
@@ -2625,7 +2720,7 @@ export class MailboxStore {
         if (
           delivery.recipientAgentId !== agentId ||
           !waitsForPlanContinuation(delivery) ||
-          (taskId !== undefined && this.#taskIdOf(delivery, messages) !== taskId)
+          (taskId !== undefined && this.#laneOf(delivery, messages) !== taskId)
         )
           continue;
         const turnIds = delivery.planContinuation?.turnIds ?? [];
@@ -2660,15 +2755,18 @@ export class MailboxStore {
     );
   }
 
-  /** As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own threads. */
-  hasUnfinishedDeliveryOutsideTasks(agentId: string): boolean {
+  /**
+   * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
+   * threads. Channel work counts only with `includeChannels`: on a provider that runs one turn at a
+   * time, a channel turn holds the agent's own chat too.
+   */
+  hasUnfinishedDeliveryOutsideTasks(agentId: string, includeChannels: boolean): boolean {
     const messages = this.#messagesById();
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId &&
-        isActiveDelivery(delivery) &&
-        this.#taskIdOf(delivery, messages) === null,
-    );
+    return this.#state.deliveries.some((delivery) => {
+      if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
+      const lane = this.#laneOf(delivery, messages);
+      return lane === null || (includeChannels && laneChannelId(lane) !== null);
+    });
   }
 
   /** As {@link hasUnfinishedDelivery}, without the `queued` deliveries that a usage limit holds. */
@@ -3482,6 +3580,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     (value.voiceRecording === undefined || isStoredAttachment(value.voiceRecording)) &&
     (isString(value.replyToMessageId) || value.replyToMessageId === null) &&
     (value.expectsReply === undefined || value.expectsReply === false) &&
+    (value.welcome === undefined || value.welcome === true) &&
     isString(value.createdAt)
   );
 }
@@ -3582,10 +3681,14 @@ function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outco
   delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
 }
 
-/** A message the person wrote in the agent's chat or a task, not one of a channel or a messaging app. */
+/**
+ * A message the person wrote in the agent's chat or a task, not one of a channel or a messaging app.
+ * A new agent's setup message is not: it runs alone, so its rules do not reach the person's message.
+ */
 function isChatMessageFromPerson(message: StoredMessage): boolean {
   return (
     message.sender.kind === "user" &&
+    message.welcome !== true &&
     message.channelId === undefined &&
     message.messaging === undefined &&
     message.messagingReturn === undefined

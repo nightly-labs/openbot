@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Triage one GitHub issue, bug report, or feature request. For a bug, decide if it is valid, find the root cause, and fix it. For a feature request, decide if it is necessary, bloated, or over-specific, and score its value and priority. Push back with evidence when the issue is not a problem, is a duplicate, is already fixed, or is out of scope. Use when the user gives an issue number, an issue URL, or a pasted report and asks to triage, debug, investigate, fix, assess, or score it.
+description: Triage one GitHub issue, bug report, or feature request. For a bug, decide if it is valid, rate its UX impact on casual users, find the root cause, and fix it. For a feature request, decide if it is necessary, bloated, or over-specific, and score its value, UX, and priority. Push back with evidence when the issue is not a problem, is a duplicate, is already fixed, or is out of scope. Use when the user gives an issue number, an issue URL, or a pasted report and asks to triage, debug, investigate, fix, assess, or score it.
 ---
 
 # Triage
@@ -9,6 +9,20 @@ Take one issue. Prove what is wrong before you change code. Then fix the
 root cause with the smallest change. When the issue is not valid, do not
 fix it: push back and show the evidence. When the issue asks for new
 behavior, do not build it: assess it and score it (Step 2a).
+
+## Who we build for
+
+Most OpenBot users are casual users, not developers. A casual user does
+not read logs, open a terminal, edit a config file, write JSON, set up a
+webhook, or know provider names. They use the app through its windows,
+buttons, and chat. Judge each issue by what this user sees and can do:
+
+- A behavior that is correct in the code but that confuses this user, or
+  that they cannot recover from without help, is a UX problem.
+- A workaround that needs a developer skill does not cover the need for
+  this user.
+- A developer or power user can ask for a change that makes the app
+  harder for all other users. Count that cost.
 
 The usual call is short, for example `$triage 2028` or `$triage <issue URL>`.
 Get the missing details from the issue, the code, and the git history.
@@ -58,7 +72,11 @@ Issue labels do not change this workflow. Labels such as `from-x` and
    - **Surface**: desktop renderer, main process, backend, mobile, public
      web, Signal, Team API, provider, or plugin.
    - **Version**: the OpenBot version or commit, and the provider CLI version.
-   For a feature request, write only **Surface** and **Version** here.
+   - **Reporter**: a casual user or a developer, from the words and the
+     data in the issue. A casual user often describes the screen, not the
+     cause. Read the symptom as what the app shows them.
+   For a feature request, write only **Surface**, **Version**, and
+   **Reporter** here.
    Step 2a has the other fields. The feature template has no version
    field; when it is missing, use the last release with a `publishedAt`
    before the `createdAt` of the issue (`gh release list --limit 10 --json tagName,publishedAt`).
@@ -77,12 +95,12 @@ an issue, a `path:line`, or a command output.
 | --- | --- |
 | `duplicate` | An open or closed issue or PR for the same root cause, or, for a feature request, for the same need and the same solution. A request for the same need with a different solution is related, not a duplicate: use it as demand in Step 2a. Search with `gh issue list --state all --search` and `gh pr list --state all --search`. |
 | `already fixed` | A commit on `origin/main` that fixes it, or that adds the requested feature, from `git log origin/main --grep` or `git log -S`. Give the first release tag that holds it: `git tag --contains <sha> --list 'v*' --sort=v:refname \| head -n 1`. |
-| `works as intended` | The code, a test, or a doc that defines the current behavior as correct. For a feature request: the feature exists, and it was in the release that the reporter used. Show where it is. |
+| `works as intended` | The code, a test, or a doc that defines the current behavior as correct, **and** a casual user can understand the behavior and continue without help. When the behavior is correct but confusing (a silent failure, a technical error text, a control that they cannot find, a dead end), the verdict is `valid`: the bug is the UX. For a feature request: the feature exists, a casual user can find and use it, and it was in the release that the reporter used. Show where it is. |
 | `out of scope` | A product constraint or a non-negotiable rule in `AGENTS.md` that the requested change breaks. Example: chats or files that leave the user's computer, or a change to a released Team API meaning. |
-| `environment` | The cause is outside OpenBot: provider CLI version, OS setting, network, or a third-party service. |
+| `environment` | The cause is outside OpenBot: provider CLI version, OS setting, network, or a third-party service, **and** the app tells the user what happened and what to do. When the app fails silently or shows only a technical error, the missing guidance is `valid`. |
 | `feature request` | The issue asks for new behavior, not a fix for broken behavior. Go to Step 2a. |
 | `needs info` | The data that is missing, and why you cannot get it from the code or the history. |
-| `valid` | None of the above holds. Continue to Step 3. |
+| `valid` | None of the above holds. Continue to Step 2b. |
 
 When the verdict is not `valid` or `feature request`, stop here and push
 back (see "Push back"). Do not change code to make a non-valid issue go
@@ -112,8 +130,14 @@ Write, in one line each:
   tools, and `marketplace/production-catalog`. Text that starts with `/`
   goes to the provider; OpenBot has no local slash commands. Give
   `path:line` for each match.
-- **Gap**: the part of the need that **Today** does not cover. Score only
-  the gap. When there is no gap, the verdict is `works as intended`.
+- **Casual path**: how a casual user gets to **Today**: the clicks, from
+  the main window. When **Today** needs a terminal, a config file, JSON,
+  a webhook, a provider slash command, or a setting that a casual user
+  cannot find, it covers the need only for developers. Put the missing
+  casual path in **Gap**.
+- **Gap**: the part of the need that **Today** does not cover for a
+  casual user. Score only the gap. When there is no gap, the verdict is
+  `works as intended`.
 
 ### 2. Collect the evidence
 
@@ -151,8 +175,8 @@ Select one:
 | --- | --- |
 | `necessary` | It fills a gap in a core workflow. The product is worse without it, and no existing mechanism covers it. |
 | `sound` | It is a clear improvement with a fair cost, but users can work without it. |
-| `bloated` | Its cost is larger than its value: a new setting, mode, screen, or dependency for few users; or it repeats a feature that exists; or it makes the UI or the code harder for all users. |
-| `over-specific` | It fits one setup, one provider, or one person's workflow. A general mechanism covers the need: a setting, an automation, a webhook, or a Marketplace app, skill, or plugin. Name that mechanism. |
+| `bloated` | Its cost is larger than its value: a new setting, mode, screen, or dependency for few users; or it repeats a feature that exists; or it makes the UI or the code harder for all users. A new choice in a main flow that only developers understand is `bloated`. |
+| `over-specific` | It fits one setup, one provider, or one person's workflow. A general mechanism covers the need: a setting, an automation, a webhook, or a Marketplace app, skill, or plugin. Name that mechanism. When only developers can use that mechanism, say so: it covers the developer, not the casual user. |
 
 ### 4. Score it
 
@@ -164,17 +188,24 @@ of evidence.
 | Impact | How much better is the app for the users who need it? | No change | Small convenience | Removes real friction | Unblocks a core use |
 | Reach | How many users need it? | Only the reporter | A small group | Many users | Almost all users |
 | Fit | Does it match the product constraints and the current patterns? | Conflicts | Needs a new pattern | Fits with changes | Fits as it is |
+| UX | What does it do to the app for a casual user? | Makes a main flow harder for most users: new words, choices, or steps | Only developers can use it | Neutral: casual users do not see it, or can ignore it | Makes a common task easier or clearer for casual users |
 | Cost | How small is the build and maintenance cost? (3 is small) | Migration, protocol, or large new surface | Several surfaces | One surface, some new UI | Small, reuses what exists |
 
+- **Impact** and **Reach** count casual users first. A need that only
+  developers have is Reach 0 or 1, also when many developers ask for it.
 - **Reach** is your estimate of who needs the gap. Base it on the demand
   that you found and on the users of the feature area. When the only
   evidence is the reporter, Reach is 0 or 1.
+- **UX** scores the design that the request names. When a simpler design
+  meets the need and scores higher, say so in `build smaller`. Do not
+  count helper text, a tooltip, or a new toggle as a UX gain: score the
+  control or the flow itself.
 - **Cost** counts these surfaces: backend, main and preload, IPC
   contracts, renderer with `packages/ui` (desktop and web), mobile,
   `apps/auth-api`, and Signal. New i18n keys and their translations do
   not add cost.
 
-**Value score** = Impact + Reach + Fit + Cost, from 0 to 12. It answers
+**Value score** = Impact + Reach + Fit + UX + Cost, from 0 to 15. It answers
 "does this make OpenBot better for its cost".
 
 **Priority** answers "how important is it now":
@@ -185,6 +216,8 @@ of evidence.
 - `P2`: Impact 2 or more, or Reach 2 or more.
 - `P3`: all other requests.
 
+A request with UX 0 is not `P1`, except for a security need.
+
 ### 5. Recommend
 
 Go down the table. The first row that applies is the recommendation.
@@ -192,11 +225,12 @@ Go down the table. The first row that applies is the recommendation.
 | Recommendation | When |
 | --- | --- |
 | `decline` | Fit is 0, an earlier decision says no, or scope is `bloated` and priority is not `P1`. |
+| `decline` | UX is 0, no smaller design keeps the main flow simple, and priority is not `P1`. |
 | `generalize` | Scope is `over-specific`. Name the general mechanism, or the Marketplace item, that covers this need and others. |
-| `build smaller` | Priority `P1` or `P2`, and the request is larger than the gap; or scope is `bloated` and priority is `P1`. Name the smallest version and what it leaves out. |
-| `build` | Value 8 or more, or priority `P1`. |
-| `defer` | Value 5 to 7. Say what would change the decision, for example more demand. |
-| `decline` | Value 4 or less. |
+| `build smaller` | Priority `P1` or `P2`, and the request is larger than the gap; or scope is `bloated` and priority is `P1`; or UX is 0 or 1 and a simpler design meets the need. Name the smallest version, what it leaves out, and what a casual user sees. |
+| `build` | Value 10 or more, or priority `P1`. |
+| `defer` | Value 7 to 9. Say what would change the decision, for example more demand. |
+| `decline` | Value 6 or less. |
 
 A `defer` or `decline` that the user approves does not close the issue.
 The user closes it.
@@ -210,6 +244,25 @@ Priority is a product decision. Show the assessment and the draft issue
 comment to the user, and wait. Post the comment only when the user
 agrees. In the comment, first tell the reporter how to use the parts that
 exist. Then give the recommendation for the gap and the reason.
+
+## Step 2b — Rate the UX impact of a bug
+
+For a `valid` bug, rate what a casual user sees. Select the first row
+that applies:
+
+| UX impact | Meaning |
+| --- | --- |
+| `blocking` | The user cannot finish a core task (set up, sign in, chat with an agent, connect a provider or channel), or they think that they lost data. |
+| `stuck` | The user can finish, but only with a developer skill or outside help: a terminal, a log, a config file, a restart that the app does not tell them about. |
+| `confusing` | The user can recover, but the app does not tell them what happened or what to do: a silent failure, an error code, a stack trace, provider or protocol words, a control that moves or does nothing. |
+| `cosmetic` | The task works and the user understands it; the problem is visual or small. |
+
+Give one sentence of evidence: the screen, the text, or the step that the
+user sees. A bug that shows only for developers (debug tools, logs,
+`dev:*` commands) is `cosmetic` for casual users. Say so.
+
+`blocking` and `stuck` make the fix urgent: say so in the report. The UX
+impact also sets the bar for the fix in Step 4.
 
 ## Step 3 — Debug
 
@@ -253,6 +306,17 @@ Otherwise, continue:
 1. Apply the smallest change at the root cause. Prefer delete and reuse
    over new code. Do not fix nearby problems in the same change; list them
    in the report.
+   When the UX impact is not `cosmetic`, the fix must also remove it for a
+   casual user. A fix that stops the crash but leaves a silent failure or
+   a technical error is not complete:
+   - Text that the user reads says what happened and what to do next, in
+     plain words. No error codes, stack traces, provider or protocol
+     words, or paths. Keep technical detail in the log.
+   - Let the app recover by itself, or give one clear action in the app.
+     Do not send the user to a terminal, a log, or a config file.
+   - Fix the control or the flow. Do not add helper text, a tooltip, or a
+     new toggle to explain a bad flow.
+   When this needs a UI design decision, stop and ask (see the list above).
 2. Obey `AGENTS.md`: non-negotiable rules, Effect rules, shared UI,
    `@openbot/i18n` text, and terms.
 3. Add a test only when `AGENTS.md` asks for one: data loss, released
@@ -286,13 +350,17 @@ directly. Do not soften the verdict. Give:
    posts from the user's account, so write it as the user: a maintainer,
    in the first person ("I"). Do not refer to "the maintainers" as other
    people, and do not mention an AI, an agent, or this skill.
+   The reporter is often a casual user. Give steps as clicks in the app,
+   with the exact UI text. Give a terminal command only when no app path
+   exists, and say where to type it.
 
 Post the comment yourself with `gh issue comment <n> --body-file <file>`
 for each verdict except `feature request`. Do not wait for the user. For a
 `feature request`, Step 2a says when to post. Give the recommendation and
 the reason in the comment, not the scores. For `needs info`, ask the
 reporter for the exact data that is missing, for example the version, the
-reproduction steps, or a redacted log. Do not close the issue.
+reproduction steps, a screenshot, or a redacted log. Tell a casual
+reporter where to find each item in the app. Do not close the issue.
 
 When the user still wants the change after the push back, follow the user.
 
@@ -305,6 +373,7 @@ Put the draft issue comment after the table.
 | --- | --- |
 | Issue | `#<n>` title |
 | Verdict | `valid` or the push-back verdict |
+| UX impact | `blocking`, `stuck`, `confusing`, or `cosmetic`, and what the user sees |
 | Root cause | One sentence, `path:line` |
 | Proof | Test, command, or reproduction |
 | Fix | Commit SHA and changed files, or "none" |
@@ -324,13 +393,14 @@ Feature request:
 | Demand | Reactions, other users, related issues |
 | History | Earlier decisions for the same need, or "none found" |
 | Scope | `necessary`, `sound`, `bloated`, or `over-specific` |
-| Scores | Impact, Reach, Fit, Cost, each with its evidence |
-| Value | `<n>/12` |
+| Casual path | How a casual user gets to **Today**, or "developers only" |
+| Scores | Impact, Reach, Fit, UX, Cost, each with its evidence |
+| Value | `<n>/15` |
 | Priority | `P1`, `P2`, or `P3` |
 | Recommendation | The recommendation, and the smallest version or the general mechanism |
 | Next step | `$prototype`, a plan, the `approved` label, or the draft comment |
 
-For several feature requests, one row for each issue: issue, scope,
+For several feature requests, one row for each issue: issue, scope, UX,
 value, priority, recommendation.
 
 Mark each claim that you could not confirm, and say where you looked.

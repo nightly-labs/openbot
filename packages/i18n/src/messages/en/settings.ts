@@ -104,7 +104,7 @@ export const messages = defineMessages("settings", {
     "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
-    "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",
+    "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
   // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "Defaults",
   "settings.agentDefaults.description": "Agents follow these defaults, unless you change them for an agent.",
@@ -260,7 +260,7 @@ export const messages = defineMessages("settings", {
   "settings.tab.notifications.description": "Choose how OpenBot alerts you.",
   "settings.tab.voice.title": "Voice",
   "settings.tab.voice.description":
-    "Dictation in the message box. Local models run on this computer; ElevenLabs runs in the cloud.",
+    "Dictation in the message box. Local models run on this computer; ElevenLabs and Groq run in the cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Let agents on this computer's OpenBot see and use its apps. Agents on another server use that server's computer.",
@@ -640,6 +640,10 @@ export const messages = defineMessages("settings", {
   "settings.voice.removeFailed": "Could not remove the model. Try again.",
   "settings.voice.model.elevenlabs.description":
     "Streams your voice to ElevenLabs. Text shows while you speak and stays fixed. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.model.groqTurbo.description":
+    "Sends each recording to Groq when you stop. Fast, and knows many languages. Uses your own API key, and Groq bills each use.",
+  "settings.voice.model.groqLarge.description":
+    "Sends each recording to Groq when you stop. More accurate than turbo, but slower. Uses your own API key, and Groq bills each use.",
   "settings.voice.apiKey.placeholder": "Paste the key",
   "settings.voice.apiKey.save": "Save key",
   "settings.voice.apiKey.remove": "Remove key",

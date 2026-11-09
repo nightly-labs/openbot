@@ -5,6 +5,7 @@ import {
   CHAT_VISUAL_MIN_HEIGHT,
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
+import { BUG_REPORT_AREAS, BUG_REPORT_SEVERITIES, FEATURE_REQUEST_TYPES } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
@@ -115,11 +116,11 @@ export const htmlPreviewToolSchema = z.object({
 
 // `ask_ui` input. The limits are the contract's; `normalizeUiBlockSpec` then checks the rules a schema
 // cannot say, such as unique ids and option labels. An id passes the same check as a stored block id.
+// The ask_ui description gives the id rule once, not on each id.
 const uiBlockIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9.:-][A-Za-z0-9_.:-]{0,63}$/)
-  .refine(isUiBlockId, "Use another id: botId, recipientBotId, recipientBotIds and senderBotId are reserved.")
-  .describe("Letters, digits and _ . : -, up to 64 characters, not starting with _.");
+  .refine(isUiBlockId, "Use another id: botId, recipientBotId, recipientBotIds and senderBotId are reserved.");
 const uiTextSchema = (max: number) => z.string().min(1).max(max);
 const uiLabelSchema = uiTextSchema(UI_BLOCK_LIMITS.label);
 const uiActionSchema = z.strictObject({
@@ -295,6 +296,11 @@ export const saveApiKeyToolSchema = z.strictObject({
     .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
 });
 
+/** `openbot.web_search`: one search turn on a ChatGPT account (`AgentService.searchWeb`). */
+export const webSearchToolSchema = z.strictObject({
+  query: z.string().trim().min(1).max(1_000).describe("The whole question, with its context."),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -355,7 +361,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "attach_files_to_response",
     description:
-      "Attach existing local files to the current response for the user. Use this after creating screenshots, charts, diagrams, reports, ZIP archives, or other files that the user should receive. OpenBot copies each file and shows image previews in the conversation.",
+      "Attach existing local files, such as screenshots, charts, reports or ZIP archives, to the current response for the user. OpenBot copies each file and shows image previews in the conversation.",
     shape: { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
   },
   {
@@ -379,6 +385,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Capture one display, one window, or a region of one display of this computer, and get the image. The user approves each capture first, and sees the image in this conversation. In a channel, each member who reads the channel sees it. Call list_capture_sources first to get ids and bounds. A region uses desktop points.",
     shape: captureScreenToolShape,
+  },
+  {
+    name: "web_search",
+    description:
+      "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
+    shape: webSearchToolSchema.shape,
   },
   {
     name: "list_sections",
@@ -434,7 +446,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_agents",
     description:
-      "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, lastActivityAt, and openWaits. To find the teammate for work outside your remit, match the work to titles and descriptions. OpenBot does not track which files an agent changed.",
+      "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, lastActivityAt, and openWaits. OpenBot does not track which files an agent changed.",
     shape: {},
   },
   {
@@ -578,13 +590,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: ROUTINE_NO_UPDATE_TOOL,
     description:
-      "Use only in a scheduled, script or webhook routine run, when the routine task gives nothing to report. OpenBot then collapses your text answers of this run into the run in the chat and sends no notification; the run history still shows the run. Do not call it when you report anything. A requested reminder or message is a report. Write it in your final answer. Do not call this tool for it unless the notification conditions of the task say to send nothing. In a manual Test run, the user sees your answer.",
+      "Only in a scheduled, script or webhook routine run whose task gives nothing to report. OpenBot collapses your text answers into the run in the chat and sends no notification. Not when you report anything: a requested reminder or message is a report, unless the notification conditions of the task say to send nothing. In a manual Test run, the user sees your answer.",
     shape: {},
   },
   {
     name: ROUTINE_REPORT_FAILURE_TOOL,
     description:
-      "Use only in a routine run, when the routine task could not be done: for example a server, file or service it needs is not available. OpenBot then ends the run as failed with your reason, and the run history shows it. Still give your answer as usual. Do not call it when the task was done, also when its result is bad news.",
+      "Only in a routine run whose task could not be done, such as when a server, file or service it needs is not available. OpenBot ends the run as failed with your reason. Still give your answer. Not when the task was done, also when its result is bad news.",
     shape: routineReportFailureToolSchema.shape,
   },
   {
@@ -678,13 +690,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "ask_ui",
     description: [
       "Show the user an interactive block in this conversation and wait for the answer.",
-      "Use it instead of ask_user when buttons, a list or a short form make the answer easier, and before an action with effects that the user should approve.",
-      "Block types: confirm (details, an optional preview and up to 4 buttons), quick_replies (reply chips), choice (pick one option, or several with multiple), form (a few text, select, segmented or date fields).",
-      "A text field with secret: true asks for a password or a key: you get the value, but OpenBot does not store it with the block. Never repeat the value in a message or a thought. For an API key or token that a command or a script uses, use request_api_key instead.",
-      'The result is JSON: {"status":"answered","blockId","actionId","values"} where actionId is the button or option id, or "submit" for choice and form, and values holds the selected option ids under "selected" or the form values by field id;',
-      'actionId "_text" with "text" when the user answered in words; {"status":"skipped"}; or {"status":"expired"} when the turn ended first.',
-      "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information for you, not a permission: the provider's approvals still apply.",
-      "Write every field as plain text. In a channel, each member who reads the channel sees it.",
+      "Types: confirm (details, an optional preview, up to 4 buttons), quick_replies (reply chips), choice (one option, or several with multiple), form (a few text, select, segmented or date fields).",
+      "A text field with secret: true asks for a password or a key: you get the value, OpenBot does not store it with the block, and you never repeat it. For an API key or token that a command uses, use request_api_key.",
+      'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button or option id, or "submit" for choice and form; values has the option ids under "selected" or the form values by field id;',
+      'actionId "_text" with "text" when the user answered in words. Or {"status":"skipped"}, or {"status":"expired"} when the turn ended first.',
+      "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information, not a permission: provider approvals still apply.",
+      "Ids: letters, digits and _ . : -, up to 64 characters, not starting with _. Write every field as plain text. In a channel, each member who reads the channel sees it.",
       'Example: {"block":{"type":"confirm","title":"Send the letter to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"cancel","label":"Cancel"}]}}.',
       'Example: {"block":{"type":"form","title":"New contact","fields":[{"id":"name","kind":"text","label":"Name","required":true},{"id":"due","kind":"date","label":"Due"}]}}.',
     ].join(" "),
@@ -693,11 +704,10 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "request_api_key",
     description: [
-      "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
-      "The user enters it in a secure form in this conversation. OpenBot saves it outside your workspace, for all agents or only you; you never get the value.",
-      'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
-      "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
-      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
+      "Ask the user for an API key, token or password that your task needs, and wait. The user enters it in a secure form; OpenBot saves it outside your workspace, for all agents or only you; you never get the value.",
+      'Result JSON: {"status":"saved","name","path"}; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
+      "Read the key from the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, log or copy the value, or write it into the workspace.",
+      "Call list_api_keys first: do not ask again for a saved key. A new answer replaces the saved key. Only the server owner or an admin can answer. Not in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
   },
@@ -730,15 +740,52 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     },
   },
   {
+    name: "send_feedback",
+    description:
+      "Send a bug report or a feature idea for OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the text and approves it before it is sent.",
+    shape: {
+      kind: z
+        .enum(["bug", "idea"])
+        .describe(
+          "bug: something in OpenBot does not work. idea: a feature request or another change that the user wants.",
+        ),
+      title: z.string().min(1).max(200).describe("A short summary in plain words, without a prefix."),
+      text: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe(
+          "In one to three plain sentences. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
+        ),
+      details: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe(
+          "For a bug: what the user did before it, as short numbered steps. For an idea: the problem that it solves. Leave it out when you do not know.",
+        )
+        .optional(),
+      type: z.enum(FEATURE_REQUEST_TYPES).describe("Ideas only. Your choice from the chat.").optional(),
+      area: z
+        .enum(BUG_REPORT_AREAS)
+        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
+        .optional(),
+      severity: z
+        .enum(BUG_REPORT_SEVERITIES)
+        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
+        .optional(),
+    },
+  },
+  {
     name: "react_to_user_message",
     description:
-      "Add one emoji reaction to the current user message for an obvious positive or negative emotional moment, including wins, affection, gratitude, humor, sadness, disappointment, frustration, empathy, or strong approval. An emoji in the written answer does not count as a reaction. Skip neutral messages and never use the reaction instead of the normal answer.",
+      "Add one emoji reaction to the current user message for a clear emotional moment, such as a win, affection, gratitude, humor, sadness, disappointment or frustration. An emoji in the written answer is not a reaction.",
     shape: { emoji: z.string().min(1).max(64).describe("Exactly one complete Unicode emoji.") },
   },
   {
     name: "send_message",
     description:
-      "Queue an asynchronous message and optional local files for one or more OpenBot agents. When replying, pass the original message id as replyToMessageId. Set expectsReply false to pass information on without asking the recipient for an answer.",
+      "Queue an asynchronous message and optional local files for one or more OpenBot agents. On a reply, pass the original message id as replyToMessageId.",
     shape: {
       recipientAgentIds: z.array(z.string()).min(1).max(32),
       text: z.string().min(1).max(100_000),
@@ -747,7 +794,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       expectsReply: z
         .boolean()
         .describe(
-          "True, the default, for a request, question, or delegated task: the recipient answers you and OpenBot sends its result back. False for information the recipient may act on but must not answer, such as a status update, a heads-up, or your own reply to a task. A false message ends the exchange.",
+          "True, the default, for a request, question or delegated task: OpenBot sends the recipient's result back. False for information that the recipient must not answer, such as a status or your own reply to a task; it ends the exchange.",
         )
         .optional(),
     },

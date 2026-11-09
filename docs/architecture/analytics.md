@@ -126,6 +126,14 @@ decode; the phase is any string in the file and the event drops a value outside 
 child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
 trace.
 
+At each sample, `ResourceMonitor` reads the heaps of the app window renderers from main through
+`webContents.debugger`: it attaches, sends `Runtime.getHeapUsage` and `Memory.getDOMCounters`, and
+detaches, with a 2 s deadline for each renderer process. The page runs no script for this, and
+`performance.memory` is not used because Blink rounds it and caches it for minutes. A renderer can
+answer with any number, so a schema with bounds decodes the answer. A window that is loading, has
+another debugger session or does not answer gives the sample no heap figures, because a part of the
+sum would be too low. The renderer needs no channel or preload change.
+
 App windows (`src/renderer/src/renderer-timing.ts`) count long tasks and input delays with
 `PerformanceObserver` and send the counts at most once a minute over `app:report-renderer-timing`.
 The main handler decodes bounded counts only; `ResourceMonitor` buffers them and adds them to the day

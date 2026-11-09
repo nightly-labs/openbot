@@ -163,6 +163,10 @@ export const messages = defineMessages("workflow", {
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "Search channels",
+  "workflow.output.postsAs": "Posts as",
+  "workflow.output.postsAsNote": "A note; no task starts",
   "workflow.output.target.file": "File",
   "workflow.output.target.notify": "Notification",
   "workflow.output.path": "File path",

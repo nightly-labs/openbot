@@ -65,9 +65,14 @@ class ProcessConfinementUnavailableError extends Error {
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 
+/** The state directory of the Grok CLI: `$GROK_HOME`, or `~/.grok`. */
+export function grokHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.GROK_HOME?.trim() || join(home, ".grok");
+}
+
 /** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
 export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const grokHome = env.GROK_HOME?.trim() || join(home, ".grok");
+  const grokHome = grokHomeDirectory(env, home);
   return {
     writable: [grokHome],
     protected: [
@@ -347,8 +352,9 @@ export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home 
  * Mistral Vibe 3.1.0 writes its session logs, history, caches, locks and the folders that it trusts
  * in its home folder. Its settings and MCP servers (`config.toml`), the saved API key (`.env`), the
  * trusted folders, hooks, instructions, tools, skills, agents, prompts and plugins are in that folder
- * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache is a
- * settings layer, so it stays read-only too. On macOS the CLI reads the API key of a sign-in from the
+ * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache and
+ * the model catalogue cache are settings layers, so they stay read-only too: the provider's shared
+ * process saves the catalogue, and a confined process reads it. Vibe 3.1.0 only logs a failed save. On macOS the CLI reads the API key of a sign-in from the
  * login Keychain with `security` (`keychainLockFiles`).
  */
 export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
@@ -373,6 +379,7 @@ export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = h
       "projects.toml",
       "local_projects.toml",
       "managed_config_cache.json",
+      "model_catalog_cache.json",
       "connector_bootstrap_cache.json",
     ].map((name) => join(vibeHome, name)),
   };

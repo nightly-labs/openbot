@@ -388,16 +388,15 @@ export const messages = {
     "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
-  "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
-    "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",
+    "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",
   "marketplace.plugin.composio.app":
-    "Composio MCP sunucunuza eklediğiniz uygulamalar, Composio hesabınızdaki bağlantı üzerinden.",
+    "Composio hesabınızda bağladığınız uygulamalar. Bir ajan, ihtiyaç duyduğunda bir uygulamayı bağlamanızı ister.",
   "marketplace.plugin.composio.prompt.inbox":
     "Okunmamış e-postalarımı özetle ve acil olanlara yanıt taslakları hazırla.",
   "marketplace.plugin.composio.prompt.handoff": "Bu çekme isteğinin özetini ekip kanalımıza gönder.",
   "marketplace.plugin.composio.prompt.apps": "Composio üzerinden hangi uygulamaları ve eylemleri kullanabilirsin?",
-  "marketplace.plugin.composio.hint.url": "Composio hesabınızdaki bir MCP sunucusunun URL'si",
   "marketplace.plugin.composio.hint.apiKey":
     "Composio hesabınızda, Settings > Sessions & API Key altında bulabilirsiniz.",
   "marketplace.plugin.neon.tagline": "Postgres projeleri, dalları ve geçişleri",
@@ -512,7 +511,6 @@ export const messages = {
     "Hava durumu zaman serilerinden oluşan bir veri kümesi bul ve sütunlarını göster.",
   "marketplace.auth.apiKey": "API anahtarı",
   "marketplace.auth.personalApiKey": "Kişisel API anahtarı",
-  "marketplace.auth.mcpUrl": "MCP URL'si",
   "marketplace.auth.createKey": "Anahtar oluştur",
 
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".

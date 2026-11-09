@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "النشاط الحالي",
   "chat.steps.show": "إظهار الخطوات",
   "chat.steps.hide": "إخفاء الخطوات",
+  "chat.steps.showError": "إظهار الخطأ",
+  "chat.steps.hideError": "إخفاء الخطأ",
   "chat.steps.list": "خطوات الوكيل",
   "chat.steps.count": {
     zero: "لا خطوات",
@@ -588,4 +590,8 @@ export const messages = {
   "chat.reference.kind.thread": "سلسلة",
   "chat.reference.open.tab": "إظهار علامة تبويب المتصفح {name}",
   "chat.reference.open.thread": "فتح السلسلة {name}",
+  "chat.feedbackSent.title": "شكرًا على ملاحظاتك 🙏",
+  "chat.feedbackSent.badge": "تم الإرسال",
+  "chat.feedbackSent.body": "سيقرأها فريق OpenBot ويتولى أمرها 💜",
+  "chat.feedbackSent.openNamed": "فتح المشكلة #{number} على GitHub",
 } as const satisfies PartialTranslation<typeof source>;

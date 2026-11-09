@@ -74,6 +74,10 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     const delivery = deps.activeDeliveries()[0];
     if (delivery) return `${agentId}:delivery:${delivery.id}`;
     if (deps.props.activeTurnId) return `${agentId}:turn:${deps.props.activeTurnId}`;
+    // A new agent prepares its welcome. Its setup message has no delivery in the queue, so this
+    // shows that the agent works, from creation until the turn starts.
+    const queue = deps.props.queue;
+    if (queue?.welcome && queue.agentId === agentId) return `${agentId}:welcome`;
     // The agent is working, on a channel thread rather than this one. Its turn belongs to that
     // thread, so nothing above reports it, and without this the chat shows an idle agent that
     // answers nothing. Only the agent the work belongs to: the same channel assignment holds the

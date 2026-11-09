@@ -276,6 +276,8 @@ interface ChatMessageListProps {
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
+  /** True while the chat shows the messages that the phone kept and reads its latest page. */
+  catchingUp?: boolean;
   messages: ChatMessage[];
   messageAliases: ReadonlyMap<string, string>;
   referenceMessages: ChatMessage[];
@@ -1223,6 +1225,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onRespondApproval,
   foreground,
   historyState,
+  catchingUp = false,
   messages,
   messageAliases,
   referenceMessages,
@@ -1309,7 +1312,9 @@ export const ChatMessageList = memo(function ChatMessageList({
   const reducedMotion = useReducedMotion();
   const textReveal = useMotionPreference("textReveal");
   const animateMessages = isFocused && online && appActive;
-  const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
+  // The latest page that a kept chat reads brings messages that the user did not watch arrive.
+  const watchesArrivals = animateMessages && historyState === "ready" && !catchingUp;
+  const replyHaptics = useReplyHaptics(watchesArrivals && motion.responseVisible);
   const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
   const replySession = useMemo(
     () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
@@ -1328,7 +1333,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     },
     [replySession],
   );
-  const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
+  const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
   const agentColorMessages = useAgentColorMessages((state) => state.enabled);
   const userBubbleColor = avatarHeadColor(
     target.kind === "agent" ? target.avatarSeed : target.id,

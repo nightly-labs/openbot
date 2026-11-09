@@ -349,6 +349,8 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
+  "error.backend.browserCertificateUntrusted":
+    "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",

@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "הפעילות הנוכחית",
   "chat.steps.show": "הצגת השלבים",
   "chat.steps.hide": "הסתרת השלבים",
+  "chat.steps.showError": "הצגת השגיאה",
+  "chat.steps.hideError": "הסתרת השגיאה",
   "chat.steps.list": "שלבי הסוכן",
   "chat.steps.count": { one: "שלב אחד", two: "שני שלבים", other: "{count} שלבים" },
   "chat.steps.failed": { one: "אחד נכשל", two: "שניים נכשלו", other: "{count} נכשלו" },
@@ -444,4 +446,8 @@ export const messages = {
   "chat.reference.kind.thread": "שרשור",
   "chat.reference.open.tab": "הצגת לשונית הדפדפן {name}",
   "chat.reference.open.thread": "פתיחת השרשור {name}",
+  "chat.feedbackSent.title": "תודה על המשוב 🙏",
+  "chat.feedbackSent.badge": "נשלח",
+  "chat.feedbackSent.body": "צוות OpenBot יקרא ויטפל בזה 💜",
+  "chat.feedbackSent.openNamed": "פתיחת issue #{number} ב-GitHub",
 } as const satisfies PartialTranslation<typeof source>;

@@ -26,6 +26,9 @@ export const messages = {
   "error.workflow.notRetryable": "再実行できるのは、失敗または停止したステップだけです。",
   "error.workflow.noDecision": "このステップは判断を待っていません。",
   "error.workflow.outputPlaceMissing": "この出力のメッセージングの投稿先を選んでください。",
+  "error.workflow.outputChannelMissing": "この出力のチャンネルを選んでください。",
+  "error.workflow.outputChannelFailed":
+    "OpenBot は結果をチャンネルに投稿できませんでした。ステップをもう一度実行してください。",
   "error.workflow.discordNoMessage":
     "この出力は実行を開始した Discord メッセージに対して動作します。Discord のメンションから実行を開始するか、「チャンネルに投稿」を選んでください。",
   "error.workflow.slackNoMessage":

@@ -2,10 +2,15 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText, registerSecretValue } from "@openbot/logging";
+import { registerSecretValue } from "@openbot/logging";
 import { Effect, Fiber } from "effect";
 import { cliSpawnTarget } from "./cli";
-import { type ProviderClientOperationError, ProviderSignInError, providerFailure } from "./provider-client-effects";
+import {
+  type ProviderClientOperationError,
+  ProviderSignInError,
+  providerFailure,
+  signInReason,
+} from "./provider-client-effects";
 import { type ProviderTempOptions, spawnWithProviderTemp } from "./provider-temp";
 import { stopProcessTree } from "./windows-process-tree";
 
@@ -17,19 +22,12 @@ type AcpMessage =
 /** A method of the agent's own, outside ACP. Its name starts with `_`. */
 export type AcpExtensionMethod = `_${string}`;
 
-/** The most characters of the server's own reason that a failed sign-in shows. */
-const SERVER_REASON_LIMIT = 200;
-
 /** The server's reason for a refused call, redacted and short, or `null` when it gave none. */
 function serverReason(error: unknown): string | null {
   if (!isDynamicRecord(error)) return null;
   const details = isDynamicRecord(error.data) ? error.data.details : undefined;
   const text = typeof details === "string" ? details : error.message;
-  if (typeof text !== "string") return null;
-  const reason = redactText(text.trim().replace(/\s+/gu, " "));
-  if (!reason) return null;
-  const characters = Array.from(reason);
-  return characters.length > SERVER_REASON_LIMIT ? `${characters.slice(0, SERVER_REASON_LIMIT - 1).join("")}…` : reason;
+  return typeof text === "string" ? signInReason(text) : null;
 }
 
 /**

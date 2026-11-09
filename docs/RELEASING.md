@@ -476,6 +476,16 @@ Use short, plain sentences that explain what the user can do. Put required upgra
 developer setup, internal paths, credentials, or unpublished plans. Review this text with the
 release notes before tagging. A release can have no dialog entry when it has nothing to show.
 
+The dialog shows the notes in the app language. Each translated language has
+`src/renderer/src/features/updates/whats-new/<locale>.json` in the shape of the English file. When
+you add a release to the English file, add its translation to each of these files: the same version
+and date, the same notices, groups and item order, and one item for each English item. Write the
+first sentence of each item as its headline, as in English; Chinese and Japanese end it with `。`.
+Use the tone, the terms, and the screen names of the app catalogs in [i18n.md](i18n.md#terms).
+`bun scripts/whats-new-translations.ts <version>` checks the files; `release:preflight` and the
+tag workflow run it and stop a release that has no translation. A release that a file does not
+have shows in English, so an older release that was never translated keeps its English text.
+
 The app bundles this text and loads it when needed, so reading it does not send data or require
 network access. The full changelog button opens the existing public page. Changing the bundled
 text requires a new app release. Missing entries do not cause a network fallback.

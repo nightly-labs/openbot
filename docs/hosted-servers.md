@@ -649,9 +649,10 @@ again with backoff (30 s to 10 min) and then publishes the host.
 ## Memory
 
 One systemd unit holds OpenBot, its browser tabs and every agent process: one `claude` process for
-each thread, and one set of MCP servers for each ACP session. A Starter server has 4 GB. The guards
-are on a hosted server, a [self-hosted server](self-hosted-server.md#memory) and a
-[container](docker.md#memory); the desktop app does not change.
+each thread, one set of MCP servers for each ACP session, and one set for each loaded Codex thread.
+A Starter server has 4 GB. The guards are on a hosted server, a
+[self-hosted server](self-hosted-server.md#memory) and a [container](docker.md#memory); the desktop
+app does not change.
 
 The unit (`openbot.service`):
 
@@ -681,7 +682,7 @@ do not all pass the check before their processes grow. A start that fails counts
 | Level | When | What happens |
 | --- | --- | --- |
 | `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
-| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. |
+| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
 | `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
 
 Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):

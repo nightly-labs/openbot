@@ -58,6 +58,10 @@ export const SIGNAL_TURN_CREDENTIAL_TTL_SECONDS = 60 * 60;
 // working for everyone except the users behind a symmetric NAT.
 export const SIGNAL_TURN_REFRESH_INTERVAL_MS = Math.floor(SIGNAL_TURN_CREDENTIAL_TTL_SECONDS * 0.75) * 1_000;
 
+// The code that the desktop's WebRTC window gives main in `signal-closed` when it replaced a host
+// socket that did not answer in time. It is not a WebSocket close code and never goes to Signal.
+export const SIGNAL_NO_READY_CLOSE_CODE = "no-ready";
+
 // Which side of the relay a socket is. Only a host may set `multiplex`. An `ingress` socket belongs
 // to a host too, but it only receives Slack and Discord deliveries: Signal never attaches a client
 // to it, so it can stay open while the host is not published.

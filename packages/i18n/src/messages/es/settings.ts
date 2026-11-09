@@ -103,7 +103,7 @@ export const messages = {
     "Muestra Reaccionar, Responder y Más junto a un mensaje, y la hora entre los mensajes. Si está desactivado, todas las acciones y la hora se muestran debajo de cada mensaje.",
   "settings.busyMessage.title": "Orientar a los agentes mientras trabajan",
   "settings.busyMessage.description":
-    "Los mensajes nuevos se incorporan al trabajo actual del agente, no a la cola. Funciona con ChatGPT y Claude.",
+    "Los mensajes nuevos se incorporan al trabajo actual del agente, no a la cola. Con los agentes que no lo admiten, esperan en la cola.",
   "settings.agentDefaults.title": "Predeterminados",
   "settings.agentDefaults.description": "Los agentes siguen estos valores, salvo que los cambies para un agente.",
   "settings.agentDefaults.value": "Predeterminado: {value}",
@@ -260,7 +260,7 @@ export const messages = {
   "settings.tab.notifications.description": "Elige cómo te avisa OpenBot.",
   "settings.tab.voice.title": "Voz",
   "settings.tab.voice.description":
-    "Dictado en el cuadro de mensaje. Los modelos locales se ejecutan en este equipo; ElevenLabs, en la nube.",
+    "Dictado en el cuadro de mensaje. Los modelos locales se ejecutan en este equipo; ElevenLabs y Groq, en la nube.",
   "settings.tab.computerUse.title": "Uso del equipo",
   "settings.tab.computerUse.description":
     "Permite que los agentes del OpenBot de este equipo vean y usen sus apps. Los agentes de otro servidor usan el equipo de ese servidor.",
@@ -632,6 +632,10 @@ export const messages = {
   "settings.voice.removeFailed": "No se pudo quitar el modelo. Inténtalo de nuevo.",
   "settings.voice.model.elevenlabs.description":
     "Envía tu voz a ElevenLabs. El texto aparece mientras hablas y no cambia. Usa tu propia clave de API, y ElevenLabs cobra cada uso.",
+  "settings.voice.model.groqTurbo.description":
+    "Envía cada grabación a Groq al detenerla. Rápido y con muchos idiomas. Usa tu propia clave de API, y Groq cobra cada uso.",
+  "settings.voice.model.groqLarge.description":
+    "Envía cada grabación a Groq al detenerla. Más preciso que turbo, pero más lento. Usa tu propia clave de API, y Groq cobra cada uso.",
   "settings.voice.apiKey.placeholder": "Pega la clave",
   "settings.voice.apiKey.save": "Guardar clave",
   "settings.voice.apiKey.remove": "Quitar clave",

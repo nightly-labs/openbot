@@ -103,7 +103,7 @@ export const messages = {
     "Mostra Reagir, Responder e Mais ao lado de uma mensagem, e a hora entre as mensagens. Desativado, todas as ações e a hora aparecem abaixo de cada mensagem.",
   "settings.busyMessage.title": "Orientar agentes enquanto trabalham",
   "settings.busyMessage.description":
-    "Novas mensagens entram no trabalho atual do agente, não na fila. Funciona com ChatGPT e Claude.",
+    "Novas mensagens entram no trabalho atual do agente, não na fila. Com agentes que não suportam isso, elas esperam na fila.",
   "settings.agentDefaults.title": "Padrões",
   "settings.agentDefaults.description": "Os agentes seguem estes padrões, a menos que você os altere para um agente.",
   "settings.agentDefaults.value": "Padrão: {value}",
@@ -258,7 +258,7 @@ export const messages = {
   "settings.tab.notifications.description": "Escolha como o OpenBot avisa você.",
   "settings.tab.voice.title": "Voz",
   "settings.tab.voice.description":
-    "Ditado na caixa de mensagem. Os modelos locais rodam neste computador; o ElevenLabs roda na nuvem.",
+    "Ditado na caixa de mensagem. Os modelos locais rodam neste computador; o ElevenLabs e o Groq rodam na nuvem.",
   "settings.tab.computerUse.title": "Uso do computador",
   "settings.tab.computerUse.description":
     "Permita que os agentes do OpenBot deste computador vejam e usem os apps dele. Agentes de outro servidor usam o computador desse servidor.",
@@ -623,6 +623,10 @@ export const messages = {
   "settings.voice.removeFailed": "Não foi possível remover o modelo. Tente novamente.",
   "settings.voice.model.elevenlabs.description":
     "Envia sua voz para a ElevenLabs. O texto aparece enquanto você fala e não muda. Usa sua própria chave de API, e a ElevenLabs cobra cada uso.",
+  "settings.voice.model.groqTurbo.description":
+    "Envia cada gravação para a Groq quando você para. Rápido e com muitos idiomas. Usa sua própria chave de API, e a Groq cobra cada uso.",
+  "settings.voice.model.groqLarge.description":
+    "Envia cada gravação para a Groq quando você para. Mais preciso que o turbo, mas mais lento. Usa sua própria chave de API, e a Groq cobra cada uso.",
   "settings.voice.apiKey.placeholder": "Cole a chave",
   "settings.voice.apiKey.save": "Salvar chave",
   "settings.voice.apiKey.remove": "Remover chave",

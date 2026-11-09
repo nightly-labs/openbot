@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} が時間内に応答しなかったため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpSignInLost":
     "{provider} のサインインが失われたため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpPlanUsedUp":
+    "{provider} のプランの利用上限に達しました。別のモデルを選ぶか、{provider} のプランをアップグレードしてください。",
   "error.provider.acpMcpNotLoaded":
     "{provider} が OpenBot のツールを読み込まなかったため、このエージェントはツールを使えず、チームメイトにも連絡できません。{provider} のチームポリシーがローカル MCP サーバーをブロックしている可能性があります。チーム管理者に許可を依頼してから、もう一度お試しください。",
   "error.provider.endpointsReadOnly":
@@ -322,6 +324,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",
   "error.provider.geminiKeyRefused":
     "Gemini は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度接続してください。",
+  "error.provider.geminiVerificationRequired":
+    "Gemini が応答するには、Google でアカウントの確認が必要です。ブラウザーで Google アカウントを確認してから、もう一度メッセージを送信してください。",
   "error.provider.keyProviderRefused":
     "{provider} は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度お試しください。",
   "error.provider.keyProviderNoBalance":

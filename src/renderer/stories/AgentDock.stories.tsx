@@ -1,3 +1,4 @@
+import { AVATAR_HUES } from "@openbot/contracts/ipc";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import {
@@ -39,7 +40,19 @@ const support: AgentProfile = {
   avatarHue: 150,
   threadId: "support-thread",
 };
-const AGENTS = [chief, research, sales, design, support];
+/** More copies of the fixture agents, so the dock has more seats than the screen shows. */
+const EXTRA_AGENTS: AgentProfile[] = Array.from({ length: 10 }, (_, index) => {
+  const base = [chief, research, sales][index % 3] ?? chief;
+  return {
+    ...base,
+    id: `extra-${index + 1}`,
+    name: `${base.name} ${index + 2}`,
+    avatarSeed: `extra-${index + 1}`,
+    avatarHue: AVATAR_HUES[index % AVATAR_HUES.length] ?? null,
+    threadId: `extra-${index + 1}-thread`,
+  };
+});
+const AGENTS = [chief, research, sales, design, support, ...EXTRA_AGENTS];
 
 /** The state of each agent: the same states as the sidebar badges. */
 const ACTIVITY: Record<string, { mood: AvatarMood; state: SidebarAgentState | undefined }> = {
@@ -227,6 +240,14 @@ export const FinishedWork: Story = {
   render: () => (
     <AgentDockStory seats={["chief", "research", "sales", "design", "support"]} results={finishedFixture(Date.now())} />
   ),
+};
+
+/**
+ * Fifteen agents: more than the dock shows. Scroll the seats; the edges fade where more agents are
+ * behind them. An agent that you open at a faded edge scrolls into view.
+ */
+export const ManyAgents: Story = {
+  render: () => <AgentDockStory seats={AGENTS.map((agent) => agent.id)} />,
 };
 
 /** No agent on the dock yet: only the + button. */

@@ -376,15 +376,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
   "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
-  "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
+  "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
-    "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",
+    "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",
   "marketplace.plugin.composio.app":
-    "التطبيقات التي تضيفها إلى خادم Composio MCP، عبر الرابط من حساب Composio الخاص بك.",
+    "التطبيقات التي تربطها في حساب Composio. يطلب منك الوكيل ربط تطبيق عندما يحتاج إليه.",
   "marketplace.plugin.composio.prompt.inbox": "لخّص بريدي غير المقروء وصُغ ردودًا على الرسائل العاجلة.",
   "marketplace.plugin.composio.prompt.handoff": "انشر ملخص طلب السحب هذا في قناة فريقنا.",
   "marketplace.plugin.composio.prompt.apps": "ما التطبيقات والإجراءات التي يمكنك استخدامها عبر Composio؟",
-  "marketplace.plugin.composio.hint.url": "عنوان URL لخادم MCP في حساب Composio الخاص بك",
   "marketplace.plugin.composio.hint.apiKey": "تجده في حساب Composio، ضمن Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "مشاريع Postgres والفروع وعمليات الترحيل",
   "marketplace.plugin.neon.description":
@@ -493,7 +492,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "ابحث عن مجموعة بيانات لسلاسل زمنية للطقس واعرض أعمدتها.",
   "marketplace.auth.apiKey": "مفتاح API",
   "marketplace.auth.personalApiKey": "مفتاح API شخصي",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "إنشاء مفتاح",
 
   "marketplace.skill.doc": "SKILL.md",

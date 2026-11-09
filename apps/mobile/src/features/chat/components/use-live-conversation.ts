@@ -1,3 +1,5 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
   type ChannelMessage,
   type ChannelTask,
@@ -20,7 +22,7 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
+import { type ReplyReading, replyVoiceFailureText, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
@@ -69,6 +71,8 @@ interface LiveConversationInput {
   foreground: boolean;
   /** The agent's conversation; null in a channel. */
   conversation: { messages: readonly ConversationMessage[]; activeTurnId: string | null } | null;
+  /** The agent's provider, which names the ids of its progress updates. Undefined in a channel. */
+  provider: AgentProviderRef | undefined;
   /** The channel; null in an agent chat. */
   channel: LiveChannel | null;
   deliveries: readonly Pick<QueueDelivery, "messageId" | "turnId">[];
@@ -228,6 +232,11 @@ function createController({
   let readIds: string[] = [];
   let speakerId: string | null = null;
   const readTexts = new Map<string, string>();
+  /**
+   * The progress updates read aloud in the newest turn. A stop of the reading keeps them: words that
+   * steer the running turn do not read its earlier updates again.
+   */
+  let readUpdates: { turnId: string; ids: Set<string> } | null = null;
   /** Each turn, interruption and the end make the work of the turn before them stale. */
   let generation = 0;
   let pauseTimer: ReturnType<typeof setTimeout> | null = null;
@@ -337,17 +346,20 @@ function createController({
   }
 
   /**
-   * Reads the answer while the agent writes it. A turn can answer in more than one message: their
-   * texts join in order, so the text only grows. The phase turns to speaking when the first part plays.
+   * Reads the answer while the agent writes it. A turn can answer in more than one message, and its
+   * progress updates come before the answer: their texts join in order, so the text only grows. The
+   * phase turns to speaking when the first part plays.
    */
-  function readAnswer(answer: ConversationMessage, complete: boolean): void {
+  function readAnswer(answer: ConversationMessage, complete: boolean, settled = false): void {
     if (!reading) {
       const own = generation;
       reading = streamReply({
         onPart: (part) => {
           if (own !== generation) return;
           if (phase !== "speaking") {
-            clearTimers();
+            // The grace timer stays: a turn that ends with only progress updates completes the reading.
+            if (pauseTimer) clearTimeout(pauseTimer);
+            pauseTimer = null;
             setPhase("speaking");
             speechLevel.set(
               withRepeat(
@@ -364,17 +376,35 @@ function createController({
         onDone: () => {
           if (own === generation && open) listen();
         },
-        onError: (failure) => {
+        onError: (failure, reason) => {
           if (own !== generation || !open) return;
           listen();
-          update({ error: currentText().t(REPLY_VOICE_FAILURE_TEXT[failure]) });
+          update({ error: replyVoiceFailureText(failure, reason) });
         },
       });
     }
     if (!readTexts.has(answer.id)) readIds.push(answer.id);
     readTexts.set(answer.id, answer.text);
-    reading.update(readIds.map((id) => readTexts.get(id) ?? "").join("\n\n"), complete);
+    // A complete update plays to its end at once, when it is the last text: the next text can come minutes later.
+    reading.update(
+      readIds.map((id) => readTexts.get(id) ?? "").join("\n\n"),
+      complete,
+      settled && readIds.at(-1) === answer.id,
+    );
     if (complete) pending = null;
+  }
+
+  /**
+   * Ends a reply that has no answer to read. The progress updates that play continue to their end,
+   * then the microphone opens.
+   */
+  function endWithoutAnswer(): void {
+    if (!reading) {
+      listen();
+      return;
+    }
+    pending = null;
+    reading.update(readIds.map((id) => readTexts.get(id) ?? "").join("\n\n"), true);
   }
 
   /**
@@ -423,6 +453,26 @@ function createController({
       }
     }
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
+    // Each progress update is read when it is complete, as on desktop. A stopped or failed turn ends
+    // its open update part way, so only a completed one is read.
+    const provider = input().provider;
+    if (turnId && readUpdates?.turnId !== turnId) readUpdates = { turnId, ids: new Set() };
+    for (const update of conversation.messages)
+      if (
+        turnId &&
+        readUpdates &&
+        update.turnId === turnId &&
+        update.author === "assistant" &&
+        update.itemType === "commentary" &&
+        update.status === "completed" &&
+        update.text.trim() &&
+        !readTexts.has(update.id) &&
+        !readUpdates.ids.has(update.id) &&
+        isNarrationItemId(update.id, provider)
+      ) {
+        readUpdates.ids.add(update.id);
+        readAnswer(update, false, true);
+      }
     // The answer plays while it streams. It is complete when it is done and its turn has ended.
     if (answer && (answer.status === "streaming" || answer.status === "completed")) {
       current.endedAt = null;
@@ -433,7 +483,7 @@ function createController({
     }
     // A stopped or failed answer is not read, as on desktop.
     if (answer) {
-      listen();
+      endWithoutAnswer();
       return;
     }
     if (!turnId || active) {
@@ -446,7 +496,7 @@ function createController({
     current.endedAt = Date.now();
     const own = generation;
     graceTimer = setTimeout(() => {
-      if (own === generation && pending === current) listen();
+      if (own === generation && pending === current) endWithoutAnswer();
     }, REPLY_GRACE_MS);
   }
 

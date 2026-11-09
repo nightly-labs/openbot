@@ -24,6 +24,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { readJsonBody } from "../backend/local-mcp-bridge";
+import { cutModelText, MCP_RESULT_MORE, MCP_RESULT_TEXT_LIMIT } from "../backend/model-text-limit";
 
 const logger = createOpenBotLogger("github-mcp-proxy");
 
@@ -236,6 +237,7 @@ export class GitHubMcpProxy {
       return forward(token, async (client) => {
         const result = await client.callTool(params, undefined, requestOptions(extra.signal));
         if (params.name === "create_repository") addRepositoryCreationHint(result);
+        boundTextContent(result);
         return result;
       });
     });
@@ -325,6 +327,19 @@ function addRepositoryCreationHint(result: Awaited<ReturnType<Client["callTool"]
     (item) => isDynamicRecord(item) && isString(item.text) && item.text.includes(MISSING_PERMISSION),
   );
   if (refused) result.content.push({ type: "text", text: REPOSITORY_CREATION_HINT });
+}
+
+/**
+ * Cuts each text item past the model limit: a long issue list or search result otherwise stays in the
+ * agent's context for the rest of the session. The note says how to read more.
+ */
+function boundTextContent(result: Awaited<ReturnType<Client["callTool"]>>): void {
+  if (!Array.isArray(result.content)) return;
+  result.content = result.content.map((item) => {
+    if (!isDynamicRecord(item) || item.type !== "text" || !isString(item.text)) return item;
+    const cut = cutModelText(item.text, MCP_RESULT_TEXT_LIMIT, MCP_RESULT_MORE);
+    return cut ? { ...item, text: `${cut.text}\n${cut.note}` } : item;
+  });
 }
 
 function requestOptions(signal: AbortSignal): RequestOptions {

@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { promisify } from "node:util";
 import {
   type CanUseTool,
@@ -25,16 +26,11 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AgentContextCategoryUsage, defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
-import {
-  isTurnContextBlock,
-  type MemoryContext,
-  memoryContextUpdate,
-  NATURAL_TURN_REMINDER,
-  type SectionTeammates,
-  sectionTeammatesUpdate,
-} from "./agent/developer-instructions";
+import { z } from "zod";
+import { advertisedZodShape } from "./agent/advertised-json-schema";
+import { isTurnContextBlock } from "./agent/developer-instructions";
 import {
   type ClaudePlanState,
   foldClaudePlanCall,
@@ -57,7 +53,8 @@ import {
   type SubagentState,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { claudeBridgedToolName, VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
+import { claudeBridgedToolName, visibleToolDefinitions } from "./agent/tool-catalog";
+import { TurnContext } from "./agent/turn-context";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
   type AgentProvider,
@@ -92,6 +89,7 @@ import {
   isClaudeTaskNotification,
 } from "./conversation-snapshots";
 import { runCauseEffect } from "./effect-boundary";
+import { skillFolderNames } from "./home-skills";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -132,6 +130,7 @@ import {
   toProviderClientOperationError,
 } from "./provider-client-effects";
 import type { ReadProviderHistory } from "./provider-history";
+import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -161,6 +160,99 @@ const CLAUDE_NATIVE_SCHEDULING = [
  * OpenBot workflow tools.
  */
 const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow", "Skill(workflow-authoring)"];
+/**
+ * Claude tools and agent types for a Claude Code host, which OpenBot is not. `ReportFindings` puts
+ * code review findings in the Claude Code review panel, which OpenBot does not have, and tells the
+ * model not to also write them as text. `DesignSync` and `PushNotification` send to
+ * claude.ai Design and the Claude mobile app. The `statusline-setup` agent edits the Claude Code
+ * status line, `claude-code-guide` answers questions about the Claude Code CLI, and `claude` is a
+ * second `general-purpose`. Together about 1.3k tokens in each request; `general-purpose`, `Explore`,
+ * `Plan` and `web-fetch` stay.
+ */
+export const CLAUDE_HOST_TOOLS = [
+  "ReportFindings",
+  "DesignSync",
+  "PushNotification",
+  "Agent(statusline-setup)",
+  "Agent(claude-code-guide)",
+  "Agent(claude)",
+];
+
+/**
+ * Bundled skills that cannot work in an OpenBot agent: their tools are blocked or off there
+ * (`Workflow`, the cron tools, Artifact, Remote Control), or they edit the Claude Code setup that
+ * OpenBot owns. A deny rule refuses a skill's call but keeps its listing, so they go off.
+ */
+export const CLAUDE_UNFIT_SKILLS = [
+  "deep-research",
+  "design",
+  "design-sync",
+  "doctor",
+  "fewer-permission-prompts",
+  "keybindings-help",
+  "loop",
+  "plugin-authoring",
+  "schedule",
+  "send-to-project",
+  "update-config",
+  "workflow-authoring",
+];
+/** Bundled coding skills. The model sees their names without their descriptions and can still use them. */
+const CLAUDE_NAME_ONLY_SKILLS = [
+  "batch",
+  "claude-api",
+  "code-review",
+  "dataviz",
+  "debug",
+  "init",
+  "run",
+  "run-skill-generator",
+  "security-review",
+  "simplify",
+  "verify",
+];
+/**
+ * The settings that OpenBot adds to each query. `disableRemoteControl` takes away `SendToProject`
+ * and `SendToProjectContext`, which send work to other Claude Code sessions, outside OpenBot. The
+ * empty `attribution` keeps Claude's co-author line out of the user's commits and pull requests, and
+ * its instructions out of each request.
+ * `bun run bench:claude-prompt-settings` measured the prompt of each request on CLI 2.1.318, Haiku 5.5,
+ * without the user setup: 16,350 tokens before the skill overrides and Remote Control setting, 14,156
+ * after; then 14,130 before `CLAUDE_HOST_TOOLS`, the extra skills and `attribution`.
+ *
+ * Flag settings come before the user, project and local settings, so a value of OpenBot would
+ * replace a value that the user set. The query leaves out each skill override whose name is a skill
+ * of the user or the project that the query loads, and each key that a settings file it loads sets.
+ */
+const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
+  configDirectory: string,
+  cwd: string,
+  sources: NonNullable<Options["settingSources"]>,
+) {
+  const files = [
+    ...(sources.includes("user") ? [join(configDirectory, "settings.json")] : []),
+    ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
+    ...(sources.includes("local") ? [join(cwd, ".claude", "settings.local.json")] : []),
+  ];
+  const ownSettings = yield* Effect.forEach(files, readClaudeSettingsFile);
+  const ownSkills = new Set([
+    ...(sources.includes("user") ? yield* skillFolderNames(join(configDirectory, "skills")) : []),
+    ...(sources.includes("project") ? yield* skillFolderNames(join(cwd, ".claude", "skills")) : []),
+  ]);
+  const ownOverride = (skill: string) =>
+    ownSettings.some((file) => isDynamicRecord(file.skillOverrides) && Object.hasOwn(file.skillOverrides, skill));
+  const overrides: Array<[string, "off" | "name-only"]> = [
+    ...CLAUDE_UNFIT_SKILLS.map((skill): [string, "off"] => [skill, "off"]),
+    ...CLAUDE_NAME_ONLY_SKILLS.map((skill): [string, "name-only"] => [skill, "name-only"]),
+  ];
+  const ownAttribution = ownSettings.some((file) => "attribution" in file || "includeCoAuthoredBy" in file);
+  const settings: Settings = {
+    ...(ownAttribution ? {} : { attribution: { commit: "", pr: "" } }),
+    disableRemoteControl: true,
+    skillOverrides: Object.fromEntries(overrides.filter(([skill]) => !ownSkills.has(skill) && !ownOverride(skill))),
+  };
+  return settings;
+});
 
 /** The longest tool description the activity line shows. The model writes about 5 to 10 words. */
 const TOOL_DESCRIPTION_LIMIT = 120;
@@ -299,6 +391,8 @@ interface ThreadRuntime {
   subagents: SubagentState;
   /** Background subagents and commands that outlive their turn. Stopping the process ends them (#1870). */
   backgroundTasks: number;
+  /** When the process last sent a message. With no turn, only background work sends one. */
+  lastOutputAt: number;
   /**
    * The uuid of the message that the CLI's next turn of its own answers, such as a steer that came
    * after the turn's last request. Its history names the turn by that uuid (#3365).
@@ -310,6 +404,8 @@ interface ThreadRuntime {
   mcpConfigFile: string | null;
   /** The `--settings` file of this query until it closes. See `writeClaudeFlagSettings`. */
   settingsFile: string | null;
+  /** The end of the CLI's stderr when OpenBot starts the CLI. See `spawnClaudeProcessGroup`. */
+  stderr: ClaudeStderrTail;
 }
 
 /** The limit of `claude auth status` when the caller names none. */
@@ -320,13 +416,19 @@ const AUTH_STATUS_TIMEOUT_MS = 5_000;
  * its MCP servers, and the SDK resumes the same session from disk, so an idle thread costs only a
  * slower first message when the user comes back.
  */
-const CLAUDE_THREAD_IDLE_RELEASE_MS = 10 * 60_000;
+const CLAUDE_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
 
 /**
  * How many idle threads keep their `claude` process before the timeout. A user who runs one turn on
- * each of five agents otherwise holds five processes of about 140 MB each for ten minutes.
+ * each of five agents otherwise holds five processes of about 140 MB each for five minutes.
  */
-const CLAUDE_IDLE_THREAD_LIMIT = 2;
+const CLAUDE_IDLE_THREAD_LIMIT = 1;
+
+/**
+ * How long background work that sends nothing keeps its thread's `claude` process while the machine
+ * is low on memory. With enough memory, background work holds the process until it ends (#1870).
+ */
+const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
 interface ClaudeStreamMessage {
   type: string;
@@ -402,6 +504,24 @@ function claudeSettingSources(
 }
 
 /**
+ * One Claude settings file. A missing or unreadable file, or one that is not a JSON object, gives an
+ * empty record. The file can hold secrets, so no value of it is logged.
+ */
+const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (path: string) {
+  const text = yield* Effect.tryPromise(() => readFile(path, "utf8")).pipe(Effect.option);
+  if (Option.isNone(text)) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.value);
+  } catch {
+    queryLogger.warn("OpenBot reads no values from a Claude settings file: the file is not valid JSON.", { path });
+    return {};
+  }
+  const record: DynamicRecord = isDynamicRecord(parsed) ? parsed : {};
+  return record;
+});
+
+/**
  * The sign-in part of the user settings, for a query that does not load the user settings: the
  * account and API backend keys, which cost no prompt tokens. The sign-in probe reads the whole file,
  * so without them an agent turn could use another account or backend than the provider settings
@@ -409,20 +529,7 @@ function claudeSettingSources(
  * A missing or unreadable file gives nothing. The file can hold secrets, so no value of it is logged.
  */
 const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (configDirectory: string) {
-  const text = yield* Effect.tryPromise(() => readFile(join(configDirectory, "settings.json"), "utf8")).pipe(
-    Effect.option,
-  );
-  if (Option.isNone(text)) return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.value);
-  } catch {
-    queryLogger.warn(
-      "Claude starts without the sign-in settings of ~/.claude/settings.json: the file is not valid JSON.",
-    );
-    return {};
-  }
-  if (!isDynamicRecord(parsed)) return {};
+  const parsed = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
   const stringSetting = (key: string): string | null => {
     const value = parsed[key];
     return isString(value) ? value : null;
@@ -454,6 +561,7 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
+  readonly turnContext = true;
   #queryRestarts = 0;
   readonly provider: AgentProvider = "claude";
   readonly #cli: ClaudeCliInfo;
@@ -497,19 +605,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
   /**
-   * Each thread's essential memories: the latest that OpenBot gave, and the last that a turn sent.
-   * They go with the turns, not in the system prompt, so a memory change keeps the cached prefix
-   * and restarts no query. Kept by thread, not by query: a restarted or reopened query resumes a
-   * conversation that already holds the memories it was sent.
+   * The memories and section-mates of each thread. They go with the turns, not in the system
+   * prompt, so a memory change keeps the cached prefix and restarts no query.
    */
-  readonly #memoryContexts = new Map<string, { current: MemoryContext; delivered: MemoryContext | null }>();
-  /** The same for the section-mates. `undefined` as `delivered`: the context can hold any earlier list. */
-  readonly #teammates = new Map<
-    string,
-    { current: SectionTeammates | null; delivered: SectionTeammates | null | undefined }
-  >();
-  /** The threads whose turns repeat the natural style's first-line rule (`NATURAL_TURN_REMINDER`). */
-  readonly #styleReminders = new Set<string>();
+  readonly #turnContext = new TurnContext();
   /** Resumes of one thread run one after another: two at once would leave a query nobody closes. */
   readonly #threadResumes = new Map<string, Deferred.Deferred<void, ProviderClientOperationError>>();
   #running = false;
@@ -600,6 +699,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return this.#threads.releaseIdle();
   }
 
+  /**
+   * Closes each thread with no turn whose background work sent nothing for `quietForMs`. The memory
+   * guard calls it only while the machine is low on memory: the work then ends with the process.
+   * Its next turn resumes the session. With enough memory the work holds its process (#1870).
+   */
+  readonly releaseQuietBackgroundThreads = Effect.fn("ClaudeAgentClient.releaseQuietBackgroundThreads")(function* (
+    this: ClaudeAgentClient,
+    quietForMs = CLAUDE_BACKGROUND_QUIET_RELEASE_MS,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const now = Date.now();
+    const closed = yield* this.#threads.releaseWhere(
+      (runtime) =>
+        runtime.config.persistSession && runtime.backgroundTasks > 0 && now - runtime.lastOutputAt >= quietForMs,
+    );
+    for (const runtime of closed)
+      queryLogger.warn("Closed a Claude thread with quiet background work, because memory is low.", {
+        threadId: runtime.id,
+        backgroundTasks: runtime.backgroundTasks,
+        quietForMinutes: Math.floor((now - runtime.lastOutputAt) / 60_000),
+      });
+  });
+
   /** Background subagents run in this process after their turn ends, so it stays while any runs. */
   canReleaseProcess(): boolean {
     return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
@@ -614,11 +735,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly releaseThread = Effect.fn("ClaudeAgentClient.releaseThread")(function* (
     this: ClaudeAgentClient,
     threadId: string,
+    resumes = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#threads.forget(threadId);
-    this.#memoryContexts.delete(threadId);
-    this.#teammates.delete(threadId);
-    this.#styleReminders.delete(threadId);
+    // `--resume` opens the same conversation, which holds the memories and section-mates that its
+    // turns were sent. They went again on each turn after a runtime reload.
+    if (!resumes) this.#turnContext.forget(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -669,7 +791,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "thread/start": {
         const threadId = randomUUID();
         yield* this.#startThread(threadId, readThreadConfig(params), false);
-        this.#setTurnContext(threadId, params, false);
+        this.#turnContext.set(threadId, params, false);
         return yield* providerSync(() => decoder({ thread: { id: threadId } }));
       }
       case "thread/resume": {
@@ -678,7 +800,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         // turn with it in `--resume` would fail, so the caller opens a new session instead (#2475).
         if (!isUuid(threadId)) return yield* providerFailure(new MissingClaudeSessionError(threadId));
         const config = readThreadConfig(params);
-        this.#setTurnContext(threadId, params, true);
+        this.#turnContext.set(threadId, params, true);
         const previous = this.#threadResumes.get(threadId);
         const completion = Deferred.makeUnsafe<void, ProviderClientOperationError>();
         this.#threadResumes.set(threadId, completion);
@@ -952,23 +1074,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return { ...this.#agentEnvironment?.(), ...(key ? { ANTHROPIC_API_KEY: key } : {}) };
   }
 
-  #setTurnContext(threadId: string, params: unknown, resume: boolean): void {
-    if (isRecord(params) && params.turnStyleReminder === true) this.#styleReminders.add(threadId);
-    else this.#styleReminders.delete(threadId);
-    const current = readMemoryContext(params);
-    if (current) {
-      const memory = this.#memoryContexts.get(threadId);
-      if (memory) memory.current = current;
-      else this.#memoryContexts.set(threadId, { current, delivered: null });
-    }
-    if (!isRecord(params) || !("sectionTeammates" in params)) return;
-    const section = readSectionTeammates(params.sectionTeammates);
-    const teammates = this.#teammates.get(threadId);
-    if (teammates) teammates.current = section;
-    // A new conversation holds no list, so no section needs no block.
-    else this.#teammates.set(threadId, { current: section, delivered: resume ? undefined : null });
-  }
-
   readonly #resumeThread = Effect.fn("ClaudeAgentClient.resumeThread")(function* (
     this: ClaudeAgentClient,
     threadId: string,
@@ -1093,14 +1198,26 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // environment has the CPU limit module there (`agentProcessEnvironment`), so it goes into
     // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
     const nodeOptionsSettings: Settings = nodeOptions ? { env: { NODE_OPTIONS: nodeOptions } } : {};
+    const settingSources = claudeSettingSources(config, userSetup);
+    // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
+    const openBotSettings: Settings = config.profileGeneration
+      ? {}
+      : yield* claudeFlagSettings(configDirectory, config.cwd, settingSources);
+    const flagSettings: Settings = { ...openBotSettings, ...nodeOptionsSettings };
+    const sandbox = config.workspaceOnly
+      ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
+      : null;
     // The sign-in settings can hold keys, so they go in a file that only this user can read, not on
-    // the command line, where `ps` shows them to other users.
+    // the command line, where `ps` shows them to other users. The SDK refuses a settings file path
+    // together with its `sandbox` option, so a Workspace only sandbox goes in the same file (#5583).
     const settingsFile =
       Object.keys(signInSettings).length > 0
         ? stateDirectory
           ? yield* writeClaudeFlagSettings(stateDirectory, threadId, {
               ...signInSettings,
+              ...openBotSettings,
               env: { ...signInSettings.env, ...nodeOptionsSettings.env },
+              ...(sandbox ? { sandbox } : {}),
             }).pipe(
               Effect.catch((error) =>
                 Effect.sync(() => {
@@ -1131,25 +1248,29 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // The CLI loads this file and the SDK's own `--mcp-config` value together.
       ...(mcpConfigFile ? { "mcp-config": mcpConfigFile } : {}),
     };
+    const stderr = new ClaudeStderrTail();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
         options: {
           cwd: config.cwd,
           ...this.#sdkLaunch,
+          ...(this.#sdkLaunch.spawnClaudeCodeProcess || !PROVIDER_PROCESS_GROUP
+            ? {}
+            : { spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeProcessGroup(options, stderr) }),
           ...(config.model ? { model: this.#sdkModel(config.model) } : {}),
           ...(appliedEffort ? { effort: appliedEffort } : {}),
           ...(resume ? { resume: threadId } : { sessionId: threadId, title: CLAUDE_SESSION_TITLE }),
-          systemPrompt: {
-            type: "preset",
-            preset: "claude_code",
-            append: config.developerInstructions,
-          },
+          // A call without tools gets only OpenBot's instructions: the `claude_code` preset adds the
+          // coding rules of an agent with tools, which such a call never uses.
+          systemPrompt: config.profileGeneration
+            ? config.developerInstructions
+            : { type: "preset", preset: "claude_code", append: config.developerInstructions },
           ...(Object.keys(extraArgs).length ? { extraArgs } : {}),
           ...(config.profileGeneration
             ? { tools: [] }
-            : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS] }),
-          settingSources: claudeSettingSources(config, userSetup),
+            : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS, ...CLAUDE_HOST_TOOLS] }),
+          settingSources,
           // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
           // settings, plugin and agent-frontmatter servers into the record above, so two computers
           // with the same OpenBot settings give their agents different tools and "which servers does
@@ -1164,12 +1285,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           canUseTool,
           ...(settingsFile
             ? { settings: settingsFile }
-            : Object.keys(nodeOptionsSettings).length > 0
-              ? { settings: nodeOptionsSettings }
+            : Object.keys(flagSettings).length > 0
+              ? { settings: flagSettings }
               : {}),
+          ...(sandbox && !settingsFile ? { sandbox } : {}),
           ...(config.workspaceOnly
             ? {
-                sandbox: claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders),
                 hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories, config.excludedFolders),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
@@ -1214,10 +1335,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       plan: newClaudePlanState(),
       subagents: newSubagentState(),
       backgroundTasks: 0,
+      lastOutputAt: Date.now(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
       settingsFile,
+      stderr,
     };
     runtime.consume = yield* Effect.forkIn(this.#consume(runtime), this.#scope, { startImmediately: true });
     // The CLI reads the file once at its start and keeps the servers in memory, also to reconnect one.
@@ -1281,16 +1404,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // Blocks of their own, so that history readers can tell them from the text of the turn. A slash
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
-    const memory = this.#memoryContexts.get(threadId);
-    const teammates = this.#teammates.get(threadId);
-    const command = text.startsWith("/");
-    const context = command
-      ? []
-      : [
-          memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
-          teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
-          this.#styleReminders.has(threadId) ? NATURAL_TURN_REMINDER : null,
-        ].filter((block): block is string => block !== null);
+    const context = this.#turnContext.take(threadId, text.startsWith("/"));
     runtime.input.push({
       type: "user",
       message: {
@@ -1304,8 +1418,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       uuid: turnId,
       session_id: threadId,
     });
-    if (memory) memory.delivered = command ? null : memory.current;
-    if (teammates) teammates.delivered = command ? undefined : teammates.current;
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
@@ -1414,8 +1526,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (this.#running && this.#threads.get(runtime.id) === runtime) {
         this.#fail(new Error("Claude session stream ended unexpectedly."));
       }
-    } catch (error) {
+    } catch (caught) {
       if (!this.#running || this.#threads.get(runtime.id) !== runtime) return;
+      const error = runtime.stderr.addTo(caught);
       const activeTurn = runtime.activeTurn;
       if (activeTurn) yield* this.#completeTurn(runtime, "failed", error);
       this.#fail(error instanceof Error ? error : new Error(String(error)));
@@ -1440,6 +1553,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime: ThreadRuntime,
     message: ClaudeStreamMessage,
   ) {
+    runtime.lastOutputAt = Date.now();
     if (message.type === "assistant") {
       // Each content block repeats its request's message; the last copy has the final count.
       const id = getString(message.message, "id");
@@ -1518,10 +1632,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "system" && message.subtype === "compact_boundary") {
       runtime.compacting = false;
       // The summary can leave the context blocks out, so the next turn sends the full blocks again.
-      const memory = this.#memoryContexts.get(runtime.id);
-      if (memory) memory.delivered = null;
-      const teammates = this.#teammates.get(runtime.id);
-      if (teammates) teammates.delivered = undefined;
+      this.#turnContext.resend(runtime.id);
       // Claude's post_tokens counts messages only, not the full context.
       this.emit("notification", {
         method: "openbot/context-compaction",
@@ -1687,7 +1798,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const call = turn.toolCalls.get(toolCallId);
         if (!call) continue;
         turn.toolCalls.delete(toolCallId);
-        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError);
+        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError ? text : null);
       }
       return;
     }
@@ -1811,14 +1922,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  /** `failed` is the tool result's `is_error`, such as a shell command with a non-zero exit. */
+  /**
+   * `failure` is the text of a tool result with `is_error`, such as a shell command with a non-zero
+   * exit. The agent service redacts it before it shows it.
+   */
   #emitToolCall(
     runtime: ThreadRuntime,
     id: string,
     name: string,
     completed: boolean,
     input?: unknown,
-    failed = false,
+    failure: string | null = null,
   ): void {
     const turn = runtime.activeTurn;
     if (!turn) return;
@@ -1844,7 +1958,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           id,
           type: "toolCall",
           name,
-          status: completed ? (failed ? "failed" : "completed") : "in_progress",
+          status: completed ? (failure === null ? "completed" : "failed") : "in_progress",
+          ...(completed && failure ? { error: failureEnds(failure) } : {}),
           // The skill that a `Skill` call loads, for the turn's activity line.
           ...(name === "Skill" && isRecord(input) && typeof input.skill === "string"
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }
@@ -2236,12 +2351,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       openbot: createSdkMcpServer({
         name: "openbot",
         version: "0.1.0",
-        // Claude uses the SDK's AskUserQuestion permission flow.
-        tools: VISIBLE_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) =>
-          tool(definition.name, definition.description, definition.shape, (args) =>
-            call("openbot", definition.name, args),
-          ),
-        ),
+        tools: claudeOpenBotTools((name, args) => call("openbot", name, args)),
       }),
     };
   }
@@ -2391,6 +2501,20 @@ const writeClaudeFlagSettings = Effect.fn("ClaudeAgentClient.writeFlagSettings")
   return file;
 });
 
+/**
+ * The tools of OpenBot's in-process MCP server for Claude. Claude uses the SDK's AskUserQuestion permission
+ * flow. The SDK lists the JSON Schema of each shape, so the shape is the advertised schema that Codex also
+ * gets, without validation-only keywords. The OpenBot tool router decodes each call with the full schema.
+ */
+export function claudeOpenBotTools(call: (name: string, args: unknown) => Promise<CallToolResult>) {
+  return visibleToolDefinitions("claude")
+    .filter((definition) => definition.name !== "ask_user")
+    .map((definition) => {
+      const shape = advertisedZodShape(z.strictObject(definition.shape));
+      return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
+    });
+}
+
 /** A file that cannot be deleted must not stop the close. */
 function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
   return file ? providerCall(() => rm(file, { force: true })).pipe(Effect.ignore) : Effect.void;
@@ -2476,6 +2600,61 @@ function spawnClaudeWrapper({ command, args, cwd, env, signal }: SpawnOptions): 
     });
     return true;
   };
+  const abort = () => child.kill();
+  const release = () => signal.removeEventListener("abort", abort);
+  signal.addEventListener("abort", abort, { once: true });
+  child.once("exit", release);
+  child.once("error", release);
+  if (signal.aborted) abort();
+  return child;
+}
+
+/** As many characters of stderr as the SDK adds to an exit error. */
+const CLAUDE_STDERR_TAIL_CHARS = 2_048;
+
+/** The SDK's exit error of a process that it did not start, which therefore has no stderr text. */
+const CLAUDE_PROCESS_EXIT = /^Claude Code process (?:exited with code|terminated by signal) [^.]*$/;
+
+/**
+ * The end of the CLI's stderr, which the SDK adds to its exit error only for a process that it
+ * started. A CLI that cannot start, such as with no sandbox (`CLAUDE_SANDBOX_UNAVAILABLE`), gives
+ * the reason there. Secrets are redacted before the text is cut, as the SDK does.
+ */
+class ClaudeStderrTail {
+  #text = "";
+  readonly #decoder = new StringDecoder("utf8");
+
+  push(chunk: Buffer): void {
+    this.#text += this.#decoder.write(chunk);
+    if (this.#text.length > 2 * CLAUDE_STDERR_TAIL_CHARS) this.#text = this.#text.slice(-CLAUDE_STDERR_TAIL_CHARS);
+  }
+
+  /** The SDK's error with the text the SDK adds when it starts the process itself. */
+  addTo(error: unknown): unknown {
+    if (!(error instanceof Error) || !CLAUDE_PROCESS_EXIT.test(error.message)) return error;
+    const text = redactText(this.#text).slice(-CLAUDE_STDERR_TAIL_CHARS).trim();
+    return text ? new Error(`${error.message}. stderr: ${text}`, { cause: error }) : error;
+  }
+}
+
+/**
+ * Outside Windows, the CLI of a thread starts as the leader of a process group of its own. The SDK
+ * starts it in OpenBot's group, where the child of an MCP server outlived the CLI with no owner
+ * (`provider-process-group.ts`). The SDK closes stdin first and sends SIGTERM to the CLI 2 seconds
+ * later, as before; when the CLI exits, what is left of its group ends. Shell commands and
+ * background tasks run in groups of their own, so they are not in it.
+ */
+function spawnClaudeProcessGroup(
+  { command, args, cwd, env, signal }: SpawnOptions,
+  stderr: ClaudeStderrTail,
+): SpawnedProcess {
+  const child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
+  endProcessGroupOnExit(child);
+  // Read to its end: a full stderr pipe would block the CLI.
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+  child.stderr.on("error", () => {
+    // The CLI exited; the SDK reports the exit.
+  });
   const abort = () => child.kill();
   const release = () => signal.removeEventListener("abort", abort);
   signal.addEventListener("abort", abort, { once: true });
@@ -2642,27 +2821,14 @@ function threadConfigKey(config: ThreadConfig, withModel: boolean): string {
   return JSON.stringify(Object.entries(fields).sort(([a], [b]) => (a < b ? -1 : 1)));
 }
 
-function readMemoryContext(params: unknown): MemoryContext | null {
-  const context = isRecord(params) ? params.memoryContext : undefined;
-  if (!isRecord(context) || !Array.isArray(context.memories)) return null;
-  if (!isNumber(context.storedCount) || !isNumber(context.limit)) return null;
-  const memories = context.memories.filter(
-    (memory): memory is MemoryContext["memories"][number] =>
-      isRecord(memory) &&
-      isString(memory.id) &&
-      isString(memory.text) &&
-      isOneOf(["automatic", "manual"] as const, memory.origin),
-  );
-  return { memories, storedCount: context.storedCount, limit: context.limit };
-}
-
-function readSectionTeammates(value: unknown): SectionTeammates | null {
-  if (!isRecord(value) || !isString(value.name) || !Array.isArray(value.members)) return null;
-  const members = value.members.filter(
-    (member): member is SectionTeammates["members"][number] =>
-      isRecord(member) && isString(member.id) && isString(member.name) && isString(member.title),
-  );
-  return members.length > 0 ? { name: value.name, members } : null;
+/**
+ * A tool error of a size that an item can hold. It keeps both ends: a command's error is at the end,
+ * another tool's at the start. The cut is in the middle, far from the text that the step shows, so a
+ * secret that it divides cannot show there.
+ */
+function failureEnds(text: string): string {
+  const half = Math.floor(INPUT_LIMITS.messageText / 2);
+  return text.length <= INPUT_LIMITS.messageText ? text : `${text.slice(0, half)}\n…\n${text.slice(-half)}`;
 }
 
 function parseAuthStatus(stdout: unknown): DynamicRecord | null {

@@ -1,4 +1,4 @@
-import type { ServerSummary } from "@openbot/contracts/ipc";
+import { LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { classifyFailure } from "@openbot/telemetry";
@@ -51,19 +51,21 @@ import {
 import { conversationPort } from "./conversation-port";
 
 /**
- * The voice conversation with the agent that is open when the pane opens. An agent on this computer
- * uses Codex live voice when the user turned it on in Settings → Voice, whatever the agent's provider:
- * the voice sends each request to the agent. A failed read of that setting keeps the conversation that
+ * The voice conversation with the agent that is open when the pane opens. An agent on this computer,
+ * or on a joined server with `live-voice-v1`, uses Codex live voice when the user turned it on in
+ * Settings → Voice, whatever the agent's provider: the voice sends each request to the agent. A failed read of that setting keeps the conversation that
  * transcribes on this computer. A conversation that still runs from an earlier visit to the pane shows again.
  */
 function VoiceConversationPane() {
   const controller = useConversationController();
   const { props } = useConversationViewScope();
   const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
-  // Live voice runs in this computer's Codex App Server, so an agent on a remote server transcribes.
-  // Settings hides the switch when Codex has no ChatGPT sign-in, so the saved choice does not count then.
+  // Live voice runs in the Codex App Server of the agent's server. An older joined server cannot start
+  // it, so its agents transcribe. Without a ChatGPT sign-in of that server's Codex, the voice transcribes.
   const codex = untrack(
-    () => props.server?.kind !== "remote" && codexLiveAccess(props.agentStatus.providers) !== "signIn",
+    () =>
+      (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "live-voice-v1")) &&
+      codexLiveAccess(props.agentStatus.providers) !== "signIn",
   );
   const [kind, setKind] = createSignal<VoiceConversationKind | null>(running ?? (codex ? null : "transcribed"));
   if (!running && codex)
@@ -85,10 +87,11 @@ function VoiceConversation(paneProps: { kind: VoiceConversationKind }) {
   const { props, startVoiceConversation, closeSidePanelPane } = useConversationViewScope();
   const agentId = untrack(() => props.agent?.id);
   if (!agentId) return null;
+  const serverId = untrack(() => props.server?.id ?? LOCAL_SERVER_ID);
   const kind = untrack(() => paneProps.kind);
   // The conversation outlives this pane: another tab or chat keeps it, and closing the Voice tab ends it.
   const conversation = controller.voiceSessions.open(agentId, kind, () =>
-    kind === "codex-live" ? createCodexLiveConversation({ agentId }) : startVoiceConversation(agentId),
+    kind === "codex-live" ? createCodexLiveConversation({ agentId, serverId }) : startVoiceConversation(agentId),
   );
   // Codex live voice speaks at the speed of the realtime model, so it has no speed button.
   const transcribed = kind === "transcribed";
@@ -382,6 +385,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   const selectedPane = () => (activeRightPanel() === "side-panel" ? null : sidePanel().selected);
   /** The side thread that shows, and whose tab is selected. */
   const shownThread = () => (activeRightPanel() === "thread" ? shownPanelThreadId() : null);
+  /** The browser tabs that an agent acts in now. Their previews show the page more often. */
+  const busyBrowserTabIds = createMemo(
+    () => new Set(props.browserControlState.sessions.flatMap((session) => (session.tabId ? [session.tabId] : []))),
+  );
   /** With no side thread to show, the side panel lists the panes. */
   const launcherShown = () =>
     activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
@@ -574,6 +581,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>
         <BrowserPreviewSidebar
           tabs={browserTabs()}
+          busyTabIds={busyBrowserTabIds()}
           hidden={browserExpandedOpen()}
           suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
           contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}

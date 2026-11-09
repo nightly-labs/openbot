@@ -21,6 +21,7 @@ import {
   type WorkflowGitHubCanvas,
 } from "@openbot/ui/features/workflows/workflow-github";
 import type {
+  WorkflowChannel,
   WorkflowDiscordServer,
   WorkflowPlace,
   WorkflowSlackWorkspace,
@@ -112,6 +113,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   }>();
   const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>([]);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
+  const [channels, setChannels] = createSignal<readonly WorkflowChannel[]>([]);
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
   const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
@@ -318,6 +320,9 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   const readPlaces = () => {
     host.places().then((next) => {
       if (!disposed) setPlaces(next);
+    }, report);
+    host.channels().then((next) => {
+      if (!disposed) setChannels(next);
     }, report);
     host.discordServers().then((next) => {
       if (!disposed) setDiscord(next);
@@ -566,6 +571,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   return {
     detail: () => stored()?.detail,
     places,
+    channels,
     discord,
     telegram,
     slack,

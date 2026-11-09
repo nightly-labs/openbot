@@ -142,6 +142,8 @@ function requiredCwd(params: unknown): string {
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "unsupported";
   readonly provider = "acp" as const;
+  /** Each child is an ACP client, which sends the memories and section-mates with the prompts. */
+  readonly turnContext = true;
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;

@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpSignInLost":
     "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpPlanUsedUp":
+    "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
   "error.provider.acpMcpNotLoaded":
     "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
   "error.provider.endpointsReadOnly":
@@ -311,6 +313,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
   "error.provider.geminiKeyRefused":
     "Gemini heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en verbind opnieuw.",
+  "error.provider.geminiVerificationRequired":
+    "Google moet je account verifiëren voordat Gemini kan antwoorden. Verifieer je Google-account in een browser en stuur je bericht daarna opnieuw.",
   "error.provider.keyProviderRefused":
     "{provider} heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en probeer het opnieuw.",
   "error.provider.keyProviderNoBalance":

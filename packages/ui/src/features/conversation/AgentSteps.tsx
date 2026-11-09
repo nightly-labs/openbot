@@ -13,11 +13,12 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
 /**
  * One step of an agent's turn: a thought, a progress line of the host, or a memory change that the
  * turn committed. `memory-summary` is the count that a host without the changes sends instead.
- * The text of `progress` and `memory-summary` is the host's English source text.
+ * The text of `progress` and `memory-summary` is the host's English source text. The `error` of a
+ * `progress` step is the output of a failed tool step, which the line can open.
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
-  | { id: string; kind: "progress"; text: string }
+  | { id: string; kind: "progress"; text: string; error?: string | undefined }
   | { id: string; kind: "memory"; change: ConversationMemoryChange }
   | { id: string; kind: "memory-summary"; text: string };
 
@@ -94,7 +95,14 @@ export function AgentStepList(props: {
 
 function StepBody(props: { step: AgentStep; newest: boolean }) {
   const text = useText();
-  return <>{stepBody(props.step, props.newest, text)}</>;
+  // Each change to the list makes new step objects. The failed line stays mounted while its step has
+  // an error, so an open error does not close when the next step arrives.
+  const failure = () => (props.step.kind === "progress" && props.step.error ? props.step : undefined);
+  return (
+    <Show when={failure()} fallback={stepBody(props.step, props.newest, text)}>
+      {(step) => <FailedStep text={text.sourceText(step().text)} error={step().error} newest={props.newest} />}
+    </Show>
+  );
 }
 
 function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Element {
@@ -123,6 +131,37 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     );
   }
   return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{text.sourceText(step.text)}</span>;
+}
+
+/** The line of a failed tool step, with a closed toggle that shows its error. */
+function FailedStep(props: { text: string; error: string | undefined; newest: boolean }) {
+  const { t } = useText();
+  const outputId = createUniqueId();
+  const [open, setOpen] = createSignal(false);
+  const expanded = () => (open() ? "true" : "false");
+  const controls = () => (open() ? outputId : undefined);
+  const label = () => t(open() ? "chat.steps.hideError" : "chat.steps.showError");
+  return (
+    <div class="agent-step-failed">
+      <span class={["agent-step-text", { "agent-activity-label": props.newest }]}>{props.text}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        class="agent-step-error-toggle"
+        aria-expanded={expanded()}
+        aria-controls={controls()}
+        onClick={() => setOpen(!open())}
+      >
+        <ChevronRight class="agent-steps-chevron" aria-hidden="true" />
+        {label()}
+      </Button>
+      <Show when={open()}>
+        <pre id={outputId} class="agent-step-error" dir="auto">
+          {props.error}
+        </pre>
+      </Show>
+    </div>
+  );
 }
 
 function StepIcon(props: { kind: AgentStep["kind"] }) {

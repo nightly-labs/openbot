@@ -11,6 +11,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSignInLost":
     "{provider} oturumunu kaybetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpPlanUsedUp":
+    "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
   "error.provider.acpMcpNotLoaded":
     "{provider}, OpenBot araçlarını yüklemedi; bu yüzden bu ajan onları kullanamıyor ve takım arkadaşlarına ulaşamıyor. Bir {provider} ekip politikası yerel MCP sunucularını engelleyebilir. Ekip yöneticinizden bunlara izin vermesini isteyin, ardından yeniden deneyin.",
   "error.provider.endpointsReadOnly":
@@ -316,6 +318,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",
   "error.provider.geminiKeyRefused":
     "Gemini kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden bağlanın.",
+  "error.provider.geminiVerificationRequired":
+    "Gemini'nin yanıt verebilmesi için Google'ın hesabınızı doğrulaması gerekiyor. Google hesabınızı bir tarayıcıda doğrulayın, ardından mesajınızı yeniden gönderin.",
   "error.provider.keyProviderRefused":
     "{provider} kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden deneyin.",
   "error.provider.keyProviderNoBalance":

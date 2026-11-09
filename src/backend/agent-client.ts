@@ -21,10 +21,17 @@ export interface AgentClient {
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   /**
-   * True when a streaming `final_answer` item can still become a step: the provider names no phase,
-   * and the client classifies the text only at the next tool call or at the end of the turn.
+   * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
+   * become a step: the provider names no phase, and the client classifies the text only at the next
+   * tool call or at the end of the turn.
    */
   readonly provisionalAnswers?: boolean;
+  /**
+   * True when the client sends the essential memories and the section-mates with the user turns
+   * (`TurnContext`), so they stay out of the developer instructions. A memory change then keeps the
+   * instructions, and the provider's cached prefix with them.
+   */
+  readonly turnContext?: boolean;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**
@@ -44,8 +51,17 @@ export interface AgentClient {
    * this call the previous session stays open inside the client, and the MCP servers it spawned stay
    * alive with it, so each further change adds another set of processes - including the servers the
    * user turned off. Optional, because a client that keeps no per-thread state has nothing to close.
+   *
+   * `resumes`: the next turn resumes this same provider session, which still holds the context that
+   * its turns were sent. A client keeps what it knows of that context, so the turn does not send it
+   * again. Otherwise the session ends, and the client forgets it.
    */
-  releaseThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Whether the session runs work that its release would end, such as a background terminal.
+   * Optional, because a client without this check must keep its idle sessions loaded.
+   */
+  holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   /**
    * Hides a thread that a replacement session took over from the provider's own thread list, and
    * keeps its history readable. Optional, because only a provider that shows its threads to the user
@@ -58,6 +74,12 @@ export interface AgentClient {
    * threads in one process frees nothing this way.
    */
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Closes each thread that has no turn and stays open only for background work that sent nothing
+   * for a long time. The memory guard calls it at each sample while the machine is low on memory.
+   * Optional, because only a client whose background work holds a thread's process has one.
+   */
+  releaseQuietBackgroundThreads?(): Effect.Effect<void, ProviderClientOperationError>;
   /** Effective provider options. Saved overrides belong to the agent store. */
   readSessionSettings?(
     externalThreadId: string,

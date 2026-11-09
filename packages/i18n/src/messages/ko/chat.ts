@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "현재 활동",
   "chat.steps.show": "단계 보기",
   "chat.steps.hide": "단계 숨기기",
+  "chat.steps.showError": "오류 보기",
+  "chat.steps.hideError": "오류 숨기기",
   "chat.steps.list": "에이전트 단계",
   "chat.steps.count": { other: "{count}단계" },
   "chat.steps.failed": { other: "{count}개 실패" },
@@ -428,4 +430,8 @@ export const messages = {
   "chat.reference.kind.thread": "스레드",
   "chat.reference.open.tab": "브라우저 탭 {name} 표시",
   "chat.reference.open.thread": "스레드 {name} 열기",
+  "chat.feedbackSent.title": "피드백 감사합니다 🙏",
+  "chat.feedbackSent.badge": "보냄",
+  "chat.feedbackSent.body": "OpenBot 팀이 읽고 처리합니다 💜",
+  "chat.feedbackSent.openNamed": "GitHub에서 이슈 #{number} 열기",
 } as const satisfies PartialTranslation<typeof source>;

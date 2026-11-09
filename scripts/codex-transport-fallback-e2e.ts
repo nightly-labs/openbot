@@ -1,6 +1,8 @@
 // Checks that the Codex warning "Falling back from WebSockets to HTTPS transport." shows no banner,
 // and that a final failure after it still does (#2559). Codex sends that warning when it changes
-// transport, and the same turn continues over HTTPS. Runs the real agent service on a temporary
+// transport, and the same turn continues over HTTPS. It also checks the warning that Codex sends on
+// each thread start when `config.toml` turns on an under-development feature, such as
+// `async_compaction`: it shows no banner either. Runs the real agent service on a temporary
 // profile with a fake Codex app-server. Two cases: the HTTPS attempt completes, and it fails.
 // `bun scripts/codex-transport-fallback-e2e.ts`. Writes .openbot-build/codex-transport-fallback-e2e/report.json.
 import assert from "node:assert/strict";
@@ -23,6 +25,9 @@ const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
 const FALLBACK = "Falling back from WebSockets to HTTPS transport.";
 const FINAL_FAILURE = "stream disconnected before completion: Connection refused (os error 61)";
+// The text of `codex-rs/features/src/lib.rs` in Codex 0.166.0, with a config path.
+const UNSTABLE_FEATURES =
+  "Under-development features enabled: async_compaction. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /home/user/.codex/config.toml.";
 
 // Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
@@ -39,9 +44,9 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 /**
- * A Codex app-server with the methods that the service calls. Each turn sends the transport
- * warning, as `codex-rs/core/src/responses_retry.rs` does, and then completes or fails as
- * `control.json` says.
+ * A Codex app-server with the methods that the service calls. Each thread start sends the
+ * under-development features warning. Each turn sends the transport warning, as
+ * `codex-rs/core/src/responses_retry.rs` does, and then completes or fails as `control.json` says.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -70,8 +75,12 @@ const answer = (message) => {
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
-    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
-    case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "thread/start":
+    case "thread/resume": {
+      const threadId = message.method === "thread/start" ? "thread-" + (++threads) : params.threadId;
+      write({ id: message.id, result: { thread: { id: threadId, turns: [] } } });
+      return write({ method: "warning", params: { threadId, message: ${JSON.stringify(UNSTABLE_FEATURES)} } });
+    }
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
     case "thread/turns/list":
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
@@ -130,6 +139,7 @@ interface CaseReport {
   finalError: string | null;
   errorEvents: { code: string; message: string }[];
   warningLogLines: string[];
+  unstableFeaturesLogLines: number;
   passed: boolean;
 }
 
@@ -212,6 +222,7 @@ try {
   for (const [index, entry] of cases.entries()) {
     await writeFile(controlPath, JSON.stringify(entry));
     const firstLogLine = logLines.length;
+    const firstErrorEvent = errorEvents.length;
     const agent = await runCauseEffect(
       agents.createAgent({
         name: `Fallback ${index + 1}`,
@@ -237,7 +248,11 @@ try {
         .map(({ code, message }) => ({ code, message })),
       warningLogLines: logLines
         .slice(firstLogLine)
-        .filter((line) => line.includes("A provider warning needs no action.")),
+        .filter((line) => line.includes("A provider warning needs no action.") && line.includes(FALLBACK)),
+      unstableFeaturesLogLines: logLines
+        .slice(firstLogLine)
+        .filter((line) => line.includes("A provider warning needs no action.") && line.includes("async_compaction"))
+        .length,
       passed: false,
     };
     report.cases.push(result);
@@ -246,6 +261,15 @@ try {
     assert.ok(
       result.errorEvents.every((event) => !event.message.includes(FALLBACK)),
       `${entry.name}: the transport warning reached the banner`,
+    );
+    // The warning comes before OpenBot knows the thread's agent, so it was a toast with no agent.
+    assert.ok(
+      errorEvents.slice(firstErrorEvent).every((event) => !event.message.includes("Under-development features")),
+      `${entry.name}: the under-development features warning reached a banner or a toast`,
+    );
+    assert.ok(
+      result.unstableFeaturesLogLines >= 1,
+      `${entry.name}: the under-development features warning was not logged`,
     );
     assert.equal(result.warningLogLines.length, 1, `${entry.name}: the warning was not logged one time`);
     assert.ok(result.warningLogLines[0]?.includes(FINAL_FAILURE), `${entry.name}: the log lost the close reason`);

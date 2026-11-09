@@ -1808,12 +1808,12 @@ async function main(): Promise<void> {
     }
     const queuedSnapshotStartedAt = Date.now();
     const queuedSnapshot = await callBrowserTool(browser, "snapshot", { tabId: waitTab.id });
-    if (
-      !queuedSnapshot.success ||
-      Date.now() - queuedSnapshotStartedAt > 1_000 ||
-      browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true
-    ) {
-      throw new Error("V2 timed-out navigation did not stop before the tab queue resumed.");
+    const queuedSnapshotMs = Date.now() - queuedSnapshotStartedAt;
+    const queuedTabLoading = browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true;
+    if (!queuedSnapshot.success || queuedSnapshotMs > 1_000 || queuedTabLoading) {
+      throw new Error(
+        `V2 timed-out navigation did not stop before the tab queue resumed: ${queuedSnapshotMs} ms, loading ${queuedTabLoading}, ${queuedSnapshot.success ? "success" : toolError(queuedSnapshot)}.`,
+      );
     }
     const beforeReloadText = String(toolTextPayload(queuedSnapshot)?.text);
     const reloadStartedAt = Date.now();
@@ -1964,11 +1964,19 @@ async function main(): Promise<void> {
     process.stdout.write("BrowserHost: top-level cache revalidation passed.\n");
 
     await expectFailure(() => runCauseEffect(browser.open("file:///etc/passwd")));
-    const tabCountBeforeAbort = browser.listTabs().length;
-    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`)));
-    if (browser.listTabs().length !== tabCountBeforeAbort) {
+    // The open tool of an agent closes its tab when the page fails, so failed attempts do not fill the tab limit.
+    const tabIdsBeforeAbort = new Set(browser.listTabs().map((tab) => tab.id));
+    const agentAbort = await callBrowserTool(browser, "open", { url: `${origin}/abort` });
+    if (agentAbort.success || browser.listTabs().length !== tabIdsBeforeAbort.size) {
       throw new Error("A failed navigation leaked a browser tab.");
     }
+    // A person's tab stays on the address that failed, so the person sees where it failed (#5630).
+    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`)));
+    const keptTabs = browser.listTabs().filter((tab) => !tabIdsBeforeAbort.has(tab.id));
+    if (keptTabs.length !== 1 || keptTabs[0]?.url !== `${origin}/abort`) {
+      throw new Error("A person's failed navigation did not keep its tab.");
+    }
+    await runCauseEffect(browser.close(keptTabs[0].id));
 
     const { tab: downloadPage, contents: downloadContents } = await openTabWithContents(
       browser,

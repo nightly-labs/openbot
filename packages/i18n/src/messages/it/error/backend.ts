@@ -342,6 +342,8 @@ export const messages = {
     "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
   "error.backend.browserProxyComputerUnreachable":
     "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
+  "error.backend.browserCertificateUntrusted":
+    "Il certificato di sicurezza di questo sito non è attendibile, quindi la pagina non si è aperta.",
   "error.backend.browserLowMemory":
     "Su questo server la memoria è quasi esaurita, quindi il browser non può aprire un'altra scheda. Chiudi una scheda o attendi che gli altri agenti finiscano.",
   "error.backend.browserOpenFailed": "Impossibile aprire {url}: {reason}",

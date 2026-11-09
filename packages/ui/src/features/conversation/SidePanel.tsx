@@ -21,7 +21,7 @@ import {
 } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
-import { useText } from "@openbot/ui/text";
+import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { For, flush, onSettled, Show } from "solid-js";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
@@ -44,37 +44,47 @@ function fileValue(key: string): string {
 }
 
 /**
- * A pane of the side panel. Each open pane has a tab at the top of the panel. A side question opens
- * from the composer only, and a subagent from its row in the chat, so the launcher and Add do not
- * list them.
+ * The panes of the side panel, with the label and icon of each. Each open pane has a tab at the top
+ * of the panel. The icons are the same glyphs as the rest of the app: the browser is the computer.
+ * The feature that owns a pane decides when it is available and renders its content.
  */
-export type SidePanelPane = "browser" | "files" | "settings" | "question" | "voice" | "subagent";
+const SIDE_PANEL_PANES = {
+  browser: { label: "conversation.sidePanel.pane.browser", icon: () => <ComputerIcon /> },
+  files: { label: "conversation.sidePanel.pane.files", icon: () => <Folder aria-hidden="true" /> },
+  settings: { label: "conversation.sidePanel.pane.settings", icon: () => <Settings aria-hidden="true" /> },
+  question: {
+    label: "conversation.sidePanel.pane.question",
+    icon: () => <MessageCircleQuestionMark aria-hidden="true" />,
+  },
+  voice: { label: "conversation.sidePanel.pane.voice", icon: () => <AudioLines aria-hidden="true" /> },
+  subagent: { label: "conversation.sidePanel.pane.subagent", icon: () => <Workflow aria-hidden="true" /> },
+} as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
 
-const PANE_LABELS: Record<SidePanelPane, AppTextKey> = {
-  browser: "conversation.sidePanel.pane.browser",
-  files: "conversation.sidePanel.pane.files",
-  settings: "conversation.sidePanel.pane.settings",
-  question: "conversation.sidePanel.pane.question",
-  voice: "conversation.sidePanel.pane.voice",
-  subagent: "conversation.sidePanel.pane.subagent",
-};
+/**
+ * A pane of the side panel. A side question opens from the composer only, and a subagent from its
+ * row in the chat, so the launcher and Add do not list them.
+ */
+export type SidePanelPane = keyof typeof SIDE_PANEL_PANES;
 
-/** The same glyphs as the rest of the app: the browser is the computer. */
+/** True when a value, such as a panel mode, is the id of a side panel pane. */
+export function isSidePanelPane(value: string): value is SidePanelPane {
+  return Object.hasOwn(SIDE_PANEL_PANES, value);
+}
+
+/** The panes in `available`, in the order of `SIDE_PANEL_PANES`. */
+function inPaneOrder(available: readonly SidePanelPane[]): SidePanelPane[] {
+  return Object.keys(SIDE_PANEL_PANES)
+    .filter(isSidePanelPane)
+    .filter((pane) => available.includes(pane));
+}
+
 function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
-  switch (props.pane) {
-    case "browser":
-      return <ComputerIcon />;
-    case "files":
-      return <Folder aria-hidden="true" />;
-    case "settings":
-      return <Settings aria-hidden="true" />;
-    case "question":
-      return <MessageCircleQuestionMark aria-hidden="true" />;
-    case "voice":
-      return <AudioLines aria-hidden="true" />;
-    case "subagent":
-      return <Workflow aria-hidden="true" />;
-  }
+  return SIDE_PANEL_PANES[props.pane].icon();
+}
+
+/** The tab and launcher name of a pane. An agent or a channel can give the settings pane its own name. */
+function paneLabel(t: TextValue["t"], pane: SidePanelPane, settingsLabel: string | undefined): string {
+  return pane === "settings" && settingsLabel !== undefined ? settingsLabel : t(SIDE_PANEL_PANES[pane].label);
 }
 
 export interface SidePanelToggleProps {
@@ -219,14 +229,13 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   const { t } = useText();
   let root: HTMLDivElement | undefined;
   let tabList: HTMLDivElement | undefined;
-  const closedPanes = () => props.available.filter((pane) => !props.panes.includes(pane));
+  const closedPanes = () => inPaneOrder(props.available).filter((pane) => !props.panes.includes(pane));
   const threads = () => props.threads?.items ?? [];
   const files = () => props.files?.items ?? [];
   const hasTabs = () => props.panes.length + threads().length + files().length > 0;
   const newBrowserTab = () =>
     props.panes.includes("browser") && props.available.includes("browser") ? props.onNewBrowserTab : undefined;
-  const paneLabel = (pane: SidePanelPane) =>
-    pane === "settings" && props.settingsLabel !== undefined ? props.settingsLabel : t(PANE_LABELS[pane]);
+  const labelOf = (pane: SidePanelPane) => paneLabel(t, pane, props.settingsLabel);
   const selectedValue = () => {
     const thread = props.threads?.selectedId;
     if (thread) return `${THREAD_VALUE}${thread}`;
@@ -421,7 +430,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         <Tabs.List ref={tabList} class="side-panel-tabs" aria-label={t("conversation.sidePanel.label")}>
           <For each={props.panes}>
             {(pane) => {
-              const label = () => paneLabel(pane);
+              const label = () => labelOf(pane);
               const selected = () =>
                 props.threads?.selectedId == null && props.files?.selectedKey == null && props.selected === pane;
               return (
@@ -592,7 +601,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     {(pane) => (
                       <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
                         <PaneIcon pane={pane} />
-                        {paneLabel(pane)}
+                        {labelOf(pane)}
                       </DropdownMenu.Item>
                     )}
                   </For>
@@ -656,14 +665,11 @@ export function SidePanelLauncher(props: {
   });
   return (
     <nav ref={launcher} class="side-panel-launcher" aria-label={t("conversation.sidePanel.launcher")}>
-      <For each={props.available}>
+      <For each={inPaneOrder(props.available)}>
         {(pane) => (
           <Button variant="secondary" class="side-panel-launch" onClick={() => props.onOpen(pane)}>
             <PaneIcon pane={pane} />
-            {t("conversation.sidePanel.openPane", {
-              name:
-                pane === "settings" && props.settingsLabel !== undefined ? props.settingsLabel : t(PANE_LABELS[pane]),
-            })}
+            {t("conversation.sidePanel.openPane", { name: paneLabel(t, pane, props.settingsLabel) })}
           </Button>
         )}
       </For>

@@ -103,7 +103,7 @@ export const messages = {
     "Zeigt Reagieren, Antworten und Mehr neben einer Nachricht und die Uhrzeit zwischen den Nachrichten. Ist es aus, stehen alle Aktionen und die Uhrzeit unter jeder Nachricht.",
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
-    "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Funktioniert mit ChatGPT und Claude.",
+    "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Bei Agenten, die das nicht können, warten sie in der Warteschlange.",
   "settings.agentDefaults.title": "Standardwerte",
   "settings.agentDefaults.description": "Agenten folgen diesen Standardwerten, außer du änderst sie für einen Agenten.",
   "settings.agentDefaults.value": "Standard: {value}",
@@ -261,7 +261,7 @@ export const messages = {
   "settings.tab.notifications.description": "Lege fest, wie OpenBot dich benachrichtigt.",
   "settings.tab.voice.title": "Diktat",
   "settings.tab.voice.description":
-    "Diktat im Nachrichtenfeld. Lokale Modelle laufen auf diesem Computer, ElevenLabs läuft in der Cloud.",
+    "Diktat im Nachrichtenfeld. Lokale Modelle laufen auf diesem Computer, ElevenLabs und Groq laufen in der Cloud.",
   "settings.tab.computerUse.title": "PC-Steuerung",
   "settings.tab.computerUse.description":
     "Agenten im OpenBot dieses Computers dürfen seine Apps sehen und bedienen. Agenten auf einem anderen Server nutzen dessen Computer.",
@@ -639,6 +639,10 @@ export const messages = {
   "settings.voice.removeFailed": "Das Modell konnte nicht entfernt werden. Versuche es erneut.",
   "settings.voice.model.elevenlabs.description":
     "Überträgt deine Stimme an ElevenLabs. Der Text erscheint beim Sprechen und bleibt stabil. Nutzt deinen eigenen API-Schlüssel, und ElevenLabs berechnet jede Nutzung.",
+  "settings.voice.model.groqTurbo.description":
+    "Sendet jede Aufnahme beim Stoppen an Groq. Schnell und für viele Sprachen. Nutzt deinen eigenen API-Schlüssel, und Groq berechnet jede Nutzung.",
+  "settings.voice.model.groqLarge.description":
+    "Sendet jede Aufnahme beim Stoppen an Groq. Genauer als turbo, aber langsamer. Nutzt deinen eigenen API-Schlüssel, und Groq berechnet jede Nutzung.",
   "settings.voice.apiKey.placeholder": "Schlüssel einfügen",
   "settings.voice.apiKey.save": "Schlüssel speichern",
   "settings.voice.apiKey.remove": "Schlüssel entfernen",

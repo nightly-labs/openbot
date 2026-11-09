@@ -75,7 +75,6 @@ export const messages = {
   "agent.error.restoreFailed": "Ajan geri yüklenemedi",
   "agent.error.hiddenFailed": "Değişiklik kaydedilmedi. Tekrar deneyin.",
   "agent.error.settingsFailed": "Ajan ayarları kaydedilemedi",
-  "agent.error.avatarFailed": "Avatar güncellenemedi",
   "agent.error.adminOnly": "Ajan ayarları yalnızca bir sunucu yöneticisi tarafından değiştirilebilir.",
   "agent.error.continueFailed": "Ajan devam edemedi. Tekrar deneyin.",
   "agent.error.mcpNotStarted": "MCP sunucusu başlatılmadı",

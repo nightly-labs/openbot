@@ -21,9 +21,9 @@ import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks
 import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
-import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
+import { AgentThreadView, type AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { TaskAnswerCard, TaskPanel } from "@openbot/ui/features/tasks/TaskPanel";
-import { TasksPage, type TasksVoice } from "@openbot/ui/features/tasks/TasksPage";
+import { TASKS_SIDE_DEFAULT, TASKS_SIDE_MIN, TasksPage, type TasksVoice } from "@openbot/ui/features/tasks/TasksPage";
 import { currentText } from "@openbot/ui/text";
 import {
   createEffect,
@@ -31,6 +31,7 @@ import {
   createProjection,
   createSignal,
   createStore,
+  flush,
   onCleanup,
   Show,
   untrack,
@@ -38,7 +39,9 @@ import {
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { readPanelWidth, savePanelWidth } from "../../components/panel-width-storage";
 import { usePlatform } from "../../platform";
+import { appendVoiceTranscript } from "../../voice-recording";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
 import { insertAtSelection, insertPastedText, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
@@ -50,6 +53,8 @@ import type { TaskEvent, TasksSource } from "./tasks-port";
 const UNDO_MS = 6_000;
 /** The agent last chosen on this page for each server, kept apart from the chat agent. */
 const TASK_AGENT_STORAGE_KEY = "openbot:task-agent:v1";
+/** The width of the task panel beside the list, the same on every server. */
+const TASK_PANEL_WIDTH_STORAGE_KEY = "openbot:task-panel-width";
 
 /** What the voice of the composer can do on the page: read and change the draft, and start a task. */
 export interface TasksVoiceControls {
@@ -60,6 +65,12 @@ export interface TasksVoiceControls {
   start: (text: string) => boolean;
   showError: (message: string) => void;
   focus: () => void;
+  /** The task whose panel shows. Its message box can record too. */
+  openTaskId: () => string | null;
+  /** Adds what was said to the draft of a task's message box. */
+  appendTaskTranscript: (taskId: string, text: string) => void;
+  /** Sends the draft of a task's message box, when its panel still shows. */
+  sendTask: (taskId: string) => Promise<void>;
 }
 
 /**
@@ -72,8 +83,18 @@ export interface TaskFiles {
   discard: (id: string, serverId: string) => Promise<void>;
 }
 
-/** The voice of the composer. `submit` sends while it records: the transcript starts the task. */
-export type TasksVoiceAdapter = TasksVoice & { submit: () => void };
+/**
+ * The voice of the composer and of the open task's message box: one recording at a time. `submit` sends
+ * while the composer records: the transcript starts the task.
+ */
+export type TasksVoiceAdapter = TasksVoice & {
+  submit: () => void;
+  /** The task of the last recording. Undefined when the Tasks composer recorded last. */
+  taskId: string | undefined;
+  startTask: (taskId: string) => void;
+  /** Stops the task's recording, and sends its message with the transcript. */
+  sendTask: () => void;
+};
 
 interface TasksViewProps {
   serverId: string;
@@ -132,6 +153,10 @@ interface TasksViewState {
   startError: string | null;
   took: { taskId: string; pending: boolean } | null;
   selectedId: string | null;
+  /** The width of the task panel that the user chose. */
+  sideWidth: number;
+  /** Each increase moves the caret of a task's message box to the end, as after a dictation. By task id. */
+  focusRequests: Record<string, number>;
 }
 
 /** The key of the start composer's files in `TasksViewState.files`. A task id never has this form. */
@@ -160,6 +185,13 @@ export function TasksView(props: TasksViewProps) {
     startError: null,
     took: null,
     selectedId: null,
+    focusRequests: {},
+    sideWidth: readPanelWidth(
+      TASK_PANEL_WIDTH_STORAGE_KEY,
+      TASKS_SIDE_DEFAULT,
+      TASKS_SIDE_MIN,
+      Number.POSITIVE_INFINITY,
+    ),
   });
   const { appFocused } = usePlatform();
   const showAgentSteps = useShowAgentSteps();
@@ -535,6 +567,38 @@ export function TasksView(props: TasksViewProps) {
     }
   }
 
+  /** Sends a message to a task. An archived task is restored first, as in a thread tab. */
+  async function sendToTask(taskId: string, text: string): Promise<boolean> {
+    const task = taskOf(taskId);
+    if (!task || task.id.startsWith("pending:")) return false;
+    const target = { agentId: task.agentId, taskId: task.id };
+    const serverId = untrack(() => props.serverId);
+    const files = untrack(() => filesOf(taskId));
+    const sent = await runAction(async () => {
+      if (taskOf(taskId)?.state === "closed") await props.source.reopen(target, serverId);
+      await props.source.send(
+        {
+          ...target,
+          text,
+          clientMessageId: crypto.randomUUID(),
+          ...(files.length ? { attachmentDraftIds: files.map((file) => file.id) } : {}),
+        },
+        serverId,
+      );
+    }, "conversation.tasks.error.send");
+    if (sent) {
+      const sentIds = new Set(files.map((file) => file.id));
+      setState((draft) => {
+        delete draft.drafts[taskId];
+        // A file that came during the send stays.
+        const rest = (draft.files[taskId] ?? []).filter((file) => !sentIds.has(file.id));
+        if (rest.length) draft.files[taskId] = rest;
+        else delete draft.files[taskId];
+      });
+    }
+    return sent;
+  }
+
   const voiceControls: TasksVoiceControls = {
     serverId: () => props.serverId,
     draft: () => state.draft,
@@ -551,8 +615,84 @@ export function TasksView(props: TasksViewProps) {
       setState((draft) => {
         draft.focusRequest += 1;
       }),
+    openTaskId: () => {
+      const taskId = state.selectedId;
+      return taskId && !taskId.startsWith("pending:") ? taskId : null;
+    },
+    appendTaskTranscript: (taskId, text) =>
+      setState((draft) => {
+        draft.drafts[taskId] = appendVoiceTranscript(draft.drafts[taskId] ?? "", text);
+        draft.focusRequests[taskId] = (draft.focusRequests[taskId] ?? 0) + 1;
+      }),
+    sendTask: async (taskId) => {
+      // The transcript was just appended; the send reads the draft, so apply that write first.
+      flush();
+      if (state.selectedId !== taskId) return;
+      const text = textOf(taskId).trim();
+      if (text || filesOf(taskId).length > 0) await sendToTask(taskId, text);
+      // The locked message box did not take the earlier focus request.
+      if (state.selectedId === taskId)
+        setState((draft) => {
+          draft.focusRequests[taskId] = (draft.focusRequests[taskId] ?? 0) + 1;
+        });
+    },
   };
   const voice = untrack(() => props.voice?.(voiceControls));
+  /** The microphone of the Tasks composer. It waits while a task's message box records. */
+  const composerVoice = voice && startVoice(voice);
+  function startVoice(adapter: TasksVoiceAdapter): TasksVoice {
+    return {
+      get phase() {
+        return adapter.taskId === undefined ? adapter.phase : "idle";
+      },
+      get blocked() {
+        return adapter.taskId !== undefined && adapter.phase !== "idle";
+      },
+      get levels() {
+        return adapter.levels;
+      },
+      get elapsedSeconds() {
+        return adapter.elapsedSeconds;
+      },
+      get liveText() {
+        return adapter.taskId === undefined ? adapter.liveText : "";
+      },
+      get modelProgress() {
+        return adapter.modelProgress;
+      },
+      onStart: adapter.onStart,
+      onCancel: adapter.onCancel,
+      onFinish: adapter.onFinish,
+    };
+  }
+  /** The microphone of a task's message box, as in a side thread of the chat. */
+  function taskVoice(adapter: TasksVoiceAdapter, taskId: string): AgentThreadVoice {
+    const owned = () => adapter.taskId === taskId;
+    return {
+      get phase() {
+        return owned() ? adapter.phase : "idle";
+      },
+      get blocked() {
+        return !owned() && adapter.phase !== "idle";
+      },
+      get liveText() {
+        return owned() ? adapter.liveText : "";
+      },
+      get levels() {
+        return adapter.levels;
+      },
+      get elapsedSeconds() {
+        return adapter.elapsedSeconds;
+      },
+      get modelProgress() {
+        return adapter.modelProgress;
+      },
+      onStart: () => adapter.startTask(taskId),
+      onCancel: adapter.onCancel,
+      onFinish: adapter.onFinish,
+      onSend: adapter.sendTask,
+    };
+  }
 
   // The page stays open when the user switches the server, so the tasks clear, load and listen again.
   createEffect(
@@ -692,35 +832,12 @@ export function TasksView(props: TasksViewProps) {
         if (target && messageId) props.onRead?.(target, messageId);
       },
     );
-    /** An archived task is restored before the message goes, as in a thread tab. */
-    const send = async (text: string): Promise<boolean> => {
-      const target = input();
-      if (!target) return false;
-      const serverId = untrack(() => props.serverId);
-      const files = untrack(() => filesOf(taskId));
-      const sent = await runAction(async () => {
-        if (hosted()?.state === "closed") await props.source.reopen(target, serverId);
-        await props.source.send(
-          {
-            ...target,
-            text,
-            clientMessageId: crypto.randomUUID(),
-            ...(files.length ? { attachmentDraftIds: files.map((file) => file.id) } : {}),
-          },
-          serverId,
-        );
-      }, "conversation.tasks.error.send");
-      if (sent) {
-        const sentIds = new Set(files.map((file) => file.id));
-        setState((draft) => {
-          delete draft.drafts[taskId];
-          // A file that came during the send stays.
-          const rest = (draft.files[taskId] ?? []).filter((file) => !sentIds.has(file.id));
-          if (rest.length) draft.files[taskId] = rest;
-          else delete draft.files[taskId];
-        });
-      }
-      return sent;
+    const panelVoice = voice && taskVoice(voice, taskId);
+    // The message box is new each time a task opens. A focus request from before is not for it.
+    const shownAt = untrack(() => state.focusRequests[taskId] ?? 0);
+    const focusRequest = () => {
+      const request = state.focusRequests[taskId] ?? 0;
+      return request > shownAt ? request : undefined;
     };
     return (
       <Show when={owner() ?? props.agents[0]}>
@@ -761,7 +878,9 @@ export function TasksView(props: TasksViewProps) {
                   draft.drafts[taskId] = text;
                 })
               }
-              onSend={send}
+              onSend={(text) => sendToTask(taskId, text)}
+              voice={hosted() ? panelVoice : undefined}
+              focusRequest={focusRequest()}
               onStop={() => {
                 const target = input();
                 if (target)
@@ -832,10 +951,10 @@ export function TasksView(props: TasksViewProps) {
         })
       }
       onStart={() => {
-        if (voice?.phase === "recording") voice.submit();
+        if (voice && composerVoice?.phase === "recording") voice.submit();
         else start(state.draft);
       }}
-      voice={voice}
+      voice={composerVoice}
       took={took()}
       onTookAgentChange={(id) => {
         if (!pending) return;
@@ -861,6 +980,13 @@ export function TasksView(props: TasksViewProps) {
       sendShortcut={props.sendShortcut}
       onSelect={select}
       panel={panel}
+      sideWidth={state.sideWidth}
+      onSideResize={(width) =>
+        setState((draft) => {
+          draft.sideWidth = width;
+        })
+      }
+      onSideResizeEnd={(width) => savePanelWidth(TASK_PANEL_WIDTH_STORAGE_KEY, width)}
     />
   );
 }

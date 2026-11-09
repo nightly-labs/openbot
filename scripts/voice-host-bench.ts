@@ -320,6 +320,14 @@ function exitAfterReply(exit: Promise<void>): Promise<number> {
 /** The bench saves no key. */
 const NO_CIPHER = { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" };
 
+/** The cloud dictation keys, with none saved: the bench transcribes with local models only. */
+function noDictationKeys(temporary: string) {
+  return {
+    elevenlabs: new VoiceApiKeyStore({ path: join(temporary, "voice-api-key.json"), cipher: NO_CIPHER }),
+    groq: new VoiceApiKeyStore({ path: join(temporary, "groq-api-key.json"), cipher: NO_CIPHER }),
+  };
+}
+
 /** The cloud speech keys, with none saved: the bench reads with Supertonic only. */
 function noSpeechKeys(temporary: string) {
   return {
@@ -335,7 +343,7 @@ async function checkIdleStop(modelId: LocalVoiceModelId, temporary: string, clip
     resourcesRoot: RESOURCES_ROOT,
     modelDirectories: MODEL_DIRECTORIES,
     preferences: new VoicePreferenceStore(join(temporary, "voice-preference.json")),
-    apiKeys: new VoiceApiKeyStore({ path: join(temporary, "voice-api-key.json"), cipher: NO_CIPHER }),
+    apiKeys: noDictationKeys(temporary),
     spawnHost: (): VoiceTranscriptionHostProcess => {
       const child = fork(TRANSCRIPTION_HOST, [], {
         execPath: ELECTRON,
@@ -427,10 +435,7 @@ async function main(): Promise<void> {
       resourcesRoot: RESOURCES_ROOT,
       modelDirectories: MODEL_DIRECTORIES,
       preferences: new VoicePreferenceStore(join(temporary, "download-preference.json")),
-      apiKeys: new VoiceApiKeyStore({
-        path: join(temporary, "download-api-key.json"),
-        cipher: { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" },
-      }),
+      apiKeys: noDictationKeys(temporary),
       spawnHost: () => {
         throw new Error("The download needs no host.");
       },

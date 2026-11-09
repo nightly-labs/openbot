@@ -2,6 +2,7 @@ import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
+import type { LiveVoiceEvent } from "./team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
@@ -318,6 +319,7 @@ export type TeamRealtimeEvent =
       typing: boolean;
     }
   | HostRestartEvent
+  | LiveVoiceEvent
   | MachineAlertEvent;
 
 export type DirectMessageRealtimeEvent = Extract<TeamRealtimeEvent, { type: "team-direct-message" }>;

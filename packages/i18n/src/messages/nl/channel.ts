@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Gestopte taak van {name} opnieuw toewijzen",
   "channel.stoppedTask.reassign": "Opnieuw toewijzen",
   "channel.stoppedTask.cancel": "Taak annuleren",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "De leden gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
   "channel.conversation.noMembers": "Voeg agents toe in de kanaalinstellingen om te beginnen.",
   "channel.conversation.archivedNotice": "Verwijderd kanaal. Alleen voorvertoning.",
   "channel.composer.label": "Bericht aan kanaal",

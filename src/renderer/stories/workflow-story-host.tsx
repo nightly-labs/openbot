@@ -150,6 +150,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
       return () => listeners.delete(changed);
     },
     places: async () => [...STORY_CATALOGS.places],
+    channels: async () => [...(STORY_CATALOGS.channels ?? [])],
     discordServers: async () => [],
     telegramChats: async () => [],
     slackWorkspaces: async () => [],
@@ -220,6 +221,7 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
             onOpenChangelog={fn()}
             onOpenGuides={fn()}
             onOpenDiscord={fn()}
+            onReportProblem={fn()}
             onSendFeedback={fn()}
           />
         }

@@ -25,6 +25,11 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Capturar a janela {name} e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureRegion":
     "Capturar a área da tela em {x}, {y}, {width} × {height} pontos e enviar a imagem ao modelo do agente.",
+  "status.agent.reportProblem":
+    "Isto será uma issue pública no GitHub, com a versão do app e o seu sistema. O seu nome não aparece.",
+  "status.agent.sendIdea": "Isto vira uma issue pública no GitHub. Seu nome não aparece.",
+  "status.agent.feedbackSent": "Enviado para a equipe do OpenBot: {title}",
+  "status.agent.feedbackSending": "Enviando seu feedback para a equipe do OpenBot…",
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",
   "status.agent.screenCaptureProgress": "Pedindo para capturar a tela…",

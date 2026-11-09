@@ -7,6 +7,8 @@ import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
+/** A 12-hour clock with AM and PM, or a 24-hour clock. */
+export type HourCycle = "h12" | "h23";
 
 export interface AppInfo {
   name: string;
@@ -22,6 +24,11 @@ export interface AppInfo {
    * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
    */
   softwareRendering?: boolean;
+  /**
+   * The clock that the macOS "24-hour time" setting selects. Chromium does not read it, so times
+   * follow it only through this value. Not set when the language's own clock applies.
+   */
+  hourCycle?: HourCycle;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -573,6 +580,8 @@ export type ExternalDestination =
   | "claude-install"
   | "hermes-install"
   | "feedback"
+  // The GitHub bug report form, from the Help menu, with the version and the system filled in.
+  | "report-problem"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
   // The community card of the sidebar also opens Discord.
