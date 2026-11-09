@@ -178,7 +178,13 @@ function CopyForAgentButton(props: { command: string }) {
   let reset: number | undefined;
   onCleanup(() => window.clearTimeout(reset));
   const copy = async () => {
-    await navigator.clipboard.writeText(t("server.install.agentPrompt", { command: props.command }));
+    try {
+      await navigator.clipboard.writeText(t("server.install.agentPrompt", { command: props.command }));
+    } catch {
+      // The clipboard refused the text, so the button does not say Copied.
+      setCopied(false);
+      return;
+    }
     setCopied(true);
     window.clearTimeout(reset);
     reset = window.setTimeout(() => setCopied(false), 2000);

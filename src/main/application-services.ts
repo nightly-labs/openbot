@@ -1996,7 +1996,10 @@ export async function createApplicationServices({
     }),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),
-    serverClaims: { create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed) },
+    serverClaims: {
+      signedIn: () => centralAuth.getState().status === "signed_in",
+      create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed),
+    },
     marketplaceAppServer: (appId) => {
       const listed = catalogPluginServers.filter((server) => server.slug === appId);
       const [server] = listed;

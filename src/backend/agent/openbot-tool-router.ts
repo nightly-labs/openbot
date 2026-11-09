@@ -218,6 +218,8 @@ export interface AgentFeedback {
 
 /** Makes one-time claims for new servers of the signed-in account (`POST /v2/server-claims`). */
 export interface AgentServerClaims {
+  /** The owner is signed in to an account, so a claim can be made. */
+  signedIn(): boolean;
   create(): Effect.Effect<ServerClaim, ToolOperationFailed>;
 }
 
@@ -1143,6 +1145,11 @@ export class OpenBotToolRouter {
     if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
       return openBotToolFailure(
         "Only a person's message, in your OpenBot chat or a thread they opened, can ask for an install command.",
+      );
+    // The owner does not approve a card that cannot give a command.
+    if (!claims.signedIn())
+      return openBotToolFailure(
+        "The user is not signed in to OpenBot, so OpenBot cannot make a command. Ask them to sign in, then try again.",
       );
     const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     const decision = yield* this.#attention.awaitToolApproval(

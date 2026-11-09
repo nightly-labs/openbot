@@ -28,8 +28,8 @@ export interface ServerInstallChatCardProps {
 
 /**
  * The card of an install command that an agent made. A server that is not in the list when the card
- * shows, with the command's name, is the new one. After the command expires, a server with that name
- * is the one it installed earlier.
+ * shows, with the command's name, is the new one. A server with that name that is in the list already
+ * signed in before the card showed, for example while another chat was open.
  */
 export function ServerInstallChatCard(props: ServerInstallChatCardProps) {
   const known = untrack(() => {
@@ -50,7 +50,7 @@ export function ServerInstallChatCard(props: ServerInstallChatCardProps) {
     const remote = props.watch.servers.filter((candidate) => candidate.kind === "remote");
     const fresh = remote.filter((candidate) => !known.has(candidate.id));
     const match = fresh.find(named) ?? (!expired() || props.name === null ? fresh[0] : undefined);
-    return match ?? (expired() ? remote.find(named) : undefined);
+    return match ?? remote.find(named);
   });
   retryNewServer(
     () => {

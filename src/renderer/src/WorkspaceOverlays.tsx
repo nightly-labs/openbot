@@ -264,6 +264,8 @@ function InstallServer() {
     const server = activeServer();
     const agent = activeAgent();
     if (!server || !agent || agentStatus().phase !== "ready" || (agentSetupOpen() && creatingAgent())) return undefined;
+    // The host makes the command for its own account: on a server of another person it is not this user's.
+    if (!server.thisComputer && server.role !== "owner") return undefined;
     if (controller.submitting() || controller.voicePhase() !== "idle" || controller.editingDeliveryId())
       return undefined;
     return { serverId: server.id, agentId: agent.id };

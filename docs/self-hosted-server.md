@@ -41,10 +41,7 @@ The app sees the new server in the server list and shows Open server.
 - The claim goes to the install script on standard input, in a line before the script. It is not an
   argument or a sudo variable, because sudo logs both (`COMMAND=` and `ENV=` in `/var/log/auth.log`
   and the journal), and `ps` shows arguments to each user. A command that you paste stays in the
-  history of your shell.
-- The claim is in the arguments of the install process while it runs. Other users of the server can
-  see it in that time. Use the command on a server where you trust each user, and make a new
-  command when it expired or when somebody else saw it.
+  history of your shell. Make a new command when it expired or when somebody else saw it.
 - The install refuses a claim on a server that is signed in already. Run `sudo openbot logout` first.
 
 ### Install from a chat
