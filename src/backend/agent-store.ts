@@ -790,6 +790,9 @@ export class AgentStore {
       if (input.fastMode !== undefined) {
         if (!isBoolean(input.fastMode)) throw new Error("Invalid fast mode value.");
         next.fastMode = input.fastMode;
+      } else if (input.provider !== undefined && input.provider !== agent.provider && next.fastMode) {
+        // The new provider has its own price, and Claude fast mode needs the user's confirmation.
+        next.fastMode = false;
       }
       // A provider change without an account returns the agent to the new provider's own sign-in.
       if (

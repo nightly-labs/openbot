@@ -1422,6 +1422,14 @@ export function createConversationViewScope(props: ConversationProps) {
     }
     void changeFastMode(next);
   }
+  // The confirmation belongs to the agent on the screen. It ends when a different agent opens, so it
+  // does not open again when the user comes back to that agent.
+  createEffect(
+    () => props.agent?.id,
+    (agentId) => {
+      if (agentId !== untrack(fastModeConfirmation)) setFastModeConfirmation(undefined);
+    },
+  );
   const fastModeConfirmationOpen = () => {
     const agentId = fastModeConfirmation();
     return agentId !== undefined && agentId === props.agent?.id;

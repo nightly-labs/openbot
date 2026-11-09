@@ -1393,10 +1393,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     if (!isRecord(params) || !("serviceTier" in params)) return;
     const fastMode = params.serviceTier === CLAUDE_FAST_SERVICE_TIER;
-    if (fastMode === (runtime.appliedFastMode ?? false)) {
-      runtime.appliedFastMode = fastMode;
-      return;
-    }
+    // A new process can start in fast mode from a Claude settings file, so the first turn also sends off.
+    if (fastMode === runtime.appliedFastMode) return;
     yield* providerCall(() => runtime.query.applyFlagSettings({ fastMode }));
     runtime.appliedFastMode = fastMode;
   });
@@ -1851,13 +1849,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       queryLogger.warn("Claude ran a fast mode turn at the standard speed.", { reason: fastModeDisabledReason });
       // The chat says it once for each new reason, because the price and speed the user chose did not apply.
       const warning = claudeFastModeWarning(fastModeDisabledReason);
-      if (warning && runtime.activeTurn)
+      if (warning && runtime.activeTurn) {
         this.emit("notification", {
           method: "warning",
           params: { threadId: runtime.id, turnId: runtime.activeTurn.id, message: warning },
         });
-    }
-    runtime.fastModeDisabledReason = fastModeDisabledReason;
+        runtime.fastModeDisabledReason = fastModeDisabledReason;
+      }
+    } else runtime.fastModeDisabledReason = fastModeDisabledReason;
     if (
       message.subtype === "success" &&
       message.total_cost_usd !== undefined &&
