@@ -1007,8 +1007,8 @@ one `.zip` file. It is a separate format from the Grok Bot agent import. The fir
 from this server" and "Import into this server". The section shows for this computer's server, and for a
 joined server with `instance-transfer-v1` when the user is an owner or admin (see
 [Instance transfer with a joined server](servers.md#instance-transfer-with-a-joined-server)). The web
-client and mobile do not show it. App preferences, the default model and the providers that are off
-belong to the app, not to a server, so they are not in the file.
+client does not show it; the phone shows it for a joined server. App preferences, the default model and
+the providers that are off belong to the app, not to a server, so they are not in the file.
 
 The file has `openbot-transfer.json` at its root, `agents/<key>/` folders (`avatar.<ext>`,
 `skills/<slug>/` and `workspace/`), and `shared/` for `~/OpenBot/Shared`. The manifest is
@@ -1035,10 +1035,52 @@ headers, custom agents keep only the names of their variables, and `signedIn` li
 never tokens. Arguments and URLs can hold a token too, so the export empties the value of a flag or
 `name=value` argument whose name says it is a secret, and removes the user, password, query and
 fragment of a URL, also of a URL in an argument such as a connection string. An MCP address keeps only
-its origin, because some services keep the access key in the path; `cleared` names each item it changed, and the import asks for those values again. Chat history, messaging connections, connectors, team and account sessions, browser
-data, approval automation and the per-agent access, Computer Use and automation settings are not
-exported, so an imported agent gets the defaults of a new agent on the new computer. Shared tables
-(`Shared/Data/agent-data.db`) are left out because their owners are agent ids.
+its origin, because some services keep the access key in the path; `cleared` names each item it changed, and the import asks for those values again. Messaging connections, connectors, team and account
+sessions, browser data, agent API key values, folders outside the workspace and webhook secrets are not
+exported. Shared tables (`Shared/Data/agent-data.db`) are left out: their owners are agent ids, and the
+only read path for them (`AgentTables`) cuts long cells, so a copy needs a database host operation.
+`Shared/Transfers`, which holds the files of messages, is not copied as files: those files go with the
+chat history.
+
+Fields added after version 1 shipped are optional, so an older app ignores them:
+
+- `agents[].preferences` (`src/main/instance-transfer-preferences.ts`): access, Computer Use, the agent
+  defaults, fast mode, backup models, hidden state, and the owner's notification level, pin and
+  approval choice, plus the names of the agent's API keys and the count of its outside folders. A file
+  can come from anywhere, so the import applies only values that keep the agent at or below a new
+  agent's permissions (`workspace` access, Computer Use off, a setting off, "ask first"). "Local
+  scripts", "Agent starts new chats" and "always allow" that were on become warnings. A member's
+  import does not change the owner's pin, level or approval choice.
+- `channels` and `exporter`: each channel with at least one exported member, with its title,
+  instructions, members and lead as agent keys, icon, image (`channels/<key>/image.<ext>`), isolated
+  and archived state, memories, routines and webhook routines. The import creates a channel with the
+  imported members only, as the importing person (`channelActor`, or the member). A channel step that
+  fails deletes that channel.
+- `agents[].webhookRoutines`, `channels[].webhookRoutines`: routines that a webhook starts, with their
+  event type and filters. The import saves each one through `HostEventsService`, which gives it a new
+  address and secret, and a warning tells the user to give them to the sender.
+- `settings.workflows` (`src/main/instance-transfer-workflows.ts`): each workflow's graph, with an
+  agent step and a channel output named by key. A messaging connection is left empty and the
+  workflow is marked `relink`; a webhook trigger needs a new address, which the user makes in the
+  workflow, because its secret shows only once.
+- `settings.routineFlowPositions`: the places on each routine canvas, as `routine:<key>` or
+  `agent:<key>`.
+- With "Include chat history" (`includeHistory`, this computer's server only; `instance-transfer-v1`
+  does not carry it), `agents[].history` names `agents/<key>/history/index.json`, which lists the
+  agent's own chat and side threads (title, title source, origin, archived state, routine key) and the
+  files of their messages. Messages are in JSON parts of 200 (`src/main/instance-transfer-history.ts`)
+  without queue state or reactions; a sender agent is named by its key. `channels[].messages` names
+  the parts of a channel's shown messages; their file cards stay behind.
+
+The import writes chats after every agent and routine exists (`AgentHistoryTransfer`,
+`src/backend/agent-history-transfer.ts`). Each batch of 200 messages is one `thread.history-imported`
+event through `persistConversationChanges`, with its files copied as generated attachments of the chat
+in the same transaction, as a branch copies them. Messages get new ids; a reply, a sender agent and a
+routine card point to the copies. `ThreadLifecycle.buildProviderHandoff` gives the first session of a
+thread with that event and no provider session the imported history, as it does for a branch. Channel
+messages go through `ChannelStore.update`, so their `channel.changed` events keep them; each gets a new
+id and no task, and the person who exported becomes the person who imports. Imported chats and
+channels are marked read for the importing person.
 
 `InstanceTransferService` (`src/main/instance-transfer-service.ts`) writes the archive one file at a
 time, stored and not compressed, to `<name>.zip.part`, and renames it when it is complete. Import uses
