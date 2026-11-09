@@ -140,7 +140,9 @@ export function AgentActivityIndicator(props: {
     const ms = elapsedMs();
     if (ms < (props.plain ? PLAIN_ELAPSED_VISIBLE_AFTER_MS : ELAPSED_VISIBLE_AFTER_MS)) return null;
     // A plain line with no step label shows only the avatar; a time alone would not say what it counts.
-    if (props.plain && !shownLabel()) return null;
+    // While the model reads a result, the line keeps the name of the step that ended, but the time
+    // counts the review, so it would not belong to that name.
+    if (props.plain && (!shownLabel() || (!props.waitingFor && detail() !== props.detail))) return null;
     const total = Math.floor(ms / 1_000);
     const seconds = format.number(total % 60, { style: "unit", unit: "second", unitDisplay: "narrow" });
     if (total < 60) return seconds;
