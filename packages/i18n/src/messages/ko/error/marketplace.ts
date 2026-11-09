@@ -37,8 +37,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "에이전트 링크가 올바르지 않아요.",
   "error.marketplace.changedSinceOpened":
     "이 에이전트가 열어본 이후에 변경되었어요. 링크를 다시 열어 새 버전을 확인해 주세요.",
-  "error.marketplace.skillNameConflict":
-    '이미 "{name}"이라는 다른 로컬 스킬이 있어요. 이름을 바꾸거나 삭제한 다음 이 에이전트를 다시 추가해 주세요.',
   "error.marketplace.avatarInvalid": "에이전트 아바타가 올바르지 않아요.",
   "error.marketplace.secretInName": "게시하기 전에 이름에서 시크릿이나 이메일 주소를 제거해 주세요.",
   "error.marketplace.secretInTitle": "게시하기 전에 제목에서 시크릿이나 이메일 주소를 제거해 주세요.",

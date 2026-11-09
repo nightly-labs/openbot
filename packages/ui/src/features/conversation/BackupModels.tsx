@@ -57,6 +57,8 @@ export interface BackupModelSource {
   providers: AgentStatus["providers"];
   /** Whether a usage limit holds this model and account now. */
   limited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  /** Whether a provider error holds this model and account now, so that a switch passes over it. */
+  failed?: ((choice: AgentModelChoice) => boolean) | undefined;
 }
 
 export function backupModelOption(choice: AgentModelChoice, source: BackupModelSource): BackupModelOption {
@@ -156,7 +158,14 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
   const label = useOptionLabel();
   const automatic = () => props.value?.automatic === true;
   const order = () => props.value?.order ?? [];
-  const entries = () => order().map((choice) => backupModelOption(choice, props.source));
+  // A switch passes over a saved backup that a provider error holds, so the list does not show it as ready (#5802).
+  const entries = () =>
+    order().map((choice) => {
+      const option = backupModelOption(choice, props.source);
+      return option.state === "ready" && props.source.failed?.(choice)
+        ? { ...option, state: "unavailable" as const }
+        : option;
+    });
   const addable = () =>
     backupModelOptions(props.source, [props.own, ...order()]).filter((option) => option.state !== "unavailable");
   // The value can come from a store, and IPC cannot clone a store proxy, so each choice is copied.

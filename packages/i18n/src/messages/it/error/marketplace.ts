@@ -47,8 +47,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "Il link dell'agente non è valido.",
   "error.marketplace.changedSinceOpened":
     "Questo agente è cambiato dopo che l'hai aperto. Riapri il link per vedere la nuova versione.",
-  "error.marketplace.skillNameConflict":
-    "Hai già una skill locale diversa chiamata «{name}». Rinominala o rimuovila, poi aggiungi di nuovo questo agente.",
   "error.marketplace.avatarInvalid": "L'avatar dell'agente non è valido.",
   "error.marketplace.secretInName": "Rimuovi il segreto o l'indirizzo email dal nome prima di pubblicare.",
   "error.marketplace.secretInTitle": "Rimuovi il segreto o l'indirizzo email dal titolo prima di pubblicare.",

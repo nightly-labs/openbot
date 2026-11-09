@@ -46,8 +46,6 @@ export const messages = defineMessages("error.marketplace", {
   "error.marketplace.linkInvalid": "The agent link is invalid.",
   "error.marketplace.changedSinceOpened":
     "This agent changed after you opened it. Open the link again to review the new version.",
-  "error.marketplace.skillNameConflict":
-    'You already have a different local skill named "{name}". Rename or remove it, then add this agent again.',
   "error.marketplace.avatarInvalid": "The agent avatar is invalid.",
   "error.marketplace.secretInName": "Remove the secret or email address from the name before publishing.",
   "error.marketplace.secretInTitle": "Remove the secret or email address from the title before publishing.",

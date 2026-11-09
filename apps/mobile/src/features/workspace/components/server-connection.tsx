@@ -1,4 +1,3 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteConnectionRecovery,
@@ -8,7 +7,11 @@ import {
   type RemoteTeamDirectoryClient,
   remoteConnectionFailureDetails,
 } from "@openbot/team-client";
-import { REMOTE_PEER_LOST_AFTER_MS, type RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
+import {
+  REMOTE_PEER_LOST_AFTER_MS,
+  type RemoteTeamConnectionUpdate,
+  type RemoteTeamEvent,
+} from "@openbot/team-client/remote-peer";
 import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
@@ -64,7 +67,7 @@ interface Props {
     resuming: boolean,
   ): void;
   onMembershipChanged?(): Promise<void>;
-  onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
+  onTeamEvent(hostId: string, event: RemoteTeamEvent): void;
   /** An attempt of this server failed in the foreground, or Signal says that its host is offline. */
   onUnavailable?(hostId: string): void;
 }

@@ -132,7 +132,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "변경 사항을 저장하려면 다시 연결해 주세요.",
   "mobile.agent.info.noMemories": "아직 메모리가 없어요.",
   "mobile.agent.info.addMemory": "메모리 추가",
-  "mobile.agent.info.routineActive": "활성",
   "mobile.agent.info.routinePaused": "일시 정지됨",
   "mobile.agent.info.noRoutines": "아직 루틴이 없어요.",
   "mobile.agent.info.addRoutine": "루틴 추가",

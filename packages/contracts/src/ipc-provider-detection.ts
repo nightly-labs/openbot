@@ -12,9 +12,11 @@ import {
   CUSTOM_PROVIDER_LIMITS,
   type CustomProviderHeader,
   type CustomProviderInputKind,
+  type CustomProviderReasoningEffort,
   isCustomProviderContextWindow,
   isCustomProviderInputs,
   isCustomProviderMaxOutput,
+  isCustomProviderReasoningEfforts,
   isNewCustomProviderId,
 } from "./ipc-custom-providers";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
@@ -66,6 +68,8 @@ export interface DetectedModel {
   contextWindow?: number;
   /** Only with `contextWindow`, as the form takes it. */
   maxOutput?: number;
+  /** The efforts that the list gives for the model, in `CUSTOM_PROVIDER_REASONING_EFFORTS` order. Never empty. */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
 }
 
 /** One server that answered `GET {baseUrl}/models` with no key. */
@@ -102,7 +106,9 @@ function isDetectedModel(value: unknown): value is DetectedModel {
     value.id.length > 0 &&
     (value.inputs === undefined || isCustomProviderInputs(value.inputs)) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
-    (value.maxOutput === undefined || (value.contextWindow !== undefined && isCustomProviderMaxOutput(value.maxOutput)))
+    (value.maxOutput === undefined ||
+      (value.contextWindow !== undefined && isCustomProviderMaxOutput(value.maxOutput))) &&
+    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts))
   );
 }
 

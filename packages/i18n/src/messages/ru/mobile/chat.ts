@@ -213,6 +213,14 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "У ключа ElevenLabs нет нужного разрешения. Проверьте его в Настройки > Голос.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs нужно подключение к сети.",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "Голосовой сервер не смог прочитать ответ. Проверьте его в разделе «Настройки > Голос».",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Этот сервер не поддерживает GPT Live Voice. Обновите OpenBot на компьютере, где он работает.",
+  "mobile.chat.liveVoice.gptFailed": "Не удалось запустить GPT Live Voice. Включите микрофон, чтобы повторить.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice остановлен. Включите микрофон, чтобы запустить его снова.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Разрешите OpenBot использовать микрофон в Настройках. Затем включите микрофон, чтобы повторить.",
   "mobile.chat.composer.addAttachment": "Добавить вложение",
   "mobile.chat.composer.ask": "Спросить: {name}",
   "mobile.chat.composer.stopFailed": "Не удалось остановить агента. Возможно, он уже закончил.",

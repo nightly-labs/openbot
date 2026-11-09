@@ -69,6 +69,11 @@ export function nextAgentActivityLabel(
  * goes away at once is only noise.
  */
 const ELAPSED_VISIBLE_AFTER_MS = 5_000;
+/**
+ * A plain line shows the time of a step only after this long. A short step keeps the calm line, and a
+ * command that runs for an hour does not look like an agent that stopped (#5757).
+ */
+const PLAIN_ELAPSED_VISIBLE_AFTER_MS = 60_000;
 
 export function AgentActivityIndicator(props: {
   agent: AgentProfile | undefined;
@@ -90,9 +95,9 @@ export function AgentActivityIndicator(props: {
    */
   waitingFor?: string | null | undefined;
   /**
-   * The line shows only what the agent does now, as the step names it, and nothing more: no label
-   * while no step is named, no time and no steps. The avatar shows what the step does, and each new
-   * label rises into place.
+   * The line shows only what the agent does now, as the step names it: no label while no step is
+   * named, and no steps. A named step shows its time only when it runs long. The avatar shows what
+   * the step does, and each new label rises into place.
    */
   plain?: boolean | undefined;
   /** What the running step does, as the host names it. A plain line shows it on the avatar. */
@@ -130,10 +135,14 @@ export function AgentActivityIndicator(props: {
   const plain = () => (props.plain ? "true" : undefined);
   const avatarActivity = () => (props.plain && !props.waitingFor ? (props.activity ?? null) : undefined);
   const shownSteps = () => (props.plain ? undefined : props.steps);
-  const elapsedMs = createElapsed(() => (props.phase === "exiting" || props.plain ? undefined : props.since));
+  const elapsedMs = createElapsed(() => (props.phase === "exiting" ? undefined : props.since));
   const elapsed = createMemo(() => {
     const ms = elapsedMs();
-    if (ms < ELAPSED_VISIBLE_AFTER_MS) return null;
+    if (ms < (props.plain ? PLAIN_ELAPSED_VISIBLE_AFTER_MS : ELAPSED_VISIBLE_AFTER_MS)) return null;
+    // A plain line with no step label shows only the avatar; a time alone would not say what it counts.
+    // While the model reads a result, the line keeps the name of the step that ended, but the time
+    // counts the review, so it would not belong to that name.
+    if (props.plain && (!shownLabel() || (!props.waitingFor && detail() !== props.detail))) return null;
     const total = Math.floor(ms / 1_000);
     const seconds = format.number(total % 60, { style: "unit", unit: "second", unitDisplay: "narrow" });
     if (total < 60) return seconds;

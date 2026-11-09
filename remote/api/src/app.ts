@@ -69,8 +69,10 @@ import type { TurnRelays } from "./turn-relays";
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
 const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
-// A JSON call holds at most 2,000 characters of text and five buttons.
-const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
+// A JSON call holds at most 2,000 characters of text, five buttons and 10 embeds: 6,000 characters
+// of embed text and 60 links of up to 2,048 characters. At 6 bytes for each escaped text character
+// and 3 for each link character, that is less than 450 KB.
+const DISCORD_JSON_BODY_BYTES_LIMIT = 512 * 1024;
 // The multipart fields and boundaries around one file.
 const DISCORD_UPLOAD_BODY_BYTES_LIMIT = DISCORD_UPLOAD_BYTES_LIMIT + 64 * 1024;
 // An account event is one small JSON object.

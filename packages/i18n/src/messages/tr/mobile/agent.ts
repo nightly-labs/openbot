@@ -140,7 +140,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "Değişiklikleri kaydetmek için yeniden bağlanın.",
   "mobile.agent.info.noMemories": "Henüz bellek yok.",
   "mobile.agent.info.addMemory": "Bellek ekle",
-  "mobile.agent.info.routineActive": "Etkin",
   "mobile.agent.info.routinePaused": "Duraklatıldı",
   "mobile.agent.info.noRoutines": "Henüz rutin yok.",
   "mobile.agent.info.addRoutine": "Rutin ekle",

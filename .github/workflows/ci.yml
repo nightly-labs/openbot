@@ -397,9 +397,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:messaging-discord-access
 
+      - name: Run the Discord embeds E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-discord-embeds
+
       - name: Run the Telegram answer mentions E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-telegram-mentions
+
+      - name: Run the Slack ping reply E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-slack-ping-reply
 
       - name: Run the turn input E2E test
         if: ${{ !cancelled() }}
@@ -664,7 +672,9 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
+            .openbot-build/messaging-discord-embeds-e2e/
             .openbot-build/messaging-telegram-mentions-e2e/
+            .openbot-build/messaging-slack-ping-reply-e2e/
             .openbot-build/turn-input-e2e/
             .openbot-build/zero-filled-settings-e2e/
             .openbot-build/provider-update-busy-e2e/

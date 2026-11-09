@@ -667,6 +667,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}
+              providerFailed={props.providerFailed}
               defaultBusyMessageMode={props.defaultBusyMessageMode}
               agentDefaults={localAgentDefaults()}
               memoryLimit={props.server?.kind === "local" ? props.agentMemoryLimit : undefined}

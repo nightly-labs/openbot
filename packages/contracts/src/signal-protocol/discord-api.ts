@@ -40,9 +40,21 @@ export const DISCORD_EMBEDS_LIMIT = 10;
 
 /**
  * The longest text of all embeds of one message that Signal passes on, links included. Discord's
- * own limit for the text of all embeds of a message, without links.
+ * own limit for the text of all embeds of a message, without links. A post's embeds have the same limit.
  */
 export const DISCORD_EMBED_TEXT_LIMIT = 6_000;
+
+/** Discord's limits for the parts of one embed that OpenBot posts. */
+export const DISCORD_EMBED_LIMITS = {
+  title: 256,
+  description: 4_096,
+  fields: 25,
+  fieldName: 256,
+  fieldValue: 1_024,
+  footerText: 2_048,
+  authorName: 256,
+  url: 2_048,
+} as const;
 
 /** The longest embed text a host accepts: a later Signal can pass more without breaking a host. */
 const EMBED_DECODE_LIMIT = 16_000;
@@ -135,6 +147,34 @@ export interface DiscordButton {
 }
 
 /**
+ * One embed of a post, in Discord's own field names, so Signal sends it as it is. `color` is an RGB
+ * integer, `timestamp` an ISO 8601 time, and each link `http:` or `https:`.
+ */
+export interface DiscordEmbed {
+  title?: string | undefined;
+  description?: string | undefined;
+  url?: string | undefined;
+  color?: number | undefined;
+  timestamp?: string | undefined;
+  author?: { name: string; url?: string | undefined; icon_url?: string | undefined } | undefined;
+  footer?: { text: string; icon_url?: string | undefined } | undefined;
+  thumbnail?: { url: string } | undefined;
+  image?: { url: string } | undefined;
+  fields?: { name: string; value: string; inline?: boolean | undefined }[] | undefined;
+}
+
+/** The text of embeds that Discord counts for `DISCORD_EMBED_TEXT_LIMIT`. Links do not count. */
+export function discordEmbedTextLength(embeds: readonly DiscordEmbed[]): number {
+  let length = 0;
+  for (const embed of embeds) {
+    length += (embed.title?.length ?? 0) + (embed.description?.length ?? 0);
+    length += (embed.author?.name.length ?? 0) + (embed.footer?.text.length ?? 0);
+    for (const field of embed.fields ?? []) length += field.name.length + field.value.length;
+  }
+  return length;
+}
+
+/**
  * One Discord call that a host asks Signal to make. Every operation names its guild, and Signal
  * checks that each channel is in that guild. Only `createMessage` can ping, and only a mentioned user.
  */
@@ -143,10 +183,16 @@ export type DiscordApiRequest =
       op: "createMessage";
       guildId: string;
       channelId: string;
+      /** Empty only when the post has embeds. */
       content: string;
       /** The message this post replies to, or null for a plain post. */
       replyTo: string | null;
       buttons: DiscordButton[];
+      /**
+       * At most `DISCORD_EMBEDS_LIMIT`, shown under the text. A host sends the key only with at
+       * least one embed: an older Signal refuses it.
+       */
+      embeds?: DiscordEmbed[] | undefined;
     }
   | {
       op: "editMessage";

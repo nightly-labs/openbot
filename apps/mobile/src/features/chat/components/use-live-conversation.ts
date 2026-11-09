@@ -144,6 +144,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   const dictation = useVoiceDictation({
     enabled: input.enabled && input.online && state.open && !state.exit,
     onDraft: controller.hear,
+    endsOnPause: true,
   });
   dictationRef.current = dictation;
   const { conversation, channel, deliveries, outboxMessages } = input;
@@ -436,6 +437,23 @@ function createController({
     current.turnId ??= current.messageId ? liveReplyTurn(conversation.messages, deliveries, current.messageId) : null;
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
+    // A streamed message that a later step marks as commentary is not part of the spoken answer.
+    // Progress updates are read on purpose, so only a message read as the answer counts.
+    if (
+      readIds.some(
+        (id) =>
+          !readUpdates?.ids.has(id) &&
+          !conversation.messages.some(
+            (message) => message.id === id && message.turnId === turnId && isAgentAnswer(message),
+          ),
+      )
+    ) {
+      stopSpeaking();
+      if (phase === "speaking") {
+        setPhase("thinking");
+        setCaption("");
+      }
+    }
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
     // Each progress update is read when it is complete, as on desktop. A stopped or failed turn ends
     // its open update part way, so only a completed one is read.

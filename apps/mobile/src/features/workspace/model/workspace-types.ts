@@ -177,6 +177,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
@@ -670,7 +671,11 @@ export interface MobileWorkspaceContextValue {
   canManageProviders: (serverId: string) => boolean;
   /** The Providers admin of one host, with the newest route set that it serves. */
   providerAdmin: (serverId: string) => ProviderAdmin;
-  /** An owner or admin of an online host that serves `mcp-servers-v1`. The host checks the role again. */
+  /**
+   * An owner or admin of an online host that serves `mcp-servers-v1`, or a member when the host also
+   * serves `mcp-member-access-v1`. The host checks the role again, and refuses a member a row that
+   * another person added.
+   */
   canManageMcpServers: (serverId: string) => boolean;
   /** The MCP servers that the host gives its agents. Each change answers with the whole list. */
   listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
@@ -681,7 +686,7 @@ export interface MobileWorkspaceContextValue {
   /** Connects once with `config` on the host. Nothing is saved. */
   testMcpServer: (config: McpServerConfig, serverId: string) => Promise<McpTestResult>;
   /**
-   * An owner or admin of an online host that serves `mcp-servers-v1` and `sign-in-relay-v1`: the phone
+   * A user who manages the MCP servers of a host that serves `sign-in-relay-v1`: the phone
    * opens the browser sign-in of an MCP server, and the host keeps the grant.
    */
   canRelayMcpSignIn: (serverId: string) => boolean;
@@ -895,6 +900,11 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `live-voice-v1`: a member can talk with an agent by GPT live voice. */
+  canUseLiveVoice: (serverId: string) => boolean;
+  /** Starts GPT live voice with the WebRTC offer of the phone's peer. Only a host with `canUseLiveVoice` takes it. */
+  startLiveVoice: (input: LiveVoiceStartRequest, serverId: string) => Promise<LiveVoiceSessionResponse>;
+  stopLiveVoice: (sessionId: string, serverId: string) => Promise<void>;
   /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
   canCompactContext: (serverId: string) => boolean;
   /**
@@ -1095,6 +1105,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "canDeleteMessages"
   | "canMarkUnreadFrom"
+  | "canUseLiveVoice"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"

@@ -34,6 +34,7 @@ export const messages = {
   "mobile.app.route.threads": "Mesaj dizileri",
   "mobile.app.route.usage": "Kullanım",
   "mobile.app.route.marketplace": "Pazaryeri",
+  "mobile.app.route.library": "Kitaplık",
   "mobile.app.quickAction.search": "Ara",
   "mobile.app.update.title": "OpenBot {version} çıktı",
   "mobile.app.update.readyTitle": "Yeni bir OpenBot hazır",

@@ -218,6 +218,12 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "لم يقبل ElevenLabs مفتاح API.",
   "mobile.chat.liveVoice.elevenLabsPermission": "ينقص مفتاح ElevenLabs إذنٌ. تحقق منه في الإعدادات > الصوت.",
   "mobile.chat.liveVoice.networkNeeded": "يحتاج ElevenLabs إلى اتصال بالشبكة.",
+  "mobile.chat.liveVoice.voiceServerFailed": "تعذّر على خادم الصوت قراءة الرد. تحقّق منه في الإعدادات > الصوت.",
+  "mobile.chat.liveVoice.gptUnsupported": "هذا الخادم لا يدعم GPT Live Voice. حدّث OpenBot على الكمبيوتر الذي يشغّله.",
+  "mobile.chat.liveVoice.gptFailed": "تعذّر بدء GPT Live Voice. ألغِ كتم الميكروفون للمحاولة مرة أخرى.",
+  "mobile.chat.liveVoice.gptEnded": "توقّف GPT Live Voice. ألغِ كتم الميكروفون لبدئه مرة أخرى.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "اسمح لـ OpenBot باستخدام الميكروفون في الإعدادات. ثم ألغِ الكتم للمحاولة مرة أخرى.",
   "mobile.chat.composer.addAttachment": "إضافة مرفق",
   "mobile.chat.composer.ask": "اسأل {name}",
   "mobile.chat.composer.stopFailed": "تعذّر إيقاف الوكيل. ربما انتهى بالفعل.",

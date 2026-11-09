@@ -17,13 +17,21 @@ import { currentText } from "@/shared/lib/text";
 import { ELEVENLABS_SAMPLE_RATE, ElevenLabsError, elevenLabsSpeech } from "./elevenlabs";
 import { speechNative } from "./speech-native";
 import { supertonicModel, useSupertonicModel } from "./supertonic-model";
+import { useVoiceServer, VoiceServerError, voiceServerSpeech } from "./voice-server";
 import { type ElevenLabsVoice, readElevenLabsKey, useVoiceSettings } from "./voice-settings";
 
 /** Supertonic 3 synthesizes faster with more threads, and a phone has four or more cores. */
 const SUPERTONIC_THREADS = 4;
 
 /** Why a reply was not read to its end. */
-export type ReplyVoiceFailure = "not-ready" | "language" | "speech" | "invalid-key" | "permission" | "network";
+export type ReplyVoiceFailure =
+  | "not-ready"
+  | "language"
+  | "speech"
+  | "invalid-key"
+  | "permission"
+  | "network"
+  | "voice-server";
 
 const REPLY_VOICE_FAILURE_TEXT = {
   "not-ready": "mobile.chat.liveVoice.voiceNotReady",
@@ -32,6 +40,7 @@ const REPLY_VOICE_FAILURE_TEXT = {
   "invalid-key": "mobile.chat.liveVoice.elevenLabsKeyInvalid",
   permission: "mobile.chat.liveVoice.elevenLabsPermission",
   network: "mobile.chat.liveVoice.networkNeeded",
+  "voice-server": "mobile.chat.liveVoice.voiceServerFailed",
 } as const satisfies Record<ReplyVoiceFailure, MobileTextKey>;
 
 /**
@@ -46,7 +55,8 @@ export function replyVoiceFailureText(failure: ReplyVoiceFailure, reason: string
 /** A voice to read with in place of the one in the settings, such as a voice the user previews. */
 export type ReplyVoiceChoice =
   | { engine: "supertonic"; supertonicVoice: SpeechVoice }
-  | { engine: "elevenlabs"; elevenLabsVoice: ElevenLabsVoice };
+  | { engine: "elevenlabs"; elevenLabsVoice: ElevenLabsVoice }
+  | { engine: "voice-server"; voice: string };
 
 export interface ReplyReading {
   stop: () => void;
@@ -66,11 +76,15 @@ type ReplyHandlers = {
   onError: (failure: ReplyVoiceFailure, reason: string | null) => void;
 };
 
-/** The chosen voice can read now: Supertonic 3 is downloaded, or ElevenLabs has a key and a voice. */
+/**
+ * The chosen voice can read now: Supertonic 3 is downloaded, ElevenLabs has a key and a voice, or
+ * the voice server has its spoken replies on.
+ */
 export function replyVoiceReady(engine = useVoiceSettings.getState().engine): boolean {
   if (!speechNative) return false;
   const settings = useVoiceSettings.getState();
   if (engine === "elevenlabs") return settings.hasElevenLabsKey && settings.elevenLabsVoice !== null;
+  if (engine === "voice-server") return useVoiceServer.getState().server?.routes.speech === true;
   return useSupertonicModel.getState().phase === "ready";
 }
 
@@ -210,8 +224,11 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   // One reading keeps one model, so its sentences do not change voice when the model changes.
   const elevenLabsModel = settings.elevenLabsModel;
   const supertonicVoice = choice?.engine === "supertonic" ? choice.supertonicVoice : settings.supertonicVoice;
+  const serverVoice = choice?.engine === "voice-server" ? choice.voice : undefined;
   const ready =
-    engine === "elevenlabs" ? settings.hasElevenLabsKey && elevenLabsVoice !== null : replyVoiceReady("supertonic");
+    engine === "elevenlabs"
+      ? settings.hasElevenLabsKey && elevenLabsVoice !== null
+      : replyVoiceReady(engine === "voice-server" ? "voice-server" : "supertonic");
   if (!native || !ready) {
     queueMicrotask(() => end("not-ready"));
     return { stop, update: () => undefined };
@@ -246,6 +263,17 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     }
   }
 
+  /** The voice server: each part plays while the next one is read on the server. */
+  async function playVoiceServer(): Promise<void> {
+    for (let index = 0; ; index++) {
+      const part = await nextPart(index);
+      if (part === null) return;
+      const audio = await voiceServerSpeech(part, abort.signal, serverVoice);
+      if (ended) return;
+      native?.playPcm(idOf(index), audio.pcm, audio.sampleRate);
+    }
+  }
+
   /** Supertonic 3: the next part is synthesized while one plays. */
   async function playSupertonic(): Promise<void> {
     const directory = supertonicModel.uri();
@@ -270,11 +298,15 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
 
   async function play(): Promise<void> {
     try {
-      await (engine === "elevenlabs" ? playElevenLabs() : playSupertonic());
+      await (engine === "elevenlabs"
+        ? playElevenLabs()
+        : engine === "voice-server"
+          ? playVoiceServer()
+          : playSupertonic());
     } catch (error) {
       if (ended) return;
       if (error instanceof ElevenLabsError) end(elevenLabsFailure(error.code), error.reason);
-      else end("speech");
+      else end(error instanceof VoiceServerError ? "voice-server" : "speech");
     }
   }
 

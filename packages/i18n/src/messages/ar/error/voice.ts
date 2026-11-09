@@ -28,7 +28,10 @@ export const messages = {
   "error.voice.live.timedOut": "لم يبدأ صوت Codex المباشر في الوقت المحدد. حاول مرة أخرى.",
   "error.voice.live.failed": "توقف الصوت المباشر: {reason}",
   "error.voice.live.disconnected": "انقطع اتصال الصوت المباشر.",
+  "error.voice.live.hostFailed":
+    "لم يتمكن Codex على الخادم من بدء الصوت المباشر. اطلب من مالكه تحديث Codex على ذلك الكمبيوتر وتسجيل الدخول باستخدام ChatGPT، ثم حاول مرة أخرى.",
   "error.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",
+  "error.voice.live.unavailable": "تعذّر على OpenAI بدء الصوت المباشر. المشكلة من جهة OpenAI. حاول مرة أخرى لاحقًا.",
   "error.voice.live.off": "صوت Codex المباشر متوقف. شغّله من الإعدادات ← الصوت.",
   "error.voice.server.routeOff": "خادم الصوت غير مُعدّ لهذا. تحقّق من الإعدادات → الصوت.",
   "error.voice.server.keyRefused": "رفض {host} مفتاح API.",

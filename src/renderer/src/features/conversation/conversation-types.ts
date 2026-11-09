@@ -287,6 +287,8 @@ export interface ConversationProps {
   usageLimitAsk?: UsageLimitAskCardProps | undefined;
   /** Whether a usage limit holds this model and account now. Absent for a joined server. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  /** Whether a provider error holds this model and account now, for the backup models page. */
+  providerFailed?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The takeover of the open thread: of a side thread while one is open, else of the agent's own chat. */
   browserTakeover: BrowserTakeoverRequest | undefined;
   /** Opens an agent. With `tabId`, the agent opens at that thread tab, not at the tab it showed last. */

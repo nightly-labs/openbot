@@ -62,7 +62,6 @@ interface BrowserScriptOptions {
 // with every check of the matching tool. They live in the sandbox, so a script can change them only
 // for itself.
 const PRELUDE = `
-const __target = (target) => (typeof target === "string" ? { kind: "css", selector: target } : target);
 // Models often pass timeout, as other browser libraries name it, or the timeout as a bare number.
 const __with = (step, options) => {
   const { timeout, ...rest } = typeof options === "number" ? { timeoutMs: options } : (options ?? {});
@@ -70,10 +69,6 @@ const __with = (step, options) => {
 };
 // waitFor("text", "Hello") and waitFor("selector", "#done"): the forms that models write by mistake.
 const __waitFields = { text: "text", url: "url", state: "state", selector: "target", css: "target" };
-// Playwright and Puppeteer state names. A target wait already waits until the element has a box.
-const __waitStates = { networkidle: "dom-quiet", networkidle0: "dom-quiet", networkidle2: "dom-quiet",
-  idle: "dom-quiet", quiet: "dom-quiet", complete: "load", interactive: "domcontentloaded" };
-const __targetStates = new Set(["visible", "attached"]);
 globalThis.css = (selector) => ({ kind: "css", selector });
 globalThis.role = (role, name, exact) => {
   // role("button", { name: "Start", exact: true }), as Playwright writes it.
@@ -81,6 +76,8 @@ globalThis.role = (role, name, exact) => {
     exact = name.exact ?? exact;
     name = name.name;
   }
+  // role("textbox", "Username", { exact: true })
+  if (exact !== null && typeof exact === "object") exact = exact.exact;
   return { kind: "role", role, ...(name === undefined ? {} : { name }), ...(exact === undefined ? {} : { exact }) };
 };
 globalThis.text = (text, exact) => ({ kind: "text", text, ...(exact === undefined ? {} : { exact }) });
@@ -90,18 +87,18 @@ globalThis.step = async (step) => {
 };
 globalThis.navigate = (url, options) =>
   step(__with(typeof url === "string" ? { action: "navigate", url } : { action: "navigate", ...url }, options));
-globalThis.click = (target, options) => step(__with({ action: "click", target: __target(target) }, options));
+globalThis.click = (target, options) => step(__with({ action: "click", target }, options));
 globalThis.type = (target, text, options) =>
-  step(__with({ action: "type", ...(target == null ? {} : { target: __target(target) }), text }, options));
+  step(__with({ action: "type", ...(target == null ? {} : { target }), text }, options));
 globalThis.press = (key, target, options) =>
-  step(__with({ action: "press", key, ...(target == null ? {} : { target: __target(target) }) }, options));
-globalThis.hover = (target, options) => step(__with({ action: "hover", target: __target(target) }, options));
+  step(__with({ action: "press", key, ...(target == null ? {} : { target }) }, options));
+globalThis.hover = (target, options) => step(__with({ action: "hover", target }, options));
 globalThis.scroll = (deltaY, target, options) =>
-  step(__with({ action: "scroll", deltaY, ...(target == null ? {} : { target: __target(target) }) }, options));
+  step(__with({ action: "scroll", deltaY, ...(target == null ? {} : { target }) }, options));
 globalThis.selectOption = (target, values, options) =>
-  step(__with({ action: "select_option", target: __target(target), values: [].concat(values) }, options));
+  step(__with({ action: "select_option", target, values: [].concat(values) }, options));
 globalThis.setChecked = (target, checked = true, options) =>
-  step(__with({ action: "set_checked", target: __target(target), checked }, options));
+  step(__with({ action: "set_checked", target, checked }, options));
 globalThis.sleep = (ms) =>
   step({ action: "sleep", ms: Math.max(0, Math.min(Math.round(Number(ms) || 0), ${BROWSER_SCRIPT_MAX_SLEEP_MS})) });
 let __timer = 0;
@@ -112,17 +109,34 @@ globalThis.setTimeout = (callback, ms, ...args) => {
   return id;
 };
 globalThis.clearTimeout = (id) => { __cancelled.add(id); };
-globalThis.waitFor = (condition, options) => {
+globalThis.waitFor = (condition, options, more) => {
   if (typeof condition === "number") return sleep(condition);
   if (typeof condition === "string" && typeof options === "string") {
-    const field = __waitFields[condition];
+    // waitFor("#done", "visible"): a selector and the state of its element.
+    if (__waitFields[condition] === undefined && (options === "visible" || options === "attached"))
+      return waitFor({ target: css(condition) }, more);
+    // waitFor("Hello", "text"): the value first, the field second.
+    const [name, value] = __waitFields[condition] === undefined ? [options, condition] : [condition, options];
+    const field = __waitFields[name];
     if (field === undefined) throw new Error('waitFor takes waitFor("text"), waitFor({ text | url | target | state }), or waitFor(() => condition).');
-    return waitFor(field === "target" ? { target: css(options) } : { [field]: options });
+    return waitFor(field === "target" ? { target: css(value) } : { [field]: value }, more);
   }
   // A page function is polled in the page until it returns a truthy value, as one evaluate step.
   if (typeof condition === "function") {
     const { timeoutMs: requested = 10000 } = __with({}, options);
     const timeoutMs = Math.min(requested, 25000);
+    // A function that calls the helpers, such as evaluate, is written for this sandbox, not for the
+    // page: poll it here, once a second, so a 25-second wait takes about 25 steps. The page's own
+    // document.evaluate is an XPath call, not the helper.
+    if (/(?<![.\\w$])(?:evaluate|snapshot|step)\\s*\\(/.test(String(condition)))
+      return (async () => {
+        const end = Date.now() + timeoutMs;
+        while (!(await condition())) {
+          if (Date.now() >= end) throw new Error("waitFor condition timed out.");
+          await sleep(1000);
+        }
+        return true;
+      })();
     return evaluate(
       "new Promise((resolve, reject) => { const end = Date.now() + " + timeoutMs + "; const check = async () => {" +
         " try { if (await (" + String(condition) + ")()) return resolve(true); } catch (error) { return reject(error); }" +
@@ -131,16 +145,14 @@ globalThis.waitFor = (condition, options) => {
       { timeoutMs: timeoutMs + 5000 },
     );
   }
-  const fields = typeof condition === "string" ? { text: condition } : { ...condition };
+  // waitFor(role("button", "Start")): a target object is the element to wait for.
+  const fields = typeof condition === "string" ? { text: condition }
+    : typeof condition?.kind === "string" ? { target: condition } : { ...condition };
   if (fields.selector !== undefined) {
     fields.target = fields.selector;
     delete fields.selector;
   }
-  const { state, ...rest } = __with(fields, options);
-  if (rest.target !== undefined) rest.target = __target(rest.target);
-  const mapped = __waitStates[state] ?? state;
-  const keepState = mapped !== undefined && !(rest.target !== undefined && __targetStates.has(mapped));
-  return step({ action: "wait_for", ...rest, ...(keepState ? { state: mapped } : {}) });
+  return step({ action: "wait_for", ...__with(fields, options) });
 };
 globalThis.evaluate = (expression, options) =>
   step(__with({
@@ -277,12 +289,18 @@ class BrowserScriptSandbox {
   }
 }
 
+// The page globals and page objects of other browser libraries, which the script does not have.
+const PAGE_GLOBAL =
+  /^ReferenceError: '?(?:document|window|location|navigator|localStorage|sessionStorage|page|browser|\$\$?)'? is not defined/u;
+const PAGE_GLOBAL_HINT =
+  " The script runs in a sandbox, not in the page: read the page in evaluate(() => ...), and call the helpers, such as click(target), directly.";
+
 function errorText(error: unknown): string {
   const text =
     typeof error === "object" && error !== null && "message" in error
       ? `${"name" in error ? String(error.name) : "Error"}: ${String(error.message)}`
       : String(error);
-  return text.slice(0, ERROR_LIMIT_CHARS);
+  return (PAGE_GLOBAL.test(text) ? `${text}${PAGE_GLOBAL_HINT}` : text).slice(0, ERROR_LIMIT_CHARS);
 }
 
 /**

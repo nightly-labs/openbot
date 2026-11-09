@@ -196,6 +196,12 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs לא קיבל את מפתח ה-API.",
   "mobile.chat.liveVoice.elevenLabsPermission": "במפתח של ElevenLabs חסרה הרשאה. יש לבדוק אותו בהגדרות > קול.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs דורש חיבור לרשת.",
+  "mobile.chat.liveVoice.voiceServerFailed": "שרת הקול שלכם לא הצליח להקריא את התשובה. בדקו אותו בהגדרות > קול.",
+  "mobile.chat.liveVoice.gptUnsupported": "השרת הזה לא תומך ב-GPT Live Voice. עדכנו את OpenBot במחשב שמריץ אותו.",
+  "mobile.chat.liveVoice.gptFailed": "לא ניתן היה להפעיל את GPT Live Voice. בטלו את ההשתקה כדי לנסות שוב.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice נעצר. בטלו את ההשתקה כדי להפעיל אותו שוב.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "אפשרו ל-OpenBot להשתמש במיקרופון בהגדרות. אחר כך בטלו את ההשתקה כדי לנסות שוב.",
   "mobile.chat.composer.addAttachment": "הוספת קובץ מצורף",
   "mobile.chat.composer.ask": "שאלה ל-{name}",
   "mobile.chat.composer.stopFailed": "לא ניתן לעצור את הסוכן. ייתכן שכבר סיים.",

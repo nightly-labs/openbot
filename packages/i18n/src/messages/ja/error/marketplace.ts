@@ -35,8 +35,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "エージェントのリンクが無効です。",
   "error.marketplace.changedSinceOpened":
     "このエージェントは開いた後に変更されました。新しいバージョンを確認するには、リンクをもう一度開いてください。",
-  "error.marketplace.skillNameConflict":
-    "「{name}」という名前の別のローカルスキルがすでにあります。名前を変更するか削除してから、このエージェントをもう一度追加してください。",
   "error.marketplace.avatarInvalid": "エージェントのアバターが無効です。",
   "error.marketplace.secretInName": "公開する前に、名前からシークレットまたはメールアドレスを削除してください。",
   "error.marketplace.secretInTitle": "公開する前に、タイトルからシークレットまたはメールアドレスを削除してください。",

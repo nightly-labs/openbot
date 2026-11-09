@@ -59,8 +59,6 @@ export type ChatMessage =
       label: MobileTextKey;
       routineId: string;
       routineName: string;
-      /** When the host stored the marker. Not `createdAt`: a marker gets no day label. */
-      storedAt?: string;
     }
   | {
       id: string;
@@ -258,7 +256,6 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
     label: marker.label,
     routineId: marker.routineId,
     routineName: marker.routineName,
-    storedAt: message.createdAt,
   }));
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
@@ -505,8 +502,9 @@ export interface RoutineRunGroupStops {
 /**
  * Joins consecutive completed runs of one routine into one row, as desktop does, so a routine that
  * runs often does not fill the chat. Any other row stops the group, and so does a run that did not
- * complete. A group also stops at a new day, at the first unread row, at the branch divider, and
- * around the run that the chat opens at.
+ * complete. A group also stops at the first unread row, at the branch divider, and around the run
+ * that the chat opens at. Unlike desktop, a new day does not stop a group: a marker gets no day
+ * label on mobile, so runs of a daily routine would otherwise each keep a row.
  */
 export function groupRoutineRunMarkers<T extends ChatRow>(
   rows: readonly T[],
@@ -537,23 +535,11 @@ export function groupRoutineRunMarkers<T extends ChatRow>(
       return;
     }
     const previous = run.at(-1);
-    if (
-      previous &&
-      (starts.has(index) || previous.routineId !== row.routineId || startsDay(previous.storedAt, row.storedAt))
-    )
-      closeRun();
+    if (previous && (starts.has(index) || previous.routineId !== row.routineId)) closeRun();
     run.push(row);
   });
   closeRun();
   return result;
-}
-
-/** Whether `current` is on a later local day than `previous`. A marker with no time starts no day. */
-function startsDay(previous: string | undefined, current: string | undefined): boolean {
-  if (!previous || !current) return false;
-  const [before, after] = [new Date(previous), new Date(current)];
-  if (Number.isNaN(before.getTime()) || Number.isNaN(after.getTime())) return false;
-  return before.toDateString() !== after.toDateString();
 }
 
 function completedRun<T extends ChatRow>(row: T): row is T & RoutineMarker {
@@ -677,7 +663,6 @@ function projectChannelMessage(
       label: routine.label,
       routineId: routine.routineId,
       routineName: routine.routineName,
-      storedAt: entry.message.createdAt,
     };
   }
   if (entry.message.questionPrompt) {

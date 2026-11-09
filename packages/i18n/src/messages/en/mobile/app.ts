@@ -34,6 +34,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.usage": "Usage",
   "mobile.app.route.remoteDesktop": "Control computer",
   "mobile.app.route.marketplace": "Marketplace",
+  "mobile.app.route.library": "Library",
   // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "Search",
   // The update header on home. A store update names its version; a downloaded update restarts the app.

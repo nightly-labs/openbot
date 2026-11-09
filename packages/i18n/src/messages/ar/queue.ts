@@ -21,6 +21,7 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "لا يستطيع هذا المزوّد توجيه دور قيد التشغيل، لذا تنتظر الرسالة في قائمة الانتظار.",
   "queue.item.steerFallback.steerFailed": "لم ينجح التوجيه، لذا تنتظر الرسالة في قائمة الانتظار.",
+  "queue.item.steerFallback.routineRun": "تعمل مهمة دورية الآن، لذا تنتظر الرسالة في قائمة الانتظار.",
   "queue.item.runAsTask": "تشغيل في سلسلة جديدة",
   "queue.item.runAsTaskLabel": "تشغيل الرسالة المنتظرة {position} في سلسلة جديدة",
   "queue.item.deleteLabel": "حذف الرسالة المنتظرة {position}",
