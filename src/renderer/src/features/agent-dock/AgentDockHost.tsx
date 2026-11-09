@@ -218,15 +218,29 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     return read?.channel.id === channelId ? read : null;
   };
   let readId = 0;
+  /** The channel that a read runs for. Changes during that read start one more read when it ends. */
+  let reading: string | null = null;
+  let readAgain = false;
   const readChannel = (channelId: string) => {
+    if (reading === channelId) {
+      readAgain = true;
+      return;
+    }
     const id = ++readId;
+    reading = channelId;
+    readAgain = false;
     void channels
       .port()
       .agent.readChannel({ channelId })
       .then((page) => {
         if (!disposed && id === readId && openChannelId() === channelId) setReadPage(page);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (id !== readId) return;
+        reading = null;
+        if (readAgain && !disposed && openChannelId() === channelId) readChannel(channelId);
+      });
   };
   /* The main window that leaves the open channel stops updating its page, so the dock reads it again. */
   const mainChannelId = createMemo(() => channels.state.page?.channel.id ?? null);
