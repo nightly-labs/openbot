@@ -223,6 +223,7 @@ export function decodeAgentDefaults(value: unknown): AgentDefaults {
   decoded.planStartAfterMs = defaults.planStartAfterMs;
   if (!isAutomationRunsPerHour(defaults.automationRunsPerHour)) throw new Error("Invalid local script limit.");
   decoded.automationRunsPerHour = defaults.automationRunsPerHour;
+  decoded.commitCoAuthor = requiredBoolean(defaults, "commitCoAuthor");
   return decoded;
 }
 

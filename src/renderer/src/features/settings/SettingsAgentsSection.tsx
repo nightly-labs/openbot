@@ -199,6 +199,10 @@ export function createSettingsAgentsSection(options: {
             const value = options.value();
             options.onValueChange({ ...value, agentDefaults: { ...value.agentDefaults, automationRunsPerHour } });
           }}
+          onCommitCoAuthorChange={(commitCoAuthor) => {
+            const value = options.value();
+            options.onValueChange({ ...value, agentDefaults: { ...value.agentDefaults, commitCoAuthor } });
+          }}
           onChoiceChange={changeChoice}
         />
         <Show when={!state.setting && state.processes}>
