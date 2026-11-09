@@ -12,7 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { redactSecrets } from "@openbot/logging";
 import {
   type AgentMemoryListPage,
   type AgentMemorySearchResult,
@@ -258,7 +258,7 @@ export class AgentMemories {
   handleTool(
     params: DynamicToolCallParams,
     senderAgentId: string,
-    redact: (value: string) => string = redactText,
+    redact: (value: string) => string = redactSecrets,
   ): OpenBotToolResponse | null {
     try {
       return this.#handleTool(params, senderAgentId, redact);

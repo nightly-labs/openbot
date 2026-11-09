@@ -19,6 +19,8 @@ export interface WorkerBindings {
   GITHUB_TOKEN_RATE_LIMITER: RateLimit;
   /** Checked by the Live Activity relay only, so a Worker without it keeps its other routes. */
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
+  /** Checked by the bug report route only, so a Worker without it keeps its other routes. */
+  FEEDBACK_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;

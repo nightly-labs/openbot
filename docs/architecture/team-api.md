@@ -29,14 +29,30 @@ the read state and the sections load. These three reads run together. Cached con
 again after Online, the open conversation first; a chat that did not load then loads when it opens.
 Transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
-adds no polling or health requests. Foreground resume reuses a healthy connection and reads the
-workspace again without showing a reconnect. The time away decides what happens to the connection:
+adds no polling or health requests. Foreground resume reuses a healthy connection without showing a
+reconnect. When the connection from before the background stays (`kept` on the `connect` result) and
+no read stopped at background entry, the first attempt only checks the path with the compatibility
+read and reads the open chats again; the event stream delivered every event, or an `event-reset`
+asks for a full load. A new connection, a stopped read, a refresh and a failed check load the
+workspace again. The time away decides what happens to the connection:
 after less than 30 s the path is kept. After 30 s the host stopped using the path (ICE consent), so the
 peer renews its Signal socket and restarts ICE; a host that dropped the connection answers with a new
 fingerprint, and the peer fails at once instead of after a read timeout. A connection that is lost
-while a return checks it is replaced at once, with no countdown, as when the check fails. After 160 s Signal has told
-the host to drop the connection (120 s socket idle timeout, then 30 s), so the peer is replaced on the
-same session at once, without a resume hello, and the first attempt connects. A server that was
+while a return checks it is replaced at once, with no countdown, as when the check fails. Signal
+closes the socket of a suspended phone after its 120 s idle timeout and drops the connection after the
+reconnect grace: 10 minutes for a host that multiplexes, 30 s for an older host or an older Signal
+(`reconnectGraceMs` in `ready`, `SIGNAL_CLIENT_RECONNECT_GRACE_MS`). After the idle timeout, the grace
+and 10 s more, the peer is replaced on the same session at once, without a resume hello, and the
+first attempt connects. A move to another kind of network, such as Wi-Fi to mobile data
+(`expo-network`, `apps/mobile/src/shared/lib/network-path.ts`), ends the connection, and the recovery
+makes a new one on the same session at once (`networkMoved`); the WebView's `online` event does not
+fire for such a move. In support logs, an ICE restart after a network move did not bring the path
+back within 6 s, and a new connection was up in 1.5–3 s. In other cases, a probe of the path waits up
+to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
+at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
+on the same session instead of an 11th. A new connection to a known host opens its Signal socket while the ticket request runs,
+and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
+holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
 5 s (`QUIET_RESUME_MS` in `server-connection.tsx`): the server is `resuming`, `showsOnline` is
 true, and no reconnect status, faded avatars or faded chat show. A workspace request to a resuming

@@ -30,7 +30,7 @@ import type { BrowserOperationError } from "../browser-effects";
 import type { BrowserDynamicToolHooks } from "../browser-tool-actions";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
-import type { DeliveryContext, MailboxStore, UsageLimitContinuation } from "../mailbox-store";
+import { channelLane, type DeliveryContext, type MailboxStore, type UsageLimitContinuation } from "../mailbox-store";
 import {
   type AppServerNotification,
   type DynamicToolCallParams,
@@ -592,6 +592,14 @@ export class TurnLifecycle {
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
   }
 
+  /** The mailbox lane of a provider thread: its task, its channel, or null for the agent's own chat. */
+  #laneForThread(agentId: string, externalThreadId: string): string | null {
+    const taskId = this.#taskForThread(agentId, externalThreadId);
+    if (taskId !== null) return taskId;
+    const channelId = this.#conversation.channelForThread(this.#conversation.publicThreadId(agentId, externalThreadId));
+    return channelId === null ? null : channelLane(channelId);
+  }
+
   /**
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
    * messages, the user did not stop it, its last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no question,
@@ -708,9 +716,10 @@ export class TurnLifecycle {
         this.#compaction.beginTurn(threadId);
         // The provider started this turn itself. A delivery that is starting now waits for its own turn.
         const unprompted = isRecord(params) && params.unprompted === true;
-        // Each lane of the agent starts its own turns: a task turn takes only that task's delivery.
-        const taskId = this.#taskForThread(agentId, threadId);
-        const starting = unprompted ? undefined : this.#mailbox.startingDeliveryForAgent(agentId, taskId)?.delivery;
+        // Each lane of the agent starts its own turns: a task or channel turn takes only the delivery
+        // of its own lane.
+        const laneId = this.#laneForThread(agentId, threadId);
+        const starting = unprompted ? undefined : this.#mailbox.startingDeliveryForAgent(agentId, laneId)?.delivery;
         const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
         const start = starting ? (this.#deliveryStarts.get(starting.id) ?? null) : null;
         // The other deliveries of the batch share this start and start no turn of their own.
@@ -731,13 +740,13 @@ export class TurnLifecycle {
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
-        if (taskId === null) this.#failedTurns.delete(agentId);
+        if (laneId === null) this.#failedTurns.delete(agentId);
         const origin = starting?.sender.kind ?? "unknown";
         if (!unprompted) {
           const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
           this.#turnAssociations.set(turnId, association);
           yield* Effect.gen({ self: this }, function* () {
-            const exit = yield* Effect.exit(this.#associateStartedTurn(agentId, taskId, turnId, snapshot));
+            const exit = yield* Effect.exit(this.#associateStartedTurn(agentId, laneId, turnId, snapshot));
             yield* Deferred.done(association, exit);
             if (this.#turnAssociations.get(turnId) === association) this.#turnAssociations.delete(turnId);
           }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
@@ -766,7 +775,8 @@ export class TurnLifecycle {
         if (itemId) this.#itemTurns.set(itemId, turnId);
         this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
-          if (this.#conversation.loadedClientFor(threadId) !== source) return;
+          // A memory change can mark the session for reload while its current client compacts it.
+          if (this.#conversation.openClientFor(threadId) !== source) return;
           if (notification.method === "item/started") this.#observedCompactions.set(threadId, turnId);
           else this.#observedCompactions.delete(threadId);
           if (!this.#compaction.isCompactionTurn(threadId, turnId))
@@ -907,7 +917,7 @@ export class TurnLifecycle {
       }
       case "thread/tokenUsage/updated": {
         if (!threadId || !agentId) return;
-        if (this.#conversation.loadedClientFor(threadId) !== source) return;
+        if (this.#conversation.openClientFor(threadId) !== source) return;
         this.#compaction.updateBudget(threadId, params, agentId);
         const usage = getRecord(params, "tokenUsage");
         const last = getRecord(usage, "last");
@@ -924,7 +934,7 @@ export class TurnLifecycle {
         return;
       }
       case "openbot/context-compaction": {
-        if (!threadId || !agentId || this.#conversation.loadedClientFor(threadId) !== source) return;
+        if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
         // Native Claude compaction does not report comparable full-context counts.
@@ -1226,7 +1236,12 @@ export class TurnLifecycle {
         this.#compaction.reserve(agentId, threadId, false, turnId);
       this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-      snapshot.activeTurnId = null;
+      // A routine run in its own session ends in the chat's snapshot, where a later turn can still
+      // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
+      // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
+      // longer runs is cleared, as before.
+      if (snapshot.activeTurnId === turnId || !this.#runningTurns.has(snapshot.activeTurnId ?? ""))
+        snapshot.activeTurnId = null;
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
       // A task turn ends as a turn of the agent's own chat does, in the task's own lane.
       const taskTurn = this.#conversation.isTaskThread(snapshot.threadId);
@@ -1368,9 +1383,11 @@ export class TurnLifecycle {
         break;
       }
       const outcome = requeued ? "interrupted" : status;
-      // The failed turn of the agent's own chat only: a task shows its outcome in its own row.
-      if (!taskTurn && outcome === "failed") this.#failedTurns.set(agentId, turnId);
-      else if (!taskTurn) this.#failedTurns.delete(agentId);
+      // The failed turn of the agent's own chat and its messaging work only: a task shows its outcome
+      // in its own row, and a channel turn in its channel.
+      const ownLane = !taskTurn && this.#conversation.channelForThread(snapshot.threadId) === null;
+      if (ownLane && outcome === "failed") this.#failedTurns.set(agentId, turnId);
+      else if (ownLane) this.#failedTurns.delete(agentId);
       const failure = refusedFailure ?? reportedError;
       if (refused) {
         yield* this.#hooks.dropRefusedSession(agentId, threadId);
@@ -1455,7 +1472,7 @@ export class TurnLifecycle {
           latestAssistant
         ) {
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
+            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant.text);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
         if (!continuation && terminal === "failed") {
@@ -1754,11 +1771,11 @@ export class TurnLifecycle {
   readonly #associateStartedTurn = Effect.fn("TurnLifecycle.associateStartedTurn")(function* (
     this: TurnLifecycle,
     agentId: string,
-    taskId: string | null,
+    laneId: string | null,
     turnId: string,
     snapshot: ConversationSnapshot,
   ) {
-    const deliveries = yield* turnStep(() => this.#mailbox.startingDeliveriesForAgent(agentId, taskId));
+    const deliveries = yield* turnStep(() => this.#mailbox.startingDeliveriesForAgent(agentId, laneId));
     if (deliveries.length === 0) return;
     yield* Effect.gen({ self: this }, function* () {
       for (const { delivery } of deliveries) {
@@ -1792,12 +1809,24 @@ export class TurnLifecycle {
     agentId: string,
     turnId: string,
     delivery: DeliveryContext,
+    turnDeliveries: readonly DeliveryContext[],
     text: string,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
     const messageId = delivery.delivery.messageId;
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
     const recipientAgentId = delivery.delivery.sender.agentId;
+    // The requests of this sender that the turn read. A reply to one of them answers only that one.
+    const requestIds = new Set(
+      turnDeliveries
+        .filter(
+          ({ delivery: other }) =>
+            other.sender.kind === "agent" &&
+            other.sender.agentId === recipientAgentId &&
+            this.#mailbox.expectsReply(other.messageId),
+        )
+        .map(({ delivery: other }) => other.messageId),
+    );
     if (
       !originAgentId ||
       originAgentId === agentId ||
@@ -1805,7 +1834,7 @@ export class TurnLifecycle {
       // this the sender is woken for an echo of work it only wanted to know about.
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId)
+      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds)
     )
       return;
 

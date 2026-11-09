@@ -524,6 +524,7 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen name="server-usage/index" options={largeTitlePage} />
+      <Stack.Screen name="server-library" options={largeTitlePage} />
       <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
       <Stack.Screen
         name="share"

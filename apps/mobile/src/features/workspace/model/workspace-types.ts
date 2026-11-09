@@ -83,6 +83,7 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  MachineMetrics,
   MarkAgentTaskReadInput,
   McpServerConfig,
   McpSignInState,
@@ -176,6 +177,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
@@ -381,6 +383,13 @@ export interface MobileWorkspaceContextValue {
   toggleWorkflowPin: (workflowId: string, serverId: string) => ToggleAgentPinResult;
   /** Drops the pins of workflows that the host no longer lists. Call only with a complete list. */
   reconcileWorkflowPins: (serverId: string, workflowIds: readonly string[]) => void;
+  /** The sidebar sections of the active server that the user closed. Saved on this device. */
+  collapsedSectionIds: ReadonlySet<string>;
+  /**
+   * Opens or closes a sidebar section of a server. `sectionIds` are the sections of its layout now:
+   * the saved list drops the others.
+   */
+  toggleSectionCollapsed: (serverId: string, sectionId: string, sectionIds: readonly string[]) => void;
   conversationStore: MobileConversationStore;
   /** Activity, unread agents, and browser requests. Read them with a selector hook, not from the context. */
   liveState: LiveWorkspaceStore;
@@ -662,7 +671,11 @@ export interface MobileWorkspaceContextValue {
   canManageProviders: (serverId: string) => boolean;
   /** The Providers admin of one host, with the newest route set that it serves. */
   providerAdmin: (serverId: string) => ProviderAdmin;
-  /** An owner or admin of an online host that serves `mcp-servers-v1`. The host checks the role again. */
+  /**
+   * An owner or admin of an online host that serves `mcp-servers-v1`, or a member when the host also
+   * serves `mcp-member-access-v1`. The host checks the role again, and refuses a member a row that
+   * another person added.
+   */
   canManageMcpServers: (serverId: string) => boolean;
   /** The MCP servers that the host gives its agents. Each change answers with the whole list. */
   listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
@@ -673,7 +686,7 @@ export interface MobileWorkspaceContextValue {
   /** Connects once with `config` on the host. Nothing is saved. */
   testMcpServer: (config: McpServerConfig, serverId: string) => Promise<McpTestResult>;
   /**
-   * An owner or admin of an online host that serves `mcp-servers-v1` and `sign-in-relay-v1`: the phone
+   * A user who manages the MCP servers of a host that serves `sign-in-relay-v1`: the phone
    * opens the browser sign-in of an MCP server, and the host keeps the grant.
    */
   canRelayMcpSignIn: (serverId: string) => boolean;
@@ -768,6 +781,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
+  canReadMachineMetrics: (serverId: string) => boolean;
+  /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
+  loadMachineMetrics: (serverId: string) => Promise<MachineMetrics>;
   /** True when the host advertises `remote-desktop`. The host decides which members it lets in. */
   canControlComputer: (serverId: string) => boolean;
   /** The connected peer's path for the remote desktop viewer, or null while the server is not connected. */
@@ -883,6 +900,11 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `live-voice-v1`: a member can talk with an agent by GPT live voice. */
+  canUseLiveVoice: (serverId: string) => boolean;
+  /** Starts GPT live voice with the WebRTC offer of the phone's peer. Only a host with `canUseLiveVoice` takes it. */
+  startLiveVoice: (input: LiveVoiceStartRequest, serverId: string) => Promise<LiveVoiceSessionResponse>;
+  stopLiveVoice: (sessionId: string, serverId: string) => Promise<void>;
   /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
   canCompactContext: (serverId: string) => boolean;
   /**
@@ -1083,6 +1105,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "canDeleteMessages"
   | "canMarkUnreadFrom"
+  | "canUseLiveVoice"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"
@@ -1115,6 +1138,7 @@ type MobileWorkspaceStateKey =
   | "pinnedAgentIds"
   | "pinnedChannelIds"
   | "pinnedWorkflowIds"
+  | "collapsedSectionIds"
   | "hiddenChannelIds"
   | "hidesAgentsOnServer"
   | "canUnhideAgent"
@@ -1123,6 +1147,7 @@ type MobileWorkspaceStateKey =
   | "canCreateLocalServers"
   | "localServerKind"
   | "canManageServerTimezone"
+  | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
   | "canReadServerAudit"

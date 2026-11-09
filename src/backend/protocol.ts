@@ -149,7 +149,10 @@ export interface AccountRateLimitsReadResult {
   rateLimits?: AccountRateLimitResult | null | undefined;
   /** Antigravity only: every quota group of the plan. `rateLimits` is one of them. */
   groups?: AccountRateLimitGroupResult[] | undefined;
-  /** OpenCode only: the weekly or monthly window that `rateLimits.secondary` does not hold. */
+  /**
+   * OpenCode: the weekly or monthly window that `rateLimits.secondary` does not hold. Cursor: the total
+   * of a plan split into Cursor's own models and the others.
+   */
   tertiary?: AccountRateLimitWindowResult | undefined;
   /** Cursor only: the provider whose plan quota this reading also counts, such as Grok on a merged plan. */
   sharedQuotaWith?: AgentProviderId | undefined;

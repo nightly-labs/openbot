@@ -38,6 +38,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} דקות",
   "account.usage.window.cursorModels": "מודלים של Cursor",
   "account.usage.window.otherModels": "מודלים אחרים",
+  "account.usage.window.total": "סך הכול",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "העדכון נכשל. יש לנסות שוב.",
   "account.update.managedByHost": "מנוהל על ידי המארח",

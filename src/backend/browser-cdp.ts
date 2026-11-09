@@ -2700,6 +2700,7 @@ export class BrowserCdpEngine {
     awaitPromise = true,
     timeoutMs = ACTION_TIMEOUT_MS,
     undefinedAsNull = false,
+    maxBytes = MAX_RESULT_BYTES,
   ): Effect.fn.Return<BrowserJsonValue, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
@@ -2730,9 +2731,11 @@ export class BrowserCdpEngine {
         if (serialized === undefined)
           return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
         const bytes = Buffer.byteLength(serialized, "utf8");
-        if (bytes > MAX_RESULT_BYTES) {
+        if (bytes > maxBytes) {
           return yield* browserFailure(
-            new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes). ${BROWSER_VALUE_TOO_LARGE}`),
+            new Error(
+              `Browser evaluation result exceeds ${Math.round(maxBytes / 1024)} KB (${bytes} bytes). ${BROWSER_VALUE_TOO_LARGE}`,
+            ),
           );
         }
         // `serialized` is the value the caller receives, so parse that rather than asserting over

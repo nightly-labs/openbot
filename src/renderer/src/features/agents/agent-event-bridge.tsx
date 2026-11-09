@@ -91,6 +91,7 @@ export function AgentEventBridge() {
     setUsageLimits,
     setSubagentTurns,
     setUsageLimitedModels,
+    setFailedModels,
     setWaitedUsageLimits,
     setContextStates,
     setThreadContextStates,
@@ -357,7 +358,7 @@ export function AgentEventBridge() {
         return;
       }
       case "runtime-snapshot":
-        void channels.refresh();
+        void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -458,6 +459,7 @@ export function AgentEventBridge() {
       Object.fromEntries(Object.entries(current).filter(([agentId]) => agentId in usageLimits)),
     );
     setUsageLimitedModels(snapshot.usageLimitedModels ?? []);
+    setFailedModels(snapshot.failedModels ?? []);
     setSubagentTurns(Object.fromEntries((snapshot.subagentTurns ?? []).map((turn) => [turn.agentId, turn.turnId])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
@@ -469,7 +471,7 @@ export function AgentEventBridge() {
     if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
-        void channels.refresh();
+        void channels.changed(event.channelId);
         return;
       }
       flush(() => handleAgentEvent(event));

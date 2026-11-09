@@ -100,6 +100,12 @@ import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import {
+  decodeLiveVoiceSessionResponse,
+  LIVE_VOICE_ROUTES,
+  type LiveVoiceSessionResponse,
+  type LiveVoiceStartRequest,
+} from "@openbot/contracts/team-protocol/live-voice-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeRoutineRunPlace,
@@ -202,6 +208,25 @@ export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(funct
   agentId: string,
 ): Effect.fn.Return<void, TeamRequestError> {
   return yield* teamCall(() => request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId }));
+});
+
+/**
+ * Starts GPT live voice in the chat of `agentId` with the WebRTC offer of the client's peer, and
+ * answers the session id and the answer of OpenAI. Send it only to a host that serves `live-voice-v1`.
+ */
+export const startLiveVoice = Effect.fn("TeamClient.startLiveVoice")(function* (
+  request: TeamApiRequest,
+  input: LiveVoiceStartRequest,
+): Effect.fn.Return<LiveVoiceSessionResponse, TeamRequestError> {
+  return yield* teamCall(() => request("POST", LIVE_VOICE_ROUTES.start, decodeLiveVoiceSessionResponse, { ...input }));
+});
+
+/** Ends a GPT live voice session. The host then sends its `live-voice` end event. */
+export const stopLiveVoice = Effect.fn("TeamClient.stopLiveVoice")(function* (
+  request: TeamApiRequest,
+  sessionId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() => request("POST", LIVE_VOICE_ROUTES.stop, ignoreResponse, { sessionId }));
 });
 
 const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks response");

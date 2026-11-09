@@ -405,7 +405,7 @@ export const messages = {
   "server.settings.skillLearningAsk": "اسأل أولًا",
   "server.settings.skillLearningOff": "إيقاف",
   "server.settings.skillLearningLoadFailed": "تعذّر تحميل إعداد تعلّم المهارات.",
-  "server.settings.rolesTitle": "الأدوار",
+  "server.settings.rolesTitle": "الأذونات",
   "server.settings.rolesDescription":
     "اختر الوكلاء الذين يمكن للأعضاء استخدامهم. يحصل العضو على أعلى وصول من «الجميع» ومن أدواره. يمكن للمالكين والمسؤولين استخدام كل الوكلاء.",
   "server.settings.auditTitle": "سجل التدقيق",
@@ -524,6 +524,7 @@ export const messages = {
   },
   "server.roles.agentList": "الوكلاء: {names}",
   "server.roles.agentLevel": "وصول {role} إلى {agent}",
+  "server.roles.changeInEveryone": "تغيير في الجميع",
   "server.roles.setAll": "تعيين للكل",
   "server.roles.setAllLabel": "تعيين للكل: وصول {role} إلى كل الوكلاء",
   "server.roles.loadFailed": "تعذّر تحميل أدوار هذا الخادم.",

@@ -12,7 +12,7 @@ import { causeHelpers } from "../backend/effect-boundary";
 /** The YAML frontmatter at the start of a `SKILL.md`; group 1 is the YAML. */
 export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
 
-const MAX_BYTES = 10 * 1024 * 1024;
+export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
 export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};

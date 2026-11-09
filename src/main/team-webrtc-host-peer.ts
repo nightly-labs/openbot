@@ -22,6 +22,7 @@ import {
   TEAM_UI_BLOCKS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
+import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
@@ -797,6 +798,7 @@ export class TeamWebRtcHostPeer {
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
             channelAttention: peerCapabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
             channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+            mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),

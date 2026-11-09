@@ -33,12 +33,16 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} bestaat al, dus deze kopie is opgeslagen als {saved}.",
   "error.import.fileSkipped": "{name}: het bestand {file} is overgeslagen. {reason}",
   "error.import.chooseZip": "Kies een .zip-bestand.",
-  "error.import.zipTooLarge": "De export moet een .zip van minder dan 2 GB zijn.",
   "error.import.unsafeFile": "De export bevat een onveilig bestand: {name}",
-  "error.import.expandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 2 GB en {limit} bestanden.",
+  "error.import.tooManyFiles": "De export mag maximaal {limit} bestanden bevatten.",
+  "error.import.diskSpace":
+    "{name}: de bestanden hebben {size} GB vrije schijfruimte nodig en er is {free} GB vrij. Maak ruimte vrij en importeer de agent opnieuw.",
   "error.import.remoteExpandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 500 MB en {limit} bestanden.",
   "error.import.zipInvalid":
     "Het gekozen bestand is geen geldige .zip. Als Grok Bot het nog opslaat, wacht dan en kies het opnieuw.",
+  "error.import.entryDamaged": "Het bestand is beschadigd in de export.",
+  "error.import.foldersSkipped":
+    "{number} bestanden in .git- en node_modules-mappen worden weggelaten. Een tool kan ze opnieuw maken.",
   "error.import.empty": "De export is leeg.",
   "error.import.remoteZipTooLarge":
     "Om te importeren in een server waaraan je deelneemt, moet de export een .zip van minder dan 100 MB zijn.",

@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "연결 안 됨",
   "mcp.connect.close": "{name} 연결 닫기",
   "mcp.connect.getKey": "키 발급받기",
+  "mcp.connect.useKey": "대신 API 키 사용",
+  "mcp.connect.useSignIn": "대신 로그인",
   "mcp.connect.keyDescription":
     "{name} 계정의 인증 정보를 붙여넣으세요. OpenBot이 이 정보로 연결하고 {host}에 보관해요.",
   "mcp.connect.thisComputer": "이 컴퓨터",

@@ -366,16 +366,15 @@ export const messages = {
     "Hoeveel contacten zitten er in het VIP-segment, en hoe is dat deze maand veranderd?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Maak een concept van een campagne voor de nieuwe collectie, maar verstuur die niet.",
-  "marketplace.plugin.composio.tagline": "Veel apps via je eigen Composio-link",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub en meer dan 1000 andere apps",
   "marketplace.plugin.composio.description":
-    "Composio koppelt agents met Gmail, Slack, GitHub en honderden andere apps via één MCP-server. Koppel de apps die je wilt in je Composio-account en plak hier de MCP-URL en API-sleutel ervan.",
+    "Composio koppelt je agents via één MCP-server met Gmail, Slack, GitHub en meer dan 1000 andere apps. Log in met je Composio-account. Als een agent een app nodig heeft, vraagt hij je die app te koppelen.",
   "marketplace.plugin.composio.app":
-    "De apps die je toevoegt aan je Composio-MCP-server, via de link uit je Composio-account.",
+    "De apps die je koppelt in je Composio-account. Een agent vraagt je een app te koppelen wanneer hij die nodig heeft.",
   "marketplace.plugin.composio.prompt.inbox":
     "Vat mijn ongelezen e-mail samen en stel antwoorden op voor de dringende.",
   "marketplace.plugin.composio.prompt.handoff": "Plaats een samenvatting van deze pull request in ons teamkanaal.",
   "marketplace.plugin.composio.prompt.apps": "Welke apps en acties kun je via Composio gebruiken?",
-  "marketplace.plugin.composio.hint.url": "De URL van een MCP-server in je Composio-account",
   "marketplace.plugin.composio.hint.apiKey":
     "Je vindt deze in je Composio-account, onder Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres-projecten, branches en migraties",
@@ -491,7 +490,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "Zoek een dataset met weertijdreeksen en toon de kolommen.",
   "marketplace.auth.apiKey": "API-sleutel",
   "marketplace.auth.personalApiKey": "Persoonlijke API-sleutel",
-  "marketplace.auth.mcpUrl": "MCP-URL",
   "marketplace.auth.createKey": "Sleutel maken",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Probeer in {name}",

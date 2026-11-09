@@ -1053,6 +1053,11 @@ Network traffic can also occur when:
   `/v1/audio/speech` and receives the audio. Nothing else is sent: no conversation, file or agent
   instruction. The server handles the audio and the text under the policy of the person who runs it.
   The address and the choices are saved in `voice-server.json` in the application data folder;
+- the user sets up a voice server in **Settings → Voice** of the phone app. The phone sends the same
+  requests as above directly to that address, not through a server of OpenBot. For dictation it keeps
+  the recording in memory, writes it as a WAV file to the app's cache folder only while the request
+  runs, and deletes it after. The address and the choices are saved in the phone's keychain, and the
+  API key in a separate keychain entry. **Remove voice server** deletes both;
 - the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
@@ -1085,6 +1090,14 @@ Network traffic can also occur when:
   transcript is not added to the chat; no recording is kept. OpenAI handles the audio and the text
   under its own policy and the user's ChatGPT plan. The setting is saved in `speech-preference.json`
   in the application data folder. It is off by default;
+- a member of a server that this computer hosts starts live voice in an agent's chat from their
+  desktop or phone. The member's device sends a WebRTC offer to this computer through the Team API,
+  and OpenBot answers it as above, with the Codex sign-in of this computer: the call uses the ChatGPT
+  account of the host owner. The microphone audio and the spoken reply then go directly between the
+  member's device and OpenAI, not through this computer. Each request that the voice gives to the
+  agent goes into the chat as the member's message, and the agent's text answer goes to OpenAI to be
+  spoken. The live transcript goes only to that member's devices and is not saved. The session stops
+  when the member ends it, closes the app or loses access;
 - an agent uses the `openbot.web_search` tool. Only agents on a provider with no web search tool of
   its own get it. OpenBot starts a separate Codex App Server process, which sends the agent's question
   to OpenAI through the default Codex sign-in of this computer. OpenAI searches the web and returns a
@@ -1116,6 +1129,18 @@ Network traffic can also occur when:
   tokens for those repositories. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
+- the user approves a bug report or a feature idea that an agent wrote. OpenBot shows the title and
+  the agent's text first (what happened and the steps, or what the user wants and why). It then sends the text to the central account
+  service (`api.openbot.run`) with the account session: that text, the agent's choice of the form's
+  area and severity, or of the request type, when it gives them, the OpenBot version, the operating
+  system and processor architecture, and the agent's provider and CLI version. OpenBot removes known
+  secrets from the text before it shows it. The service opens it as a public issue in the
+  `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
+  the account. The service does not store or log the text. For the limit of a few issues each minute and
+  10 each day, it counts the issues of each account; D1 keeps the account ID, the UTC day and the
+  count, and deletes the earlier days of an account when the account sends again, or when the account
+  is deleted. When the user is not signed in or the send fails, OpenBot gives a link to the GitHub
+  form with the same text instead, and nothing goes to the account service;
 - the user connects Link in Server settings › Vault. OpenBot asks `login.link.com` for a sign-in
   code and a token, with the label "OpenBot on" and this computer's name, which Link shows in its list
   of connected apps. OpenBot renews and revokes the token there, and reads the account email from

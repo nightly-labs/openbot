@@ -169,6 +169,8 @@ export interface AgentSettingsPanelProps {
   folders?: AgentFolderCalls | undefined;
   /** Whether a usage limit holds this model and account now, for the backup models page. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  /** Whether a provider error holds this model and account now, for the backup models page. */
+  providerFailed?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The app or host default an agent without its own busy-message setting follows. */
   defaultBusyMessageMode?: BusyMessageMode | undefined;
   /** The account defaults an agent without its own value follows. Absent for a remote agent. */
@@ -1569,6 +1571,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   modelOptions: props.modelOptions,
                   providers: props.agentStatus.providers,
                   limited: props.usageLimited,
+                  failed: props.providerFailed,
                 }}
                 onChange={(next) => void saveBackupModels(next)}
               />

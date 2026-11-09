@@ -237,7 +237,14 @@ import { isReaderAuthor } from "../team/reader-identity";
 import type { ServerVaultOptions } from "../vault/ServerVaultPanel";
 import { createVaultStore } from "../vault/stores/vault-store";
 import { RailHelpMenu } from "../window/RailHelpMenu";
-import { ServerSettingsPageTitle, SettingsPageFrame } from "../window/SettingsPageFrame";
+import {
+  openFirstSettingsSection,
+  PersonalSettingsLink,
+  ServerSettingsLink,
+  ServerSettingsPageTitle,
+  SettingsPageFrame,
+  SettingsSearchField,
+} from "../window/SettingsPageFrame";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -1020,6 +1027,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   /** The elements of the settings page that the settings panel shows in. The page sets them. */
   const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
+  /** The search of the server settings page, which filters its section list. It clears when the page closes. */
+  const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
+  /** Each Enter in that search adds one. The server settings then open the first match. */
+  const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
   /** Where the panel of a settings page shows, or nothing while that page is not on screen. */
   function settingsPlacement(kind: SettingsKind): SettingsPagePlacement | undefined {
     const mounts = settingsMounts();
@@ -1483,7 +1494,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+      if (event.type === "channels-changed") void channels.changed(event.channelId);
+      else if (event.type === "runtime-snapshot") void channels.resync();
     }),
   );
   // The user changed their levels on another device: the matrix and the notifications follow at once.
@@ -2159,9 +2171,44 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               <Show when={server()}>{(target) => <ServerSettingsPageTitle server={target()} />}</Show>
                             )
                           }
-                          onMounts={setSettingsMounts}
-                          onEscape={showAgents}
-                        />
+                          footer={
+                            kind === "personal" ? (
+                              <Show when={server()}>
+                                {(target) => (
+                                  <ServerSettingsLink
+                                    server={target()}
+                                    onOpen={() => void openServerSettings(target().id, null)}
+                                  />
+                                )}
+                              </Show>
+                            ) : (
+                              <PersonalSettingsLink account={account()} onOpen={openAccountSettings} />
+                            )
+                          }
+                          onMounts={(mounts) => {
+                            setSettingsMounts(mounts);
+                            if (!mounts) setServerSettingsQuery("");
+                          }}
+                          // Escape clears the search, or else closes the page.
+                          onEscape={() => {
+                            if (kind === "server" && serverSettingsQuery()) setServerSettingsQuery("");
+                            else showAgents();
+                          }}
+                        >
+                          <Show when={kind === "server"}>
+                            <SettingsSearchField
+                              value={serverSettingsQuery()}
+                              onInput={setServerSettingsQuery}
+                              onEnter={() =>
+                                openFirstSettingsSection(
+                                  settingsMounts()?.nav,
+                                  () => setOpenFirstServerSectionRequest((request) => request + 1),
+                                  serverSettingsQuery,
+                                )
+                              }
+                            />
+                          </Show>
+                        </SettingsPageFrame>
                       )}
                     </Show>
                   }
@@ -2425,6 +2472,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       <ServerSettingsOverlay
                         open={serverSettings.state.open && settingsPlacement("server") !== undefined}
                         page={settingsPlacement("server")}
+                        sectionQuery={serverSettingsQuery()}
+                        openFirstSectionRequest={openFirstServerSectionRequest()}
+                        onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
                         platform="darwin"

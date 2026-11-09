@@ -8,6 +8,10 @@ export const messages = defineMessages("channel", {
   "channel.stoppedTask.reassignLabel": "Reassign the stopped task of {name}",
   "channel.stoppedTask.reassign": "Reassign",
   "channel.stoppedTask.cancel": "Cancel task",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} passed this task between them too many times. It stopped to prevent a loop.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "The members passed this task between them too many times. It stopped to prevent a loop.",
   "channel.conversation.noMembers": "Add agents in channel settings to start work.",
   "channel.conversation.archivedNotice": "Deleted channel. Preview only.",
   "channel.composer.label": "Message to channel",

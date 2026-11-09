@@ -1,6 +1,6 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
-import { redactText } from "@openbot/logging";
+import { redactSecrets, redactText } from "@openbot/logging";
 import type { OpenBotDatabase } from "../openbot-database";
 import { HANDOFF_END, HANDOFF_START, renderHandoffMessage } from "./delivery-content";
 
@@ -34,7 +34,7 @@ function historyExcerpt(text: string, limit: number): string {
 }
 
 function render(message: ConversationMessage, names: ReadonlyMap<string, string>): string {
-  return redactText(`[messageId: ${message.id}]\n${renderHandoffMessage(message, names)}`);
+  return redactSecrets(`[messageId: ${message.id}]\n${renderHandoffMessage(message, names)}`);
 }
 
 /** Reads only enough recent pages for the packet. The complete history stays in SQLite. */
@@ -217,7 +217,9 @@ const ROUTINE_DIGEST_MARKER = "\n\n--- routine run in its own session (also in t
  * digests go before its last line. Past `ROUTINE_DIGESTS_CHARACTERS`, the oldest digests go.
  */
 export function appendRoutineDigest(existing: string | undefined, routineName: string, answer: string): string {
-  const digest = redactText(historyExcerpt(`[routine: ${routineName}]\n${answer.trim()}`, ROUTINE_DIGEST_CHARACTERS));
+  const digest = redactSecrets(
+    historyExcerpt(`[routine: ${routineName}]\n${answer.trim()}`, ROUTINE_DIGEST_CHARACTERS),
+  );
   const { history, digests } = handoffParts(existing);
   digests.push(digest);
   while (digests.length > 1 && digests.join(ROUTINE_DIGEST_MARKER).length > ROUTINE_DIGESTS_CHARACTERS) digests.shift();

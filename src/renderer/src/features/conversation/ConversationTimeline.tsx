@@ -1,14 +1,19 @@
 import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
-import { ChannelActivityIndicator } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
-import { AgentStepsDisclosure, type AgentStepsTrace } from "@openbot/ui/features/conversation/AgentSteps";
+import {
+  type AgentStep,
+  AgentStepsDisclosure,
+  type AgentStepsTrace,
+} from "@openbot/ui/features/conversation/AgentSteps";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import { agentActivityExitDelay, agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { UsageLimitAskCard } from "@openbot/ui/features/conversation/BackupModels";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -19,6 +24,7 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { feedbackApproval } from "@openbot/ui/features/conversation/feedback-approval";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -37,7 +43,7 @@ import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/feature
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
@@ -353,6 +359,30 @@ export function ConversationTimeline() {
     props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
+
+  /**
+   * Send on a feedback card resolves the approval at once, but the tool still waits for GitHub. The
+   * card stays, with its loader, until the next row (the thank-you card) arrives or the turn ends.
+   */
+  const [sendingFeedback, setSendingFeedback] = createSignal<{
+    approval: AgentApproval;
+    rows: number;
+    turnId: string | null | undefined;
+  } | null>(null);
+  const heldFeedback = createMemo(() => {
+    const held = sendingFeedback();
+    if (!held || props.approval) return undefined;
+    if (props.messages.length !== held.rows || props.activeTurnId !== held.turnId) return undefined;
+    return held.approval;
+  });
+  async function approve(approval: AgentApproval) {
+    if (feedbackApproval(approval)) {
+      setSendingFeedback({ approval, rows: props.messages.length, turnId: props.activeTurnId });
+    }
+    const accepted = await props.onRespondToApproval("accept");
+    if (!accepted) setSendingFeedback(null);
+    return accepted;
+  }
   /**
    * The other person who wrote a message. The reader's own message, an agent message, and a message
    * from before senders were kept have none, so a chat with one person looks as it always did.
@@ -638,6 +668,43 @@ export function ConversationTimeline() {
   /** The Natural style shows the plain activity line: what the agent does now, and nothing more. */
   const plainActivity = () => !channel && props.responseStyle === "natural";
   const channelWorkingSteps = createMemo(() => (channel ? turnSteps.workingSteps(channel.workingTurns()) : []));
+  /*
+   * The channel's activity line leaves as the agent chat's line does: it waits a moment for the next
+   * member, then folds away with the workers and steps it last showed. When it went at once, the chat
+   * above it jumped down.
+   */
+  const [channelActivity, setChannelActivity] = createSignal<{
+    workers: ChannelWorker[];
+    steps: readonly AgentStep[];
+    phase: "active" | "exiting";
+  } | null>(null);
+  createEffect(
+    (): ChannelWorker[] => channel?.workers() ?? [],
+    (workers) => {
+      if (workers.length > 0) {
+        setChannelActivity({
+          workers,
+          steps: untrack(channelWorkingSteps),
+          phase: "active",
+        });
+        return;
+      }
+      if (!untrack(channelActivity)) return;
+      let exitTimer: number | undefined;
+      const delayTimer = window.setTimeout(() => {
+        setChannelActivity((latest) => latest && { ...latest, phase: "exiting" });
+        exitTimer = window.setTimeout(() => setChannelActivity(null), agentActivityExitDuration());
+      }, agentActivityExitDelay());
+      return () => {
+        window.clearTimeout(delayTimer);
+        window.clearTimeout(exitTimer);
+      };
+    },
+  );
+  createEffect(channelWorkingSteps, (steps) => {
+    if (untrack(channelActivity)?.phase === "active" && untrack(() => channel?.workers().length))
+      setChannelActivity((latest) => latest && { ...latest, steps });
+  });
   /**
    * A direct chat with no message yet, and no turn, queued send, welcome or question. A queued send leaves the
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
@@ -989,6 +1056,7 @@ export function ConversationTimeline() {
                                                     onOpenRoutine={openRoutineSettings}
                                                     openRoutineThread={openRoutineThread}
                                                     onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                    onOpenLink={(url) => void openExternalMessageUrl(url)}
                                                     onToggleRoutineRun={toggleRoutineRun}
                                                     onToggleAgentMessage={toggleAgentMessage}
                                                     agentMessageText={agentMessageText}
@@ -1449,9 +1517,10 @@ export function ConversationTimeline() {
                             steps={stepsInRow() ? stepsDisclosure() : undefined}
                             actionsBeside={actionsBeside()}
                             animate={animateEntrance}
-                            // Natural shows a message once it is complete. Its bubble enters with all of its
-                            // text, so the height does not grow while the words fade in.
-                            textAtOnce={plainActivity()}
+                            // Natural shows a message once it is complete, in an agent chat and in a channel.
+                            // Its bubble enters with all of its text, so the height does not grow while the
+                            // words fade in, and a complete answer does not look as if it still arrives.
+                            textAtOnce={props.responseStyle === "natural"}
                             agents={props.agents}
                             skills={installedSkills()}
                             referencedMessage={referencedMessage()}
@@ -1631,13 +1700,14 @@ export function ConversationTimeline() {
                 registerComposerAnswer={registerPromptComposerAnswer}
               />
             </Show>
-            <Show keyed when={props.approval}>
+            <Show keyed when={props.approval ?? heldFeedback()}>
               {(approval) => (
                 <Loading>
                   <ApprovalCard
                     approval={approval}
                     agentName={interactionAgentName()}
-                    onApprove={() => props.onRespondToApproval("accept")}
+                    sending={heldFeedback() !== undefined}
+                    onApprove={() => approve(approval)}
                     onReject={() => props.onRespondToApproval("decline")}
                     onAlwaysAllow={props.onAlwaysAllowApproval}
                   />
@@ -1668,12 +1738,15 @@ export function ConversationTimeline() {
               <Show
                 when={!channel}
                 fallback={
-                  <Show when={channel && channel.workers().length > 0}>
-                    <ChannelActivityIndicator
-                      workers={channel?.workers() ?? []}
-                      steps={channelWorkingSteps()}
-                      stepsOpenByDefault={showAgentSteps()}
-                    />
+                  <Show when={channelActivity()}>
+                    {(activity) => (
+                      <ChannelActivityIndicator
+                        workers={activity().workers}
+                        steps={activity().steps}
+                        phase={activity().phase}
+                        stepsOpenByDefault={showAgentSteps()}
+                      />
+                    )}
                   </Show>
                 }
               >

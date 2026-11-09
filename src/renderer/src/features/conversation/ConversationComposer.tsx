@@ -351,7 +351,9 @@ export function ConversationComposer() {
       provider,
       resetsAt: window.resetsAt,
       covers,
-      key: JSON.stringify([slot, window.windowDurationMins, window.resetsAt]),
+      // Not the reset time: Codex sends the same window's reset a second or two apart between readings.
+      // A window that ends clears the dismissal below, and the clock ends it when no reading comes.
+      key: JSON.stringify([slot, window.windowDurationMins]),
     };
   });
   const usageNoticeAccount = () => {
@@ -522,6 +524,11 @@ export function ConversationComposer() {
                       canSteer={Boolean(props.activeTurnId)}
                       onSteer={sendQueued()}
                       sendsNow={!steers()}
+                      routineRuns={props.queue?.deliveries.some(
+                        (delivery) =>
+                          delivery.sender.kind === "routine" &&
+                          (delivery.status === "starting" || delivery.status === "running"),
+                      )}
                       onRunAsTask={props.threads?.onRunQueuedMessage}
                       onCancel={props.onCancelQueuedMessage}
                       onEdit={editQueuedMessage}
@@ -674,9 +681,9 @@ export function ConversationComposer() {
           data-has-attachments={composerAttachmentRow() ? "" : undefined}
           onPointerDown={(event) => {
             if (!(event.target instanceof Element)) return;
-            // The "+" menu is in a portal, but its events come here too. Focus taken from it closes the menu
-            // before the item gets the pointerup.
-            if (event.target.closest("button, .composer-editor-surface, .ui-action-menu")) return;
+            // The "+" menu and the image viewer are in portals, but their events come here too. Focus taken
+            // from the menu closes it before the item gets the pointerup.
+            if (event.target.closest("button, .composer-editor-surface, .ui-action-menu, .image-lightbox")) return;
             event.preventDefault();
             setComposerFocusRequest((current) => current + 1);
           }}
@@ -689,6 +696,7 @@ export function ConversationComposer() {
             onRetryUpload={retryUpload}
             removeDisabled={voicePhase() === "transcribing" || savePending()}
             onRemove={(attachment) => removeAttachment(attachment.id)}
+            macWindowControls={props.platform === "darwin"}
           />
           <div class="composer-input-label">
             <ComposerEditor

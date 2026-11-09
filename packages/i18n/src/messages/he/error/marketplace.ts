@@ -50,8 +50,6 @@ export const messages = {
   "error.marketplace.templateTooLarge": "הסוכן גדול מדי לפרסום. יש לקצר את ההנחיות, המיומנויות או השגרות שלו.",
   "error.marketplace.linkInvalid": "הקישור לסוכן אינו תקין.",
   "error.marketplace.changedSinceOpened": "הסוכן השתנה אחרי שנפתח. יש לפתוח את הקישור שוב כדי לבדוק את הגרסה החדשה.",
-  "error.marketplace.skillNameConflict":
-    'כבר יש לך מיומנות מקומית אחרת בשם "{name}". יש לשנות את שמה או להסיר אותה, ואז להוסיף את הסוכן שוב.',
   "error.marketplace.avatarInvalid": "הדמות של הסוכן אינה תקינה.",
   "error.marketplace.secretInName": "יש להסיר את הסוד או כתובת האימייל מהשם לפני הפרסום.",
   "error.marketplace.secretInTitle": "יש להסיר את הסוד או כתובת האימייל מהכותרת לפני הפרסום.",

@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "إعادة إسناد المهمة المتوقفة لـ {name}",
   "channel.stoppedTask.reassign": "إعادة الإسناد",
   "channel.stoppedTask.cancel": "إلغاء المهمة",
+  "channel.stoppedTask.assignmentLoop":
+    "تبادل {names} هذه المهمة فيما بينهم مرات كثيرة جدًا. توقفت لمنع تكرارها بلا نهاية.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "تبادل الأعضاء هذه المهمة فيما بينهم مرات كثيرة جدًا. توقفت لمنع تكرارها بلا نهاية.",
   "channel.conversation.noMembers": "أضف وكلاء في إعدادات القناة لبدء العمل.",
   "channel.conversation.archivedNotice": "قناة محذوفة. معاينة فقط.",
   "channel.composer.label": "رسالة إلى القناة",

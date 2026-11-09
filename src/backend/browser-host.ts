@@ -160,8 +160,10 @@ import {
   browserInputAction,
   browserToolTimeout,
 } from "./browser-tool-actions";
+import { repairBrowserToolInput } from "./browser-tool-input";
 import {
   BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS,
+  BROWSER_SCRIPT_EVALUATE_MAX_BYTES,
   BROWSER_SCRIPT_MAX_STEPS,
   type BrowserStep,
   type BrowserToolArguments,
@@ -458,6 +460,16 @@ function runBrowserTool<Name extends BrowserToolName>(
 
 const AGENT_CODE_CARD_FILL =
   "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
+
+/**
+ * The origins of the documents in the page. A frame whose renderer is gone, for example after a crash,
+ * has no document. `isDestroyed()` of its `WebContents` stays false, but Electron throws when code
+ * reads the frame, and in an Electron event listener that throw stops the main process.
+ */
+function frameOrigins(contents: WebContents): string[] {
+  if (contents.isDestroyed() || contents.mainFrame.isDestroyed()) return [];
+  return contents.mainFrame.framesInSubtree.flatMap((frame) => (frame.isDestroyed() ? [] : [frame.origin]));
+}
 
 function markScriptedOrigin(tab: BrowserHostTab, origin: string): void {
   const origins = tab.scriptedOrigins ?? new Set<string>();
@@ -1383,7 +1395,9 @@ export class BrowserHost {
         this.listTabs().find((tab) => this.#userControlTabIds.has(tab.id) && this.#canUseToolTab(params, tab))?.id ??
         null
       );
-    const tabId = isRecord(params.arguments) ? params.arguments.tabId : undefined;
+    // The tool reads the repaired arguments, so this check does too: a call with tab_id names the tab.
+    const args = repairBrowserToolInput(params.tool, params.arguments).value;
+    const tabId = isRecord(args) ? args.tabId : undefined;
     if (!isString(tabId) || !this.#userControlTabIds.has(tabId)) return null;
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
     return tab && this.#canUseToolTab(params, tab) ? tabId : null;
@@ -1627,9 +1641,12 @@ export class BrowserHost {
     if (!tab.hasSharedBrowsingContext) return;
     const site = approximateSite(origin);
     for (const connected of this.#connectedTabs(tab)) {
-      if (connected === tab || connected.contents.isDestroyed()) continue;
-      const origins = connected.contents.mainFrame.framesInSubtree.map((frame) => frame.origin);
-      if (origins.some((frameOrigin) => frameOrigin !== "null" && approximateSite(frameOrigin) === site))
+      if (connected === tab) continue;
+      if (
+        frameOrigins(connected.contents).some(
+          (frameOrigin) => frameOrigin !== "null" && approximateSite(frameOrigin) === site,
+        )
+      )
         throw new Error(
           "Secure input is unavailable while a connected popup or opener tab shows the same site. Use takeover.",
         );
@@ -1676,10 +1693,10 @@ export class BrowserHost {
     if (!scripted) return;
     const connected = this.#connectedTabs(tab);
     for (const other of this.#sessionTabs(target)) {
-      if (other === tab || other.contents.isDestroyed()) continue;
-      const frameOrigins = new Set(other.contents.mainFrame.framesInSubtree.map((frame) => frame.origin));
+      if (other === tab) continue;
+      const otherOrigins = new Set(frameOrigins(other.contents));
       for (const origin of scripted) {
-        if (!frameOrigins.has(origin)) continue;
+        if (!otherOrigins.has(origin)) continue;
         if (connected.has(other)) markScriptedOrigin(other, origin);
         else markWorkerExposedOrigin(other, origin);
       }
@@ -1762,11 +1779,7 @@ export class BrowserHost {
   /** Whether a page of the origin other than the tab's own is open in the session. */
   #originOpenElsewhere(target: Session, origin: string, tab: BrowserHostTab): boolean {
     return [...this.#tabs.values()].some(
-      (other) =>
-        other !== tab &&
-        !other.contents.isDestroyed() &&
-        this.#tabSession(other) === target &&
-        other.contents.mainFrame.framesInSubtree.some((frame) => frame.origin === origin),
+      (other) => other !== tab && this.#tabSession(other) === target && frameOrigins(other.contents).includes(origin),
     );
   }
 
@@ -2735,6 +2748,8 @@ export class BrowserHost {
               step.awaitPromise ?? true,
               browserToolTimeout(step.timeoutMs),
               true,
+              // The value goes to the script, not to the model; the script result keeps the 64 KB limit.
+              BROWSER_SCRIPT_EVALUATE_MAX_BYTES,
             ),
           };
         case "sleep":
@@ -4070,6 +4085,7 @@ export class BrowserHost {
     awaitPromise: boolean,
     timeoutMs: number,
     undefinedAsNull = false,
+    maxBytes?: number,
   ): Effect.fn.Return<BrowserJsonValue, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     // The origin is read in the tab's queue, just before the script runs, and again when it ends: a
@@ -4090,6 +4106,7 @@ export class BrowserHost {
       awaitPromise,
       timeoutMs,
       undefinedAsNull,
+      maxBytes,
     ).pipe(Effect.ensuring(Effect.sync(markScripted)));
   });
 

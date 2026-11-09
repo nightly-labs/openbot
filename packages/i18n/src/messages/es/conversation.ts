@@ -189,6 +189,7 @@ export const messages = {
   "conversation.tasks.panel.closePanel": "Cerrar panel",
   "conversation.tasks.panel.label": "Tarea {title}",
   "conversation.tasks.panel.openInChat": "Abrir en el chat",
+  "conversation.tasks.panel.resize": "Cambiar el tamaño del panel de la tarea",
   "conversation.tasks.section.needsYou": "Te necesita",
   "conversation.tasks.section.waiting": "En espera",
   "conversation.tasks.section.unread": "Sin leer",

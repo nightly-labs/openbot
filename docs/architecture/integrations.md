@@ -89,7 +89,7 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 
 | Part | Rule |
 | --- | --- |
-| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer. |
+| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer, and `canManageMcpServers` what the phone offers. |
 | Read and add | A member reads the whole list, with its `env` and header values, tests a server, and adds a server, a stdio command too. |
 | Change | A member changes, turns on or off, or removes only a server that the member added. Any other row gets 403 `error.team.mcpServerNotYours`. Owners and admins change every row. |
 | Owners | `McpServerOwnersStore` keeps the member ID of each row that a joined server added, in `openbot-mcp-server-owners-v1.json`. A row with no entry, such as one added on the host, counts as an admin's. A damaged file reads as empty. |
@@ -97,6 +97,20 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 | Providers | Provider sign-ins, account starts and agent links on the relay stay with owners and admins. |
 
 Run `bun run test:mcp-member-access` to check these rules on a real host.
+
+### How many MCP servers a host keeps
+
+A computer keeps up to 100 MCP servers (`INPUT_LIMITS.mcpServers`). Disabled rows count too. The
+released codecs of `mcp-servers-v1` and `mcp-sign-in-v1` read at most 32 rows in one list, and they
+are frozen. The protocol 9 capability `mcp-many-servers-v1`
+([`mcp-many-servers-v1.ts`](../../packages/contracts/src/team-protocol/mcp-many-servers-v1.ts)) lets a
+list hold 100 rows when both peers send it. The rows and the requests keep their frozen shapes.
+
+| Peer | Rule |
+| --- | --- |
+| Client with the capability | Reads lists of up to 100 rows. |
+| Client without it | Works while the host has 32 rows or fewer. When a route would answer with more, or a save would add the 33rd row, the host refuses it with 409 `error.team.mcpServerListNeedsUpdate` before it changes anything (`requireMcpListFits` in [`route-mcp.ts`](../../src/main/team-api/route-mcp.ts)). |
+| Transfer file | An export can hold up to 100 rows. An app before this change refuses the Settings section of a file with more than 32. |
 
 ### How an agent reaches a signed-in MCP server
 

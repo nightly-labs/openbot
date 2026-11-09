@@ -34,6 +34,7 @@ export const messages = {
   "mobile.app.route.threads": "Threads",
   "mobile.app.route.usage": "Gebruik",
   "mobile.app.route.marketplace": "Marktplaats",
+  "mobile.app.route.library": "Bibliotheek",
   "mobile.app.quickAction.search": "Zoeken",
   "mobile.app.update.title": "OpenBot {version} is er",
   "mobile.app.update.readyTitle": "Een nieuwe OpenBot staat klaar",

@@ -148,7 +148,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "Połącz ponownie, aby zapisać zmiany.",
   "mobile.agent.info.noMemories": "Brak wspomnień.",
   "mobile.agent.info.addMemory": "Dodaj wspomnienie",
-  "mobile.agent.info.routineActive": "Aktywna",
   "mobile.agent.info.routinePaused": "Wstrzymana",
   "mobile.agent.info.noRoutines": "Brak rutyn.",
   "mobile.agent.info.addRoutine": "Dodaj rutynę",

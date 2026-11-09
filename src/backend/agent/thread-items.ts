@@ -507,6 +507,8 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
+  // Its name has `send`, a word of the agent words below.
+  if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");
   const skill = getString(item, "name") === "Skill" ? getString(item, "skill") : null;
   if (skill) return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillUsing", { name: skill });
   if (descriptor.includes("capture_screen")) {

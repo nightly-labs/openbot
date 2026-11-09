@@ -342,7 +342,7 @@ export const messages = {
   "server.settings.skillLearningAsk": "Eerst vragen",
   "server.settings.skillLearningOff": "Uit",
   "server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
-  "server.settings.rolesTitle": "Rollen",
+  "server.settings.rolesTitle": "Machtigingen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",
   "server.settings.auditTitle": "Auditlog",
@@ -437,6 +437,7 @@ export const messages = {
   "server.roles.memberCount": { one: "{count} lid", other: "{count} leden" },
   "server.roles.agentList": "Agents: {names}",
   "server.roles.agentLevel": "Toegang van {role} tot {agent}",
+  "server.roles.changeInEveryone": "Wijzigen in Iedereen",
   "server.roles.setAll": "Alles instellen",
   "server.roles.setAllLabel": "Alles instellen: toegang van {role} tot alle agents",
   "server.roles.loadFailed": "Kan de rollen van deze server niet laden.",

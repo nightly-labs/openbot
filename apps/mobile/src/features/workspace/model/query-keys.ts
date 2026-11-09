@@ -194,7 +194,15 @@ export const queryKeys = {
   ],
   /** The plan limits of a server's providers. The host's `usage-changed` event writes the providers' own sign-ins. */
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
+  machineMetrics: (scope: QueryScope, serverId: string) => ["machine-metrics", ...scope, serverId],
   serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
+  /** The past year of the paired desktop, which the Profile page summarizes as the desktop Profile tab does. */
+  profileActivity: (scope: QueryScope, serverId: string, range: unknown) => [
+    "profile-activity",
+    ...scope,
+    serverId,
+    range,
+  ],
   /** The routine calendar of a server. Its routine and turn events invalidate the prefix. */
   serverRoutines: (scope: QueryScope, serverId: string, ...range: [] | [from: string, to: string]) => [
     "server-routines",

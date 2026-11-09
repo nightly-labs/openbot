@@ -26,6 +26,10 @@ export const messages = {
     "التقاط منطقة الشاشة عند {x}، {y}، بحجم {width} × {height} نقطة وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.vaultCardFill":
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
+  "status.agent.reportProblem": "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك. لا يظهر اسمك.",
+  "status.agent.sendIdea": "يصبح هذا مشكلة عامة على GitHub. لا يظهر اسمك.",
+  "status.agent.feedbackSent": "أُرسل إلى فريق OpenBot: {title}",
+  "status.agent.feedbackSending": "جارٍ إرسال ملاحظاتك إلى فريق OpenBot…",
   "status.agent.workflowDelete": "احذف سير العمل {title} مع عمليات تشغيله وإصداراته. تتوقف خطواته المفتوحة.",
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",
   "status.agent.linkCardFill":

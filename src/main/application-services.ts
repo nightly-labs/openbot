@@ -35,6 +35,7 @@ import {
   browserProxyConnection,
   createBrowserProfileService,
 } from "./browser-profile-service";
+import { feedbackFacts, feedbackSender } from "./feedback";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -1941,6 +1942,8 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    feedbackFacts: feedbackFacts(),
+    feedback: feedbackSender(centralAuth),
     marketplaceAppServer: (appId) => {
       const listed = catalogPluginServers.filter((server) => server.slug === appId);
       const [server] = listed;

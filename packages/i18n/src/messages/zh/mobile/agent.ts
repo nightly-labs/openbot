@@ -131,7 +131,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "请重新连接以保存更改。",
   "mobile.agent.info.noMemories": "还没有记忆。",
   "mobile.agent.info.addMemory": "添加记忆",
-  "mobile.agent.info.routineActive": "启用",
   "mobile.agent.info.routinePaused": "已暂停",
   "mobile.agent.info.noRoutines": "还没有自动化任务。",
   "mobile.agent.info.addRoutine": "添加自动化任务",

@@ -728,10 +728,14 @@ export class ChannelStore {
     );
   }
 
-  executionThreads(): Array<{ id: string; threadId: string }> {
+  executionThreads(): Array<{ id: string; threadId: string; channelId: string }> {
     return databaseRows(
-      this.database.connection.prepare("SELECT agent_id, thread_id FROM projection_channel_contexts").all(),
-    ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
+      this.database.connection.prepare("SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts").all(),
+    ).map((row) => ({
+      id: requiredStringColumn(row, "agent_id"),
+      threadId: requiredStringColumn(row, "thread_id"),
+      channelId: requiredStringColumn(row, "channel_id"),
+    }));
   }
 
   contextThreads(channelId: string): string[] {

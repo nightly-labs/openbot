@@ -9,6 +9,9 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "הקצאה מחדש של המשימה שנעצרה של {name}",
   "channel.stoppedTask.reassign": "הקצאה מחדש",
   "channel.stoppedTask.cancel": "ביטול המשימה",
+  "channel.stoppedTask.assignmentLoop": "{names} העבירו את המשימה ביניהם יותר מדי פעמים. היא נעצרה כדי למנוע לולאה.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "החברים העבירו את המשימה ביניהם יותר מדי פעמים. היא נעצרה כדי למנוע לולאה.",
   "channel.conversation.noMembers": "יש להוסיף סוכנים בהגדרות הערוץ כדי להתחיל לעבוד.",
   "channel.conversation.archivedNotice": "הערוץ נמחק. תצוגה בלבד.",
   "channel.composer.label": "הודעה לערוץ",

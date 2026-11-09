@@ -13,7 +13,7 @@ import type {
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
 import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
-import { type Logger, toLogValue } from "@openbot/logging";
+import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
@@ -569,7 +569,16 @@ export class McpGateway {
    * `redactText`, which covers the patterns shared across the app.
    */
   redact(text: string): string {
-    return redactMcpValues(text, [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()]);
+    return redactMcpValues(text, this.#secretValues());
+  }
+
+  /** `redact` for text that the agent reads back, such as its memories and history: emails stay. */
+  redactForAgent(text: string): string {
+    return redactMcpValues(text, this.#secretValues(), redactSecrets);
+  }
+
+  #secretValues(): string[] {
+    return [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()];
   }
 }
 

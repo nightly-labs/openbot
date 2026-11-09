@@ -25,6 +25,10 @@ export const messages = {
     "צילום אזור המסך ב-{x}, {y}, {width} × {height} נקודות ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.vaultCardFill":
     "מילוי הכרטיס השמור {card} ב-{site}. אחרי האישור שלך, סוכנים יוכלו למלא את הכרטיס הזה באתר הזה בלי אישור. אפשר להסיר את האתר בהגדרות שרת > כספת.",
+  "status.agent.reportProblem": "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך. השם שלך לא מוצג.",
+  "status.agent.sendIdea": "זה יהפוך ל-issue ציבורי ב-GitHub. השם שלך לא מוצג.",
+  "status.agent.feedbackSent": "נשלח לצוות OpenBot: {title}",
+  "status.agent.feedbackSending": "שולח את המשוב שלך לצוות OpenBot…",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",
   "status.agent.linkCardFill": "מילוי כרטיס Link חד-פעמי {card} ב-{site}. אישרת את התשלום הזה ב-Link עבור {merchant}.",

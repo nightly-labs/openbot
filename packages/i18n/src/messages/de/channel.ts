@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Gestoppte Aufgabe von {name} neu zuweisen",
   "channel.stoppedTask.reassign": "Neu zuweisen",
   "channel.stoppedTask.cancel": "Aufgabe abbrechen",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} haben diese Aufgabe zu oft untereinander weitergegeben. Sie wurde gestoppt, um eine Schleife zu verhindern.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Die Mitglieder haben diese Aufgabe zu oft untereinander weitergegeben. Sie wurde gestoppt, um eine Schleife zu verhindern.",
   "channel.conversation.noMembers": "Füge in den Kanaleinstellungen Agenten hinzu, um mit der Arbeit zu beginnen.",
   "channel.conversation.archivedNotice": "Gelöschter Kanal. Nur Vorschau.",
   "channel.composer.label": "Nachricht an den Kanal",

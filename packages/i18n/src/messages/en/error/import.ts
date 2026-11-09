@@ -31,12 +31,16 @@ export const messages = defineMessages("error.import", {
   "error.import.fileRenamed": "{name}: {file} already exists, so this copy is saved as {saved}.",
   "error.import.fileSkipped": "{name}: the file {file} is skipped. {reason}",
   "error.import.chooseZip": "Choose a .zip file.",
-  "error.import.zipTooLarge": "The export must be a .zip under 2 GB.",
   "error.import.unsafeFile": "The export contains an unsafe file: {name}",
-  "error.import.expandedTooLarge": "The export must expand to under 2 GB and {limit} files.",
+  "error.import.tooManyFiles": "The export must have {limit} files or fewer.",
+  "error.import.diskSpace":
+    "{name}: its files need {size} GB of free disk space, and {free} GB is free. Free up space, then import the agent again.",
   "error.import.remoteExpandedTooLarge": "The export must expand to under 500 MB and {limit} files.",
   "error.import.zipInvalid":
     "The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.",
+  "error.import.entryDamaged": "The file is damaged in the export.",
+  "error.import.foldersSkipped":
+    "{number} files in .git and node_modules folders are left out. A tool can make them again.",
   "error.import.empty": "The export is empty.",
   "error.import.remoteZipTooLarge": "To import into a joined server, the export must be a .zip under 100 MB.",
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",

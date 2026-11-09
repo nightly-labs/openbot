@@ -941,8 +941,12 @@ then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
 `~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
-`cursor` row, because both windows have the same length. A plan with only `totalPercentUsed` fills
-the primary window. The reader also sends `GetPlanInfo`: on a merged plan (`isMerged`), such as an X
+`cursor` row, because both windows have the same length. The total of that split plan
+(`totalPercentUsed`), which the Cursor CLI shows first as "Included", goes to `tertiary`: the dock
+lists it first as "Total", and the rail ring shows it, or a window that is used up, because the
+models of that window then stop. Only the usage list and the ring read `tertiary`; the usage limit
+check reads the two windows, and the Team API does not send it, so a peer shows the two windows. A
+plan with only `totalPercentUsed` fills the primary window. The reader also sends `GetPlanInfo`: on a merged plan (`isMerged`), such as an X
 subscription, the included usage covers Grok and Composer only, so `totalPercentUsed` alone fills the
 primary window and the dock shows no other models window, as the Cursor app does. The Cursor app
 keeps the split for a merged Enterprise team plan; the reader cannot see the membership type, so it

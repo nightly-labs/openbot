@@ -43,7 +43,9 @@ import {
   presentChatMessages,
 } from "@/features/chat/model/chat-messages";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
+import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
@@ -90,6 +92,7 @@ import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
 import { useComposerDictation } from "./use-composer-dictation";
+import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
 export interface ChatViewProps {
@@ -645,8 +648,25 @@ export function ChatView({
   const writable = canSend && !readOnly && !notice;
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
-  const live = useLiveConversation({
+  // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
+  // it, and this app binary has WebRTC. A call that runs keeps it, also while the server is away.
+  const gptLiveChosen = useVoiceSettings((state) => state.gptLive);
+  const gptLiveVoice = useVoiceSettings((state) => state.gptLiveVoice);
+  const serverLiveVoice = useMobileWorkspaceSelector((current) => current.canUseLiveVoice(target.serverId));
+  const gptLive = useGptLiveConversation({
+    active: target.kind === "agent" && gptLiveChosen && serverLiveVoice && liveVoiceWebRtc !== null,
     enabled: isFocused && writable,
+    online: serverOnline,
+    focused: isFocused,
+    foreground: foregroundVisit,
+    agentId: target.id,
+    voice: gptLiveVoice,
+    serverId: target.serverId,
+    startSession: (input) => workspace().startLiveVoice(input, target.serverId),
+    stopSession: (sessionId) => workspace().stopLiveVoice(sessionId, target.serverId),
+  });
+  const phoneLive = useLiveConversation({
+    enabled: isFocused && writable && !gptLive.open,
     online: serverOnline,
     focused: isFocused,
     foreground: foregroundVisit,
@@ -657,6 +677,10 @@ export function ChatView({
     outboxMessages,
     send: (text) => (writable ? deliver(text, null, []) : null),
   });
+  // A phone conversation that runs keeps the call bar until it ends, also when the server starts to
+  // serve GPT live voice during it, such as at its first connection or after a host update.
+  const usesGptLive = gptLive.open || (gptLive.available && !phoneLive.open);
+  const live = usesGptLive ? gptLive : phoneLive;
   // The agent who speaks in a voice conversation: the agent of the chat, or the channel's leader, who
   // gives out the channel's tasks.
   const voiceAgent =
@@ -674,7 +698,7 @@ export function ChatView({
     live.available || live.open
       ? {
           ...liveVoice(live, voiceAgent?.name ?? target.name, t),
-          start: () => (replyVoiceReady() ? live.start() : router.push("/settings/voice")),
+          start: () => (usesGptLive || replyVoiceReady() ? live.start() : router.push("/settings/voice")),
         }
       : undefined;
   // A live conversation keeps the chat in view and turns the composer into a call bar.
@@ -1098,6 +1122,7 @@ export function ChatView({
                         ? "error"
                         : "loading"
               }
+              catchingUp={catchingUp}
               appActive={appActive}
               activeTurnId={activeTurnId}
               turnSummaries={turnSummaries}

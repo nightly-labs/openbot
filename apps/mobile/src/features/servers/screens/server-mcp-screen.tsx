@@ -15,8 +15,9 @@ import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 /**
- * Server sheet > MCP servers: the MCP servers that the host gives its agents. An owner or admin
- * opens a server to change, test or remove it, and adds one with the header "+".
+ * Server sheet > MCP servers: the MCP servers that the host gives its agents. An owner or admin, or a
+ * member of a host with `mcp-member-access-v1`, opens a server to change, test or remove it, and adds
+ * one with the header "+". The host refuses a member a row that another person added.
  */
 export function ServerMcpScreen() {
   const { t, errorMessage } = useText();

@@ -1,3 +1,4 @@
+import { feedbackSentIssue } from "@openbot/contracts/feedback";
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
@@ -20,6 +21,7 @@ import {
   skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
   AgentDeliveryMarkerStatus,
@@ -32,6 +34,12 @@ import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-time
 import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
+
+/** The title in the host's thank-you text, which ends with it. Text from another host gives none. */
+function feedbackSentTitle(text: string): string {
+  const prefix = englishSourceText("status.agent.feedbackSent", { title: "" });
+  return text.startsWith(prefix) ? text.slice(prefix.length) : "";
+}
 
 export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
   return {
@@ -371,6 +379,9 @@ function chatActionMarker(
   if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
   if (signIn) return { kind: "mcp-sign-in", mcpServerId: signIn.mcpServerId, timestamp: message.createdAt };
+  const issue = feedbackSentIssue(message);
+  if (issue)
+    return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",

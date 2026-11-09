@@ -6,6 +6,8 @@ export const messages = defineMessages("mcp", {
   "mcp.connect.notConnected": "Not connected",
   "mcp.connect.close": "Close connect {name}",
   "mcp.connect.getKey": "Get a key",
+  "mcp.connect.useKey": "Use an API key instead",
+  "mcp.connect.useSignIn": "Sign in instead",
   "mcp.connect.keyDescription":
     "Paste a credential from your {name} account. OpenBot connects with it and keeps it on {host}.",
   "mcp.connect.thisComputer": "this computer",

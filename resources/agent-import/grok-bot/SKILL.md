@@ -38,6 +38,12 @@ file when the manifest is invalid, so follow the format below exactly.
    and group chats or only some. Wait for the answer before you continue. Export every group chat,
    including one with only one other agent. Leave one out only when none of its agents are exported.
 
+   Leave out folders that a tool makes again from the other files, and do not count them in the
+   size: `node_modules`, `.git`, `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`,
+   `.next`, `.nuxt`, `dist`, `build`, `target`, `.gradle`, `.cache`, and `coverage`. Also leave out
+   `.DS_Store` files. When a folder with one of these names holds the user's own work, ask before
+   you leave it out.
+
 3. **Write memories.** From each agent's chats, write at most 50 short facts that the agent must
    keep: user preferences, names, recurring tasks, decisions, and open work. One fact per memory,
    500 characters or fewer, written as a statement ("The user reports in EUR."). Do not copy
@@ -46,8 +52,7 @@ file when the manifest is invalid, so follow the format below exactly.
 4. **Remove secrets.** Do not export `.env` files, private keys, API keys, tokens, passwords, or
    cookies, in files or in instructions. Replace a secret in instructions with
    `<ask the user for …>`. OpenBot rejects the archive if it contains a file named `.env*` or
-   `*private*key*`, a nested archive (`.zip`, `.tar`, `.gz`, `.7z`, `.rar`), or a `.git` or
-   `node_modules` folder, so leave those out.
+   `*private*key*`, or a nested archive (`.zip`, `.tar`, `.gz`, `.7z`, `.rar`), so leave those out.
 
 5. **Build the folder** (see Format) and write `openbot-import.json` last.
 
@@ -155,7 +160,8 @@ Channel field rules:
 
 A channel has no folder in the archive. Up to 100 channels.
 
-The whole archive must be under 2 GB and 50,000 files or fewer.
+The whole archive must have 200,000 files or fewer. It has no size limit, but the computer that
+imports it needs free disk space for the workspace files.
 
 ### Schedules
 
@@ -186,5 +192,6 @@ with an invalid schedule and tells the user; the rest of the agent still imports
 - [ ] Every group chat is in `channels`, unless none of its agents are exported.
 - [ ] Each channel has at least one `members` entry, each member is an agent `key` in this export, and
       `lead` is one of the members or `null`.
-- [ ] No secrets, `.env` files, keys, nested archives, `.git`, or `node_modules`.
+- [ ] No secrets, `.env` files, keys, or nested archives.
+- [ ] No folders that a tool makes again, such as `node_modules`, `.git`, `.venv`, `dist`, or `build`.
 - [ ] Workspace files are included only if the user said yes.

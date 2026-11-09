@@ -378,7 +378,7 @@ export const messages = {
   "server.settings.skillLearningAsk": "לשאול קודם",
   "server.settings.skillLearningOff": "כבוי",
   "server.settings.skillLearningLoadFailed": "לא ניתן לטעון את הגדרת למידת המיומנויות.",
-  "server.settings.rolesTitle": "תפקידים",
+  "server.settings.rolesTitle": "הרשאות",
   "server.settings.rolesDescription":
     "יש לבחור את הסוכנים שחברים יכולים להשתמש בהם. חבר מקבל את רמת הגישה הגבוהה ביותר מבין כולם ותפקידיו. בעלים ומנהלים יכולים להשתמש בכל הסוכנים.",
   "server.settings.auditTitle": "יומן ביקורת",
@@ -472,6 +472,7 @@ export const messages = {
   "server.roles.memberCount": { one: "חבר אחד", two: "שני חברים", other: "{count} חברים" },
   "server.roles.agentList": "סוכנים: {names}",
   "server.roles.agentLevel": "גישה של {role} אל {agent}",
+  "server.roles.changeInEveryone": "שינוי בכולם",
   "server.roles.setAll": "הגדרת הכול",
   "server.roles.setAllLabel": "הגדרת הכול: גישה של {role} לכל הסוכנים",
   "server.roles.loadFailed": "לא ניתן לטעון את התפקידים של השרת הזה.",

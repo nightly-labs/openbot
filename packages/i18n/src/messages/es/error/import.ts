@@ -32,14 +32,17 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} ya existe, por lo que esta copia se guarda como {saved}.",
   "error.import.fileSkipped": "{name}: se omite el archivo {file}. {reason}",
   "error.import.chooseZip": "Elige un archivo .zip.",
-  "error.import.zipTooLarge": "La exportación debe ser un archivo .zip de menos de 2 GB.",
   "error.import.unsafeFile": "La exportación contiene un archivo no seguro: {name}",
-  "error.import.expandedTooLarge":
-    "La exportación descomprimida debe ocupar menos de 2 GB y contener menos de {limit} archivos.",
+  "error.import.tooManyFiles": "La exportación debe tener {limit} archivos o menos.",
+  "error.import.diskSpace":
+    "{name}: sus archivos necesitan {size} GB de espacio libre en disco y hay {free} GB libres. Libera espacio y vuelve a importar el agente.",
   "error.import.remoteExpandedTooLarge":
     "La exportación descomprimida debe ocupar menos de 500 MB y contener menos de {limit} archivos.",
   "error.import.zipInvalid":
     "El archivo seleccionado no es un .zip válido. Si Grok Bot aún lo está guardando, espera y selecciónalo de nuevo.",
+  "error.import.entryDamaged": "El archivo está dañado en la exportación.",
+  "error.import.foldersSkipped":
+    "Se omiten {number} archivos de las carpetas .git y node_modules. Una herramienta puede volver a crearlos.",
   "error.import.empty": "La exportación está vacía.",
   "error.import.remoteZipTooLarge":
     "Para importar a un servidor al que te has unido, la exportación debe ser un archivo .zip de menos de 100 MB.",

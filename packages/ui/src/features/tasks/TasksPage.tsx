@@ -25,6 +25,7 @@ import {
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { SwapLabel, type SwapMotion } from "@openbot/ui/components/SwapLabel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -75,6 +76,8 @@ export interface TasksVoice {
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
+  /** True while another message box on the page records. */
+  blocked?: boolean | undefined;
 }
 
 /** The task of the last start, in the line under the composer. */
@@ -129,10 +132,18 @@ interface TasksPageProps {
   onSelect: (taskId: string | null) => void;
   /** The conversation of one task, for the side panel. */
   panel: (taskId: string) => JSX.Element;
+  /** The width of the side panel that the user chose, in pixels. A narrow page shows it narrower. */
+  sideWidth: number;
+  /** Each move of the side panel edge. */
+  onSideResize: (width: number) => void;
+  /** The width at the end of a move, to keep for the next visit. */
+  onSideResizeEnd: (width: number) => void;
   /** What the task's running turn waits for from the person: an approval, or an answer in the chat. */
   waitOf?: ((task: AgentTask) => AgentTaskWait) | undefined;
   /** The user's send shortcut for the composer. */
   sendShortcut?: SendShortcut | undefined;
+  /** The window draws the macOS window controls over the image viewer's top start corner. */
+  macWindowControls?: boolean | undefined;
 }
 
 const agentOf = (agents: readonly AgentProfile[], agentId: string) => agents.find((agent) => agent.id === agentId);
@@ -472,6 +483,7 @@ function TasksComposer(props: TasksPageProps) {
           pending={props.pendingImages}
           removeDisabled={phase() === "transcribing"}
           onRemove={(attachment) => props.onRemoveFile?.(attachment)}
+          macWindowControls={props.macWindowControls}
         />
         <div class="composer-input-label">
           <ComposerEditor
@@ -516,7 +528,7 @@ function TasksComposer(props: TasksPageProps) {
                       variant="ghost"
                       class="dictation-button"
                       aria-label={t(voiceButtonLabel(phase()))}
-                      disabled={busy()}
+                      disabled={busy() || voice().blocked === true}
                       onClick={() => voice().onStart()}
                     >
                       <Show when={busy()} fallback={<Mic aria-hidden="true" />}>
@@ -686,6 +698,11 @@ function TasksList(props: TasksPageProps) {
 /** The close transition is 200ms; this ends a close whose `transitionend` does not come. */
 const SIDE_CLOSE_FALLBACK_MS = 300;
 
+export const TASKS_SIDE_DEFAULT = 420;
+export const TASKS_SIDE_MIN = 320;
+/** What the list keeps for itself, however far the side panel is dragged. */
+const TASKS_LIST_MIN = 320;
+
 /**
  * The task panel at the right of the page. It makes the list narrower; it does not cover it. The
  * panel slides in from the right and out again, so it stays shown until its close ends.
@@ -695,8 +712,23 @@ function TasksSidePanel(props: {
   taskId: string | null;
   panel: (taskId: string) => JSX.Element;
   onClose: () => void;
+  width: number;
+  onResize: (width: number) => void;
+  onResizeEnd: (width: number) => void;
 }) {
-  const [view, setView] = createStore({ shownId: untrack(() => props.taskId), closing: false });
+  const { t } = useText();
+  const sideId = createUniqueId();
+  const [view, setView] = createStore<{
+    shownId: string | null;
+    closing: boolean;
+    /** The width of the page, once measured. A narrow page makes the panel narrower, not the saved width. */
+    pageWidth: number | null;
+  }>({ shownId: untrack(() => props.taskId), closing: false, pageWidth: null });
+  let side: HTMLDivElement | undefined;
+  /** The list keeps its minimum; a page too narrow for both keeps the panel minimum. */
+  const maxFor = (page: number | null | undefined) =>
+    page == null ? Number.POSITIVE_INFINITY : Math.max(TASKS_SIDE_MIN, page - TASKS_LIST_MIN);
+  const width = () => Math.round(Math.min(maxFor(view.pageWidth), Math.max(TASKS_SIDE_MIN, props.width)));
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
   const finishClose = () => {
     clearTimeout(closeTimer);
@@ -758,7 +790,10 @@ function TasksSidePanel(props: {
         });
         return (
           <div
+            ref={(element) => (side = element)}
+            id={sideId}
             class="tasks-page-side"
+            style={{ "--tasks-page-side-width": `${width()}px` }}
             data-closing={view.closing ? "" : undefined}
             onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "flex-basis" && view.closing) {
@@ -766,18 +801,38 @@ function TasksSidePanel(props: {
               }
             }}
           >
-            <For each={[taskId()]} keyed={(id) => id}>
-              {(id) => {
-                const current = untrack(id);
-                const entering = contentId !== null && contentId !== current;
-                contentId = current;
-                return (
-                  <div class="tasks-page-side-content" data-entering={entering ? "" : undefined}>
-                    {props.panel(current)}
-                  </div>
-                );
-              }}
-            </For>
+            <PanelResizer
+              class="right-panel-resizer"
+              label={t("conversation.tasks.panel.resize")}
+              controls={sideId}
+              direction="right"
+              value={width()}
+              defaultValue={TASKS_SIDE_DEFAULT}
+              min={TASKS_SIDE_MIN}
+              max={() => maxFor(side?.parentElement?.clientWidth)}
+              onResize={props.onResize}
+              onResizeEnd={props.onResizeEnd}
+              onParentResize={() =>
+                setView((draft) => {
+                  draft.pageWidth = side?.parentElement?.clientWidth ?? null;
+                })
+              }
+            />
+            {/* The panel clips its content while it opens and closes; the edge handle stays outside the clip. */}
+            <div class="tasks-page-side-clip">
+              <For each={[taskId()]} keyed={(id) => id}>
+                {(id) => {
+                  const current = untrack(id);
+                  const entering = contentId !== null && contentId !== current;
+                  contentId = current;
+                  return (
+                    <div class="tasks-page-side-content" data-entering={entering ? "" : undefined}>
+                      {props.panel(current)}
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
           </div>
         );
       }}
@@ -863,6 +918,9 @@ export function TasksPage(props: TasksPageProps) {
         taskId={props.selectedId}
         panel={props.panel}
         onClose={() => props.onSelect(null)}
+        width={props.sideWidth}
+        onResize={props.onSideResize}
+        onResizeEnd={props.onSideResizeEnd}
       />
     </section>
   );

@@ -57,6 +57,7 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
+import { visibleDynamicTools } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import {
   AgentProcessExitError,
@@ -758,6 +759,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 threadId: request.threadId,
                 cwd: request.cwd,
                 includeTurns: request.items === "full",
+                // The turns that follow use the session that this read opens (#5778).
+                dynamicTools: visibleDynamicTools(this.provider),
               },
               true,
             ),
@@ -890,6 +893,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * instructions, and the channel messages that the session read, so the next turn sends both again.
    */
   #compacted(thread: AcpThread): void {
+    // A compaction is the whole answer of a `/compact` turn.
+    if (thread.activeTurn) thread.activeTurn.answered = true;
     thread.instructionsSent = null;
     this.#turnContext.resend(thread.id);
     this.emit("notification", {
@@ -1471,13 +1476,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<AcpThread | null, ProviderClientOperationError> {
     const held = this.#threads.get(id);
     if (held) return yield* providerSync(() => held);
-    if (!getString(params, "cwd")) return null;
+    if (!isRecord(params) || !getString(params, "cwd")) return null;
     // A resume that is already loading this session opens it for a turn, not for this read.
     const resuming = this.#startingThreads.has(id);
     try {
       providerResult(yield* Effect.result(this.#ensureInitializedEffect()));
       if (!this.#loadsSessions) return null;
-      providerResult(yield* Effect.result(this.#startThread(params, true)));
+      // The turns that follow use the session that this read opens, so it gets the agent's OpenBot tools (#5778).
+      providerResult(
+        yield* Effect.result(this.#startThread({ ...params, dynamicTools: visibleDynamicTools(this.provider) }, true)),
+      );
     } catch (error) {
       // The next turn replaces the missing session, so the user has nothing to act on.
       if (!(error instanceof MissingAcpSessionError)) {
@@ -2291,12 +2299,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
           },
         });
-      // A flavor can fail a turn that ended with no answer (OpenCode). A turn told not to answer ends
-      // empty on purpose, and an error there costs no answer the user waits for.
-      const emptyAnswerFailure = this.#flavor.emptyAnswerFailure;
-      if (emptyAnswerFailure && response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional) {
+      // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
+      // to answer ends empty on purpose, and an error there costs no answer the user waits for. A
+      // stopped turn ends as interrupted, also when the agent answers the cancel with `end_turn`.
+      const emptyAnswerFailure =
+        response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
+          ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
+          : null;
+      if (emptyAnswerFailure !== null) {
         turn.failureCause = "empty_answer";
-        yield* this.#completeTurn(thread, turn, "failed", emptyAnswerFailure(turn.reasoned));
+        yield* this.#completeTurn(thread, turn, "failed", emptyAnswerFailure);
         return;
       }
       const sdkHarness = this.#flavor.sdkHarness;

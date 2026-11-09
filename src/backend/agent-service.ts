@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
+import type { FeedbackFacts } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentAccessLevel,
@@ -198,7 +199,7 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { OpenBotToolRouter } from "./agent/openbot-tool-router";
+import { type AgentFeedback, OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -346,6 +347,10 @@ export interface AgentServiceOptions {
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   /** The saved server that a Marketplace app installs, for an agent that suggests the app. */
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
+  /** This build's version and system, which `send_feedback` adds to a bug report or an idea. */
+  feedbackFacts?: FeedbackFacts | null;
+  /** Sends approved `send_feedback` text to the account service. */
+  feedback?: AgentFeedback | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -1142,8 +1147,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        // Read late: `channels` is built after this.
-        queueHold: (agentId) => this.channels.queueHold(agentId),
+        // Read late: `channels` is built after this. A channel turn runs beside the agent's own chat,
+        // so it holds the chat's queue only on a provider that runs one turn at a time.
+        queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
       },
     });
     this.#reader = new ConversationReader({
@@ -1321,15 +1327,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
       loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
       // A held agent gets no channel assignment: one that waited for the reset would hold its
-      // resources. A channel turn runs beside the agent's tasks, unless its provider runs one turn
-      // of the agent at a time. A delivery of its own chat that starts has no turn ID yet, and it
-      // makes the agent busy too: otherwise the assignment waits as "starting" for that turn (#4761).
+      // resources. A channel turn runs in its own lane, beside the agent's own chat and its tasks,
+      // and the agent runs one channel turn at a time. A provider that runs one turn of the agent at
+      // a time waits for the own chat and the tasks too. A delivery of its own chat that starts has
+      // no turn ID yet, and it makes such an agent busy: otherwise the assignment waits as
+      // "starting" for that turn (#4761).
       busy: (agentId) =>
-        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
-        this.#mailbox.laneActive(agentId, null) ||
+        !this.#usageLimits.mayDrain(agentId) ||
+        this.#mailbox.channelLanes(agentId).length > 0 ||
+        this.#conversation.workingChannelSnapshots(agentId).length > 0 ||
         (this.#tasks.oneTurnAtATime(agentId) &&
-          this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId)) ||
-        !this.#usageLimits.mayDrain(agentId),
+          (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
+            this.#mailbox.laneActive(agentId, null) ||
+            this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
       usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
@@ -1762,6 +1772,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
+      feedbackFacts: options.feedbackFacts ?? null,
+      feedback: options.feedback ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       hooks: {
@@ -1788,6 +1800,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         enabledMcpServers: () => this.enabledMcpServers(),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
+        redactMcpForAgent: (text) => this.#mcp.redactForAgent(text),
         runsTurn: (agentId) => this.#runsTurn(agentId),
         interrupt: (agentId, turnId, mayStop) =>
           this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(toToolOperationFailed),
@@ -1802,6 +1815,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         steerAgentMessage: (recipientAgentId, deliveryId) => this.#steerAgentMessage(recipientAgentId, deliveryId),
         searchWeb: (agentId, query) => this.#searchWeb(agentId, query),
+        providerVersion: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.version ?? null,
       },
     });
   }
@@ -3468,7 +3482,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
     if (!limited && !failed) return null;
     const taskWork = () =>
-      this.#mailbox.queuedTaskIds(agentId).some((taskId) => this.#mailbox.nextQueued(agentId, taskId));
+      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some((laneId) =>
+        this.#mailbox.nextQueued(agentId, laneId),
+      );
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#mailbox.nextQueued(agentId) && !taskWork() && !this.channels.ownsWaitingWork(agentId)) return null;
     const next = this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId));
@@ -3492,9 +3508,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
-  /** Whether the next queued work of the agent, in its chat or a task, continues work that a limit stopped. */
+  /**
+   * Whether the next queued work of the agent, in its chat, a task or a channel, continues work that
+   * a limit stopped.
+   */
   #queuedContinuation(agentId: string): boolean {
-    return [null, ...this.#mailbox.queuedTaskIds(agentId)].some(
+    return [null, ...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some(
       (taskId) => this.#mailbox.nextQueued(agentId, taskId)?.resumeAfterUsageLimit !== undefined,
     );
   }
@@ -3717,7 +3736,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null);
       if (
         activeTurn ||
-        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId) ||
+        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
         this.#threads.mainContextBusy(agent)
       ) {
         throw new ContextResetBusyError(sourceText("error.agent.waitBeforeClearContext"));
@@ -3768,7 +3787,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
           (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null),
       ) ||
-      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId) ||
+      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
       this.#threads.mainContextBusy(agent);
     const target = yield* lifecycleStep("delete agent history", () => {
       const agent = this.#conversation.requireKnownAgent(agentId);
@@ -3831,7 +3850,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null);
       if (
         activeTurn ||
-        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId) ||
+        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
         this.#threads.mainContextBusy(agent)
       )
         throw new ContextCompactRefusedError(sourceText("error.agent.waitBeforeCompactContext"));

@@ -31,12 +31,15 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file}이(가) 이미 있어서 이 사본을 {saved}(으)로 저장했어요.",
   "error.import.fileSkipped": "{name}: 파일 {file}을(를) 건너뛰었어요. {reason}",
   "error.import.chooseZip": ".zip 파일을 선택해 주세요.",
-  "error.import.zipTooLarge": "내보내기 파일은 2 GB 이하의 .zip이어야 해요.",
   "error.import.unsafeFile": "내보내기 파일에 안전하지 않은 파일이 있어요: {name}",
-  "error.import.expandedTooLarge": "내보내기 파일은 압축을 풀었을 때 2 GB 이하, 파일 {limit}개 이하여야 해요.",
+  "error.import.tooManyFiles": "내보내기 파일은 파일 {limit}개 이하여야 해요.",
+  "error.import.diskSpace":
+    "{name}: 파일에 {size} GB의 여유 디스크 공간이 필요한데 여유 공간은 {free} GB예요. 공간을 확보한 뒤 에이전트를 다시 가져오세요.",
   "error.import.remoteExpandedTooLarge": "내보내기 파일은 압축을 풀었을 때 500 MB 이하, 파일 {limit}개 이하여야 해요.",
   "error.import.zipInvalid":
     "선택한 파일이 올바른 .zip이 아니에요. Grok Bot이 아직 저장 중이라면 잠시 기다린 후 다시 선택해 주세요.",
+  "error.import.entryDamaged": "내보내기 파일 안의 파일이 손상되었어요.",
+  "error.import.foldersSkipped": ".git 및 node_modules 폴더의 파일 {number}개는 제외돼요. 도구로 다시 만들 수 있어요.",
   "error.import.empty": "내보내기 파일이 비어 있어요.",
   "error.import.remoteZipTooLarge": "참여 중인 서버로 가져오려면 내보내기 파일이 100 MB 이하의 .zip이어야 해요.",
   "error.import.hostBusy": "서버가 다른 내보내기 파일을 읽고 있어요. 몇 분 후 다시 시도해 주세요.",

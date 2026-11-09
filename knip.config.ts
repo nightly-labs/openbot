@@ -54,6 +54,10 @@ const config: KnipConfig = {
     "vm_stat",
     // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
     "dbus-run-session",
+    // Find Icon Composer, and make the macOS `.icns` and Dock image in `compile-macos-icon.ts`.
+    "xcode-select",
+    "sips",
+    "iconutil",
   ],
   workspaces: {
     ".": {
@@ -114,8 +118,9 @@ const config: KnipConfig = {
       entry: [
         "src/app/**/*.{ts,tsx}",
         "plugins/**/*.{js,ts}",
-        // metro.config.js maps `solid-js` and `@solidjs/web` to these files by path.
-        "src/shims/*.ts",
+        // metro.config.js maps `solid-js` and `@solidjs/web` to these files by path, and gives the
+        // Uniwind component wrappers `uniwind-react-native.js` as `react-native`.
+        "src/shims/*.{ts,js}",
         // metro.config.js loads this stylesheet by path (`cssEntryFile`).
         "global.css",
         // scripts/mobile-share-sender.ts builds the share extension page from this file by path.
@@ -123,6 +128,8 @@ const config: KnipConfig = {
       ],
       project: ["src/**/*.{ts,tsx}", "plugins/**/*.{js,ts}"],
       ignoreDependencies: [
+        // Not a package: metro.config.js resolves this name to the real `react-native` for the shims.
+        "openbot-original-react-native",
         // `expo` installs it; Expo config plugins import it by this name.
         "@expo/config-plugins",
         // Expo CLI loads it as a dev tools plugin (the simulators in a browser tab); no code imports it.

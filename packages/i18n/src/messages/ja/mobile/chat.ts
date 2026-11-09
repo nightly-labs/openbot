@@ -189,6 +189,14 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs のキーに権限が不足しています。設定 > 音声 で確認してください。",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs にはネットワーク接続が必要です。",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "音声サーバーが返信を読み上げられませんでした。設定 > 音声 で確認してください。",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "このサーバーは GPT Live Voice に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
+  "mobile.chat.liveVoice.gptFailed": "GPT Live Voice を開始できませんでした。ミュートを解除して再試行してください。",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice が停止しました。ミュートを解除すると再開します。",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "設定で OpenBot にマイクの使用を許可してから、ミュートを解除して再試行してください。",
   "mobile.chat.composer.addAttachment": "添付ファイルを追加",
   "mobile.chat.composer.ask": "{name} に質問",
   "mobile.chat.composer.stopFailed": "エージェントを停止できませんでした。すでに終了している可能性があります。",

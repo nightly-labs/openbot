@@ -25,6 +25,7 @@ import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
   MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL,
   MESSAGING_MEMORY_SCHEMA_SQL,
+  MESSAGING_PINGS_SCHEMA_SQL,
   MESSAGING_SCHEMA_SQL,
 } from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
@@ -631,7 +632,8 @@ const LATEST_SCHEMA_SQL =
   MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL +
   DELETED_THREAD_MESSAGES_SCHEMA_SQL +
   BROWSER_PROXY_SCHEMA_SQL +
-  AGENT_SKILL_LOADS_SCHEMA_SQL;
+  AGENT_SKILL_LOADS_SCHEMA_SQL +
+  MESSAGING_PINGS_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -979,6 +981,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No skill load was
     // recorded before it, so the table starts empty and no usage row changes.
     up: (db) => db.exec(AGENT_SKILL_LOADS_SCHEMA_SQL),
+  },
+  {
+    version: 59,
+    // Only creates a table, so no foreign-key pause and no vacuum. No post was recorded as a ping
+    // before it, so the table starts empty, and every thread routes its replies as before.
+    up: (db) => db.exec(MESSAGING_PINGS_SCHEMA_SQL),
   },
 ];
 

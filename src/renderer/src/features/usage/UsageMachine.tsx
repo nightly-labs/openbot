@@ -8,10 +8,10 @@ import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 
-/** Memory and CPU change fast, and the host reads CPU since the reading before. */
-const MACHINE_REFRESH_MS = 60_000;
-/** The poll compares the age often, so a reading is at most this much later than the minute. */
-const MACHINE_REFRESH_CHECK_MS = 10_000;
+/** Memory and CPU change fast, so the meter is live. The host reads CPU since the reading before. */
+const MACHINE_REFRESH_MS = 5_000;
+/** The poll compares the age often, so a reading is at most this much later than its interval. */
+const MACHINE_REFRESH_CHECK_MS = 1_000;
 
 type MachinePort = Pick<OpenBotDesktopApi["storage"], "getMachineMetrics">;
 
@@ -22,8 +22,8 @@ function machinePort(): MachinePort {
 
 /**
  * The machine use of a server in the Usage header. Only an owner or admin reads the machine, and only
- * on a host with `machine-resources-v1`; for others it shows nothing. It reads each minute while the
- * window is visible, and at once when the window shows again after a minute or more.
+ * on a host with `machine-resources-v1`; for others it shows nothing. It reads every few seconds while
+ * the window is visible, and at once when the window shows again.
  */
 export function UsageMachine(props: { serverId: string }) {
   const { servers } = useServers();
@@ -35,10 +35,17 @@ export function UsageMachine(props: { serverId: string }) {
       : null;
   });
   const [reading, setReading] = createSignal<{ serverId: string; metrics: MachineMetrics } | null>(null);
+  /** A slow remote host does not get a second read of the same server before it answers the first. */
+  let pending: string | null = null;
 
   function refresh(serverId: string): void {
+    if (pending === serverId) return;
+    pending = serverId;
     machinePort()
       .getMachineMetrics(serverId)
+      .finally(() => {
+        if (pending === serverId) pending = null;
+      })
       .then(
         (metrics) => {
           // An answer for a server that the panel no longer shows is dropped.

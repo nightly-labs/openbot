@@ -26,6 +26,10 @@ export const messages = {
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureRegion":
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
+  "status.agent.reportProblem": "앱 버전과 시스템 정보가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
+  "status.agent.sendIdea": "공개 GitHub 이슈가 됩니다. 이름은 표시되지 않습니다.",
+  "status.agent.feedbackSent": "OpenBot 팀에 보냄: {title}",
+  "status.agent.feedbackSending": "피드백을 OpenBot 팀에 보내는 중…",
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",

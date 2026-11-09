@@ -29,7 +29,12 @@ export interface MarketplacePluginPrompt {
  */
 export type MarketplacePluginServer = MarketplacePluginServerBase &
   (
-    | { transport: Extract<McpTransport, "http">; url: string }
+    | {
+        transport: Extract<McpTransport, "http">;
+        url: string;
+        /** The addresses that an earlier version of the listing saved rows on. */
+        earlierUrls?: readonly string[];
+      }
     | {
         transport: Extract<McpTransport, "stdio">;
         /**
@@ -71,9 +76,12 @@ export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePlugi
     // account" writes. Any other row must have the catalog name.
     if (mcpAccountFragment(config.url) === null && config.name !== server.name) return false;
     const url = withoutMcpAccountFragment(config.url);
+    if (url === server.url) return true;
     // A listing that asks for the user's own link cannot know the address, only its host.
     const userLink = (server.auth ?? []).some((flow) => mcpFlowFields(flow).some((field) => field.url));
-    return userLink ? isListingUrl(url, server.url) : url === server.url;
+    if (userLink && isListingUrl(url, server.url)) return true;
+    // A row that an earlier version of the listing saved, such as a Composio link from before its sign-in.
+    return (server.earlierUrls ?? []).some((earlier) => isListingUrl(url, earlier));
   }
   if (config.name !== server.name) return false;
   return (
@@ -81,6 +89,20 @@ export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePlugi
     config.args.length === server.args.length &&
     config.args.every((arg, index) => arg === server.args[index])
   );
+}
+
+/**
+ * The row to connect again. A row that an earlier version of the listing saved moves to the address
+ * the listing names now, so the new sign-in or key goes to the current server. Its headers stay
+ * behind: they are the credentials of the old address. An account fragment stays with the row.
+ */
+export function currentPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): McpServerConfig {
+  const server = app.server;
+  if (server.transport !== "http" || config.transport !== "http") return config;
+  const url = withoutMcpAccountFragment(config.url);
+  if (url === server.url || isListingUrl(url, server.url)) return config;
+  if (!(server.earlierUrls ?? []).some((earlier) => isListingUrl(url, earlier))) return config;
+  return { ...config, url: `${server.url}${mcpAccountFragment(config.url) ?? ""}`, headers: [] };
 }
 
 /** An MCP server the plugin publishes. The listing calls it an app, because that is what it is to the user. */

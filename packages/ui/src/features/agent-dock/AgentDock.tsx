@@ -938,7 +938,7 @@ export function AgentDock(props: AgentDockProps) {
                     <Plus aria-hidden="true" />
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content>
+                    <DropdownMenu.Content class="agent-dock-add-menu">
                       <For
                         each={props.available}
                         fallback={<DropdownMenu.Item disabled>{t("agent.dock.allAdded")}</DropdownMenu.Item>}

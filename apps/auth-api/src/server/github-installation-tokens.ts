@@ -100,8 +100,16 @@ const repositoriesSchema = Schema.Struct({
   ),
 });
 const accessTokenSchema = Schema.Struct({ token: Schema.NonEmptyString, expires_at: Schema.String });
+const repositoryInstallationSchema = Schema.Struct({ id: Schema.Number });
+const issueSchema = Schema.Struct({ number: Schema.Number, html_url: Schema.String });
 
-type Credential = { kind: "user"; token: string } | { kind: "app" };
+/** An issue that the app opened. */
+export interface GitHubIssue {
+  number: number;
+  url: string;
+}
+
+type Credential = { kind: "user"; token: string } | { kind: "app" } | { kind: "installation"; token: string };
 const APP: Credential = { kind: "app" };
 
 interface WritableRepository {
@@ -125,6 +133,7 @@ export class GitHubInstallationTokens {
   readonly #now: () => number;
   #key: CryptoKey | null = null;
   #appId: number | null = null;
+  readonly #repositoryInstallations = new Map<string, number>();
 
   constructor(options: GitHubInstallationTokensOptions) {
     this.#options = options;
@@ -189,6 +198,37 @@ export class GitHubInstallationTokens {
       if (Result.isFailure(result) && result.failure.code !== "github_failed") return yield* result.failure;
     }
     return routes;
+  }).bind(this);
+
+  /**
+   * Opens an issue as `openbotgit[bot]` in a repository of the app's own installation. The token can
+   * only write issues of that one repository, and it is dropped after the request.
+   */
+  readonly openIssue = Effect.fn("GitHubInstallationTokens.openIssue")(function* (
+    this: GitHubInstallationTokens,
+    repository: string,
+    issue: { title: string; body: string; labels: readonly string[] },
+  ): Effect.fn.Return<GitHubIssue, GitHubInstallationTokensError> {
+    const [, name] = repository.split("/");
+    let installationId = this.#repositoryInstallations.get(repository);
+    if (installationId === undefined) {
+      installationId = (yield* this.#get(`/repos/${repository}/installation`, APP, repositoryInstallationSchema)).id;
+      this.#repositoryInstallations.set(repository, installationId);
+    }
+    // A reinstalled app has a new installation ID, so a failed mint looks it up again next time.
+    const minted = yield* this.#post(
+      `/app/installations/${installationId}/access_tokens`,
+      APP,
+      { repositories: [name], permissions: { issues: "write" } },
+      accessTokenSchema,
+    ).pipe(Effect.tapError(() => Effect.sync(() => this.#repositoryInstallations.delete(repository))));
+    const opened = yield* this.#post(
+      `/repos/${repository}/issues`,
+      { kind: "installation", token: minted.token },
+      issue,
+      issueSchema,
+    );
+    return { number: opened.number, url: opened.html_url };
   }).bind(this);
 
   readonly #issueForInstallation = Effect.fn("GitHubInstallationTokens.issueForInstallation")(function* (
@@ -323,7 +363,7 @@ export class GitHubInstallationTokens {
     schema: Schema.Decoder<T>,
   ): Effect.fn.Return<T, GitHubInstallationTokensError> {
     const route = path.split("?")[0];
-    const authorization = credential.kind === "user" ? `token ${credential.token}` : `Bearer ${yield* this.#appJwt()}`;
+    const authorization = credential.kind === "app" ? `Bearer ${yield* this.#appJwt()}` : `token ${credential.token}`;
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         this.#options.fetch(`${GITHUB_API}${path}`, {

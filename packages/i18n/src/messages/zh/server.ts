@@ -341,7 +341,7 @@ export const messages = {
   "server.settings.skillLearningAsk": "先询问",
   "server.settings.skillLearningOff": "关闭",
   "server.settings.skillLearningLoadFailed": "无法加载技能学习设置。",
-  "server.settings.rolesTitle": "角色",
+  "server.settings.rolesTitle": "权限",
   "server.settings.rolesDescription":
     "选择成员可以使用的助手。成员拥有“所有人”和自己所属角色中最高的访问权限。所有者和管理员可以使用所有助手。",
   "server.settings.auditTitle": "审计日志",
@@ -431,6 +431,7 @@ export const messages = {
   "server.roles.memberCount": { other: "{count} 位成员" },
   "server.roles.agentList": "助手：{names}",
   "server.roles.agentLevel": "{role} 对 {agent} 的访问权限",
+  "server.roles.changeInEveryone": "在所有人中更改",
   "server.roles.setAll": "全部设置",
   "server.roles.setAllLabel": "全部设置：{role} 对所有助手的访问权限",
   "server.roles.loadFailed": "无法加载该服务器的角色。",

@@ -11,6 +11,7 @@ import { isChannelAttentionRoute, withChannelAttention } from "./channel-attenti
 import { withChannelDraftIsolation, withChannelIsolation } from "./channel-isolation-v1";
 import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
+import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
@@ -34,6 +35,11 @@ export interface TeamSideRouteOptions {
    * as `channelAttention` is, for a request as for a response.
    */
   channelIsolation?: boolean;
+  /**
+   * mcp-many-servers-v1: a list of MCP servers or of their sign-ins holds up to 100 rows. Passed as
+   * `channelAttention` is.
+   */
+  mcpManyServers?: boolean;
 }
 
 export interface TeamSideRouteCodec {
@@ -58,7 +64,11 @@ const CHANNEL_CODEC: TeamSideRouteCodec = {
       : isolated;
   },
 };
-const MCP_CODEC: TeamSideRouteCodec = { request: mcpRequest, response: mcpResponse };
+const MCP_CODEC: TeamSideRouteCodec = {
+  request: mcpRequest,
+  response: (path, status, value, options) =>
+    options?.mcpManyServers ? mcpManyServersResponse(path, status, value) : mcpResponse(path, status, value),
+};
 const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: storageResponse };
 
 /** The side-protocol codec that owns `path`, or `null` when the negotiated protocol's adapter does. */
@@ -71,7 +81,10 @@ export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
     ? {
         request: (_path, value) => admin.request(value),
         response: (path, status, value, options) => {
-          const projected = admin.response(status, value);
+          const projected =
+            options?.mcpManyServers && status < 400 && isMcpSignInListRoute(path)
+              ? mcpManySignInsResponse(value)
+              : admin.response(status, value);
           return options?.agentTaskUiBlocks && status < 400 ? withAgentTaskUiBlocks(path, projected, value) : projected;
         },
       }
