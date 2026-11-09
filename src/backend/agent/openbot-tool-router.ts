@@ -163,6 +163,7 @@ import {
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
+import { READ_VIDEO_DEFAULT_FRAMES, readVideoToolSchema, type VideoReaderHost } from "./video-reader";
 
 const logger = createOpenBotLogger("openbot-tool-router");
 
@@ -302,6 +303,8 @@ export interface OpenBotToolRouterOptions {
   visualPreview?: ChatVisualPreviewHost | null | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null | undefined;
+  /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
+  videoReader?: VideoReaderHost | null | undefined;
   /** The MCP servers of this OpenBot server, for the MCP tools; null where nothing holds them. */
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
@@ -350,6 +353,7 @@ export class OpenBotToolRouter {
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #screenCapture: ScreenCaptureHost | null;
+  readonly #videoReader: VideoReaderHost | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #feedbackFacts: FeedbackFacts | null;
@@ -392,6 +396,7 @@ export class OpenBotToolRouter {
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
     this.#screenCapture = options.screenCapture ?? null;
+    this.#videoReader = options.videoReader ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#feedbackFacts = options.feedbackFacts ?? null;
@@ -714,8 +719,9 @@ export class OpenBotToolRouter {
             );
             // Both store a file and then add the message that names it.
             if (tool === "attach_files_to_response" || tool === "html_render") yield* Effect.uninterruptible(response);
-            // A side Codex search can take up to two minutes on the user's ChatGPT quota, so Stop ends it.
-            else if (tool === "web_search") {
+            // A side Codex search can take up to two minutes on the user's ChatGPT quota, and a video
+            // download and transcript can take longer, so Stop ends them.
+            else if (tool === "web_search" || tool === "read_video") {
               if (toolRequest.signal?.aborted) return;
               yield* response.pipe(Effect.raceFirst(requestAborted(toolRequest.signal)));
             } else yield* response;
@@ -1332,6 +1338,10 @@ export class OpenBotToolRouter {
       return { success: true, contentItems: [{ type: "inputText", text: answer }] };
     }
 
+    if (params.tool === "read_video") {
+      return yield* this.#readVideo(params);
+    }
+
     if (params.tool === "list_sites") {
       return openBotToolResult(yield* this.#hostedSites.listSites());
     }
@@ -1743,6 +1753,42 @@ export class OpenBotToolRouter {
         ),
         Effect.catchTag("ChatVisualPreviewFailed", (failure) => Effect.succeed(openBotToolFailure(failure.reason))),
       );
+  });
+
+  /**
+   * `read_video`: downloads a public video, and gives the agent its details and transcript as text and
+   * its frames as images. A video that cannot be read is a result the agent can explain or correct.
+   */
+  readonly #readVideo = Effect.fn("OpenBotToolRouter.readVideo")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+  ) {
+    const parsed = readVideoToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const reader = this.#videoReader;
+    if (!reader) return openBotToolFailure("This OpenBot cannot read videos. Use openbot_browser to read the page.");
+    return yield* reader.read({ url: parsed.data.url, frames: parsed.data.frames ?? READ_VIDEO_DEFAULT_FRAMES }).pipe(
+      Effect.map(({ frames, transcriptNote, framesNote, ...details }): DynamicToolResult => {
+        // The notes can hold the text of a voice provider error.
+        const redact = (note: string | null) => (note === null ? null : this.#hooks.redactMcp(note));
+        const text = JSON.stringify({
+          ...details,
+          transcriptNote: redact(transcriptNote),
+          framesNote: redact(framesNote),
+          frameSeconds: frames.map(({ seconds }) => seconds),
+        });
+        return {
+          success: true,
+          contentItems: [
+            { type: "inputText", text },
+            ...frames.map(({ imageUrl }) => ({ type: "inputImage" as const, imageUrl })),
+          ],
+        };
+      }),
+      Effect.catchTag("VideoReadFailed", (failure) =>
+        Effect.succeed(openBotToolFailure(this.#hooks.redactMcp(failure.reason))),
+      ),
+    );
   });
 
   /**

@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Warte, bis die Sprachtranskription endet, und entferne das Modell dann.",
   "error.voice.removeFailed": "Das Sprachmodell konnte nicht entfernt werden. Versuche es erneut.",
   "error.voice.runtimeUnavailable": "Lokale Sprachtranskription ist auf dieser Plattform nicht verfügbar.",
-  "error.voice.busy": "Eine Sprachtranskription läuft bereits.",
   "error.voice.modelUnavailable": "Das Sprachmodell ist nicht verfügbar.",
   "error.voice.transcriptionTimedOut": "Die Zeit für die Sprachtranskription ist abgelaufen.",
   "error.voice.prepareRequired":

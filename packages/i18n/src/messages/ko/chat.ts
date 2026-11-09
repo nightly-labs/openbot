@@ -418,7 +418,6 @@ export const messages = {
   "chat.suggestion.saveReply": "네, 스킬로 저장해 줘.",
   "chat.suggestion.updateReply": "네, 스킬에 추가해 줘.",
   "chat.suggestion.detailsNamed": "마켓플레이스에서 {name} 열기",
-  "chat.suggestion.dismissNamed": "{name} 닫기",
   "chat.suggestion.dismissed": "{name} 추천을 닫았어요.",
   "chat.suggestion.undo": "실행 취소",
   "chat.suggestion.localOnly": "내 컴퓨터의 OpenBot에서 {name}을(를) 연결해 주세요.",

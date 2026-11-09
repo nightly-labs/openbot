@@ -3,6 +3,7 @@ import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
   "uiBlock.status.answered": "已回答",
+  "uiBlock.status.waiting": "等待你操作",
   "uiBlock.outcome.expired": "超时未回答",
   "uiBlock.outcome.closed": "未回答即关闭",
   "uiBlock.outcome.autoAnswered": "{outcome}（无人及时回答）",
@@ -17,9 +18,6 @@ export const messages = {
   "uiBlock.choice.submit": "发送",
   "uiBlock.choice.shortcutHint": "按 {first} 到 {last} 选择",
   "uiBlock.quick.label": "快捷回复",
-  "uiBlock.quick.textLabel": "自己写的回复",
-  "uiBlock.quick.textPlaceholder": "也可以自己输入回复",
-  "uiBlock.quick.send": "发送",
   "uiBlock.form.submit": "提交",
   "uiBlock.form.required": "该项为必填",
   "uiBlock.form.choose": "请选择一个选项",

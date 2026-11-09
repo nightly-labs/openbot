@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Poczekaj na koniec transkrypcji głosu, a potem usuń model.",
   "error.voice.removeFailed": "Nie udało się usunąć modelu głosowego. Spróbuj ponownie.",
   "error.voice.runtimeUnavailable": "Lokalna transkrypcja głosu nie jest dostępna na tej platformie.",
-  "error.voice.busy": "Transkrypcja głosu już trwa.",
   "error.voice.modelUnavailable": "Model głosowy jest niedostępny.",
   "error.voice.transcriptionTimedOut": "Przekroczono limit czasu transkrypcji głosu.",
   "error.voice.prepareRequired":

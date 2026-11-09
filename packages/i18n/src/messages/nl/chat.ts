@@ -428,7 +428,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Ja, sla het op als vaardigheid.",
   "chat.suggestion.updateReply": "Ja, voeg het toe aan de vaardigheid.",
   "chat.suggestion.detailsNamed": "{name} openen in de marktplaats",
-  "chat.suggestion.dismissNamed": "{name} negeren",
   "chat.suggestion.dismissed": "Suggestie {name} genegeerd.",
   "chat.suggestion.undo": "Ongedaan maken",
   "chat.suggestion.localOnly": "Koppel {name} in OpenBot op je eigen computer.",

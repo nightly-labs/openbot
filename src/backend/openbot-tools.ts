@@ -34,6 +34,7 @@ import {
   renameSectionToolSchema,
 } from "./agent/sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
+import { readVideoToolShape } from "./agent/video-reader";
 import { CREATE_WEBHOOK_ROUTINE_TOOL, UPDATE_WEBHOOK_ROUTINE_TOOL } from "./agent/webhook-routine-tool";
 import { START_TASK_TOOL, startTaskToolSchema } from "./agent-tasks/agent-tasks";
 import {
@@ -134,7 +135,6 @@ const uiActionSchema = z.strictObject({
       "The desktop and web apps ask the user again before they send this action. An app that shows only the plain question does not.",
     ),
 });
-const uiOptionSchema = z.strictObject({ id: uiBlockIdSchema, label: uiLabelSchema });
 const uiStringOptionsSchema = (max: number) => z.array(uiLabelSchema).min(1).max(max);
 const uiFormFieldBase = { id: uiBlockIdSchema, required: z.boolean().optional() };
 const uiFormTextField = (kind: "text" | "textarea") =>
@@ -217,12 +217,6 @@ export const askUiToolSchema = z.object({
         .optional(),
       preview: uiTextSchema(UI_BLOCK_LIMITS.preview).optional().describe("Markdown, such as the body of a letter."),
       actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
-    }),
-    z.strictObject({
-      type: z.literal("quick_replies"),
-      title: uiTextSchema(UI_BLOCK_LIMITS.title).optional(),
-      options: z.array(uiOptionSchema).min(1).max(UI_BLOCK_LIMITS.quickReplies),
-      allowText: z.boolean().optional().describe("Show a text box for a reply in the user's own words."),
     }),
     z.strictObject({
       type: z.literal("choice"),
@@ -391,6 +385,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
     shape: webSearchToolSchema.shape,
+  },
+  {
+    name: "read_video",
+    description:
+      "Watch a video link, such as Facebook, Instagram, TikTok, X or YouTube: title, author, counts, description, a timed transcript and still frames. Use it for what a video says or shows. Public videos only.",
+    shape: readVideoToolShape,
   },
   {
     name: "list_sections",
@@ -690,7 +690,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "ask_ui",
     description: [
       "Show the user an interactive block in this conversation and wait for the answer.",
-      "Types: confirm (details, an optional preview, up to 4 buttons), quick_replies (reply chips), choice (one option, or several with multiple), form (a few text, select, segmented or date fields).",
+      "Types: confirm (details, an optional preview, up to 4 buttons), choice (one option, or several with multiple), form (a few text, select, segmented or date fields).",
       "A text field with secret: true asks for a password or a key: you get the value, OpenBot does not store it with the block, and you never repeat it. For an API key or token that a command uses, use request_api_key.",
       'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button or option id, or "submit" for choice and form; values has the option ids under "selected" or the form values by field id;',
       'actionId "_text" with "text" when the user answered in words. Or {"status":"skipped"}, or {"status":"expired"} when the turn ended first.',

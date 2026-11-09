@@ -435,7 +435,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Evet, beceri olarak kaydet.",
   "chat.suggestion.updateReply": "Evet, beceriye ekle.",
   "chat.suggestion.detailsNamed": "{name} uygulamasını Pazaryerinde aç",
-  "chat.suggestion.dismissNamed": "{name} önerisini kapat",
   "chat.suggestion.dismissed": "{name} önerisi kapatıldı.",
   "chat.suggestion.undo": "Geri al",
   "chat.suggestion.localOnly": "{name} bağlantısını kendi bilgisayarınızdaki OpenBot'ta kurun.",

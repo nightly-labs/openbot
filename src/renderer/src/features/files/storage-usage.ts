@@ -177,6 +177,54 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     }
   }
 
+  /**
+   * Runs `run` on the files one at a time and tells `onProgress` how many are done. Resolves with the
+   * number of files that failed.
+   */
+  async function eachFile(
+    files: readonly StoredFileRow[],
+    run: (file: StoredFileRow, serverId: string) => Promise<void>,
+    onProgress: ((done: number) => void) | undefined,
+  ): Promise<number> {
+    const current = target();
+    if (!current) return files.length;
+    let failed = 0;
+    for (const [index, file] of files.entries()) {
+      try {
+        await run(file, current.serverId);
+      } catch {
+        failed += 1;
+      }
+      onProgress?.(index + 1);
+    }
+    return failed;
+  }
+
+  /**
+   * Deletes the files one at a time, so a host with `storage-v1` needs no new route, and scans once at
+   * the end. Resolves with the number of files that could not be deleted.
+   */
+  async function deleteFiles(files: readonly StoredFileRow[], onProgress?: (done: number) => void): Promise<number> {
+    try {
+      return await eachFile(
+        files,
+        (file, serverId) => calls().storage.deleteFile({ fileId: file.id }, serverId),
+        onProgress,
+      );
+    } finally {
+      await refresh(true);
+    }
+  }
+
+  /** Puts the files in the Downloads folder with no dialog. Resolves with the number that could not be saved. */
+  function saveFiles(files: readonly StoredFileRow[], onProgress?: (done: number) => void): Promise<number> {
+    return eachFile(
+      files,
+      (file, serverId) => calls().storage.openFile({ fileId: file.id, action: "save" }, serverId),
+      onProgress,
+    );
+  }
+
   /** Null while nothing went wrong. A host that answered null predates `storage-v1`. */
   function error(): string | null {
     if (state.error) return state.error;
@@ -189,7 +237,7 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     return state.loaded ? "ready" : "scanning";
   }
 
-  return { state, error, scanState, refresh, clear, fileAction };
+  return { state, error, scanState, refresh, clear, fileAction, deleteFiles, saveFiles };
 }
 
 export type StorageUsageResource = ReturnType<typeof createStorageUsage>;

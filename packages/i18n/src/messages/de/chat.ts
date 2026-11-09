@@ -443,7 +443,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Ja, speichere es als Fähigkeit.",
   "chat.suggestion.updateReply": "Ja, füge es der Fähigkeit hinzu.",
   "chat.suggestion.detailsNamed": "{name} im Marketplace öffnen",
-  "chat.suggestion.dismissNamed": "{name} ausblenden",
   "chat.suggestion.dismissed": "Vorschlag für {name} ausgeblendet.",
   "chat.suggestion.undo": "Rückgängig",
   "chat.suggestion.localOnly": "Verbinde {name} in OpenBot auf deinem eigenen Computer.",

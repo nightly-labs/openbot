@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "音声文字起こしが終わってから、モデルを削除してください。",
   "error.voice.removeFailed": "音声モデルを削除できませんでした。もう一度お試しください。",
   "error.voice.runtimeUnavailable": "このプラットフォームではローカル音声文字起こしを使用できません。",
-  "error.voice.busy": "音声文字起こしはすでに実行中です。",
   "error.voice.modelUnavailable": "音声モデルを使用できません。",
   "error.voice.transcriptionTimedOut": "音声文字起こしがタイムアウトしました。",
   "error.voice.prepareRequired":

@@ -97,7 +97,6 @@ export const messages = {
   "vault.request.addLogin": "添加登录信息",
   "vault.request.addCard": "添加银行卡",
   "vault.request.addContact": "添加地址",
-  "vault.request.notNow": "暂不",
   "vault.request.saved": "已保存到保险库",
   "vault.twoStep.title": "两步验证码",
   "vault.twoStep.on": "已开启",

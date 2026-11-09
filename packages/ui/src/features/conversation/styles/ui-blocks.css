@@ -7,17 +7,14 @@
   max-width: 100%;
 }
 
+/* The card has a fixed width, so its content can be a size container for the narrow layout below. */
 .ui-block-card > .ui-block-content {
+  container: ui-block / inline-size;
   display: flex;
   width: 100%;
   flex-direction: column;
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-4) var(--openbot-space-4) var(--openbot-space-3);
-}
-
-/* Only an open block warns: a closed one has nothing left to press. */
-.ui-block-card[data-danger][data-status="pending"] > .ui-block-content {
-  border-color: var(--openbot-danger-border);
 }
 
 .ui-block-card[data-status="expired"],
@@ -56,6 +53,53 @@
   line-height: var(--openbot-leading-md);
 }
 
+/* The status badge of a block: "Waiting for you", or the outcome of a frozen block that shows it in
+   the header (interaction-cards.css draws it). It sits on the title row, so the subtitle keeps the
+   full width of the card. */
+.ui-block-header:has(> .ui-block-status) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--openbot-space-3);
+  row-gap: var(--openbot-space-0-5);
+}
+
+.ui-block-header:has(> .ui-block-status) > .ui-block-heading {
+  display: contents;
+}
+
+.ui-block-header:has(> .ui-block-status):has(> .ui-block-icon) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.ui-block-header:has(> .ui-block-status) > .ui-block-icon {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+}
+
+/* With no subtitle, the icon, the title and the badge share one centered row. */
+.ui-block-header:has(> .ui-block-status):has(> .ui-block-icon):not(:has(.ui-block-subtitle))
+> :is(.ui-block-icon, .ui-block-status) {
+  grid-row: 1;
+  align-self: center;
+}
+
+/* Counted from the end, so the same lines fit a header with and without an icon. */
+.ui-block-header:has(> .ui-block-status) .ui-block-title {
+  grid-row: 1;
+  grid-column: -3 / -2;
+  align-self: center;
+}
+
+.ui-block-header:has(> .ui-block-status) .ui-block-subtitle {
+  grid-column: -3 / -1;
+}
+
+.ui-block-status {
+  grid-row: 1;
+  grid-column: -2 / -1;
+  align-self: start;
+}
+
 .ui-block-body {
   display: flex;
   min-width: 0;
@@ -86,6 +130,93 @@
 .ui-block-footer-select > .ui-select-trigger {
   width: auto;
   max-width: 100%;
+}
+
+/* A short block: the buttons share the title row, and go under it when the card is narrow. A body,
+   an error or an outcome line goes under that row. */
+.ui-block-card[data-inline-actions] > .ui-block-content {
+  flex-flow: row wrap;
+  align-items: center;
+  column-gap: var(--openbot-space-4);
+  padding-block: var(--openbot-space-3);
+}
+
+.ui-block-card[data-inline-actions] > .ui-block-content > .ui-block-header {
+  flex: 1 1 240px;
+}
+
+.ui-block-card[data-inline-actions] > .ui-block-content > .ui-block-card-footer {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.ui-block-card[data-inline-actions] > .ui-block-content > :is(.ui-block-body, .ui-block-error, .ui-block-outcome) {
+  flex-basis: 100%;
+  order: 1;
+}
+
+/* The badge of a short block takes the place of the buttons: the icon and the badge are centered on
+   the title and the subtitle, and the subtitle stops before the badge. */
+.ui-block-card[data-inline-actions]
+  .ui-block-header:has(> .ui-block-status):has(.ui-block-subtitle)
+  > :is(.ui-block-icon, .ui-block-status) {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.ui-block-card[data-inline-actions]
+  .ui-block-header:has(> .ui-block-status):has(.ui-block-subtitle)
+  .ui-block-subtitle {
+  grid-row: 2;
+  grid-column: -3 / -2;
+}
+
+/* A short block keeps the height of a title and a subtitle, so it does not get shorter when a closed
+   block loses its subtitle. */
+.ui-block-card[data-inline-actions] > .ui-block-content > .ui-block-header {
+  min-height: calc(var(--openbot-leading-lg) + var(--openbot-space-0-5) + var(--openbot-leading-md));
+}
+
+/* The badge that replaces the buttons when the person answers or closes the block. */
+.ui-block-card[data-settled] .ui-block-header > .ui-block-status {
+  animation: ui-block-status-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+@keyframes ui-block-status-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* The outcome of a short block takes the place of its buttons, so it has their size and shape, as the
+   Connected button of a Marketplace suggestion. */
+.ui-block-card[data-inline-actions] .ui-block-header > .ui-block-status {
+  height: var(--openbot-control-md);
+  padding-inline: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-pill);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* An answer is a status: the same success fill as Connected. On-light text keeps AA on the dark-theme fill. */
+.ui-block-card[data-inline-actions][data-status="answered"] .ui-block-header > .ui-block-status {
+  border-color: transparent;
+  background: var(--openbot-success);
+  color: var(--openbot-text-on-light);
+}
+
+/* On-light text on the light-theme success fill is 3:1. The darker success-text fill keeps AA. */
+:root[data-openbot-color-scheme="light"]
+  .ui-block-card[data-inline-actions][data-status="answered"]
+  .ui-block-header
+  > .ui-block-status {
+  background: var(--openbot-success-text);
+}
+
+/* Only an open block warns: a closed one has nothing left to press. */
+.ui-block-card[data-danger][data-status="pending"] > .ui-block-content {
+  border-color: var(--openbot-danger-border);
 }
 
 /* The line a frozen block ends with. */
@@ -120,16 +251,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The end of an open block: a failed answer and the skip button. */
-.ui-block-footer {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-2);
-}
-
 .ui-block-error {
   min-width: 0;
   margin: 0;
@@ -139,14 +260,6 @@
   overflow-wrap: anywhere;
 }
 
-.ui-block-footer .ui-block-error {
-  flex: 1 1 auto;
-}
-
-.ui-block-footer .ui-block-skip {
-  margin-inline-start: auto;
-}
-
 .ui-block-actions {
   display: flex;
   flex-wrap: wrap;
@@ -154,13 +267,14 @@
   gap: var(--openbot-space-2);
 }
 
+/* The buttons stay on one row while they fit; in a narrow card, the main one goes to the next row, at the end. */
 .ui-block-card-footer > .ui-block-actions {
-  flex-wrap: nowrap;
   justify-content: flex-end;
   margin-inline-start: auto;
 }
 
-.ui-block-card .ui-block-actions > .ui-button {
+/* Every button of a block is a pill, also one that a block wraps in its own element. */
+.ui-block-card .ui-block-actions .ui-button {
   border-radius: var(--openbot-radius-pill);
   padding-inline: var(--openbot-space-4);
   font-size: var(--openbot-text-md);
@@ -395,46 +509,36 @@
   overflow-wrap: anywhere;
 }
 
-/* Quick replies */
-.ui-block-quick {
-  display: flex;
-  max-width: 600px;
-  flex-direction: column;
-  gap: var(--openbot-space-2);
+/* The last row of an old quick reply block takes an answer in words. */
+.ui-block-option-custom {
+  cursor: text;
 }
 
-.ui-block-quick-title {
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
+.ui-block-option-custom:focus-within {
+  background: var(--openbot-question-option-soft);
 }
 
-.ui-block-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-2);
-}
-
-.ui-block-chip[data-faded] {
-  opacity: 0.35;
-}
-
-.ui-block-chip[data-chosen] {
-  border-color: var(--openbot-accent);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-text-primary);
-  opacity: 1;
-}
-
-.ui-block-quick-text {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-
-.ui-block-quick-text > :first-child {
-  flex: 1 1 auto;
+.ui-block-option-custom-input.ui-input {
+  width: 100%;
   min-width: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: var(--openbot-text-primary);
+  font: inherit;
+}
+
+.ui-block-option-custom-input.ui-input::placeholder {
+  color: var(--openbot-text-muted);
+}
+
+.ui-block-option-custom-input.ui-input:focus,
+.ui-block-option-custom-input.ui-input:focus-visible {
+  outline: 0;
+  box-shadow: none;
 }
 
 /* Form */
@@ -562,5 +666,62 @@
   .ui-block-option-key.ui-kbd,
   .ui-block-hold-fill {
     transition: none;
+  }
+
+  .ui-block-card[data-settled] .ui-block-header > .ui-block-status {
+    animation: none;
+  }
+}
+
+/* A narrow card: the badge goes on its own row under the subtitle, so the title keeps the width of the
+   card, and the buttons fill the rows of the footer, so the main one is not alone at the end. */
+@container ui-block (width < 360px) {
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-header:has(> .ui-block-status) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-header:has(> .ui-block-status):has(> .ui-block-icon) {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-header:has(> .ui-block-status) .ui-block-title {
+    grid-row: 1;
+    grid-column: -2 / -1;
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-header:has(> .ui-block-status) .ui-block-subtitle {
+    grid-row: 2;
+    grid-column: -2 / -1;
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-header:has(> .ui-block-status) > .ui-block-icon {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    align-self: start;
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-header:has(> .ui-block-status) > .ui-block-status {
+    grid-row: 3;
+    grid-column: -2 / -1;
+    justify-self: start;
+    align-self: start;
+    margin-top: var(--openbot-space-1);
+  }
+
+  /* The outcome of a short block stays at the end, where its buttons were. */
+  .ui-block-card.ui-bubble[data-inline-actions]
+    > .ui-block-content
+    > .ui-block-header:has(> .ui-block-status)
+    > .ui-block-status {
+    justify-self: end;
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-card-footer > .ui-block-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .ui-block-card.ui-bubble > .ui-block-content > .ui-block-card-footer > .ui-block-actions > .ui-button {
+    flex: 1 1 auto;
   }
 }

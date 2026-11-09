@@ -64,8 +64,9 @@ export const Failed: Story = {
     },
   },
 };
+// The narrowest chat: a pop-out chat window at its 380px minimum width.
 const renderNarrow: NonNullable<Story["render"]> = (args) => (
-  <div style={{ width: "280px", "max-width": "100%" }}>
+  <div style={{ width: "340px", "max-width": "100%" }}>
     <BrowserSecretCard {...args} />
   </div>
 );

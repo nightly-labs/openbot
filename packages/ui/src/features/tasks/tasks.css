@@ -466,12 +466,6 @@ html.panel-resizing .tasks-page-side {
   --task-list-glyph: 16px;
 }
 
-/* A question or a browser takeover waits: the chat answers it. */
-.tasks-panel-answer-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
 /* A change to a different task: the new task fades in at its place. */
 .tasks-page-side-content[data-entering] {
   animation: tasks-page-side-swap var(--openbot-duration-normal) var(--openbot-ease-out);

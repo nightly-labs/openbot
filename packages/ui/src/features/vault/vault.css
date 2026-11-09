@@ -207,64 +207,14 @@
   color: var(--openbot-danger-text);
 }
 
-/* The chat card that asks for a Vault item: one row, with the outcome below it. */
-.vault-request.conversation-interaction-card {
-  display: grid;
-  width: 100%;
+/* The chat card that asks for a Vault item. The frame is a UiBlockCard (ui-blocks.css). */
+.vault-request {
   max-width: 520px;
-  gap: var(--openbot-space-3);
 }
 
-.vault-request-row {
+.vault-request-logo {
   display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--openbot-space-3);
-}
-
-.vault-request-text {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: var(--openbot-space-0-5);
-}
-
-.vault-request-title {
-  overflow: hidden;
-  margin: 0;
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-md);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-request-detail {
-  overflow: hidden;
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-request:is([data-status="expired"], [data-status="closed"]) .vault-request-title {
-  color: var(--openbot-text-muted);
-}
-
-.vault-request-done {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  gap: var(--openbot-space-1-5);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.vault-request-done svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
 }
 
 /* Two-step codes: the live code of a login and the setup steps of its key. */

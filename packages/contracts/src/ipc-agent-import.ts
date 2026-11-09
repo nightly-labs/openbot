@@ -13,7 +13,7 @@ import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bo
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 /** The Grok Bot page of the ready export agent. */
-export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/gI0XdhhDYPJeyQaqQBC0O";
+export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/pOUBH2kQK8CKvM7nW8stG";
 
 /** The apps OpenBot ships an export skill for. Each is also the `source.app` its export writes. */
 export const AGENT_IMPORT_SKILL_SOURCES = ["grok-bot", "hermes-agent"] as const;

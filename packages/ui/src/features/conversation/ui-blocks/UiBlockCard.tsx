@@ -1,13 +1,26 @@
 import type { UiBlockStatus } from "@openbot/contracts/ui-blocks";
-import { Bubble, BubbleContent, Button, CircleCheck, Clock3, Spinner, X } from "@openbot/ui";
+import {
+  Badge,
+  Bubble,
+  BubbleContent,
+  Button,
+  Check,
+  CircleCheck,
+  Clock3,
+  LoaderCircle,
+  Spinner,
+  X,
+} from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createUniqueId, Match, Show, Switch } from "solid-js";
+import { children, createUniqueId, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
 
 export interface UiBlockCardProps {
-  title?: string | undefined;
-  subtitle?: string | undefined;
+  /** Plain text, or a control such as a link that opens the item. */
+  title?: JSX.Element | undefined;
+  /** Plain text, or text with a bold part, such as the site that a code goes to. */
+  subtitle?: JSX.Element | undefined;
   status: UiBlockStatus;
   /** The line a frozen block shows, such as the chosen button. */
   outcome?: string | undefined;
@@ -17,12 +30,31 @@ export interface UiBlockCardProps {
   danger?: boolean | undefined;
   /** An answer is on its way. */
   busy?: boolean | undefined;
+  /**
+   * Shows "Waiting for you" with a turning loader at the end of the header while the block is open.
+   * The footer's "Sending…" takes its place while an answer is on its way.
+   */
+  waiting?: boolean | undefined;
+  /** The text of the waiting badge, when the block waits for something more exact than "you". */
+  waitingLabel?: string | undefined;
+  /**
+   * Shows the outcome of a frozen block as a badge at the end of the header, in the place of the
+   * waiting badge, and not as a line under the block.
+   */
+  outcomeBadge?: boolean | undefined;
+  /** The body already shows the answer, such as the chosen row: an answered block has no outcome line. */
+  answerInBody?: boolean | undefined;
   /** Why the last answer did not go through. Shown while the block is open. */
   error?: string | undefined;
   /** Closes the open block without an answer. */
   onSkip?: (() => void) | undefined;
   /** The buttons that answer the open block. The footer shows them at its end, after Skip. */
   actions?: JSX.Element | undefined;
+  /**
+   * Puts the buttons on the title row, for a short block with no body. They go to the next line
+   * when the card is too narrow.
+   */
+  inlineActions?: boolean | undefined;
   /** A small control at the start of the footer, such as a choice that goes with the answer. */
   footerStart?: JSX.Element | undefined;
   class?: string | undefined;
@@ -30,19 +62,19 @@ export interface UiBlockCardProps {
   children?: JSX.Element;
 }
 
+function outcomeText(status: UiBlockStatus, outcome: string | undefined, t: ReturnType<typeof useText>["t"]) {
+  // A blank outcome, such as a form of secret fields, still says that the block was answered.
+  if (outcome?.trim()) return outcome;
+  if (status === "answered") return t("uiBlock.status.answered");
+  if (status === "expired") return t("uiBlock.outcome.expired");
+  if (status === "closed") return t("uiBlock.outcome.closed");
+  return "";
+}
+
 /** The line under a frozen block: the answer with a check, or why there is none. */
-export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
+function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
   const { t } = useText();
-  const text = () =>
-    // A blank outcome, such as a form of secret fields, still says that the block was answered.
-    (props.outcome?.trim() ? props.outcome : undefined) ??
-    (props.status === "answered"
-      ? t("uiBlock.status.answered")
-      : props.status === "expired"
-        ? t("uiBlock.outcome.expired")
-        : props.status === "closed"
-          ? t("uiBlock.outcome.closed")
-          : "");
+  const text = () => outcomeText(props.status, props.outcome, t);
   return (
     <Show when={props.status !== "pending" && text() !== ""}>
       <p class="ui-block-outcome" data-status={props.status}>
@@ -63,40 +95,9 @@ export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string 
   );
 }
 
-/** The end of an open block: why the last answer failed, and the button that skips the block. */
-export function UiBlockFooter(props: {
-  status: UiBlockStatus;
-  error?: string | undefined;
-  onSkip?: (() => void) | undefined;
-  busy?: boolean | undefined;
-  disabled?: boolean | undefined;
-}) {
-  const { t } = useText();
-  return (
-    <Show when={props.status === "pending" && (props.error || props.onSkip)}>
-      <div class="ui-block-footer">
-        <Show when={props.error}>
-          <p class="ui-block-error" role="alert">
-            {props.error}
-          </p>
-        </Show>
-        <Show when={props.onSkip}>
-          {(skip) => (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              class="ui-block-skip"
-              disabled={props.busy === true || props.disabled === true}
-              onClick={() => skip()()}
-            >
-              {t("uiBlock.skip")}
-            </Button>
-          )}
-        </Show>
-      </div>
-    </Show>
-  );
+/** Whether resolved JSX has something to show: a control that renders nothing gives no nodes. */
+function filled(nodes: unknown[]): boolean {
+  return nodes.some((node) => node !== undefined && node !== null && node !== false && node !== "");
 }
 
 /**
@@ -107,34 +108,71 @@ export function UiBlockFooter(props: {
 export function UiBlockCard(props: UiBlockCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
+  // Each read of a JSX prop builds its nodes again, so the card resolves each one once.
+  const title = children(() => props.title);
+  const subtitle = children(() => props.subtitle);
+  const icon = children(() => props.icon);
+  const actions = children(() => props.actions);
+  const hasTitle = () => filled(title.toArray());
   const pending = () => props.status === "pending";
+  const waiting = () => props.waiting === true && pending() && props.busy !== true;
+  const headerOutcome = () => props.outcomeBadge === true && !pending();
+  // A block that was open when it appeared and is now answered or closed. Only this change animates:
+  // a closed block in the history shows at once.
+  const openedPending = untrack(() => props.status === "pending");
+  const settled = () => openedPending && !pending();
   return (
     <Bubble
       variant="muted"
       class={cx("ui-block-card", props.class)}
       data-status={props.status}
       data-danger={props.danger ? "" : undefined}
+      data-inline-actions={props.inlineActions ? "" : undefined}
+      data-settled={settled() ? "" : undefined}
       ref={(element: HTMLDivElement) => props.elementRef?.(element)}
     >
       <BubbleContent
         as="article"
         class="ui-block-content"
-        aria-labelledby={props.title ? titleId : undefined}
+        aria-labelledby={hasTitle() ? titleId : undefined}
         aria-busy={props.busy ? "true" : undefined}
       >
-        <Show when={props.title || props.subtitle || props.icon}>
+        <Show when={hasTitle() || filled(subtitle.toArray()) || filled(icon.toArray()) || waiting() || headerOutcome()}>
           <header class="ui-block-header">
-            {props.icon}
+            {icon()}
             <div class="ui-block-heading">
-              <Show when={props.title}>
+              <Show when={hasTitle()}>
                 <h3 id={titleId} class="ui-block-title">
-                  {props.title}
+                  {title()}
                 </h3>
               </Show>
-              <Show when={props.subtitle}>
-                <p class="ui-block-subtitle">{props.subtitle}</p>
+              <Show when={filled(subtitle.toArray())}>
+                <p class="ui-block-subtitle">{subtitle()}</p>
               </Show>
             </div>
+            <Show when={waiting()}>
+              <Badge variant="warning-light" class="ui-block-status conversation-interaction-status" role="status">
+                <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
+                {props.waitingLabel ?? t("uiBlock.status.waiting")}
+              </Badge>
+            </Show>
+            <Show when={headerOutcome()}>
+              <Badge
+                variant={props.status === "answered" ? "success-light" : "outline"}
+                class="ui-block-status conversation-interaction-status"
+                role="status"
+              >
+                <Switch fallback={<X data-icon="inline-start" aria-hidden="true" />}>
+                  <Match when={props.status === "answered"}>
+                    <Check data-icon="inline-start" aria-hidden="true" />
+                  </Match>
+                  <Match when={props.status === "expired"}>
+                    <Clock3 data-icon="inline-start" aria-hidden="true" />
+                  </Match>
+                </Switch>
+                {outcomeText(props.status, props.outcome, t)}
+              </Badge>
+            </Show>
           </header>
         </Show>
         <div class="ui-block-body">{props.children}</div>
@@ -143,7 +181,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
             {props.error}
           </p>
         </Show>
-        <Show when={pending() && (props.actions || props.onSkip)}>
+        <Show when={pending() && (filled(actions.toArray()) || props.onSkip)}>
           <footer class="ui-block-card-footer">
             {props.footerStart}
             <Show when={props.busy}>
@@ -160,6 +198,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
                     variant="secondary"
                     size="sm"
                     class="ui-block-skip"
+                    aria-describedby={hasTitle() ? titleId : undefined}
                     disabled={props.busy === true}
                     onClick={() => skip()()}
                   >
@@ -167,11 +206,13 @@ export function UiBlockCard(props: UiBlockCardProps) {
                   </Button>
                 )}
               </Show>
-              {props.actions}
+              {actions()}
             </span>
           </footer>
         </Show>
-        <UiBlockOutcome status={props.status} outcome={props.outcome} />
+        <Show when={!headerOutcome() && !(props.answerInBody === true && props.status === "answered")}>
+          <UiBlockOutcome status={props.status} outcome={props.outcome} />
+        </Show>
       </BubbleContent>
     </Bubble>
   );

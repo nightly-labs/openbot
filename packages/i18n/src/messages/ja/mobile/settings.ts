@@ -381,5 +381,7 @@ export const messages = {
     "ElevenLabs ではモデルごとに料金が異なります。変更は次の返信から適用されます。",
   "mobile.settings.voice.elevenLabs.model.flash": "最速",
   "mobile.settings.voice.elevenLabs.model.multilingual": "より自然 · 低速",
-  "mobile.settings.voice.elevenLabs.model.v3": "最も表現豊か · 最も低速",
+  "mobile.settings.voice.elevenLabs.model.v3": "表現豊か · 低速",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90以上の言語 · 高速",
+  "mobile.settings.voice.elevenLabs.model.v4": "最高品質 · 90以上の言語 · 低速",
 } as const satisfies PartialTranslation<typeof source>;

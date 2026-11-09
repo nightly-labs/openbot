@@ -59,6 +59,9 @@ export const messages = {
   "agent.dock.writing": "{name} يكتب",
   "agent.dock.empty": "لا توجد رسائل بعد. اكتب إلى {name}.",
   "agent.dock.settings": "إعدادات الشريط",
+  "agent.dock.search": "ابحث عن وكلاء وقنوات",
+  "agent.dock.searchPlaceholder": "بحث",
+  "agent.dock.noMatch": "لا شيء باسم “{query}”",
   "agent.dock.finished.label": "العمل المنجز",
   "agent.dock.finished.result": "{label}، من {name}",
   "agent.dock.finished.more": {

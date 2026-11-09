@@ -380,5 +380,7 @@ export const messages = {
     "ElevenLabs'te her modelin kendi fiyatı vardır. Değişiklik bir sonraki yanıttan itibaren geçerlidir.",
   "mobile.settings.voice.elevenLabs.model.flash": "En hızlı",
   "mobile.settings.voice.elevenLabs.model.multilingual": "Daha doğal · daha yavaş",
-  "mobile.settings.voice.elevenLabs.model.v3": "En etkileyici · en yavaş",
+  "mobile.settings.voice.elevenLabs.model.v3": "Etkileyici · yavaş",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90'dan fazla dil · hızlı",
+  "mobile.settings.voice.elevenLabs.model.v4": "En iyi kalite · 90'dan fazla dil · yavaş",
 } as const satisfies PartialTranslation<typeof source>;
