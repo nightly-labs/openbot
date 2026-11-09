@@ -120,10 +120,16 @@ type LevelOption = AgentAccessLevel | "everyone";
 const EVERYONE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS];
 const ROLE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS, "everyone"];
 
+/** The access that a member of a role gets to an agent: the higher level of the role and of Everyone. */
+function memberLevel(role: AgentAccessLevel, everyone: AgentAccessLevel): AgentAccessLevel {
+  return agentAccessRank(everyone) >= agentAccessRank(role) ? everyone : role;
+}
+
 /**
- * One agent with the level that the open page gives it. On a role page, `everyone` is the level that
- * Everyone gives the agent. A role only adds access, so when Everyone gives as much or more, the row
- * shows that level with "· Everyone", the lower levels are off, and the last item opens Everyone.
+ * One agent with the access that the open page gives. On a role page, `level` is the access that a
+ * member gets and `everyone` is the level that Everyone gives. A role only adds access, so when
+ * Everyone gives the level, the row shows "· Everyone", the lower levels are off, and the last item
+ * opens Everyone.
  */
 function AgentAccessRow(props: {
   agent: RoleAgent;
@@ -136,18 +142,13 @@ function AgentAccessRow(props: {
   onOpenEveryone: () => void;
 }) {
   const { t } = useText();
-  const fromEveryone = () => {
-    const everyone = props.everyone;
-    return everyone !== undefined && everyone !== "none" && agentAccessRank(everyone) >= agentAccessRank(props.level);
-  };
-  const shown = () => {
-    const everyone = props.everyone;
-    return everyone !== undefined && fromEveryone() ? everyone : props.level;
-  };
+  const fromEveryone = () =>
+    props.everyone !== undefined && props.everyone !== "none" && props.level === props.everyone;
   const below = (option: LevelOption) => {
     const everyone = props.everyone;
     return option !== "everyone" && everyone !== undefined && agentAccessRank(option) < agentAccessRank(everyone);
   };
+  const options = () => (props.everyone === undefined ? EVERYONE_OPTIONS : ROLE_OPTIONS);
   return (
     <Item class="settings-modal-row">
       <ItemMedia>
@@ -160,14 +161,14 @@ function AgentAccessRow(props: {
       </ItemContent>
       <ItemActions>
         <Select<LevelOption>
-          options={props.everyone === undefined ? EVERYONE_OPTIONS : ROLE_OPTIONS}
-          value={shown()}
+          options={options()}
+          value={props.level}
           disabled={props.disabled}
           placement="bottom-end"
           optionDisabled={below}
           onChange={(option) => {
             if (option === "everyone") props.onOpenEveryone();
-            else if (option && option !== shown()) props.onChange(option);
+            else if (option && option !== props.level) props.onChange(option);
           }}
           itemComponent={(item) => {
             const option = item.item.rawValue;
@@ -184,7 +185,7 @@ function AgentAccessRow(props: {
             <SelectValue<LevelOption>>
               {() => (
                 <>
-                  {t(LEVEL_LABELS[shown()])}
+                  {t(LEVEL_LABELS[props.level])}
                   <Show when={fromEveryone()}>
                     <span class="server-roles-level-source">
                       {" · "}
@@ -291,9 +292,9 @@ export interface ServerRolesPanelProps {
   onCreate: () => void;
   onRename: (roleId: string, name: string) => void;
   onDelete: (roleId: string) => void;
-  /** Gives `level` to each agent of `agentIds`, in one save. */
-  onSetEveryoneLevel: (agentIds: readonly string[], level: AgentAccessLevel) => void;
-  onSetRoleLevel: (roleId: string, agentIds: readonly string[], level: AgentAccessLevel) => void;
+  /** Gives each agent of `levels` its level, in one save. */
+  onSetEveryoneLevels: (levels: ReadonlyMap<string, AgentAccessLevel>) => void;
+  onSetRoleLevels: (roleId: string, levels: ReadonlyMap<string, AgentAccessLevel>) => void;
 }
 
 /**
@@ -312,56 +313,75 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
   const agentList = (
     title: string,
     level: (agentId: string) => AgentAccessLevel,
-    onChange: (agentIds: readonly string[], level: AgentAccessLevel) => void,
+    onChange: (levels: ReadonlyMap<string, AgentAccessLevel>) => void,
     // On a role page: the level that Everyone gives, so each row shows the access that members get.
     everyone?: (agentId: string) => AgentAccessLevel,
-  ) => (
-    <SettingsSection
-      title={t("server.roles.agents")}
-      actions={
-        props.agents.length > 1 ? (
-          <SetAllLevelsMenu
-            title={title}
-            levels={props.agents.map((agent) => level(agent.id))}
-            disabled={props.disabled}
-            mount={props.menuMount}
-            onChange={(next) => {
-              const changed = props.agents.filter((agent) => level(agent.id) !== next).map((agent) => agent.id);
-              if (changed.length > 0) onChange(changed, next);
-            }}
-          />
-        ) : undefined
+  ) => {
+    const shown = (agentId: string) => {
+      const floor = everyone?.(agentId);
+      return floor === undefined ? level(agentId) : memberLevel(level(agentId), floor);
+    };
+    // A role keeps no level that Everyone gives already. Else the level stays out of sight, and
+    // members still get it after Everyone gives less.
+    const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+      const levels = new Map<string, AgentAccessLevel>();
+      for (const agentId of agentIds) {
+        const floor = everyone?.(agentId);
+        const kept = floor !== undefined && agentAccessRank(next) <= agentAccessRank(floor) ? "none" : next;
+        if (kept !== level(agentId)) levels.set(agentId, kept);
       }
-    >
-      <ItemGroup class="settings-modal-card">
-        <For
-          each={props.agents}
-          fallback={
-            <Item class="server-settings-empty-row">
-              <ItemContent>
-                <Text variant="caption" tone="muted">
-                  {t("server.roles.noAgents")}
-                </Text>
-              </ItemContent>
-            </Item>
-          }
-        >
-          {(agent) => (
-            <AgentAccessRow
-              agent={agent}
-              label={t("server.roles.agentLevel", { role: title, agent: agent.name })}
-              level={level(agent.id)}
-              everyone={everyone?.(agent.id)}
+      if (levels.size > 0) onChange(levels);
+    };
+    return (
+      <SettingsSection
+        title={t("server.roles.agents")}
+        actions={
+          props.agents.length > 1 ? (
+            <SetAllLevelsMenu
+              title={title}
+              levels={props.agents.map((agent) => shown(agent.id))}
               disabled={props.disabled}
-              menuMount={props.menuMount}
-              onChange={(next) => onChange([agent.id], next)}
-              onOpenEveryone={() => props.onPage({ kind: "everyone" })}
+              mount={props.menuMount}
+              onChange={(next) =>
+                give(
+                  props.agents.map((agent) => agent.id),
+                  next,
+                )
+              }
             />
-          )}
-        </For>
-      </ItemGroup>
-    </SettingsSection>
-  );
+          ) : undefined
+        }
+      >
+        <ItemGroup class="settings-modal-card">
+          <For
+            each={props.agents}
+            fallback={
+              <Item class="server-settings-empty-row">
+                <ItemContent>
+                  <Text variant="caption" tone="muted">
+                    {t("server.roles.noAgents")}
+                  </Text>
+                </ItemContent>
+              </Item>
+            }
+          >
+            {(agent) => (
+              <AgentAccessRow
+                agent={agent}
+                label={t("server.roles.agentLevel", { role: title, agent: agent.name })}
+                level={shown(agent.id)}
+                everyone={everyone?.(agent.id)}
+                disabled={props.disabled}
+                menuMount={props.menuMount}
+                onChange={(next) => give([agent.id], next)}
+                onOpenEveryone={() => props.onPage({ kind: "everyone" })}
+              />
+            )}
+          </For>
+        </ItemGroup>
+      </SettingsSection>
+    );
+  };
 
   const list = () => (
     <>
@@ -417,7 +437,7 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
             {agentList(
               t("server.roles.everyone"),
               (agentId) => everyoneLevel(props.everyone, agentId),
-              props.onSetEveryoneLevel,
+              props.onSetEveryoneLevels,
             )}
           </Show>
         }
@@ -443,7 +463,7 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
             {agentList(
               role().name,
               (agentId) => roleLevel(role(), agentId),
-              (agentIds, level) => props.onSetRoleLevel(role().id, agentIds, level),
+              (levels) => props.onSetRoleLevels(role().id, levels),
               (agentId) => everyoneLevel(props.everyone, agentId),
             )}
           </>
