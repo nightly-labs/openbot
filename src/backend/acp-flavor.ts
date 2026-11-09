@@ -1,6 +1,7 @@
 import { win32 } from "node:path";
 import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
@@ -44,8 +45,11 @@ export interface AcpFlavor {
    * decision to the protocol's rules. It is a fixed code; it never carries the error's text.
    */
   failureCause?(error: unknown): CauseCode | null;
-  /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
-  emptyAnswerFailure?(reasoned: boolean): string;
+  /**
+   * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
+   * Absent: such a turn succeeds.
+   */
+  emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
   /**
    * What to do when `session/load` or `session/resume` fails: wait once for a process that still
    * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
@@ -294,14 +298,26 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
     : null;
 }
 
+/**
+ * A custom agent can end a turn as done and send nothing for it, for example when its context is full.
+ * The chat then showed nothing at all (#5110). A turn that sent any update, such as a thought, a plan
+ * or a compaction, shows it, so it still succeeds.
+ */
+function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
+  return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
+}
+
 /** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
-const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAnswerFailure: customEmptyAnswerFailure };
 
 /**
  * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
  * ID, and an agent can reuse omp's error text.
  */
-const CUSTOM_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+const CUSTOM_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: ompSessionNotFound,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+};
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = { omp: OMP_ACP_FLAVOR };
 

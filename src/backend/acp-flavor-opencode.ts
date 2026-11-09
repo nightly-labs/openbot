@@ -184,7 +184,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // turn and logs no error. OpenCode 1.18.31 failed the prompt on a rate limit and on a refused
   // connection; other provider errors can still end here. Do not invent the upstream cause or
   // report that turn as a successful reply.
-  emptyAnswerFailure: (reasoned) =>
+  emptyAnswerFailure: ({ reasoned }) =>
     sourceText(reasoned ? "error.provider.opencodeReasoningWithoutAnswer" : "error.provider.opencodeNoAnswer"),
   restoreFailure: (error, method) => {
     if (method === "resume" && isOpenCodeStarting(error)) return "wait-for-start";
