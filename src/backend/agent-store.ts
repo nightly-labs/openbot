@@ -1134,6 +1134,7 @@ export class AgentStore {
       let relocated = false;
       for (const agent of this.#state.agents) {
         relocated = (yield* this.#reconcileWorkspaceDirectoryEffect(agent)) || relocated;
+        relocated = (yield* this.#rebaseForeignWorkspaceEffect(agent)) || relocated;
         yield* this.#reconcileAvatarDirectoryEffect(agent);
       }
       if (relocated) this.#persist("agent.workspace-relocated");
@@ -1229,6 +1230,40 @@ export class AgentStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible);
+
+  /**
+   * Answers whether the agent's stored workspace path had to change. A database copied from another
+   * computer, or restored for another user, keeps the full workspace path of that home, and the folder
+   * cannot be made here: Windows refuses `mkdir` under another user's folder with `EPERM`, so the agent has
+   * no workspace and no screen can change it. Only an application-made path is changed -- `Agents/<id>` or
+   * `Bots/<id>` outside this computer's OpenBot root -- and only when nothing is there, so a path the
+   * user can still reach keeps its files. No file is moved or deleted.
+   */
+  #rebaseForeignWorkspaceEffect = Effect.fn("AgentStore.rebaseForeignWorkspace")(function* (
+    this: AgentStore,
+    agent: StoredAgent,
+  ): Effect.fn.Return<boolean> {
+    const stored = agent.workspacePath;
+    if (!isApplicationWorkspacePath(stored, agent.id) || isPathInside(dirname(this.#agentsRoot), stored)) return false;
+    const probe = yield* Effect.result(storedIO(() => lstat(stored)));
+    if (Result.isSuccess(probe) || !isRecord(probe.failure.cause) || probe.failure.cause.code !== "ENOENT") {
+      return false;
+    }
+    const targetPath = join(this.#agentsRoot, agent.id);
+    const created = yield* Effect.result(storedIO(() => mkdir(targetPath, { recursive: true, mode: 0o700 })));
+    if (Result.isFailure(created)) {
+      logger.warn(
+        "Could not create the workspace of an agent from another computer.",
+        toLogValue(created.failure.cause),
+      );
+    }
+    logger.warn("An agent workspace path from another computer was changed to this computer.");
+    // An exclusion in the old workspace applies to the same folder in the new one, as for a duplicate.
+    if (agent.excludedFolders)
+      agent.excludedFolders = agent.excludedFolders.map((folder) => rebasedFolder(folder, stored, targetPath));
+    agent.workspacePath = targetPath;
+    return true;
+  });
 
   /**
    * An uploaded avatar lives under the agent id, and `avatarUrl` derives that directory from the id
@@ -1888,6 +1923,30 @@ const probeDirectoryEffect = Effect.fn("AgentStore.probeDirectory")((path: strin
     ),
   ),
 );
+
+/**
+ * Whether a stored workspace has the shape this application gives one: `Agents/<id>`, or `Bots/<id>` from
+ * before the rename. Both separators are read, because the database can come from Windows or from macOS.
+ */
+function isApplicationWorkspacePath(workspacePath: string, agentId: string): boolean {
+  const parts = workspacePath.split(/[\\/]+/);
+  const name = parts.at(-1);
+  const folder = parts.at(-2);
+  if (folder === "Agents") return name === agentId;
+  return folder === "Bots" && (name === agentId || name === legacyAgentId(agentId));
+}
+
+/**
+ * `folder` moved from `from` to `to` when it is inside `from`, else `folder`. A Windows path on macOS or
+ * Linux has no native separator, so its segments are compared when the native check does not match.
+ */
+function rebasedFolder(folder: string, from: string, to: string): string {
+  if (isPathInside(from, folder)) return join(to, relative(from, folder));
+  const fromParts = from.split(/[\\/]+/);
+  const parts = folder.split(/[\\/]+/);
+  const inside = parts.length > fromParts.length && fromParts.every((part, index) => part === parts[index]);
+  return inside ? join(to, ...parts.slice(fromParts.length)) : folder;
+}
 
 function titleFromId(id: string): string {
   return id
