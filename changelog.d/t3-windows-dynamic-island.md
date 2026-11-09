@@ -5,4 +5,4 @@
 
 ### Changed
 
-- While an agent works, the Dynamic Island and the moving agent avatars use less CPU and GPU. The spinner on the island now turns in small steps.
+- While an agent works, the Dynamic Island and the moving agent avatars use less CPU and GPU.

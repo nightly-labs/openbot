@@ -398,15 +398,9 @@
   color: var(--openbot-message-badge-text);
 }
 
-/*
- * The island is on screen for as long as an agent works. A smooth spin makes its window draw a frame on
- * every display refresh: measured on Windows, about 13% of a core in the GPU process. Twelve steps a
- * turn draw 17 frames a second, and the small ring still reads as a spinner.
- */
 .dynamic-island-surface-working-badge .ui-spinner {
   border-color: var(--openbot-success-soft);
   border-top-color: currentColor;
-  animation-timing-function: steps(12);
 }
 
 /* The island is above every app all day. Its spinner turns only while the user looks at it. */
