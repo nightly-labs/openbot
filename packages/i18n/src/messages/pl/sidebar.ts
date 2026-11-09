@@ -102,6 +102,7 @@ export const messages = {
     many: "{count} nowych odpowiedzi",
     other: "{count} nowej odpowiedzi",
   },
+  "sidebar.state.unreadThreads": "Nowe odpowiedzi w wątkach",
   "sidebar.state.waitingQuestion": "Czeka na twoją odpowiedź",
   "sidebar.state.waitingApproval": "Czeka na twoje zatwierdzenie",
   "sidebar.state.waitingTakeover": "Czeka na ciebie w przeglądarce",

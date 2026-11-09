@@ -28,7 +28,11 @@ import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/co
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
-import { useAgentListUnreadCount, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
+import {
+  useAgentListUnreadCount,
+  useAgentListUnreadThreads,
+  useAgentListWaitReason,
+} from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -128,6 +132,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
   const unreadCount = useAgentListUnreadCount(agent.id);
+  const unreadThreads = useAgentListUnreadThreads(agent.id);
   const waitReason = useAgentListWaitReason(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
@@ -146,7 +151,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   // As on the desktop, a wait outranks the unread count in the corner of the avatar.
   const waitBadge = waitReason ? (
     <AgentWaitBadge reason={waitReason} />
-  ) : unreadCount > 0 ? (
+  ) : unreadCount > 0 || unreadThreads ? (
     <AgentUnreadBadge count={unreadCount} avatarSize={54} ringColor={background} />
   ) : null;
   const avatar = (
@@ -165,10 +170,13 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       accessibilityLabel={
         waitReason
           ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : unreadCount > 0
+          : unreadCount > 0 || unreadThreads
             ? t("mobile.agent.list.withState", {
                 label: openLabel,
-                state: t("mobile.agent.list.unread", { count: unreadCount }),
+                state:
+                  unreadCount > 0
+                    ? t("mobile.agent.list.unread", { count: unreadCount })
+                    : t("mobile.agent.list.unreadThreads"),
               })
             : openLabel
       }

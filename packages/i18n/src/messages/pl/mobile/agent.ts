@@ -575,6 +575,7 @@ export const messages = {
     many: "{count} nieprzeczytanych wiadomości",
     other: "{count} nieprzeczytanej wiadomości",
   },
+  "mobile.agent.list.unreadThreads": "Nieprzeczytane wiadomości w wątkach",
   "mobile.agent.list.waiting.title": "Czeka na ciebie",
   "mobile.agent.list.waiting.label": {
     one: "Czeka na ciebie: {count} agent",

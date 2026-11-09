@@ -228,7 +228,9 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
                 </span>
               )}
             </Show>
-            <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+            <Show when={count() > 0}>
+              <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+            </Show>
           </Show>
         </span>
       )}

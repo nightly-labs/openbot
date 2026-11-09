@@ -584,6 +584,7 @@ export const messages = {
     many: "{count} رسالة غير مقروءة",
     other: "{count} رسالة غير مقروءة",
   },
+  "mobile.agent.list.unreadThreads": "رسائل غير مقروءة في السلاسل",
   "mobile.agent.list.waiting.title": "يحتاج إليك",
   "mobile.agent.list.waiting.label": {
     zero: "يحتاج إليك، لا وكلاء",

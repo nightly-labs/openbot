@@ -537,6 +537,7 @@ export const messages = {
   "mobile.agent.list.openPinnedWithTitle": "Angehefteten Chat mit {name} öffnen, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
   "mobile.agent.list.unread": { one: "{count} ungelesene Nachricht", other: "{count} ungelesene Nachrichten" },
+  "mobile.agent.list.unreadThreads": "Ungelesene Nachrichten in Threads",
   "mobile.agent.list.waiting.title": "Braucht dich",
   "mobile.agent.list.waiting.label": { one: "Braucht dich, {count} Agent", other: "Braucht dich, {count} Agenten" },
   "mobile.agent.list.waiting.action.question": "Antworten",

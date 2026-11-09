@@ -86,15 +86,22 @@ export function useAgentListWaitReason(agentId: string) {
 
 /**
  * The unread messages that the home list shows on this agent, as the desktop counts them: those of its
- * own chat and of its side threads. 0 when the person read them all. An unread chat with no count from
- * the host counts as one.
+ * own chat. 0 when the person read them all. An unread chat with no count from the host counts as one.
  */
 export function useAgentListUnreadCount(agentId: string): number {
-  const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
   const own = useAgentUnread(agentId);
   const ownCount = useAgentUnreadCount(agentId);
-  const threads = useAgentThreadUnread(serverId, agentId);
-  return (own ? Math.max(1, ownCount) : 0) + threads;
+  return own ? Math.max(1, ownCount) : 0;
+}
+
+/**
+ * Whether a side thread of this agent, such as a routine's thread, has unread messages. As on the
+ * desktop, they add a badge with no number: a routine that runs each hour would raise a count that
+ * opening the chat cannot clear.
+ */
+export function useAgentListUnreadThreads(agentId: string): boolean {
+  const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
+  return useAgentThreadUnread(serverId, agentId) > 0;
 }
 
 /**

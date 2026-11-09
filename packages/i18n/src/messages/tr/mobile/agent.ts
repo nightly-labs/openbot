@@ -543,6 +543,7 @@ export const messages = {
     one: "{count} okunmamış mesaj",
     other: "{count} okunmamış mesaj",
   },
+  "mobile.agent.list.unreadThreads": "Mesaj dizilerinde okunmamış mesajlar",
   "mobile.agent.list.waiting.title": "Size ihtiyacı var",
   "mobile.agent.list.waiting.label": {
     one: "Size ihtiyacı var, {count} ajan",
