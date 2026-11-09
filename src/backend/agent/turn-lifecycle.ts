@@ -195,8 +195,9 @@ export interface TurnHooks {
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
   /**
-   * Whether a ready backup continues work that a usage limit stopped after it started. An agent set
-   * to ask uses its order too: the turn already started, so there is no moment to ask.
+   * Whether a ready backup, or the ready model the agent left for a limit, continues work that a usage
+   * limit stopped after it started. An agent set to ask uses its order too: the turn already started,
+   * so there is no moment to ask.
    */
   mayContinueOnBackup(agentId: string): boolean;
   /**
@@ -1392,9 +1393,9 @@ export class TurnLifecycle {
                 )?.plan ?? null,
             })
           : null;
-      // After work started, only a ready backup in the agent's order continues it. A turn refused before
-      // work still waits for the reset when no backup is ready. A continuation that a backup refused
-      // before work keeps the earlier provider's work.
+      // After work started, only a ready backup in the agent's order, or the ready model that the agent
+      // left, continues it. A turn refused before work still waits for the reset when no backup is
+      // ready. A continuation that a backup refused before work keeps the earlier provider's work.
       const carriesWork = this.#carriesWork(agentId, turnId, running);
       let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
       if (continuing) {
