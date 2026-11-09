@@ -419,11 +419,10 @@ export function VaultPanel(props: VaultPanelProps) {
   const itemSummary = (item: VaultItemSummary) =>
     [itemDetail(item), item.addedBy ? t("vault.addedBy", { agent: item.addedBy }) : ""].filter(Boolean).join(" · ");
 
-  const keyedLogins = () =>
-    props.state.items
-      .filter((item) => item.kind === "login" && item.hasTwoStep)
-      .map((item) => item.id)
-      .join(",");
+  // A new list after each saved change, so a replaced key loads its code again.
+  const keyedLogins = createMemo(() =>
+    props.state.items.filter((item) => item.kind === "login" && item.hasTwoStep).map((item) => item.id),
+  );
   const twoStepCodes = createSavedTwoStepCodes(() => props.onCodes, keyedLogins);
   const editingCode = () => {
     const item = ui.editing?.item;

@@ -4,7 +4,13 @@
 // setup step and has not saved yet, so the user can check the key on the site before saving it.
 
 import type { VaultTwoStepCodes } from "@openbot/contracts/ipc";
-import { groupedTwoStepCode, parseTwoStepKey, twoStepCode, twoStepRemainingMs } from "@openbot/contracts/two-step-code";
+import {
+  groupedTwoStepCode,
+  parseTwoStepKey,
+  TWO_STEP_KEY_LIMIT,
+  twoStepCode,
+  twoStepRemainingMs,
+} from "@openbot/contracts/two-step-code";
 import {
   Button,
   Copy,
@@ -51,29 +57,35 @@ function createSecondClock(onTick?: (now: number) => void) {
   return now;
 }
 
+/** The time after a failed load before the codes load again. */
+const RETRY_MS = 30_000;
+
 /**
  * The codes of the saved logins, from main. They load again when the first one runs out, and when the
- * set of logins with a key changes.
+ * list of logins with a key is a new one: a saved change can replace the key of a login.
  */
 export function createSavedTwoStepCodes(
   load: () => (() => Promise<VaultTwoStepCodes>) | undefined,
-  keyedLogins: () => string,
+  keyedLogins: () => readonly string[],
 ) {
   const [codes, setCodes] = createSignal<ReadonlyMap<string, LiveTwoStepCode>>(new Map());
-  let loadedFor: string | null = null;
+  let loadedFor: readonly string[] | null = null;
+  let retryAt = 0;
   let loading = false;
   let run = 0;
   const now = createSecondClock((at) => {
     const loader = load();
     const logins = keyedLogins();
-    if (!loader || logins === "") {
+    if (!loader || logins.length === 0) {
       loadedFor = null;
       run++;
       if (codes().size > 0) setCodes(new Map());
       return;
     }
     const expired = [...codes().values()].some((code) => code.expiresAt <= at);
-    if (loading || (loadedFor === logins && !expired)) return;
+    // The same list waits for the first code to run out, or after a failed load for the next try.
+    const waiting = loadedFor === logins && (retryAt > 0 ? at < retryAt : !expired);
+    if (loading || waiting) return;
     loading = true;
     const current = ++run;
     loader()
@@ -81,6 +93,7 @@ export function createSavedTwoStepCodes(
         if (current !== run) return;
         const received = Date.now();
         loadedFor = logins;
+        retryAt = 0;
         setCodes(
           new Map(
             result.codes.map((code) => [
@@ -90,10 +103,11 @@ export function createSavedTwoStepCodes(
           ),
         );
       })
-      // After a failed load the rows show no code until the set of logins changes.
+      // After a failed load the rows show no code until the next try.
       .catch(() => {
         if (current !== run) return;
         loadedFor = logins;
+        retryAt = Date.now() + RETRY_MS;
         setCodes(new Map());
       })
       .finally(() => {
@@ -119,11 +133,16 @@ export function createDraftTwoStepCode(keyText: () => string) {
     }
     if (shown && shown.expiresAt > at && shownKey === current) return;
     const ticket = ++run;
-    void twoStepCode(current, at).then((value) => {
-      if (ticket !== run) return;
-      shownKey = current;
-      setCode({ code: value, period: current.period, expiresAt: at + twoStepRemainingMs(current.period, at) });
-    });
+    twoStepCode(current, at)
+      .then((value) => {
+        if (ticket !== run) return;
+        shownKey = current;
+        setCode({ code: value, period: current.period, expiresAt: at + twoStepRemainingMs(current.period, at) });
+      })
+      // Without Web Crypto (a page that is not a secure context) the check step shows no code.
+      .catch(() => {
+        if (ticket === run) setCode(undefined);
+      });
   });
   return { code, now, valid: () => key() !== null };
 }
@@ -279,7 +298,7 @@ export function TwoStepKeyStep(props: {
         <Input
           autocomplete="off"
           spellcheck={false}
-          maxlength={1024}
+          maxlength={TWO_STEP_KEY_LIMIT}
           placeholder={EXAMPLE_KEY}
           value={props.keyText}
           onValueChange={(value) => {

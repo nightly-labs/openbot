@@ -13,6 +13,7 @@ import {
   twoStepCode,
   twoStepRemainingMs,
 } from "@openbot/contracts/two-step-code";
+import { sourceText } from "@openbot/i18n/source";
 
 function brandOf(number: string): "visa" | "mastercard" | "amex" | "discover" | null {
   if (number.startsWith("4")) return "visa";
@@ -45,7 +46,7 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
       if (input.twoStepKey === "") twoStepKeys.delete(id);
       else if (input.twoStepKey !== undefined) {
         const key = normalizeTwoStepKey(input.twoStepKey);
-        if (!key) throw new Error("This is not a two-step key.");
+        if (!key) throw new Error(sourceText("error.vault.twoStepKeyInvalid"));
         twoStepKeys.set(id, key);
       }
       const { password: _password, twoStepKey: _twoStepKey, ...login } = input;
