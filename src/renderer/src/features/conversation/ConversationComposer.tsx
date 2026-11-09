@@ -351,7 +351,9 @@ export function ConversationComposer() {
       provider,
       resetsAt: window.resetsAt,
       covers,
-      key: JSON.stringify([slot, window.windowDurationMins, window.resetsAt]),
+      // Not the reset time: Codex sends the same window's reset a second or two apart between readings.
+      // A window that ends clears the dismissal below, and the clock ends it when no reading comes.
+      key: JSON.stringify([slot, window.windowDurationMins]),
     };
   });
   const usageNoticeAccount = () => {
