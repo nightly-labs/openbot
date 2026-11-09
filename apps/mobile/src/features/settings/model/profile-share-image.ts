@@ -7,6 +7,7 @@ import {
   PaintStyle,
   type SkCanvas,
   type SkFont,
+  type SkFontMgr,
   Skia,
   StrokeCap,
   StrokeJoin,
@@ -49,9 +50,7 @@ export interface ProfileShareAccount {
   avatarUrl: string | null;
 }
 
-function font(size: number, weight: "500" | "600"): SkFont {
-  return matchFont({ fontFamily: APP_FONT, fontSize: size, fontWeight: weight });
-}
+type MakeFont = (size: number, weight: "500" | "600") => SkFont;
 
 function fill(color: string, alpha = 1) {
   const paint = Skia.Paint();
@@ -124,7 +123,12 @@ function drawLogo(canvas: SkCanvas, x: number, y: number, colors: ProfileShareCo
   canvas.restore();
 }
 
-async function drawHeader(canvas: SkCanvas, account: ProfileShareAccount, colors: ProfileShareColors): Promise<void> {
+async function drawHeader(
+  canvas: SkCanvas,
+  account: ProfileShareAccount,
+  colors: ProfileShareColors,
+  font: MakeFont,
+): Promise<void> {
   const { t } = currentText();
   const cx = PAD + AVATAR / 2;
   const cy = PAD + AVATAR / 2;
@@ -164,7 +168,12 @@ async function drawHeader(canvas: SkCanvas, account: ProfileShareAccount, colors
 }
 
 /** The last `WEEKS` columns of the year, Sunday at the top, with the month above its first week. */
-function drawWeeks(canvas: SkCanvas, days: ProfileStats<{ id: string }>["days"], colors: ProfileShareColors): void {
+function drawWeeks(
+  canvas: SkCanvas,
+  days: ProfileStats<{ id: string }>["days"],
+  colors: ProfileShareColors,
+  font: MakeFont,
+): void {
   const { format } = currentText();
   const last = days.at(-1);
   const visible = days.slice(-(WEEKS * 7 - (6 - (last?.weekday ?? 6))));
@@ -192,7 +201,12 @@ function drawWeeks(canvas: SkCanvas, days: ProfileStats<{ id: string }>["days"],
   });
 }
 
-function drawTiles(canvas: SkCanvas, stats: ProfileStats<{ id: string }>, colors: ProfileShareColors): void {
+function drawTiles(
+  canvas: SkCanvas,
+  stats: ProfileStats<{ id: string }>,
+  colors: ProfileShareColors,
+  font: MakeFont,
+): void {
   const { t, format } = currentText();
   const longDate = (date: string) =>
     format.date(Date.parse(`${date}T00:00:00Z`), { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -233,19 +247,26 @@ function drawTiles(canvas: SkCanvas, stats: ProfileStats<{ id: string }>, colors
   });
 }
 
-/** Draws the activity image and saves it as a PNG file in the cache. The caller deletes the file. */
+/**
+ * Draws the activity image and saves it as a PNG file in the cache. The caller deletes the file.
+ * Android does not give the fonts of the app to the system font manager, so the caller passes the
+ * Inter files in `appFonts`. Without them, Skia uses the system font.
+ */
 export async function renderProfileShareImage(
   account: ProfileShareAccount,
   stats: ProfileStats<{ id: string }>,
   colors: ProfileShareColors,
+  appFonts: SkFontMgr | null,
 ): Promise<File> {
+  const font: MakeFont = (size, weight) =>
+    matchFont({ fontFamily: APP_FONT, fontSize: size, fontWeight: weight }, appFonts ?? undefined);
   const surface = Skia.Surface.Make(WIDTH, HEIGHT);
   if (!surface) throw new Error("The activity image cannot be drawn.");
   const canvas = surface.getCanvas();
   canvas.drawRect(Skia.XYWHRect(0, 0, WIDTH, HEIGHT), fill(colors.surface));
-  await drawHeader(canvas, account, colors);
-  drawWeeks(canvas, stats.days, colors);
-  drawTiles(canvas, stats, colors);
+  await drawHeader(canvas, account, colors, font);
+  drawWeeks(canvas, stats.days, colors, font);
+  drawTiles(canvas, stats, colors, font);
   surface.flush();
   const file = new File(Paths.cache, currentText().t("mobile.settings.profile.share.fileName"));
   if (file.exists) file.delete();

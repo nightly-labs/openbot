@@ -1,4 +1,5 @@
 import { validateProfileName } from "@openbot/contracts/validation";
+import { useFonts } from "@shopify/react-native-skia";
 import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { Typography } from "heroui-native";
@@ -6,6 +7,8 @@ import MonitorSmartphone from "lucide-react-native/icons/monitor-smartphone";
 import { useRef, useState } from "react";
 import { Alert, Keyboard } from "react-native";
 import { useCSSVariable } from "uniwind";
+import interMedium from "@/assets/fonts/inter/Inter-Medium.ttf";
+import interSemiBold from "@/assets/fonts/inter/Inter-SemiBold.ttf";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ProfileActivity } from "@/features/settings/components/profile-activity";
@@ -16,6 +19,7 @@ import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { renderProfileShareImage } from "@/features/settings/model/profile-share-image";
 import { useProfileActivity } from "@/features/settings/model/use-profile-activity";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import { APP_FONT } from "@/shared/lib/app-font";
 import { haptics } from "@/shared/lib/haptics";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
@@ -40,6 +44,7 @@ export function ProfileSettingsScreen() {
     logo: String(useCSSVariable("--openbot-logo-production")),
     logoEye: String(useCSSVariable("--openbot-logo-eye")),
   };
+  const shareFonts = useFonts({ [APP_FONT]: [interMedium, interSemiBold] });
   if (!session) return null;
   const busy = pendingAction !== null;
   const name = draftName ?? savedName;
@@ -101,7 +106,7 @@ export function ProfileSettingsScreen() {
 
   async function share(current: NonNullable<typeof shareStats>): Promise<void> {
     if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.settings.support.sharingUnavailable"));
-    const file = await renderProfileShareImage({ name: savedName, avatarUrl }, current, shareColors);
+    const file = await renderProfileShareImage({ name: savedName, avatarUrl }, current, shareColors, shareFonts);
     try {
       await Sharing.shareAsync(file.uri, {
         mimeType: "image/png",
