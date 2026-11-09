@@ -44,6 +44,10 @@
     --openbot-accent-text: #5b52df;
     --openbot-logo-production: #cdadec;
     --openbot-logo-eye: #040007;
+    --openbot-paper: #f0f0f0;
+    --openbot-paper-text: #141414;
+    --openbot-paper-text-muted: rgba(20, 20, 20, 0.52);
+    --openbot-paper-border: rgba(20, 20, 20, 0.14);
     --openbot-success: #32a85d;
     --openbot-warning: #c58a23;
     --openbot-danger: #d85f58;
@@ -114,6 +118,10 @@
     --openbot-accent-text: #42a0ff;
     --openbot-logo-production: #d6adf2;
     --openbot-logo-eye: #040007;
+    --openbot-paper: #f0f0f0;
+    --openbot-paper-text: #141414;
+    --openbot-paper-text-muted: rgba(20, 20, 20, 0.52);
+    --openbot-paper-border: rgba(20, 20, 20, 0.14);
     --openbot-success: #31cf76;
     --openbot-warning: #ff9412;
     --openbot-danger: #fd2f3b;

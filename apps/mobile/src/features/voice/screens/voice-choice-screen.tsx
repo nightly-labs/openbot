@@ -93,8 +93,9 @@ export function VoiceChoiceScreen() {
         select: () => saveVoiceSettings({ supertonicVoice: voice }),
       }));
   const canPreview = elevenLabs ? settings.hasElevenLabsKey : modelReady;
-  const failure =
-    voices.failure === "missing-voices-permission"
+  const failure = voices.reason
+    ? t("mobile.settings.voice.elevenLabs.refused", { reason: voices.reason })
+    : voices.failure === "missing-voices-permission"
       ? t("mobile.settings.voice.elevenLabs.missingVoicesPermission")
       : voices.failure === "invalid-key"
         ? t("mobile.chat.liveVoice.elevenLabsKeyInvalid")
