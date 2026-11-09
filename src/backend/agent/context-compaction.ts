@@ -169,6 +169,11 @@ export class ContextCompaction {
     this.#isStopping = options.isStopping;
   }
 
+  /** How long a started compaction runs before OpenBot stops it. */
+  get runTimeoutMs(): number {
+    return this.#runTimeoutMs;
+  }
+
   /** Only personal sessions appear in the desktop snapshot; execution threads remain separate. */
   snapshot(): AgentContextState[] {
     return this.#store.list().flatMap((agent) => {

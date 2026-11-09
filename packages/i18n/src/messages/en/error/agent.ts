@@ -73,6 +73,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.endpointRemoved": "The endpoint this agent used was removed. Choose another model for it.",
   "error.agent.turnStalled":
     "{provider} stopped responding, so OpenBot ended this turn. Send the message again, or choose another model.",
+  "error.agent.compactionConnectionLost":
+    "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection, then send a message to continue.",
   "error.agent.selectedGone": "The selected agent no longer exists.",
   "error.agent.profileEndpointsChanged": "The custom endpoints changed while this was generating. Try again.",
   "error.agent.profileInvalid": "The provider returned an invalid profile. Try revising your prompt.",

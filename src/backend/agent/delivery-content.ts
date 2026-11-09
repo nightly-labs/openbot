@@ -397,6 +397,14 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
   ].join("\n");
 }
 
+/** The note for a turn that a failed compaction stopped: the connection failed or stopped during it. */
+export function compactionContinuationPrompt(): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn stopped because the connection failed while your context was compacted.",
+    "Continue the work now, from where you stopped. Do not repeat finished work or restate earlier answers. Check the result of an action that was interrupted before you do it again. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+  ].join("\n");
+}
+
 /**
  * The provider input for a turn that starts with several deliveries: all the answers to one request,
  * or the answers that wait when the person writes. The texts become one text item, so a history

@@ -84,6 +84,8 @@ export const messages = {
     "Le point de terminaison utilisé par cet agent a été supprimé. Choisissez un autre modèle pour lui.",
   "error.agent.turnStalled":
     "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
+  "error.agent.compactionConnectionLost":
+    "La connexion s’est interrompue pendant que l’agent compactait son contexte, la tâche s’est donc arrêtée. Vérifiez votre connexion internet, puis envoyez un message pour continuer.",
   "error.agent.selectedGone": "L’agent sélectionné n’existe plus.",
   "error.agent.profileEndpointsChanged":
     "Les points de terminaison personnalisés ont changé pendant la génération. Réessayez.",

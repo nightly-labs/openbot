@@ -453,6 +453,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-hung-app-server
 
+      - name: Run the Codex mid-turn compaction E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-midturn-compaction
+
       - name: Run the Codex missing rollout backfill E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-missing-rollout
@@ -685,6 +689,7 @@ jobs:
             .openbot-build/codex-subagent-steps-e2e/
             .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
+            .openbot-build/codex-midturn-compaction-e2e/
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-idle-thread-release-e2e/
             .openbot-build/codex-usage-metering-e2e/

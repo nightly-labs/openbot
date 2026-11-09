@@ -77,6 +77,8 @@ export const messages = {
   "error.agent.endpointRemoved": "O endpoint usado por este agente foi removido. Escolha outro modelo para ele.",
   "error.agent.turnStalled":
     "{provider} parou de responder, então o OpenBot encerrou este turno. Envie a mensagem novamente ou escolha outro modelo.",
+  "error.agent.compactionConnectionLost":
+    "A conexão parou enquanto o agente compactava o contexto, então a tarefa parou. Verifique sua conexão com a internet e envie uma mensagem para continuar.",
   "error.agent.selectedGone": "O agente selecionado não existe mais.",
   "error.agent.profileEndpointsChanged": "Os endpoints personalizados mudaram durante a geração. Tente novamente.",
   "error.agent.profileInvalid": "O provedor retornou um perfil inválido. Tente reformular seu pedido.",
