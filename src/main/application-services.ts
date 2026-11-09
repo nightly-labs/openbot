@@ -255,7 +255,7 @@ import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
-import { ozonePlatformArguments } from "./linux-wayland-output";
+import { aboveAppsWindowKind, ozonePlatformArguments } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -1059,8 +1059,9 @@ export async function createApplicationServices({
   // two lazy getters, so the gap is visible and bounded.
   let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
     null;
+  const windowKind = aboveAppsWindowKind(Boolean(hostedServer || serverModeEnvironment || localServerChild));
   const dynamicIsland = new DynamicIslandWindowController({
-    platform: process.platform,
+    windowKind,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
     // Only the dev server build starts with the island off, the same builds as the agent dock default.
     ...(process.env.ELECTRON_RENDERER_URL
@@ -1091,7 +1092,7 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
   const agentDock = new AgentDockWindowController({
-    platform: process.platform,
+    windowKind,
     createWindow: createAgentDockWindow,
     loadWindow: loadAgentDockRenderer,
     screen,

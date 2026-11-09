@@ -63,26 +63,55 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 
 /**
  * Where this window shows the dock. Null hides the dock: the user turned it off, the platform is not
- * known yet, or it is not macOS or Windows.
+ * known yet, or it has no dock. On Linux with Wayland windows, the dock above other apps waits for a
+ * start on XWayland, and shows in the window until then.
  */
 export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const platform = usePlatform();
   const preference = useAgentDockPreference();
   return () => {
-    const os = platform.appInfo()?.platform;
-    if ((os !== "darwin" && os !== "win32") || !preference().shown) return null;
-    return preference().placement;
+    const info = platform.appInfo();
+    if (!info || !preference().shown) return null;
+    const placement = preference().placement;
+    return placement === "screen" && info.aboveAppsSupport ? "window" : placement;
   };
 }
 
 /**
- * The agent dock of the active server, on macOS and Windows. Each server has its own dock. By default the dock
+ * The agent dock of the active server, on macOS, Windows and Linux. Each server has its own dock. By default the dock
  * is a window of its own at the right edge of the screen, above the other apps; this renderer publishes
  * what it shows. The user can keep it in the main window instead.
  */
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
+  const platform = usePlatform();
+  const preference = useAgentDockPreference();
+
+  /* Linux: a dock that is off or in the window does not need XWayland, so the next start on a Wayland
+     session uses Wayland again. A dock that the user turns on again on XWayland keeps it; a dock that
+     was on at start does not, so a start on XWayland for another reason stays a single start. On
+     Wayland, only the restart in the settings turns it on. */
+  let wasOn: boolean | undefined;
+  createEffect(
+    () => {
+      const info = platform.appInfo();
+      if (info?.platform !== "linux") return undefined;
+      return {
+        on: preference().shown && preference().placement === "screen",
+        onWayland: info.aboveAppsSupport !== undefined,
+      };
+    },
+    (state) => {
+      if (state === undefined) return;
+      const turnedOn = state.on && wasOn === false;
+      wasOn = state.on;
+      if (state.on && (!turnedOn || state.onWayland)) return;
+      void agentDockPort()
+        .agentDock.setXWayland({ enabled: state.on })
+        .catch(() => undefined);
+    },
+  );
 
   /* The window hides when no server is active, when the dock is off or in the main window, and when
      this renderer goes away. */

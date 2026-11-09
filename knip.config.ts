@@ -58,6 +58,16 @@ const config: KnipConfig = {
     "xcode-select",
     "sips",
     "iconutil",
+    // Run the X11 desktop, the window manager, the compositor, the screen recording and the screenshots
+    // of the Linux agent dock and Dynamic Island E2E scripts in Docker.
+    "Xvfb",
+    "xdpyinfo",
+    "openbox",
+    "wmctrl",
+    "picom",
+    "ffmpeg",
+    "gdbus",
+    "import",
   ],
   workspaces: {
     ".": {

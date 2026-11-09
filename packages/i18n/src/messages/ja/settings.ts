@@ -202,6 +202,12 @@ export const messages = {
   "settings.notch.show.title": "MacBook のノッチに状況を表示する",
   "settings.notch.show.titleTopOfScreen": "画面上部に状況を表示する",
   "settings.notch.show.description": "エージェントの動作と対応が必要な項目を各ディスプレイの上部に表示します。",
+  "settings.notch.xwayland.title": "再起動が必要です",
+  "settings.notch.xwayland.description":
+    "Wayland では、ほかのアプリの上に Dynamic Island を表示するために OpenBot が XWayland を使う必要があります。それまでは、アイランドは表示されません。",
+  "settings.notch.xwayland.unsupported":
+    "XWayland のない Wayland では、Dynamic Island をほかのアプリの上に表示できません。",
+  "settings.notch.xwayland.restart": "再起動",
   "settings.notch.idle.title": "待機中のアイランドを表示する",
   "settings.notch.idle.description": "表示する状況がないときに OpenBot のロゴとあいさつを表示します。",
   "settings.notch.displays.title": "追加のディスプレイにも表示する",
@@ -226,6 +232,12 @@ export const messages = {
     "「他のアプリの上」にすると、OpenBot がバックグラウンドのときもドックが表示されます。",
   "settings.agentDock.placement.screen": "他のアプリの上",
   "settings.agentDock.placement.window": "OpenBot のウィンドウ内",
+  "settings.agentDock.xwayland.title": "再起動が必要です",
+  "settings.agentDock.xwayland.description":
+    "Wayland では、ほかのアプリの上にドックを表示するために OpenBot が XWayland を使う必要があります。それまでは、ドックは OpenBot のウィンドウ内に表示されます。",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland のない Wayland では、ドックをほかのアプリの上に表示できません。OpenBot のウィンドウ内に表示されます。",
+  "settings.agentDock.xwayland.restart": "再起動",
   "settings.agentDock.display.title": "ディスプレイ",
   "settings.agentDock.display.description":
     "そのディスプレイが接続されていない場合、ドックは OpenBot ウィンドウのディスプレイに表示されます。",

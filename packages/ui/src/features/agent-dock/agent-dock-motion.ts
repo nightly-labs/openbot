@@ -302,8 +302,11 @@ export class Spring {
   }
 }
 
-/** Steps every spring each frame and calls `render`, until all of them rest. */
-export function createMotion(render: () => void) {
+/**
+ * Steps every spring each frame and calls `render`, until all of them rest. `onActivity` is told when
+ * the springs start to move and when all of them rest again.
+ */
+export function createMotion(render: () => void, onActivity?: (moving: boolean) => void) {
   const springs = new Set<Spring>();
   let frame = 0;
   let last = 0;
@@ -319,6 +322,7 @@ export function createMotion(render: () => void) {
     }
     render();
     frame = moving ? requestAnimationFrame(tick) : 0;
+    if (!moving) onActivity?.(false);
   };
   return {
     spring(value: number, config: SpringConfig) {
@@ -333,6 +337,7 @@ export function createMotion(render: () => void) {
       if (frame) return;
       last = performance.now();
       frame = requestAnimationFrame(tick);
+      onActivity?.(true);
     },
     stop() {
       cancelAnimationFrame(frame);

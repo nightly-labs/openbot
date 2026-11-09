@@ -214,6 +214,12 @@ export const messages = {
   "settings.notch.show.titleTopOfScreen": "Afficher l’état en haut de l’écran",
   "settings.notch.show.description":
     "Afficher l’activité des agents et les éléments nécessitant votre attention en haut de chaque écran.",
+  "settings.notch.xwayland.title": "Redémarrage requis",
+  "settings.notch.xwayland.description":
+    "Sous Wayland, OpenBot doit utiliser XWayland pour afficher l’îlot dynamique au-dessus des autres apps. D’ici là, l’îlot ne s’affiche pas.",
+  "settings.notch.xwayland.unsupported":
+    "Sous Wayland sans XWayland, l’îlot dynamique ne peut pas s’afficher au-dessus des autres apps.",
+  "settings.notch.xwayland.restart": "Redémarrer",
   "settings.notch.idle.title": "Afficher l’îlot au repos",
   "settings.notch.idle.description": "Afficher le logo OpenBot et un message d’accueil lorsqu’aucun état n’est actif.",
   "settings.notch.displays.title": "Afficher sur les écrans supplémentaires",
@@ -239,6 +245,12 @@ export const messages = {
     "« Au-dessus des autres apps » garde le dock à l’écran quand OpenBot est en arrière-plan.",
   "settings.agentDock.placement.screen": "Au-dessus des autres apps",
   "settings.agentDock.placement.window": "Dans la fenêtre OpenBot",
+  "settings.agentDock.xwayland.title": "Redémarrage requis",
+  "settings.agentDock.xwayland.description":
+    "Sous Wayland, OpenBot doit utiliser XWayland pour afficher le dock au-dessus des autres apps. D’ici là, le dock s’affiche dans la fenêtre OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "Sous Wayland sans XWayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
+  "settings.agentDock.xwayland.restart": "Redémarrer",
   "settings.agentDock.display.title": "Écran",
   "settings.agentDock.display.description":
     "Si cet écran n’est pas connecté, le dock passe sur l’écran de la fenêtre OpenBot.",

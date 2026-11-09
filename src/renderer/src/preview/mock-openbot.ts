@@ -1351,6 +1351,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       performAction: async () => undefined,
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
+      setInputRegion: async () => undefined,
+      setXWayland: async () => undefined,
       onCloseChat: () => () => undefined,
       listDisplays: async () => [{ id: 1, label: "Built-in Retina Display", primary: true, internal: true }],
       drag: async () => undefined,
@@ -1374,6 +1376,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       performHaptic: async () => undefined,
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
+      setInputRegion: async () => undefined,
+      setXWayland: async () => undefined,
     },
     // The preview has no Apple apps to ask, so every app answers as allowed.
     macAutomation: {

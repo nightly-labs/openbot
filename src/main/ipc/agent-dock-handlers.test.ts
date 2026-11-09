@@ -3,6 +3,7 @@
 import type {
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockInputRect,
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
 } from "@openbot/contracts/ipc";
@@ -96,6 +97,8 @@ function register() {
   const actions: Array<[number, AgentDockAction]> = [];
   const interactive: Array<[number, SetAgentDockInteractiveInput]> = [];
   const drags: Array<[number, AgentDockDragPhase]> = [];
+  const regions: Array<[number, AgentDockInputRect[]]> = [];
+  const xwayland: boolean[] = [];
   const { agentDock } = agentDockIpcHandlers({
     agentDock: {
       mainRendererIds: new Set([MAIN_ID]),
@@ -112,11 +115,18 @@ function register() {
       setInteractive: (rendererId, input) => {
         interactive.push([rendererId, input]);
       },
+      setInputRegion: (rendererId, rects) => {
+        regions.push([rendererId, rects]);
+      },
       listDisplays: () => DISPLAYS,
       drag: (rendererId, phase) => {
         drags.push([rendererId, phase]);
       },
     },
+    setXWayland: (enabled) =>
+      Effect.sync(() => {
+        xwayland.push(enabled);
+      }),
   });
   for (const [name, bind] of Object.entries(agentDock)) bind(`agentDock:${name}`);
   const call = (name: string, senderId: number, payload?: unknown) => {
@@ -124,7 +134,7 @@ function register() {
     if (!listener) throw new Error(`No handler for ${name}.`);
     return listener(event(senderId), payload);
   };
-  return { published, actions, interactive, drags, call };
+  return { published, actions, interactive, drags, regions, xwayland, call };
 }
 
 beforeEach(() => registrations.clear());
@@ -188,6 +198,44 @@ describe("agent dock handlers", () => {
       [DOCK_ID, "move"],
       [DOCK_ID, "end"],
     ]);
+  });
+
+  it("takes the input region only from the dock window, with whole px inside the limits", () => {
+    const { regions, call } = register();
+    const shape = [{ x: 0, y: 40, width: 120, height: 400 }];
+    expect(() => call("setInputRegion", MAIN_ID, shape)).toThrow("outside the agent dock window");
+    expect(() => call("setInputRegion", OTHER_ID, shape)).toThrow("outside the agent dock window");
+    const wrong = [
+      { x: 0, y: 0, width: 0, height: 10 },
+      { x: -1, y: 0, width: 10, height: 10 },
+      { x: 0.5, y: 0, width: 10, height: 10 },
+      { x: 0, y: 0, width: 10 },
+    ];
+    for (const rect of wrong) expect(() => call("setInputRegion", DOCK_ID, [rect])).toThrow("input region is invalid");
+    expect(() =>
+      call(
+        "setInputRegion",
+        DOCK_ID,
+        Array.from({ length: 9 }, () => shape[0]),
+      ),
+    ).toThrow("input region is invalid");
+    call("setInputRegion", DOCK_ID, shape);
+    call("setInputRegion", DOCK_ID, []);
+    expect(regions).toEqual([
+      [DOCK_ID, shape],
+      [DOCK_ID, []],
+    ]);
+  });
+
+  it("starts on XWayland only for the main renderer, with a boolean state", async () => {
+    const { xwayland, call } = register();
+    expect(() => call("setXWayland", DOCK_ID, { enabled: true })).toThrow("outside the main renderer");
+    expect(() => call("setXWayland", OTHER_ID, { enabled: true })).toThrow("outside the main renderer");
+    expect(() => call("setXWayland", MAIN_ID, { enabled: "yes" })).toThrow("XWayland state is required");
+    expect(() => call("setXWayland", MAIN_ID, true)).toThrow("XWayland state is required");
+    await call("setXWayland", MAIN_ID, { enabled: true });
+    await call("setXWayland", MAIN_ID, { enabled: false });
+    expect(xwayland).toEqual([true, false]);
   });
 
   it("checks the sender before it decodes the payload", () => {

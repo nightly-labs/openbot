@@ -63,9 +63,11 @@ import type {
   AgentDockAction,
   AgentDockDisplayInfo,
   AgentDockDragPhase,
+  AgentDockInputRect,
   AgentDockOffset,
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
+  SetAgentDockXWaylandInput,
 } from "./ipc-agent-dock";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
@@ -998,6 +1000,10 @@ export const IPC_ENDPOINTS = {
     performHaptic: request<undefined, void>()("dynamic-island:perform-haptic"),
     action: event<DynamicIslandAction>()("dynamic-island:action"),
     setInteractive: request<SetDynamicIslandInteractiveInput, void>()("dynamic-island:set-interactive"),
+    /** X11: the parts of the island window that take the pointer and show, as for the agent dock. */
+    setInputRegion: request<AgentDockInputRect[], void>()("dynamic-island:set-input-region"),
+    /** On Wayland, starts OpenBot again on XWayland at each start, so the island shows above other apps. */
+    setXWayland: request<SetAgentDockXWaylandInput, void>()("dynamic-island:set-xwayland"),
   },
   /**
    * The dock over a local page. The main renderer publishes it and does its actions; the overlay view
@@ -1026,6 +1032,9 @@ export const IPC_ENDPOINTS = {
     performAction: request<AgentDockAction, void>()("agent-dock:perform-action"),
     action: event<AgentDockAction>()("agent-dock:action"),
     setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
+    /** Linux: the parts of the window that take the pointer. Clicks elsewhere go to the apps under it. */
+    setInputRegion: request<AgentDockInputRect[], void>()("agent-dock:set-input-region"),
+    setXWayland: request<SetAgentDockXWaylandInput, void>()("agent-dock:set-xwayland"),
     /** Closes the chat of a dock window, because the dock on another display opened a chat. */
     closeChat: event<undefined>()("agent-dock:close-chat"),
     /** The connected displays, for the display setting of the dock. */
