@@ -113,6 +113,12 @@ export function readDevelopmentState(projectRoot: string): DevelopmentState {
   }
 }
 
+/** Reads the effective default state for a dry run without creating or changing files. */
+export function readDevelopmentStateForDryRun(projectRoot: string): DevelopmentState {
+  const paths = developmentStatePaths(projectRoot);
+  return readStateIfPresent(paths.state, false) ?? createInitialState();
+}
+
 /**
  * Applies explicit local development overrides and publishes them as one atomic state update.
  * `undefined` and `null` remove an override. The writer takes an exclusive lock and therefore
@@ -189,7 +195,7 @@ function createInitialState(): DevelopmentState {
   };
 }
 
-function readStateIfPresent(path: string): DevelopmentState | undefined {
+function readStateIfPresent(path: string, repairPermissions = true): DevelopmentState | undefined {
   if (!existsSync(path)) return undefined;
   assertRegularPrivateFile(path, "development state");
   let parsed: unknown;
@@ -203,7 +209,7 @@ function readStateIfPresent(path: string): DevelopmentState | undefined {
       "The development state file has an invalid format. Restore .openbot/dev-state.json before continuing.",
     );
   }
-  chmodSync(path, 0o600);
+  if (repairPermissions) chmodSync(path, 0o600);
   return parsed;
 }
 
