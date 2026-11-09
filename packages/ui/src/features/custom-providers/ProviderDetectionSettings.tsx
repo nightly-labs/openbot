@@ -1,6 +1,6 @@
 import { isDetectionFolder, PROVIDER_DETECTION_LIMITS } from "@openbot/contracts/ipc";
 import { ItemGroup, SettingsSection, SwitchField, Text } from "@openbot/ui";
-import { createStore, Show, untrack } from "solid-js";
+import { createStore, flush, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { endpointUrlError } from "./custom-provider-form";
 import { RepeatableRows } from "./RepeatableRows";
@@ -55,6 +55,8 @@ export function ProviderDetectionSettings(props: ProviderDetectionSettingsProps)
     setLists((state) => {
       change(state[list]);
     });
+    // A store write shows only after a flush, and `publish` reads the rows.
+    flush();
     publish();
   };
 
