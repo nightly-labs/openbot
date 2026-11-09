@@ -51,6 +51,11 @@ export interface AcpFlavor {
    */
   emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
   /**
+   * The failure text of a prompt that the agent failed because the model gave no answer. The turn
+   * then ends as a turn with no answer does, not with the agent's own error text.
+   */
+  emptyAnswerError?: RegExp;
+  /**
    * What to do when `session/load` or `session/resume` fails: wait once for a process that still
    * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
    */
@@ -196,6 +201,9 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
  */
 export const GROK_ACP_FLAVOR: AcpFlavor = {
   promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
+  // Grok CLI 1.0.77 fails the prompt when the model sends only its reasoning: `Internal error:
+  // "empty response from model (reasoning_only)"` (#6073).
+  emptyAnswerError: /\bempty response from model\b/u,
 };
 
 /**
