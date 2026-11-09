@@ -120,6 +120,8 @@ export const messages = {
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
   "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
+  "provider.picker.museNoModels":
+    "Muse bu hesap için model göndermedi. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir. Başka bir sağlayıcıdan model seçin.",
   "provider.picker.customEmpty":
     "OpenAI uyumlu bir uç nokta ekleyin — bu bilgisayardaki bir model sunucusu veya bir temel URL ve anahtara sahip herhangi bir hizmet.",
   "provider.picker.customPending":

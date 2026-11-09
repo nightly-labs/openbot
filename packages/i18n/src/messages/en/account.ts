@@ -39,6 +39,7 @@ export const messages = defineMessages("account", {
   "account.usage.window.otherModels": "Other models",
   "account.usage.window.total": "Total",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} left",
   "account.update.failedRetry": "Update failed. Try again.",
   "account.update.managedByHost": "Managed by host",
   "account.update.restart": "Restart",

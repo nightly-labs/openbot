@@ -28,13 +28,16 @@ import { clearElevenLabsVoices, loadElevenLabsVoices, useElevenLabsVoices } from
 import { liveVoiceWebRtc } from "../model/live-voice-webrtc";
 import type { ModelDownload, ModelState } from "../model/model-download";
 import {
-  checkParakeetModels,
-  type ParakeetEngine,
-  parakeetModelOf,
-  parakeetSupported,
+  checkRecognitionModels,
+  isLocalRecognition,
+  type LocalRecognition,
+  localModelOf,
+  localRecognitionInBinary,
+  localRecognitionSupported,
   useParakeetModel,
   useParakeetUnifiedModel,
-} from "../model/parakeet-model";
+  useQwenModel,
+} from "../model/recognition-models";
 import { canChangeReplySpeed } from "../model/reply-voice";
 import { speechNative } from "../model/speech-native";
 import { supertonicModel, useSupertonicModel } from "../model/supertonic-model";
@@ -102,39 +105,62 @@ function useCheckMark() {
   return (checked: boolean) => (checked ? <Check size={18} color={accent} strokeWidth={2} /> : null);
 }
 
+/** The text of each recognizer that runs on the phone: its name, its ready status and its footer. */
+const LOCAL_RECOGNITION_TEXT = {
+  parakeet: {
+    name: "mobile.settings.voice.recognition.parakeet",
+    ready: "mobile.settings.voice.recognition.parakeetReady",
+    footer: "mobile.settings.voice.recognition.parakeetFooter",
+  },
+  "parakeet-unified": {
+    name: "mobile.settings.voice.recognition.parakeetUnified",
+    ready: "mobile.settings.voice.recognition.parakeetUnifiedReady",
+    footer: "mobile.settings.voice.recognition.parakeetUnifiedFooter",
+  },
+  "qwen3-asr": {
+    name: "mobile.settings.voice.recognition.qwen",
+    ready: "mobile.settings.voice.recognition.qwenReady",
+    footer: "mobile.settings.voice.recognition.qwenFooter",
+  },
+} as const satisfies Record<LocalRecognition, Record<"name" | "ready" | "footer", MobileTextKey>>;
+
 /**
- * The status line of a Parakeet row: too little memory, ready, the download, or the download size.
+ * The status line of a row of a model on the phone: too little memory, ready, the download, or the
+ * download size.
  */
-function useParakeetStatus(engine: ParakeetEngine): string {
+function useLocalModelStatus(engine: LocalRecognition): string {
   const { t, format } = useText();
-  const v3 = useParakeetModel();
-  const unified = useParakeetUnifiedModel();
-  const model = engine === "parakeet" ? v3 : unified;
-  if (!parakeetSupported()) return t("mobile.settings.voice.recognition.parakeetUnsupported");
-  if (model.phase === "ready")
-    return t(
-      engine === "parakeet"
-        ? "mobile.settings.voice.recognition.parakeetReady"
-        : "mobile.settings.voice.recognition.parakeetUnifiedReady",
-    );
+  const models = {
+    parakeet: useParakeetModel(),
+    "parakeet-unified": useParakeetUnifiedModel(),
+    "qwen3-asr": useQwenModel(),
+  };
+  const model = models[engine];
+  if (!localRecognitionSupported(engine)) return t("mobile.settings.voice.recognition.parakeetUnsupported");
+  if (model.phase === "ready") return t(LOCAL_RECOGNITION_TEXT[engine].ready);
   return (
     downloadStatus(model, t, format.percent) ??
-    t("mobile.settings.voice.engine.supertonicMissing", { size: format.fileSize(parakeetModelOf(engine).bytes) })
+    t("mobile.settings.voice.engine.supertonicMissing", { size: format.fileSize(localModelOf(engine).bytes) })
   );
 }
 
 /**
  * The choice of what recognizes the user's speech, in a voice conversation and in dictation. The
- * checked row is the choice; a Parakeet model listens once it is downloaded, and the phone's
- * recognizer listens until then.
+ * checked row is the choice; a model on the phone listens once it is downloaded, and the phone's
+ * recognizer listens until then. An app binary from before Qwen3-ASR does not show it.
  */
 function RecognitionSection({ onError }: { onError: (message: string) => void }) {
   const { t } = useText();
   const settings = useVoiceSettings();
   const mark = useCheckMark();
-  const supported = parakeetSupported();
-  const parakeetStatus = useParakeetStatus("parakeet");
-  const unifiedStatus = useParakeetStatus("parakeet-unified");
+  const statuses = {
+    parakeet: useLocalModelStatus("parakeet"),
+    "parakeet-unified": useLocalModelStatus("parakeet-unified"),
+    "qwen3-asr": useLocalModelStatus("qwen3-asr"),
+  };
+  const localEngines = (["parakeet", "parakeet-unified", "qwen3-asr"] as const).filter(
+    (engine) => localRecognitionInBinary(engine) || layoutPreview,
+  );
   const server = useVoiceServer((state) => state.server);
   const choose = (recognition: RecognitionEngine) => {
     // ElevenLabs needs a key first; the key page makes it the recognizer when the key is saved.
@@ -166,26 +192,19 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
       >
         <Typography.Paragraph>{t("mobile.settings.voice.recognition.system")}</Typography.Paragraph>
       </SettingsRow>
-      <SettingsRow
-        checked={settings.recognition === "parakeet"}
-        disclosure={false}
-        disabled={!settings.ready || (!supported && !layoutPreview)}
-        supportingText={parakeetStatus}
-        trailing={mark(settings.recognition === "parakeet")}
-        onPress={() => choose("parakeet")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.parakeet")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
-        checked={settings.recognition === "parakeet-unified"}
-        disclosure={false}
-        disabled={!settings.ready || (!supported && !layoutPreview)}
-        supportingText={unifiedStatus}
-        trailing={mark(settings.recognition === "parakeet-unified")}
-        onPress={() => choose("parakeet-unified")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.parakeetUnified")}</Typography.Paragraph>
-      </SettingsRow>
+      {localEngines.map((engine) => (
+        <SettingsRow
+          key={engine}
+          checked={settings.recognition === engine}
+          disclosure={false}
+          disabled={!settings.ready || (!localRecognitionSupported(engine) && !layoutPreview)}
+          supportingText={statuses[engine]}
+          trailing={mark(settings.recognition === engine)}
+          onPress={() => choose(engine)}
+        >
+          <Typography.Paragraph>{t(LOCAL_RECOGNITION_TEXT[engine].name)}</Typography.Paragraph>
+        </SettingsRow>
+      ))}
       <SettingsRow
         checked={settings.recognition === "elevenlabs"}
         disclosure={false}
@@ -389,24 +408,14 @@ function ReplySpeedSection({ onError }: { onError: (message: string) => void }) 
   );
 }
 
-/** The model of the chosen Parakeet, below the choice of recognizer while a Parakeet is chosen. */
-function ParakeetSection({ engine, onError }: { engine: ParakeetEngine; onError: (message: string) => void }) {
+/** The model of the chosen recognizer on the phone, below the choice of recognizer. */
+function LocalModelSection({ engine, onError }: { engine: LocalRecognition; onError: (message: string) => void }) {
   const { t } = useText();
-  const unified = engine === "parakeet-unified";
   return (
-    <SettingsSection
-      title={t(
-        unified ? "mobile.settings.voice.recognition.parakeetUnified" : "mobile.settings.voice.recognition.parakeet",
-      )}
-      footer={t(
-        unified
-          ? "mobile.settings.voice.recognition.parakeetUnifiedFooter"
-          : "mobile.settings.voice.recognition.parakeetFooter",
-      )}
-    >
+    <SettingsSection title={t(LOCAL_RECOGNITION_TEXT[engine].name)} footer={t(LOCAL_RECOGNITION_TEXT[engine].footer)}>
       <ModelRow
         key={engine}
-        model={parakeetModelOf(engine)}
+        model={localModelOf(engine)}
         label={t("mobile.settings.voice.recognition.model")}
         removeTitle={t("mobile.settings.voice.recognition.removeTitle")}
         removeBody={t("mobile.settings.voice.recognition.removeBody")}
@@ -609,6 +618,8 @@ const ELEVENLABS_MODEL_HINT = {
   "elevenlabs-flash-v2.5": "mobile.settings.voice.elevenLabs.model.flash",
   "elevenlabs-multilingual-v2": "mobile.settings.voice.elevenLabs.model.multilingual",
   "elevenlabs-v3": "mobile.settings.voice.elevenLabs.model.v3",
+  "elevenlabs-v4-turbo": "mobile.settings.voice.elevenLabs.model.v4Turbo",
+  "elevenlabs-v4": "mobile.settings.voice.elevenLabs.model.v4",
 } as const satisfies Record<ElevenLabsSpeechModelId, MobileTextKey>;
 
 /** The ElevenLabs model that reads replies, with the same choices as desktop. */
@@ -696,7 +707,7 @@ function GptLiveSection({ onError }: { onError: (message: string) => void }) {
 
 /**
  * Settings > Voice, in tabs. Listening: what recognizes the user's speech, the phone's
- * recognizer, Parakeet v3 or Parakeet Unified on the phone, or ElevenLabs Scribe, and the pause that sends the words in a
+ * recognizer, Parakeet v3, Parakeet Unified or Qwen3-ASR on the phone, or ElevenLabs Scribe, and the pause that sends the words in a
  * voice conversation. Speaking: the voice that reads replies, Supertonic 3, the default, which runs
  * on the phone as on desktop, or ElevenLabs, and the reply speed. GPT live voice: its switch, its
  * voice and the servers. Each tab lists its choices with a check mark, and the
@@ -719,7 +730,7 @@ export function VoiceSettingsScreen() {
   }).current;
   // The page needs to know whether the model is on the phone before Download can work.
   useEffect(() => {
-    checkParakeetModels();
+    checkRecognitionModels();
   }, []);
   // The voices of the key load once, so the voice list opens with them.
   useEffect(() => {
@@ -787,9 +798,8 @@ export function VoiceSettingsScreen() {
         <>
           <RecognitionSection onError={showError} />
           {recognition === "system" ? <DictationLanguageSection /> : null}
-          {(recognition === "parakeet" || recognition === "parakeet-unified") &&
-          (parakeetSupported() || layoutPreview) ? (
-            <ParakeetSection engine={recognition} onError={showError} />
+          {isLocalRecognition(recognition) && (localRecognitionSupported(recognition) || layoutPreview) ? (
+            <LocalModelSection engine={recognition} onError={showError} />
           ) : null}
           {recognition === "elevenlabs" && hasKey ? (
             <ElevenLabsSection preview={preview} readsReplies={false} onError={showError} />

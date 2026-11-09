@@ -42,6 +42,7 @@ import {
   decodeChannelPage,
   decodeChannelSummaries,
   decodeSaveAgentProfileResult,
+  decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
   isAgentModelOption,
   LOCAL_SERVER_ID,
@@ -54,6 +55,7 @@ import {
   parseLocalBrowserSecretResponse,
   parseResetAgentSessionSetting,
   parseSaveAgentProfile,
+  parseSaveSkillSuggestion,
   parseSetAgentHiddenInput,
   parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
@@ -91,6 +93,7 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_COMPACT_ROUTES,
@@ -110,6 +113,7 @@ import {
   SIDE_QUESTION_CAPABILITY,
   SIDE_QUESTION_ROUTES,
 } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -279,6 +283,16 @@ export function agentIpcHandlers({
   const remoteCompact = async (serverId: string, path: string, body: AgentTaskInput | { agentId: string }) => {
     if (!remoteServers.supportsCapability(serverId, CONTEXT_COMPACT_CAPABILITY))
       throw new Error(sourceText("error.team.contextCompactUnsupported"));
+    await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
+  // The chat-history-v1 codec has already checked the empty reply. The host says why it refuses.
+  const remoteChatHistory = async (
+    serverId: string,
+    path: string,
+    body: { agentId: string } | { channelId: string },
+    unsupported: "error.team.channelContextUnsupported" | "error.team.historyDeleteUnsupported",
+  ) => {
+    if (!remoteServers.supportsCapability(serverId, CHAT_HISTORY_CAPABILITY)) throw new Error(sourceText(unsupported));
     await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
   // The message-delete-v1 codec has already checked the empty reply. The host says why it refuses.
@@ -552,25 +566,36 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.team.channelPictureUnsupported"));
         },
       }),
-      // Team API has no route for these yet; the channel editor offers them only for this computer.
+      // A joined server serves these with `chat-history-v1`.
       clearChannelContext: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.clearChannelContext(channelId, host.channelActor())),
-        remote: () => {
-          throw new Error(sourceText("error.team.channelContextUnsupported"));
-        },
+        remote: (channelId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.channelClear,
+            { channelId },
+            "error.team.channelContextUnsupported",
+          ),
       }),
-      // Only this computer deletes a channel history. Team API has no route for it.
       deleteChannelHistory: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.deleteChannelHistory(channelId)),
-        remote: () => {
-          throw new Error(sourceText("error.team.historyDeleteUnsupported"));
-        },
+        remote: (channelId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.channelDelete,
+            { channelId },
+            "error.team.historyDeleteUnsupported",
+          ),
       }),
       compactChannelContext: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.compactChannelContext(channelId)),
-        remote: () => {
-          throw new Error(sourceText("error.team.channelContextUnsupported"));
-        },
+        remote: (channelId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.channelCompact,
+            { channelId },
+            "error.team.channelContextUnsupported",
+          ),
       }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
@@ -644,6 +669,20 @@ export function agentIpcHandlers({
                 question: input.question,
                 earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
               },
+              timeoutMs: 150_000,
+            }),
+          );
+        },
+      }),
+      saveSkillSuggestion: scopedHandler(parseSaveSkillSuggestion, {
+        local: (input) => runCauseEffect(service.saveSkillSuggestion(input)),
+        remote: async (input, serverId) => {
+          // An older host has no route: the card then sends the user's yes to the agent.
+          if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY)) return { saved: false };
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+              method: "POST",
+              body: { agentId: input.agentId, messageId: input.messageId },
               timeoutMs: 150_000,
             }),
           );
@@ -1205,12 +1244,16 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // Only this computer deletes an agent's history. Team API has no route for it.
+      // A joined server deletes an agent's history with `chat-history-v1`.
       deleteHistory: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(service.deleteAgentHistory(agentId)),
-        remote: () => {
-          throw new Error(sourceText("error.team.historyDeleteUnsupported"));
-        },
+        remote: (agentId, serverId) =>
+          remoteChatHistory(
+            serverId,
+            CHAT_HISTORY_ROUTES.agentDelete,
+            { agentId },
+            "error.team.historyDeleteUnsupported",
+          ),
       }),
       // A joined server compacts with `context-compact-v1`.
       compactContext: scopedHandler(parseAgentId, {

@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanlar bir düzeltmeden veya işe yarayan bir yöntemden sonra yeni becerileri kendi kendine öğrenir. Sunucu ayarları → Genel bölümünde Otomatik, Önce sor veya Kapalı seçeneğini belirleyin.",
+          "Vault'taki girişler iki adımlı doğrulama kodunu saklayabilir ve ajanlar bu kodla oturum açabilir.",
+          "Windows'ta Dynamic Island ve ajan yuvası, Mac'te olduğu gibi ajanlarınızı gösterir. Ajan yuvası kanalları da tutabilir.",
+          "Ajanlar YouTube veya TikTok bağlantıları gibi herkese açık çevrimiçi videoları izleyebilir.",
+          "Kitaplık'ta birden çok dosya seçin ve hepsini bir kerede indirin veya silin.",
+          "Ajanlar sizin için OpenBot ekibine bir hata raporu veya özellik fikri gönderebilir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kanal üyeleri kendi sohbetlerinde çalışırken yanıt verir; selamlama veya belirsiz bir mesaj kanal liderine gider.",
+          "Yeni bir ajan kısa bir karşılama ve seçebileceğiniz üç ilk görevle açılır.",
+          "Composio'yu tarayıcıda oturum açarak bağlayın. Artık URL ve API anahtarı yazmanız gerekmez.",
+          "Ayarlar'ın adı artık Ayarlarınız, Sunucu ayarları'nda da bir arama alanı var.",
+          "macOS uygulama simgesinin yeni bir cam görünümü var."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bir ajanın kuyruğu, ajan kendi sorusunun yanıtını beklerken aynı mesajı artık tekrar tekrar başlatmaz.",
+          "Bir ChatGPT ajanı artık tekrar tekrar sıkıştırma yapmaz veya \"Bağlam sıkıştırılıyor\" durumunda sonsuza kadar kalmaz.",
+          "Cursor ve bazı diğer sağlayıcılardaki ajanlar, OpenBot yeniden başladıktan sonra OpenBot araçlarını korur.",
+          "Ajanlar, n8n gibi oturum açtığınız uzak bir MCP sunucusunu en yeni MCP sürümüyle kullanabilir."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],

@@ -1,7 +1,8 @@
 import type { AgentTask } from "@openbot/contracts/ipc";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
-import { Archive, ArchiveRestore, Badge, Button, MessageSquare, X } from "@openbot/ui";
+import { Archive, ArchiveRestore, Button, MessageSquare, X } from "@openbot/ui";
 import { AgentTaskMark, type AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
+import { UiBlockCard } from "@openbot/ui/features/conversation/ui-blocks/UiBlockCard";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
@@ -103,22 +104,21 @@ export function TaskPanel(props: TaskPanelProps) {
 export function TaskAnswerCard(props: { agentName: string; onAnswer?: (() => void) | undefined }) {
   const { t } = useText();
   return (
-    <section class="conversation-interaction-card tasks-panel-answer">
-      <header class="conversation-interaction-header">
-        <strong>{t("conversation.tasks.panel.answerTitle", { name: props.agentName })}</strong>
-        <Badge variant="warning-light" class="conversation-interaction-status">
-          {t("conversation.tasks.state.waitingAnswer")}
-        </Badge>
-      </header>
-      <Show when={props.onAnswer}>
-        {(answer) => (
-          <footer class="tasks-panel-answer-footer">
-            <Button type="button" variant="default" onClick={() => answer()()}>
+    <UiBlockCard
+      class="tasks-panel-answer"
+      status="pending"
+      title={t("conversation.tasks.panel.answerTitle", { name: props.agentName })}
+      waiting
+      waitingLabel={t("conversation.tasks.state.waitingAnswer")}
+      actions={
+        <Show when={props.onAnswer}>
+          {(answer) => (
+            <Button type="button" size="sm" onClick={() => answer()()}>
               {t("conversation.tasks.panel.answerInChat")}
             </Button>
-          </footer>
-        )}
-      </Show>
-    </section>
+          )}
+        </Show>
+      }
+    />
   );
 }

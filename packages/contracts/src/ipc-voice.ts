@@ -392,6 +392,8 @@ export const VOICE_KEY_PROVIDER_NAMES: Record<VoiceKeyProvider, string> = {
 export const CLOUD_SPEECH_MODEL_IDS = [
   "elevenlabs-flash-v2.5",
   "elevenlabs-multilingual-v2",
+  "elevenlabs-v4-turbo",
+  "elevenlabs-v4",
   "elevenlabs-v3",
   "xai-tts",
 ] as const;
@@ -411,6 +413,8 @@ export interface CloudSpeechModelInfo {
 export const CLOUD_SPEECH_MODELS: readonly CloudSpeechModelInfo[] = [
   { id: "elevenlabs-flash-v2.5", provider: "elevenlabs", name: "Flash v2.5" },
   { id: "elevenlabs-multilingual-v2", provider: "elevenlabs", name: "Multilingual v2" },
+  { id: "elevenlabs-v4-turbo", provider: "elevenlabs", name: "Eleven v4 Turbo" },
+  { id: "elevenlabs-v4", provider: "elevenlabs", name: "Eleven v4" },
   { id: "elevenlabs-v3", provider: "elevenlabs", name: "Eleven v3" },
   { id: "xai-tts", provider: "xai", name: "Text to Speech" },
 ];

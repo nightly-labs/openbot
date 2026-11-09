@@ -27,6 +27,8 @@ export const messages = {
     "Ein anderer OpenBot-Prozess läuft noch in diesem Benutzerkonto. Beende ihn und installiere die Aktualisierung erneut.",
   "error.update.siblingCheckFailed":
     "Andere OpenBot-Sitzungen konnten nicht überprüft werden. Versuche es vor der Installation erneut.",
+  "error.update.readOnlyLocation":
+    "OpenBot kann von diesem Ort aus keine Aktualisierungen installieren. Beende OpenBot. Ziehe OpenBot im Finder in den Ordner „Programme“ (wenn es schon dort ist, ziehe es heraus und wieder hinein). Öffne OpenBot dann und installiere die Aktualisierung erneut.",
   "error.update.remoteDisabled": "Aktualisierungen durch Serveradministratoren sind auf diesem Computer deaktiviert.",
   "error.update.restartStarted": "OpenBot startet bereits zur Installation der Aktualisierung neu.",
   "error.update.alreadyRestarting": "OpenBot startet bereits neu.",

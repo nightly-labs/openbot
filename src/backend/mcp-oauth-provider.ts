@@ -263,6 +263,8 @@ export interface McpOAuthAuthority {
   needsSignIn: (url: string) => boolean;
   /** Whether this computer keeps a sign-in for this URL: current, expired, or ended by the server. */
   hasSignIn: (url: string) => boolean;
+  /** Whether Sign in would open a page for a server that answered without one. See `McpOAuth.offersSignIn`. */
+  offersSignIn: (url: string) => Effect.Effect<boolean>;
   /** Drops the tokens and keeps the sign-in app, so the next sign-in uses the same app. */
   signOut: (url: string) => Effect.Effect<void, McpOperationError>;
   /** Drops everything kept for this URL, the sign-in app included. Used when the row is removed. */
@@ -479,33 +481,8 @@ export class McpOAuth implements McpOAuthAuthority {
           return yield* withTimeout(
             Effect.gen(function* () {
               // A server that answers without a sign-in and names no authorization server takes none:
-              // the SDK would otherwise guess `/authorize` at the server's own origin. Any answer
-              // below 500 is such a server: a 404, a refusal, or a page that is not metadata. No
-              // answer, a server error, or a busy server (408, 429) says nothing about the server. It
-              // must not end the sign-in as if the server asked for none: that left the row showing
-              // the result of the earlier test, with no page and no words.
-              let metadataStatus: number | null = null;
-              const metadataFetch: FetchLike = async (input, init) => {
-                metadataStatus = null;
-                const response = await fetchFn(input, init);
-                metadataStatus = response.status;
-                return response;
-              };
-              const metadata = yield* mcpCall(() =>
-                discoverOAuthProtectedResourceMetadata(resource, undefined, metadataFetch),
-              ).pipe(
-                Effect.catch(() => {
-                  if (
-                    metadataStatus !== null &&
-                    metadataStatus < 500 &&
-                    metadataStatus !== 408 &&
-                    metadataStatus !== 429
-                  )
-                    return Effect.succeed(null);
-                  return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
-                }),
-              );
-              if (!metadata?.authorization_servers?.length) return false;
+              // the SDK would otherwise guess `/authorize` at the server's own origin.
+              if (!(yield* namesAuthorizationServer(resource, fetchFn))) return false;
               return (yield* mcpCall(() => auth(provider, { serverUrl: resource, fetchFn }))) === "REDIRECT";
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
@@ -609,6 +586,26 @@ export class McpOAuth implements McpOAuthAuthority {
     const record = key === null ? undefined : this.#options.storage.read(key);
     return record?.tokens !== undefined || record?.lostAt !== undefined;
   }
+
+  /**
+   * Whether Sign in would open a page for a server that answered without one: no token is on file,
+   * and its metadata names an authorization server. Some servers list their tools to anyone and want
+   * a token only to run one. Public documents only; a read that fails is a no, because nobody
+   * pressed Sign in to see its error.
+   */
+  readonly offersSignIn = Effect.fn("McpOAuth.offersSignIn")(function* (this: McpOAuth, url: string) {
+    const key = mcpOAuthAccountKey(url);
+    if (!key || this.#options.storage.read(key)?.tokens) return false;
+    const controller = new AbortController();
+    return yield* namesAuthorizationServer(mcpOAuthServerUrl(key), this.#fetch(key, controller.signal)).pipe(
+      Effect.timeoutOrElse({
+        duration: this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
+        orElse: () => Effect.succeed(false),
+      }),
+      Effect.catch(() => Effect.succeed(false)),
+      Effect.ensuring(Effect.sync(() => controller.abort())),
+    );
+  });
 
   get redirectUrl(): string {
     return this.#options.redirectUrl;
@@ -1397,6 +1394,33 @@ export function mcpOAuthAccountKey(url: string): string | null {
 function mcpOAuthServerUrl(key: string): string {
   return normalizeResource(key) ?? key;
 }
+
+/**
+ * Whether the server publishes protected-resource metadata that names an authorization server, which
+ * is what a sign-in needs to open a page. Any answer below 500 that is not such metadata says no: a
+ * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
+ * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
+ * none, which left the row showing the result of the earlier test, with no page and no words.
+ */
+const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+  let metadataStatus: number | null = null;
+  const metadataFetch: FetchLike = async (input, init) => {
+    metadataStatus = null;
+    const response = await fetchFn(input, init);
+    metadataStatus = response.status;
+    return response;
+  };
+  const metadata = yield* mcpCall(() =>
+    discoverOAuthProtectedResourceMetadata(resource, undefined, metadataFetch),
+  ).pipe(
+    Effect.catch(() => {
+      if (metadataStatus !== null && metadataStatus < 500 && metadataStatus !== 408 && metadataStatus !== 429)
+        return Effect.succeed(null);
+      return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
+    }),
+  );
+  return Boolean(metadata?.authorization_servers?.length);
+});
 
 /** A legacy binding is useful only when it names an endpoint this client would send credentials to. */
 function legacyIssuer(record: McpOAuthRecord | null): string | undefined {

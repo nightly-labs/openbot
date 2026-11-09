@@ -615,6 +615,10 @@ recognizer chosen under **Speech recognition** in **Settings → Voice**:
   from `huggingface.co`, the same files as desktop, checks the SHA-256 of each file, and keeps it in
   the app's storage outside the device backup until you remove it. The request carries no user data.
   The audio and the recognized text stay on the phone.
+- Qwen3-ASR. When you press Download, the phone downloads the pinned Qwen3-ASR 0.6B model from
+  `huggingface.co`, checks the SHA-256 of each file, and keeps it in the app's storage outside the
+  device backup until you remove it. The request carries no user data. The audio and the recognized
+  text stay on the phone.
 - ElevenLabs Scribe, only with your own ElevenLabs API key. For each dictation, the phone asks
   `api.elevenlabs.io` for a single-use token with the key, then streams the microphone audio to
   ElevenLabs with that token, and receives the text. ElevenLabs handles the audio and the text under
@@ -1109,6 +1113,15 @@ Network traffic can also occur when:
   short answer with source URLs to the agent. Only the question and short OpenBot instructions go to
   OpenAI, not the agent's chat, files or instructions, and not the agent's own provider account.
   OpenAI handles the question under its own policy and the user's ChatGPT plan;
+- an agent uses the `openbot.read_video` tool on a video link. The first time, OpenBot downloads the
+  yt-dlp release that it pins from `github.com`, checks its SHA-256, and keeps it in `runtimes` in the
+  application data folder. yt-dlp then requests the video page and the video file from the site of the
+  link, as a browser does, with no cookies or sign-in. The file goes to a temporary folder on this
+  computer and is deleted after the read. A hidden OpenBot window takes still frames and the sound on
+  this computer. Only a speech recognition model that the user set up in **Settings → Voice**
+  transcribes the sound: a local model keeps it on this computer, and Groq or a voice server gets the
+  sound in parts of 60 seconds as described for dictation. The agent gets the title, the author, the
+  counts, the description, the transcript and the frames;
 - the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
   configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
   These calls send no OpenBot conversations, files, or agent instructions to Bitwarden. For a

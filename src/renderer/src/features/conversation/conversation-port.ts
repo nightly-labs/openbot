@@ -10,6 +10,7 @@ export interface ConversationPort {
     | "readAgentSessionSettings"
     | "listAgentNotificationLevels"
     | "askSideQuestion"
+    | "saveSkillSuggestion"
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"
     | "onScopedEvent"

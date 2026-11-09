@@ -69,6 +69,7 @@ export const messages = {
   "error.team.channelTaskCancelUnsupported":
     "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",
+  "error.team.membersCannotDeleteChannelHistory": "I membri non possono eliminare la cronologia del canale.",
   "error.team.membersCannotArchiveChannels": "I membri non possono archiviare i canali.",
   "error.team.membersCannotRestoreChannels": "I membri non possono ripristinare i canali.",
   "error.team.sharedDataUnsupported": "I dati condivisi non sono supportati da questa connessione.",
@@ -118,6 +119,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
   "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
+  "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
   "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",

@@ -132,6 +132,8 @@ export const messages = {
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
   "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.museNoModels":
+    "Muse 没有为此账号返回任何模型。Muse 可能在此智能体运行的国家或地区不可用。请选择其他提供商的模型。",
   "provider.picker.customEmpty":
     "添加一个兼容 OpenAI 的端点 —— 可以是这台电脑上的模型服务，也可以是任何提供 base URL 和密钥的服务。",
   "provider.picker.customPending": "端点的模型尚未加载。当前任务结束后服务商会读取这些模型。",

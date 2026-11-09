@@ -292,6 +292,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "在此手机上运行 · 仅英语",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified 与桌面端一样在此手机上运行。它只识别英语，会加标点，错误比 Parakeet v3 更少，你的语音不会离开手机。在模型下载完成之前，由手机的语音识别来听。",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "在此手机上运行 · 也能识别中英混说",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR 在此手机上运行。它能在 30 种语言和 22 种中文方言中自动识别你说的语言，一句话里中英混说也能识别。你的语音不会离开手机。在模型下载完成之前，由手机的语音识别来听。",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "90 多种语言 · 将你的语音发送给 ElevenLabs",
   "mobile.settings.voice.recognition.model": "语音模型",
@@ -358,5 +362,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.model.footer": "ElevenLabs 对每个模型单独计价。更改从下一条回复开始生效。",
   "mobile.settings.voice.elevenLabs.model.flash": "最快",
   "mobile.settings.voice.elevenLabs.model.multilingual": "更自然 · 更慢",
-  "mobile.settings.voice.elevenLabs.model.v3": "表现力最强 · 最慢",
+  "mobile.settings.voice.elevenLabs.model.v3": "富有表现力 · 较慢",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90 多种语言 · 快",
+  "mobile.settings.voice.elevenLabs.model.v4": "最佳质量 · 90 多种语言 · 较慢",
 } as const satisfies PartialTranslation<typeof source>;

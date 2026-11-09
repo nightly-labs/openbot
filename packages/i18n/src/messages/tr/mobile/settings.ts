@@ -308,6 +308,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "Bu telefonda · yalnızca İngilizce",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified, masaüstünde olduğu gibi bu telefonda çalışır. Yalnızca İngilizceyi tanır; noktalama işaretleri ekler ve Parakeet v3'ten daha az hata yapar. Konuşmanız telefonda kalır. Model indirilene kadar telefonun tanıyıcısı dinler.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "Bu telefonda · İngilizceyle karışık Çince de",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR bu telefonda çalışır. Konuştuğunuz dili 30 dil ve 22 Çince lehçe arasından kendisi bulur; tek cümlede Çince ile İngilizceyi karıştırdığınızda da tanır. Konuşmanız telefonda kalır. Model indirilene kadar telefonun tanıyıcısı dinler.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "90'dan fazla dil · sesini ElevenLabs'e gönderir",
   "mobile.settings.voice.recognition.model": "Konuşma modeli",
@@ -376,5 +380,7 @@ export const messages = {
     "ElevenLabs'te her modelin kendi fiyatı vardır. Değişiklik bir sonraki yanıttan itibaren geçerlidir.",
   "mobile.settings.voice.elevenLabs.model.flash": "En hızlı",
   "mobile.settings.voice.elevenLabs.model.multilingual": "Daha doğal · daha yavaş",
-  "mobile.settings.voice.elevenLabs.model.v3": "En etkileyici · en yavaş",
+  "mobile.settings.voice.elevenLabs.model.v3": "Etkileyici · yavaş",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90'dan fazla dil · hızlı",
+  "mobile.settings.voice.elevenLabs.model.v4": "En iyi kalite · 90'dan fazla dil · yavaş",
 } as const satisfies PartialTranslation<typeof source>;

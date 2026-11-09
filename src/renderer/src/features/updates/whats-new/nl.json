@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents leren zelf nieuwe vaardigheden na een correctie of een aanpak die werkte. Kies Automatisch, Eerst vragen of Uit in Serverinstellingen → Algemeen.",
+          "Logins in de Kluis kunnen een verificatiecode bewaren, en agents kunnen daarmee inloggen.",
+          "Op Windows tonen het Dynamic Island en het agentdock je agents, net als op een Mac. Het agentdock kan ook kanalen bevatten.",
+          "Agents kunnen openbare online video's bekijken, zoals YouTube- of TikTok-links.",
+          "Selecteer meerdere bestanden in de Bibliotheek om ze in één keer te downloaden of te verwijderen.",
+          "Agents kunnen voor je een bugmelding of een idee voor een functie naar het OpenBot-team sturen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kanaalleden antwoorden terwijl ze in hun eigen chat werken, en een begroeting of een onduidelijk bericht gaat naar de kanaalleider.",
+          "Een nieuwe agent opent met een kort welkom en drie eerste taken waaruit je kunt kiezen.",
+          "Verbind Composio door in de browser in te loggen. Je typt geen URL en API-sleutel meer.",
+          "Instellingen heet nu Jouw instellingen, en Serverinstellingen heeft een zoekveld.",
+          "Het app-pictogram voor macOS heeft een nieuwe glazen look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De wachtrij van een agent start niet meer steeds opnieuw hetzelfde bericht terwijl de agent op een antwoord op zijn eigen vraag wacht.",
+          "Een ChatGPT-agent comprimeert niet meer steeds opnieuw en blijft niet meer eindeloos op “Context comprimeren” staan.",
+          "Agents op Cursor en enkele andere aanbieders houden hun OpenBot-tools nadat OpenBot opnieuw is gestart.",
+          "Agents kunnen een externe MCP-server gebruiken waarop je bent ingelogd, zoals n8n, met de nieuwste MCP-versie."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],

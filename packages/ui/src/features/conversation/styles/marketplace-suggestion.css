@@ -1,25 +1,15 @@
 /* Marketplace suggestion: an app or skill an agent suggests in the chat, with its connect action. */
 
-.marketplace-suggestion.conversation-interaction-card {
-  display: grid;
-  container-type: inline-size;
-  width: 100%;
+/* The frame is a UiBlockCard (ui-blocks.css). */
+.marketplace-suggestion.ui-block-card {
   max-width: 520px;
-  gap: var(--openbot-space-3);
-  padding: var(--openbot-space-3);
-}
-
-.marketplace-suggestion-header {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--openbot-space-3);
 }
 
 /* The listing icon keeps its tile border here, as on a dark chat its own fill meets the card. */
 .marketplace-suggestion .marketplace-suggestion-icon {
   width: var(--openbot-control-lg);
   height: var(--openbot-control-lg);
+  flex: none;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-surface-raised);
@@ -30,57 +20,39 @@
   border-radius: inherit;
 }
 
-.marketplace-suggestion-heading {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-}
-
-/* In a narrow chat the action takes its own row, so the name keeps the width. */
-@container (max-width: 360px) {
-  .marketplace-suggestion-header {
-    flex-wrap: wrap;
-  }
-
-  .marketplace-suggestion-heading {
-    flex-basis: calc(100% - var(--openbot-control-lg) - var(--openbot-control-md) - 2 * var(--openbot-space-3));
-  }
-
-  .marketplace-suggestion-action {
-    order: 1;
-    width: 100%;
-  }
-
-  .marketplace-suggestion-action > .ui-button {
-    width: 100%;
-  }
-}
-
-.marketplace-suggestion-title {
+/* The name and the tagline keep one line each, so the card stays short. */
+.marketplace-suggestion .ui-block-title,
+.marketplace-suggestion .ui-block-subtitle {
   overflow: hidden;
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .marketplace-suggestion .marketplace-suggestion-name {
+  display: inline-block;
   height: auto;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0;
   color: inherit;
   font: inherit;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  white-space: nowrap;
 }
 
-.marketplace-suggestion-description {
-  overflow: hidden;
-  color: var(--openbot-text-muted);
+/* Skip and the action sit in the actions of the card; the wrapper only carries their state. */
+.marketplace-suggestion-controls {
+  display: contents;
+}
+
+/* A question to answer with the action: all of it, in the body of the card, with the action in the footer. */
+.marketplace-suggestion-question {
+  margin: 0;
+  color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .marketplace-suggestion-action {
@@ -153,10 +125,10 @@
   opacity: 1;
 }
 
-.marketplace-suggestion[data-state="connected"] .marketplace-suggestion-dismiss {
+.marketplace-suggestion-controls[data-state="connected"] .marketplace-suggestion-dismiss {
   width: 0;
   min-width: 0;
-  margin-inline-start: calc(-1 * var(--openbot-space-3));
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
   overflow: hidden;
   border-width: 0;
   padding: 0;
@@ -170,23 +142,23 @@
  * old label lifts away as the new one rises, the check draws from its short stroke, and Dismiss
  * folds so the button glides to the edge.
  */
-.marketplace-suggestion[data-motion] .marketplace-suggestion-button.ui-button {
+.marketplace-suggestion-controls[data-motion] .marketplace-suggestion-button.ui-button {
   transition:
     background-color var(--openbot-duration-slow) var(--openbot-ease-out),
     color var(--openbot-duration-slow) var(--openbot-ease-out),
     opacity var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.marketplace-suggestion[data-motion] .marketplace-suggestion-layer {
+.marketplace-suggestion-controls[data-motion] .marketplace-suggestion-layer {
   transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .marketplace-suggestion[data-motion] .marketplace-suggestion-stage {
+  .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-stage {
     transition: width var(--openbot-duration-slow) var(--openbot-ease-out);
   }
 
-  .marketplace-suggestion[data-motion] .marketplace-suggestion-layer {
+  .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-layer {
     transition:
       opacity var(--openbot-duration-normal) var(--openbot-ease-out),
       transform var(--openbot-duration-slow) var(--openbot-ease-out);
@@ -200,30 +172,30 @@
     transform: translateY(40%);
   }
 
-  .marketplace-suggestion[data-motion] .marketplace-suggestion-layer > svg path {
+  .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-layer > svg path {
     stroke-dasharray: 24 24;
     stroke-dashoffset: -24;
     transition: stroke-dashoffset var(--openbot-duration-overlay) var(--openbot-ease-out) var(--openbot-duration-fast);
   }
 
-  .marketplace-suggestion[data-motion] .marketplace-suggestion-button[data-state="connected"] svg path {
+  .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-button[data-state="connected"] svg path {
     stroke-dashoffset: 0;
   }
 
-  .marketplace-suggestion[data-motion] .marketplace-suggestion-spinner {
+  .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-spinner {
     transform: scale(0.6);
     transition:
       opacity var(--openbot-duration-normal) var(--openbot-ease-out),
       transform var(--openbot-duration-normal) var(--openbot-ease-out);
   }
 
-  .marketplace-suggestion[data-motion]
+  .marketplace-suggestion-controls[data-motion]
     .marketplace-suggestion-button[data-state="busy"]
     .marketplace-suggestion-spinner {
     transform: none;
   }
 
-  .marketplace-suggestion[data-motion] .marketplace-suggestion-dismiss {
+  .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-dismiss {
     transition:
       opacity var(--openbot-duration-fast) var(--openbot-ease-out),
       width var(--openbot-duration-slow) var(--openbot-ease-out),
@@ -232,24 +204,10 @@
   }
 }
 
-.marketplace-suggestion-done[data-slot="badge"] {
-  gap: var(--openbot-space-1-5);
-  border-radius: var(--openbot-radius-pill);
-  font-size: var(--openbot-text-sm);
-  font-weight: var(--openbot-weight-medium);
-}
-
-.marketplace-suggestion-done svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-}
-
 .marketplace-suggestion-unavailable {
   display: flex;
   margin: 0;
   gap: var(--openbot-space-2);
-  border-top: 1px solid var(--openbot-border);
-  padding-top: var(--openbot-space-3);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);

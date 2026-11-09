@@ -74,6 +74,7 @@ export function serverSupportsCapability(
       capability === "providers-v4" ||
       capability === "providers-v5" ||
       capability === "custom-provider-harness-v1" ||
+      capability === "custom-provider-edit-v1" ||
       capability === "agent-session-settings-v1" ||
       capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
@@ -83,6 +84,7 @@ export function serverSupportsCapability(
       capability === "host-timezone-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
+      capability === "skill-learning-v1" ||
       capability === "prompt-cache-ttl-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
@@ -119,6 +121,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1") &&
     server?.kind === "remote"
   ) {

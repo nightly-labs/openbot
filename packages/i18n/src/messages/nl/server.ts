@@ -354,6 +354,12 @@ export const messages = {
   "server.settings.memoryReviewOff": "Uit",
   "server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
   "server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
+  "server.settings.skillLearning": "Vaardigheden leren",
+  "server.settings.skillLearningDescription": "Of agents op deze server wat ze leren als vaardigheden opslaan.",
+  "server.settings.skillLearningAutomatic": "Automatisch",
+  "server.settings.skillLearningAsk": "Eerst vragen",
+  "server.settings.skillLearningOff": "Uit",
+  "server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
   "server.settings.rolesTitle": "Machtigingen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",

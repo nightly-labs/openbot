@@ -15,6 +15,7 @@ import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
 import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
+import { pendingSkillSuggestionNote } from "./skill-suggestion";
 
 export function responseAttachmentMessageId(threadId: string, turnId: string, callId: string): string {
   const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
@@ -333,6 +334,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
     if (waits) text += `\n\n${waits}`;
   }
+  const skillSuggestion = pendingSkillSuggestionNote(
+    delivery,
+    snapshot.messages,
+    agentNames.get(delivery.recipientAgentId) ?? "Agent",
+  );
+  if (skillSuggestion) text = `${skillSuggestion}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   if (managedAttachments.length) {
     text += `${ATTACHED_FILES_HEADER}${managedAttachments.map((item) => `- ${item.name}: ${item.path}`).join("\n")}`;
   }
@@ -394,6 +401,14 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
     "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
     "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
+}
+
+/** The note for a turn that a failed compaction stopped: the connection failed or stopped during it. */
+export function compactionContinuationPrompt(): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn stopped because the connection failed while your context was compacted.",
+    "Continue the work now, from where you stopped. Do not repeat finished work or restate earlier answers. Check the result of an action that was interrupted before you do it again. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
   ].join("\n");
 }
 

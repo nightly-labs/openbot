@@ -21,7 +21,7 @@ import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
-import { inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
+import { hasCredentialHeader, inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
   type McpEndpoint,
   type McpEndpointRefusal,
@@ -508,6 +508,16 @@ export class McpGateway {
         signedIn: oauth?.signedIn(config.url) ?? false,
         needsSignIn: oauth?.needsSignIn(config.url) ?? false,
       }));
+  }
+
+  /**
+   * Whether an http row that answered without a sign-in offers one. A key the user pasted into a
+   * header is theirs to manage: a sign-in would not replace it.
+   */
+  offersSignIn(config: McpServerConfig): Effect.Effect<boolean> {
+    const oauth = this.#oauth;
+    if (!oauth || config.transport !== "http" || hasCredentialHeader(config)) return Effect.succeed(false);
+    return oauth.offersSignIn(config.url);
   }
 
   /**

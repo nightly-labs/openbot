@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
-import { appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
@@ -125,6 +126,8 @@ interface UpdateServiceOptions {
   /** The uid of this process. It tells a refusal in this account apart from another account. */
   currentUid?: number | undefined;
   platform?: NodeJS.Platform;
+  /** macOS: the application bundle that Squirrel.Mac replaces. */
+  appBundlePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
@@ -212,6 +215,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   > &
     Pick<
       UpdateServiceOptions,
+      | "appBundlePath"
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
@@ -609,6 +613,11 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       );
       if (siblings.length > 0)
         return yield* new UpdateOperationFailure({ cause: new Error(this.#siblingSessionMessage(siblings)) });
+      const bundle = this.#options.platform === "darwin" ? this.#options.appBundlePath : undefined;
+      if (bundle && (yield* isOnReadOnlyVolume(bundle))) {
+        logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
+      }
       if (this.#managedByHost) return yield* new UpdateOperationFailure({ cause: new Error(MANAGED_HOST_MESSAGE) });
       if (!this.#canInstall() || this.#installStarted)
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.notReady")) });
@@ -937,6 +946,21 @@ function logUpdateFailure(text: string, error: unknown): void {
       statusCode: "statusCode" in fields ? fields.statusCode : undefined,
       message: error instanceof Error ? error.message : error,
     }),
+  );
+}
+
+/**
+ * Squirrel.Mac cannot replace an application on a read-only volume, and it finds this only inside
+ * `quitAndInstall`, after shutdown preparation. macOS App Translocation runs a quarantined app from
+ * such a volume, and so does an app opened from its disk image. Checked first, the app stays open.
+ */
+function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
+  if (bundlePath.includes("/AppTranslocation/")) return Effect.succeed(true);
+  return updateIO(() => access(bundlePath, constants.W_OK)).pipe(
+    Effect.as(false),
+    Effect.catch(({ cause }) =>
+      Effect.succeed(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "EROFS"),
+    ),
   );
 }
 

@@ -151,6 +151,17 @@ refuses with 409 while a turn runs or a message waits, or when the provider cann
 The progress and the result arrive in the `compaction` of `context-usage-v1`. Protocol 9 only. The web
 client shows no context meter, so it does not use the capability.
 
+### Delete history and channel context
+
+`chat-history-v1` (`team-protocol/chat-history-v1.ts`) adds `POST /v1/agent-history/delete` with
+`{ agentId }`, and `POST /v1/channels/context/clear`, `/v1/channels/context/compact` and
+`/v1/channels/history/delete` with `{ channelId }`. They run the same host operations as "Delete
+history" in agent settings, and "New conversation", "Compact now" and "Delete history" in channel
+settings. A member with manage access to the agent deletes its history. A member who sees a channel
+starts a new conversation or compacts it; only an owner or admin deletes the channel history, and the
+desktop hides that row from a member. A host without the capability does not show the rows. Protocol
+9 only.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
@@ -590,6 +601,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
+| `custom-provider-edit-v1` | List, add, edit and remove custom endpoints. A list names each endpoint's harness and header names. An edit changes the name, address, models, key and headers; no key keeps the saved key, and `value: null` keeps a saved header value. The host keeps the harness and the limits of each kept model. Protocol 9 only | `providerAdmin` |
 | `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `codex-api-key-v1` | No routes. The host logs Codex in with an OpenAI API key sent through the `apiKeySet` route of `providers-v1`, `-v5` or `-v8` | `providerAdmin` |
@@ -603,6 +615,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
@@ -697,6 +710,29 @@ background memory reviews of the host's agents (`openbot-memory-review-v1.json`;
 other values. The agent service reads the value at each use, so a change applies from the next turn.
 Server settings → General → Agents → Memory review sets it for this computer
 (`hostAdmin.setMemoryReview`, local handler) and for a joined server.
+
+`skill-learning-v1` reads and sets what the background memory reviews of the host's agents do when a
+chat teaches an agent a skill (`openbot-skill-learning-v1.json`; `automatic`, the default, writes
+and installs the skill for that agent; `ask` asks the user in the chat first; `off` does neither).
+The snapshot gives the mode and the modes that the host permits; the host refuses other values. A
+client shows an unknown mode from a later host as its raw value. The agent service reads the value
+at each review. Server settings → General → Agents → Skill learning sets it for this computer
+(`hostAdmin.setSkillLearning`, local handler) and for a joined server.
+
+The capability also carries the skill question card (see [providers.md](providers.md#skill-suggestions)).
+A skill question message (`itemType` `skill-suggestion:*`) gets `skillSuggestion: { name }` on the
+wire. The frozen protocol 9 projection drops it, so the host adds it after the projection, for a
+connection that advertises the capability only: in HTTP bodies, WebSocket events, and WebRTC bodies
+and event frames (`withSkillSuggestionNames`, `addSkillSuggestionNames`), as `ui-block-vault-v1`
+does for Vault requests. The filtered conversation cache key includes the capability. The team
+client (`remote-peer.ts`, web) and the desktop joined-server transports
+(`team-webrtc-client-transport.ts` for a host on protocol 9, `remote-server-http.ts` and
+`remote-server-event-stream.ts` when they advertise the capability) copy the key back after the
+frozen decode.
+`POST /v1/skill-suggestions/save` (`{ agentId, messageId }` → `{ saved }`) saves the skill of that
+question with the host's background writer. A member needs chat level on the agent: a viewer gets
+403, and a hidden or missing agent 404. `saved: false` means the host saved nothing; the client then
+sends the user's yes. The desktop handler asks a joined host only when it advertises the capability.
 
 `agent-notification-levels-v1` reads and sets the notification levels that the signed-in member chose
 on this server, for all of their devices: the level of the whole server (`server`, `null` until they

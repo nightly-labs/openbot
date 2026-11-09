@@ -123,6 +123,8 @@ export const messages = {
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "No hay modelos disponibles de {name}.",
+  "provider.picker.museNoModels":
+    "Muse no envió modelos para esta cuenta. Es posible que Muse no esté disponible en el país donde se ejecuta este agente. Elige un modelo de otro proveedor.",
   "provider.picker.customEmpty":
     "Añade un endpoint compatible con OpenAI: un servidor de modelos en este equipo o cualquier servicio con una URL base y una clave.",
   "provider.picker.customPending":

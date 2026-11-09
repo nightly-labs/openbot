@@ -343,7 +343,8 @@ const Settings = createSimpleContext({
       if (
         AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key]) ||
         previous.agentDefaults.planStartAfterMs !== value.agentDefaults.planStartAfterMs ||
-        previous.agentDefaults.automationRunsPerHour !== value.agentDefaults.automationRunsPerHour
+        previous.agentDefaults.automationRunsPerHour !== value.agentDefaults.automationRunsPerHour ||
+        previous.agentDefaults.commitCoAuthor !== value.agentDefaults.commitCoAuthor
       ) {
         agentDefaultsChanged = true;
         persistField("agentDefaults", settingsPort().setAgentDefaults({ ...value.agentDefaults }), (saved) => saved);

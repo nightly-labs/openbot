@@ -69,6 +69,7 @@ export const messages = {
   "error.team.channelTaskCancelUnsupported":
     "L’annulation des tâches de canal n’est pas prise en charge par cette connexion.",
   "error.team.membersCannotDeleteChannels": "Les membres ne peuvent pas supprimer de canaux.",
+  "error.team.membersCannotDeleteChannelHistory": "Les membres ne peuvent pas supprimer l’historique du canal.",
   "error.team.membersCannotArchiveChannels": "Les membres ne peuvent pas archiver de canaux.",
   "error.team.membersCannotRestoreChannels": "Les membres ne peuvent pas restaurer de canaux.",
   "error.team.sharedDataUnsupported": "Les données partagées ne sont pas prises en charge par cette connexion.",
@@ -121,6 +122,8 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Cette connexion ne prend pas en charge les dossiers des agents.",
   "error.team.folderUnavailable": "Ce dossier n’est pas disponible sur l’ordinateur hôte.",
   "error.team.memoryReviewUnsupported": "Cette connexion ne prend pas en charge la revue des souvenirs.",
+  "error.team.skillLearningUnsupported":
+    "L’apprentissage des compétences n’est pas pris en charge par cette connexion.",
   "error.team.promptCacheTtlUnsupported": "Cette connexion ne prend pas en charge la durée du cache de prompt.",
   "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",

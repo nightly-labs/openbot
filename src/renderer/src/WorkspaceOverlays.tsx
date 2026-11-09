@@ -651,8 +651,16 @@ function ServerSettings() {
       },
       onAddCustomProvider: endpoints.saveCustomProvider,
       onDeleteCustomProvider: endpoints.deleteCustomProvider,
-      // The Team API has no edit route, so only this computer's endpoints have Edit.
-      onUpdateCustomProvider: local ? localEndpoints.updateCustomProvider : undefined,
+      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`. A list read
+      // before the host's capabilities arrived has no header names, and an edit from it would send no
+      // headers and delete the saved ones, so Edit waits for the list of that route.
+      get onUpdateCustomProvider() {
+        if (local) return endpoints.updateCustomProvider;
+        const editable =
+          serverSupportsCapability(server, "custom-provider-edit-v1") &&
+          endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
+        return editable ? endpoints.updateCustomProvider : undefined;
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },
@@ -880,6 +888,7 @@ function ServerSettings() {
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
+          skillLearning={{}}
           hostPromptCacheTtl={{}}
           claudeUserSetup
           hostModelVisibility={{}}

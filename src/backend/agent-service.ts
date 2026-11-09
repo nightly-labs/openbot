@@ -90,6 +90,7 @@ import type {
   SaveAgentProfileResult,
   SaveMcpServerInput,
   SaveMcpSignInAppInput,
+  SaveSkillSuggestionInput,
   SendMessageInput,
   SentMessageStats,
   SetAgentHiddenInput,
@@ -135,6 +136,7 @@ import {
   type ModelSwitchReason,
   type QueueSteerFallback,
   type ResponseStyle,
+  type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOWS_USAGE_ID,
@@ -185,6 +187,7 @@ import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-to
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
+import type { ReviewSkill } from "./agent/memory-review-prompt";
 import { MessageDeletion } from "./agent/message-deletion";
 import {
   creationModel,
@@ -218,6 +221,7 @@ import type { ScreenCaptureHost } from "./agent/screen-capture";
 import { SessionSettings } from "./agent/session-settings";
 import { SIDE_QUESTION_CHAT_MESSAGES, sideQuestionPrompt } from "./agent/side-question";
 import type { AgentSidebar } from "./agent/sidebar-tools";
+import type { SkillLearner } from "./agent/skill-learning";
 import type { LocalSkillTools } from "./agent/skill-tools";
 import {
   agentProviderAccount,
@@ -231,6 +235,7 @@ import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operati
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
+import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
 import type { AgentApiKeys } from "./agent-api-keys";
@@ -336,6 +341,8 @@ export interface AgentServiceOptions {
   visualPreview?: ChatVisualPreviewHost | null;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null;
+  /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
+  videoReader?: VideoReaderHost | null;
   /**
    * What an agent's MCP server test waits for first, as the Test button does: the managed tool
    * runtimes a stdio command may need. Without it the test runs with what this machine holds.
@@ -361,6 +368,18 @@ export interface AgentServiceOptions {
   providerAccounts?: ProviderAccountStore;
   saveProviderUse?: (provider: AgentProvider, on: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
   localSkillTools?: (() => LocalSkillTools) | undefined;
+  /**
+   * The skills that an agent has, read from this computer only. A memory review reads them to suggest
+   * a new skill or a change to one. Omitted, a review does not suggest skills.
+   */
+  reviewSkills?: ((agentId: string) => Effect.Effect<readonly ReviewSkill[], unknown>) | undefined;
+  /**
+   * The server setting for the skills that a memory review finds: save them, ask first, or do not look
+   * for them. The main process owns the preference. Omitted, the review asks first.
+   */
+  skillLearning?: (() => SkillLearningMode) | undefined;
+  /** Saves a skill that a memory review finds. Built after the service, so read at each use. */
+  skillLearner?: (() => SkillLearner) | undefined;
   /** Built after the service, so read when a tool call needs it. */
   routineFlowTools?: () => RoutineFlowTools;
   /** Built after the service, so read when a tool call needs it. */
@@ -677,6 +696,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       ...(options.agentMemoryLimit ? { limit: options.agentMemoryLimit } : {}),
     });
+    const reviewSkills = options.reviewSkills;
+    const skillLearner = options.skillLearner;
     this.#memoryReview = new MemoryReview({
       memories: this.#memories,
       profileClients: this.#profileClients,
@@ -712,6 +733,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         sideThreadId
           ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "thread.memory-reviewed")
           : this.#appendSystemMessage(agentId, message, "thread.memory-reviewed"),
+      ...(reviewSkills ? { skills: reviewSkills } : {}),
+      ...(options.skillLearning ? { skillLearning: options.skillLearning } : {}),
+      ...(skillLearner
+        ? {
+            skillLearner: {
+              read: (skillId) => Effect.suspend(() => skillLearner().read(skillId)),
+              save: (agentId, draft) => Effect.suspend(() => skillLearner().save(agentId, draft)),
+            },
+          }
+        : {}),
       redact: (text) => this.#mcp.redact(text),
       stopping: () => this.#stopping,
       ...(options.memoryReviewIdleMs === undefined ? {} : { idleMs: options.memoryReviewIdleMs }),
@@ -1171,6 +1202,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // Only a server has a memory reading.
       serverHost: hostMemory !== null,
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
+      memoryReview: () => this.#memoryReview.running(),
+      skillRevision: () => options.skillLearning?.() === "automatic",
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
@@ -1504,7 +1537,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
-        mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
+        mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
@@ -1639,7 +1672,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
-        mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
+        mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
@@ -1743,6 +1776,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
+      ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       feedbackFacts: options.feedbackFacts ?? null,
@@ -1754,6 +1788,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
+        providerStatuses: () => this.getStatus().providers ?? [],
         preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) =>
           this.createAgent(
@@ -1881,6 +1916,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * instructions of the new style. A running turn keeps its instructions.
    */
   responseStyleChanged(): void {
+    for (const agent of this.#store.list()) this.#conversation.unloadAgentThreads(agent.id);
+  }
+
+  /**
+   * Skill learning moved into or out of Automatic, which adds or removes the skill revision line.
+   * Each agent's next turn opens its session again with the new instructions.
+   */
+  skillRevisionChanged(): void {
     for (const agent of this.#store.list()) this.#conversation.unloadAgentThreads(agent.id);
   }
 
@@ -2567,6 +2610,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     },
     Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "ask side question", cause: failure.cause })),
   ).bind(this);
+
+  /**
+   * Save on a skill question of the `ask` mode in the agent's own chat. The memory review writes and
+   * saves the skill in the background. `saved: false` tells the card to send the user's yes to the
+   * agent instead.
+   */
+  readonly saveSkillSuggestion = Effect.fn("AgentService.saveSkillSuggestion")(function* (
+    this: AgentService,
+    input: SaveSkillSuggestionInput,
+  ) {
+    const agent = this.listAgents().find((candidate) => candidate.id === input.agentId);
+    if (!agent || this.#stopping) return { saved: false };
+    const saved = yield* this.#memoryReview.saveSuggestion(agent.id, null, input.messageId);
+    return { saved };
+  }).bind(this);
 
   /**
    * Answers one model step of a workflow. Like a side question, the generation has no tools, no
@@ -3465,6 +3523,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#usageLimitReady(choice) &&
         !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
     );
+  }
+
+  /**
+   * Whether a ready model continues work that a usage limit stopped after it started: a backup in the
+   * agent's order, or the model the agent left, once no limit holds it. The move after the turn goes
+   * back to that model first, so the work goes with it (#6022).
+   */
+  #mayContinueStoppedWork(agentId: string): boolean {
+    const returnTo = this.#store.list().find((candidate) => candidate.id === agentId)?.usageLimitReturn;
+    return Boolean(returnTo && this.#usageLimitReady(returnTo)) || this.#usageLimitBackup(agentId, true) !== undefined;
   }
 
   /**

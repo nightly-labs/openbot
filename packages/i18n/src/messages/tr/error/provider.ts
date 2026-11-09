@@ -423,6 +423,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse metin veya görsel gerektirir.",
   "error.provider.museMethodUnsupported": "Muse {method} yöntemini desteklemiyor.",
   "error.provider.museTurnFailed": "Muse turu başarısız oldu.",
+  "error.provider.museModelUnavailable":
+    "Muse bu modeli kullanamıyor. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir ya da bu hesabın modele erişimi olmayabilir. Başka bir model seçip yeniden deneyin.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse, harici araçlara erişim olmadan profil oluşturamaz. Profili oluşturmak için başka bir sağlayıcı kullanın, ardından ajan için Muse'u seçin.",
   "error.provider.museAuthUnverified":

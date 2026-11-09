@@ -29,6 +29,7 @@ import type { RequestedUpdate } from "../requested-update";
 import type { ServerAuditStore } from "../server-audit-store";
 import type { ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import type { ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
+import type { SkillLearningPreferenceStore } from "../skill-learning-preference-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
 //
@@ -106,6 +107,7 @@ type TeamApiAgentMethods = Pick<
   | "listConversationReads"
   | "generateProfile"
   | "askSideQuestion"
+  | "saveSkillSuggestion"
   | "saveProfile"
   | "createAgent"
   | "committedAgentDuplication"
@@ -164,6 +166,10 @@ type TeamApiAgentMethods = Pick<
   | "reorderQueue"
   | "interrupt"
   | "clearAgentContext"
+  | "deleteAgentHistory"
+  | "clearChannelContext"
+  | "compactChannelContext"
+  | "deleteChannelHistory"
   | "compactAgentContext"
   | "compactTaskContext"
   | "agentIdForRequest"
@@ -491,6 +497,8 @@ export interface TeamApiAdmin {
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */
   memoryReview?: MemoryReviewPreferenceStore;
+  /** `skill-learning-v1`: what this computer's memory reviews do when a chat teaches an agent a skill. */
+  skillLearning?: SkillLearningPreferenceStore;
   /** `prompt-cache-ttl-v1`: how long the provider keeps the prompt cache of this computer's agents. */
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   /** `model-visibility-v1`: which models the model picker of this computer shows, for each provider. */

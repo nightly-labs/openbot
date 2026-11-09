@@ -886,9 +886,18 @@ export class ChannelService {
         // open work, such as a task that failed days ago, does not make it ambiguous: the request of
         // the newest stopped task chooses, and every stopped task of that request continues. A task
         // that the user stopped comes before one that failed, and a member named as the recipient
-        // continues its own stopped task before it takes over the task of another member.
+        // continues its own stopped task before it takes over the task of another member. A restart
+        // or a failed turn can stop a subtask while its parent waits for it, and that subtask is the
+        // stopped work of the request (#6010).
         const failedRoots = roots.filter((task) => task.state === "failed");
-        const stoppedRoots = pausedRoots.length ? pausedRoots : failedRoots;
+        const heldSubtasks = open.filter(
+          (task) =>
+            task.parentTaskId !== null &&
+            open.some((parent) => parent.id === task.parentTaskId && parent.state === "waiting"),
+        );
+        const paused = [...pausedRoots, ...heldSubtasks.filter((task) => task.state === "paused")];
+        const failed = [...failedRoots, ...heldSubtasks.filter((task) => task.state === "failed")];
+        const stoppedTasks = paused.length ? paused : failed;
         const sequence = (task: ChannelTask) =>
           messages.find((message) => message.id === task.sourceMessageIds[0])?.sequence ?? 0;
         const newest = (tasks: ChannelTask[]) =>
@@ -896,10 +905,10 @@ export class ChannelService {
             (found, task) => (!found || sequence(task) > sequence(found) ? task : found),
             undefined,
           );
-        const newestStopped = newest(stoppedRoots);
-        const stoppedRequest = newestStopped ? stoppedRoots.filter((task) => sameRequest(task, newestStopped)) : [];
+        const newestStopped = newest(stoppedTasks);
+        const stoppedRequest = newestStopped ? stoppedTasks.filter((task) => sameRequest(task, newestStopped)) : [];
         const own = (tasks: ChannelTask[]) => newest(tasks.filter((task) => task.ownerAgentId === recipients[0]));
-        const recipientStopped = own(pausedRoots) ?? own(failedRoots);
+        const recipientStopped = own(paused) ?? own(failed);
         const continued: ChannelTask[] =
           recipients.length > 1
             ? []
@@ -927,15 +936,19 @@ export class ChannelService {
           !previous && referenced && !referenced.taskId && referenced.author.kind === "agent"
             ? eligible.find((agentId) => agentId === referenced.author.id)
             : undefined;
+        // A held reply task still answers the member that waits for it, as the Continue control
+        // keeps it: it keeps its reply message and its reply rules.
+        const heldReply = (item: ChannelTask) =>
+          !referenced && isReplyTask(item) && heldSubtasks.some((task) => task.id === item.id);
         const resumed = continued.map(
           (item, index): ChannelTask => ({
             ...item,
             // The task keeps the request it was made for. The new message is its request now, and the
             // dispatch and the packet give it as a follow-up: "continue" alone is no assignment.
             dependencies: [],
-            requestMessageId: id,
+            requestMessageId: heldReply(item) ? item.requestMessageId : id,
             // A resumed reply task answers the person now, not the member that replied.
-            expectedResult: isReplyTask(item) ? TASK_EXPECTED_RESULT : item.expectedResult,
+            expectedResult: isReplyTask(item) && !heldReply(item) ? TASK_EXPECTED_RESULT : item.expectedResult,
             sourceMessageIds: [...item.sourceMessageIds.slice(-30), id],
             revision: item.revision + 1,
             state: "queued",
@@ -1675,15 +1688,21 @@ export class ChannelService {
           }
           // Idle stays silent: the lead judged that nothing needs doing, so there is no dispatch. A
           // message that names a member is never idle: "Thanks @Ana" or "hi @Ana" gets Ana's answer, as
-          // a person who is named in a group chat answers.
+          // a person who is named in a group chat answers. An agent writes a name as text, not as a tag,
+          // so a typed "@Name" anywhere counts too; idle completed such a request with no answer (#5964).
+          // An "@" in a link or in a tag, such as a quote, names no one.
           const eligible = this.eligibleMembers(channel);
+          const tags = chatTagReferences(task.instruction);
           const named = [
-            ...new Set(
-              chatTagReferences(task.instruction)
+            ...new Set([
+              ...tags
                 .filter((reference) => reference.kind === "agent")
                 .map((reference) => reference.id)
                 .filter((agentId) => eligible.includes(agentId)),
-            ),
+              ...("idle" in decision ? [...task.instruction.matchAll(/(?<=^|[\s(])@/gu)] : [])
+                .filter((match) => !tags.some((tag) => match.index >= tag.start && match.index < tag.end))
+                .flatMap((match) => this.#typedAddress(eligible, task.instruction.slice(match.index))),
+            ]),
           ];
           if ("idle" in decision && !named.length) {
             channelResult(

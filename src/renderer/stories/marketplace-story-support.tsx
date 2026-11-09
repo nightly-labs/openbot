@@ -16,6 +16,7 @@ import type {
   MarketplaceApp,
   MarketplaceAppAccount,
   MarketplaceAppConnection,
+  MarketplaceAppsBlock,
   MarketplaceModel,
 } from "@openbot/ui/features/marketplace/marketplace-model";
 import {
@@ -241,6 +242,8 @@ type HeldState = "connected" | "signInNeeded";
 export interface StoryProps {
   /** A member of a joined server browses and adds nothing. */
   member?: boolean;
+  /** Why a member cannot connect apps, as the app page says it. */
+  blocked?: MarketplaceAppsBlock;
   empty?: boolean;
   /** What the app's server answers when Connect opens its dialog. */
   outcome?: ConnectOutcome;
@@ -307,6 +310,7 @@ function pluginStatus(held: HeldState | undefined): MarketplaceApp["status"] {
 export function MarketplaceStory(props: StoryProps) {
   const {
     member,
+    blocked,
     empty,
     start,
     held = FIRST_HELD,
@@ -542,6 +546,7 @@ export function MarketplaceStory(props: StoryProps) {
 
     apps: () => state.apps,
     canConnectApps: () => !member,
+    appsBlocked: () => (member ? blocked : undefined),
     appBusy: (id) => Boolean(state.busy[id]),
     connectApp: async (app) => {
       setBusy(app.id, true);

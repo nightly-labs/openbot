@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.65.0",
+  "version": "0.66.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -305,6 +305,7 @@
     "test:provider-runtime-remove": "bun scripts/provider-runtime-remove-e2e.ts",
     "test:provider-exit-session": "bun scripts/provider-exit-session-e2e.ts",
     "test:codex-hung-app-server": "bun scripts/codex-hung-app-server-e2e.ts",
+    "test:codex-midturn-compaction": "bun scripts/codex-midturn-compaction-e2e.ts",
     "test:codex-state-busy": "bun scripts/codex-state-busy-e2e.ts",
     "test:codex-subagent-steps": "bun scripts/codex-subagent-steps-e2e.ts",
     "test:subagent-status": "bun scripts/subagent-status-e2e.ts",
@@ -378,6 +379,7 @@
     "test:agent-waits-tools": "bun scripts/agent-waits-tools-e2e.ts",
     "test:agent-hide-restore": "bun scripts/agent-hide-restore-e2e.ts",
     "test:memory-review": "bun scripts/memory-review-e2e.ts",
+    "test:skill-revision": "bun scripts/skill-revision-e2e.ts",
     "test:plan-continuation": "bun scripts/plan-continuation-e2e.ts",
     "test:messaging-pause-resume": "bun scripts/messaging-pause-resume-e2e.ts",
     "test:messaging-discord-access": "bun scripts/messaging-discord-access-e2e.ts",
@@ -556,7 +558,8 @@
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
     "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
     "expo-widgets@58.0.22": "patches/expo-widgets@58.0.22.patch",
-    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch"
+    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
+    "@norbert_bodziony/bloub@0.6.4": "patches/@norbert_bodziony%2Fbloub@0.6.4.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

@@ -1,3 +1,15 @@
+/*
+ * The idle greeting emojis, cut from Noto Color Emoji (SIL Open Font License 1.1; see
+ * noto-greeting-emoji-OFL.txt). A Linux desktop or server with no emoji font shows them with it.
+ * It is last in the font list, so a system emoji font comes first.
+ */
+@font-face {
+  font-family: "OpenBot Greeting Emoji";
+  src: url("../../assets/fonts/noto-greeting-emoji.woff2") format("woff2");
+  unicode-range: U+2728, U+1F44B, U+1F44F, U+1F604, U+1F60A, U+1F64C, U+1FAF6;
+  font-display: block;
+}
+
 :root[data-surface="dynamic-island"],
 :root[data-surface="dynamic-island"] body,
 :root[data-surface="dynamic-island"] #root {
@@ -174,7 +186,7 @@
   height: var(--openbot-icon-md);
   display: block;
   flex: 0 0 auto;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "OpenBot Greeting Emoji", sans-serif;
   font-size: var(--openbot-text-xl);
   line-height: 1;
   transition:

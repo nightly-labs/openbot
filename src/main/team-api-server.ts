@@ -123,6 +123,7 @@ import {
   ROUTINE_RUN_PLACE_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -149,6 +150,7 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -174,6 +176,7 @@ import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { withSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -279,6 +282,7 @@ import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeBrowserProxies } from "./team-api/route-browser-proxies";
 import { routeChannels } from "./team-api/route-channels";
 import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/route-chat-colors";
+import { routeChatHistory } from "./team-api/route-chat-history";
 import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
@@ -328,6 +332,8 @@ import { routeSideQuestion } from "./team-api/route-side-question";
 import { routeSidebarFolders } from "./team-api/route-sidebar-folders";
 import { routeSidebarPins } from "./team-api/route-sidebar-pins";
 import { routeSignInRelay } from "./team-api/route-sign-in-relay";
+import { routeSkillLearning } from "./team-api/route-skill-learning";
+import { routeSkillSuggestionSave } from "./team-api/route-skill-suggestion-save";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
@@ -1155,6 +1161,7 @@ export class TeamApiServer {
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentMemoryLimit(context, this.#options.admin)) === "handled") return;
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
+      if ((await routeSkillLearning(context, this.#options.admin)) === "handled") return;
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
       if ((await routeModelVisibility(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDefault(context, this.#options.admin)) === "handled") return;
@@ -1177,11 +1184,13 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
+      if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
       if ((await routeConversationUnreadFrom(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeConversationFiles(context, this.#options.agents)) === "handled") return;
       if ((await routeSideQuestion(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeSkillSuggestionSave(context, this.#options.agents, hidden)) === "handled") return;
       if (
         (await routeLiveVoice(context, {
           liveVoice: this.#options.liveVoice,
@@ -1404,7 +1413,10 @@ export class TeamApiServer {
       const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
         ? withUiBlockAutoAnswers(encoded, visible)
         : encoded;
-      return capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY) ? withUiBlockVaultRequests(answered, visible) : answered;
+      const withVault = capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
+        ? withUiBlockVaultRequests(answered, visible)
+        : answered;
+      return capabilities.has(SKILL_LEARNING_CAPABILITY) ? withSkillSuggestionNames(withVault, visible) : withVault;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1661,7 +1673,7 @@ export class TeamApiServer {
           ))
       ) {
         // The payloads are shared between clients, so the key holds what the roles allow too.
-        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -2196,9 +2208,12 @@ export class TeamApiServer {
     const answered = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
       ? withUiBlockAutoAnswers(encoded, effortValue)
       : encoded;
-    const body = route.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
+    const withVault = route.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
       ? withUiBlockVaultRequests(answered, effortValue)
       : answered;
+    const body = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
+      ? withSkillSuggestionNames(withVault, effortValue)
+      : withVault;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -2439,7 +2454,8 @@ export class TeamApiServer {
             capability === PROVIDERS_V4_CAPABILITY ||
             capability === PROVIDERS_V5_CAPABILITY ||
             capability === PROVIDERS_V8_CAPABILITY ||
-            capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY
+            capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY ||
+            capability === CUSTOM_PROVIDER_EDIT_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
           if (capability === CLAUDE_API_KEY_CAPABILITY || capability === CODEX_API_KEY_CAPABILITY)
@@ -2454,6 +2470,7 @@ export class TeamApiServer {
           if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
           if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
           if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
+          if (capability === SKILL_LEARNING_CAPABILITY) return this.#options.admin?.skillLearning !== undefined;
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
           if (capability === MODEL_VISIBILITY_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;

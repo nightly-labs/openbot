@@ -80,7 +80,7 @@ function measure(): Map<string, number> {
     ["catalog.schemas", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.inputSchema))],
     ["catalog.descriptions", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.description))],
     ["guidance", sum([...guidance])],
-    ["list-models.fixture", bytes(listModelsPayload(syntheticModels(), "codex", () => undefined))],
+    ["list-models.fixture", bytes(listModelsPayload(syntheticModels(), "codex", () => undefined, []))],
   ]);
 }
 

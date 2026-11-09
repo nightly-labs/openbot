@@ -62,7 +62,15 @@ export type AgentDefaults = Record<AgentDefaultKey, boolean> & {
    * script that loops from spending the user's provider quota.
    */
   automationRunsPerHour: number;
+  /** Agents end each git commit message that they write with `OPENBOT_COMMIT_TRAILER`, for all agents. */
+  commitCoAuthor: boolean;
 };
+
+/**
+ * The trailer that names OpenBot as a co-author of a commit. The address is the GitHub noreply address
+ * of the `openbotgit[bot]` account (user id 335604065), so GitHub links the co-author to the OpenBot app.
+ */
+export const OPENBOT_COMMIT_TRAILER = "Co-authored-by: OpenBot <335604065+openbotgit[bot]@users.noreply.github.com>";
 
 /** The plan card start time that every agent had before the setting existed. */
 export const DEFAULT_PLAN_START_AFTER_MS = 10_000;
@@ -75,13 +83,14 @@ export const DEFAULT_AUTOMATION_RUNS_PER_HOUR = 30;
 export const MIN_AUTOMATION_RUNS_PER_HOUR = 1;
 export const MAX_AUTOMATION_RUNS_PER_HOUR = 10_000;
 
-/** Off, which is what every agent had before the defaults existed. */
+/** Off, which is what every agent had before the defaults existed. The commit co-author is on. */
 export const DEFAULT_AGENT_DEFAULTS: AgentDefaults = {
   allowAutomation: false,
   allowNewChat: false,
   quickAcknowledgement: false,
   planStartAfterMs: DEFAULT_PLAN_START_AFTER_MS,
   automationRunsPerHour: DEFAULT_AUTOMATION_RUNS_PER_HOUR,
+  commitCoAuthor: true,
 };
 
 export function isAutomationRunsPerHour(value: unknown): value is number {
@@ -109,7 +118,8 @@ export function isAgentDefaults(value: unknown): value is AgentDefaults {
     isDynamicRecord(value) &&
     AGENT_DEFAULT_KEYS.every((key) => isBoolean(value[key])) &&
     isPlanStartAfterMs(value.planStartAfterMs) &&
-    isAutomationRunsPerHour(value.automationRunsPerHour)
+    isAutomationRunsPerHour(value.automationRunsPerHour) &&
+    isBoolean(value.commitCoAuthor)
   );
 }
 

@@ -129,6 +129,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "在 {name} 桌面应用中运行，地址为 {address}。",
   "marketplace.app.setup.desktopConnected": "已连接到 {address}。",
   "marketplace.app.setup.open": "无需登录或密钥。",
+  "marketplace.app.blocked.update":
+    "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
+  "marketplace.app.blocked.member":
+    "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",

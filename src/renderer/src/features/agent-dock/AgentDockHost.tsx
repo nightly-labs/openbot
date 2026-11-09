@@ -1,31 +1,55 @@
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_DOCK_LIMITS,
   type AgentDockAgent,
+  type AgentDockChannel,
   type AgentDockChat,
   type AgentDockMessage,
   type AgentDockPresentation,
   type AgentDockResult,
+  type AgentDockSeat,
+  type AgentDockSeatRef,
   type AgentDockSeatState,
+  type ChannelPage,
+  type ChannelSummary,
   isAttachmentSummary,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
-import { AgentDock, type AgentDockChatModel } from "@openbot/ui/features/agent-dock/AgentDock";
+import {
+  AgentDock,
+  type AgentDockChatModel,
+  type AgentDockSendResult,
+  type AgentDockChannel as AgentDockUiChannel,
+  type AgentDockSeat as AgentDockUiSeat,
+} from "@openbot/ui/features/agent-dock/AgentDock";
 import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
+import { sidebarChannelWaits, sidebarUnreadBadge } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
+import { useTurns } from "../../turns";
+import { useAuth } from "../account/account-context";
 import { createAgentActivity } from "../agents/agent-activity";
 import { useAgents } from "../agents/agents-context";
+import {
+  channelConversationRows,
+  channelMessageHasContent,
+  sentChannelMessageId,
+} from "../channels/channel-conversation-rows";
+import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
+import { isReaderAuthor } from "../team/reader-identity";
+import { usePresence } from "../team/team-context";
 import { agentDockPort } from "./agent-dock-port";
 import {
   type AgentDockPlacement,
@@ -39,26 +63,55 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 
 /**
  * Where this window shows the dock. Null hides the dock: the user turned it off, the platform is not
- * known yet, or it is not macOS. The agent dock is a macOS feature.
+ * known yet, or it has no dock. On Linux with Wayland windows, the dock above other apps waits for a
+ * start on XWayland, and shows in the window until then.
  */
 export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const platform = usePlatform();
   const preference = useAgentDockPreference();
   return () => {
     const info = platform.appInfo();
-    if (info?.platform !== "darwin" || !preference().shown) return null;
-    return preference().placement;
+    if (!info || !preference().shown) return null;
+    const placement = preference().placement;
+    return placement === "screen" && info.aboveAppsSupport ? "window" : placement;
   };
 }
 
 /**
- * The agent dock of the active server, on macOS only. Each server has its own dock. By default the dock
+ * The agent dock of the active server, on macOS, Windows and Linux. Each server has its own dock. By default the dock
  * is a window of its own at the right edge of the screen, above the other apps; this renderer publishes
  * what it shows. The user can keep it in the main window instead.
  */
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
+  const platform = usePlatform();
+  const preference = useAgentDockPreference();
+
+  /* Linux: a dock that is off or in the window does not need XWayland, so the next start on a Wayland
+     session uses Wayland again. A dock that the user turns on again on XWayland keeps it; a dock that
+     was on at start does not, so a start on XWayland for another reason stays a single start. On
+     Wayland, only the restart in the settings turns it on. */
+  let wasOn: boolean | undefined;
+  createEffect(
+    () => {
+      const info = platform.appInfo();
+      if (info?.platform !== "linux") return undefined;
+      return {
+        on: preference().shown && preference().placement === "screen",
+        onWayland: info.aboveAppsSupport !== undefined,
+      };
+    },
+    (state) => {
+      if (state === undefined) return;
+      const turnedOn = state.on && wasOn === false;
+      wasOn = state.on;
+      if (state.on && (!turnedOn || state.onWayland)) return;
+      void agentDockPort()
+        .agentDock.setXWayland({ enabled: state.on })
+        .catch(() => undefined);
+    },
+  );
 
   /* The window hides when no server is active, when the dock is off or in the main window, and when
      this renderer goes away. */
@@ -92,14 +145,20 @@ export function AgentDockHost() {
   );
 }
 
-/** The seats, the agents and the chats of one server's dock, and what its actions change. */
+/** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
   const { agentList, userHiddenAgentIds } = useAgents();
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply } = useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
   const { sidebarLayout, pinnedSidebarItems } = useSidebar();
+  const channels = useChannels();
+  const { approvals, pendingPrompts } = useTurns();
+  const { currentTeamMember } = usePresence();
+  const auth = useAuth();
+  const { activeServer } = useServers();
+  const { t, errorMessage } = useText();
   const preference = useAgentDockPreference();
-  const seatIds = createMemo(
+  const seatRefs = createMemo(
     () =>
       agentDockSeats(
         serverId,
@@ -113,51 +172,206 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       ),
     { equals: sameAgentDockSeats },
   );
-  const [openAgentId, setOpenAgentId] = createSignal<string | null>(null);
+  const [openSeat, setOpenSeat] = createSignal<AgentDockSeatRef | null>(null);
+  const openChannelId = createMemo(() => {
+    const seat = openSeat();
+    return seat?.kind === "channel" ? seat.id : null;
+  });
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
+  /** A send that failed. A retry of the same text keeps its operation, so the channel gets the message once. */
+  let failedSend: { channelId: string; text: string; operationId: string } | null = null;
 
-  const saveSeats = (seats: string[]) => setAgentDockSeats(serverId, seats);
+  const saveSeats = (seats: readonly AgentDockSeatRef[]) => setAgentDockSeats(serverId, seats);
+  const seated = (seat: AgentDockSeatRef) => seatRefs().some((item) => item.kind === seat.kind && item.id === seat.id);
 
-  /* A deleted or hidden agent leaves the dock without a change to the saved list: an agent list that
-     is still loading must not empty the dock. */
+  /* A deleted or hidden agent, and a deleted channel, leave the dock without a change to the saved list:
+     a list that is still loading must not empty the dock. */
   const shownAgents = createMemo(() => agentList().filter((agent) => !userHiddenAgentIds().has(agent.id)));
-  const seats = createMemo(() => {
-    const agents = new Map(shownAgents().map((agent) => [agent.id, agent]));
-    return seatIds().flatMap((id) => {
-      const agent = agents.get(id);
-      return agent ? [{ agent, mood: agentMoods()[id] ?? "idle", state: agentStates()[id] }] : [];
+  const shownChannels = createMemo(() =>
+    channels.supported() ? channels.state.channels.filter((channel) => !channel.archived) : [],
+  );
+  /* A wait in a channel thread goes to the channel, as in the sidebar. */
+  const channelWaits = createMemo(() => {
+    const prompts = Object.values(pendingPrompts());
+    return sidebarChannelWaits({
+      channels: shownChannels(),
+      prompts: prompts.flatMap((event) => (event?.type === "prompt" ? [event] : [])),
+      takeovers: prompts.flatMap((event) => (event?.type === "browser-takeover-requested" ? [event.request] : [])),
+      approvals: approvals(),
     });
   });
-  const available = createMemo(() => {
-    const seated = new Set(seatIds());
-    return shownAgents().filter((agent) => !seated.has(agent.id));
+  /* The badge of the sidebar row; work that runs shows when the channel has no other badge. */
+  const channelState = (channel: ChannelSummary): SidebarAgentState | undefined =>
+    sidebarUnreadBadge(channel.unreadCount, channelWaits()[channel.id]) ??
+    (channel.activeTasks > 0 ? { kind: "working" } : undefined);
+  const seats = createMemo((): AgentDockUiSeat[] => {
+    const agents = new Map(shownAgents().map((agent) => [agent.id, agent]));
+    const channelById = new Map(shownChannels().map((channel) => [channel.id, channel]));
+    return seatRefs().flatMap((seat): AgentDockUiSeat[] => {
+      if (seat.kind === "agent") {
+        const agent = agents.get(seat.id);
+        return agent
+          ? [{ kind: "agent", agent, mood: agentMoods()[seat.id] ?? "idle", state: agentStates()[seat.id] }]
+          : [];
+      }
+      const channel = channelById.get(seat.id);
+      return channel ? [{ kind: "channel", channel: dockChannel(channel), state: channelState(channel) }] : [];
+    });
   });
+  const available = createMemo(() => shownAgents().filter((agent) => !seated({ kind: "agent", id: agent.id })));
+  const availableChannels = createMemo(() =>
+    shownChannels()
+      .filter((channel) => !seated({ kind: "channel", id: channel.id }))
+      .map(dockChannel),
+  );
 
-  const chat = (agentId: string): AgentDockChatModel => {
-    const state = agentStates()[agentId];
+  const isOwnSender = (senderId: string) => {
+    const state = auth.centralAuth();
+    return isReaderAuthor(senderId, {
+      memberId: currentTeamMember()?.id ?? null,
+      accountUserId: state.status === "signed_in" ? state.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
+  };
+
+  /* The page of the open channel: the one the main window shows, or one that the dock reads itself. A
+     change of the channel on the host reads it again. */
+  const [readPage, setReadPage] = createSignal<ChannelPage | null>(null);
+  const channelPage = (channelId: string): ChannelPage | null => {
+    const selected = channels.state.page;
+    if (selected?.channel.id === channelId) return selected;
+    const read = readPage();
+    return read?.channel.id === channelId ? read : null;
+  };
+  let readId = 0;
+  /** The channel that a read runs for. Changes during that read start one more read when it ends. */
+  let reading: string | null = null;
+  let readAgain = false;
+  const readChannel = (channelId: string) => {
+    if (reading === channelId) {
+      readAgain = true;
+      return;
+    }
+    const id = ++readId;
+    reading = channelId;
+    readAgain = false;
+    void channels
+      .port()
+      .agent.readChannel({ channelId })
+      .then((page) => {
+        if (!disposed && id === readId && openChannelId() === channelId) setReadPage(page);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (id !== readId) return;
+        reading = null;
+        if (readAgain && !disposed && openChannelId() === channelId) readChannel(channelId);
+      });
+  };
+  /* The main window that leaves the open channel stops updating its page, so the dock reads it again. */
+  const mainChannelId = createMemo(() => channels.state.page?.channel.id ?? null);
+  createEffect(
+    () => [openChannelId(), mainChannelId()] as const,
+    ([channelId, mainId]) => {
+      if (channelId && mainId !== channelId) readChannel(channelId);
+    },
+  );
+  onCleanup(
+    channels.onChange((changed) => {
+      const channelId = openChannelId();
+      if (!channelId || (changed !== null && changed !== channelId)) return;
+      if (channels.state.page?.channel.id !== channelId) readChannel(channelId);
+    }),
+  );
+
+  /* The channel that the chat shows. It stays after a close, so the chat keeps its rows while it fades. */
+  const shownChannelId = createMemo((previous?: string | null) => openChannelId() ?? previous ?? null);
+  /* The dock shows a message with no sender as the reader's own. A signed-in reader's messages carry their sender. */
+  const ownCopies = new WeakMap<AgentMessage, AgentMessage>();
+  const asOwn = (message: AgentMessage): AgentMessage => {
+    if (message.author !== "you" || !message.senderMember || !isOwnSender(message.senderMember.id)) return message;
+    /* A copy stays the same while the text, the kind and the files of its message stay: the chat reads it
+       again for each streamed word of an answer, and a new copy would draw the row again. */
+    const copy = ownCopies.get(message);
+    if (copy && copy.body === message.body && copy.kind === message.kind && copy.attachments === message.attachments)
+      return copy;
+    const { senderMember: _own, ...own } = message;
+    ownCopies.set(message, own);
+    return own;
+  };
+  /* The rows of the shown channel. */
+  const channelMessages = createMemo((): AgentMessage[] => {
+    const channelId = shownChannelId();
+    const page = channelId ? channelPage(channelId) : null;
+    if (!page) return [];
+    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn);
+  });
+  const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
+
+  const chat = (seat: AgentDockSeatRef): AgentDockChatModel => {
+    if (seat.kind === "channel") {
+      const summary = shownChannels().find((channel) => channel.id === seat.id);
+      return {
+        messages: shownChannelId() === seat.id ? channelMessages() : [],
+        working: (summary?.activeTasks ?? 0) > 0,
+        wait: channelWaits()[seat.id]?.reason ?? null,
+      };
+    }
+    const state = agentStates()[seat.id];
     return {
-      messages: conversations[agentId]?.messages ?? [],
-      working: Boolean(workingTurns()[agentId]),
+      messages: agentMessages(seat.id),
+      working: Boolean(workingTurns()[seat.id]),
       wait: state?.kind === "waiting" ? state.reason : null,
     };
   };
 
   /* The open chat is on screen, so its new answers are read, as in the main window. The dock window is
      on screen when the main window is not, so there the visibility of this page does not count. */
+  const readable = () => options.readWhenHidden || document.visibilityState === "visible";
   createEffect(
     () => {
-      const agentId = openAgentId();
-      return agentId ? { agentId, latest: latestVisibleAgentMessageId(conversations[agentId]?.messages) } : null;
+      const seat = openSeat();
+      return seat?.kind === "agent"
+        ? { agentId: seat.id, latest: latestVisibleAgentMessageId(conversations[seat.id]?.messages) }
+        : null;
     },
     (open) => {
-      if (!open?.latest) return;
-      if (!options.readWhenHidden && document.visibilityState !== "visible") return;
+      if (!open?.latest || !readable()) return;
       clearRecentReply(open.agentId);
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
     },
   );
+  /* A channel is read through the newest message of its page, once for each new message. */
+  const channelReadThrough = new Map<string, number>();
+  createEffect(
+    () => {
+      const channelId = openChannelId();
+      if (!channelId) return null;
+      const unread = shownChannels().find((channel) => channel.id === channelId)?.unreadCount ?? 0;
+      const page = channelPage(channelId);
+      return unread > 0 && page ? { channelId, throughSequence: page.throughSequence } : null;
+    },
+    (open) => {
+      if (!open || !readable()) return;
+      if ((channelReadThrough.get(open.channelId) ?? 0) >= open.throughSequence) return;
+      channelReadThrough.set(open.channelId, open.throughSequence);
+      void channels
+        .port()
+        .agent.channelCommand({
+          type: "read",
+          channelId: open.channelId,
+          throughSequence: open.throughSequence,
+          operationId: crypto.randomUUID(),
+        })
+        .catch(() => channelReadThrough.delete(open.channelId));
+    },
+  );
 
   /* The unread answers of the seated agents, for the finished-work shelf. The shelf hides each one
-     after some time; the seat keeps its unread badge. */
+     after some time; the seat keeps its unread badge. Channels have no results. */
   let firstSeen = new Map<string, number>();
   const results = createMemo((): AgentDockResult[] => {
     if (!preference().results) return [];
@@ -169,6 +383,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       return at;
     };
     const all = seats().flatMap((seat) => {
+      if (seat.kind !== "agent") return [];
       const conversation = conversations[seat.agent.id];
       const unread = conversation?.read?.unreadCount ?? 0;
       if (unread <= 0 || workingTurns()[seat.agent.id]) return [];
@@ -186,19 +401,51 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     agents: agentList,
     seats,
     available,
+    availableChannels,
     results,
     chat,
-    openAgentId,
-    openChat(agentId: string | null) {
-      setOpenAgentId(agentId);
+    channelMessages,
+    agentMessages,
+    openSeat,
+    openChat(seat: AgentDockSeatRef | null) {
+      setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
       // The main window keeps the latest page of every agent it has opened; another agent loads it here.
-      if (agentId && !conversations[agentId]?.messages?.length) void loadLatestAgentMessages(agentId);
+      if (seat?.kind === "agent" && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
-    add(agentId: string) {
-      if (!seatIds().includes(agentId)) saveSeats([...seatIds(), agentId]);
+    add(seat: AgentDockSeatRef) {
+      if (!seated(seat)) saveSeats([...seatRefs(), { kind: seat.kind, id: seat.id }]);
     },
-    remove(agentId: string) {
-      saveSeats(seatIds().filter((id) => id !== agentId));
+    remove(seat: AgentDockSeatRef) {
+      saveSeats(seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id));
+    },
+    /** The same send as in the channel view of the main window. A retry keeps the operation of the failed send. */
+    async sendToChannel(channelId: string, text: string): Promise<AgentDockSendResult> {
+      const sequenceBefore = channelPage(channelId)?.throughSequence ?? 0;
+      const operationId =
+        failedSend && failedSend.channelId === channelId && failedSend.text === text
+          ? failedSend.operationId
+          : crypto.randomUUID();
+      failedSend = { channelId, text, operationId };
+      try {
+        const after = await channels.send({
+          type: "send",
+          operationId,
+          channelId,
+          text,
+          // A message that opens with a member is addressed to that member.
+          recipientAgentId: leadingAddress(text).mentions[0]?.id ?? null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        });
+        if (!disposed && openChannelId() === channelId && channels.state.page?.channel.id !== channelId)
+          setReadPage(after);
+        const messageId = sentChannelMessageId(after, sequenceBefore, text, isOwnSender);
+        if (!messageId) return { error: t("channel.error.action") };
+        failedSend = null;
+        return { messageId };
+      } catch (error) {
+        return { error: errorMessage(error, t("channel.error.action")) };
+      }
     },
   };
 }
@@ -207,6 +454,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
 function WindowAgentDock(props: { serverId: string }) {
   const { sendMessage } = useConversation();
   const { selectAgent } = useNavigation();
+  const channels = useChannels();
   const { openAppSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
   const voice = createAgentDockVoice(() => props.serverId);
@@ -215,12 +463,17 @@ function WindowAgentDock(props: { serverId: string }) {
     <AgentDock
       seats={dock.seats()}
       available={dock.available()}
+      availableChannels={dock.availableChannels()}
       chat={dock.chat}
       onOpenChange={dock.openChat}
       onAdd={dock.add}
       onRemove={dock.remove}
-      onSend={(agentId, text) => sendMessage(text, [], null, { agentId, serverId: props.serverId })}
-      onOpenInMain={(agentId) => selectAgent(agentId)}
+      onSend={(seat, text) =>
+        seat.kind === "channel"
+          ? dock.sendToChannel(seat.id, text)
+          : sendMessage(text, [], null, { agentId: seat.id, serverId: props.serverId })
+      }
+      onOpenInMain={(seat) => (seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id))}
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
       voice={voice}
       agents={dock.agents()}
@@ -237,8 +490,8 @@ function WindowAgentDock(props: { serverId: string }) {
  * Main sends the messages typed in the dock, so `send` does not come here.
  */
 function ScreenAgentDock(props: { serverId: string }) {
-  const { conversations } = useConversation();
   const { selectAgent } = useNavigation();
+  const channels = useChannels();
   const { openAppSettings } = useSettings();
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
@@ -254,10 +507,18 @@ function ScreenAgentDock(props: { serverId: string }) {
       seats: dock
         .seats()
         .slice(0, AGENT_DOCK_LIMITS.seats)
-        .map((seat) => ({ agent: dockAgent(seat.agent), mood: seat.mood, state: dockSeatState(seat.state) })),
+        .map(
+          (seat): AgentDockSeat =>
+            seat.kind === "agent"
+              ? { kind: "agent", agent: dockAgent(seat.agent), mood: seat.mood, state: dockSeatState(seat.state) }
+              : { kind: "channel", channel: plainChannel(seat.channel), state: dockSeatState(seat.state) },
+        ),
       available: dock.available().slice(0, INPUT_LIMITS.agents).map(dockAgent),
+      availableChannels: dock.availableChannels().slice(0, AGENT_DOCK_LIMITS.channels).map(plainChannel),
       agents: dock.agents().slice(0, INPUT_LIMITS.agents).map(dockAgent),
-      chats: openChats(dock.openAgentId(), dock.chat, (agentId) => conversations[agentId]?.messages ?? []),
+      chats: openChats(dock.openSeat(), dock.chat, (seat) =>
+        seat.kind === "channel" ? dock.channelMessages() : dock.agentMessages(seat.id),
+      ),
       results: dock.results(),
     }),
   );
@@ -300,16 +561,19 @@ function ScreenAgentDock(props: { serverId: string }) {
       if (action.serverId !== props.serverId) return;
       switch (action.type) {
         case "open-chat":
-          dock.openChat(action.agentId);
+          dock.openChat(action.seat);
           return;
         case "add":
-          dock.add(action.agentId);
+          dock.add(action.seat);
           return;
         case "remove":
-          dock.remove(action.agentId);
+          dock.remove(action.seat);
           return;
         case "open-agent":
           selectAgent(action.agentId);
+          return;
+        case "open-channel":
+          void channels.open(action.channelId);
           return;
         case "open-window":
           void appPort().openChatWindow({ serverId: action.serverId, agentId: action.agentId });
@@ -343,6 +607,31 @@ function dockAgent(agent: ComposerAgent): AgentDockAgent {
   };
 }
 
+/** The channel fields of a seat. The members are kept in channel order. */
+function dockChannel(channel: ChannelSummary): AgentDockUiChannel {
+  return {
+    id: channel.id,
+    name: channel.name,
+    title: channel.title,
+    members: channel.members,
+    icon: channel.icon ?? null,
+    imageUrl: channel.imageUrl ?? null,
+  };
+}
+
+/** A plain copy of a channel for the dock window, in the bounds of the presentation. */
+function plainChannel(channel: AgentDockUiChannel): AgentDockChannel {
+  return {
+    id: channel.id,
+    name: channel.name.slice(0, INPUT_LIMITS.agentName),
+    title: channel.title.slice(0, INPUT_LIMITS.agentTitle),
+    members: channel.members.slice(0, INPUT_LIMITS.agents).map((member) => member.agentId),
+    icon: channel.icon ? { ...channel.icon } : null,
+    imageUrl:
+      channel.imageUrl && channel.imageUrl.length <= AGENT_DOCK_LIMITS.channelImageUrl ? channel.imageUrl : null,
+  };
+}
+
 /** Plain copies: the IPC clone refuses the store proxies that the app state is made of. */
 function dockSeatState(state: SidebarAgentState | undefined): AgentDockSeatState | null {
   if (!state) return null;
@@ -367,16 +656,16 @@ function dockSeatState(state: SidebarAgentState | undefined): AgentDockSeatState
 }
 
 function openChats(
-  agentId: string | null,
-  chat: (agentId: string) => AgentDockChatModel,
-  messages: (agentId: string) => readonly AgentMessage[],
+  seat: AgentDockSeatRef | null,
+  chat: (seat: AgentDockSeatRef) => AgentDockChatModel,
+  messages: (seat: AgentDockSeatRef) => readonly AgentMessage[],
 ): AgentDockChat[] {
-  if (!agentId) return [];
-  const model = chat(agentId);
+  if (!seat) return [];
+  const model = chat(seat);
   return [
     {
-      agentId,
-      messages: messages(agentId).filter(isDockMessage).slice(-AGENT_DOCK_LIMITS.messages).map(dockMessage),
+      seat: { kind: seat.kind, id: seat.id },
+      messages: messages(seat).filter(isDockMessage).slice(-AGENT_DOCK_LIMITS.messages).map(dockMessage),
       working: model.working,
       wait: model.wait,
     },
@@ -387,6 +676,8 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
   return {
     id: message.id.slice(0, INPUT_LIMITS.identifier),
     author: message.author,
+    senderAgentId: message.senderAgentId ? message.senderAgentId.slice(0, INPUT_LIMITS.identifier) : null,
+    senderMember: message.senderMember ? { id: message.senderMember.id, name: message.senderMember.name } : null,
     kind: message.kind === "error" ? "error" : "text",
     body: message.body.slice(0, INPUT_LIMITS.messageText),
     attachments: (message.attachments ?? [])

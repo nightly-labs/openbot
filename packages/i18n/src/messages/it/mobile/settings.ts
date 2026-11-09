@@ -313,6 +313,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "Su questo telefono · solo inglese",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified funziona su questo telefono, come sul desktop. Riconosce solo l’inglese, con la punteggiatura e meno errori di Parakeet v3, e la tua voce resta sul telefono. Finché il modello non è scaricato, ascolta il riconoscimento del telefono.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "Su questo telefono · anche cinese misto a inglese",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR funziona su questo telefono. Riconosce la lingua che parli, tra 30 lingue e 22 dialetti cinesi, anche quando mescoli cinese e inglese nella stessa frase. La tua voce resta sul telefono. Finché il modello non è scaricato, ascolta il riconoscimento del telefono.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "Oltre 90 lingue · invia la tua voce a ElevenLabs",
   "mobile.settings.voice.recognition.model": "Modello vocale",
@@ -384,5 +388,7 @@ export const messages = {
     "Ogni modello ha un suo prezzo su ElevenLabs. La modifica vale dalla prossima risposta.",
   "mobile.settings.voice.elevenLabs.model.flash": "Il più veloce",
   "mobile.settings.voice.elevenLabs.model.multilingual": "Più naturale · più lento",
-  "mobile.settings.voice.elevenLabs.model.v3": "Il più espressivo · il più lento",
+  "mobile.settings.voice.elevenLabs.model.v3": "Espressivo · lento",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "Oltre 90 lingue · veloce",
+  "mobile.settings.voice.elevenLabs.model.v4": "Qualità migliore · oltre 90 lingue · lento",
 } as const satisfies PartialTranslation<typeof source>;

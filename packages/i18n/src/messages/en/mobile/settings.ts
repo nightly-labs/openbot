@@ -309,6 +309,10 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "On this phone · English only",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified runs on this phone, as on the desktop. It hears English only, with punctuation and fewer errors than Parakeet v3, and your speech stays on the phone. Until the model is downloaded, the phone recognizer listens.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "On this phone · also mixed Chinese and English",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR runs on this phone. It finds the language you speak, in 30 languages and 22 Chinese dialects, also when you mix Chinese and English in one sentence. Your speech stays on the phone. Until the model is downloaded, the phone recognizer listens.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "More than 90 languages · sends your speech to ElevenLabs",
   "mobile.settings.voice.recognition.model": "Speech model",
@@ -377,5 +381,7 @@ export const messages = defineMessages("mobile.settings", {
     "Each model has its own price at ElevenLabs. The change applies to the next reply.",
   "mobile.settings.voice.elevenLabs.model.flash": "Fastest",
   "mobile.settings.voice.elevenLabs.model.multilingual": "More natural · slower",
-  "mobile.settings.voice.elevenLabs.model.v3": "Most expressive · slowest",
+  "mobile.settings.voice.elevenLabs.model.v3": "Expressive · slow",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90+ languages · fast",
+  "mobile.settings.voice.elevenLabs.model.v4": "Best quality · 90+ languages · slow",
 });

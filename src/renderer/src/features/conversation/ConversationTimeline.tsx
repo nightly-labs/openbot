@@ -79,6 +79,7 @@ import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { ServerInstallChatCard } from "./ServerInstallChatCard";
+import { SkillSuggestionChatCard, skillSuggestionOutcome } from "./SkillSuggestionChatCard";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 import { createSubagentDock } from "./subagent-dock";
 import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
@@ -193,6 +194,7 @@ export function ConversationTimeline() {
     props,
     mcpServers,
     sendCardMessage,
+    saveSkillSuggestion,
     reactToMessage,
     renderedAgentActivity,
     activeStepActivity,
@@ -585,6 +587,10 @@ export function ConversationTimeline() {
   /** A suggestion this client can draw is a card. One for an app it does not know keeps the marker. */
   const suggestionMarker = (marker: ChatActionMarkerModel) =>
     marker.kind === "marketplace-suggestion" && marketplaceSuggestionKnown(marker.appId) ? marker : undefined;
+  /** A memory review's skill suggestion with its name is a card; one from an older host keeps its text. */
+  const skillSuggestionMarker = (marker: ChatActionMarkerModel) =>
+    marker.kind === "skill-suggestion" ? marker : undefined;
+  const skillOpener = () => (agentSkillsMode(props.server, props.runtime) === "hidden" ? undefined : openSkillSettings);
   /** The saved http row a sign-in card names. A row this client cannot read keeps the marker. */
   const mcpSignInConfig = (marker: ChatActionMarkerModel) =>
     marker.kind === "mcp-sign-in"
@@ -1028,96 +1034,117 @@ export function ConversationTimeline() {
                                 when={routineCard(message() ?? initialMessage, marker())}
                                 fallback={
                                   <Show
-                                    when={suggestionMarker(marker())}
+                                    when={skillSuggestionMarker(marker())}
                                     fallback={
                                       <Show
-                                        when={mcpSignInConfig(marker())}
+                                        when={suggestionMarker(marker())}
                                         fallback={
                                           <Show
-                                            when={webhookRoutineCard(message() ?? initialMessage, marker())}
+                                            when={mcpSignInConfig(marker())}
                                             fallback={
                                               <Show
-                                                when={serverInstallCard(marker())}
+                                                when={webhookRoutineCard(message() ?? initialMessage, marker())}
                                                 fallback={
-                                                  <ChatActionMarker
-                                                    onOpenSkill={
-                                                      agentSkillsMode(props.server, props.runtime) === "hidden"
-                                                        ? undefined
-                                                        : openSkillSettings
+                                                  <Show
+                                                    when={serverInstallCard(marker())}
+                                                    fallback={
+                                                      <ChatActionMarker
+                                                        onOpenSkill={
+                                                          agentSkillsMode(props.server, props.runtime) === "hidden"
+                                                            ? undefined
+                                                            : openSkillSettings
+                                                        }
+                                                        marker={marker()}
+                                                        agents={props.agents}
+                                                        announce={arrives}
+                                                        routineAvailable={routineMarkerAvailable(
+                                                          marker(),
+                                                          availableRoutineIds(),
+                                                        )}
+                                                        onSelectAgent={props.onSelectAgent}
+                                                        onOpenRoutine={openRoutineSettings}
+                                                        openRoutineThread={openRoutineThread}
+                                                        onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                        onOpenLink={(url) => void openExternalMessageUrl(url)}
+                                                        onToggleRoutineRun={toggleRoutineRun}
+                                                        onToggleAgentMessage={toggleAgentMessage}
+                                                        agentMessageText={agentMessageText}
+                                                        instructions={localInstructionsCalls()}
+                                                        onOpenInstructions={
+                                                          channel || !localInstructionsCalls()
+                                                            ? undefined
+                                                            : openInstructionsSettings
+                                                        }
+                                                      />
                                                     }
-                                                    marker={marker()}
-                                                    agents={props.agents}
-                                                    announce={arrives}
-                                                    routineAvailable={routineMarkerAvailable(
-                                                      marker(),
-                                                      availableRoutineIds(),
+                                                  >
+                                                    {(card) => (
+                                                      <ServerInstallChatCard
+                                                        messageId={message()?.id ?? initialMessage.id}
+                                                        name={card().marker.name}
+                                                        expiresAt={card().marker.expiresAt}
+                                                        watch={card().watch}
+                                                      />
                                                     )}
-                                                    onSelectAgent={props.onSelectAgent}
-                                                    onOpenRoutine={openRoutineSettings}
-                                                    openRoutineThread={openRoutineThread}
-                                                    onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                                    onOpenLink={(url) => void openExternalMessageUrl(url)}
-                                                    onToggleRoutineRun={toggleRoutineRun}
-                                                    onToggleAgentMessage={toggleAgentMessage}
-                                                    agentMessageText={agentMessageText}
-                                                    instructions={localInstructionsCalls()}
-                                                    onOpenInstructions={
-                                                      channel || !localInstructionsCalls()
-                                                        ? undefined
-                                                        : openInstructionsSettings
-                                                    }
-                                                  />
+                                                  </Show>
                                                 }
                                               >
                                                 {(card) => (
-                                                  <ServerInstallChatCard
-                                                    messageId={message()?.id ?? initialMessage.id}
-                                                    name={card().marker.name}
-                                                    expiresAt={card().marker.expiresAt}
-                                                    watch={card().watch}
+                                                  <RoutineWebhookChatCard
+                                                    api={card().api}
+                                                    action={card().action}
+                                                    routine={card().routine}
+                                                    connected={webhookRoutines.state.connected}
+                                                    secret={webhookRoutines.state.secrets[card().routine.id] ?? null}
+                                                    onSecret={(secret) =>
+                                                      webhookRoutines.setSecret(card().routine.id, secret)
+                                                    }
+                                                    onOpenRoutine={openRoutineSettings}
                                                   />
                                                 )}
                                               </Show>
                                             }
                                           >
-                                            {(card) => (
-                                              <RoutineWebhookChatCard
-                                                api={card().api}
-                                                action={card().action}
-                                                routine={card().routine}
-                                                connected={webhookRoutines.state.connected}
-                                                secret={webhookRoutines.state.secrets[card().routine.id] ?? null}
-                                                onSecret={(secret) =>
-                                                  webhookRoutines.setSecret(card().routine.id, secret)
+                                            {(config) => (
+                                              <McpSignInChatCard
+                                                config={config()}
+                                                signedIn={props.mcpSignedIn?.(config().id) ?? false}
+                                                onSignIn={
+                                                  props.onOpenMcpSignIn
+                                                    ? (trigger) => props.onOpenMcpSignIn?.(config().id, trigger)
+                                                    : undefined
                                                 }
-                                                onOpenRoutine={openRoutineSettings}
+                                                onContinue={sendCardMessage}
                                               />
                                             )}
                                           </Show>
                                         }
                                       >
-                                        {(config) => (
-                                          <McpSignInChatCard
-                                            config={config()}
-                                            signedIn={props.mcpSignedIn?.(config().id) ?? false}
-                                            onSignIn={
-                                              props.onOpenMcpSignIn
-                                                ? (trigger) => props.onOpenMcpSignIn?.(config().id, trigger)
-                                                : undefined
-                                            }
-                                            onContinue={sendCardMessage}
+                                        {(suggestion) => (
+                                          <MarketplaceSuggestionChatCard
+                                            messageId={message()?.id ?? initialMessage.id}
+                                            appId={suggestion().appId}
+                                            connectors={props.connectors}
+                                            mcpServers={mcpServers()}
+                                            onOpenMarketplaceApp={props.onOpenMarketplaceApp}
                                           />
                                         )}
                                       </Show>
                                     }
                                   >
                                     {(suggestion) => (
-                                      <MarketplaceSuggestionChatCard
+                                      <SkillSuggestionChatCard
                                         messageId={message()?.id ?? initialMessage.id}
-                                        appId={suggestion().appId}
-                                        connectors={props.connectors}
-                                        mcpServers={mcpServers()}
-                                        onOpenMarketplaceApp={props.onOpenMarketplaceApp}
+                                        suggestion={suggestion()}
+                                        outcome={skillSuggestionOutcome(
+                                          timelineMessages(),
+                                          message()?.id ?? initialMessage.id,
+                                          suggestion(),
+                                          Boolean(props.activeTurnId),
+                                        )}
+                                        onSave={sendCardMessage}
+                                        onSaveSkill={() => saveSkillSuggestion(message()?.id ?? initialMessage.id)}
+                                        onOpenSkill={skillOpener()}
                                       />
                                     )}
                                   </Show>

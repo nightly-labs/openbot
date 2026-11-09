@@ -120,6 +120,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "Definir {setting} para todos os agentes",
   "settings.agentDefaults.agentLabel": "{setting} para {agent}",
   "settings.agentDefaults.loadFailed": "Não foi possível ler os agentes.",
+  "settings.commitCoAuthor.sectionTitle": "Commits do Git",
+  "settings.commitCoAuthor.title": "Creditar o OpenBot nos commits",
+  "settings.commitCoAuthor.description":
+    "Os agentes adicionam o OpenBot como coautor dos commits que fazem. Você continua sendo o autor.",
   "settings.planStart.title": "Iniciar o trabalho",
   "settings.planStart.wait": "Quando eu tocar em Iniciar",
   "settings.planStart.after": "Após {time}",
@@ -198,8 +202,15 @@ export const messages = {
   "settings.soundTheme.play": "Tocar {name}",
   "settings.notch.title": "Comportamento",
   "settings.notch.show.title": "Mostrar status no recorte da tela do MacBook",
+  "settings.notch.show.titleTopOfScreen": "Mostrar o status no topo da tela",
   "settings.notch.show.description":
     "Mostre a atividade dos agentes e os itens que precisam de atenção na parte superior de cada tela.",
+  "settings.notch.xwayland.title": "Reinício necessário",
+  "settings.notch.xwayland.description":
+    "No Wayland, o OpenBot precisa usar o XWayland para mostrar a Dynamic Island acima de outros apps. Até lá, a ilha não aparece.",
+  "settings.notch.xwayland.unsupported":
+    "No Wayland sem XWayland, a Dynamic Island não pode aparecer acima de outros apps.",
+  "settings.notch.xwayland.restart": "Reiniciar",
   "settings.notch.idle.title": "Mostrar ilha ociosa",
   "settings.notch.idle.description": "Mostre o logotipo do OpenBot e a saudação quando não houver status ativo.",
   "settings.notch.displays.title": "Mostrar em telas adicionais",
@@ -224,6 +235,12 @@ export const messages = {
     "“Sobre outros apps” mantém o dock na tela quando o OpenBot está em segundo plano.",
   "settings.agentDock.placement.screen": "Sobre outros apps",
   "settings.agentDock.placement.window": "Na janela do OpenBot",
+  "settings.agentDock.xwayland.title": "Reinício necessário",
+  "settings.agentDock.xwayland.description":
+    "No Wayland, o OpenBot precisa usar o XWayland para mostrar o dock acima de outros apps. Até lá, o dock aparece na janela do OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "No Wayland sem XWayland, o dock não pode aparecer acima de outros apps. Ele aparece na janela do OpenBot.",
+  "settings.agentDock.xwayland.restart": "Reiniciar",
   "settings.agentDock.display.title": "Tela",
   "settings.agentDock.display.description":
     "Se essa tela não estiver conectada, o dock vai para a tela da janela do OpenBot.",

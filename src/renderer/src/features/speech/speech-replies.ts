@@ -19,8 +19,10 @@ import {
   resumeSpeech,
   type SpeechSource,
   seekSpeech,
+  setUpcomingReading,
   speechReading,
   stopSpeech,
+  type UpcomingReading,
   type VoiceRecordingSummary,
 } from "./speech-playback";
 import { speechPort } from "./speech-port";
@@ -74,6 +76,8 @@ const replyEndListeners = new Set<(agent: SpeechAgent) => void>();
 let readings: Promise<void> = Promise.resolve();
 /** Changes when the user stops the readings, so the readings that wait are not read. */
 let readingsGeneration = 0;
+/** The texts of the readings that wait, oldest first. The first one is the upcoming reading. */
+const waitingReadings: UpcomingReading[] = [];
 /**
  * The progress updates read aloud in the newest turn of each agent, by `agentKey`. It outlives the
  * dictated message: words that steer the running turn do not read its earlier updates again.
@@ -86,6 +90,37 @@ function afterReadings(read: () => Promise<void>): Promise<void> {
   const next = readings.then(() => (own === readingsGeneration ? read() : undefined));
   readings = next.catch(() => undefined);
   return next;
+}
+
+/**
+ * Reads a reply aloud after the readings before it. Its first part is synthesized while the reading
+ * before it plays its last part.
+ */
+function readAfterReadings(
+  markdown: string,
+  source: SpeechSource,
+  fallback: SpeechLanguage,
+  trigger: SpeechTrigger,
+): Promise<void> {
+  const waiting = speechInput(markdown, fallback);
+  if (waiting) {
+    waitingReadings.push(waiting);
+    if (waitingReadings.length === 1) setUpcomingReading(waiting);
+  }
+  return afterReadings(() => {
+    const index = waiting ? waitingReadings.indexOf(waiting) : -1;
+    if (index >= 0) waitingReadings.splice(index, 1);
+    // The reading asks for its first part before the next one can.
+    const read = speak(markdown, source, fallback, trigger, waiting);
+    setUpcomingReading(waitingReadings[0]);
+    return read;
+  });
+}
+
+/** The readings that wait are not read, so none of them is prepared. */
+function forgetWaitingReadings(): void {
+  waitingReadings.length = 0;
+  setUpcomingReading(undefined);
 }
 
 function isSpoken(agent: SpeechAgent): boolean {
@@ -166,11 +201,13 @@ export function dropDictatedReply(agent: SpeechAgent): void {
  */
 function skipWaitingReadings(): void {
   readingsGeneration += 1;
+  forgetWaitingReadings();
 }
 
 /** Stops the reply that is read aloud, and the replies that load: the user speaks again. */
 export function stopSpokenReply(): void {
   readingsGeneration += 1;
+  forgetWaitingReadings();
   loading.clear();
   spoken = undefined;
   stopSpeech();
@@ -271,7 +308,7 @@ function readProgressUpdates(messages: readonly ConversationMessage[], agent: Sp
       continue;
     read.ids.add(update.id);
     const source = { ...agent, messageId: update.id };
-    void afterReadings(() => speak(update.text, source, message.language, "progress_update"));
+    void readAfterReadings(update.text, source, message.language, "progress_update");
   }
 }
 
@@ -289,13 +326,11 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
     if (!loading.has(own)) return;
     loading.delete(own);
     const answer = latestTurnAnswer(page.messages, turnId);
-    await afterReadings(() =>
-      speak(
-        answer?.text ?? "",
-        { ...agent, messageId: answer?.id ?? null },
-        message.language,
-        message.always ? "voice_conversation" : "dictation",
-      ),
+    await readAfterReadings(
+      answer?.text ?? "",
+      { ...agent, messageId: answer?.id ?? null },
+      message.language,
+      message.always ? "voice_conversation" : "dictation",
     );
   } catch (error) {
     if (!loading.has(own)) return;
@@ -391,24 +426,34 @@ function serverLanguage(fallback: SpeechLanguage): SpeechLanguage | null {
   return voiceServer()?.routes.speech ? fallback : null;
 }
 
-/** Reads a reply aloud. A failure shows a toast, because no control waits for the answer. */
+/** The text to read aloud and its language, or undefined when there is nothing to read. */
+function speechInput(markdown: string, fallback: SpeechLanguage): UpcomingReading | undefined {
+  const text = markdown ? speechTextFromMarkdown(markdown) : "";
+  // Supertonic reads only its own languages. The user's server takes any text, and ignores the language.
+  const language = text ? (speechLanguageOf(text, fallback) ?? serverLanguage(fallback)) : null;
+  return language ? { text, language } : undefined;
+}
+
+/**
+ * Reads a reply aloud. A failure shows a toast, because no control waits for the answer. `prepared`
+ * is its upcoming reading, whose first part can be synthesized already.
+ */
 async function speak(
   markdown: string,
   source: SpeechSource,
   fallback: SpeechLanguage,
   trigger: SpeechTrigger,
+  prepared?: UpcomingReading,
 ): Promise<void> {
   const own = { serverId: source.serverId, agentId: source.agentId };
   const analytics = desktopAnalytics.scope();
   try {
-    const text = markdown ? speechTextFromMarkdown(markdown) : "";
-    // Supertonic reads only its own languages. The user's server takes any text, and ignores the language.
-    const language = text ? (speechLanguageOf(text, fallback) ?? serverLanguage(fallback)) : null;
-    if (!language) return;
+    const input = speechInput(markdown, fallback);
+    if (!input) return;
     spoken = own;
     // The first part takes longer to synthesize than the speed to load; a late speed applies at once.
     void loadSpeechSpeed();
-    const result = await readAloud(text, language, source);
+    const result = await readAloud(input.text, input.language, source, prepared);
     analytics.track("speech_reply", {
       trigger,
       result: "succeeded",

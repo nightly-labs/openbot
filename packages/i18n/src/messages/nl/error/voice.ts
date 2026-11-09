@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Wacht tot de spraaktranscriptie klaar is en verwijder dan het model.",
   "error.voice.removeFailed": "Kan het spraakmodel niet verwijderen. Probeer het opnieuw.",
   "error.voice.runtimeUnavailable": "Lokale spraaktranscriptie is niet beschikbaar op dit platform.",
-  "error.voice.busy": "Er loopt al een spraaktranscriptie.",
   "error.voice.modelUnavailable": "Het spraakmodel is niet beschikbaar.",
   "error.voice.transcriptionTimedOut": "De spraaktranscriptie duurde te lang.",
   "error.voice.prepareRequired":

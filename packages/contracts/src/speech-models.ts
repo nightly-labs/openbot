@@ -87,6 +87,57 @@ export const PARAKEET_UNIFIED_MODEL_FILES: readonly SpeechModelFile[] = [
   },
 ];
 
+const QWEN3_ASR_MODEL_REVISION = "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a";
+const QWEN3_ASR_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/${QWEN3_ASR_MODEL_REVISION}`;
+
+/** The directory name of Qwen3-ASR on the phone. A new pin needs a new name. */
+export const QWEN3_ASR_MODEL_DIRECTORY = "qwen3-asr-0.6b-int8-2026-03-25";
+
+/**
+ * Qwen3-ASR 0.6B (Apache-2.0), int8 ONNX export for sherpa-onnx. It finds the spoken language
+ * itself, in 30 languages and 22 Chinese dialects, also when one sentence mixes two of them. The
+ * tokenizer files of the export's `tokenizer/` directory are kept next to the weights, so the model
+ * directory is also the tokenizer directory.
+ */
+export const QWEN3_ASR_MODEL_FILES: readonly SpeechModelFile[] = [
+  {
+    name: "conv_frontend.onnx",
+    url: `${QWEN3_ASR_MODEL_BASE_URL}/conv_frontend.onnx`,
+    bytes: 44_148_281,
+    sha256: "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+  },
+  {
+    name: "encoder.int8.onnx",
+    url: `${QWEN3_ASR_MODEL_BASE_URL}/encoder.int8.onnx`,
+    bytes: 182_491_662,
+    sha256: "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+  },
+  {
+    name: "decoder.int8.onnx",
+    url: `${QWEN3_ASR_MODEL_BASE_URL}/decoder.int8.onnx`,
+    bytes: 755_914_231,
+    sha256: "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+  },
+  {
+    name: "vocab.json",
+    url: `${QWEN3_ASR_MODEL_BASE_URL}/tokenizer/vocab.json`,
+    bytes: 2_776_833,
+    sha256: "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+  },
+  {
+    name: "merges.txt",
+    url: `${QWEN3_ASR_MODEL_BASE_URL}/tokenizer/merges.txt`,
+    bytes: 1_671_853,
+    sha256: "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+  },
+  {
+    name: "tokenizer_config.json",
+    url: `${QWEN3_ASR_MODEL_BASE_URL}/tokenizer/tokenizer_config.json`,
+    bytes: 12_487,
+    sha256: "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+  },
+];
+
 const SUPERTONIC_MODEL_REVISION = "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4";
 const SUPERTONIC_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/${SUPERTONIC_MODEL_REVISION}`;
 

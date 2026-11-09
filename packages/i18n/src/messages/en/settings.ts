@@ -122,6 +122,10 @@ export const messages = defineMessages("settings", {
   "settings.agentDefaults.setAllLabel": "Set {setting} for all agents",
   "settings.agentDefaults.agentLabel": "{setting} for {agent}",
   "settings.agentDefaults.loadFailed": "The agents could not be read.",
+  "settings.commitCoAuthor.sectionTitle": "Git commits",
+  "settings.commitCoAuthor.title": "Credit OpenBot in commits",
+  "settings.commitCoAuthor.description":
+    "Agents add OpenBot as a co-author to the commits they make. You stay the author.",
   // "Start the work", under the default of "Show the plan before long tasks".
   "settings.planStart.title": "Start the work",
   "settings.planStart.wait": "When I press Start",
@@ -201,7 +205,14 @@ export const messages = defineMessages("settings", {
   "settings.soundTheme.play": "Play {name}",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
+  "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
+  "settings.notch.xwayland.title": "Restart needed",
+  "settings.notch.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the Dynamic Island above other apps. Until then, the island does not show.",
+  "settings.notch.xwayland.unsupported":
+    "On Wayland without XWayland, the Dynamic Island cannot show above other apps.",
+  "settings.notch.xwayland.restart": "Restart",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
   "settings.notch.displays.title": "Show on additional displays",
@@ -226,6 +237,12 @@ export const messages = defineMessages("settings", {
     "Above other apps keeps the dock on screen when OpenBot is in the background.",
   "settings.agentDock.placement.screen": "Above other apps",
   "settings.agentDock.placement.window": "In the OpenBot window",
+  "settings.agentDock.xwayland.title": "Restart needed",
+  "settings.agentDock.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the dock above other apps. Until then, the dock shows in the OpenBot window.",
+  "settings.agentDock.xwayland.unsupported":
+    "On Wayland without XWayland, the dock cannot show above other apps. It shows in the OpenBot window.",
+  "settings.agentDock.xwayland.restart": "Restart",
   "settings.agentDock.display.title": "Display",
   "settings.agentDock.display.description":
     "If that display is not connected, the dock goes to the display of the OpenBot window.",
@@ -662,7 +679,11 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.model.multilingual.description":
     "More natural, and slower. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.v3.description":
-    "The most expressive, and the slowest. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+    "Expressive, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4Turbo.description":
+    "Fast, in more than 90 languages. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4.description":
+    "The best quality, in more than 90 languages, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.xai.description":
     "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
   "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",

@@ -129,7 +129,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.7",
+      "version": "1.4.8",
       "dependencies": {
         "@config-plugins/react-native-webrtc": "15.0.2",
         "@expo/metro-runtime": "~58.0.15",
@@ -426,6 +426,7 @@
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "expo@58.0.17": "patches/expo@58.0.17.patch",
     "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
+    "@norbert_bodziony/bloub@0.6.4": "patches/@norbert_bodziony%2Fbloub@0.6.4.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",

@@ -12,14 +12,12 @@ import {
 } from "@openbot/contracts/ipc";
 import {
   ArrowLeftRight,
-  Badge,
   Button,
   Checkbox,
   ChevronDown,
   ChevronUp,
   ErrorReference,
   IconButton,
-  LoaderCircle,
   Plus,
   SearchSelect,
   Select,
@@ -37,6 +35,7 @@ import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { providerAccountName } from "../../components/provider-accounts";
 import { currentText, useText } from "../../text";
 import { formatUsageReset } from "./ComposerNotice";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 /** `limit`: a usage limit holds it now. `unavailable`: its provider or account cannot run it now. */
 export type BackupModelState = "ready" | "limit" | "unavailable";
@@ -311,7 +310,6 @@ export interface UsageLimitAskCardProps {
 export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
   const { t, format, errorMessage } = useText();
   const label = useOptionLabel();
-  const titleId = createUniqueId();
   const rememberId = createUniqueId();
   const [choice, setChoice] = createSignal<BackupModelOption>();
   const picked = () => {
@@ -337,41 +335,59 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
     }
   }
   return (
-    <section class="conversation-interaction-card usage-limit-ask-card" aria-labelledby={titleId}>
-      <header class="conversation-interaction-header">
-        <strong id={titleId}>{t("chat.usageLimit.title", { provider: agentProviderName(props.provider) })}</strong>
-        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          {t("chat.usageLimit.onHold")}
-        </Badge>
-      </header>
-      <p class="usage-limit-ask-body">{body()}</p>
-      <Select<BackupModelOption>
-        class="usage-limit-ask-select"
-        options={[...props.options]}
-        optionValue="key"
-        optionTextValue={label}
-        value={picked() ?? null}
-        disabled={sending()}
-        onChange={(option) => {
-          if (option) setChoice(option);
-        }}
-        itemComponent={(item) => (
-          <SelectItem item={item.item}>
-            <OptionContent option={item.item.rawValue} />
-          </SelectItem>
-        )}
-      >
-        <SelectTrigger aria-label={t("chat.usageLimit.sendTo")}>
-          <SelectValue<BackupModelOption>>
-            {(state) => {
-              const option = state.selectedOption();
-              return option ? <OptionContent option={option} /> : null;
-            }}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent />
-      </Select>
+    <UiBlockCard
+      class="usage-limit-ask-card"
+      status="pending"
+      title={t("chat.usageLimit.title", { provider: agentProviderName(props.provider) })}
+      subtitle={body()}
+      busy={sending()}
+      waiting
+      waitingLabel={t("chat.usageLimit.onHold")}
+      footerStart={
+        <Select<BackupModelOption>
+          class="ui-block-footer-select"
+          sameWidth={false}
+          placement="bottom-start"
+          options={[...props.options]}
+          optionValue="key"
+          optionTextValue={label}
+          value={picked() ?? null}
+          disabled={sending()}
+          onChange={(option) => {
+            if (option) setChoice(option);
+          }}
+          itemComponent={(item) => (
+            <SelectItem item={item.item}>
+              <OptionContent option={item.item.rawValue} />
+            </SelectItem>
+          )}
+        >
+          <SelectTrigger aria-label={t("chat.usageLimit.sendTo")} size="sm">
+            <SelectValue<BackupModelOption>>
+              {(state) => {
+                const option = state.selectedOption();
+                return option ? <OptionContent option={option} /> : null;
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent />
+        </Select>
+      }
+      actions={
+        <>
+          <Button type="button" variant="secondary" size="sm" disabled={sending()} onClick={() => props.onWait()}>
+            {t("chat.usageLimit.wait")}
+          </Button>
+          <Show when={picked()}>
+            {(option) => (
+              <Button type="button" size="sm" disabled={sending()} onClick={() => void send(option())}>
+                {t("chat.usageLimit.send", { model: option().model })}
+              </Button>
+            )}
+          </Show>
+        </>
+      }
+    >
       <label class="usage-limit-ask-remember" for={rememberId}>
         <Checkbox
           id={rememberId}
@@ -389,19 +405,7 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
           </p>
         )}
       </Show>
-      <div class="usage-limit-ask-actions">
-        <Button type="button" variant="outline" disabled={sending()} onClick={() => props.onWait()}>
-          {t("chat.usageLimit.wait")}
-        </Button>
-        <Show when={picked()}>
-          {(option) => (
-            <Button type="button" loading={sending()} onClick={() => void send(option())}>
-              {t("chat.usageLimit.send", { model: option().model })}
-            </Button>
-          )}
-        </Show>
-      </div>
-    </section>
+    </UiBlockCard>
   );
 }
 

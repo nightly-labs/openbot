@@ -124,7 +124,13 @@ import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
-import { restartOnXWaylandWithoutMonitor, takeXWaylandRestartMarker } from "./linux-wayland-output";
+import {
+  keepAboveAppsXWayland,
+  restartOnXWaylandForAboveApps,
+  restartOnXWaylandWithoutMonitor,
+  setAboveAppsXWayland,
+  takeXWaylandRestartMarker,
+} from "./linux-wayland-output";
 import { openLocalServerControl, takeLocalServerChildEnvironment } from "./local-server-child";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
@@ -298,11 +304,13 @@ if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
 // XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
 // systemd watches the process, the output and the input of a headless server, so it does not restart.
+// The agent dock and the Dynamic Island above other apps also start again on XWayland, when the user chose it.
 const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
-  (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env)))
+  ((await Effect.runPromise(restartOnXWaylandForAboveApps(process.env, app.getPath("userData")))) ||
+    (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -331,8 +339,10 @@ if (hasSingleInstanceLock) {
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
   stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
-  if (startedOnXWayland)
+  if (startedOnXWayland === "monitor")
     logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
+  if (startedOnXWayland === "above-apps")
+    logger.info("The agent dock or the Dynamic Island shows above other apps, so OpenBot uses XWayland.");
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
@@ -372,6 +382,11 @@ protocol.registerSchemesAsPrivileged([
   {
     scheme: "openbot-remote-visual",
     privileges: { standard: true, secure: true },
+  },
+  // The decode window of `read_video`, in its own session. It fetches the downloaded files.
+  {
+    scheme: "openbot-video",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
   },
   {
     scheme: "openbot-avatar",
@@ -724,6 +739,7 @@ function registerIpcHandlers({
   agentDefaults,
   agentMemoryLimit,
   memoryReview,
+  skillLearning,
   agentAccess,
   serverAudit,
   teamStore,
@@ -835,8 +851,15 @@ function registerIpcHandlers({
       resources: resourceMonitor,
       startup,
     }),
-    ...dynamicIslandIpcHandlers({ dynamicIsland }),
-    ...agentDockIpcHandlers({ agentDock }),
+    ...dynamicIslandIpcHandlers({
+      dynamicIsland,
+      setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
+      keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
+    }),
+    ...agentDockIpcHandlers({
+      agentDock,
+      setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "agent-dock", enabled),
+    }),
     ...browserDockIpcHandlers({ browserDock }),
     ...computerUseIpcHandlers({
       cuaDriver,
@@ -955,6 +978,7 @@ function registerIpcHandlers({
       serverPersonality,
       agentMemoryLimit,
       memoryReview,
+      skillLearning,
       machineAlerts,
       promptCacheTtl,
       modelVisibility,

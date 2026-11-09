@@ -74,8 +74,8 @@ export interface ChannelsEnvironment {
    */
   pictureSupported: () => boolean;
   /**
-   * Whether this reader can start a new conversation in a channel or compact it. Only this computer
-   * can: the Team API has no route for them yet.
+   * Whether this reader can start a new conversation in a channel or compact it: this computer, or a
+   * joined server with `chat-history-v1`.
    */
   contextActionsSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
@@ -139,6 +139,11 @@ export function createChannelsController(env: ChannelsEnvironment) {
    * and the read brings it up to date, as a chat app does. Before, each visit showed Loading.
    */
   const keptPages = new Map<string, ChannelPage>();
+  /** Other readers of channel pages, such as the agent dock. Null is a resync: every page can be old. */
+  const changeListeners = new Set<(channelId: string | null) => void>();
+  function announce(channelId: string | null): void {
+    for (const listener of changeListeners) listener(channelId);
+  }
   function keepPage(page: ChannelPage | null): void {
     if (!page) return;
     keptPages.delete(page.channel.id);
@@ -560,9 +565,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
       await clearChannelContext(channelId);
       await refreshAfter();
     },
-    /** Whether the host deletes a channel history: as the context actions, from this computer only. */
+    /** Whether the host deletes a channel history: as the context actions, for an owner or admin only. */
     historyDeletionSupported: () =>
-      supported() && env.contextActionsSupported() && env.port().agent.deleteChannelHistory !== undefined,
+      supported() &&
+      env.contextActionsSupported() &&
+      env.deletesAnyMessage() &&
+      env.port().agent.deleteChannelHistory !== undefined,
     /** "Delete history": the messages go, and the members forget them. A failure rejects, for the dialog to show. */
     deleteHistory: async (channelId: string) => {
       const deleteChannelHistory = env.port().agent.deleteChannelHistory;
@@ -617,6 +625,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
      */
     changed: (channelId: string) => {
       if (channelId !== state.selectedId) keptPages.delete(channelId);
+      announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
     /**
@@ -625,7 +634,18 @@ export function createChannelsController(env: ChannelsEnvironment) {
      */
     resync: () => {
       keptPages.clear();
+      announce(null);
       return refresh();
+    },
+    /**
+     * Calls `listener` with the channel of each host event, and with null after a resync. Returns the
+     * function that removes it.
+     */
+    onChange: (listener: (channelId: string | null) => void) => {
+      changeListeners.add(listener);
+      return () => {
+        changeListeners.delete(listener);
+      };
     },
     command,
     send,

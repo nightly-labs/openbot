@@ -21,15 +21,24 @@ export type VoiceEngine = "supertonic" | "elevenlabs" | "voice-server";
 /**
  * What recognizes the user's speech. The phone's recognizer needs no download and hears one language;
  * Parakeet v3 runs on the phone and finds the language itself, as on desktop; Parakeet Unified runs on
- * the phone and hears English only; ElevenLabs Scribe finds the language too, with the user's own key,
- * and sends the audio to ElevenLabs; the voice server gets each recording, as on desktop.
+ * the phone and hears English only; Qwen3-ASR runs on the phone, finds the language itself and hears
+ * Chinese mixed with English; ElevenLabs Scribe finds the language too, with the user's own key, and
+ * sends the audio to ElevenLabs; the voice server gets each recording, as on desktop. A version from
+ * before an engine reads its saved name as the phone's recognizer.
  */
-export type RecognitionEngine = "system" | "parakeet" | "parakeet-unified" | "elevenlabs" | "voice-server";
+export type RecognitionEngine =
+  | "system"
+  | "parakeet"
+  | "parakeet-unified"
+  | "qwen3-asr"
+  | "elevenlabs"
+  | "voice-server";
 
 const RECOGNITION_ENGINES: readonly RecognitionEngine[] = [
   "system",
   "parakeet",
   "parakeet-unified",
+  "qwen3-asr",
   "elevenlabs",
   "voice-server",
 ];
@@ -60,6 +69,8 @@ export interface ElevenLabsVoice {
 export const ELEVENLABS_SPEECH_MODEL_IDS = [
   "elevenlabs-flash-v2.5",
   "elevenlabs-multilingual-v2",
+  "elevenlabs-v4-turbo",
+  "elevenlabs-v4",
   "elevenlabs-v3",
 ] as const satisfies readonly CloudSpeechModelId[];
 export type ElevenLabsSpeechModelId = (typeof ELEVENLABS_SPEECH_MODEL_IDS)[number];

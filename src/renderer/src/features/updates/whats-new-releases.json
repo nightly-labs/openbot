@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents learn new skills by themselves after a correction or a method that worked. Choose Automatic, Ask first or Off in Server settings → General.",
+          "Vault logins can keep a two-step code, and agents can sign in with it.",
+          "On Windows, the Dynamic Island and the agent dock show your agents, as on a Mac. The agent dock can also hold channels.",
+          "Agents can watch public online videos, such as YouTube or TikTok links.",
+          "Select many files in the Library to download or delete them at once.",
+          "Agents can send a bug report or a feature idea to the OpenBot team for you."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Channel members answer while they work in their own chat, and a greeting or an unclear message goes to the lead.",
+          "A new agent opens with a short welcome and three first tasks that you can choose.",
+          "Connect Composio with a sign-in in the browser. You no longer type a URL and an API key.",
+          "Settings is now named Your settings, and Server settings has a search field.",
+          "The macOS app icon has a new glass look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "An agent's queue no longer starts the same message again and again while the agent waits on its own question.",
+          "A ChatGPT agent no longer compacts again and again, or stays on \"Compacting context\" with no end.",
+          "Agents on Cursor and some other providers keep their OpenBot tools after OpenBot restarts.",
+          "Agents can use a remote MCP server that you signed in to, such as n8n, with the newest MCP version."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],
