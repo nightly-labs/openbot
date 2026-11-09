@@ -29,7 +29,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { isProviderTimeout, ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -455,18 +455,10 @@ export class ProviderAccounts {
   #startCheck(account: StoredProviderAccount): Effect.Effect<void> {
     const provider = account.provider;
     return Effect.gen({ self: this }, function* () {
-      const wasConnected = this.#states.get(account.id)?.state === "connected";
       const check = this.#check(account).pipe(
         Effect.catchCause((cause) =>
           Effect.sync(() => {
             const error = Cause.squash(cause);
-            // A slow start says nothing about the sign-in: a connected account stays connected, and
-            // does not ask the user to sign in again (#5927).
-            if (wasConnected && error instanceof ProviderAccountFailed && isProviderTimeout(error.cause)) {
-              logger.warn("A provider account check did not start in time.", { provider, accountId: account.id });
-              this.#setState(account.id, { state: "connected", message: null });
-              return;
-            }
             const signedOut = error instanceof ProviderSignInError || isSignInError(error);
             this.#setState(account.id, {
               state: signedOut ? "signed-out" : "error",
