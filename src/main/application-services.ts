@@ -78,6 +78,7 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentStatus,
@@ -94,7 +95,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentBrowserProfile,
+  type ChannelCommand,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  decodeChannel,
   IPC_ENDPOINTS,
   isManagedToolRuntime,
   isUpdateBusyPhase,
@@ -102,6 +105,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
@@ -1086,17 +1090,37 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     // The same send as a reply from the Dynamic Island: main sends it to the local or the remote agent.
+    // A channel message is the same send command as in the channel view of the main window.
     sendMessage: (action) =>
       Effect.suspend(() => {
         if (!criticalActionTargets) {
           return Effect.fail(new AgentDockFailed({ cause: new Error(sourceText("error.app.notReady")) }));
         }
         const { agents, host, remoteServers } = criticalActionTargets;
+        if (action.seat.kind === "channel") {
+          const command: ChannelCommand = {
+            type: "send",
+            operationId: action.clientMessageId,
+            channelId: action.seat.id,
+            text: action.text,
+            // A message that opens with a member is addressed to that member.
+            recipientAgentId: leadingAddress(action.text).mentions[0]?.id ?? null,
+            replyToMessageId: null,
+            attachmentDraftIds: [],
+          };
+          const sent =
+            action.serverId === LOCAL_SERVER_ID
+              ? agents.channels.command(command, host.channelActor()).pipe(Effect.asVoid)
+              : remoteServers
+                  .request(action.serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: command })
+                  .pipe(Effect.asVoid);
+          return sent.pipe(toAgentDockFailed);
+        }
         return performDynamicIslandCriticalAction(
           {
             type: "send-message",
             serverId: action.serverId,
-            agentId: action.agentId,
+            agentId: action.seat.id,
             text: action.text,
             clientMessageId: action.clientMessageId,
           },
