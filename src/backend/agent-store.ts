@@ -1258,6 +1258,11 @@ export class AgentStore {
       );
     }
     logger.warn("An agent workspace path from another computer was changed to this computer.");
+    // An exclusion in the old workspace applies to the same folder in the new one, as for a duplicate.
+    if (agent.excludedFolders)
+      agent.excludedFolders = agent.excludedFolders.map((folder) =>
+        isPathInside(stored, folder) ? join(targetPath, relative(stored, folder)) : folder,
+      );
     agent.workspacePath = targetPath;
     return true;
   });
