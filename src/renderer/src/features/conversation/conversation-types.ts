@@ -45,6 +45,7 @@ import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agen
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
 
 /**
@@ -160,7 +161,7 @@ export interface ConversationProps {
    * The server list that an install command card watches until its new server is online. Absent where
    * this client cannot open a server; the card then stays a marker.
    */
-  serverInstall?: import("./ServerInstallChatCard").ServerInstallWatch | undefined;
+  serverInstall?: ServerInstallWatch | undefined;
   platform?: import("@openbot/contracts/ipc").AppInfo["platform"] | undefined;
 
   agentStatus: AgentStatus;
