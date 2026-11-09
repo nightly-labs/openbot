@@ -120,6 +120,8 @@ const RUNTIME_RELOADED_ON_RESUME: ReadonlySet<AgentProvider> = new Set(["claude"
 
 /** Per server key, the `tools` table Codex saved for it: each tool's approval. */
 type CodexToolApprovals = Array<[string, DynamicRecord]>;
+/** The start of the title that `#nameSession` gives a session in the provider's own thread list. */
+const SESSION_NAME_PREFIX = "OpenBot · ";
 
 /** The instruction file that the developer instructions name, and its text when they carry it. */
 interface InstructionsFileInPrompt {
@@ -899,9 +901,10 @@ export class ThreadLifecycle {
   }, Effect.uninterruptible);
 
   /**
-   * Gives the session a title in the provider's own thread list, such as the Codex app, and keeps it
-   * when the agent's name changes. Without it the row shows the first turn's OpenBot context block.
-   * A failure is logged, and the session goes on with its old title.
+   * Gives the session a title in the provider's own thread list, such as the Codex app. Without it
+   * the row shows the first turn's OpenBot context block. A resume gives the title again when the
+   * agent's name changed, but keeps a title that the user wrote in the other app. A failure is
+   * logged, and the session goes on with its old title.
    */
   readonly #nameSession = Effect.fn("ThreadLifecycle.nameSession")(function* (
     this: ThreadLifecycle,
@@ -910,8 +913,9 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     currentName: string | null,
   ) {
-    const name = `OpenBot · ${agent.name}`;
+    const name = `${SESSION_NAME_PREFIX}${agent.name}`;
     if (!client.nameThread || currentName === name) return;
+    if (currentName !== null && !currentName.startsWith(SESSION_NAME_PREFIX)) return;
     yield* client
       .nameThread(externalThreadId, name)
       .pipe(
