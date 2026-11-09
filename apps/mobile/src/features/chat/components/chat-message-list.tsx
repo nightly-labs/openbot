@@ -847,6 +847,25 @@ const MessageRow = memo(function MessageRow({
         {children}
       </ChatBubble>
     ) : null;
+  // A table out of the user's bubble is as wide as the widest bubble and on its side. With a message
+  // color, it stands on that color, with the corners of the table.
+  const sentTable = (table: ReactNode, key: string) => (
+    <Animated.View
+      key={key}
+      className="self-end"
+      style={[
+        {
+          width: shared.listWidth * USER_BUBBLE_WIDTH,
+          borderRadius: 16,
+          borderCurve: "continuous",
+          overflow: "hidden",
+        },
+        tone ? userBubbleStyle : undefined,
+      ]}
+    >
+      {table}
+    </Animated.View>
+  );
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
@@ -947,7 +966,11 @@ const MessageRow = memo(function MessageRow({
         {message.body.trim() ? (
           tableOutside && !selecting ? (
             <ChatFileActionsContext value={openMessageFile}>
-              <ChatMarkdown {...markdownProps} renderText={bubbleFor} />
+              <ChatMarkdown
+                {...markdownProps}
+                renderText={bubbleFor}
+                renderTable={message.kind === "message" && message.author === "user" ? sentTable : undefined}
+              />
             </ChatFileActionsContext>
           ) : (
             bubbleFor(

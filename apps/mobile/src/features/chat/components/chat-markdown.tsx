@@ -1030,6 +1030,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   inline: inlineOnly = false,
   tone,
   renderText,
+  renderTable,
 }: {
   body: string;
   color: ColorValue | undefined;
@@ -1040,6 +1041,12 @@ export const ChatMarkdown = memo(function ChatMarkdown({
    * between the bubbles, on the screen, in the colors of the theme. Unset, all blocks are one view.
    */
   renderText?: (children: ReactNode, key: string) => ReactNode;
+  /**
+   * Places a table out of the bubble, such as at the width and the side of the bubbles. With `tone`,
+   * the table keeps the colors of the bubble, so the caller lays it on the bubble color. Unset, the
+   * table is as wide as the message, on the screen, in the colors of the theme.
+   */
+  renderTable?: (table: ReactNode, key: string) => ReactNode;
   /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
   fontWeight?: TextStyle["fontWeight"];
   /** Only inline Markdown, in one paragraph: a line that starts with `1.` or `#` stays text. */
@@ -1138,11 +1145,25 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     <StreamRevealProvider>
       {blockGroups(visibleTokens).map((group) =>
         group.table ? (
-          <View key={`table-${group.offset}`} className="self-stretch">
-            {group.tokens.map((token) => (
-              <MarkdownBlock key={group.offset} token={token} presentation={screenPresentation} inList={false} />
-            ))}
-          </View>
+          renderTable ? (
+            renderTable(
+              group.tokens.map((token) => (
+                <MarkdownBlock
+                  key={group.offset}
+                  token={token}
+                  presentation={tone ? presentation : screenPresentation}
+                  inList={false}
+                />
+              )),
+              `table-${group.offset}`,
+            )
+          ) : (
+            <View key={`table-${group.offset}`} className="self-stretch">
+              {group.tokens.map((token) => (
+                <MarkdownBlock key={group.offset} token={token} presentation={screenPresentation} inList={false} />
+              ))}
+            </View>
+          )
         ) : (
           renderText(<MarkdownBlocks tokens={group.tokens} presentation={presentation} />, `text-${group.offset}`)
         ),
