@@ -63,6 +63,7 @@ export interface DynamicIslandWindowControllerOptions {
   createWindow: (bounds: Rectangle, display: Display) => BrowserWindow;
   loadWindow: (window: BrowserWindow, display: Display) => Promise<void>;
   getDisplays: () => Display[];
+  getPrimaryDisplay: () => Display;
   getMainWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
@@ -284,9 +285,14 @@ export class DynamicIslandWindowController {
       return;
     }
 
-    const displays = this.#options
-      .getDisplays()
-      .filter((display) => this.#preference.additionalDisplaysEnabled || display.internal);
+    const allDisplays = this.#options.getDisplays();
+    const builtInDisplays = allDisplays.filter((display) => display.internal);
+    // A computer with no built-in display, such as a desktop PC or a Mac mini, uses its primary display.
+    const displays = this.#preference.additionalDisplaysEnabled
+      ? allDisplays
+      : builtInDisplays.length > 0
+        ? builtInDisplays
+        : [this.#options.getPrimaryDisplay()];
     const displayIds = new Set(displays.map((display) => display.id));
     for (const [displayId, window] of this.#windows) {
       if (displayIds.has(displayId) && !window.isDestroyed()) continue;
