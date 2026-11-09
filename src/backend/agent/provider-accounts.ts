@@ -29,7 +29,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { isProviderTimeout, ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -75,13 +75,13 @@ export interface ProviderAccountsHost {
   signInTemp(provider: AgentProviderId): ProviderTempOptions | undefined;
   /**
    * Starts and checks a client that signs in to the account's folder. The caller stops it.
-   * `afterSignIn`: the check that ends a sign-in, which gets the long start wait.
+   * `longStart`: an account check, which gets the long start wait.
    */
   authenticate(
     provider: AgentProviderId,
     cli: AgentCliInfo,
     accountEnvironment: Readonly<Record<string, string>>,
-    afterSignIn?: boolean,
+    longStart?: boolean,
   ): Effect.Effect<{ client: AgentClient; account: NonNullable<AccountReadResult["account"]> }, ProviderAccountFailed>;
   stopClient(client: AgentClient): Effect.Effect<void>;
   /** The running process of an agent on this account, if there is one. */
@@ -455,10 +455,18 @@ export class ProviderAccounts {
   #startCheck(account: StoredProviderAccount): Effect.Effect<void> {
     const provider = account.provider;
     return Effect.gen({ self: this }, function* () {
+      const wasConnected = this.#states.get(account.id)?.state === "connected";
       const check = this.#check(account).pipe(
         Effect.catchCause((cause) =>
           Effect.sync(() => {
             const error = Cause.squash(cause);
+            // A slow start says nothing about the sign-in: a connected account stays connected, and
+            // does not ask the user to sign in again (#5927).
+            if (wasConnected && error instanceof ProviderAccountFailed && isProviderTimeout(error.cause)) {
+              logger.warn("A provider account check did not start in time.", { provider, accountId: account.id });
+              this.#setState(account.id, { state: "connected", message: null });
+              return;
+            }
             const signedOut = error instanceof ProviderSignInError || isSignInError(error);
             this.#setState(account.id, {
               state: signedOut ? "signed-out" : "error",
@@ -599,7 +607,7 @@ export class ProviderAccounts {
     if (this.#states.get(account.id)?.state !== "connecting")
       this.#setState(account.id, { state: "checking", message: null });
     yield* Effect.acquireUseRelease(
-      this.#host.authenticate(provider, cli, this.environment(account), afterSignIn),
+      this.#host.authenticate(provider, cli, this.environment(account), true),
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
