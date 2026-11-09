@@ -154,10 +154,14 @@
   gap: var(--openbot-space-2);
 }
 
+/* The buttons go to the next line when the row is wider than the card. The card is 540px wide and the
+   content clips what passes it, so `nowrap` cut the last button in half instead of wrapping it. The
+   row keeps its end alignment, so the main action stays last, on its own line when the row wraps. */
 .ui-block-card-footer > .ui-block-actions {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-end;
   margin-inline-start: auto;
+  row-gap: var(--openbot-space-2);
 }
 
 .ui-block-card .ui-block-actions > .ui-button {
