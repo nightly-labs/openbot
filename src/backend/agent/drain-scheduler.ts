@@ -207,6 +207,12 @@ export class DrainScheduler {
    */
   readonly #requeuedAtLimit = new Set<string>();
   readonly #settingsHolds = new Map<string, number>();
+  /**
+   * Lanes whose last start found the provider in a turn of its own, by lane key. OpenBot's snapshot
+   * can show no turn then, so without this the drain asked again at once, with no end. The next
+   * `scheduleDrain` of the agent, which the end of any of its turns calls, lets the lane try again.
+   */
+  readonly #providerTurnHolds = new Set<string>();
   /** The last hold `#reportHold` logged per lane, so a waiting queue logs once per reason. */
   readonly #reportedHolds = new Map<string, string>();
   /**
@@ -339,6 +345,7 @@ export class DrainScheduler {
     if (this.#hooks.isDeleting(agentId)) return "deleting";
     if (this.#settingsHolds.has(agentId)) return "session-settings";
     if (this.#laneTurnActive(lane)) return "active-turn";
+    if (this.#providerTurnHolds.has(laneKey(lane))) return "provider-turn";
     // The provider has one turn of the agent at a time, so each lane waits for the turn of any other.
     if (
       this.#tasks.oneTurnAtATime(agentId) &&
@@ -420,6 +427,8 @@ export class DrainScheduler {
 
   /** `followUsageLimit` is false after a move that failed, so that the drain does not try it again. */
   scheduleDrain(agentId: string, followUsageLimit = true): void {
+    for (const key of [...this.#providerTurnHolds])
+      if (laneOf(key).agentId === agentId) this.#providerTurnHolds.delete(key);
     this.#scheduleDrain(agentId, followUsageLimit);
     this.retrySlotWaiters();
   }
@@ -516,7 +525,7 @@ export class DrainScheduler {
 
   forgetAgent(agentId: string): void {
     const ofAgent = (key: string) => laneOf(key).agentId === agentId;
-    for (const keys of [this.#drainingLanes, this.#scheduledDrains, this.#slotWaiters])
+    for (const keys of [this.#drainingLanes, this.#scheduledDrains, this.#slotWaiters, this.#providerTurnHolds])
       for (const key of [...keys]) if (ofAgent(key)) keys.delete(key);
     for (const key of [...this.#reportedHolds.keys()]) if (ofAgent(key)) this.#reportedHolds.delete(key);
     for (const key of [...this.#turnModels.keys()]) if (ofAgent(key)) this.#turnModels.delete(key);
@@ -1059,6 +1068,8 @@ export class DrainScheduler {
             error instanceof ProviderTurnActiveError ||
             (recipient && this.#providers.signInRequired(providerForAgent(recipient)) && this.#waitsForSignIn(delivery))
           ) {
+            if (error instanceof ProviderTurnActiveError)
+              this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             return;

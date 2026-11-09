@@ -626,6 +626,8 @@ export class ConversationWriter {
           new Date().toISOString(),
           sequence,
         );
+        if (input.eventType === CONVERSATION_UPDATED && input.commandId === undefined)
+          supersedePreviousConversationUpdate(db, input.threadId, sequence, changedMessages, input.activeTurnId);
         return { revision: sequence };
       },
     );
@@ -982,6 +984,76 @@ function supersedeStreamedMessageEvents(
     messageId,
   );
   deleteReceiptsOf(db, supersededCommandIds);
+}
+
+const CONVERSATION_UPDATED = "conversation.snapshot-updated";
+
+/**
+ * Drops the thread's previous event when it is an update that the new one replaces whole, so a chat
+ * that changes the same messages again and again keeps one event, not one per change. A queue that
+ * moved every 0.4 s for a day wrote 1.7 million of them, 66 GB, into one database.
+ *
+ * A replay (`ThreadReplay`) gives the same thread without it: each message of the new event replaces
+ * the earlier one with `{ ...earlier, ...new }`, so an earlier message whose keys the new one all has
+ * leaves nothing behind, and the new event sets the same active turn. Only the event just before the
+ * new one is read, so no other event can depend on it, and its messages come first in the new event
+ * in the same order, so a replay adds them in the same order. An update with its own command id is
+ * kept: its sender can send that command again, and the receipt is what makes the second one a no-op.
+ */
+function supersedePreviousConversationUpdate(
+  db: DatabaseSync,
+  threadId: string,
+  sequence: number,
+  changedMessages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+): void {
+  // The type and the command first: a whole snapshot holds every message of the thread, and its
+  // payload is read only when the event can be superseded.
+  const previous = databaseRow(
+    db
+      .prepare(
+        `SELECT sequence, command_id, event_type FROM orchestration_events
+         WHERE aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
+         ORDER BY sequence DESC LIMIT 1`,
+      )
+      .get(threadId, sequence),
+  );
+  if (!previous || requiredStringColumn(previous, "event_type") !== CONVERSATION_UPDATED) return;
+  const commandId = requiredStringColumn(previous, "command_id");
+  if (!commandId.startsWith(`conversation:${CONVERSATION_UPDATED}:`)) return;
+  const previousSequence = requiredNumberColumn(previous, "sequence");
+  const payload = databaseRow(
+    db.prepare("SELECT payload_json FROM orchestration_events WHERE sequence = ?").get(previousSequence),
+  );
+  if (
+    !payload ||
+    !replacedUpdate(JSON.parse(requiredStringColumn(payload, "payload_json")), changedMessages, activeTurnId)
+  )
+    return;
+  db.prepare("DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence = ?").run(
+    threadId,
+    previousSequence,
+  );
+  db.prepare("DELETE FROM orchestration_events WHERE sequence = ?").run(previousSequence);
+  deleteReceiptsOf(db, [commandId]);
+}
+
+function replacedUpdate(
+  previous: unknown,
+  changedMessages: readonly ConversationMessage[],
+  activeTurnId: string | null,
+): boolean {
+  if (!isDynamicRecord(previous) || previous.activeTurnId !== activeTurnId) return false;
+  if (!Array.isArray(previous.removedMessageIds) || previous.removedMessageIds.length > 0) return false;
+  const messages = previous.changedMessages;
+  if (!Array.isArray(messages) || messages.length > changedMessages.length) return false;
+  return messages.every((message, index) => {
+    const next = changedMessages[index];
+    if (!isDynamicRecord(message) || next === undefined || message.id !== next.id) return false;
+    // A key the new message leaves undefined is not in its stored JSON, so the earlier value would stay.
+    const nextKeys = new Set(Object.entries(next).flatMap(([key, value]) => (value === undefined ? [] : [key])));
+    return Object.keys(message).every((key) => nextKeys.has(key));
+  });
 }
 
 function pruneConversationSnapshots(db: DatabaseSync, threadId: string, retainedSequence: number): void {
