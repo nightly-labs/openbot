@@ -975,6 +975,33 @@ const MarkdownBlock = memo(function MarkdownBlock({
 
 const NO_AGENTS: readonly MobileAgent[] = [];
 
+/** True when a message body has a table at its top level, which `ChatMarkdown` can draw out of the bubble. */
+export function chatMarkdownHasTable(body: string, finished: boolean): boolean {
+  if (!body.includes("|")) return false;
+  return (finished ? parseFinishedChatMarkdown(body) : parseStreamingChatMarkdown(body)).some(
+    (token) => token.type === "table",
+  );
+}
+
+/** A run of blocks that is not a table, or one table, in the order of the message. */
+interface BlockGroup {
+  table: boolean;
+  tokens: Token[];
+  offset: number;
+}
+
+function blockGroups(tokens: Token[]): BlockGroup[] {
+  const groups: BlockGroup[] = [];
+  for (const { value: token, offset } of sourceEntries(tokens, (entry) => entry.raw)) {
+    const last = groups.at(-1);
+    if (token.type === "table") groups.push({ table: true, tokens: [token], offset });
+    else if (last && !last.table) last.tokens.push(token);
+    else groups.push({ table: false, tokens: [token], offset });
+  }
+  // A space between two tables would be an empty bubble.
+  return groups.filter((group) => group.table || group.tokens.some((token) => token.type !== "space"));
+}
+
 export const ChatMarkdown = memo(function ChatMarkdown({
   body,
   color,
@@ -989,11 +1016,17 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   fontWeight,
   inline: inlineOnly = false,
   tone,
+  renderText,
 }: {
   body: string;
   color: ColorValue | undefined;
   /** The colors of code in a bubble with a message color. */
   tone?: BubbleTone;
+  /**
+   * Draws each run of blocks that is not a table in a bubble. A table at the top level then stands
+   * between the bubbles, on the screen, in the colors of the theme. Unset, all blocks are one view.
+   */
+  renderText?: (children: ReactNode, key: string) => ReactNode;
   /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
   fontWeight?: TextStyle["fontWeight"];
   /** Only inline Markdown, in one paragraph: a line that starts with `1.` or `#` stays text. */
@@ -1070,9 +1103,37 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       chipBackground,
     ],
   );
+  // A table out of the bubble is on the screen, so it takes the colors of the theme.
+  const screenPresentation = useMemo<TextPresentation>(
+    () => ({
+      ...presentation,
+      style: fontWeight ? { color: themeForeground, fontWeight } : { color: themeForeground },
+      codeColor: themeForeground,
+      tone: undefined,
+      chipBackground: withAlpha(textColor, "14"),
+    }),
+    [presentation, fontWeight, themeForeground, textColor],
+  );
+  if (!renderText) {
+    return (
+      <StreamRevealProvider>
+        <MarkdownBlocks tokens={visibleTokens} presentation={presentation} />
+      </StreamRevealProvider>
+    );
+  }
   return (
     <StreamRevealProvider>
-      <MarkdownBlocks tokens={visibleTokens} presentation={presentation} />
+      {blockGroups(visibleTokens).map((group) =>
+        group.table ? (
+          <View key={`table-${group.offset}`} className="self-stretch">
+            {group.tokens.map((token) => (
+              <MarkdownBlock key={group.offset} token={token} presentation={screenPresentation} inList={false} />
+            ))}
+          </View>
+        ) : (
+          renderText(<MarkdownBlocks tokens={group.tokens} presentation={presentation} />, `text-${group.offset}`)
+        ),
+      )}
     </StreamRevealProvider>
   );
 });

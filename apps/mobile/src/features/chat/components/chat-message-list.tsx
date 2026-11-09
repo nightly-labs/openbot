@@ -58,7 +58,7 @@ import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar"
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
-import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { ChatMarkdown, chatMarkdownHasTable } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row";
@@ -774,6 +774,11 @@ const MessageRow = memo(function MessageRow({
   // message in a channel names shared files only.
   const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
   const fileBody = message.kind === "message" ? message.body : "";
+  const finishedBody = message.kind !== "message" || !isStreamingReply(message);
+  // A table stands out of the bubble, between the bubbles of the text around it, as the screen is too
+  // narrow for a table in a bubble. While the reader selects text, the message is one bubble again,
+  // so the selectable text can cover it.
+  const tableOutside = useMemo(() => chatMarkdownHasTable(fileBody, finishedBody), [fileBody, finishedBody]);
   const openFile = shared.openFile;
   const openMessageFile = useMemo<OpenMessageFile>(() => {
     const directory = messageFileDirectory(fileBody);
@@ -802,6 +807,46 @@ const MessageRow = memo(function MessageRow({
   const gallery = message.kind === "message" ? files.filter(isStackImage) : [];
   const fileUpload = (attachment: AttachmentSummary) =>
     upload ? uploadProgressAt(files.indexOf(attachment), upload.completed, upload.current) : undefined;
+  const markdownProps = {
+    agents,
+    body: fileBody,
+    finished: finishedBody,
+    selectable: message.kind === "message" && message.author === "user" && !bubble,
+    color: textColor,
+    tone,
+    playback,
+    animationEnabled: shared.animationActive && arriving,
+  };
+  const bubbleFor = (children: ReactNode, key?: string) =>
+    message.kind === "message" ? (
+      <ChatBubble
+        key={key}
+        agent={message.author === "agent"}
+        collapsed={waiting}
+        animateSize={shared.textReveal}
+        className={
+          message.author === "user"
+            ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
+            : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
+        }
+        style={[
+          { borderCurve: "circular", overflow: "hidden" },
+          // A row with files is as wide as the list, and its column takes the width of its widest
+          // child. A percentage would be of that column: the text wraps after the row has its
+          // height, and the bubble covers the next row. The width in points does not depend on it.
+          message.author === "user" && message.attachments?.length
+            ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
+            : undefined,
+          message.author === "user"
+            ? memberColor
+              ? { backgroundColor: `${memberColor}38` }
+              : userBubbleStyle
+            : undefined,
+        ]}
+      >
+        {children}
+      </ChatBubble>
+    ) : null;
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
@@ -900,61 +945,35 @@ const MessageRow = memo(function MessageRow({
           </Button>
         ) : null}
         {message.body.trim() ? (
-          <ChatBubble
-            agent={message.author === "agent"}
-            collapsed={waiting}
-            animateSize={shared.textReveal}
-            className={
-              message.author === "user"
-                ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
-                : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
-            }
-            style={[
-              { borderCurve: "circular", overflow: "hidden" },
-              // A row with files is as wide as the list, and its column takes the width of its widest
-              // child. A percentage would be of that column: the text wraps after the row has its
-              // height, and the bubble covers the next row. The width in points does not depend on it.
-              message.author === "user" && message.attachments?.length
-                ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
-                : undefined,
-              message.author === "user"
-                ? memberColor
-                  ? { backgroundColor: `${memberColor}38` }
-                  : userBubbleStyle
-                : undefined,
-            ]}
-          >
-            {/* The message text stays mounted while the reader selects, so it does not change size or
-                play its reveal again. The selectable text covers it at the same place. */}
-            <View style={selecting ? { minHeight: selectionHeight } : undefined}>
-              <View
-                style={selecting ? { opacity: 0 } : undefined}
-                accessibilityElementsHidden={selecting}
-                importantForAccessibility={selecting ? "no-hide-descendants" : "auto"}
-              >
-                <ChatFileActionsContext value={openMessageFile}>
-                  <ChatMarkdown
-                    agents={agents}
-                    body={message.body}
-                    finished={!isStreamingReply(message)}
-                    selectable={message.author === "user" && !bubble}
+          tableOutside && !selecting ? (
+            <ChatFileActionsContext value={openMessageFile}>
+              <ChatMarkdown {...markdownProps} renderText={bubbleFor} />
+            </ChatFileActionsContext>
+          ) : (
+            bubbleFor(
+              // The message text stays mounted while the reader selects, so it does not change size or
+              // play its reveal again. The selectable text covers it at the same place.
+              <View style={selecting ? { minHeight: selectionHeight } : undefined}>
+                <View
+                  style={selecting ? { opacity: 0 } : undefined}
+                  accessibilityElementsHidden={selecting}
+                  importantForAccessibility={selecting ? "no-hide-descendants" : "auto"}
+                >
+                  <ChatFileActionsContext value={openMessageFile}>
+                    <ChatMarkdown {...markdownProps} />
+                  </ChatFileActionsContext>
+                </View>
+                {selecting ? (
+                  <ChatSelectableText
+                    text={markdownPlainText(message.body)}
                     color={textColor}
-                    tone={tone}
-                    playback={playback}
-                    animationEnabled={shared.animationActive && arriving}
+                    onHeight={setSelectionHeight}
+                    onSelectionChange={actions.selectionChange}
                   />
-                </ChatFileActionsContext>
-              </View>
-              {selecting ? (
-                <ChatSelectableText
-                  text={markdownPlainText(message.body)}
-                  color={textColor}
-                  onHeight={setSelectionHeight}
-                  onSelectionChange={actions.selectionChange}
-                />
-              ) : null}
-            </View>
-          </ChatBubble>
+                ) : null}
+              </View>,
+            )
+          )
         ) : null}
       </Animated.View>
     );
