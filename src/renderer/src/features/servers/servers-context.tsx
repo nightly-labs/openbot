@@ -377,7 +377,9 @@ const Servers = createSimpleContext({
     );
 
     async function retryServerConnection(serverId: string): Promise<void> {
-      pendingCompatibilityRetryServerId = serverId;
+      // A server that stays online needs no new load. A replaced connection loads as a reconnection.
+      if (servers().find((server) => server.id === serverId)?.state !== "online")
+        pendingCompatibilityRetryServerId = serverId;
       try {
         await serversPort().servers.retryConnection(serverId);
       } catch (error) {
