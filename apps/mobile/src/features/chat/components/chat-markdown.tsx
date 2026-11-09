@@ -118,6 +118,12 @@ interface TextPresentation {
   direction: TextDirection;
   /** The colors of code in a bubble with a message color. */
   tone: BubbleTone | undefined;
+  /**
+   * The background of a mention chip: the chip color of a message color, or else a clear layer of
+   * the text color, which shows on the screen and on an agent's bubble. The grey of a control was the
+   * color of the agent's bubble.
+   */
+  chipBackground: string;
 }
 
 /** Each block reads in the direction of its own first letter, in an app of either direction. */
@@ -373,7 +379,6 @@ function CodeSpan({
  * their bottom edge, so the chip moves down until it is centred on the letters around it.
  */
 function mentionChip(presentation: TextPresentation) {
-  const { tone } = presentation;
   const size = CHAT_TEXT_STYLES[presentation.type].fontSize - 1;
   const lineHeight = Math.round(size * 1.25);
   const padding = 1;
@@ -383,12 +388,12 @@ function mentionChip(presentation: TextPresentation) {
   return {
     label: [CHAT_TEXT_STYLES[presentation.type], presentation.style, { fontSize: size, lineHeight, flexShrink: 1 }],
     mark: (size + 1) * presentation.fontScale,
-    className: `max-w-full flex-row items-center gap-1 rounded-full pr-1.5 pl-1 ${tone ? "" : "bg-control/30"}`,
+    className: "max-w-full flex-row items-center gap-1 rounded-full pr-1.5 pl-1",
     style: {
       paddingVertical: padding * presentation.fontScale,
       transform: [{ translateY: below * presentation.fontScale }],
       borderCurve: "circular" as const,
-      ...(tone ? { backgroundColor: tone.chip } : null),
+      backgroundColor: presentation.chipBackground,
     },
   };
 }
@@ -1024,6 +1029,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   );
   const { tokens: visibleTokens, flushed } = useReplyPlayback(reveal, playback);
   const themeForeground = useThemeColor("foreground");
+  const textColor = String(useCSSVariable("--openbot-text-primary"));
+  const chipBackground = tone?.chip ?? withAlpha(textColor, "14");
   const codeColor = tone?.foreground ?? themeForeground;
   const { t } = useText();
   const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
@@ -1044,6 +1051,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       linkFavicons,
       direction: layoutDirection(),
       tone,
+      chipBackground,
     }),
     [
       linkFavicons,
@@ -1059,6 +1067,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       finished,
       animateTail,
       tone,
+      chipBackground,
     ],
   );
   return (
