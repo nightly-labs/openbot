@@ -938,6 +938,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 pending={props.pendingImages}
                 removeDisabled={sending() || voicePhase() === "transcribing"}
                 onRemove={(attachment) => remove()(attachment)}
+                macWindowControls={props.macWindowControls}
               />
             )}
           </Show>

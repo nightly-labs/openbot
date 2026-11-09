@@ -679,9 +679,9 @@ export function ConversationComposer() {
           data-has-attachments={composerAttachmentRow() ? "" : undefined}
           onPointerDown={(event) => {
             if (!(event.target instanceof Element)) return;
-            // The "+" menu is in a portal, but its events come here too. Focus taken from it closes the menu
-            // before the item gets the pointerup.
-            if (event.target.closest("button, .composer-editor-surface, .ui-action-menu")) return;
+            // The "+" menu and the image viewer are in portals, but their events come here too. Focus taken
+            // from the menu closes it before the item gets the pointerup.
+            if (event.target.closest("button, .composer-editor-surface, .ui-action-menu, .image-lightbox")) return;
             event.preventDefault();
             setComposerFocusRequest((current) => current + 1);
           }}
@@ -694,6 +694,7 @@ export function ConversationComposer() {
             onRetryUpload={retryUpload}
             removeDisabled={voicePhase() === "transcribing" || savePending()}
             onRemove={(attachment) => removeAttachment(attachment.id)}
+            macWindowControls={props.platform === "darwin"}
           />
           <div class="composer-input-label">
             <ComposerEditor
