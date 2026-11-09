@@ -116,8 +116,14 @@ export function LibraryPage(props: LibraryPageProps) {
   const pillOpen = () => selected().length > 0 || step().kind !== "actions";
   const pillCanDelete = () => props.canDelete === true && props.onDeleteFiles !== undefined;
 
+  /** A new selection ends the delete question, because it asked about the files before. */
+  function leaveConfirm(): void {
+    if (step().kind === "confirm") setStep({ kind: "actions" });
+  }
+
   function toggle(file: StoredFileRow, event: MouseEvent): void {
     if (!canSelect(file) || busy()) return;
+    leaveConfirm();
     const current = selection() ?? { ids: new Set<string>(), anchor: null };
     const ids = new Set(current.ids);
     const list = shown();
@@ -136,6 +142,7 @@ export function LibraryPage(props: LibraryPageProps) {
   }
 
   function toggleAll(): void {
+    leaveConfirm();
     // Only the files on the page change; a file that the search or type hides keeps its state.
     const ids = new Set(selection()?.ids);
     const clear = allSelected();
@@ -182,7 +189,7 @@ export function LibraryPage(props: LibraryPageProps) {
     onStart: (additive) => {
       beforeDrag = selection();
       dragBase = additive ? (beforeDrag?.ids ?? new Set()) : new Set();
-      if (step().kind === "confirm") setStep({ kind: "actions" });
+      leaveConfirm();
     },
     onChange: (hits) => {
       const ids = new Set(dragBase);
