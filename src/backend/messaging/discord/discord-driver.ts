@@ -5,6 +5,7 @@ import {
   DISCORD_UPLOAD_BYTES_LIMIT,
   type DiscordApiRequest,
   type DiscordButton,
+  type DiscordEmbed,
   type DiscordHistoryMessage,
   decodeDiscordChannels,
   decodeDiscordHistory,
@@ -124,6 +125,8 @@ class DiscordAdapter implements MessagingAdapter {
         content: clip(body.text),
         replyTo: target.replyThreadId,
         buttons: buttons(body),
+        // Only with embeds: an older Signal refuses the key.
+        ...(body.embeds?.length ? { embeds: body.embeds } : {}),
       },
       decodeDiscordMessageId,
     );
@@ -221,6 +224,24 @@ class DiscordAdapter implements MessagingAdapter {
     } else firstId = yield* this.post(target, { text: first });
     for (const chunk of rest) yield* this.post(target, { text: chunk });
     return firstId;
+  });
+
+  /** The text in as many posts as it needs, and the embeds on the last one. Returns the id of the first. */
+  readonly postEmbeds = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    markdown: string,
+    embeds: DiscordEmbed[],
+  ) {
+    const chunks = markdown ? chunkMarkdown(markdown, CHUNK_CHARACTERS) : [];
+    const last = chunks.pop() ?? "";
+    let firstId: string | null = null;
+    for (const chunk of chunks) {
+      const id = yield* this.post(target, { text: chunk });
+      firstId ??= id;
+    }
+    const lastId = yield* this.post(target, { text: last, embeds });
+    return firstId ?? lastId;
   });
 
   readonly upload = Effect.fnUntraced(function* (
