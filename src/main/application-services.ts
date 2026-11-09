@@ -399,6 +399,7 @@ import {
   PARAKEET_UNIFIED_MODEL_DIRECTORY,
   removeLegacyWhisperCache,
   SUPERTONIC_MODEL_DIRECTORY,
+  VoiceOperationError,
   WHISPER_TURBO_MODEL_DIRECTORY,
 } from "./voice-model-service";
 import { VoicePreferenceStore } from "./voice-preference-store";
@@ -1940,8 +1941,20 @@ export async function createApplicationServices({
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
-      // The voice service starts after the agents; an agent turn runs only later.
-      transcribe: (audio) => voice.transcribe(audio),
+      // The voice service starts after the agents; an agent turn runs only later. A video never
+      // starts a model download: only a model that the user set up transcribes it.
+      transcribe: (audio) =>
+        voice.getModelStatus().pipe(
+          Effect.flatMap((status) =>
+            status.phase === "ready"
+              ? voice.transcribe(audio)
+              : Effect.fail(
+                  new VoiceOperationError({
+                    cause: new Error("No speech recognition model is set up in Settings → Voice."),
+                  }),
+                ),
+          ),
+        ),
     }),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),

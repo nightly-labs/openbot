@@ -51,6 +51,8 @@ export interface VideoReading {
   /** Why the transcript is empty or incomplete, or null. Safe to give to the agent. */
   transcriptNote: string | null;
   frames: VideoFrame[];
+  /** Why there are no frames, or null. Safe to give to the agent. */
+  framesNote: string | null;
 }
 
 /** The video could not be read. The reason is safe to give to the agent. */

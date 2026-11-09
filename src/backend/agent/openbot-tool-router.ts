@@ -1768,8 +1768,15 @@ export class OpenBotToolRouter {
     const reader = this.#videoReader;
     if (!reader) return openBotToolFailure("This OpenBot cannot read videos. Use openbot_browser to read the page.");
     return yield* reader.read({ url: parsed.data.url, frames: parsed.data.frames ?? READ_VIDEO_DEFAULT_FRAMES }).pipe(
-      Effect.map(({ frames, ...details }): DynamicToolResult => {
-        const text = JSON.stringify({ ...details, frameSeconds: frames.map(({ seconds }) => seconds) });
+      Effect.map(({ frames, transcriptNote, framesNote, ...details }): DynamicToolResult => {
+        // The notes can hold the text of a voice provider error.
+        const redact = (note: string | null) => (note === null ? null : this.#hooks.redactMcp(note));
+        const text = JSON.stringify({
+          ...details,
+          transcriptNote: redact(transcriptNote),
+          framesNote: redact(framesNote),
+          frameSeconds: frames.map(({ seconds }) => seconds),
+        });
         return {
           success: true,
           contentItems: [
@@ -1778,7 +1785,9 @@ export class OpenBotToolRouter {
           ],
         };
       }),
-      Effect.catchTag("VideoReadFailed", (failure) => Effect.succeed(openBotToolFailure(failure.reason))),
+      Effect.catchTag("VideoReadFailed", (failure) =>
+        Effect.succeed(openBotToolFailure(this.#hooks.redactMcp(failure.reason))),
+      ),
     );
   });
 

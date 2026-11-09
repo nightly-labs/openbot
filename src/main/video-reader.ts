@@ -425,6 +425,7 @@ export class VideoReader implements VideoReaderHost {
       transcript: decoded.transcript,
       transcriptNote: decoded.transcriptNote,
       frames: decoded.frames,
+      framesNote: decoded.framesNote,
     };
   });
 
@@ -578,27 +579,34 @@ export class VideoReader implements VideoReaderHost {
 
     let duration = knownDuration;
     let frames: VideoReading["frames"] = [];
+    let framesNote: string | null = null;
+    // A picture that does not decode leaves the details and the transcript for the agent.
     if (media.video && frameCount > 0) {
       const result = yield* script(
         `openbotVideo.frames(${JSON.stringify(`${origin}/video`)}, ${frameCount}, ${knownDuration ?? 0}, ${FRAME_LONG_SIDE})`,
         FramesResult,
         "OpenBot cannot decode the picture of this video.",
-      );
-      frames = [...result.frames];
-      duration ??= result.duration;
-    }
+      ).pipe(Effect.catchTag("VideoReadFailed", (error) => Effect.succeed(error)));
+      if (result instanceof VideoReadFailed) framesNote = result.reason;
+      else {
+        frames = [...result.frames];
+        duration ??= result.duration;
+      }
+    } else if (frameCount > 0) framesNote = "The video has no picture.";
 
     const transcript: VideoReading["transcript"] = [];
     let transcriptNote: string | null = null;
     if (!media.audio) {
       transcriptNote = "The video has no sound.";
     } else {
-      const samples = yield* script(
+      const decoded = yield* script(
         `openbotVideo.sound(${JSON.stringify(`${origin}/audio`)}, ${SAMPLE_RATE}, ${MAX_TRANSCRIPT_SECONDS})`,
         Schema.Number,
         "OpenBot cannot decode the sound of this video.",
-      );
-      if (samples === 0) transcriptNote = "The video has no sound that OpenBot can decode.";
+      ).pipe(Effect.catchTag("VideoReadFailed", (error) => Effect.succeed(error)));
+      if (decoded instanceof VideoReadFailed) transcriptNote = decoded.reason;
+      const samples = decoded instanceof VideoReadFailed ? 0 : decoded;
+      if (samples === 0 && !transcriptNote) transcriptNote = "The video has no sound that OpenBot can decode.";
       duration ??= samples / SAMPLE_RATE;
       const heard = Math.min(samples, MAX_TRANSCRIPT_SECONDS * SAMPLE_RATE);
       const partLength = TRANSCRIPT_PART_SECONDS * SAMPLE_RATE;
@@ -607,7 +615,11 @@ export class VideoReader implements VideoReaderHost {
           `openbotVideo.part(${start}, ${partLength})`,
           Schema.String,
           "OpenBot cannot decode the sound of this video.",
-        );
+        ).pipe(Effect.catchTag("VideoReadFailed", (error) => Effect.succeed(error)));
+        if (encoded instanceof VideoReadFailed) {
+          transcriptNote = encoded.reason;
+          break;
+        }
         const heardPart = yield* this.#options.transcribe(wav(Buffer.from(encoded, "base64"))).pipe(
           Effect.map(({ text }) => ({ text: text.trim(), note: null })),
           Effect.catch((error) =>
@@ -628,6 +640,6 @@ export class VideoReader implements VideoReaderHost {
       if (!transcriptNote && samples > 0 && transcript.length === 0)
         transcriptNote = "No speech was heard in the video.";
     }
-    return { duration, frames, transcript, transcriptNote };
+    return { duration, frames, framesNote, transcript, transcriptNote };
   });
 }
