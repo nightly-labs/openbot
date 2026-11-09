@@ -33,7 +33,7 @@ import {
 import { mcpSecretValues, redactMcpRecord, redactMcpValues } from "./mcp-redaction";
 import type { CustomProviderSource } from "./opencode-config";
 import { PendingServerRequests } from "./pending-server-requests";
-import { createPiCustomEndpointExtension } from "./pi-custom-endpoints";
+import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
@@ -1227,6 +1227,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   ) {
     yield* requireSessionFile(sessionFile);
     if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
+    // A thread registers these secrets when it writes its key extension. This read has no extension,
+    // but the history can still contain the key.
+    const keyProvider = this.options.keyProvider;
+    const key = keyProvider?.apiKey();
+    if (key) this.#secrets.add(key);
+    if (!keyProvider)
+      for (const secret of piCustomEndpointSecrets(this.options.customEndpoints?.() ?? [])) this.#secrets.add(secret);
     const rpc = new PiRpc(this.#redact, this.provider);
     // What Pi writes after the read, while OpenBot stops it, is not an error for the user.
     let stopping = false;
