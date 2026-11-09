@@ -78,11 +78,22 @@ interface Reading {
   before: number;
   /** For a reading: the audio of the parts that played, kept to play the message again. */
   played: AudioBuffer[];
+  /** For a reading: it asked for its last part, so the host is free for the next reading. */
+  lastPartAsked: boolean;
+}
+
+/** A text that is read aloud after the reading of now. */
+export interface UpcomingReading {
+  text: string;
+  language: SpeechLanguage;
+  /** The synthesis of its first part, once it started. */
+  first?: Promise<SpeechAudio>;
 }
 
 let audioContext: AudioContext | undefined;
 let analyser: AnalyserNode | undefined;
 let reading: Reading | undefined;
+let upcoming: UpcomingReading | undefined;
 /** The speed of replies. A change applies to the reply that plays now. */
 let replyRate = 1;
 const [state, setState] = createStore<{
@@ -219,6 +230,26 @@ export function seekSpeech(seconds: number): void {
   else own.seekTo = to;
 }
 
+/**
+ * Sets the text that is read after the reading of now, or none. Its first part is synthesized while
+ * the reading of now plays its last part, so that it plays without a wait. The host synthesizes one
+ * part at a time, so it does not start earlier: the reading of now would wait for it.
+ */
+export function setUpcomingReading(next: UpcomingReading | undefined): void {
+  upcoming = next;
+  if (reading?.lastPartAsked) prepareUpcoming();
+}
+
+function prepareUpcoming(): void {
+  const next = upcoming;
+  if (!next || next.first) return;
+  const first = speechParts(next.text, next.language)[0];
+  if (first === undefined) return;
+  next.first = speechPort().voice.speak({ text: first, language: next.language });
+  // A reading that stops before this part plays never reads its answer.
+  next.first.catch(() => undefined);
+}
+
 /** Ends the reading that plays now, if there is one. */
 export function stopSpeech(): void {
   if (!reading) return;
@@ -249,12 +280,14 @@ export interface ReadAloudResult {
 /**
  * Reads a text aloud in parts, and synthesizes each part while the part before it plays. A new
  * reading, or `stopSpeech`, ends this one; the answer then comes at once. A failed part ends the
- * reading with its error.
+ * reading with its error. `prepared` is the upcoming reading of this text, whose first part can be
+ * synthesized already.
  */
 export async function readAloud(
   text: string,
   language: SpeechLanguage,
   source: SpeechSource | null = null,
+  prepared?: UpcomingReading,
 ): Promise<ReadAloudResult> {
   const calledAt = performance.now();
   const result: ReadAloudResult = { completed: false, firstAudioMs: null, seconds: 0 };
@@ -276,7 +309,8 @@ export async function readAloud(
     };
   });
   const voice = speechPort().voice;
-  let next: Promise<SpeechAudio> | undefined = voice.speak({ text: first, language });
+  const preparedFirst = prepared?.text === text && prepared.language === language ? prepared.first : undefined;
+  let next: Promise<SpeechAudio> | undefined = preparedFirst ?? voice.speak({ text: first, language });
   try {
     for (let index = 1; next; index += 1) {
       const audio = await next;
@@ -291,6 +325,10 @@ export async function readAloud(
       next = following === undefined ? undefined : voice.speak({ text: following, language });
       // A reading that stops before this part plays never reads its answer.
       next?.catch(() => undefined);
+      if (!next) {
+        own.lastPartAsked = true;
+        prepareUpcoming();
+      }
       result.firstAudioMs ??= Math.round(performance.now() - calledAt);
       result.seconds += audio.pcm.byteLength / 2 / audio.sampleRate;
       await play(own, audio);
@@ -418,6 +456,7 @@ function newReading(reply: boolean): Reading {
     seekTo: undefined,
     before: 0,
     played: [],
+    lastPartAsked: false,
   };
   reading = own;
   return own;
