@@ -117,7 +117,8 @@
           "android": {
             "usesCleartextTraffic": true,
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-dontwarn org.webrtc.Dav1dDecoder$Natives"
           }
         }
       ],
