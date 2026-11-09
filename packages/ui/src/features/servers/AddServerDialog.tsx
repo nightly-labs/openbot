@@ -24,6 +24,7 @@ import {
   Link2,
   Monitor,
   OctagonX,
+  Server,
   Text,
   TriangleAlert,
   X,
@@ -106,6 +107,11 @@ interface AddServerDialogProps {
    * options" menu does not show the item.
    */
   onCreateLocal?: (() => void) | undefined;
+  /**
+   * Opens the dialog with the command that installs a server on another computer, in place of this one.
+   * Without it, the "Other options" menu does not show the item.
+   */
+  onInstallServer?: (() => void) | undefined;
   /** The consumer names the server, so the user does not have to. The logo uses the ID as its seed, as the rail does. */
   onCreate: (input: CreateHostedServerInput) => Promise<CreatedHostedServer>;
   onRetry: () => void;
@@ -365,10 +371,13 @@ export function AddServerDialog(props: AddServerDialogProps) {
               <X />
             </IconButton>
 
-            <Show when={step() === "pricing" && (props.onJoinWithInvite || props.onCreateLocal)}>
+            <Show
+              when={step() === "pricing" && (props.onJoinWithInvite || props.onCreateLocal || props.onInstallServer)}
+            >
               <AddServerOtherOptions
                 disabled={creating()}
                 onCreateLocal={props.onCreateLocal}
+                onInstallServer={props.onInstallServer}
                 onJoinWithInvite={props.onJoinWithInvite}
               />
             </Show>
@@ -640,6 +649,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
 function AddServerOtherOptions(props: {
   disabled: boolean;
   onCreateLocal: (() => void) | undefined;
+  onInstallServer: (() => void) | undefined;
   onJoinWithInvite: (() => void) | undefined;
 }) {
   const { t } = useText();
@@ -657,6 +667,14 @@ function AddServerOtherOptions(props: {
                 <DropdownMenu.Item onSelectAfterClose={() => onCreateLocal()()}>
                   <Monitor aria-hidden="true" />
                   {t("server.local.createTitle")}
+                </DropdownMenu.Item>
+              )}
+            </Show>
+            <Show when={props.onInstallServer}>
+              {(onInstallServer) => (
+                <DropdownMenu.Item onSelectAfterClose={() => onInstallServer()()}>
+                  <Server aria-hidden="true" />
+                  {t("server.install.title")}
                 </DropdownMenu.Item>
               )}
             </Show>

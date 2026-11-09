@@ -124,6 +124,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot остановит сервер и переместит его агентов, чаты и файлы в корзину.",
   "server.local.deleting": "Удаление сервера…",
   "server.local.deletedTitle": "{name} удалён",
+  "server.install.title": "Новый сервер на другом компьютере",
+  "server.install.description":
+    "Выполните эту команду на своём компьютере с Linux или VPS. Она устанавливает OpenBot и добавляет сервер в этот аккаунт.",
+  "server.install.making": "Создание команды для этого аккаунта…",
+  "server.install.failed": "OpenBot не удалось создать команду. Проверьте подключение к интернету.",
+  "server.install.copyForAgent": "Копировать для ИИ-агента",
+  "server.install.expiresIn": "Работает один раз. Истекает через {time}.",
+  "server.install.newCommand": "Новая команда",
+  "server.install.waiting": "Ожидание запуска команды на вашем сервере…",
+  "server.install.starting": "{name} вошёл в аккаунт. Запуск сервера…",
+  "server.install.connected": "{name} подключён.",
+  "server.install.offline": "{name} не в сети.",
+  "server.install.expired": "Срок действия команды истёк. Создайте новую.",
+  "server.install.agentPrompt":
+    'Установи OpenBot на этот сервер Linux и подключи его к моему аккаунту OpenBot.\nВыполни эту команду от root. Она не задаёт вопросов и занимает несколько минут:\n\n{command}\n\nОна завершается строкой "OpenBot is connected to your account." и кодом выхода 0.\nКоманда работает один раз, в течение 15 минут. Нигде её не сохраняй.',
+  "server.install.setUpWithAgent": "Настроить с агентом",
+  "server.install.sshAgentPrompt":
+    "Подключись по SSH к моему серверу Linux и установи на него OpenBot как сервер.\n\nАдрес SSH (user@host):",
   "server.add.limit.title": "В этом аккаунте максимальное число серверов",
   "server.add.limit.description": {
     one: "В аккаунте может быть {count} платный сервер. Чтобы добавить сервер, сначала удалите один из существующих.",

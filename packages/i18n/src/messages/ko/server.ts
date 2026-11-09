@@ -119,6 +119,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot이 서버를 중지하고 에이전트, 채팅, 파일을 휴지통으로 옮겨요.",
   "server.local.deleting": "서버 삭제 중…",
   "server.local.deletedTitle": "{name}을(를) 삭제했어요",
+  "server.install.title": "다른 컴퓨터의 새 서버",
+  "server.install.description":
+    "본인이 소유한 Linux 컴퓨터나 VPS에서 이 명령을 실행하세요. OpenBot을 설치하고 서버를 이 계정에 추가해요.",
+  "server.install.making": "이 계정용 명령을 만드는 중…",
+  "server.install.failed": "OpenBot이 명령을 만들지 못했어요. 인터넷 연결을 확인하세요.",
+  "server.install.copyForAgent": "AI 에이전트용으로 복사",
+  "server.install.expiresIn": "한 번만 작동해요. {time} 후에 만료돼요.",
+  "server.install.newCommand": "새 명령",
+  "server.install.waiting": "서버에서 명령이 실행되기를 기다리는 중…",
+  "server.install.starting": "{name}이(가) 로그인했어요. 서버를 시작하는 중…",
+  "server.install.connected": "{name}이(가) 연결됐어요.",
+  "server.install.offline": "{name}이(가) 오프라인이에요.",
+  "server.install.expired": "이 명령은 만료됐어요. 새 명령을 만드세요.",
+  "server.install.agentPrompt":
+    '이 Linux 서버에 OpenBot을 설치하고 내 OpenBot 계정에 로그인시켜 줘.\n이 명령을 root로 실행해. 질문은 없고 몇 분 걸려:\n\n{command}\n\n"OpenBot is connected to your account." 줄과 종료 코드 0으로 끝나.\n이 명령은 15분 동안 한 번만 작동해. 어디에도 저장하지 마.',
+  "server.install.setUpWithAgent": "에이전트로 설정",
+  "server.install.sshAgentPrompt":
+    "SSH로 내 Linux 서버에 연결하고 OpenBot을 서버로 설치해 주세요.\n\nSSH 주소 (user@host):",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "이 계정은 서버를 최대 개수까지 만들었어요",
   "server.add.limit.description": {

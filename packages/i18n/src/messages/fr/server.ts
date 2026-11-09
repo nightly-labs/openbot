@@ -124,6 +124,24 @@ export const messages = {
     "OpenBot arrête le serveur et place ses agents, discussions et fichiers dans la corbeille.",
   "server.local.deleting": "Suppression du serveur…",
   "server.local.deletedTitle": "{name} supprimé",
+  "server.install.title": "Nouveau serveur sur un autre ordinateur",
+  "server.install.description":
+    "Exécutez cette commande sur un ordinateur Linux ou un VPS qui vous appartient. Elle installe OpenBot et ajoute le serveur à ce compte.",
+  "server.install.making": "Création d’une commande pour ce compte…",
+  "server.install.failed": "OpenBot n’a pas pu créer de commande. Vérifiez la connexion internet.",
+  "server.install.copyForAgent": "Copier pour un agent IA",
+  "server.install.expiresIn": "Fonctionne une fois. Expire dans {time}.",
+  "server.install.newCommand": "Nouvelle commande",
+  "server.install.waiting": "En attente de l’exécution de la commande sur votre serveur…",
+  "server.install.starting": "{name} est connecté au compte. Démarrage du serveur…",
+  "server.install.connected": "{name} est connecté.",
+  "server.install.offline": "{name} est hors ligne.",
+  "server.install.expired": "Cette commande a expiré. Créez-en une nouvelle.",
+  "server.install.agentPrompt":
+    'Installe OpenBot sur ce serveur Linux et connecte-le à mon compte OpenBot.\nExécute cette commande en root. Elle ne pose aucune question et prend quelques minutes :\n\n{command}\n\nElle se termine par la ligne "OpenBot is connected to your account." et le code de sortie 0.\nLa commande fonctionne une fois, pendant 15 minutes. Ne l’enregistre nulle part.',
+  "server.install.setUpWithAgent": "Configurer avec un agent",
+  "server.install.sshAgentPrompt":
+    "Connecte-toi en SSH à mon serveur Linux et installe OpenBot dessus comme serveur.\n\nAdresse SSH (user@host) :",
   "server.add.limit.title": "Ce compte a atteint le nombre maximal de serveurs",
   "server.add.limit.description": {
     one: "Un compte peut avoir {count} serveur payant. Pour ajouter un serveur, supprimez-en d’abord un.",

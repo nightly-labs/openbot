@@ -163,6 +163,11 @@ export type ChatActionMarkerModel =
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
   | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
+  /**
+   * The agent got a one-time command that installs a server. The chat shows a card that waits for the
+   * server. `name` is the name that the command gives it; `expiresAt` is in milliseconds since the epoch.
+   */
+  | { kind: "server-install"; name: string | null; expiresAt: number; timestamp: string }
   /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
   | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */

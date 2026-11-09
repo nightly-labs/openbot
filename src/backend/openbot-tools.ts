@@ -301,6 +301,16 @@ export const webSearchToolSchema = z.strictObject({
   query: z.string().trim().min(1).max(1_000).describe("The whole question, with its context."),
 });
 
+/** `openbot.create_server_install_command`: a one-time command for a new server of this account. */
+export const serverInstallCommandToolSchema = z.strictObject({
+  name: z
+    .string()
+    .trim()
+    .min(INPUT_LIMITS.serverNameMin)
+    .max(INPUT_LIMITS.serverName)
+    .describe("The server name in the user's server list, such as the host name. Ask the user when unsure."),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -391,6 +401,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
     shape: webSearchToolSchema.shape,
+  },
+  {
+    name: "create_server_install_command",
+    description:
+      'Make a one-time command that installs OpenBot on a Linux computer or VPS as a server and signs it in to the user\'s OpenBot account. Use it when the user asks to install or set up OpenBot on a server. Get the SSH address (user@host) from the user first. The user approves each command. Run the command as root over SSH; it asks no questions, takes a few minutes, and ends with the line "OpenBot is connected to your account." and exit code 0. It works once, for 15 minutes: never save it, show it, or give it to anyone. A card in the chat shows when the server connects.',
+    shape: serverInstallCommandToolSchema.shape,
   },
   {
     name: "list_sections",

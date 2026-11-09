@@ -197,6 +197,7 @@ import {
   decodeRemoteNetworkRouteState,
   decodeRemoteSessionReusePreference,
   decodeSentMessageStats,
+  decodeServerClaim,
   decodeSpeechAudio,
   decodeSpeechModelStatus,
   decodeSpeechSettings,
@@ -1095,6 +1096,7 @@ const openbotApi: OpenBotDesktopApi = {
     delete: decodeVoid,
     wake: decodeHostedServer,
     restart: decodeHostedServer,
+    createServerClaim: decodeServerClaim,
   }),
   localServers: bridgeGroup(IPC_ENDPOINTS.localServers, {
     create: decodeServer,

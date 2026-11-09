@@ -191,5 +191,13 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
     },
     wake: async (serverId) => update(serverId, { state: "waking" }),
     restart: async (serverId) => update(serverId, { state: "stopping" }),
+    // A fake claim in the account service's form: 32 bytes, base64url.
+    createServerClaim: async () => ({
+      claim: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, ""),
+      expiresAt: Date.now() + 15 * 60_000,
+    }),
   };
 }

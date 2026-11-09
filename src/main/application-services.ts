@@ -6,6 +6,7 @@ import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository
 import { Effect, Fiber, Schema } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
+import { toToolOperationFailed } from "../backend/agent/tool-operation";
 import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
@@ -1938,6 +1939,7 @@ export async function createApplicationServices({
     visualPreview: new ChatVisualPreviewer(),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),
+    serverClaims: { create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed) },
     marketplaceAppServer: (appId) => {
       const listed = catalogPluginServers.filter((server) => server.slug === appId);
       const [server] = listed;

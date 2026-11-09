@@ -119,6 +119,24 @@ export const messages = {
     "OpenBot はサーバーを停止し、エージェント、チャット、ファイルをゴミ箱に移動します。",
   "server.local.deleting": "サーバーを削除中…",
   "server.local.deletedTitle": "{name} を削除しました",
+  "server.install.title": "別のコンピューター上の新しいサーバー",
+  "server.install.description":
+    "このコマンドを、自分が所有する Linux コンピューターまたは VPS で実行してください。OpenBot をインストールし、サーバーをこのアカウントに追加します。",
+  "server.install.making": "このアカウント用のコマンドを作成しています…",
+  "server.install.failed": "OpenBot はコマンドを作成できませんでした。インターネット接続を確認してください。",
+  "server.install.copyForAgent": "AI エージェント用にコピー",
+  "server.install.expiresIn": "1 回だけ使えます。{time} 後に期限切れになります。",
+  "server.install.newCommand": "新しいコマンド",
+  "server.install.waiting": "サーバーでコマンドが実行されるのを待っています…",
+  "server.install.starting": "{name} がサインインしました。サーバーを起動しています…",
+  "server.install.connected": "{name} に接続しました。",
+  "server.install.offline": "{name} はオフラインです。",
+  "server.install.expired": "このコマンドは期限切れです。新しいコマンドを作成してください。",
+  "server.install.agentPrompt":
+    'この Linux サーバーに OpenBot をインストールし、私の OpenBot アカウントにサインインさせてください。\nこのコマンドを root で実行してください。質問はなく、数分かかります:\n\n{command}\n\n最後に "OpenBot is connected to your account." という行が出力され、終了コード 0 で終わります。\nこのコマンドは 15 分間、1 回だけ使えます。どこにも保存しないでください。',
+  "server.install.setUpWithAgent": "エージェントで設定",
+  "server.install.sshAgentPrompt":
+    "SSH で私の Linux サーバーに接続し、OpenBot をサーバーとしてインストールしてください。\n\nSSH アドレス (user@host):",
   "server.add.limit.title": "このアカウントのサーバー数が上限に達しています",
   "server.add.limit.description": {
     other:

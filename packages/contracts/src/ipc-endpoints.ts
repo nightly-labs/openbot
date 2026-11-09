@@ -40,6 +40,7 @@ import type {
   HostedServerLifecycleInput,
   HostedServerList,
   HostedServerSummary,
+  ServerClaim,
 } from "./hosted-servers";
 import type {
   AddedAgent,
@@ -1506,6 +1507,8 @@ export const IPC_ENDPOINTS = {
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
     // Owner only. Stops a running server and starts it again; a server that does not run starts.
     restart: request<string, HostedServerSummary>()("hosted-servers:restart"),
+    // A one-time claim for the install command of a self-hosted server. Never log the claim.
+    createServerClaim: request<undefined, ServerClaim>()("hosted-servers:create-server-claim"),
   },
   // Servers that the desktop app starts on this computer, each with its own data. Each one is in the
   // server list as a joined server with `thisComputer`. `create` takes the name; the others take the

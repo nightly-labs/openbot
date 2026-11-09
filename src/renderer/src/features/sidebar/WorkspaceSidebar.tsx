@@ -264,6 +264,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
                 onSelect: serverActions.select,
                 onAdd: serverActions.add,
                 onCreateLocal: serverActions.addMenuCreateLocal(),
+                onInstallServer: serverActions.addMenuInstallServer(),
                 addCreatesServer: serverActions.addCreatesServer(),
                 hiddenLocal: serverActions.hiddenLocal(),
                 ...serverActions.callbacks,

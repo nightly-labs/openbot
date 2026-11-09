@@ -29,6 +29,9 @@ export const messages = {
   "status.agent.reportProblem": "앱 버전과 시스템 정보가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
   "status.agent.sendIdea": "공개 GitHub 이슈가 됩니다. 이름은 표시되지 않습니다.",
   "status.agent.feedbackSent": "OpenBot 팀에 보냄: {title}",
+  "status.agent.serverInstallCommand":
+    "다른 컴퓨터에 OpenBot을 서버 {name}(으)로 설치하고 계정에 로그인하는 일회용 명령을 만듭니다. 에이전트가 그곳에서 실행합니다.",
+  "status.agent.serverInstallCard": "서버 {name}의 설치 명령",
   "status.agent.feedbackSending": "피드백을 OpenBot 팀에 보내는 중…",
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",

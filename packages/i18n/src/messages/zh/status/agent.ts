@@ -27,6 +27,9 @@ export const messages = {
   "status.agent.reportProblem": "这会成为一个公开的 GitHub issue，附带应用版本和你的系统信息。不会显示你的名字。",
   "status.agent.sendIdea": "这会成为一个公开的 GitHub issue。不会显示你的名字。",
   "status.agent.feedbackSent": "已发送给 OpenBot 团队：{title}",
+  "status.agent.serverInstallCommand":
+    "创建一个一次性命令，在另一台计算机上把 OpenBot 安装为服务器 {name}，并登录到你的账户。代理会在那里运行它。",
+  "status.agent.serverInstallCard": "服务器 {name} 的安装命令",
   "status.agent.feedbackSending": "正在将你的反馈发送给 OpenBot 团队…",
   "status.agent.workflowDelete": "删除工作流 {title} 及其运行记录和版本。其未完成的步骤会停止。",
   "status.agent.vaultCardFillFrames": "银行卡字段位于来自 {origins} 的框架中。",

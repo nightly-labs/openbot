@@ -113,6 +113,24 @@ export const messages = {
     "OpenBot stopt de server en verplaatst de agents, chats en bestanden ervan naar de prullenbak.",
   "server.local.deleting": "Server wissen…",
   "server.local.deletedTitle": "{name} gewist",
+  "server.install.title": "Nieuwe server op een andere computer",
+  "server.install.description":
+    "Voer deze opdracht uit op een Linux-computer of VPS van jezelf. De opdracht installeert OpenBot en voegt de server toe aan dit account.",
+  "server.install.making": "Opdracht voor dit account maken…",
+  "server.install.failed": "OpenBot kon geen opdracht maken. Controleer de internetverbinding.",
+  "server.install.copyForAgent": "Kopiëren voor een AI-agent",
+  "server.install.expiresIn": "Werkt één keer. Verloopt over {time}.",
+  "server.install.newCommand": "Nieuwe opdracht",
+  "server.install.waiting": "Wachten tot de opdracht op je server draait…",
+  "server.install.starting": "{name} is aangemeld. Server starten…",
+  "server.install.connected": "{name} is verbonden.",
+  "server.install.offline": "{name} is offline.",
+  "server.install.expired": "Deze opdracht is verlopen. Maak een nieuwe.",
+  "server.install.agentPrompt":
+    'Installeer OpenBot op deze Linux-server en meld hem aan bij mijn OpenBot-account.\nVoer deze opdracht uit als root. Hij stelt geen vragen en duurt een paar minuten:\n\n{command}\n\nHij eindigt met de regel "OpenBot is connected to your account." en exitcode 0.\nDe opdracht werkt één keer, 15 minuten lang. Sla hem nergens op.',
+  "server.install.setUpWithAgent": "Instellen met een agent",
+  "server.install.sshAgentPrompt":
+    "Maak via SSH verbinding met mijn Linux-server en installeer OpenBot daarop als server.\n\nSSH-adres (user@host):",
   "server.add.limit.title": "Dit account heeft het maximale aantal servers",
   "server.add.limit.description": {
     one: "Een account kan {count} betaalde server hebben. Verwijder eerst een server om er een toe te voegen.",

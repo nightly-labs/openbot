@@ -29,6 +29,9 @@ export const messages = {
     "Это станет публичным issue на GitHub с версией приложения и вашей системой. Ваше имя не показывается.",
   "status.agent.sendIdea": "Это станет публичным issue на GitHub. Ваше имя не показывается.",
   "status.agent.feedbackSent": "Отправлено команде OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Создать одноразовую команду, которая устанавливает OpenBot на другой компьютер как сервер {name} и подключает его к вашему аккаунту. Агент запускает её там.",
+  "status.agent.serverInstallCard": "Команда установки для сервера {name}",
   "status.agent.feedbackSending": "Отправка отзыва команде OpenBot…",
   "status.agent.workflowDelete":
     "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",

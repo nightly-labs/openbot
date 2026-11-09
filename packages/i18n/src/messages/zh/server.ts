@@ -121,6 +121,23 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot 会停止该服务器，并将其助手、对话和文件移到回收站。",
   "server.local.deleting": "正在删除服务器…",
   "server.local.deletedTitle": "已删除 {name}",
+  "server.install.title": "另一台电脑上的新服务器",
+  "server.install.description": "在你自己的 Linux 电脑或 VPS 上运行此命令。它会安装 OpenBot，并把服务器添加到此账号。",
+  "server.install.making": "正在为此账号生成命令…",
+  "server.install.failed": "OpenBot 无法生成命令。请检查网络连接。",
+  "server.install.copyForAgent": "复制给 AI 智能体",
+  "server.install.expiresIn": "仅可使用一次。{time} 后过期。",
+  "server.install.newCommand": "新命令",
+  "server.install.waiting": "正在等待命令在你的服务器上运行…",
+  "server.install.starting": "{name} 已登录。正在启动服务器…",
+  "server.install.connected": "{name} 已连接。",
+  "server.install.offline": "{name} 已离线。",
+  "server.install.expired": "此命令已过期。请生成新命令。",
+  "server.install.agentPrompt":
+    '在这台 Linux 服务器上安装 OpenBot，并将其登录到我的 OpenBot 账号。\n以 root 身份运行此命令。它不会提问，需要几分钟：\n\n{command}\n\n最后输出 "OpenBot is connected to your account." 这一行，退出码为 0。\n此命令仅可使用一次，有效期 15 分钟。不要把它保存在任何地方。',
+  "server.install.setUpWithAgent": "用代理设置",
+  "server.install.sshAgentPrompt":
+    "通过 SSH 连接到我的 Linux 服务器，并在上面把 OpenBot 安装为服务器。\n\nSSH 地址（user@host）：",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "该账号的服务器数量已达上限",
   "server.add.limit.description": {

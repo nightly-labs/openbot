@@ -563,6 +563,28 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
+  /** For the signed-in user: a claim that signs a new server in to the same account. */
+  readonly createServerClaimForUser = Effect.fn("AuthService.createServerClaimForUser")(
+    function* (
+      this: AuthService,
+      userId: string,
+    ): Effect.fn.Return<{ claim: string; expiresAt: number }, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`server-claim:user:${userId}`, 20, now);
+      const claim = randomToken();
+      const expiresAt = now + SERVER_CLAIM_TTL_MS;
+      yield* dependencies.repository.createServerClaimForUser({
+        claimHash: yield* sha256(claim),
+        userId,
+        createdAt: now,
+        expiresAt,
+      });
+      return { claim, expiresAt };
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
   /** A server exchanges a claim once for a desktop session of the claim's user. */
   readonly redeemServerClaim = Effect.fn("AuthService.redeemServerClaim")(
     function* (

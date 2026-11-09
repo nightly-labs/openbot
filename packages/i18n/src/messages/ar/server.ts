@@ -123,6 +123,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "يوقف OpenBot الخادم وينقل وكلاءه ودردشاته وملفاته إلى سلة المهملات.",
   "server.local.deleting": "جارٍ حذف الخادم…",
   "server.local.deletedTitle": "تم حذف {name}",
+  "server.install.title": "خادم جديد على كمبيوتر آخر",
+  "server.install.description":
+    "شغّل هذا الأمر على كمبيوتر Linux أو VPS تملكه. يثبّت الأمر OpenBot ويضيف الخادم إلى هذا الحساب.",
+  "server.install.making": "جارٍ إنشاء أمر لهذا الحساب…",
+  "server.install.failed": "تعذّر على OpenBot إنشاء أمر. تحقّق من الاتصال بالإنترنت.",
+  "server.install.copyForAgent": "نسخ لوكيل ذكاء اصطناعي",
+  "server.install.expiresIn": "يعمل مرة واحدة. تنتهي صلاحيته بعد {time}.",
+  "server.install.newCommand": "أمر جديد",
+  "server.install.waiting": "في انتظار تشغيل الأمر على خادمك…",
+  "server.install.starting": "سجّل {name} الدخول. جارٍ تشغيل الخادم…",
+  "server.install.connected": "{name} متصل.",
+  "server.install.offline": "{name} غير متصل.",
+  "server.install.expired": "انتهت صلاحية هذا الأمر. أنشئ أمرًا جديدًا.",
+  "server.install.agentPrompt":
+    'ثبّت OpenBot على خادم Linux هذا وسجّل دخوله إلى حسابي في OpenBot.\nشغّل هذا الأمر بصلاحيات root. لا يطرح أسئلة ويستغرق بضع دقائق:\n\n{command}\n\nينتهي بالسطر "OpenBot is connected to your account." ورمز الخروج 0.\nيعمل الأمر مرة واحدة، لمدة 15 دقيقة. لا تحفظه في أي مكان.',
+  "server.install.setUpWithAgent": "الإعداد باستخدام وكيل",
+  "server.install.sshAgentPrompt":
+    "اتصل عبر SSH بخادم Linux الخاص بي وثبّت OpenBot عليه كخادم.\n\nعنوان SSH (user@host):",
   "server.add.limit.title": "لدى هذا الحساب الحد الأقصى من الخوادم",
   "server.add.limit.description": {
     zero: "لا يمكن أن يكون للحساب خوادم مدفوعة.",
