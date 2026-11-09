@@ -1171,14 +1171,6 @@ export class TurnLifecycle {
     );
   }
 
-  /** A turn of the agent that still runs in this public thread, or null. */
-  #runningTurnIn(agentId: string, publicThreadId: string | null): string | null {
-    for (const [turnId, turn] of this.#runningTurns)
-      if (turn.agentId === agentId && this.#conversation.publicThreadId(agentId, turn.threadId) === publicThreadId)
-        return turnId;
-    return null;
-  }
-
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {
       const running = this.#runningTurns.get(turnId);
@@ -1244,11 +1236,12 @@ export class TurnLifecycle {
         this.#compaction.reserve(agentId, threadId, false, turnId);
       this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-      // A routine run in its own session ends in the chat's snapshot, where another turn can still
-      // run: the chat's own, or one the provider started itself. That turn stays active. Cleared, the
-      // queue saw an idle chat and asked the busy provider for a turn again and again.
+      // A routine run in its own session ends in the chat's snapshot, where a later turn can still
+      // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
+      // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
+      // longer runs is cleared, as before.
       if (snapshot.activeTurnId === turnId || !this.#runningTurns.has(snapshot.activeTurnId ?? ""))
-        snapshot.activeTurnId = this.#runningTurnIn(agentId, snapshot.threadId);
+        snapshot.activeTurnId = null;
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
       // A task turn ends as a turn of the agent's own chat does, in the task's own lane.
       const taskTurn = this.#conversation.isTaskThread(snapshot.threadId);

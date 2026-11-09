@@ -26,6 +26,7 @@ interface CaseReport {
   name: string;
   updateEvents: number;
   expectedUpdateEvents: number;
+  updateActivities: number;
   replayMatches: boolean;
   passed: boolean;
 }
@@ -99,6 +100,15 @@ const cases: Array<{ name: string; expectedUpdateEvents: number; run: (write: Wr
     },
   },
   {
+    // With no delivery, a replay keeps the time of the message that came first.
+    name: "a later time with no delivery keeps the earlier update",
+    expectedUpdateEvents: 2,
+    run: (write) => {
+      write({ changedMessages: [message("a", 1)] });
+      write({ changedMessages: [message("a", 5, { text: "Edited" })] });
+    },
+  },
+  {
     name: "another event between them keeps the earlier update",
     expectedUpdateEvents: 2,
     run: (write) => {
@@ -156,6 +166,17 @@ async function runCase(name: string, expectedUpdateEvents: number, run: (write: 
         ...(input.commandId === undefined ? {} : { commandId: input.commandId }),
       });
     });
+    // Before the replay, which writes the activity rows again.
+    const updateActivities = requiredNumberColumn(
+      databaseRows(
+        database.connection
+          .prepare(
+            "SELECT COUNT(*) AS count FROM projection_thread_activities WHERE thread_id = ? AND activity_type = ?",
+          )
+          .all(threadId, UPDATED),
+      )[0] ?? { count: 0 },
+      "count",
+    );
     const live = database.readConversation(agent.id, threadId);
     const replayed = database.rebuildThreadProjection(threadId);
     const updateEvents = requiredNumberColumn(
@@ -174,8 +195,10 @@ async function runCase(name: string, expectedUpdateEvents: number, run: (write: 
       name,
       updateEvents,
       expectedUpdateEvents,
+      updateActivities,
       replayMatches,
-      passed: replayMatches && updateEvents === expectedUpdateEvents,
+      // Each removed update takes its activity row with it.
+      passed: replayMatches && updateEvents === expectedUpdateEvents && updateActivities === updateEvents,
     };
   } finally {
     database.close();
@@ -194,7 +217,7 @@ try {
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   for (const result of report.cases)
     process.stdout.write(
-      `${result.passed ? "ok  " : "FAIL"} ${result.name}: ${result.updateEvents}/${result.expectedUpdateEvents} events, replay ${result.replayMatches ? "matches" : "differs"}\n`,
+      `${result.passed ? "ok  " : "FAIL"} ${result.name}: ${result.updateEvents}/${result.expectedUpdateEvents} events, ${result.updateActivities} activities, replay ${result.replayMatches ? "matches" : "differs"}\n`,
     );
   if (report.error) process.stdout.write(`${report.error}\n`);
   process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${join(OUT, "report.json")}\n`);

@@ -7,7 +7,8 @@
 // steered message does when it arrives just after its turn ended); ASK asks at once; others end.
 // Steps (LOOP_VARIANT=routine, the incident): 1. a LATER chat turn ends; 2. a routine that runs in
 // the chat starts a SLOW turn in its own session; 3. the CLI's own turn asks; 4. the routine turn
-// ends; 5. a user message queues; 6. the chat's events are counted for 20 s or until 200; 7. the
+// ends; 5. a user message queues; 6. the drain must log that the message waits, with at most one
+// refused `turn/start` (a loop reaches 100 first); 7. the
 // asking turn ends (file `end-ask`), and the queued message must then run and complete.
 // LOOP_VARIANT=simple skips the routine. The check fails when the queued message loops: each cycle
 // calls `turn/start`, gets `ProviderTurnActiveError`, and writes the chat twice.
@@ -18,6 +19,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, defaultProviderModel } from "@openbot/contracts/ipc";
+import { teeLogLines } from "@openbot/logging";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient, DiagnosticOrigin } from "../src/backend/agent-client";
@@ -39,7 +41,6 @@ const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
 /** The loop count that proves the loop; a healthy queue writes a few events only. */
 const LOOP_EVENTS = 200;
-const WATCH_MS = 20_000;
 /** `routine` (default): a routine turn in its own session ends while the question waits; `simple`: no routine. */
 const VARIANT = process.env.LOOP_VARIANT === "simple" ? "simple" : "routine";
 
@@ -301,6 +302,7 @@ interface Report {
   statusChanges: number;
   deliveries: unknown[];
   loop: boolean;
+  hold: string | null;
   followUpCompleted: boolean;
   passed: boolean;
   error?: string;
@@ -313,6 +315,7 @@ const report: Report = {
   statusChanges: 0,
   deliveries: [],
   loop: false,
+  hold: null,
   followUpCompleted: false,
   passed: false,
 };
@@ -402,26 +405,26 @@ try {
     step("routine turn ended", queueBrief());
   }
 
-  // 5. More work queues behind the waiting question.
-  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Plain follow-up." }));
-  step("message queued", queueBrief());
-
-  // 6. Watch the chat's event count. A loop passes LOOP_EVENTS quickly; a held queue stays flat.
+  // 5. More work queues behind the waiting question. The drain logs once why it holds a message.
+  const holds: string[] = [];
+  const stopTee = teeLogLines(["drain-scheduler"], (line) => {
+    if (line.includes("A queued message waits.") && line.includes(agent.id)) holds.push(line);
+  });
   report.snapshotEvents.before = snapshotEvents(threadId);
   const watchStart = Date.now();
   const startsBefore = turnStarts.calls;
-  // Each cycle calls `turn/start` once and writes the chat twice. A held queue does neither.
-  const looping = () =>
-    snapshotEvents(threadId) - report.snapshotEvents.before >= LOOP_EVENTS ||
-    turnStarts.calls - startsBefore >= LOOP_EVENTS / 2;
-  await waitFor(
-    "loop events or the end of the watch",
-    () => looping() || Date.now() - watchStart >= WATCH_MS,
-    WATCH_MS + 5_000,
-  );
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Plain follow-up." }));
+  step("message queued", queueBrief());
+
+  // 6. The drain holds the message, or loops. Each cycle of the loop calls `turn/start` and gets
+  // `ProviderTurnActiveError`; a held queue calls it at most once, when only the provider knew of its turn.
+  const looping = () => turnStarts.calls - startsBefore >= LOOP_EVENTS / 2;
+  await waitFor("the queue to hold the message, or the loop", () => holds.length > 0 || looping());
+  stopTee();
   report.snapshotEvents.after = snapshotEvents(threadId);
   report.snapshotEvents.windowMs = Date.now() - watchStart;
-  report.loop = looping();
+  report.hold = holds[0]?.match(/"reason":"([^"]+)"/)?.[1] ?? null;
+  report.loop = looping() || turnStarts.calls - startsBefore > 1;
   for (const row of databaseRows(
     database.connection
       .prepare(

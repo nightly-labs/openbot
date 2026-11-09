@@ -618,7 +618,7 @@ export class ConversationWriter {
             (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `).run(
-          randomUUID(),
+          input.eventType === CONVERSATION_UPDATED ? updateActivityId(sequence) : randomUUID(),
           input.threadId,
           activityTurnId(input.eventType, input.detail, input.activeTurnId),
           input.eventType,
@@ -987,6 +987,17 @@ function supersedeStreamedMessageEvents(
 }
 
 const CONVERSATION_UPDATED = "conversation.snapshot-updated";
+/** The command id that a write gets when its caller gives none: new for each write. */
+const GENERATED_UPDATE_COMMAND =
+  /^conversation:conversation\.snapshot-updated:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The activity row of an update, found again by its key. `projection_thread_activities` has no
+ * index on the thread or the sequence, so a search by them reads the whole table.
+ */
+function updateActivityId(sequence: number): string {
+  return `${CONVERSATION_UPDATED}:${sequence}`;
+}
 
 /**
  * Drops the thread's previous event when it is an update that the new one replaces whole, so a chat
@@ -994,11 +1005,13 @@ const CONVERSATION_UPDATED = "conversation.snapshot-updated";
  * moved every 0.4 s for a day wrote 1.7 million of them, 66 GB, into one database.
  *
  * A replay (`ThreadReplay`) gives the same thread without it: each message of the new event replaces
- * the earlier one with `{ ...earlier, ...new }`, so an earlier message whose keys the new one all has
- * leaves nothing behind, and the new event sets the same active turn. Only the event just before the
- * new one is read, so no other event can depend on it, and its messages come first in the new event
- * in the same order, so a replay adds them in the same order. An update with its own command id is
- * kept: its sender can send that command again, and the receipt is what makes the second one a no-op.
+ * the earlier one with `{ ...earlier, ...new }` and keeps the earlier author, and the earlier time when
+ * the new message has no delivery. So an earlier message leaves nothing behind when the new one has
+ * all its keys, its author and, with no delivery, its time, and the new event sets the same active
+ * turn. Only the event just before the new one is read, so no other event can depend on it, and its
+ * messages come first in the new event in the same order, so a replay adds them in the same order.
+ * Only an event with a generated command id goes: that id is new for each write, so no sender can
+ * send the command again and need its receipt.
  */
 function supersedePreviousConversationUpdate(
   db: DatabaseSync,
@@ -1020,7 +1033,7 @@ function supersedePreviousConversationUpdate(
   );
   if (!previous || requiredStringColumn(previous, "event_type") !== CONVERSATION_UPDATED) return;
   const commandId = requiredStringColumn(previous, "command_id");
-  if (!commandId.startsWith(`conversation:${CONVERSATION_UPDATED}:`)) return;
+  if (!GENERATED_UPDATE_COMMAND.test(commandId)) return;
   const previousSequence = requiredNumberColumn(previous, "sequence");
   const payload = databaseRow(
     db.prepare("SELECT payload_json FROM orchestration_events WHERE sequence = ?").get(previousSequence),
@@ -1030,10 +1043,8 @@ function supersedePreviousConversationUpdate(
     !replacedUpdate(JSON.parse(requiredStringColumn(payload, "payload_json")), changedMessages, activeTurnId)
   )
     return;
-  db.prepare("DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence = ?").run(
-    threadId,
-    previousSequence,
-  );
+  // An update written before this key existed keeps its activity row: one row for each thread.
+  db.prepare("DELETE FROM projection_thread_activities WHERE activity_id = ?").run(updateActivityId(previousSequence));
   db.prepare("DELETE FROM orchestration_events WHERE sequence = ?").run(previousSequence);
   deleteReceiptsOf(db, [commandId]);
 }
@@ -1050,6 +1061,8 @@ function replacedUpdate(
   return messages.every((message, index) => {
     const next = changedMessages[index];
     if (!isDynamicRecord(message) || next === undefined || message.id !== next.id) return false;
+    if (message.author !== next.author || (next.delivery === undefined && message.createdAt !== next.createdAt))
+      return false;
     // A key the new message leaves undefined is not in its stored JSON, so the earlier value would stay.
     const nextKeys = new Set(Object.entries(next).flatMap(([key, value]) => (value === undefined ? [] : [key])));
     return Object.keys(message).every((key) => nextKeys.has(key));
