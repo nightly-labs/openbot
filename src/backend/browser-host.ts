@@ -3911,7 +3911,8 @@ export class BrowserHost {
         x: 0,
         y: 0,
         width: this.#bounds.width * zoomFactor,
-        height: this.#bounds.height * zoomFactor,
+        // A shown page ends above the dock, so a hidden one gets the same height.
+        height: this.#bounds.height * zoomFactor - this.#mainPageDockRoom,
       });
       if (width >= MIN_HIDDEN_VIEWPORT.width && height >= MIN_HIDDEN_VIEWPORT.height)
         return { x: 0, y: 0, width, height };

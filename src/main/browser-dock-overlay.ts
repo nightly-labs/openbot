@@ -107,8 +107,11 @@ export class BrowserDockOverlay {
   #page: BrowserMainPage | null = null;
   /** The height that the overlay has, in CSS pixels, and the glass of its last frame. */
   #height = INITIAL_HEIGHT;
-  /** The height of the dock without an open menu, in CSS pixels. A menu does not move the page. */
-  #room = INITIAL_HEIGHT;
+  /**
+   * The height of the dock without an open menu, in CSS pixels, from its last frame. A menu does not move
+   * the page. Zero until the first frame, so the page does not move for the height before it.
+   */
+  #room = 0;
   #glass: BrowserDockGlass[] = [];
   #seq = -1;
   #shrinkTimer: ReturnType<typeof setTimeout> | null = null;
@@ -162,10 +165,12 @@ export class BrowserDockOverlay {
   /** The space that the dock needs. A taller dock gets it at once; a shorter one after a pause. */
   setFrame(frame: BrowserDockFrame): void {
     if (this.#destroyed || frame.seq <= this.#seq) return;
+    // The first frame replaces the height that the overlay starts with, also when it is smaller.
+    const first = this.#seq < 0;
     this.#seq = frame.seq;
     this.#glass = frame.glass;
     const height = Math.ceil(frame.height / HEIGHT_STEP) * HEIGHT_STEP;
-    if (height >= this.#height) {
+    if (first || height >= this.#height) {
       this.#cancelShrink();
       this.#height = height;
     } else {
@@ -244,7 +249,7 @@ export class BrowserDockOverlay {
       this.#loaded = false;
       this.#seq = -1;
       this.#height = INITIAL_HEIGHT;
-      this.#room = INITIAL_HEIGHT;
+      this.#room = 0;
       this.#glass = [];
     }
     if (!window.isDestroyed()) window.contentView.removeChildView(view);
@@ -276,7 +281,7 @@ export class BrowserDockOverlay {
       return;
     }
     // A dock with an open menu asks for the whole page.
-    if (this.#height < BROWSER_DOCK_LIMITS.frameSize) this.#room = this.#height;
+    if (this.#seq >= 0 && this.#height < BROWSER_DOCK_LIMITS.frameSize) this.#room = this.#height;
     const layout = browserDockLayout(page, this.#height, this.#glass);
     // The page view was raised, so the glass and then the overlay go above it again, in this order.
     layout.glass.forEach((shape, index) => {
