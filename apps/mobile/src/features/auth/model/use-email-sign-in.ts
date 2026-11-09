@@ -172,6 +172,8 @@ export function useEmailSignIn({
         requestId.current = null;
         setPending(null);
         setCompanyEmail(address);
+        // A resend gets this answer when the company turned the sign-in on after the first code.
+        go("email");
         await signInWithCompany(address);
         return;
       }
