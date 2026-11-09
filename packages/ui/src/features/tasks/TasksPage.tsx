@@ -142,6 +142,8 @@ interface TasksPageProps {
   waitOf?: ((task: AgentTask) => AgentTaskWait) | undefined;
   /** The user's send shortcut for the composer. */
   sendShortcut?: SendShortcut | undefined;
+  /** The window draws the macOS window controls over the image viewer's top start corner. */
+  macWindowControls?: boolean | undefined;
 }
 
 const agentOf = (agents: readonly AgentProfile[], agentId: string) => agents.find((agent) => agent.id === agentId);
@@ -481,6 +483,7 @@ function TasksComposer(props: TasksPageProps) {
           pending={props.pendingImages}
           removeDisabled={phase() === "transcribing"}
           onRemove={(attachment) => props.onRemoveFile?.(attachment)}
+          macWindowControls={props.macWindowControls}
         />
         <div class="composer-input-label">
           <ComposerEditor
