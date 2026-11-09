@@ -356,7 +356,10 @@ export class BrowserCdpEngine {
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
        * field is a password field, or every field asks for a one-time code. A text field that the page
-       * masks with `-webkit-text-security` is a password field. The fingerprint check of `enter` keeps
+       * masks with `-webkit-text-security` is a password field. A code field has
+       * `autocomplete="one-time-code"`, or is a text, tel or number input with a strong code word such as
+       * otp, 2fa or verification code in its id, name or aria-label, as older Keycloak sign-in pages have;
+       * a backup or recovery code field is not one. The fingerprint check of `enter` keeps
        * this true until the fill; the mask is read here only, because a page can change it as it fills.
        */
       fields: { password: boolean; oneTimeCode: boolean };
@@ -437,7 +440,9 @@ export class BrowserCdpEngine {
             send,
             node.backendNodeId,
             `function() {
-              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
+              const named = [this.id, this.name, this.getAttribute('aria-label') ?? ''].join(' ').replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+              const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && /\\b(?:t?otp|2fa|mfa)(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?factor\\b/.test(named) && !/\\b(?:backup|recovery)\\b/.test(named));
+              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
           );
