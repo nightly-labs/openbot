@@ -48,6 +48,7 @@ import { LocalSignInWindows } from "./local-sign-in-window";
 import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
+import { displaysFilledByOtherApps } from "./mac-full-screen-windows";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
@@ -1095,6 +1096,20 @@ export async function createApplicationServices({
     createWindow: createAgentDockWindow,
     loadWindow: loadAgentDockRenderer,
     screen,
+    // A full-screen app has its own Space: entering and leaving it changes the active Space.
+    fullScreenApps:
+      process.platform === "darwin"
+        ? {
+            filledDisplays: displaysFilledByOtherApps,
+            watch: (onChange) => {
+              const id = systemPreferences.subscribeWorkspaceNotification(
+                "NSWorkspaceActiveSpaceDidChangeNotification",
+                onChange,
+              );
+              return () => systemPreferences.unsubscribeWorkspaceNotification(id);
+            },
+          }
+        : undefined,
     getMainWindow: windows.getMainWindow,
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,

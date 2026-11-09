@@ -28,6 +28,9 @@ const logger = createOpenBotLogger("agent-dock-window");
  */
 const AGENT_DOCK_WINDOW_SIZE = { width: 502, height: 640 } as const;
 
+/** How often the dock checks again while an app fills a display. */
+const FULL_SCREEN_CHECK_INTERVAL_MS = 1000;
+
 export type AgentDockSendAction = Extract<AgentDockAction, { type: "send" }>;
 
 /** An agent dock operation that failed. The cause is what the dock window reads. */
@@ -52,6 +55,16 @@ export interface AgentDockWindowControllerOptions {
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
+  /**
+   * The apps that fill a display on the active Space, such as a video, a game or slides in full screen.
+   * The dock hides on those displays. `watch` calls back when the active Space changes.
+   */
+  fullScreenApps?:
+    | {
+        filledDisplays: (displays: readonly Display[]) => ReadonlySet<number>;
+        watch: (onChange: () => void) => () => void;
+      }
+    | undefined;
   logger?: Logger;
 }
 
@@ -80,10 +93,15 @@ export class AgentDockWindowController {
   #drag: { rendererId: number; pointerY: number; windowY: number } | null = null;
   /** The main windows whose moves the dock follows. A new main window is added when it publishes. */
   readonly #followedWindows = new WeakSet<BrowserWindow>();
+  /** The displays where another app fills the screen, and the check that repeats while there are any. */
+  #filled: ReadonlySet<number> = new Set();
+  #filledCheck: ReturnType<typeof setInterval> | null = null;
+  readonly #stopWatchingSpaces: (() => void) | null;
   #destroyed = false;
 
   constructor(options: AgentDockWindowControllerOptions) {
     this.#options = options;
+    this.#stopWatchingSpaces = options.fullScreenApps?.watch(() => this.#checkFullScreenApps()) ?? null;
   }
 
   get presentation(): AgentDockPresentation | null {
@@ -309,10 +327,12 @@ export class AgentDockWindowController {
           }
           this.#windows = this.#liveWindows();
           if (this.#presentation === null) {
+            this.#setFilled(new Set());
             for (const { window } of this.#windows) window.hide();
             return Effect.void;
           }
           const targets = this.#targetDisplays();
+          this.#setFilled(this.#options.fullScreenApps?.filledDisplays(targets) ?? new Set());
           const targetIds = new Set(targets.map((display) => display.id));
           // A window stays on its display. A window whose display is no longer a choice moves to a display
           // that has no window, or closes.
@@ -327,7 +347,9 @@ export class AgentDockWindowController {
             current.displayId = display.id;
             const bounds = this.#boundsFor(display);
             if (!isDeepStrictEqual(current.window.getBounds(), bounds)) current.window.setBounds(bounds, false);
-            if (!current.window.isVisible()) current.window.showInactive();
+            if (this.#filled.has(display.id)) {
+              if (current.window.isVisible()) this.#hideForFullScreenApp(current);
+            } else if (!current.window.isVisible()) current.window.showInactive();
           }
           for (const entry of spare) this.#closeWindow(entry.window);
           return Effect.forEach(opens, (display) =>
@@ -373,7 +395,7 @@ export class AgentDockWindowController {
           if (owned()) this.#release(entry);
         });
         window.once("ready-to-show", () => {
-          if (!owned() || this.#presentation === null) return;
+          if (!owned() || this.#presentation === null || this.#filled.has(entry.displayId)) return;
           window.showInactive();
         });
         // macOS can move a window off a display that goes away. Put the dock back at its place on its edge.
@@ -401,8 +423,37 @@ export class AgentDockWindowController {
     );
   }
 
+  /** Reconciles the windows when an app starts or stops filling a display. */
+  #checkFullScreenApps(): void {
+    const apps = this.#options.fullScreenApps;
+    if (!apps || this.#destroyed || this.#presentation === null) return;
+    if (isDeepStrictEqual(apps.filledDisplays(this.#targetDisplays()), this.#filled)) return;
+    void Effect.runPromise(this.reconcileWindow());
+  }
+
+  /** A hidden dock closes its chat, so that the chat does not mark new answers as read. */
+  #hideForFullScreenApp(entry: DockWindow): void {
+    if (this.#chatOwner === entry.rendererId) sendToRenderer(entry.window, IPC_ENDPOINTS.agentDock.closeChat);
+    this.#release(entry);
+    entry.window.hide();
+  }
+
+  #setFilled(filled: ReadonlySet<number>): void {
+    this.#filled = filled;
+    // When the user leaves a full-screen app, the window list still shows it for a moment after the
+    // Space change, and no other event follows. So the check repeats while an app fills a display.
+    if (filled.size > 0 && this.#filledCheck === null) {
+      this.#filledCheck = setInterval(() => this.#checkFullScreenApps(), FULL_SCREEN_CHECK_INTERVAL_MS);
+    } else if (filled.size === 0 && this.#filledCheck !== null) {
+      clearInterval(this.#filledCheck);
+      this.#filledCheck = null;
+    }
+  }
+
   destroy(): void {
     this.#destroyed = true;
+    this.#stopWatchingSpaces?.();
+    this.#setFilled(new Set());
     this.#destroyWindow();
   }
 
