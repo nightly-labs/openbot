@@ -346,7 +346,8 @@ export class DynamicIslandWindowController {
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
     window.setAlwaysOnTop(true, "status");
-    // These methods exist only on macOS. Electron does not define them on Windows, so a call throws.
+    // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
+    // defined on Windows, so a call there throws.
     if (this.#options.platform === "darwin") {
       window.excludedFromShownWindowsMenu = true;
       window.setWindowButtonVisibility(false);

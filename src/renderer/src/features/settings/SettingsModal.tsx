@@ -200,7 +200,7 @@ export function SettingsModal(props: SettingsModalProps) {
     navItems.filter(
       (item) =>
         settingsTabShown(item.value, { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
-        (item.value !== "agent-dock" || agentDockShown()),
+        (item.value !== "agent-dock" || props.agentDock !== undefined),
     );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);

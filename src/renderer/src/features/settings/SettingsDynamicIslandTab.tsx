@@ -64,6 +64,8 @@ export interface SettingsDynamicIslandTabProps {
 export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
   const i18n = useI18n();
   const isMac = () => props.platform === "darwin";
+  // The row key is also the settings search anchor in `settings-tabs.ts`, so the label and the anchor use one key.
+  const showKey = () => (isMac() ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen");
   const widthPercent = () => props.value.macBookNotchWidthPercent;
   const heightPercent = () => props.value.macBookNotchHeightPercent;
   const widestBuiltInWidth = () =>
@@ -107,10 +109,10 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       <SettingsSection title={i18n.t("settings.notch.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
-            data-settings-row={isMac() ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen"}
+            data-settings-row={showKey()}
             checked={props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-            label={isMac() ? i18n.t("settings.notch.show.title") : i18n.t("settings.notch.show.titleTopOfScreen")}
+            label={i18n.t(showKey())}
             description={i18n.t("settings.notch.show.description")}
           />
           <SwitchField

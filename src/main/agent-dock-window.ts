@@ -353,7 +353,8 @@ export class AgentDockWindowController {
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
         window.setHasShadow(false);
         window.setAlwaysOnTop(true, "floating");
-        // These methods exist only on macOS. Electron does not define them on Windows, so a call throws.
+        // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
+        // defined on Windows, so a call there throws.
         if (this.#options.platform === "darwin") {
           window.excludedFromShownWindowsMenu = true;
           window.setWindowButtonVisibility(false);
