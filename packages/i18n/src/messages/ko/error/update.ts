@@ -23,6 +23,8 @@ export const messages = {
   "error.update.siblingSessionSameAccount":
     "이 사용자 계정에서 다른 OpenBot 프로세스가 아직 실행 중이에요. 종료한 후 업데이트를 다시 설치해 주세요.",
   "error.update.siblingCheckFailed": "다른 OpenBot 세션을 확인할 수 없었어요. 설치하기 전에 다시 시도해 주세요.",
+  "error.update.readOnlyLocation":
+    "이 위치에서는 OpenBot 업데이트를 설치할 수 없습니다. OpenBot을 종료하세요. Finder에서 OpenBot을 응용 프로그램 폴더로 드래그하세요(이미 그곳에 있다면 밖으로 꺼냈다가 다시 넣으세요). 그런 다음 OpenBot을 열고 업데이트를 다시 설치하세요.",
   // A joined server's admin reads these from the host.
   "error.update.remoteDisabled": "이 컴퓨터에서는 서버 관리자의 업데이트가 꺼져 있어요.",
   "error.update.restartStarted": "OpenBot이 업데이트를 설치하기 위해 이미 다시 시작하고 있어요.",
