@@ -358,5 +358,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.model.footer": "ElevenLabs 对每个模型单独计价。更改从下一条回复开始生效。",
   "mobile.settings.voice.elevenLabs.model.flash": "最快",
   "mobile.settings.voice.elevenLabs.model.multilingual": "更自然 · 更慢",
-  "mobile.settings.voice.elevenLabs.model.v3": "表现力最强 · 最慢",
+  "mobile.settings.voice.elevenLabs.model.v3": "富有表现力 · 较慢",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90 多种语言 · 快",
+  "mobile.settings.voice.elevenLabs.model.v4": "最佳质量 · 90 多种语言 · 较慢",
 } as const satisfies PartialTranslation<typeof source>;

@@ -609,6 +609,8 @@ const ELEVENLABS_MODEL_HINT = {
   "elevenlabs-flash-v2.5": "mobile.settings.voice.elevenLabs.model.flash",
   "elevenlabs-multilingual-v2": "mobile.settings.voice.elevenLabs.model.multilingual",
   "elevenlabs-v3": "mobile.settings.voice.elevenLabs.model.v3",
+  "elevenlabs-v4-turbo": "mobile.settings.voice.elevenLabs.model.v4Turbo",
+  "elevenlabs-v4": "mobile.settings.voice.elevenLabs.model.v4",
 } as const satisfies Record<ElevenLabsSpeechModelId, MobileTextKey>;
 
 /** The ElevenLabs model that reads replies, with the same choices as desktop. */

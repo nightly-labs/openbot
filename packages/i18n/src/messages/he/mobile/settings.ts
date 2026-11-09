@@ -374,5 +374,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.model.footer": "לכל מודל יש מחיר משלו ב-ElevenLabs. השינוי חל על התשובה הבאה.",
   "mobile.settings.voice.elevenLabs.model.flash": "המהיר ביותר",
   "mobile.settings.voice.elevenLabs.model.multilingual": "טבעי יותר · איטי יותר",
-  "mobile.settings.voice.elevenLabs.model.v3": "הכי אקספרסיבי · האיטי ביותר",
+  "mobile.settings.voice.elevenLabs.model.v3": "אקספרסיבי · איטי",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "יותר מ-90 שפות · מהיר",
+  "mobile.settings.voice.elevenLabs.model.v4": "האיכות הטובה ביותר · יותר מ-90 שפות · איטי",
 } as const satisfies PartialTranslation<typeof source>;

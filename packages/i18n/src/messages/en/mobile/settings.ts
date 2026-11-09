@@ -377,5 +377,7 @@ export const messages = defineMessages("mobile.settings", {
     "Each model has its own price at ElevenLabs. The change applies to the next reply.",
   "mobile.settings.voice.elevenLabs.model.flash": "Fastest",
   "mobile.settings.voice.elevenLabs.model.multilingual": "More natural · slower",
-  "mobile.settings.voice.elevenLabs.model.v3": "Most expressive · slowest",
+  "mobile.settings.voice.elevenLabs.model.v3": "Expressive · slow",
+  "mobile.settings.voice.elevenLabs.model.v4Turbo": "90+ languages · fast",
+  "mobile.settings.voice.elevenLabs.model.v4": "Best quality · 90+ languages · slow",
 });

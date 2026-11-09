@@ -2831,6 +2831,38 @@
     "tr",
     "zh"
   ],
+  "settings.voice.speech.model.v4Turbo.description": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
+  "settings.voice.speech.model.v4.description": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "settings.voice.speech.model.xai.description": [
     "ar",
     "de",
