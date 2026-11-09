@@ -108,15 +108,14 @@ type RemoteTeamCommandInput =
   | { type: "disconnect" }
   | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
 
-function isLiveVoiceRoute(path: string): boolean {
-  return path === LIVE_VOICE_ROUTES.start || path === LIVE_VOICE_ROUTES.stop;
-}
-
 /**
- * The host's sentence for a refused live voice start: no Codex sign-in with ChatGPT on the host, no
- * event connection, or a timeout. The screen translates it and removes secrets from it.
+ * The text for a refused live voice request. A 409 has the host's sentence: no Codex sign-in with
+ * ChatGPT on the host, no event connection, or a timeout. The screen translates it and removes
+ * secrets from it. A 500 of a start is a Codex failure on the host, whose reason stays in the host log.
  */
-function hostErrorText(body: unknown): string | null {
+function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
+  if (path === LIVE_VOICE_ROUTES.start && status >= 500) return sourceText("error.voice.live.hostFailed");
+  if (path !== LIVE_VOICE_ROUTES.start && path !== LIVE_VOICE_ROUTES.stop) return null;
   return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
 }
 
@@ -281,7 +280,7 @@ export const RemoteTeamTransport = memo(
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
             throw referencedError(
-              (isLiveVoiceRoute(path) && hostErrorText(result.body)) || sourceText("error.remote.serverRequestFailed"),
+              liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
               referenceFrom("http", result.status),
             );
           return decode(result.body);

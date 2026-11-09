@@ -28,6 +28,7 @@ import {
   type WhisperLanguage,
   XAI_SPEECH_VOICES,
 } from "@openbot/contracts/ipc";
+import { shortVoiceServerModel, voiceServerHost } from "@openbot/contracts/voice-server";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -59,7 +60,7 @@ import {
   VoiceKeyRow,
   VoiceModelRow,
 } from "./VoiceModelRow";
-import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
+import { VoiceServerDialog } from "./VoiceServerDialog";
 
 const MODEL_DESCRIPTION = {
   "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
@@ -675,14 +676,14 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   <Show when={serverDictates()}>
                     <ItemDescription>
                       {t("settings.voice.server.dictationSummary", {
-                        model: shortModel(saved().routes.transcriptionModel),
+                        model: shortVoiceServerModel(saved().routes.transcriptionModel),
                       })}
                     </ItemDescription>
                   </Show>
                   <Show when={serverSpeaks()}>
                     <ItemDescription>
                       {t("settings.voice.server.speechSummary", {
-                        model: shortModel(saved().routes.speechModel),
+                        model: shortVoiceServerModel(saved().routes.speechModel),
                         voice: saved().routes.voice ?? "",
                       })}
                     </ItemDescription>

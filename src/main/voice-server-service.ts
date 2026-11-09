@@ -26,6 +26,7 @@ import {
   decodeVoiceServerWav,
   OPENAI_VOICES,
   VOICE_SERVER_VOICE_PATHS,
+  voiceServerHost,
   voiceServerModelLists,
   voiceServerVoiceNames,
 } from "@openbot/contracts/voice-server";
@@ -263,15 +264,6 @@ export function transcribeRecording(
   );
 }
 
-/** The part of an address that an error may name. */
-function hostOf(address: string): string {
-  try {
-    return new URL(address).host;
-  } catch {
-    return "?";
-  }
-}
-
 function routeOff() {
   return new VoiceOperationError({ cause: new Error(sourceText("error.voice.server.routeOff")) });
 }
@@ -279,7 +271,7 @@ function routeOff() {
 function invalidAnswer(address: string) {
   return new VoiceServerFailure({
     field: "address",
-    message: sourceText("error.voice.server.invalidAnswer", { host: hostOf(address) }),
+    message: sourceText("error.voice.server.invalidAnswer", { host: voiceServerHost(address) }),
   });
 }
 
@@ -301,7 +293,7 @@ function exchange<A>(
   read: (response: Response, host: string) => Effect.Effect<A, VoiceServerFailure>,
   refused?: StatusText,
 ): Effect.Effect<A, VoiceServerFailure> {
-  const host = hostOf(target.address);
+  const host = voiceServerHost(target.address);
   const fail = (field: VoiceServerProbeField, message: string) => new VoiceServerFailure({ field, message });
   return Effect.acquireUseRelease(
     Effect.sync(() => new AbortController()),
@@ -383,7 +375,7 @@ function listModels(fetcher: typeof fetch, target: ServerTarget): Effect.Effect<
     if (!lists)
       return yield* new VoiceServerFailure({
         field: "address",
-        message: sourceText("error.provider.discoveryInvalid", { host: hostOf(target.address) }),
+        message: sourceText("error.provider.discoveryInvalid", { host: voiceServerHost(target.address) }),
       });
     const { transcription, speech } = lists;
     const voices = speech.length > 0 ? yield* listVoices(fetcher, target) : [];

@@ -1194,8 +1194,6 @@ export class TeamApiServer {
                 connection.capabilities.has(LIVE_VOICE_CAPABILITY) &&
                 client.readyState === webSockets.WebSocket.OPEN,
             ),
-          logStartFailure: (error) =>
-            (this.#options.logger ?? logger).warn("Live voice of a member did not start:", toLogValue(error)),
         })) === "handled"
       )
         return;
