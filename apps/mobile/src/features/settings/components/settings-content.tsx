@@ -92,8 +92,9 @@ const ROW_PADDING_X = 32;
 export function SettingsRow({
   children,
   supportingText,
+  value,
   onPress,
-  trailing,
+  trailing: trailingControl,
   disabled = false,
   leading,
   disclosure = true,
@@ -105,6 +106,8 @@ export function SettingsRow({
   onAccessibilityAction,
 }: PropsWithChildren<{
   supportingText?: string;
+  /** A short value, such as a count, before the disclosure chevron. */
+  value?: string;
   onPress?: () => void;
   trailing?: ReactNode;
   disabled?: boolean;
@@ -126,6 +129,16 @@ export function SettingsRow({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
+  const chevron =
+    onPress && disclosure ? <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} /> : null;
+  const trailing = value ? (
+    <View className="flex-row items-center gap-2">
+      <Typography.Paragraph className="text-grouped-secondary">{value}</Typography.Paragraph>
+      {chevron}
+    </View>
+  ) : (
+    trailingControl
+  );
   const fontScale = useFontScale();
   const measures = Boolean(trailing) && fontScale >= STACKED_FONT_SCALE;
   const [rowWidth, setRowWidth] = useState(0);
@@ -159,14 +172,7 @@ export function SettingsRow({
         {title}
         {stacked ? measuredTrailing : null}
       </View>
-      {stacked
-        ? null
-        : measures
-          ? measuredTrailing
-          : trailing ||
-            (onPress && disclosure ? (
-              <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
-            ) : null)}
+      {stacked ? null : measures ? measuredTrailing : trailing || chevron}
     </>
   );
   return onPress ? (
