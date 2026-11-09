@@ -10,20 +10,28 @@
 //
 // The answer has two shapes. The older one has the weekly quota in `usage` and the rolling windows
 // in `limits[]`, as `limit`, `used` or `remaining`, and `resetTime`. The newer one adds
-// `usages.limit_5h` and `usages.limit_7d`, each a `used_ratio` from 0 to 1 and a `reset_time`.
+// `usages.limit_5h`, `usages.limit_7d` and, on plans with a monthly quota, `usages.limit_month_total`,
+// each a `used_ratio` from 0 to 1 and a `reset_time` (`packages/oauth/src/managed-usage.ts`).
 
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Effect, Option, Schema } from "effect";
 import { kimiHomeDirectory } from "./process-confinement";
-import { type AccountRateLimitsReadResult, type AccountRateLimitWindowResult, getArray, getRecord } from "./protocol";
+import {
+  type AccountRateLimitsReadResult,
+  type AccountRateLimitWindowResult,
+  bindingWindow,
+  getArray,
+  getRecord,
+} from "./protocol";
 
 /** The CLIs' default API address, kimi.com. A global sign-in writes `api.kimi.ai` into the config. */
 const KIMI_CODE_BASE_URL = "https://api.kimi.com/coding/v1";
 const KIMI_USAGE_TIMEOUT_MS = 10_000;
 const ROLLING_WINDOW_MINS = 300;
 const WEEKLY_WINDOW_MINS = 10_080;
+const MONTHLY_WINDOW_MINS = 43_200;
 
 const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLimitId: null };
 
@@ -168,8 +176,10 @@ function percent(used: number): number {
   return Math.max(0, Math.min(100, used));
 }
 
+type KimiWindow = AccountRateLimitWindowResult & { usedPercent: number };
+
 /** One `usage` or `limits[].detail` block, or null when it has no limit to divide by. */
-function detailWindow(value: unknown, windowDurationMins: number | null): AccountRateLimitWindowResult | null {
+function detailWindow(value: unknown, windowDurationMins: number | null): KimiWindow | null {
   const detail = Schema.decodeUnknownOption(QuotaDetail)(value);
   if (Option.isNone(detail)) return null;
   const { limit, used, remaining, resetTime } = detail.value;
@@ -179,7 +189,7 @@ function detailWindow(value: unknown, windowDurationMins: number | null): Accoun
 }
 
 /** One `usages.limit_*` entry of the newer shape. */
-function ratioWindow(value: unknown, windowDurationMins: number): AccountRateLimitWindowResult | null {
+function ratioWindow(value: unknown, windowDurationMins: number): KimiWindow | null {
   const ratio = Schema.decodeUnknownOption(QuotaRatio)(value);
   if (Option.isNone(ratio)) return null;
   return {
@@ -203,16 +213,25 @@ function rollingWindow(value: unknown[]): AccountRateLimitWindowResult | null {
 }
 
 /**
- * The primary window is the rolling 5-hour quota and the secondary one the weekly quota, as in the
- * CLI's `/usage`. `limits[]` and `usage` come first; the newer `usages` entries fill a missing one.
+ * The primary window is the rolling 5-hour quota, as in the CLI's `/usage`. The secondary one is the
+ * weekly or the monthly quota, whichever stops a turn first, and the other goes to `tertiary` for the
+ * usage list. A spent monthly quota stops turns while the weekly one still has some left (#5901).
+ * `limits[]` and `usage` come first; the newer `usages` entries fill a missing one.
  */
 function kimiRateLimits(value: unknown): AccountRateLimitsReadResult {
   const usages = getRecord(value, "usages");
   const primary =
     rollingWindow(getArray(value, "limits")) ?? ratioWindow(getRecord(usages, "limit_5h"), ROLLING_WINDOW_MINS);
-  const secondary =
+  const weekly =
     detailWindow(getRecord(value, "usage"), WEEKLY_WINDOW_MINS) ??
     ratioWindow(getRecord(usages, "limit_7d"), WEEKLY_WINDOW_MINS);
+  const monthly = ratioWindow(getRecord(usages, "limit_month_total"), MONTHLY_WINDOW_MINS);
+  const secondary = weekly && monthly ? bindingWindow(weekly, monthly) : (weekly ?? monthly);
   if (!primary && !secondary) return NO_USAGE;
-  return { rateLimits: { limitId: "kimi", primary, secondary }, rateLimitsByLimitId: null };
+  const tertiary = weekly && monthly ? (secondary === weekly ? monthly : weekly) : undefined;
+  return {
+    rateLimits: { limitId: "kimi", primary, secondary },
+    ...(tertiary ? { tertiary } : {}),
+    rateLimitsByLimitId: null,
+  };
 }
