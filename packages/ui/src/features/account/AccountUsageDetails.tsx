@@ -117,7 +117,9 @@ export function AccountUsageWindowList(props: { windows: readonly AccountUsageWi
       <For each={props.windows}>
         {(usageWindow) => (
           <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
-            <span class="account-usage-window-label">{usageWindow.label}</span>
+            <span class="account-usage-window-label" title={usageWindow.label}>
+              {usageWindow.label}
+            </span>
             <span class="account-usage-window-bar" aria-hidden="true">
               <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
             </span>
