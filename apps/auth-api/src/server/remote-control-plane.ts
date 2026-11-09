@@ -893,8 +893,6 @@ export class RemoteControlPlane {
         dependencies.database
           .prepare(
             `SELECT h.host_id, h.name, h.logo_key, h.device_public_key, h.auth_epoch, m.membership_id, m.role,
-           EXISTS(SELECT 1 FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted,
            (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan
          FROM remote_memberships m
@@ -911,7 +909,6 @@ export class RemoteControlPlane {
             auth_epoch: number;
             membership_id: string;
             role: RemoteMemberRole;
-            hosted: number;
             hosted_plan: string | null;
           }>(),
       );
@@ -938,7 +935,7 @@ export class RemoteControlPlane {
               // join after its users. So no server takes more people than the license has users.
               memberLimit: license ? Math.min(limit, license.users) : limit,
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
-              hosted: row.hosted === 1,
+              hosted: row.hosted_plan !== null,
               // The storage that the plan of a hosted server gives, so a client warns before the plan is full.
               ...hostedStorage(row.hosted_plan),
             };
