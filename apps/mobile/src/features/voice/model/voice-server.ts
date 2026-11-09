@@ -34,7 +34,7 @@ const LIST_BODY_LIMIT = 1024 * 1024;
 /** A minute of 48 kHz stereo 16-bit WAV is 11 MB. */
 const SPEECH_BODY_LIMIT = 32 * 1024 * 1024;
 /** The capture of the speech module: 16 kHz mono 16-bit PCM. */
-export const VOICE_SERVER_CAPTURE_RATE = 16_000;
+const VOICE_SERVER_CAPTURE_RATE = 16_000;
 
 const SERVER_KEY = "openbot.mobile.voice-server.v1";
 /** The key stays in the keychain only: no state, log or analytics event holds it. */

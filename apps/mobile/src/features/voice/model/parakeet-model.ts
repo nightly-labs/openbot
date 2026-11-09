@@ -16,7 +16,7 @@ const unload = async () => {
  * Parakeet TDT 0.6B v3, the speech recognition model of desktop. It finds the spoken language itself,
  * in 25 European languages, and runs on the phone.
  */
-export const parakeetModel = createModelDownload({
+const parakeetModel = createModelDownload({
   directory: PARAKEET_MODEL_DIRECTORY,
   files: PARAKEET_MODEL_FILES,
   unload,
@@ -26,7 +26,7 @@ export const parakeetModel = createModelDownload({
  * Parakeet Unified EN 0.6B, as on desktop: English only, with punctuation and fewer errors than v3.
  * It is a Parakeet transducer of the same size, so the phone loads it with the same recognizer.
  */
-export const parakeetUnifiedModel = createModelDownload({
+const parakeetUnifiedModel = createModelDownload({
   directory: PARAKEET_UNIFIED_MODEL_DIRECTORY,
   files: PARAKEET_UNIFIED_MODEL_FILES,
   unload,
