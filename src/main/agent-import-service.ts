@@ -13,7 +13,7 @@ import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } 
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
   type AgentImportChannel,
@@ -31,18 +31,19 @@ import {
   isChannelDraft,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { zipSync } from "fflate";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { diskSpace } from "../backend/storage-usage";
 import {
   type ArchiveEntry,
   type ArchiveFile,
   type ArchiveLimits,
-  availableDiskBytes,
   avatarImage,
+  MANIFEST_MAX_BYTES,
   readArchiveEffect,
   readEntriesEffect,
+  readSkillEffect,
   writeImportedFilesEffect,
   writeTreeEffect,
 } from "./agent-archive";
@@ -55,7 +56,6 @@ import {
 import { validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
-import { inspectArchive, MAX_BYTES as SKILL_MAX_BYTES } from "./skill-package";
 
 /** Skill folders are copied here, published to the local library, and removed again. */
 const SKILL_STAGING = ".openbot/import-skills";
@@ -173,7 +173,9 @@ export class AgentImportService {
     private readonly channelActor: () => ChannelActor,
     private readonly timezone: () => string = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     private readonly uploadDirectory: string | null = null,
-    private readonly freeDiskBytes: (path: string) => Promise<number> = availableDiskBytes,
+    /** `null` when the disk does not say, and then the import does not check. */
+    private readonly freeDiskBytes: (path: string) => Effect.Effect<number | null> = (path) =>
+      diskSpace(path).pipe(Effect.map((disk) => disk.freeBytes)),
   ) {}
 
   /** Reads and checks an export. A new stage by the same owner replaces the owner's previous one. */
@@ -257,14 +259,15 @@ export class AgentImportService {
       return yield* archiveFailure(
         new Error(sourceText("error.import.manifestMissing", { manifest: AGENT_IMPORT_MANIFEST })),
       );
-    const manifestBytes = (yield* readEntriesEffect(archive, [manifestName]))[manifestName] ?? new Uint8Array();
+    const manifestBytes =
+      (yield* readEntriesEffect(archive, [manifestName], MANIFEST_MAX_BYTES))[manifestName] ?? new Uint8Array();
     const { manifest, warnings } = yield* archiveSync(() =>
       decodeImportManifest(manifestBytes, this.agents.memoryLimit()),
     );
     if (archive.skipped) warnings.push(sourceText("error.import.foldersSkipped", { number: archive.skipped }));
 
     const avatarPaths = new Set(manifest.agents.flatMap((agent) => (agent.avatar ? [wrapper + agent.avatar] : [])));
-    const avatarBytes = yield* readEntriesEffect(archive, avatarPaths);
+    const avatarBytes = yield* readEntriesEffect(archive, avatarPaths, AVATAR_IMAGE_LIMITS.sourceBytes);
     const avatars = new Map<string, AvatarImageInput>();
     const existing = new Set(this.agents.listAgents().map((agent) => agent.name.toLowerCase()));
     for (const agent of manifest.agents) {
@@ -515,30 +518,19 @@ export class AgentImportService {
     context: ImportContext,
     warnings: string[],
   ): Effect.fn.Return<AgentSummary, ArchiveOperationError> {
+    // The manifest keeps each path of an agent inside `agents/<key>/`, so only those entries are searched.
+    const prefix = `${staged.wrapper}agents/${source.key}/`;
+    const agentEntries = [...archive.entries.values()].filter((entry) => entry.name.startsWith(prefix));
     /** The entries under a folder of the export, by their names in that folder. */
     const under = (path: string) => {
       const folder = `${staged.wrapper}${path}/`;
-      return [...archive.entries.values()]
+      return agentEntries
         .filter((entry) => entry.name.startsWith(folder))
         .map((entry) => [entry.name.slice(folder.length), entry] as const);
     };
-    // Every skill is checked before the agent exists, so a bad one publishes nothing. A skill is
-    // read into memory, so a folder larger than a skill can be is refused before it is read.
+    // Every skill is checked before the agent exists, so a bad one publishes nothing.
     const skills: Array<{ files: Array<readonly [string, Uint8Array]>; slug: string }> = [];
-    for (const skill of source.skills) {
-      const entries = under(skill);
-      if (entries.reduce((total, [, entry]) => total + entry.size, 0) > SKILL_MAX_BYTES)
-        return yield* archiveFailure(new Error(sourceText("error.skill.expandedTooLarge")));
-      const data = yield* readEntriesEffect(
-        archive,
-        entries.map(([, entry]) => entry.name),
-      );
-      const files = entries.map(([name, entry]) => [name, data[entry.name] ?? new Uint8Array()] as const);
-      skills.push({
-        files,
-        slug: yield* archiveSync(() => inspectArchive(zipSync(Object.fromEntries(files))).slug),
-      });
-    }
+    for (const skill of source.skills) skills.push(yield* readSkillEffect(archive, under(skill)));
     const files = source.files ? under(source.files) : [];
 
     const published: Array<{ id: string; revision: number }> = [];
@@ -558,9 +550,10 @@ export class AgentImportService {
           let agent = created;
           try {
             if (files.length) {
-              const needed = files.reduce((total, [, entry]) => total + entry.size, 0);
-              const free = yield* archiveCall(() => this.freeDiskBytes(agent.workspacePath));
-              if (needed > free)
+              // Each file takes whole disk blocks, so a small file counts as one 4 KB block.
+              const needed = files.reduce((total, [, entry]) => total + Math.ceil(entry.size / 4096) * 4096, 0);
+              const free = yield* this.freeDiskBytes(agent.workspacePath);
+              if (free !== null && needed > free)
                 return yield* archiveFailure(
                   new Error(
                     sourceText("error.import.diskSpace", {

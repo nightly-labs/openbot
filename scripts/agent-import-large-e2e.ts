@@ -44,6 +44,8 @@ interface Report {
   bigEntry?: { fileBytes: number; rssGrowthMiB: number };
   changedExport?: string;
   damagedEntry?: { imported: boolean; warnings: string[] };
+  wrongCount?: { endRecordCount: number; written: number };
+  brokenDeflate?: string[];
   reason?: string;
 }
 const report: Report = { status: "running" };
@@ -102,7 +104,7 @@ const agentBoundary: AgentImportAgents = {
 };
 
 const library = new LocalSkillLibrary(join(root, "local-skills"), () => agents);
-function service(freeDiskBytes?: (path: string) => Promise<number>): AgentImportService {
+function service(freeDiskBytes?: (path: string) => Effect.Effect<number | null>): AgentImportService {
   return new AgentImportService(
     agentBoundary,
     { library: () => library, installLocal: () => Effect.void },
@@ -268,7 +270,7 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
     manifest("huge"),
     String(HUGE_BYTES),
   );
-  const small = service(async () => GiB);
+  const small = service(() => Effect.succeed(GiB));
   const hugePreview = await run(small.stage(huge));
   const hugeResult = await run(small.apply({ token: hugePreview.token, keys: ["huge"], channelKeys: [] }));
   report.hugeEntry = {
@@ -359,6 +361,61 @@ with open(sys.argv[1], "r+b") as f:
       reason: sourceText("error.import.entryDamaged"),
     }),
   ]);
+
+  // 7. The end record says 1 entry, as a tool that keeps only the low 16 bits of a count can write.
+  //    The reader uses the whole central directory, so all 3 files arrive.
+  const counted = join(root, "export-count.zip");
+  python(
+    `import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("openbot-import.json", sys.argv[2])
+    z.writestr("agents/count/files/a.txt", "a\\n")
+    z.writestr("agents/count/files/b.txt", "b\\n")
+data = bytearray(open(sys.argv[1], "rb").read())
+end = data.rfind(b"PK\\x05\\x06")
+data[end + 8:end + 12] = (1).to_bytes(2, "little") * 2
+open(sys.argv[1], "wb").write(data)
+`,
+    counted,
+    manifest("count"),
+  );
+  const countPreview = await run(local.stage(counted));
+  const countResult = await run(local.apply({ token: countPreview.token, keys: ["count"], channelKeys: [] }));
+  report.wrongCount = {
+    endRecordCount: 1,
+    written: await countFiles(importedFolder(countResult.agents[0]?.id)),
+  };
+  assert.equal(report.wrongCount.written, 2);
+
+  // 8. A deflate stream with an invalid block type: zlib fails, and the warning is the catalog text.
+  const broken = join(root, "export-broken.zip");
+  python(
+    `import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("openbot-import.json", sys.argv[2])
+    z.writestr("agents/broken/files/text.txt", "OpenBot " * 10000)
+    z.writestr("agents/broken/files/ok.txt", "ok\\n")
+info = zipfile.ZipFile(sys.argv[1]).getinfo("agents/broken/files/text.txt")
+with open(sys.argv[1], "r+b") as f:
+    f.seek(info.header_offset + 26)
+    name, extra = int.from_bytes(f.read(2), "little"), int.from_bytes(f.read(2), "little")
+    f.seek(info.header_offset + 30 + name + extra)
+    f.write(b"\\xff")
+`,
+    broken,
+    manifest("broken"),
+  );
+  const brokenPreview = await run(local.stage(broken));
+  const brokenResult = await run(local.apply({ token: brokenPreview.token, keys: ["broken"], channelKeys: [] }));
+  report.brokenDeflate = brokenResult.warnings;
+  assert.deepEqual(brokenResult.warnings, [
+    sourceText("error.import.fileSkipped", {
+      name: "Agent broken",
+      file: "text.txt",
+      reason: sourceText("error.import.entryDamaged"),
+    }),
+  ]);
+  assert.equal(await readFile(join(importedFolder(brokenResult.agents[0]?.id), "ok.txt"), "utf8"), "ok\n");
 
   report.status = "pass";
 } catch (error) {

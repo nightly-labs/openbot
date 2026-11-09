@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
   type AgentImportPreviewAgent,
@@ -58,7 +58,7 @@ import {
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Result } from "effect";
-import { Zip, ZipPassThrough, zipSync } from "fflate";
+import { Zip, ZipPassThrough } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
 import { isPathInside } from "../backend/path-containment";
 import {
@@ -67,8 +67,10 @@ import {
   avatarImage,
   extractEntryEffect,
   isUnsafeEntry,
+  MANIFEST_MAX_BYTES,
   readArchiveEffect,
   readEntriesEffect,
+  readSkillEffect,
   withArchive,
   writeImportedFilesEffect,
   writeTreeEffect,
@@ -90,7 +92,7 @@ import {
 } from "./instance-transfer-manifest";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
-import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
+import { isUnsafeArchivePath } from "./skill-package";
 
 const ARCHIVE: ArchiveLimits = {
   files: INSTANCE_TRANSFER_LIMITS.files,
@@ -522,7 +524,9 @@ export class InstanceTransferService {
     if (!entries.has(INSTANCE_TRANSFER_MANIFEST))
       return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
     const manifestBytes =
-      (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST]))[INSTANCE_TRANSFER_MANIFEST] ?? new Uint8Array();
+      (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST], MANIFEST_MAX_BYTES))[
+        INSTANCE_TRANSFER_MANIFEST
+      ] ?? new Uint8Array();
     const { manifest, warnings } = yield* archiveSync(() => decodeTransferManifest(manifestBytes));
     if (archive.skipped) warnings.push(sourceText("error.import.foldersSkipped", { number: archive.skipped }));
     // An agent whose skill has no SKILL.md cannot import, so it is not offered.
@@ -532,7 +536,7 @@ export class InstanceTransferService {
       return !missing;
     });
     const avatarPaths = new Set(agents.flatMap((agent) => (agent.avatar ? [agent.avatar] : [])));
-    const avatarBytes = yield* readEntriesEffect(archive, avatarPaths);
+    const avatarBytes = yield* readEntriesEffect(archive, avatarPaths, AVATAR_IMAGE_LIMITS.sourceBytes);
     const avatars = new Map<string, AvatarImageInput>();
     for (const agent of agents) {
       if (!agent.avatar) continue;
@@ -839,18 +843,7 @@ export class InstanceTransferService {
         .map((entry) => [entry.name.slice(path.length + 1), entry] as const);
     // Every skill is checked before the agent exists, so a bad one publishes nothing.
     const skills: Array<{ files: Array<readonly [string, Uint8Array]>; slug: string }> = [];
-    for (const skill of source.skills) {
-      const entries = under(skill);
-      const data = yield* readEntriesEffect(
-        archive,
-        entries.map(([, entry]) => entry.name),
-      );
-      const files = entries.map(([name, entry]) => [name, data[entry.name] ?? new Uint8Array()] as const);
-      skills.push({
-        files,
-        slug: yield* archiveSync(() => inspectArchive(zipSync(Object.fromEntries(files))).slug),
-      });
-    }
+    for (const skill of source.skills) skills.push(yield* readSkillEffect(archive, under(skill)));
     // The model is kept when this computer offers it, and the provider is on.
     const model = this.options.agents
       .listModels()

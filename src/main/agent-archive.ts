@@ -2,7 +2,7 @@
 // OpenBot instance transfer share these checks, so both refuse the same unsafe entries.
 
 import { createHash } from "node:crypto";
-import { type FileHandle, mkdir, open, rm, stat, statfs, writeFile } from "node:fs/promises";
+import { type FileHandle, mkdir, open, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, resolve } from "node:path";
 import { Readable, Transform, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -11,10 +11,10 @@ import { AVATAR_MIME_TYPES, isValidAvatarImage } from "@openbot/contracts/avatar
 import { AGENT_IMPORT_LIMITS, type AvatarImageInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema } from "effect";
-import { strFromU8 } from "fflate";
+import { strFromU8, zipSync } from "fflate";
 import { isPathInside } from "../backend/path-containment";
-import { type ArchiveOperationError, archiveCall, archiveFailure, archiveResult } from "./archive-effects";
-import { isUnsafeArchivePath } from "./skill-package";
+import { type ArchiveOperationError, archiveCall, archiveFailure, archiveResult, archiveSync } from "./archive-effects";
+import { inspectArchive, isUnsafeArchivePath, MAX_BYTES as SKILL_MAX_BYTES } from "./skill-package";
 
 /** The most an archive may hold. */
 export interface ArchiveLimits {
@@ -84,7 +84,7 @@ export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
     Effect.gen(function* () {
       const directory = yield* readDirectoryEffect(handle, info.size, limits);
       const { entries, skipped } = yield* Effect.try({
-        try: () => directoryEntries(directory.bytes, directory.count, limits),
+        try: () => directoryEntries(directory, limits),
         catch: (error) =>
           archiveFailure(
             error instanceof UnsafeEntry
@@ -96,20 +96,24 @@ export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
                 : new Error(limits.invalid),
           ),
       });
-      const fingerprint = createHash("sha256").update(`${info.size}\0`).update(directory.bytes).digest("hex");
+      const fingerprint = createHash("sha256").update(`${info.size}\0`).update(directory).digest("hex");
       return { path, entries, fingerprint, skipped };
     }),
   );
 });
 
-/** Inflates the named entries into memory. Use it for small entries: a manifest, an avatar, a skill. */
+/**
+ * Inflates the named entries into memory. Use it for small entries: a manifest, an avatar, a skill.
+ * An entry larger than `maxBytes` is left out of the result, as a missing entry is.
+ */
 export const readEntriesEffect = Effect.fn("Archive.readEntries")(function* (
   archive: ArchiveFile,
   names: Iterable<string>,
+  maxBytes: number,
 ): Effect.fn.Return<Record<string, Uint8Array>, ArchiveOperationError> {
   const wanted = [...names].flatMap((name) => {
     const entry = archive.entries.get(name);
-    return entry ? [entry] : [];
+    return entry && entry.size <= maxBytes ? [entry] : [];
   });
   if (!wanted.length) return {};
   return yield* withArchive(archive.path, (handle) =>
@@ -129,6 +133,29 @@ export const readEntriesEffect = Effect.fn("Archive.readEntries")(function* (
       return files;
     }),
   );
+});
+
+/** The most a manifest can be. A manifest with 100 agents and all their memories is a few MB. */
+export const MANIFEST_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Reads one skill folder into memory and checks it, before its agent exists. A folder larger than a
+ * skill can be is refused before it is read.
+ */
+export const readSkillEffect = Effect.fn("Archive.readSkill")(function* (
+  archive: ArchiveFile,
+  files: ReadonlyArray<readonly [string, ArchiveEntry]>,
+): Effect.fn.Return<{ files: Array<readonly [string, Uint8Array]>; slug: string }, ArchiveOperationError> {
+  if (files.reduce((total, [, entry]) => total + entry.size, 0) > SKILL_MAX_BYTES)
+    return yield* archiveFailure(new Error(sourceText("error.skill.expandedTooLarge")));
+  const data = yield* readEntriesEffect(
+    archive,
+    files.map(([, entry]) => entry.name),
+    SKILL_MAX_BYTES,
+  );
+  const read = files.map(([name, entry]) => [name, data[entry.name] ?? new Uint8Array()] as const);
+  const slug = yield* archiveSync(() => inspectArchive(zipSync(Object.fromEntries(read))).slug);
+  return { files: read, slug };
 });
 
 /** Opens the archive once for a group of reads, and closes it after them. */
@@ -154,29 +181,34 @@ export const extractEntryEffect = Effect.fn("Archive.extractEntry")(function* (
   mode = 0o666,
 ): Effect.fn.Return<void, ArchiveOperationError> {
   const output = yield* archiveCall(() => open(target, "wx", mode));
-  const written = yield* Effect.exit(inflateEntryEffect(handle, entry, output.createWriteStream()));
+  const stream = output.createWriteStream();
+  const written = yield* Effect.exit(inflateEntryEffect(handle, entry, stream));
   if (Exit.isFailure(written)) {
+    // The entry can fail before the stream is piped, so it is closed here before the file is removed.
+    yield* archiveCall(
+      () =>
+        new Promise<void>((done) => {
+          if (stream.closed) return done();
+          stream.once("close", () => done());
+          stream.destroy();
+        }),
+    );
     yield* archiveCall(() => rm(target, { force: true })).pipe(Effect.ignore);
     return yield* written;
   }
 });
 
-/** The disk space free for files under `path`. */
-export const availableDiskBytes = (path: string): Promise<number> =>
-  statfs(path).then((filesystem) => filesystem.bavail * filesystem.bsize);
-
 const readDirectoryEffect = Effect.fn("Archive.readDirectory")(function* (
   handle: FileHandle,
   size: number,
   limits: ArchiveLimits,
-): Effect.fn.Return<{ bytes: Buffer; count: number }, ArchiveOperationError> {
+): Effect.fn.Return<Buffer, ArchiveOperationError> {
   const invalid = () => archiveFailure(new Error(limits.invalid));
   const tailStart = Math.max(0, size - TAIL_BYTES);
   const tail = yield* readAtEffect(handle, tailStart, size - tailStart, limits.invalid);
   let end = tail.length - END_BYTES;
   while (end >= 0 && tail.readUInt32LE(end) !== END) end -= 1;
   if (end < 0) return yield* invalid();
-  let count = tail.readUInt16LE(end + 10);
   let directoryBytes = tail.readUInt32LE(end + 12);
   let directoryOffset = tail.readUInt32LE(end + 16);
   // ZIP64 puts the real values in a second end record, which a locator before the first one names.
@@ -186,33 +218,31 @@ const readDirectoryEffect = Effect.fn("Archive.readDirectory")(function* (
     const recordOffset = uint64(tail, locator + 8);
     if (recordOffset === null || recordOffset + ZIP64_END_BYTES > size) return yield* invalid();
     const record = yield* readAtEffect(handle, recordOffset, ZIP64_END_BYTES, limits.invalid);
-    const wideCount = uint64(record, 32);
     const wideBytes = uint64(record, 40);
     const wideOffset = uint64(record, 48);
-    if (record.readUInt32LE(0) !== ZIP64_END || wideCount === null || wideBytes === null || wideOffset === null)
-      return yield* invalid();
-    count = wideCount;
+    if (record.readUInt32LE(0) !== ZIP64_END || wideBytes === null || wideOffset === null) return yield* invalid();
     directoryBytes = wideBytes;
     directoryOffset = wideOffset;
   }
   if (directoryBytes > MAX_DIRECTORY_BYTES || directoryOffset + directoryBytes > size) return yield* invalid();
-  return { bytes: yield* readAtEffect(handle, directoryOffset, directoryBytes, limits.invalid), count };
+  return yield* readAtEffect(handle, directoryOffset, directoryBytes, limits.invalid);
 });
 
 /**
  * The checked file entries of a central directory. A folder entry holds no data and is left out.
- * A tool makes `.git` and `node_modules` again, so their files are counted and left out too.
+ * A tool makes `.git` and `node_modules` again, so their files are counted and left out too. The
+ * whole directory is read, not the count in the end record: some tools write only the low 16 bits
+ * of a count over 65,535 and no ZIP64 record.
  */
 function directoryEntries(
   directory: Buffer,
-  count: number,
   limits: ArchiveLimits,
 ): { entries: Map<string, ArchiveEntry>; skipped: number } {
   const entries = new Map<string, ArchiveEntry>();
   let expanded = 0;
   let skipped = 0;
   let offset = 0;
-  for (let index = 0; index < count; index += 1) {
+  while (offset < directory.length) {
     if (offset + 46 > directory.length || directory.readUInt32LE(offset) !== CENTRAL) throw new Error("Invalid.");
     const flags = directory.readUInt16LE(offset + 8);
     const nameBytes = directory.readUInt16LE(offset + 28);
@@ -287,6 +317,10 @@ function zip64Sizes(
   throw new Error("Invalid.");
 }
 
+function isZlibError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && typeof error.code === "string" && error.code.startsWith("Z_");
+}
+
 function uint64(buffer: Buffer, offset: number): number | null {
   const value = buffer.readBigUInt64LE(offset);
   return value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
@@ -317,7 +351,12 @@ const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
   } else {
     const input = Readable.from(readRange(handle, start, entry.compressedSize));
     yield* archiveCall(() =>
-      entry.method === 8 ? pipeline(input, createInflateRaw(), check, sink) : pipeline(input, check, sink),
+      (entry.method === 8 ? pipeline(input, createInflateRaw(), check, sink) : pipeline(input, check, sink)).catch(
+        (error: unknown) => {
+          // zlib names a damaged deflate stream with a `Z_` code and English text.
+          throw isZlibError(error) ? new Error(sourceText("error.import.entryDamaged")) : error;
+        },
+      ),
     );
   }
   if (bytes !== entry.size || crc >>> 0 !== entry.crc) return yield* damaged();
@@ -327,7 +366,8 @@ const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
 async function* readRange(handle: FileHandle, start: number, length: number): AsyncGenerator<Buffer> {
   for (let offset = 0; offset < length; ) {
     const size = Math.min(READ_CHUNK_BYTES, length - offset);
-    const { bytesRead, buffer } = await handle.read(Buffer.alloc(size), 0, size, start + offset);
+    // Only the bytes read are used, so the buffer does not need to be zero-filled.
+    const { bytesRead, buffer } = await handle.read(Buffer.allocUnsafe(size), 0, size, start + offset);
     if (bytesRead === 0) throw new Error(sourceText("error.import.entryDamaged"));
     offset += bytesRead;
     yield buffer.subarray(0, bytesRead);
