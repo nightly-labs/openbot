@@ -345,7 +345,7 @@
 
 .settings-modal :where(.ui-button-variant-default) {
   background: var(--openbot-accent);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-accent);
 }
 
 .settings-modal :where(.ui-button-variant-outline, .ui-button-variant-secondary) {
@@ -354,7 +354,7 @@
 
 .settings-modal :where(.ui-button-variant-destructive) {
   background: var(--openbot-danger);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-accent);
 }
 
 .settings-modal .ui-switch[data-checked] {
@@ -362,7 +362,7 @@
 }
 
 .settings-modal .ui-switch-thumb[data-checked] {
-  background: var(--openbot-text-primary);
+  background: var(--openbot-text-on-accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -372,7 +372,7 @@
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
     background: var(--openbot-danger-hover);
-    color: var(--openbot-text-primary);
+    color: var(--openbot-text-on-accent);
   }
 }
 

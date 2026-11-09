@@ -1329,7 +1329,7 @@
 }
 
 .agent-skills-modal .ui-switch-thumb[data-checked] {
-  background: var(--openbot-text-primary);
+  background: var(--openbot-text-on-accent);
 }
 
 .agent-local-library,
