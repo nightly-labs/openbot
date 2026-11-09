@@ -8,7 +8,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { ElevenLabsError, scribeToken } from "@/features/voice/model/elevenlabs";
-import { type ParakeetEngine, parakeetModelOf } from "@/features/voice/model/parakeet-model";
+import { type LocalRecognition, loadLocalRecognizer } from "@/features/voice/model/recognition-models";
 import { type ScribeFailure, ScribeRealtimeSession } from "@/features/voice/model/scribe-realtime";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { transcribeWithVoiceServer, useVoiceServer, VoiceServerError } from "@/features/voice/model/voice-server";
@@ -32,17 +32,19 @@ import {
 import type { VoiceDictation } from "./use-voice-dictation";
 
 /** The engines that capture the microphone in the speech module, not in the phone's recognizer. */
-export type ModelRecognition = ParakeetEngine | "elevenlabs" | "voice-server";
+export type ModelRecognition = LocalRecognition | "elevenlabs" | "voice-server";
 
-/** Parakeet decodes faster with more threads, and a phone has four or more cores. */
-const PARAKEET_THREADS = 4;
+/** A model on the phone decodes faster with more threads, and a phone has four or more cores. */
+const LOCAL_MODEL_THREADS = 4;
 /**
  * A finish that never reports its end must not hold the composer. Parakeet decodes the last segment
- * in about a second; ElevenLabs can take up to ten seconds for its last segment.
+ * in about a second; Qwen3-ASR writes the words one at a time, so it takes longer; ElevenLabs can
+ * take up to ten seconds for its last segment.
  */
 const STOP_TIMEOUT_MS = {
   parakeet: 8_000,
   "parakeet-unified": 8_000,
+  "qwen3-asr": 20_000,
   elevenlabs: 12_000,
   // The whole recording goes at the end, and a server without a GPU can take two minutes.
   "voice-server": 125_000,
@@ -78,7 +80,7 @@ interface CaptureSession {
   engine: ModelRecognition;
   base: string;
   transcript: DictationTranscript;
-  /** The ElevenLabs session; null for Parakeet. */
+  /** The ElevenLabs session; null for a model on the phone. */
   scribe: ScribeRealtimeSession | null;
   /** The voice server: the audio so far, as Base64 PCM chunks. It goes to the server at the end. */
   recording: string[] | null;
@@ -169,9 +171,9 @@ export const modelCaptureAvailable = (): boolean =>
 let owner: symbol | null = null;
 
 /**
- * Dictation with Parakeet on the phone or ElevenLabs Scribe, which both find the spoken language
- * themselves, as on desktop. The speech module opens the microphone: Parakeet recognizes each
- * segment there, and ElevenLabs gets the audio through a socket. The draft and the phases work as
+ * Dictation with Parakeet or Qwen3-ASR on the phone, or ElevenLabs Scribe, which all find the spoken
+ * language themselves. The speech module opens the microphone: the model on the phone recognizes
+ * each segment there, and ElevenLabs gets the audio through a socket. The draft and the phases work as
  * with the phone's recognizer, so the composer and the voice conversation use both the same way.
  */
 export function useModelDictation({
@@ -351,11 +353,9 @@ export function useModelDictation({
             if (!useVoiceServer.getState().server?.routes.dictation)
               throw new VoiceServerError("address", sourceText("error.voice.server.routeOff"));
           } else if (engine !== "elevenlabs") {
-            const directory = parakeetModelOf(engine).uri();
             try {
-              if (!directory || !module.loadRecognizer) throw new Error("The model is not downloaded.");
-              // The first start loads about 650 MB, which takes a few seconds.
-              await module.loadRecognizer(directory, PARAKEET_THREADS);
+              // The first start loads about 650 MB, or 1 GB for Qwen3-ASR, which takes a few seconds.
+              await loadLocalRecognizer(engine, LOCAL_MODEL_THREADS);
             } catch (error) {
               if (!stillCurrent()) return;
               current.ending = "operation_failed";

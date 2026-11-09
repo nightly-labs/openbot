@@ -320,6 +320,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "Auf diesem Telefon · nur Englisch",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified läuft auf diesem Telefon, wie auf dem Desktop. Es erkennt nur Englisch, mit Satzzeichen und weniger Fehlern als Parakeet v3, und deine Sprache bleibt auf dem Telefon. Bis das Modell geladen ist, hört die Telefonerkennung zu.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "Auf diesem Telefon · auch Chinesisch mit Englisch gemischt",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR läuft auf diesem Telefon. Es erkennt die Sprache, die du sprichst, in 30 Sprachen und 22 chinesischen Dialekten, auch wenn du Chinesisch und Englisch in einem Satz mischst. Deine Sprache bleibt auf dem Telefon. Bis das Modell geladen ist, hört die Telefonerkennung zu.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "Mehr als 90 Sprachen · sendet deine Sprache an ElevenLabs",
   "mobile.settings.voice.recognition.model": "Sprachmodell",
