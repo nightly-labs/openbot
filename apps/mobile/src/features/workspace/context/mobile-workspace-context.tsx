@@ -46,6 +46,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/i
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
+import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -1096,6 +1097,41 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       agents: agentsRef,
     });
 
+  /**
+   * Reads the latest page of each open chat of `agentIds`, one at a time, then saves the server's copy.
+   * The server is usable before this ends. A lost connection stops the reads, and the next attempt
+   * reads them again. A closed chat that is not up to date reads its page when it opens. The phone's
+   * copy can hold every chat that the user opened, and a read of each one on each connect held the
+   * replies to the user's own requests on the ordered rpc channel for tens of seconds (#5091).
+   */
+  const loadOpenChats = useCallback(
+    (serverId: string, agentIds: string[], client: RemoteTeamTransportRef, context: ServerLoadContext) => {
+      const open = agentIds.filter((agentId) => conversationStore.isObserved(agentId));
+      void (async () => {
+        for (const agentId of open) {
+          if (!context.isCurrent()) return;
+          // A chat that the user closed during the loop loads when it opens again.
+          if (!conversationStore.get(agentId) || !conversationStore.isObserved(agentId)) continue;
+          await conversationStore
+            .loadLatest(
+              agentId,
+              () =>
+                client.request(
+                  "GET",
+                  `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+                  decodeConversationPage,
+                ),
+              context.isCurrent,
+              true,
+            )
+            .catch(() => undefined);
+        }
+        if (context.isCurrent()) persistServer(serverId);
+      })();
+    },
+    [conversationStore, persistServer],
+  );
+
   const loadServer = useCallback(
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
       // Runtime events and snapshots own activity; workspace reads must preserve it.
@@ -1103,12 +1139,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const saved = preferenceStore.read(serverId);
       setPreferences((current) => ({ ...current, [serverId]: saved }));
       context.stage = "connection";
-      // Events sent while the connection was down are lost, so open chats read their page again.
-      conversationStore.markStale();
-      await client.connect(serverId, publicKey);
+      const { kept } = await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
       const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
+      // At a return, the connection from before the background stays, and its event stream
+      // delivered every event or reset, which asks for a full load. The compatibility read checks
+      // the path; a dead path fails it, and the next attempt loads all.
+      if (context.check && kept) {
+        await compatibilityRead;
+        if (!context.isCurrent()) return;
+        // The background stopped the chat reads that were running, and an open chat reads its page again.
+        loadOpenChats(
+          serverId,
+          agentsRef.current.filter((agent) => agent.serverId === serverId).map((agent) => agent.id),
+          client,
+          context,
+        );
+        return;
+      }
+      // Events sent while the connection was down are lost, so open chats read their page again.
+      conversationStore.markStale();
       // On a reconnect the capabilities of the last connection are known, and at a start those that
       // the phone kept, so the workspace reads go out with the compatibility read and do not wait one
       // more round trip. Their results apply only after the check. The read state applies when it
@@ -1213,37 +1264,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         sections,
       ]);
       if (!context.isCurrent()) return;
-      // The server is usable now, so the reconnect status does not wait for the open chats. They load
-      // again after it. A lost connection stops them, and the next attempt loads them again. A closed
-      // chat loads when it opens: it is not up to date after `markStale`. The phone's copy can hold
-      // every chat that the user opened, and a read of each one on each connect held the replies to
-      // the user's own requests on the ordered rpc channel for tens of seconds (#5091).
-      const open = summaries.filter((agent) => conversationStore.isObserved(agent.id));
-      void (async () => {
-        for (const agent of open) {
-          if (!context.isCurrent()) return;
-          // A chat that the user closed during the loop loads when it opens again.
-          if (!conversationStore.get(agent.id) || !conversationStore.isObserved(agent.id)) continue;
-          await conversationStore
-            .loadLatest(
-              agent.id,
-              () =>
-                client.request(
-                  "GET",
-                  `${TEAM_API_ROUTES.agent.conversationPage(agent.id)}?limit=50`,
-                  decodeConversationPage,
-                ),
-              context.isCurrent,
-              true,
-            )
-            .catch(() => undefined);
-        }
-        if (context.isCurrent()) persistServer(serverId);
-      })();
+      // The server is usable now, so the reconnect status does not wait for the open chats.
+      loadOpenChats(
+        serverId,
+        summaries.map((agent) => agent.id),
+        client,
+        context,
+      );
       context.stage = "connection";
     },
     [
-      persistServer,
       replaceServerAgents,
       applyHostHidden,
       applyHostColors,
@@ -1255,6 +1285,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applyConversationReads,
       liveState,
       syncSidebarPins,
+      loadOpenChats,
     ],
   );
 
@@ -2402,6 +2433,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
         administers(serverId, LOCAL_SERVERS_CAPABILITY),
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+      canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
       canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),

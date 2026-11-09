@@ -236,6 +236,8 @@ export interface DeliveryContext {
   resumeAfterUsageLimit?: UsageLimitContinuation;
   planContinuation?: PlanContinuationMarker;
   channelId?: string;
+  /** The side thread that an agent sent the message from. */
+  senderTaskId?: string;
 }
 
 const EMPTY_STATE: StoredState = {
@@ -3161,6 +3163,7 @@ export class MailboxStore {
       ...(delivery.resumeAfterUsageLimit ? { resumeAfterUsageLimit: delivery.resumeAfterUsageLimit } : {}),
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
+      ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
       managedAttachments: message.attachments.map((attachment) => ({
         ...toAttachmentSummary(attachment),
         path: attachment.path,
@@ -3211,6 +3214,11 @@ export class MailboxStore {
           : null,
       editing: Boolean(delivery.editId),
     };
+  }
+
+  /** The queue position of each queued delivery, by delivery id. */
+  queuedPositions(): Map<string, number> {
+    return this.#queuedPositions();
   }
 
   #queuedPositions(): Map<string, number> {

@@ -1135,6 +1135,14 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "Questo host non supporta le analisi sull'utilizzo. Aggiorna l'host per usare questa vista.",
   "mobile.server.usage.planLimitsNote": "I limiti attuali di ogni provider. Il periodo qui sotto non li cambia.",
+  "mobile.server.machine.title": "Macchina",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Memoria",
+  "mobile.server.machine.disk": "Disco",
+  "mobile.server.machine.cores": { one: "{cores} core", other: "{cores} core" },
+  "mobile.server.machine.sizeDetail": "{used} di {total}",
+  "mobile.server.machine.unknown": "Non disponibile",
+  "mobile.server.machine.unsupported": "Questo host non indica l’uso della sua macchina. Aggiorna l’host per vederlo.",
   "mobile.server.planLimits.title": "Limiti del piano",
   "mobile.server.planLimits.button": "Limiti del piano: {summary}",
   "mobile.server.planLimits.left": "{percent}% rimanente",
@@ -1252,7 +1260,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Impossibile aprire il sito.",
   "mobile.server.sites.unsupported": "Aggiorna OpenBot su questo server per vedere qui i suoi siti.",
   "mobile.server.sites.offline": "Connettiti a questo server per vederne i siti.",
-  "mobile.server.route.roles": "Ruoli",
+  "mobile.server.route.roles": "Autorizzazioni",
   "mobile.server.route.role": "Ruolo",
   "mobile.server.roles.description":
     "Scegli gli agenti che i membri possono usare. Proprietari e admin possono usare tutti gli agenti.",

@@ -336,7 +336,7 @@ export const messages = {
   "server.settings.memoryReviewOff": "Uit",
   "server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
   "server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
-  "server.settings.rolesTitle": "Rollen",
+  "server.settings.rolesTitle": "Machtigingen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",
   "server.settings.auditTitle": "Auditlog",

@@ -1108,6 +1108,15 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "このホストは使用量の分析に対応していません。この画面を使うには、ホストを更新してください。",
   "mobile.server.usage.planLimitsNote": "各プロバイダーの現在の上限です。下の期間では変わりません。",
+  "mobile.server.machine.title": "マシン",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "メモリ",
+  "mobile.server.machine.disk": "ディスク",
+  "mobile.server.machine.cores": { other: "{cores} コア" },
+  "mobile.server.machine.sizeDetail": "{used} / {total}",
+  "mobile.server.machine.unknown": "利用できません",
+  "mobile.server.machine.unsupported":
+    "このホストはマシンの使用状況を報告しません。表示するにはホストを更新してください。",
   "mobile.server.planLimits.title": "プランの上限",
   "mobile.server.planLimits.button": "プランの上限: {summary}",
   "mobile.server.planLimits.left": "残り {percent}%",
@@ -1227,7 +1236,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "サイトを開けませんでした。",
   "mobile.server.sites.unsupported": "ここでサイトを表示するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.sites.offline": "このサーバーに接続するとサイトが表示されます。",
-  "mobile.server.route.roles": "ロール",
+  "mobile.server.route.roles": "権限",
   "mobile.server.route.role": "ロール",
   "mobile.server.roles.description":
     "メンバーが使えるエージェントを選びます。オーナーと管理者はすべてのエージェントを使えます。",

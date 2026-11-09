@@ -34,5 +34,7 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex op de server kon live spraak niet starten. Vraag de eigenaar om Codex op die computer bij te werken en in te loggen met ChatGPT, en probeer het dan opnieuw.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "error.voice.live.unavailable":
+    "OpenAI kon live spraak niet starten. Het probleem ligt bij OpenAI. Probeer het later opnieuw.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
 } as const satisfies PartialTranslation<typeof source>;

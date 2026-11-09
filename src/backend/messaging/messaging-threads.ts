@@ -12,7 +12,9 @@ import {
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   MESSAGING_LIMITS,
 } from "@openbot/contracts/ipc";
+import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import type { AttachmentOperationError } from "../attachment-effects";
@@ -20,9 +22,9 @@ import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { MessagingMemoryStore } from "./messaging-memory-store";
-import { type MessagingContextMessage, messagingPromptText } from "./messaging-prompt";
+import { type MessagingContextMessage, messagingPromptText, REPLY_CHARACTERS } from "./messaging-prompt";
 import type { MessagingOperationFailed } from "./messaging-service";
-import { type MessagingLink, MessagingStore } from "./messaging-store";
+import { type MessagingLink, type MessagingPingInput, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
 import type { ContextEntry, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
 
@@ -112,8 +114,16 @@ export interface MessagingOutbound {
     target: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[],
+    embeds?: DiscordEmbed[],
   ): Effect.Effect<
-    | { posted: true; messageId: string; url?: string; skippedFiles?: string[] }
+    | {
+        posted: true;
+        messageId: string;
+        url?: string;
+        skippedFiles?: string[];
+        /** The people that a Slack post pinged, and its redacted text. */
+        ping?: { userIds: string[]; text: string };
+      }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
   /** A Discord output of a workflow: a reply, a post or a reaction. */
@@ -246,6 +256,7 @@ export interface MessagingThreadsHooks {
  * Enough work from one conversation platform to hold an agent for a long time. The Slack
  * orchestrator receives every new conversation, and it mostly asks teammates, so its turns are short.
  */
+const logger = createOpenBotLogger("messaging-threads");
 const AGENT_QUEUE_LIMIT = 20;
 const AUTHOR_QUEUE_LIMIT = 2;
 const CONTEXT_TIMEOUT_MS = 5_000;
@@ -449,10 +460,12 @@ export class MessagingThreads {
   /**
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
    * place; only an enabled connection of this host can take a post. `openFiles` checks the files of a
-   * post under the calling agent's path rules, before the text is sent.
+   * post under the calling agent's path rules, before the text is sent. A Slack post that pings people
+   * records them, so that a reply of theirs reaches the orchestrator without a mention.
    */
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
+    agentId: string,
     tool: string,
     args: unknown,
     openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
@@ -485,8 +498,50 @@ export class MessagingThreads {
             { platformChannelId: call.place, replyThreadId: call.replyTo },
             call.text,
             call.files.length ? yield* openFiles(call.files) : [],
+            call.embeds,
           );
-    return "error" in answer ? openBotToolFailure(answer.error) : openBotToolResult(answer);
+    if ("error" in answer) return openBotToolFailure(answer.error);
+    if (!("ping" in answer)) return openBotToolResult(answer);
+    const { ping, ...result } = answer;
+    if (ping && call.tool === "messaging_post")
+      yield* this.recordPings({
+        connectionId: record.connectionId,
+        platformChannelId: call.place,
+        threadKey: call.replyTo ?? result.messageId,
+        userIds: ping.userIds,
+        agentId,
+        text: ping.text,
+      });
+    return openBotToolResult(result);
+  });
+
+  /**
+   * Records the people that a Slack post pinged, so that a reply of theirs reaches the orchestrator
+   * without a mention. A thread that a person opened with a mention hears everyone, so a ping there
+   * changes nothing. The post is sent already, so a failure only logs: a reply then needs a mention.
+   */
+  readonly recordPings = Effect.fn("MessagingThreads.recordPings")(function* (
+    this: MessagingThreads,
+    input: MessagingPingInput,
+  ) {
+    yield* Effect.try(() => {
+      const { connectionId, platformChannelId, threadKey } = input;
+      if (
+        this.store.linkByKey(connectionId, platformChannelId, threadKey) &&
+        !this.store.pings(connectionId, platformChannelId, threadKey).length
+      )
+        return;
+      // The prompt quotes no more of the post than this.
+      this.store.savePings({ ...input, text: input.text.slice(0, REPLY_CHARACTERS) });
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("A Slack ping was not recorded.", {
+            error: failure.cause instanceof Error ? failure.cause.name : "unknown",
+          }),
+        ),
+      ),
+    );
   });
 
   /**

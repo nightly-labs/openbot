@@ -29,6 +29,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES, MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import { TELEGRAM_LINK_CODE_TTL_SECONDS } from "@openbot/contracts/signal-protocol/telegram-route";
 import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
@@ -43,6 +44,7 @@ import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import { type DiscordAppPort, DiscordConnect, type DiscordConnectFailed } from "./discord/discord-connect";
 import { discordOrchestratorMemories, discordOrchestratorProfile } from "./discord/discord-orchestrator";
 import { mentionNames, withMentionNames } from "./messaging-mentions";
+import { QUIET_ANSWER } from "./messaging-prompt";
 import { MessagingStatusPosts, type PendingFinal, type StatusPost, type StopButton } from "./messaging-status-posts";
 import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store";
 import {
@@ -75,6 +77,7 @@ import {
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
 import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
+import { slackPingedUsers } from "./slack/slack-render";
 import { SlackApiError, SlackWebApi } from "./slack/slack-web-api";
 import { type TelegramAppPort, telegramLinkUrl } from "./telegram/telegram-connect";
 import { telegramOrchestratorMemories, telegramOrchestratorProfile } from "./telegram/telegram-orchestrator";
@@ -309,7 +312,8 @@ export class MessagingService {
     this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
-      post: (connectionId, target, markdown, files) => this.#outboundPost(connectionId, target, markdown, files),
+      post: (connectionId, target, markdown, files, embeds) =>
+        this.#outboundPost(connectionId, target, markdown, files, embeds),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
       slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
@@ -1346,8 +1350,16 @@ export class MessagingService {
     // files, before the mailbox holds its idempotency key. The mailbox key covers a restart.
     const store = this.#threads.store;
     const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
+    // In a thread that an agent's post pinged people in, a reply without a mention counts only from a
+    // pinged person: the first one starts the conversation. Other threads need a link, as before.
+    // A first reply with a mention, which comes only as `app_mention`, also gets the post that pinged its author.
+    const pings =
+      live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)
+        ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
+        : [];
+    const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;
     // Before the dedup key: a reply with a mention also arrives as `app_mention`, which must still run.
-    if (message.requiresLink && !existing) return;
+    if (message.requiresLink && (pings.length ? !ping : !existing)) return;
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
     if (this.#recent.has(dedupKey)) return;
     this.#recent.add(dedupKey);
@@ -1407,9 +1419,12 @@ export class MessagingService {
     );
     const named = withMentionNames(message.text, mentioned);
     const quote = message.replyTo;
+    // The context does not have OpenBot's own posts, so the post that the person answers comes as the quote.
     const replyTo = quote
       ? { authorName: quote.authorName, text: withMentionNames(quote.text, mentioned), sentAt: quote.sentAt }
-      : null;
+      : ping && !existing
+        ? { authorName: this.#pingAuthor(live.record, ping.agentId), text: ping.text, sentAt: ping.createdAt }
+        : null;
     // A new mention in a Discord server goes to the workflows first: a Discord trigger that takes it
     // starts a run, and no agent answers it. A conversation that has an agent keeps it.
     if (live.record.platform === "discord" && !message.isDirect && !existing) {
@@ -1451,8 +1466,9 @@ export class MessagingService {
           .pipe(Effect.catch(() => Effect.void));
       if (workflows !== "none") return;
     }
-    // A new mention in a Slack channel goes to the workflows first, in the same way.
-    if (live.record.platform === "slack" && !message.isDirect && !existing) {
+    // A new mention in a Slack channel goes to the workflows first, in the same way. A reply to a ping
+    // has no mention, so it goes to the orchestrator.
+    if (live.record.platform === "slack" && !message.isDirect && !existing && !ping) {
       const workflows = yield* this.#threads.slackWorkflowMention({
         connectionId: live.record.connectionId,
         workspaceName: live.record.workspaceName,
@@ -1593,6 +1609,13 @@ export class MessagingService {
     return allowed.some((role) => roles.has(role.id));
   }
 
+  /** Who the orchestrator reads as the author of a post that pinged a person: the agent that posted it. */
+  #pingAuthor(record: MessagingConnectionRecord, agentId: string): string {
+    if (agentId === this.#orchestrator(record)) return "OpenBot, a post of yours";
+    const name = this.#agents.listAgents().find((agent) => agent.id === agentId)?.name;
+    return name ? `OpenBot, a post by your teammate ${name}` : "OpenBot";
+  }
+
   #orchestrator(record: MessagingConnectionRecord): string | null {
     const id = this.#threads.store.connection(record.connectionId)?.orchestratorAgentId ?? null;
     return id && this.#agents.listAgents().some((agent) => agent.id === id) ? id : null;
@@ -1692,9 +1715,13 @@ export class MessagingService {
     target: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[] = [],
+    embeds: DiscordEmbed[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
+    const postEmbeds = live.adapter.postEmbeds;
+    if (embeds.length && !postEmbeds)
+      return { error: "Only a Discord post can have embeds. Post the text alone.", failure: "refused" as const };
     // Signal accepts every chat linked to this host, but the chat's own adapter keeps its reply chains.
     if (live.record.platform === "telegram" && target.platformChannelId !== live.identity.workspaceId)
       return {
@@ -1704,11 +1731,20 @@ export class MessagingService {
     // A Discord workspace id is the guild id, which a link to the post needs.
     const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
     // The place is outside this computer, so a secret in the text must not reach it.
-    const posted = yield* live.adapter.postAnswer(target, redactText(markdown), null).pipe(
+    const text = redactText(markdown);
+    const botUserId = live.identity.botUserId;
+    const pinged =
+      live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
+    const posted = yield* (
+      postEmbeds && embeds.length
+        ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
+        : live.adapter.postAnswer(target, text, null)
+    ).pipe(
       Effect.map((messageId) => ({
         posted: true as const,
         messageId,
         ...(guildId ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${messageId}` } : {}),
+        ...(pinged.length ? { ping: { userIds: pinged, text } } : {}),
       })),
       Effect.catch((failure) =>
         Effect.succeed({
@@ -1873,6 +1909,20 @@ export class MessagingService {
     }
     this.#targets.delete(key);
     const final = finalPost(activity, this.#threads.awaitsTeammate(activity.link.linkId));
+    // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
+    if (final.answer && live?.record.platform === "slack") {
+      const botUserId = live.identity?.botUserId;
+      const userIds = slackPingedUsers(final.text).filter((userId) => userId !== botUserId);
+      if (userIds.length)
+        yield* this.#threads.recordPings({
+          connectionId: activity.link.connectionId,
+          platformChannelId: activity.link.platformChannelId,
+          threadKey: activity.link.threadKey,
+          userIds,
+          agentId: activity.link.agentId,
+          text: final.text,
+        });
+    }
     const ended: StatusPost = {
       connectionId: activity.link.connectionId,
       target,
@@ -1926,7 +1976,12 @@ export class MessagingService {
       }
       if (final.answer)
         yield* adapter.postAnswer(post.target, final.text, placeholder).pipe(toMessagingOperationFailed);
-      else yield* this.#say(adapter, post.target, placeholder, final.text);
+      else if (final.text) yield* this.#say(adapter, post.target, placeholder, final.text);
+      // A quiet answer: the status post goes, and the reaction shows that OpenBot read the message.
+      else if (placeholder && adapter.remove)
+        yield* adapter.remove(post.target, placeholder).pipe(toMessagingOperationFailed);
+      else if (placeholder)
+        yield* this.#say(adapter, post.target, placeholder, sourceText("status.messaging.noAnswer"));
     }).pipe(
       Effect.tapError(() =>
         Effect.gen({ self: this }, function* () {
@@ -2290,6 +2345,34 @@ function linkTarget(link: MessagingLink): MessageTarget {
   return { platformChannelId: link.platformChannelId, replyThreadId: link.threadKey };
 }
 
+/**
+ * The embed with a secret in each text or link masked, as in the post's text. Discord refuses a link
+ * that the mask breaks, so the post fails and the secret stays here.
+ */
+function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
+  const mask = (value: string | undefined) => (value === undefined ? undefined : redactText(value));
+  return {
+    title: mask(embed.title),
+    description: mask(embed.description),
+    url: mask(embed.url),
+    color: embed.color,
+    timestamp: embed.timestamp,
+    author: embed.author && {
+      name: redactText(embed.author.name),
+      url: mask(embed.author.url),
+      icon_url: mask(embed.author.icon_url),
+    },
+    footer: embed.footer && { text: redactText(embed.footer.text), icon_url: mask(embed.footer.icon_url) },
+    thumbnail: embed.thumbnail && { url: redactText(embed.thumbnail.url) },
+    image: embed.image && { url: redactText(embed.image.url) },
+    fields: embed.fields?.map((field) => ({
+      name: redactText(field.name),
+      value: redactText(field.value),
+      inline: field.inline,
+    })),
+  };
+}
+
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
@@ -2310,6 +2393,11 @@ function roleName(name: string): string {
   return /[\uD800-\uDBFF]$/u.test(cut) ? cut.slice(0, -1) : cut;
 }
 
+/** The answer is the quiet marker alone, also in code or quotes, or with a full stop. */
+function isQuietAnswer(answer: string): boolean {
+  return answer.trim().replace(/^[`*_"']+|[`*_"'.]+$/g, "") === QUIET_ANSWER;
+}
+
 function token(): string {
   return randomBytes(16).toString("hex");
 }
@@ -2327,6 +2415,8 @@ function finalPost(
   if (activity.status === "failed")
     return { answer: false, text: sourceText("status.messaging.failed"), reaction: reacts ? "failed" : null };
   const reaction = reacts ? "done" : null;
+  // A quiet answer posts nothing: an empty text takes back the status post.
+  if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
   // The platform is outside this computer, so a secret in the answer must not reach it.
   if (activity.answer) return { answer: true, text: redactText(activity.answer), reaction };
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.

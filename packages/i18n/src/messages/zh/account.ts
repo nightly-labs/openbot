@@ -38,6 +38,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} 分钟",
   "account.usage.window.cursorModels": "Cursor 模型",
   "account.usage.window.otherModels": "其他模型",
+  "account.usage.window.total": "总计",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "更新失败，请重试。",
   "account.update.managedByHost": "由主机管理",

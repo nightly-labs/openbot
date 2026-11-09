@@ -1549,6 +1549,14 @@ export const messages = {
   "mobile.server.usage.noAgents": "לא נרשם שימוש של סוכנים בטווח הזה.",
   "mobile.server.usage.unsupported": "המארח הזה לא תומך בניתוח שימוש. יש לעדכן את המארח כדי להשתמש בתצוגה הזו.",
   "mobile.server.usage.planLimitsNote": "המגבלות הנוכחיות של כל ספק. הטווח שלמטה לא משנה אותן.",
+  "mobile.server.machine.title": "מכונה",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "זיכרון",
+  "mobile.server.machine.disk": "דיסק",
+  "mobile.server.machine.cores": { one: "ליבה אחת", two: "שתי ליבות", other: "{cores} ליבות" },
+  "mobile.server.machine.sizeDetail": "{used} מתוך {total}",
+  "mobile.server.machine.unknown": "לא זמין",
+  "mobile.server.machine.unsupported": "המארח הזה לא מדווח על השימוש במכונה שלו. יש לעדכן את המארח כדי לראות אותו.",
   // The plan limits of the host's providers: the rings in the home header, their sheet and the Usage screen. {time} is a date.
   "mobile.server.planLimits.title": "מגבלות המסלול",
   "mobile.server.planLimits.button": "מגבלות המסלול: {summary}",
@@ -1672,7 +1680,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "לא ניתן לפתוח את האתר.",
   "mobile.server.sites.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לראות כאן את האתרים שלו.",
   "mobile.server.sites.offline": "יש להתחבר לשרת הזה כדי לראות את האתרים שלו.",
-  "mobile.server.route.roles": "תפקידים",
+  "mobile.server.route.roles": "הרשאות",
   "mobile.server.route.role": "תפקיד",
   "mobile.server.roles.description":
     "יש לבחור את הסוכנים שחברים יכולים להשתמש בהם. בעלים ומנהלים יכולים להשתמש בכל הסוכנים.",

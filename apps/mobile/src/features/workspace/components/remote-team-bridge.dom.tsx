@@ -34,6 +34,11 @@ export type RemoteTeamBridgeHandle = {
    * render, so a `connect` sent at a return to the app ran before it and failed as in the background.
    */
   setActive: (active: BridgeJson) => void;
+  /**
+   * The native side saw the phone move to another network, such as from Wi-Fi to mobile data. The
+   * WebView's `online` event does not fire for that move, and the old path and socket can be dead.
+   */
+  networkChanged: (value: BridgeJson) => void;
 };
 
 interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
@@ -152,11 +157,18 @@ export default function RemoteTeamBridge({
       peer.setActive(value);
     };
   const setActive = applyActive.current;
+  const networkChanged = useRef(() => peer.networkMoved()).current;
 
   useDOMImperativeHandle<RemoteTeamBridgeHandle>(
     ref ?? null,
-    () => ({ browserView: views.command, remoteDesktop: desktopStreams.command, teamCommands, setActive }),
-    [views, desktopStreams, teamCommands, setActive],
+    () => ({
+      browserView: views.command,
+      remoteDesktop: desktopStreams.command,
+      teamCommands,
+      setActive,
+      networkChanged,
+    }),
+    [views, desktopStreams, teamCommands, setActive, networkChanged],
   );
 
   // After the handle effect above, so the native side knows the handle before it sends the commands.

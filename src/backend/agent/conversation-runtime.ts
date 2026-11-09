@@ -12,6 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { withoutQueuePositions } from "../database/conversation-writer";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -1274,6 +1275,9 @@ function oldestMessagesToRemove(
   return removed;
 }
 
+/** What a write must store of a message: it with no queue position (`withoutQueuePositions`). */
 function messageSignature(message: ConversationMessage): string {
-  return createHash("sha256").update(JSON.stringify(message)).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(withoutQueuePositions(message)))
+    .digest("hex");
 }

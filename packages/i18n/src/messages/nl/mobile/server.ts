@@ -1108,6 +1108,15 @@ export const messages = {
     "Deze host ondersteunt geen gebruiksanalyses. Werk de host bij om deze weergave te gebruiken.",
   "mobile.server.usage.planLimitsNote":
     "De huidige limieten van elke provider. De periode hieronder verandert ze niet.",
+  "mobile.server.machine.title": "Machine",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Geheugen",
+  "mobile.server.machine.disk": "Schijf",
+  "mobile.server.machine.cores": { one: "{cores} kern", other: "{cores} kernen" },
+  "mobile.server.machine.sizeDetail": "{used} van {total}",
+  "mobile.server.machine.unknown": "Niet beschikbaar",
+  "mobile.server.machine.unsupported":
+    "Deze host meldt het gebruik van zijn machine niet. Werk de host bij om het te zien.",
   "mobile.server.planLimits.title": "Abonnementslimieten",
   "mobile.server.planLimits.button": "Abonnementslimieten: {summary}",
   "mobile.server.planLimits.left": "{percent}% over",
@@ -1224,7 +1233,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Kan de site niet openen.",
   "mobile.server.sites.unsupported": "Werk OpenBot bij op deze server om de sites hier te zien.",
   "mobile.server.sites.offline": "Maak verbinding met deze server om de sites te zien.",
-  "mobile.server.route.roles": "Rollen",
+  "mobile.server.route.roles": "Machtigingen",
   "mobile.server.route.role": "Rol",
   "mobile.server.roles.description":
     "Kies de agents die leden kunnen gebruiken. Eigenaren en beheerders kunnen alle agents gebruiken.",

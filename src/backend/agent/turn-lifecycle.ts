@@ -1236,7 +1236,12 @@ export class TurnLifecycle {
         this.#compaction.reserve(agentId, threadId, false, turnId);
       this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-      snapshot.activeTurnId = null;
+      // A routine run in its own session ends in the chat's snapshot, where a later turn can still
+      // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
+      // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
+      // longer runs is cleared, as before.
+      if (snapshot.activeTurnId === turnId || !this.#runningTurns.has(snapshot.activeTurnId ?? ""))
+        snapshot.activeTurnId = null;
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
       // A task turn ends as a turn of the agent's own chat does, in the task's own lane.
       const taskTurn = this.#conversation.isTaskThread(snapshot.threadId);

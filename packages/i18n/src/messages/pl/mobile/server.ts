@@ -1249,6 +1249,19 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "Ten host nie obsługuje analityki użycia. Zaktualizuj hosta, aby korzystać z tego widoku.",
   "mobile.server.usage.planLimitsNote": "Bieżące limity każdego dostawcy. Zakres poniżej ich nie zmienia.",
+  "mobile.server.machine.title": "Maszyna",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Pamięć",
+  "mobile.server.machine.disk": "Dysk",
+  "mobile.server.machine.cores": {
+    one: "{cores} rdzeń",
+    few: "{cores} rdzenie",
+    many: "{cores} rdzeni",
+    other: "{cores} rdzenia",
+  },
+  "mobile.server.machine.sizeDetail": "{used} z {total}",
+  "mobile.server.machine.unknown": "Niedostępne",
+  "mobile.server.machine.unsupported": "Ten host nie podaje użycia swojej maszyny. Zaktualizuj hosta, aby je zobaczyć.",
   "mobile.server.planLimits.title": "Limity planu",
   "mobile.server.planLimits.button": "Limity planu: {summary}",
   "mobile.server.planLimits.left": "Pozostało {percent}%",
@@ -1381,7 +1394,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Nie udało się otworzyć witryny.",
   "mobile.server.sites.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zobaczyć tutaj jego witryny.",
   "mobile.server.sites.offline": "Połącz się z tym serwerem, aby zobaczyć jego witryny.",
-  "mobile.server.route.roles": "Role",
+  "mobile.server.route.roles": "Uprawnienia",
   "mobile.server.route.role": "Rola",
   "mobile.server.roles.description":
     "Wybierz agentów, z których mogą korzystać członkowie. Właściciele i administratorzy mogą korzystać ze wszystkich agentów.",

@@ -6,7 +6,8 @@
 // (`autoPercentUsed`) and every other model (`apiPercentUsed`) for one billing cycle. The included
 // usage of a merged plan (`GetPlanInfo` `isMerged`) covers Grok and Composer only, so its reading is
 // the total alone, as in the Cursor app. That total is the quota of the Grok plan, so the reading
-// names Grok as sharing it, and the rail shows one ring for both.
+// names Grok as sharing it, and the rail shows one ring for both. A split plan also sends its total,
+// which the Cursor CLI shows first, as `tertiary`.
 
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -144,8 +145,9 @@ const PlanUsage = Schema.Struct({
 
 /**
  * The primary window holds Cursor's own models and the secondary one every other model; the dock
- * names them by slot. A merged plan, or a plan that reports only the total, fills the primary
- * window with the total.
+ * names them by slot. `tertiary` holds the total of a split plan, the number that Cursor shows first.
+ * The Team API does not send `tertiary`, so a peer keeps the two windows. A merged plan, or a plan
+ * that reports only the total, fills the primary window with the total.
  */
 function cursorRateLimits(value: unknown, merged: boolean): AccountRateLimitsReadResult {
   const period = Schema.decodeUnknownOption(CurrentPeriodUsage)(value);
@@ -165,10 +167,12 @@ function cursorRateLimits(value: unknown, merged: boolean): AccountRateLimitsRea
   const split = !merged && (autoPercentUsed !== undefined || apiPercentUsed !== undefined);
   const primary = window(split ? autoPercentUsed : totalPercentUsed);
   const secondary = split ? window(apiPercentUsed) : null;
+  const total = split ? window(totalPercentUsed) : null;
   if (!primary && !secondary) return NO_USAGE;
   return {
     rateLimits: { limitId: "cursor", primary, secondary },
     rateLimitsByLimitId: null,
+    ...(total ? { tertiary: total } : {}),
     ...(merged ? { sharedQuotaWith: "grok" as const } : {}),
   };
 }

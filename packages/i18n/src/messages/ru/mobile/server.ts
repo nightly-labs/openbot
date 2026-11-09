@@ -1244,6 +1244,20 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "Этот хост не поддерживает аналитику использования. Обновите хост, чтобы открыть этот экран.",
   "mobile.server.usage.planLimitsNote": "Текущие лимиты каждого провайдера. Период ниже на них не влияет.",
+  "mobile.server.machine.title": "Машина",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Память",
+  "mobile.server.machine.disk": "Диск",
+  "mobile.server.machine.cores": {
+    one: "{cores} ядро",
+    few: "{cores} ядра",
+    many: "{cores} ядер",
+    other: "{cores} ядра",
+  },
+  "mobile.server.machine.sizeDetail": "{used} из {total}",
+  "mobile.server.machine.unknown": "Недоступно",
+  "mobile.server.machine.unsupported":
+    "Этот хост не сообщает об использовании своей машины. Обновите хост, чтобы увидеть его.",
   "mobile.server.planLimits.title": "Лимиты тарифа",
   "mobile.server.planLimits.button": "Лимиты тарифа: {summary}",
   "mobile.server.planLimits.left": "Осталось {percent}%",
@@ -1377,7 +1391,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Не удалось открыть сайт.",
   "mobile.server.sites.unsupported": "Обновите OpenBot на этом сервере, чтобы видеть его сайты здесь.",
   "mobile.server.sites.offline": "Подключитесь к серверу, чтобы увидеть его сайты.",
-  "mobile.server.route.roles": "Роли",
+  "mobile.server.route.roles": "Права доступа",
   "mobile.server.route.role": "Роль",
   "mobile.server.roles.description":
     "Выберите агентов, которыми могут пользоваться участники. Владельцы и администраторы могут пользоваться всеми агентами.",

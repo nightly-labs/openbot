@@ -2,20 +2,16 @@ import {
   DEFAULT_MACHINE_ALERT_SETTINGS,
   type MachineMetric,
   type MachineMetrics,
+  type MachineMetricTone,
   machineAlertLevel,
+  machineMetricPercent,
+  machineMetricTone,
 } from "@openbot/contracts/ipc";
 import { Button, buttonVariants, ChevronRight, Popover, Progress, RadialProgress } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
-import {
-  MACHINE_METRIC_ICONS,
-  MACHINE_METRIC_LABELS,
-  type MachineMetricTone,
-  machineMetricPercent,
-  machineMetricTone,
-  useMachineMetricDetail,
-} from "../files/machine-metric";
+import { MACHINE_METRIC_ICONS, MACHINE_METRIC_LABELS, useMachineMetricDetail } from "../files/machine-metric";
 
 export interface UsageMachineMeterProps {
   metrics: MachineMetrics;
