@@ -1675,15 +1675,21 @@ export class ChannelService {
           }
           // Idle stays silent: the lead judged that nothing needs doing, so there is no dispatch. A
           // message that names a member is never idle: "Thanks @Ana" or "hi @Ana" gets Ana's answer, as
-          // a person who is named in a group chat answers.
+          // a person who is named in a group chat answers. An agent writes a name as text, not as a tag,
+          // so a typed "@Name" anywhere counts too; idle completed such a request with no answer (#5964).
+          // An "@" in a link or in a tag, such as a quote, names no one.
           const eligible = this.eligibleMembers(channel);
+          const tags = chatTagReferences(task.instruction);
           const named = [
-            ...new Set(
-              chatTagReferences(task.instruction)
+            ...new Set([
+              ...tags
                 .filter((reference) => reference.kind === "agent")
                 .map((reference) => reference.id)
                 .filter((agentId) => eligible.includes(agentId)),
-            ),
+              ...("idle" in decision ? [...task.instruction.matchAll(/(?<=^|[\s(])@/gu)] : [])
+                .filter((match) => !tags.some((tag) => match.index >= tag.start && match.index < tag.end))
+                .flatMap((match) => this.#typedAddress(eligible, task.instruction.slice(match.index))),
+            ]),
           ];
           if ("idle" in decision && !named.length) {
             channelResult(
