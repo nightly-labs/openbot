@@ -95,6 +95,34 @@ function service(uploadDirectory: string): InstanceTransferService {
     },
     setAvatar: (_agentId, _image) => Effect.fail(unexpected("setAvatar")),
     deleteAgent: (_agentId) => Effect.fail(unexpected("deleteAgent")),
+    channels: {
+      store: {
+        ids: () => [],
+        get: (_channelId) => {
+          throw unexpected("channels.get");
+        },
+      },
+      images: {
+        resolve: (_channel) => {
+          throw unexpected("channels.images.resolve");
+        },
+      },
+      command: (_command, _actor) => Effect.fail(unexpected("channels.command")),
+      setImage: (_channelId, _image) => Effect.fail(unexpected("channels.setImage")),
+    },
+    listChannelMemories: (_channelId) => {
+      throw unexpected("listChannelMemories");
+    },
+    listChannelRoutines: (_channelId) => {
+      throw unexpected("listChannelRoutines");
+    },
+    createChannelMemory: (_input) => {
+      throw unexpected("createChannelMemory");
+    },
+    createChannelRoutine: (_input) => {
+      throw unexpected("createChannelRoutine");
+    },
+    deleteChannel: (_channelId) => Effect.fail(unexpected("deleteChannel")),
   };
   const library: ReturnType<InstanceTransferOptions["skills"]["library"]> = {
     list: () => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.list") })),
@@ -130,6 +158,7 @@ function service(uploadDirectory: string): InstanceTransferService {
   };
   const options: InstanceTransferOptions = {
     uploadDirectory,
+    channelActor: () => ({ id: "local", name: "You" }),
     sharedRoot: join(dirname(uploadDirectory), "shared"),
     appVersion: "e2e",
     agents,

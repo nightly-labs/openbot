@@ -191,10 +191,22 @@ try {
     initializeMemorySelection: () => undefined,
     setAvatar: () => Effect.die("The agent has no avatar."),
     deleteAgent: () => Effect.die("A successful import deletes no agent."),
+    channels: {
+      store: { ids: () => [], get: () => assert.fail("The instance has no channels.") },
+      images: { resolve: () => null },
+      command: () => Effect.die("The instance has no channels."),
+      setImage: () => Effect.die("The instance has no channels."),
+    },
+    listChannelMemories: () => [],
+    listChannelRoutines: () => [],
+    createChannelMemory: () => assert.fail("The instance has no channels."),
+    createChannelRoutine: () => assert.fail("The instance has no channels."),
+    deleteChannel: () => Effect.die("The instance has no channels."),
   };
   const transfer = new InstanceTransferService({
     agents: transferAgents,
     skills: { library: () => library, installLocal: (input) => skills.installLocal(input) },
+    channelActor: () => ({ id: "local", name: "You" }),
     settings: {
       mcpServers: () => [],
       saveMcpServer: () => Effect.void,

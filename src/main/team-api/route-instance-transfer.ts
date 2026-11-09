@@ -79,7 +79,16 @@ export async function routeInstanceTransfer(
       }
       // The service checks the zone and uses the host's own when it is not valid.
       const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
-      const result = await answer(() => runCauseEffect(instanceTransfer.apply(input, member.id, timezone)), 409);
+      const result = await answer(
+        () =>
+          runCauseEffect(
+            instanceTransfer.apply(input, member.id, timezone, {
+              id: member.id,
+              name: member.name ?? "Team member",
+            }),
+          ),
+        409,
+      );
       return json(200, {
         ...result,
         agents: result.agents.map((agent) => ({ agentId: agent.id, name: agent.name })),

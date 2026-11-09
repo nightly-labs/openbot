@@ -26,8 +26,14 @@ import {
   type ApplyInstanceTransferInput,
   AVATAR_SEED_PATTERN,
   type AvatarImageInput,
+  type Channel,
+  type ChannelCommand,
+  type ChannelMemory,
+  type ChannelRoutine,
   type ConnectRoutineFlowInput,
   type CreateAgentInput,
+  type CreateChannelMemoryInput,
+  type CreateChannelRoutineInput,
   type CreateRoutineInput,
   type CustomAgentSummary,
   type CustomProviderSummary,
@@ -41,6 +47,8 @@ import {
   type InstanceTransferSummary,
   isAgentImportKey,
   isAvatarColor,
+  isChannelDraft,
+  isChannelIcon,
   isCustomProviderContextWindow,
   isCustomProviderHarness,
   isCustomProviderInputs,
@@ -75,17 +83,20 @@ import {
   writeImportedFilesEffect,
   writeTreeEffect,
 } from "./agent-archive";
-import type { AgentImportSkills } from "./agent-import-service";
+import type { AgentImportSkills, ChannelActor } from "./agent-import-service";
 import { validTimezone } from "./agent-marketplace-service";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import {
   agentPrefix,
+  channelPrefix,
   decodeTransferManifest,
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
   INSTANCE_TRANSFER_VERSION,
   SHARED_FOLDER,
+  TRANSFER_CHANNELS,
   type TransferAgent,
+  type TransferChannel,
   type TransferManifest,
   type TransferManifestFile,
   type TransferSettings,
@@ -145,6 +156,17 @@ interface InstanceTransferAgents {
   initializeMemorySelection(agentId: string): void;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, unknown>;
   deleteAgent(agentId: string): Effect.Effect<void, unknown>;
+  channels: {
+    store: { ids(): string[]; get(channelId: string): Channel };
+    images: { resolve(channel: Channel): { path: string; mimeType: AvatarImageInput["mimeType"] } | null };
+    command(command: ChannelCommand, actor: ChannelActor): Effect.Effect<Channel, unknown>;
+    setImage(channelId: string, image: AvatarImageInput | null): Effect.Effect<unknown, unknown>;
+  };
+  listChannelMemories(channelId: string): ChannelMemory[];
+  listChannelRoutines(channelId: string): ChannelRoutine[];
+  createChannelMemory(input: CreateChannelMemoryInput): unknown;
+  createChannelRoutine(input: CreateChannelRoutineInput): Pick<ChannelRoutine, "id">;
+  deleteChannel(channelId: string): Effect.Effect<void, unknown>;
 }
 
 /** The server settings an export reads and an import writes. Main wires each to its owner. */
@@ -170,6 +192,8 @@ export interface InstanceTransferOptions {
   settings: InstanceTransferSettings;
   /** `~/OpenBot/Shared`. */
   sharedRoot: string;
+  /** Who creates an imported channel when the local user imports. */
+  channelActor: () => ChannelActor;
   appVersion: string;
   /** Where a file sent by a member of a joined client, or made for one, waits. */
   uploadDirectory?: string;
@@ -303,19 +327,7 @@ export class InstanceTransferService {
         }
       }
 
-      const routines: TransferAgent["routines"][number][] = this.options.agents
-        .listRoutines(agent.id)
-        .map((routine) => ({
-          key: routine.id,
-          name: routine.name,
-          instruction: routine.instruction,
-          active: routine.active,
-          timezone: routine.timezone,
-          schedule: routine.trigger.schedule,
-          ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
-          ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
-          ...(routine.runIn ? { runIn: routine.runIn } : {}),
-        }));
+      const routines = this.options.agents.listRoutines(agent.id).map(transferRoutine);
       const oneTimeRoutines = routines.filter((routine) => routine.schedule.kind === "once");
 
       const selections = new Map(
@@ -351,6 +363,40 @@ export class InstanceTransferService {
       });
     }
 
+    const channels: TransferChannel[] = [];
+    const channelPort = this.options.agents.channels;
+    for (const channelId of channelPort.store.ids()) {
+      const channel = channelPort.store.get(channelId);
+      const members = channel.members.flatMap((member) => keys.get(member.agentId) ?? []);
+      if (members.length === 0) continue;
+      if (channels.length === TRANSFER_CHANNELS) {
+        warnings.push(sourceText("error.import.transferChannelLimit", { limit: TRANSFER_CHANNELS }));
+        break;
+      }
+      const key = isAgentImportKey(channel.id) ? channel.id : `channel-${channels.length + 1}`;
+      let image: string | null = null;
+      const resolved = channelPort.images.resolve(channel);
+      if (resolved) {
+        image = `${channelPrefix(key)}image.${AVATAR_EXTENSIONS[resolved.mimeType]}`;
+        const imagePath = resolved.path;
+        entries.push({ name: image, read: () => readFile(imagePath) });
+      }
+      channels.push({
+        key,
+        name: channel.name,
+        title: channel.title,
+        instructions: channel.instructions,
+        members,
+        lead: channel.leadAgentId ? (keys.get(channel.leadAgentId) ?? null) : null,
+        ...(channel.isolated === undefined ? {} : { isolated: channel.isolated }),
+        ...(channel.icon ? { icon: channel.icon } : {}),
+        image,
+        archived: channel.archived,
+        memories: this.options.agents.listChannelMemories(channel.id).map((memory) => memory.text),
+        routines: this.options.agents.listChannelRoutines(channel.id).map(transferRoutine),
+      });
+    }
+
     let shared: typeof SHARED_FOLDER | null = null;
     if (input.includeFiles) {
       const sharedFiles = yield* walk(this.options.sharedRoot, isSharedData);
@@ -376,6 +422,7 @@ export class InstanceTransferService {
       settings: input.includeSettings ? yield* this.#readSettings(keys, manifestAgents) : null,
       shared,
       signedIn: this.options.settings.signedInProviders(),
+      ...(channels.length > 0 ? { channels } : {}),
     };
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     entries.unshift({ name: INSTANCE_TRANSFER_MANIFEST, read: () => Promise.resolve(manifestBytes) });
@@ -615,6 +662,8 @@ export class InstanceTransferService {
     owner = LOCAL_OWNER,
     /** The caller's zone, for routines with no valid zone. A zone that is not valid reads as the host's. */
     timezone?: string,
+    /** Who creates the channels: the member who imports, or the local user. */
+    actor?: ChannelActor,
   ): Effect.fn.Return<InstanceTransferResult, ArchiveOperationError> {
     const staged = this.#staged.get(input.token);
     // Another member's token reads as a closed file, so the answer does not show that it exists.
@@ -622,7 +671,9 @@ export class InstanceTransferService {
       return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
     this.#staged.delete(staged.token);
     const fallbackTimezone = timezone !== undefined && validTimezone(timezone) ? timezone : this.#timezone();
-    return yield* this.#applyStaged(staged, input, fallbackTimezone).pipe(Effect.ensuring(this.#drop(staged)));
+    return yield* this.#applyStaged(staged, input, fallbackTimezone, actor ?? this.options.channelActor()).pipe(
+      Effect.ensuring(this.#drop(staged)),
+    );
   }).bind(this);
 
   readonly #applyStaged = Effect.fn("InstanceTransfer.applyStaged")(function* (
@@ -630,6 +681,7 @@ export class InstanceTransferService {
     staged: StagedTransfer,
     input: ApplyInstanceTransferInput,
     fallbackTimezone: string,
+    actor: ChannelActor,
   ): Effect.fn.Return<InstanceTransferResult, ArchiveOperationError> {
     const selected = staged.manifest.agents.filter((agent) => input.keys.includes(agent.key));
     if (selected.length !== input.keys.length)
@@ -665,6 +717,18 @@ export class InstanceTransferService {
         imported.push(result.success);
         agentIds.set(agent.key, result.success.id);
       }
+    }
+    for (const channel of staged.manifest.channels) {
+      const result = yield* Effect.result(
+        this.#importChannel(archive, channel, agentIds, routineIds, actor, warnings, fallbackTimezone),
+      );
+      if (Result.isFailure(result))
+        warnings.push(
+          sourceText("error.import.transferSettingSkipped", {
+            name: channel.name,
+            reason: message(result.failure.cause),
+          }),
+        );
     }
     if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
     if (staged.manifest.shared) yield* this.#importShared(archive, staged.manifest.shared, warnings);
@@ -823,6 +887,84 @@ export class InstanceTransferService {
         }),
       );
     if (kept > 0) warnings.push(sourceText("error.import.transferSharedKept", { number: kept }));
+  });
+
+  /** Creates a channel of the imported members. A step that fails deletes it, and the others go on. */
+  readonly #importChannel = Effect.fn("InstanceTransfer.importChannel")(function* (
+    this: InstanceTransferService,
+    archive: ArchiveFile,
+    source: TransferChannel,
+    agentIds: ReadonlyMap<string, string>,
+    routineIds: Map<string, string>,
+    actor: ChannelActor,
+    warnings: string[],
+    fallbackTimezone: string,
+  ): Effect.fn.Return<void, ArchiveOperationError> {
+    const members = source.members.flatMap((key) => {
+      const agentId = agentIds.get(key);
+      return agentId ? [{ agentId }] : [];
+    });
+    // The user did not import any member: the channel is not offered.
+    if (members.length === 0) return;
+    const leadAgentId = source.lead ? (agentIds.get(source.lead) ?? null) : null;
+    const draft = {
+      name: source.name,
+      title: source.title,
+      instructions: source.instructions,
+      members,
+      leadAgentId,
+      ...(source.isolated === undefined ? {} : { isolated: source.isolated }),
+      ...(isChannelIcon(source.icon) ? { icon: source.icon } : {}),
+    };
+    if (!isChannelDraft(draft)) return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
+    const image = source.image
+      ? avatarImage((yield* readEntriesEffect(archive, [source.image], AVATAR_IMAGE_LIMITS.sourceBytes))[source.image])
+      : null;
+    if (source.image && !image) warnings.push(sourceText("error.import.avatarSkipped", { name: source.name }));
+
+    const port = this.options.agents;
+    let completed = false;
+    yield* Effect.acquireUseRelease(
+      port.channels
+        .command({ type: "save", operationId: randomUUID(), channelId: randomUUID(), draft }, actor)
+        .pipe(Effect.mapError(failure)),
+      (channel) =>
+        Effect.gen(function* () {
+          if (image) yield* port.channels.setImage(channel.id, image).pipe(Effect.mapError(failure));
+          // A memory that this computer refuses, such as a repeated text, is left out.
+          for (const text of source.memories)
+            yield* archiveSync(() => port.createChannelMemory({ channelId: channel.id, text })).pipe(Effect.ignore);
+          for (const routine of source.routines) {
+            const created = yield* archiveSync(() =>
+              port.createChannelRoutine({
+                channelId: channel.id,
+                name: routine.name,
+                instruction: routine.instruction,
+                active: routine.active,
+                timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
+                schedule: routine.schedule,
+                ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+                ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+              }),
+            ).pipe(Effect.result);
+            if (Result.isSuccess(created)) routineIds.set(routine.key, created.success.id);
+            else
+              warnings.push(
+                sourceText("error.import.routineSkipped", {
+                  name: source.name,
+                  routine: routine.name,
+                  reason: message(created.failure.cause),
+                }),
+              );
+          }
+          if (source.archived)
+            yield* port.channels
+              .command({ type: "archive", operationId: randomUUID(), channelId: channel.id }, actor)
+              .pipe(Effect.mapError(failure));
+          completed = true;
+        }),
+      (channel) => (completed ? Effect.void : port.deleteChannel(channel.id).pipe(Effect.ignore)),
+    );
   });
 
   readonly #importAgent = Effect.fn("InstanceTransfer.importAgent")(function* (
@@ -1145,6 +1287,21 @@ export function createRedaction() {
 /** The warning for an item of the settings that is not imported. */
 function named(name: string): (reason: string) => string {
   return (reason) => sourceText("error.import.transferSettingSkipped", { name, reason });
+}
+
+/** A routine of an agent or a channel, as the file keeps it. */
+function transferRoutine(routine: Routine | ChannelRoutine): TransferAgent["routines"][number] {
+  return {
+    key: routine.id,
+    name: routine.name,
+    instruction: routine.instruction,
+    active: routine.active,
+    timezone: routine.timezone,
+    schedule: routine.trigger.schedule,
+    ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+    ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+    ...("runIn" in routine && routine.runIn ? { runIn: routine.runIn } : {}),
+  };
 }
 
 /** The routines of an agent in a file, with the one-time routines that older apps skip. */

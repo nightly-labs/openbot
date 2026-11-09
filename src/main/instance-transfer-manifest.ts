@@ -29,6 +29,8 @@ export const INSTANCE_TRANSFER_FORMAT = "openbot-instance-transfer";
 export const INSTANCE_TRANSFER_VERSION = 1;
 /** Where the files of `~/OpenBot/Shared` are in the archive. */
 export const SHARED_FOLDER = "shared";
+/** The most channels a file carries. An export with more keeps the first ones and says so. */
+export const TRANSFER_CHANNELS = 1000;
 
 const text = (limit: number) => Schema.String.check(Schema.isMaxLength(limit));
 const name = (limit: number) => text(limit).check(Schema.isMinLength(1));
@@ -151,6 +153,28 @@ const Settings = Schema.Struct({
   cleared: Schema.optionalKey(Schema.Array(name(128)).check(Schema.isMaxLength(128))),
 });
 
+/**
+ * Added after version 1 shipped: a channel whose members are agents in the file. An older app ignores
+ * the field. Members and the lead are agent keys; an import adds only the members it imports.
+ */
+const Channel = Schema.Struct({
+  /** The channel id on the computer that made the file. */
+  key: name(INPUT_LIMITS.identifier),
+  name: name(INPUT_LIMITS.agentName),
+  title: text(INPUT_LIMITS.agentTitle),
+  instructions: text(INPUT_LIMITS.agentDescription),
+  members: Schema.Array(Key).check(Schema.isMaxLength(INPUT_LIMITS.agents)),
+  lead: Schema.NullOr(Key),
+  isolated: Schema.optionalKey(Schema.Boolean),
+  /** The import drops an icon that this app does not draw, as for an agent's colour. */
+  icon: Schema.optionalKey(Schema.Unknown),
+  /** An archive path inside `channels/<key>/`, checked below. */
+  image: Schema.NullOr(text(512)),
+  archived: Schema.Boolean,
+  memories: Schema.Array(name(INPUT_LIMITS.agentMemoryText)).check(Schema.isMaxLength(INPUT_LIMITS.channelMemories)),
+  routines: Schema.Array(Routine).check(Schema.isMaxLength(INPUT_LIMITS.agentRoutines)),
+});
+
 const Manifest = Schema.Struct({
   format: Schema.Literal(INSTANCE_TRANSFER_FORMAT),
   version: Schema.Number,
@@ -160,10 +184,12 @@ const Manifest = Schema.Struct({
   shared: Schema.NullOr(Schema.Literal(SHARED_FOLDER)),
   /** Providers that were signed in on the computer that made the file. Never a token. */
   signedIn: Schema.Array(Provider).check(Schema.isMaxLength(32)),
+  channels: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_CHANNELS))),
 });
 
 export type TransferAgent = typeof Agent.Type;
 export type TransferSettings = typeof Settings.Type;
+export type TransferChannel = typeof Channel.Type;
 
 export interface TransferManifest {
   appVersion: string;
@@ -172,6 +198,7 @@ export interface TransferManifest {
   settings: TransferSettings | null;
   shared: string | null;
   signedIn: readonly (typeof Provider.Type)[];
+  channels: TransferChannel[];
 }
 
 /** What the export writes. The same shape that `decodeTransferManifest` reads. */
@@ -183,11 +210,13 @@ export interface TransferManifestFile {
   settings: TransferSettings | null;
   shared: typeof SHARED_FOLDER | null;
   signedIn: (typeof Provider.Type)[];
+  channels?: TransferChannel[];
 }
 
 const decodeManifest = Schema.decodeUnknownResult(Manifest);
 const decodeAgent = Schema.decodeUnknownResult(Agent);
 const decodeSettings = Schema.decodeUnknownResult(Settings);
+const decodeChannel = Schema.decodeUnknownResult(Channel);
 
 export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferManifest; warnings: string[] } {
   let value: unknown;
@@ -229,9 +258,43 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
       settings,
       shared: file.shared,
       signedIn: file.signedIn,
+      channels: decodeChannels(file.channels ?? [], keys, warnings),
     },
     warnings,
   };
+}
+
+/** The valid channels. Members and a lead that are not agents in the file are left out. */
+function decodeChannels(
+  values: readonly unknown[],
+  agentKeys: ReadonlySet<string>,
+  warnings: string[],
+): TransferChannel[] {
+  const keys = new Set<string>();
+  const channels: TransferChannel[] = [];
+  for (const [index, item] of values.entries()) {
+    const decoded = decodeChannel(item);
+    const channel = Result.isSuccess(decoded) ? decoded.success : null;
+    const prefix = channel ? channelPrefix(channel.key) : "";
+    if (
+      !channel ||
+      keys.has(channel.key) ||
+      !isAgentImportKey(channel.key) ||
+      (channel.image !== null && (!channel.image.startsWith(prefix) || isUnsafeArchivePath(channel.image)))
+    ) {
+      warnings.push(sourceText("error.import.transferChannelInvalid", { number: index + 1 }));
+      continue;
+    }
+    keys.add(channel.key);
+    const members = [...new Set(channel.members)].filter((key) => agentKeys.has(key));
+    if (members.length === 0) continue;
+    channels.push({ ...channel, members, lead: channel.lead && members.includes(channel.lead) ? channel.lead : null });
+  }
+  return channels;
+}
+
+export function channelPrefix(key: string): string {
+  return `channels/${key}/`;
 }
 
 /** Every path an agent names is inside its own `agents/<key>/` folder. */

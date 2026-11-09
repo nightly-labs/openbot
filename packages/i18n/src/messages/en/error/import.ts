@@ -85,4 +85,6 @@ export const messages = defineMessages("error.import", {
     "{name}: values that can hold a secret were removed from its arguments or address. Enter them again in Settings.",
   "error.import.transferSharedKept":
     "{number} files in the Shared folder are already here, so they are kept as they are.",
+  "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
+  "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
 });
