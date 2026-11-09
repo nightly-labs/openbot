@@ -441,7 +441,7 @@ export class BrowserCdpEngine {
             node.backendNodeId,
             `function() {
               const named = [this.id, this.name, this.getAttribute('aria-label') ?? ''].join(' ').replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-              const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && /\\b(?:t?otp|2fa|mfa)(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?factor\\b/.test(named) && !/\\b(?:backup|recovery)\\b/.test(named));
+              const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && /totp|\\b(?:otp|2fa|mfa)+(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?factor\\b/.test(named) && !/\\b(?:backup|recovery)\\b/.test(named));
               return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, network: ${LOADED_FROM_NETWORK} };
             }`,
             [],

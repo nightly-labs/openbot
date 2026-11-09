@@ -28,6 +28,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
       <form method="post" action="/search"><label>Override password<input id="override-password" name="password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
       <label>One-time code<input id="otp" name="otp" type="text" autocomplete="off"></label>
+      <label>MFA code<input id="totpmfa" name="totpmfa" type="text"></label>
       <label>Recovery code<input id="recovery-otp" name="recoveryOtp" type="text"></label>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
       <form method="post" action="/session"><label>Masked password<input id="masked-password" type="text" style="-webkit-text-security: disc"></label></form>
@@ -166,6 +167,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
     // autocomplete="one-time-code"; a recovery code field or a plain numeric field does not take it.
     for (const [selector, fillable] of [
       ["#otp", true],
+      ["#totpmfa", true],
       ["#recovery-otp", false],
       ["#code", false],
     ] as const) {
