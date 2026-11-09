@@ -90,20 +90,27 @@ export function AgentDockHost() {
   const preference = useAgentDockPreference();
 
   /* Linux: a dock that is off or in the window does not need XWayland, so the next start on a Wayland
-     session uses Wayland again. A dock turned on again on XWayland keeps it. On Wayland, only the
-     restart in the settings turns it on. */
+     session uses Wayland again. A dock that the user turns on again on XWayland keeps it; a dock that
+     was on at start does not, so a start on XWayland for another reason stays a single start. On
+     Wayland, only the restart in the settings turns it on. */
+  let wasOn: boolean | undefined;
   createEffect(
     () => {
       const info = platform.appInfo();
       if (info?.platform !== "linux") return undefined;
-      const on = preference().shown && preference().placement === "screen";
-      return on && info.aboveAppsSupport !== undefined ? undefined : on;
+      return {
+        on: preference().shown && preference().placement === "screen",
+        onWayland: info.aboveAppsSupport !== undefined,
+      };
     },
-    (enabled) => {
-      if (enabled !== undefined)
-        void agentDockPort()
-          .agentDock.setXWayland({ enabled })
-          .catch(() => undefined);
+    (state) => {
+      if (state === undefined) return;
+      const turnedOn = state.on && wasOn === false;
+      wasOn = state.on;
+      if (state.on && (!turnedOn || state.onWayland)) return;
+      void agentDockPort()
+        .agentDock.setXWayland({ enabled: state.on })
+        .catch(() => undefined);
     },
   );
 

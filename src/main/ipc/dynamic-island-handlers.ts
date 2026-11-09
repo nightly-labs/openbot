@@ -56,15 +56,23 @@ export function dynamicIslandIpcHandlers({
         );
         return dynamicIsland.preference;
       }),
-      setPreference: authorizedHandler(fromMainRenderer, parseDynamicIslandPreference, (_event, preference) =>
-        runCauseEffect(
+      setPreference: authorizedHandler(fromMainRenderer, parseDynamicIslandPreference, (_event, preference) => {
+        const wasEnabled = dynamicIsland.preference.enabled;
+        return runCauseEffect(
           dynamicIsland.setPreference(preference).pipe(
             // Linux: an island that is off does not need XWayland, so the next start on a Wayland
-            // session uses Wayland again. An island turned on again on XWayland keeps it.
-            Effect.tap((saved) => (saved.enabled ? keepXWayland() : setXWayland(false)).pipe(Effect.ignore)),
+            // session uses Wayland again. An island that the user turns on again on XWayland keeps it;
+            // another change does not, so a start on XWayland for another reason stays a single start.
+            Effect.tap((saved) =>
+              saved.enabled
+                ? wasEnabled
+                  ? Effect.void
+                  : keepXWayland().pipe(Effect.ignore)
+                : setXWayland(false).pipe(Effect.ignore),
+            ),
           ),
-        ),
-      ),
+        );
+      }),
       publishPresentation: authorizedHandler(fromMainRenderer, parseDynamicIslandPresentation, (_event, presentation) =>
         dynamicIsland.publish(presentation),
       ),
