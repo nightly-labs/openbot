@@ -203,6 +203,7 @@ export const messages = {
   "settings.soundTheme.play": "Воспроизвести: {name}",
   "settings.notch.title": "Поведение",
   "settings.notch.show.title": "Показывать статус в вырезе MacBook",
+  "settings.notch.show.titleTopOfScreen": "Показывать статус вверху экрана",
   "settings.notch.show.description":
     "Показывать активность агентов и всё, что требует внимания, в верхней части каждого дисплея.",
   "settings.notch.idle.title": "Показывать панель в режиме ожидания",

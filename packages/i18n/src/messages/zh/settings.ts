@@ -194,6 +194,7 @@ export const messages = {
   "settings.soundTheme.play": "播放{name}",
   "settings.notch.title": "行为",
   "settings.notch.show.title": "在 MacBook 刘海处显示状态",
+  "settings.notch.show.titleTopOfScreen": "在屏幕顶部显示状态",
   "settings.notch.show.description": "在每个屏幕顶部显示助手活动和需要关注的事项。",
   "settings.notch.idle.title": "空闲时显示灵动岛",
   "settings.notch.idle.description": "没有活跃状态时显示 OpenBot 标志和问候语。",

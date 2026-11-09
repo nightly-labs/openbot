@@ -197,6 +197,7 @@ export const messages = {
   "settings.soundTheme.play": "{name} afspelen",
   "settings.notch.title": "Gedrag",
   "settings.notch.show.title": "Toon status in de notch van de MacBook",
+  "settings.notch.show.titleTopOfScreen": "Toon status bovenaan het scherm",
   "settings.notch.show.description":
     "Toon activiteit van agents en items die aandacht nodig hebben bovenaan elk scherm.",
   "settings.notch.idle.title": "Toon inactief eiland",

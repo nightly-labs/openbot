@@ -224,7 +224,10 @@ export function DynamicIslandSurface() {
     };
   });
   return (
-    <main class="dynamic-island-surface" aria-label={t("island.surface.label")}>
+    <main
+      class="dynamic-island-surface"
+      aria-label={notchSize() ? t("island.surface.label") : t("island.surface.labelIsland")}
+    >
       <Show when={presentation().mode !== "idle" || preference().idleVisible}>
         <fieldset
           class="dynamic-island-surface-anchor"

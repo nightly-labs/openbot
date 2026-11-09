@@ -194,12 +194,13 @@ export function SettingsModal(props: SettingsModalProps) {
     },
   );
   const agentDockShown = () =>
-    props.appInfo?.platform === "darwin" && props.chatWindow !== true && props.agentDock !== undefined;
+    settingsTabShown("agent-dock", { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
+    props.agentDock !== undefined;
   const visibleNavItems = () =>
     navItems.filter(
       (item) =>
         settingsTabShown(item.value, { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
-        (item.value !== "agent-dock" || agentDockShown()),
+        (item.value !== "agent-dock" || props.agentDock !== undefined),
     );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
@@ -350,6 +351,7 @@ export function SettingsModal(props: SettingsModalProps) {
             <SettingsDynamicIslandTab
               value={props.value}
               variant={props.appInfo?.variant ?? "production"}
+              platform={props.appInfo?.platform}
               builtInDisplayGeometry={props.builtInDisplayGeometry}
               servers={props.servers ?? []}
               onUpdateSetting={updateSetting}

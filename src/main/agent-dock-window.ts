@@ -37,6 +37,11 @@ export class AgentDockFailed extends Schema.TaggedError<AgentDockFailed>()("Agen
 
 export const { rewrap: toAgentDockFailed } = causeHelpers(AgentDockFailed);
 
+/** The platforms that show the dock window. On Windows it is a tool window above the other apps. */
+function agentDockSupported(platform: NodeJS.Platform): boolean {
+  return platform === "darwin" || platform === "win32";
+}
+
 export interface AgentDockWindowControllerOptions {
   platform: NodeJS.Platform;
   createWindow: (bounds: Rectangle) => BrowserWindow;
@@ -298,7 +303,7 @@ export class AgentDockWindowController {
     return this.#reconciliation
       .withPermit(
         Effect.suspend(() => {
-          if (this.#destroyed || this.#options.platform !== "darwin") {
+          if (this.#destroyed || !agentDockSupported(this.#options.platform)) {
             this.#destroyWindow();
             return Effect.void;
           }
@@ -346,12 +351,16 @@ export class AgentDockWindowController {
         const entry: DockWindow = { window, rendererId: window.webContents.id, displayId: display.id };
         this.#windows.push(entry);
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
-        window.excludedFromShownWindowsMenu = true;
         window.setHasShadow(false);
-        window.setWindowButtonVisibility(false);
         window.setAlwaysOnTop(true, "floating");
-        window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-        window.setHiddenInMissionControl(true);
+        // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
+        // defined on Windows, so a call there throws.
+        if (this.#options.platform === "darwin") {
+          window.excludedFromShownWindowsMenu = true;
+          window.setWindowButtonVisibility(false);
+          window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+          window.setHiddenInMissionControl(true);
+        }
         window.setFocusable(false);
         window.setIgnoreMouseEvents(true, { forward: true });
         window.webContents.on("did-finish-load", () => {
@@ -434,7 +443,7 @@ function agentDockWindowHeight(display: Pick<Display, "workArea">): number {
 }
 
 /**
- * At an edge of the work area, so the macOS Dock at that edge does not cover it. `offset` is the place
+ * At an edge of the work area, so the macOS Dock or the Windows taskbar at that edge does not cover it. `offset` is the place
  * in height: 0 is the top, 1 the bottom.
  */
 function agentDockWindowBounds(display: Pick<Display, "workArea">, edge: AgentDockEdge, offset: number): Rectangle {

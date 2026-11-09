@@ -40,6 +40,14 @@ const MACBOOK_NOTCH_REFERENCE = {
 } as const;
 const MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE = 0.01;
 
+/**
+ * The platforms that show the island. A Windows display has no notch: the built-in display gets the
+ * notch shape at the top edge, and other displays get the floating island, as on a Mac.
+ */
+function dynamicIslandSupported(platform: NodeJS.Platform): boolean {
+  return platform === "darwin" || platform === "win32";
+}
+
 /** A Dynamic Island operation that failed. The cause is what the renderer reads. */
 export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>()("DynamicIslandFailed", {
   cause: Schema.Defect(),
@@ -102,7 +110,7 @@ export class DynamicIslandWindowController {
   /** The notch of the built-in display, or null when there is no built-in display or it has no notch. */
   get builtInDisplayGeometry(): DynamicIslandNotchSize | null {
     const builtIn = this.#options.getDisplays().find((display) => display.internal);
-    return (builtIn && dynamicIslandNotchSizeForDisplay(builtIn)) ?? null;
+    return (builtIn && dynamicIslandNotchSizeForDisplay(builtIn, this.#options.platform)) ?? null;
   }
 
   get mainRendererIds(): ReadonlySet<number> {
@@ -153,7 +161,7 @@ export class DynamicIslandWindowController {
     if (interactive) this.#interactiveDisplays.add(displayId);
     else this.#interactiveDisplays.delete(displayId);
     const display = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
-    const bounds = display ? dynamicIslandWindowBounds(display) : undefined;
+    const bounds = display ? dynamicIslandWindowBounds(display, this.#options.platform) : undefined;
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(bounds, false);
     window.setIgnoreMouseEvents(!interactive, { forward: true });
@@ -174,7 +182,10 @@ export class DynamicIslandWindowController {
         // rather than replaying the rectangle captured when the pointer left.
         const current = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
         if (!current) return;
-        window.setBounds(this.#windowBounds(current, dynamicIslandWindowBounds(current), false), false);
+        window.setBounds(
+          this.#windowBounds(current, dynamicIslandWindowBounds(current, this.#options.platform), false),
+          false,
+        );
       }, DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS),
     );
   }
@@ -182,7 +193,7 @@ export class DynamicIslandWindowController {
   #windowBounds(display: Pick<Display, "bounds" | "internal">, bounds: Rectangle, interactive: boolean): Rectangle {
     if (interactive) return bounds;
     const compactHeight = dynamicIslandCompactHeight(
-      notchSizeForDisplay(display)?.height,
+      dynamicIslandNotchSizeForDisplay(display, this.#options.platform)?.height,
       this.#preference.heightPercent,
     );
     return {
@@ -268,7 +279,7 @@ export class DynamicIslandWindowController {
   readonly #reconcileWindows = Effect.fn("DynamicIsland.reconcileWindows")(function* (
     this: DynamicIslandWindowController,
   ) {
-    if (this.#destroyed || this.#options.platform !== "darwin" || !this.#preference.enabled) {
+    if (this.#destroyed || !dynamicIslandSupported(this.#options.platform) || !this.#preference.enabled) {
       this.destroyWindows();
       return;
     }
@@ -288,8 +299,8 @@ export class DynamicIslandWindowController {
 
     for (const display of displays) {
       if (this.#destroyed) return;
-      const bounds = dynamicIslandWindowBounds(display);
-      const notchSize = notchSizeForDisplay(display);
+      const bounds = dynamicIslandWindowBounds(display, this.#options.platform);
+      const notchSize = dynamicIslandNotchSizeForDisplay(display, this.#options.platform);
       const current = this.#windows.get(display.id);
       if (current && !current.isDestroyed()) {
         current.setBounds(
@@ -332,16 +343,20 @@ export class DynamicIslandWindowController {
   /** Creates the window now and returns its load. */
   #openDisplayWindow(display: Display, bounds: Rectangle): Effect.Effect<void, DynamicIslandFailed> {
     const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
-    window.excludedFromShownWindowsMenu = true;
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
-    window.setWindowButtonVisibility(false);
     window.setAlwaysOnTop(true, "status");
-    window.setVisibleOnAllWorkspaces(true, {
-      visibleOnFullScreen: true,
-      skipTransformProcessType: true,
-    });
-    window.setHiddenInMissionControl(true);
+    // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
+    // defined on Windows, so a call there throws.
+    if (this.#options.platform === "darwin") {
+      window.excludedFromShownWindowsMenu = true;
+      window.setWindowButtonVisibility(false);
+      window.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+      window.setHiddenInMissionControl(true);
+    }
     window.setFocusable(false);
     window.setIgnoreMouseEvents(true, { forward: true });
     window.webContents.on("did-finish-load", () => {
@@ -349,7 +364,7 @@ export class DynamicIslandWindowController {
       const currentDisplay = this.#options.getDisplays().find((candidate) => candidate.id === display.id) ?? display;
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, this.#presentation);
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
-      const notchSize = notchSizeForDisplay(currentDisplay);
+      const notchSize = dynamicIslandNotchSizeForDisplay(currentDisplay, this.#options.platform);
       if (sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
         this.#rememberNotchSize(display.id, notchSize);
       }
@@ -366,7 +381,7 @@ export class DynamicIslandWindowController {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const current = this.#options.getDisplays().find((candidate) => candidate.id === display.id);
       if (!current) return;
-      const bounds = dynamicIslandWindowBounds(current);
+      const bounds = dynamicIslandWindowBounds(current, this.#options.platform);
       const { x, y } = window.getBounds();
       if (x === bounds.x && y === bounds.y) return;
       const interactive = this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id);
@@ -422,10 +437,12 @@ export class DynamicIslandWindowController {
   }
 }
 
+/** Only a MacBook has a notch. A Windows laptop with the same aspect ratio has none. */
 export function dynamicIslandNotchSizeForDisplay(
   display: Pick<Display, "bounds" | "internal">,
+  platform: NodeJS.Platform,
 ): DynamicIslandNotchSize | undefined {
-  if (!display.internal || !isRecognizedNotchedMacBookDisplay(display)) return undefined;
+  if (platform !== "darwin" || !display.internal || !isRecognizedNotchedMacBookDisplay(display)) return undefined;
   return dynamicIslandNotchSize(display);
 }
 
@@ -434,10 +451,6 @@ function isRecognizedNotchedMacBookDisplay(display: Pick<Display, "bounds">): bo
   if (width <= 0 || height <= 0) return false;
   const referenceAspectRatio = MACBOOK_NOTCH_REFERENCE.displayWidth / MACBOOK_NOTCH_REFERENCE.displayHeight;
   return Math.abs(width / height - referenceAspectRatio) <= MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE;
-}
-
-function notchSizeForDisplay(display: Pick<Display, "bounds" | "internal">): DynamicIslandNotchSize | undefined {
-  return dynamicIslandNotchSizeForDisplay(display);
 }
 
 function notchSizeChanged(
@@ -457,10 +470,17 @@ function criticalActionKey(action: CriticalAction): string {
   return [action.type, action.serverId, action.agentId, id].join("\u0000");
 }
 
-function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rectangle {
+/**
+ * On macOS the island sits in the menu bar, at the top of the display. On Windows it starts below a
+ * taskbar at the top of the display, because the taskbar is also a topmost window.
+ */
+function dynamicIslandWindowBounds(
+  display: Pick<Display, "bounds" | "workArea">,
+  platform: NodeJS.Platform,
+): Rectangle {
   return {
     x: Math.round(display.bounds.x + (display.bounds.width - DYNAMIC_ISLAND_WINDOW_SIZE.width) / 2),
-    y: display.bounds.y,
+    y: platform === "win32" ? display.workArea.y : display.bounds.y,
     ...DYNAMIC_ISLAND_WINDOW_SIZE,
   };
 }

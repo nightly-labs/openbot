@@ -3,6 +3,7 @@ import type { messages as source } from "../en/island";
 
 export const messages = {
   "island.surface.label": "OpenBot MacBook 노치",
+  "island.surface.labelIsland": "OpenBot Dynamic Island",
   "island.surface.interactionArea": "Dynamic Island 상호작용 영역",
   "island.label.idle": "OpenBot 열기",
   "island.label.working": "OpenBot 작업 상태",

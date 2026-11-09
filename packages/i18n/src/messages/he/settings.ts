@@ -193,6 +193,7 @@ export const messages = {
   "settings.soundTheme.play": "השמעת {name}",
   "settings.notch.title": "התנהגות",
   "settings.notch.show.title": "הצגת סטטוס בחריץ של ה-MacBook",
+  "settings.notch.show.titleTopOfScreen": "הצגת סטטוס בראש המסך",
   "settings.notch.show.description": "הצגת פעילות סוכנים ופריטים שדורשים תשומת לב בראש כל תצוגה.",
   "settings.notch.idle.title": "הצגת האי במצב סרק",
   "settings.notch.idle.description": "הצגת הלוגו של OpenBot וברכה כשאין סטטוס פעיל.",
