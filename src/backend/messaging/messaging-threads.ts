@@ -14,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import type { AttachmentOperationError } from "../attachment-effects";
@@ -21,9 +22,9 @@ import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { MessagingMemoryStore } from "./messaging-memory-store";
-import { type MessagingContextMessage, messagingPromptText } from "./messaging-prompt";
+import { type MessagingContextMessage, messagingPromptText, REPLY_CHARACTERS } from "./messaging-prompt";
 import type { MessagingOperationFailed } from "./messaging-service";
-import { type MessagingLink, MessagingStore } from "./messaging-store";
+import { type MessagingLink, type MessagingPingInput, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
 import type { ContextEntry, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
 
@@ -255,13 +256,12 @@ export interface MessagingThreadsHooks {
  * Enough work from one conversation platform to hold an agent for a long time. The Slack
  * orchestrator receives every new conversation, and it mostly asks teammates, so its turns are short.
  */
+const logger = createOpenBotLogger("messaging-threads");
 const AGENT_QUEUE_LIMIT = 20;
 const AUTHOR_QUEUE_LIMIT = 2;
 const CONTEXT_TIMEOUT_MS = 5_000;
 const HISTORY_TIMEOUT_MS = 15_000;
 const FINISHED_TURN_LIMIT = 256;
-/** The part of a pinging post that is kept: the prompt quotes no more of the message that a reply answers. */
-const MESSAGING_PING_TEXT_LIMIT = 4_000;
 /** What a messaging tool answers when its connection does not run. */
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
 const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
@@ -503,26 +503,45 @@ export class MessagingThreads {
     if ("error" in answer) return openBotToolFailure(answer.error);
     if (!("ping" in answer)) return openBotToolResult(answer);
     const { ping, ...result } = answer;
-    if (ping && call.tool === "messaging_post") {
-      const threadKey = call.replyTo ?? result.messageId;
-      // A thread that a person opened with a mention hears everyone, so a ping there changes nothing.
-      // The post is sent already, so a failed record does not fail it: a reply then needs a mention.
-      if (
-        !this.store.linkByKey(record.connectionId, call.place, threadKey) ||
-        this.store.pings(record.connectionId, call.place, threadKey).length
-      )
-        yield* Effect.try(() =>
-          this.store.savePings({
-            connectionId: record.connectionId,
-            platformChannelId: call.place,
-            threadKey,
-            userIds: ping.userIds,
-            agentId,
-            text: ping.text.slice(0, MESSAGING_PING_TEXT_LIMIT),
-          }),
-        ).pipe(Effect.ignore);
-    }
+    if (ping && call.tool === "messaging_post")
+      yield* this.recordPings({
+        connectionId: record.connectionId,
+        platformChannelId: call.place,
+        threadKey: call.replyTo ?? result.messageId,
+        userIds: ping.userIds,
+        agentId,
+        text: ping.text,
+      });
     return openBotToolResult(result);
+  });
+
+  /**
+   * Records the people that a Slack post pinged, so that a reply of theirs reaches the orchestrator
+   * without a mention. A thread that a person opened with a mention hears everyone, so a ping there
+   * changes nothing. The post is sent already, so a failure only logs: a reply then needs a mention.
+   */
+  readonly recordPings = Effect.fn("MessagingThreads.recordPings")(function* (
+    this: MessagingThreads,
+    input: MessagingPingInput,
+  ) {
+    yield* Effect.try(() => {
+      const { connectionId, platformChannelId, threadKey } = input;
+      if (
+        this.store.linkByKey(connectionId, platformChannelId, threadKey) &&
+        !this.store.pings(connectionId, platformChannelId, threadKey).length
+      )
+        return;
+      // The prompt quotes no more of the post than this.
+      this.store.savePings({ ...input, text: input.text.slice(0, REPLY_CHARACTERS) });
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("A Slack ping was not recorded.", {
+            error: failure.cause instanceof Error ? failure.cause.name : "unknown",
+          }),
+        ),
+      ),
+    );
   });
 
   /**

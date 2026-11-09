@@ -51,7 +51,8 @@ const MENTION_GUIDANCE: Partial<Record<MessagingPlatform, string>> = {
 export const QUIET_ANSWER = "NO_REPLY";
 const CONTEXT_MESSAGES = 30;
 const CONTEXT_CHARACTERS = 12_000;
-const REPLY_CHARACTERS = 4_000;
+/** How much of the message that this one replies to the prompt quotes. */
+export const REPLY_CHARACTERS = 4_000;
 
 /**
  * The prompt of one external message. The author is not the OpenBot user, so the text is framed as

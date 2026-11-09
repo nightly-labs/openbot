@@ -299,8 +299,9 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the
   Orchestrator. One exception, on Slack: when the post pings a person with `<@user ID>`, that
   person's reply in the post's thread reaches the Slack Orchestrator without a mention. The
-  Orchestrator gets the post and the name of the agent that sent it. In that thread, the replies of
-  other people always need a mention.
+  Orchestrator gets the post and the name of the agent that sent it. A person that a later answer in
+  that thread pings can reply without a mention too. The replies of other people always need a
+  mention.
 - There is no list of allowed channels and no approval. Anyone who can give the agents work can ask
   them to post in any place that OpenBot can see. A Slack private channel needs an `/invite`.
 - Discord listing needs a Signal that knows the `listChannels` call. An older Signal refuses it

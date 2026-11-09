@@ -645,7 +645,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   row for each person, with the calling agent and the redacted post, unless a person's mention opened
   the thread. In a thread with pings, a reply without a mention counts only from a pinged person,
   also after the link exists: the first one skips the workflows and goes to the orchestrator with the
-  post as its `replyTo`. Deleting an agent deletes the pings of its threads and its pings of threads
+  post as its `replyTo`. An answer in such a thread that pings people records them too
+  (`MessagingThreads.recordPings`). Deleting an agent deletes the pings of its threads and its pings of threads
   that no reply opened. A thread `message` event that mentions OpenBot is
   left to its `app_mention` event, so the order of the two events does not decide the route.
 - **Quiet answer.** In Slack threads the guidance lets the agent answer only `NO_REPLY` when a

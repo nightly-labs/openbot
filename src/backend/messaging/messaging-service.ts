@@ -1422,7 +1422,7 @@ export class MessagingService {
     const replyTo = quote
       ? { authorName: quote.authorName, text: withMentionNames(quote.text, mentioned), sentAt: quote.sentAt }
       : ping && !existing
-        ? { authorName: this.#pingAuthor(ping.agentId), text: ping.text, sentAt: ping.createdAt }
+        ? { authorName: this.#pingAuthor(live.record, ping.agentId), text: ping.text, sentAt: ping.createdAt }
         : null;
     // A new mention in a Discord server goes to the workflows first: a Discord trigger that takes it
     // starts a run, and no agent answers it. A conversation that has an agent keeps it.
@@ -1609,7 +1609,8 @@ export class MessagingService {
   }
 
   /** Who the orchestrator reads as the author of a post that pinged a person: the agent that posted it. */
-  #pingAuthor(agentId: string): string {
+  #pingAuthor(record: MessagingConnectionRecord, agentId: string): string {
+    if (agentId === this.#orchestrator(record)) return "OpenBot, a post of yours";
     const name = this.#agents.listAgents().find((agent) => agent.id === agentId)?.name;
     return name ? `OpenBot, a post by your teammate ${name}` : "OpenBot";
   }
@@ -1907,6 +1908,20 @@ export class MessagingService {
     }
     this.#targets.delete(key);
     const final = finalPost(activity, this.#threads.awaitsTeammate(activity.link.linkId));
+    // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
+    if (final.answer && live?.record.platform === "slack") {
+      const botUserId = live.identity?.botUserId;
+      const userIds = slackPingedUsers(final.text).filter((userId) => userId !== botUserId);
+      if (userIds.length)
+        yield* this.#threads.recordPings({
+          connectionId: activity.link.connectionId,
+          platformChannelId: activity.link.platformChannelId,
+          threadKey: activity.link.threadKey,
+          userIds,
+          agentId: activity.link.agentId,
+          text: final.text,
+        });
+    }
     const ended: StatusPost = {
       connectionId: activity.link.connectionId,
       target,
