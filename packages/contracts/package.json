@@ -45,6 +45,7 @@
     "./selection-instruction": "./src/selection-instruction.ts",
     "./speech-language": "./src/speech-language.ts",
     "./speech-models": "./src/speech-models.ts",
+    "./voice-server": "./src/voice-server.ts",
     "./speech-text": "./src/speech-text.ts",
     "./agent-memory-context": "./src/agent-memory-context.ts",
     "./ipc": "./src/ipc.ts",

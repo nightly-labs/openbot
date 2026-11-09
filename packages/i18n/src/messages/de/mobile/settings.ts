@@ -316,6 +316,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnsupported": "Braucht ein Telefon mit mindestens 6 GB Arbeitsspeicher",
   "mobile.settings.voice.recognition.parakeetFooter":
     "Parakeet läuft auf diesem Telefon, wie auf dem Desktop. Es erkennt die Sprache, die du sprichst, in 25 europäischen Sprachen, und deine Sprache bleibt auf dem Telefon. Bis das Modell geladen ist, hört die Erkennung des Telefons zu.",
+  "mobile.settings.voice.recognition.parakeetUnified": "Parakeet Unified (Englisch)",
+  "mobile.settings.voice.recognition.parakeetUnifiedReady": "Auf diesem Telefon · nur Englisch",
+  "mobile.settings.voice.recognition.parakeetUnifiedFooter":
+    "Parakeet Unified läuft auf diesem Telefon, wie auf dem Desktop. Es erkennt nur Englisch, mit Satzzeichen und weniger Fehlern als Parakeet v3, und deine Sprache bleibt auf dem Telefon. Bis das Modell geladen ist, hört die Telefonerkennung zu.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "Mehr als 90 Sprachen · sendet deine Sprache an ElevenLabs",
   "mobile.settings.voice.recognition.model": "Sprachmodell",
@@ -327,6 +331,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Zuhören",
   "mobile.settings.voice.tab.speaking": "Sprechen",
+  "mobile.settings.voice.tab.gptLive": "GPT live",
   "mobile.settings.voice.pause.title": "Pause vor dem Senden",
   "mobile.settings.voice.pause.label": "Auf neue Wörter warten",
   "mobile.settings.voice.pause.footer":
@@ -335,6 +340,49 @@ export const messages = {
   "mobile.settings.voice.speed.title": "Antworttempo",
   "mobile.settings.voice.speed.footer": "Das Tempo der Antworten, die OpenBot vorliest, auch in einem Sprachgespräch.",
   "mobile.settings.voice.speed.value": "{speed}×",
+  "mobile.settings.voice.gptLive.title": "GPT Live Voice",
+  "mobile.settings.voice.gptLive.footer":
+    "In einem Sprachgespräch mit einem Agenten hört und spricht GPT Live Voice anstelle dieses Telefons. Es verwendet die Codex-Anmeldung (ChatGPT) des Computers, auf dem der Server läuft. Deine Stimme geht zwischen diesem Telefon und OpenAI hin und her, und OpenAI spricht die Antworten des Agenten. Es braucht einen Server, der es unterstützt; andere Server verwenden die Stimme dieses Telefons.",
+  "mobile.settings.voice.gptLive.automatic": "Automatisch",
+  "mobile.settings.voice.gptLive.choiceFooter":
+    "OpenAI spricht im nächsten Sprachgespräch mit dieser Stimme. Bei „Automatisch“ wählt OpenAI die Stimme.",
+  "mobile.settings.voice.gptLive.serversTitle": "Server",
+  "mobile.settings.voice.gptLive.serversFooter":
+    "Tippe auf einen Server, der eine Anmeldung braucht, um Codex mit einem ChatGPT-Konto zu verbinden. Nur ein Eigentümer oder Admin sieht die Anmeldung eines Servers.",
+  "mobile.settings.voice.gptLive.status.ready": "Bereit",
+  "mobile.settings.voice.gptLive.status.supported": "Unterstützt",
+  "mobile.settings.voice.gptLive.status.offline": "Offline",
+  "mobile.settings.voice.gptLive.status.update": "Braucht ein neueres OpenBot auf seinem Computer",
+  "mobile.settings.voice.gptLive.status.signIn": "Bei Codex mit ChatGPT anmelden",
+  "mobile.settings.voice.server.title": "Sprachserver",
+  "mobile.settings.voice.server.row": "OpenAI-kompatibler Server",
+  "mobile.settings.voice.server.notSetUp": "Nicht eingerichtet",
+  "mobile.settings.voice.server.footer":
+    "Dein eigener Server mit den OpenAI-Routen /v1/audio, etwa Speaches oder Kokoro-FastAPI, wie auf dem Desktop. OpenBot sendet deine Aufnahmen und den Antworttext nur an seine Adresse, und das Telefon muss sie erreichen können, zum Beispiel im selben Netzwerk.",
+  "mobile.settings.voice.server.choice": "Dein Sprachserver",
+  "mobile.settings.voice.server.dictationReady": "Auf deinem Sprachserver · {model}",
+  "mobile.settings.voice.server.dictationOff": "Richte das Diktieren auf deinem Sprachserver ein",
+  "mobile.settings.voice.server.speechReady": "Auf deinem Sprachserver · {model} · {voice}",
+  "mobile.settings.voice.server.speechOff": "Richte gesprochene Antworten auf deinem Sprachserver ein",
+  "mobile.settings.voice.server.address": "Adresse",
+  "mobile.settings.voice.server.addressHint": "Die Basisadresse der API, etwa http://studio.local:8000/v1.",
+  "mobile.settings.voice.server.apiKey": "API-Schlüssel (optional)",
+  "mobile.settings.voice.server.apiKeySaved":
+    "Für diesen Server ist ein Schlüssel gespeichert. Lass das Feld leer, um ihn zu behalten.",
+  "mobile.settings.voice.server.connect": "Verbinden",
+  "mobile.settings.voice.server.connecting": "Verbinde …",
+  "mobile.settings.voice.server.connectFooter":
+    "Verbinde dich, um zu sehen, was der Server für Diktieren und gesprochene Antworten hat.",
+  "mobile.settings.voice.server.probeFailed": "Keine Verbindung zum Sprachserver möglich.",
+  "mobile.settings.voice.server.dictation": "Diktieren",
+  "mobile.settings.voice.server.speech": "Gesprochene Antworten",
+  "mobile.settings.voice.server.missing": "Nicht auf diesem Server",
+  "mobile.settings.voice.server.saveFailed": "Der Sprachserver konnte nicht gespeichert werden.",
+  "mobile.settings.voice.server.remove": "Sprachserver entfernen",
+  "mobile.settings.voice.server.removeTitle": "Sprachserver entfernen?",
+  "mobile.settings.voice.server.removeBody":
+    "Die Spracherkennung des Telefons und Supertonic 3 übernehmen dort, wo der Server zugehört oder gesprochen hat, und sein API-Schlüssel wird von diesem Telefon gelöscht.",
+  "mobile.settings.voice.server.removeFailed": "Der Sprachserver konnte nicht entfernt werden.",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streamt deine Sprache mit einem Einmal-Token an ElevenLabs, und ElevenLabs rechnet über dein Konto ab. Der Schlüssel bleibt auf diesem Telefon.",
   "mobile.settings.voice.elevenLabs.model.title": "Modell",

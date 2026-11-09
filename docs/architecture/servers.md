@@ -194,7 +194,8 @@ sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` wit
 Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
 the agent, because each spoken request goes to the agent as the member's message. The start needs an
 open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
-timeout or a refused call also answers 409 with a sentence for the member.
+timeout or a refused call also answers 409 with a sentence for the member. Any other failure answers
+500, and its reason stays in the host log; the phone shows `error.voice.live.hostFailed` for it.
 
 Each member has at most one session; a new start ends the earlier one of that member, and the local
 user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
@@ -202,7 +203,10 @@ connections of that member. `POST /v1/live-voice/stop` with `{ sessionId }` stop
 caller only. The host also stops it when the last event connection of the logical session that started
 it closes. The capability is advertised only to protocol 9 clients. The desktop on a joined server
 uses live voice only when the host advertises it and the user turned it on in Settings → Voice;
-otherwise the voice transcribes. The web client and the mobile app do not use it yet.
+otherwise the voice transcribes. The mobile app uses it in the voice conversation of an agent chat
+when the host advertises it, the user turned on GPT live voice in Settings → Voice, and the app binary
+has WebRTC (`react-native-webrtc`); otherwise the phone's own voice conversation runs. The phone sends
+a voice name only when it is one of the contract. The web client does not use it yet.
 
 ### Agent import from a joined server
 

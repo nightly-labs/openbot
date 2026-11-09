@@ -31,6 +31,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
+  "error.voice.live.hostFailed":
+    "Codex op de server kon live spraak niet starten. Vraag de eigenaar om Codex op die computer bij te werken en in te loggen met ChatGPT, en probeer het dan opnieuw.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
 } as const satisfies PartialTranslation<typeof source>;

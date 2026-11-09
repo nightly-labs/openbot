@@ -176,6 +176,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
@@ -890,6 +891,11 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `live-voice-v1`: a member can talk with an agent by GPT live voice. */
+  canUseLiveVoice: (serverId: string) => boolean;
+  /** Starts GPT live voice with the WebRTC offer of the phone's peer. Only a host with `canUseLiveVoice` takes it. */
+  startLiveVoice: (input: LiveVoiceStartRequest, serverId: string) => Promise<LiveVoiceSessionResponse>;
+  stopLiveVoice: (sessionId: string, serverId: string) => Promise<void>;
   /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
   canCompactContext: (serverId: string) => boolean;
   /**
@@ -1090,6 +1096,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "canDeleteMessages"
   | "canMarkUnreadFrom"
+  | "canUseLiveVoice"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"

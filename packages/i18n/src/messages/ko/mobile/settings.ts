@@ -298,6 +298,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnsupported": "메모리가 6GB 이상인 휴대폰이 필요해요",
   "mobile.settings.voice.recognition.parakeetFooter":
     "Parakeet은 데스크톱처럼 이 휴대폰에서 실행돼요. 유럽 언어 25개 중에서 말하는 언어를 찾고, 음성은 휴대폰 밖으로 나가지 않아요. 모델을 다운로드하기 전까지는 휴대폰 음성 인식이 들어요.",
+  "mobile.settings.voice.recognition.parakeetUnified": "Parakeet Unified(영어)",
+  "mobile.settings.voice.recognition.parakeetUnifiedReady": "이 휴대폰에서 실행 · 영어만",
+  "mobile.settings.voice.recognition.parakeetUnifiedFooter":
+    "Parakeet Unified는 데스크톱과 같이 이 휴대폰에서 실행됩니다. 영어만 인식하며, 문장 부호를 넣고 Parakeet v3보다 오류가 적습니다. 음성은 휴대폰에 남습니다. 모델을 다운로드하기 전까지는 휴대폰 음성 인식이 듣습니다.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "90개 이상의 언어 · 음성을 ElevenLabs로 보내요",
   "mobile.settings.voice.recognition.model": "음성 모델",
@@ -308,6 +312,7 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "듣기",
   "mobile.settings.voice.tab.speaking": "말하기",
+  "mobile.settings.voice.tab.gptLive": "GPT 라이브",
   "mobile.settings.voice.pause.title": "보내기 전 멈춤",
   "mobile.settings.voice.pause.label": "새 단어 대기",
   "mobile.settings.voice.pause.footer":
@@ -316,6 +321,48 @@ export const messages = {
   "mobile.settings.voice.speed.title": "답장 속도",
   "mobile.settings.voice.speed.footer": "OpenBot이 소리 내어 읽는 답장의 속도입니다. 음성 대화에도 적용됩니다.",
   "mobile.settings.voice.speed.value": "{speed}×",
+  "mobile.settings.voice.gptLive.title": "GPT Live Voice",
+  "mobile.settings.voice.gptLive.footer":
+    "에이전트와 음성 대화를 할 때 이 휴대폰 대신 GPT Live Voice가 듣고 말합니다. 서버를 실행하는 컴퓨터의 Codex(ChatGPT) 로그인을 사용합니다. 음성은 이 휴대폰과 OpenAI 사이를 오가며, OpenAI가 에이전트의 답변을 말합니다. 이를 지원하는 서버가 필요하며, 다른 서버는 이 휴대폰의 음성을 사용합니다.",
+  "mobile.settings.voice.gptLive.automatic": "자동",
+  "mobile.settings.voice.gptLive.choiceFooter":
+    "다음 음성 대화에서 OpenAI가 이 음성으로 말합니다. 자동을 선택하면 OpenAI가 음성을 고릅니다.",
+  "mobile.settings.voice.gptLive.serversTitle": "서버",
+  "mobile.settings.voice.gptLive.serversFooter":
+    "로그인이 필요한 서버를 탭하면 Codex를 ChatGPT 계정에 연결할 수 있습니다. 서버의 로그인은 소유자나 관리자만 볼 수 있습니다.",
+  "mobile.settings.voice.gptLive.status.ready": "준비됨",
+  "mobile.settings.voice.gptLive.status.supported": "지원됨",
+  "mobile.settings.voice.gptLive.status.offline": "오프라인",
+  "mobile.settings.voice.gptLive.status.update": "해당 컴퓨터에 더 새로운 OpenBot이 필요합니다",
+  "mobile.settings.voice.gptLive.status.signIn": "ChatGPT로 Codex에 로그인",
+  "mobile.settings.voice.server.title": "음성 서버",
+  "mobile.settings.voice.server.row": "OpenAI 호환 서버",
+  "mobile.settings.voice.server.notSetUp": "설정 안 됨",
+  "mobile.settings.voice.server.footer":
+    "데스크톱과 같이 Speaches나 Kokoro-FastAPI처럼 OpenAI /v1/audio 경로가 있는 내 서버입니다. OpenBot은 녹음과 답장 텍스트를 그 주소로만 보내며, 같은 네트워크처럼 휴대폰이 그 주소에 연결할 수 있어야 합니다.",
+  "mobile.settings.voice.server.choice": "내 음성 서버",
+  "mobile.settings.voice.server.dictationReady": "내 음성 서버 · {model}",
+  "mobile.settings.voice.server.dictationOff": "음성 서버에서 받아쓰기를 설정하세요",
+  "mobile.settings.voice.server.speechReady": "내 음성 서버 · {model} · {voice}",
+  "mobile.settings.voice.server.speechOff": "음성 서버에서 음성 답장을 설정하세요",
+  "mobile.settings.voice.server.address": "주소",
+  "mobile.settings.voice.server.addressHint": "API의 기본 주소입니다. 예: http://studio.local:8000/v1",
+  "mobile.settings.voice.server.apiKey": "API 키(선택)",
+  "mobile.settings.voice.server.apiKeySaved": "이 서버의 키가 저장되어 있어요. 그대로 쓰려면 비워 두세요.",
+  "mobile.settings.voice.server.connect": "연결",
+  "mobile.settings.voice.server.connecting": "연결 중…",
+  "mobile.settings.voice.server.connectFooter":
+    "연결하면 서버에서 받아쓰기와 음성 답장에 쓸 수 있는 것을 볼 수 있어요.",
+  "mobile.settings.voice.server.probeFailed": "음성 서버에 연결할 수 없어요.",
+  "mobile.settings.voice.server.dictation": "받아쓰기",
+  "mobile.settings.voice.server.speech": "음성 답장",
+  "mobile.settings.voice.server.missing": "이 서버에 없음",
+  "mobile.settings.voice.server.saveFailed": "음성 서버를 저장할 수 없어요.",
+  "mobile.settings.voice.server.remove": "음성 서버 제거",
+  "mobile.settings.voice.server.removeTitle": "음성 서버를 제거할까요?",
+  "mobile.settings.voice.server.removeBody":
+    "서버가 듣거나 말하던 곳은 휴대폰 음성 인식과 Supertonic 3가 맡고, API 키는 이 휴대폰에서 삭제돼요.",
+  "mobile.settings.voice.server.removeFailed": "음성 서버를 제거할 수 없어요.",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot은 일회용 토큰으로 음성을 ElevenLabs에 스트리밍하고, ElevenLabs가 계정에 요금을 청구해요. 키는 이 휴대폰에 남아 있어요.",
   "mobile.settings.voice.elevenLabs.model.title": "모델",

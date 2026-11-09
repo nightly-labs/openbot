@@ -5,7 +5,11 @@ import { mkdir, open, rename, rm, stat } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import type { LocalSpeechModelId, LocalVoiceModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
-import { PARAKEET_MODEL_FILES, SUPERTONIC_MODEL_FILES } from "@openbot/contracts/speech-models";
+import {
+  PARAKEET_MODEL_FILES,
+  PARAKEET_UNIFIED_MODEL_FILES,
+  SUPERTONIC_MODEL_FILES,
+} from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -129,43 +133,6 @@ const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
   },
 ];
 
-const PARAKEET_UNIFIED_MODEL_REVISION = "8c3a10fb13408c7a7054f6898958bf1c64a8d6c7";
-const PARAKEET_UNIFIED_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-non-streaming/resolve/${PARAKEET_UNIFIED_MODEL_REVISION}`;
-
-/** The directory name of Parakeet Unified EN in `<userData>/runtimes`. A new pin needs a new name. */
-export const PARAKEET_UNIFIED_MODEL_DIRECTORY = "parakeet-unified-en-0.6b-int8";
-
-/**
- * NVIDIA Parakeet Unified EN 0.6B (NVIDIA Open Model License), int8 ONNX export of its offline
- * mode for sherpa-onnx. It has the file names of the Parakeet TDT export.
- */
-const PARAKEET_UNIFIED_MODEL_FILES: readonly VoiceModelFile[] = [
-  {
-    name: "encoder.int8.onnx",
-    url: `${PARAKEET_UNIFIED_MODEL_BASE_URL}/encoder.int8.onnx`,
-    bytes: 654_040_552,
-    sha256: "6716910b7a0833997fec7a410494c995d70124001a0e9b66d6370d6aced577e0",
-  },
-  {
-    name: "decoder.int8.onnx",
-    url: `${PARAKEET_UNIFIED_MODEL_BASE_URL}/decoder.int8.onnx`,
-    bytes: 7_257_753,
-    sha256: "a5e223392c90e75f8144cdb5eb95af7625db389e39edef2bd1a9c872b3298fe6",
-  },
-  {
-    name: "joiner.int8.onnx",
-    url: `${PARAKEET_UNIFIED_MODEL_BASE_URL}/joiner.int8.onnx`,
-    bytes: 1_735_860,
-    sha256: "869f43f7d24595c55581ad3bf249a935fb8a71389fbdaa7504b9f46f93140f8a",
-  },
-  {
-    name: "tokens.txt",
-    url: `${PARAKEET_UNIFIED_MODEL_BASE_URL}/tokens.txt`,
-    bytes: 8_952,
-    sha256: "dc0b4584ab2e4ddbf888425c076c61b736e7356a015250db7d307e6f1a8188ff",
-  },
-];
-
 const COHERE_TRANSCRIBE_MODEL_REVISION = "156a470cf08eefe706a0004f3c52d9ee567ca7a0";
 const COHERE_TRANSCRIBE_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01/resolve/${COHERE_TRANSCRIBE_MODEL_REVISION}`;
 
@@ -210,6 +177,7 @@ type DownloadedModelId = LocalVoiceModelId | LocalSpeechModelId;
 export {
   PARAKEET_MODEL_DIRECTORY,
   PARAKEET_MODEL_FILES,
+  PARAKEET_UNIFIED_MODEL_DIRECTORY,
   SUPERTONIC_MODEL_DIRECTORY,
 } from "@openbot/contracts/speech-models";
 

@@ -1,5 +1,4 @@
 import {
-  type AgentEvent,
   type AvatarColor,
   canAdministerServer,
   isQueuedMessageReceipt,
@@ -7,7 +6,6 @@ import {
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
   type SidebarPin,
-  type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -42,6 +40,7 @@ import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-up
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
@@ -85,7 +84,7 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -180,6 +179,7 @@ import {
   restoreDrawerSnapshot,
   startDrawerSnapshots,
 } from "@/features/workspace/model/drawer-snapshot";
+import { publishLiveVoiceEvent } from "@/features/workspace/model/live-voice-events";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import {
   dropApproval,
@@ -1473,8 +1473,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [servers, activeServerId, startupWaitOver, sortByPreference, conversationStore]);
 
   const handleTeamEvent = useCallback(
-    (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
+    (serverId: string, event: RemoteTeamEvent) => {
       if (removedServers.current.has(serverId)) return;
+      // The voice conversation that started the session reads its events; no cache keeps them.
+      if (event.type === LIVE_VOICE_EVENT) {
+        publishLiveVoiceEvent(serverId, event);
+        return;
+      }
       applyLiveActivityEvent(serverId, event);
       liveState.update("approvalRequests", (current) => {
         const previous = current[serverId] ?? [];
