@@ -136,7 +136,14 @@ export function LibraryPage(props: LibraryPageProps) {
   }
 
   function toggleAll(): void {
-    setSelection({ ids: allSelected() ? new Set() : new Set(selectable().map((file) => file.id)), anchor: null });
+    // Only the files on the page change; a file that the search or type hides keeps its state.
+    const ids = new Set(selection()?.ids);
+    const clear = allSelected();
+    for (const file of selectable()) {
+      if (clear) ids.delete(file.id);
+      else ids.add(file.id);
+    }
+    setSelection({ ids, anchor: null });
   }
 
   function stopSelecting(): void {
@@ -180,6 +187,9 @@ export function LibraryPage(props: LibraryPageProps) {
     onChange: (hits) => {
       const ids = new Set(dragBase);
       for (const file of selectable()) if (hits.has(file.id)) ids.add(file.id);
+      // Most pointer moves do not change the files under the rectangle. Do not update every tile for them.
+      const current = selection()?.ids;
+      if (current && current.size === ids.size && [...ids].every((id) => current.has(id))) return;
       // A drag that touches no file before a selection started does not start one.
       setSelection(ids.size === 0 && beforeDrag === null ? null : { ids, anchor: beforeDrag?.anchor ?? null });
     },

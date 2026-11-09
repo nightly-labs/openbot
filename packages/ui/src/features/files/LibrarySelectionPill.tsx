@@ -1,5 +1,12 @@
 import { Button, Download, Trash2 } from "@openbot/ui";
-import { type Spring, springKeyframes } from "@openbot/ui/spring-motion";
+import {
+  EASE_OUT,
+  ISLAND_CLOSE,
+  ISLAND_CONTENT,
+  ISLAND_OPEN,
+  type Spring,
+  springKeyframes,
+} from "@openbot/ui/spring-motion";
 import { useText } from "@openbot/ui/text";
 import { clamp, mix, prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -14,11 +21,6 @@ export type LibraryPillStep =
   | { kind: "confirm" }
   | { kind: "working"; action: LibraryBatchAction; done: number; total: number };
 
-// The springs of the browser dock island: it opens with a small overshoot and closes with none.
-const OPEN: Spring = { response: 0.5, dampingFraction: 0.8 };
-const CLOSE: Spring = { response: 0.45, dampingFraction: 1 };
-const CONTENT: Spring = { response: 0.34, dampingFraction: 0.88 };
-const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 /** The small capsule under the bottom edge that the pill grows out of and goes back into. */
 const BUD = { width: 64, height: 22 };
 
@@ -27,12 +29,12 @@ const ms = (spring: Spring) => spring.response * 1000;
 
 function contentIn(element: HTMLElement, delay = 0, motion = (rest: number) => `scale(${1 - 0.04 * rest})`) {
   element.animate(
-    springKeyframes(CONTENT, (progress) => ({
+    springKeyframes(ISLAND_CONTENT, (progress) => ({
       opacity: clamp(progress * 1.5, 0, 1),
       filter: `blur(${Math.max(0, 4 * (1 - progress))}px)`,
       transform: motion(1 - progress),
     })),
-    { duration: ms(CONTENT), delay, easing: "linear", fill: "backwards" },
+    { duration: ms(ISLAND_CONTENT), delay, easing: "linear", fill: "backwards" },
   );
 }
 
@@ -81,7 +83,7 @@ function MorphPill(props: {
     sizing?.cancel();
     shell.style.width = px(next);
     if (prefersReducedMotion() || Math.abs(from - next) < 0.5) return;
-    const spring = next >= from ? OPEN : CLOSE;
+    const spring = next >= from ? ISLAND_OPEN : ISLAND_CLOSE;
     sizing = shell.animate(
       springKeyframes(spring, (progress) => ({ width: px(mix(from, next, progress)) })),
       { duration: ms(spring), easing: "linear" },
@@ -100,15 +102,15 @@ function MorphPill(props: {
     const down = drop();
     sizing?.cancel();
     sizing = shell.animate(
-      springKeyframes(OPEN, (progress) => ({
+      springKeyframes(ISLAND_OPEN, (progress) => ({
         width: px(mix(BUD.width, width, progress)),
         height: px(mix(BUD.height, height, progress)),
         transform: `translateY(${mix(down, 0, progress)}px)`,
       })),
-      { duration: ms(OPEN), easing: "linear" },
+      { duration: ms(ISLAND_OPEN), easing: "linear" },
     );
-    shell.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1 }], ms(OPEN));
-    contentIn(face, ms(OPEN) * 0.3);
+    shell.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1 }], ms(ISLAND_OPEN));
+    contentIn(face, ms(ISLAND_OPEN) * 0.3);
   }
 
   function sink() {
@@ -125,18 +127,18 @@ function MorphPill(props: {
             { opacity: 1, filter: "blur(0px)", transform: "none" },
             { opacity: 0, filter: "blur(4px)", transform: "scale(0.96)" },
           ],
-          { duration: ms(CLOSE) * 0.35, easing: EASE_OUT, fill: "forwards" },
+          { duration: ms(ISLAND_CLOSE) * 0.35, easing: EASE_OUT, fill: "forwards" },
         ),
         shell.animate(
-          springKeyframes(CLOSE, (progress) => ({
+          springKeyframes(ISLAND_CLOSE, (progress) => ({
             width: px(mix(from.width, BUD.width, progress)),
             height: px(mix(from.height, BUD.height, progress)),
             transform: `translateY(${mix(0, down, progress)}px)`,
           })),
-          { duration: ms(CLOSE), easing: "linear", fill: "forwards" },
+          { duration: ms(ISLAND_CLOSE), easing: "linear", fill: "forwards" },
         ),
         shell.animate([{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }], {
-          duration: ms(CLOSE),
+          duration: ms(ISLAND_CLOSE),
           fill: "forwards",
         }),
       ];
@@ -195,6 +197,8 @@ function MorphPill(props: {
         <div
           class="library-pill-face"
           ref={(element) => {
+            // The face is made again each time the pill opens; the observer must not keep the old one.
+            if (face) observer.unobserve(face);
             face = element;
             observer.observe(element);
           }}

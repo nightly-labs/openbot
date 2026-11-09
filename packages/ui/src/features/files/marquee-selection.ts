@@ -26,6 +26,8 @@ interface Drag {
   originY: number;
   additive: boolean;
   started: boolean;
+  /** The height of the scrolled content when the drag started. The rectangle stops there, so it does not make the page longer. */
+  contentHeight: number;
   items: ItemBox[];
   frame: number;
 }
@@ -85,10 +87,11 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
 
   function update(current: Drag): void {
     const point = contentPoint(current.clientX, current.clientY);
+    const y = Math.min(Math.max(point.y, 0), current.contentHeight);
     const left = Math.min(current.originX, point.x);
-    const top = Math.min(current.originY, point.y);
+    const top = Math.min(current.originY, y);
     const right = Math.max(current.originX, point.x);
-    const bottom = Math.max(current.originY, point.y);
+    const bottom = Math.max(current.originY, y);
     setBox({ left, top, width: right - left, height: bottom - top });
     const ids = new Set<string>();
     for (const item of current.items) {
@@ -108,13 +111,20 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     if (depth !== 0) {
       const before = scroller.scrollTop;
       scroller.scrollTop += (depth / SCROLL_EDGE) * SCROLL_SPEED;
-      if (scroller.scrollTop !== before) update(current);
+      if (scroller.scrollTop !== before) {
+        // Files that come into view can load and change the layout, so measure them again. The
+        // rectangle is never below the content, so the content alone sets the new height.
+        current.contentHeight = scroller.scrollHeight;
+        current.items = measureItems();
+        update(current);
+      }
     }
     current.frame = requestAnimationFrame(scrollStep);
   }
 
   function start(current: Drag): void {
     current.started = true;
+    current.contentHeight = scroller?.scrollHeight ?? 0;
     current.items = measureItems();
     scroller?.setAttribute("data-marquee", "");
     window.getSelection()?.removeAllRanges();
@@ -188,6 +198,7 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
       originY: origin.y,
       additive: event.shiftKey || event.metaKey || event.ctrlKey,
       started: false,
+      contentHeight: 0,
       items: [],
       frame: 0,
     };

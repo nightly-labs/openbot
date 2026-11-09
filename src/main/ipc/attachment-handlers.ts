@@ -361,7 +361,8 @@ export function openAttachmentForServer(
       const downloaded = await runCauseEffect(
         remoteServers.downloadAttachment(input.attachmentId, target, false, input.size),
       ).catch((error: unknown) => {
-        if (error instanceof AttachmentDownloadStopped) return null;
+        // A stopped save wrote no file, so the batch must count it as a failure.
+        if (error instanceof AttachmentDownloadStopped && input.action !== "save") return null;
         throw error;
       });
       if (!downloaded) return;
