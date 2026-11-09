@@ -120,6 +120,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "Podgląd przeglądarki na żywo jest niedostępny.",
   "error.team.browserSessionNotFound": "Nie znaleziono sesji podglądu przeglądarki.",
   "error.team.mcpUnsupported": "To połączenie nie obsługuje serwerów MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Zaktualizuj OpenBot na tym urządzeniu, aby używać na tym serwerze więcej niż {limit} serwerów MCP.",
   "error.team.storageUnsupported": "To połączenie nie obsługuje pamięci dyskowej.",
   "error.team.machineResourcesUnsupported": "To połączenie nie obsługuje użycia maszyny.",
   "error.team.machineAlertMemberInvalid":

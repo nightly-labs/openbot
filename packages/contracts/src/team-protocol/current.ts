@@ -81,6 +81,7 @@ import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
+import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
@@ -260,6 +261,7 @@ export {
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
+  MCP_MANY_SERVERS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
@@ -486,6 +488,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
+  MCP_MANY_SERVERS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -662,7 +665,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HOST_PERSONALITY_CAPABILITY &&
     capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
     capability !== LIVE_VOICE_CAPABILITY &&
-    capability !== AGENT_WELCOME_CAPABILITY,
+    capability !== AGENT_WELCOME_CAPABILITY &&
+    capability !== MCP_MANY_SERVERS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -715,6 +719,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
+  MCP_MANY_SERVERS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -850,6 +855,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_PERSONALITY_CAPABILITY &&
       capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
       capability !== LIVE_VOICE_CAPABILITY &&
-      capability !== AGENT_WELCOME_CAPABILITY,
+      capability !== AGENT_WELCOME_CAPABILITY &&
+      capability !== MCP_MANY_SERVERS_CAPABILITY,
   );
 }

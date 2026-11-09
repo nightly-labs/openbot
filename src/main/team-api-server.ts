@@ -162,6 +162,7 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   type MachineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import {
@@ -2161,6 +2162,7 @@ export class TeamApiServer {
       historyExtent: route.capabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
       channelAttention: route.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
       channelIsolation: route.capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+      mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
