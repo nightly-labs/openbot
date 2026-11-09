@@ -16,7 +16,7 @@ import { useText } from "@/shared/lib/text";
 /** What starts a routine: a schedule frequency, or a request to its webhook. */
 export type RoutineTriggerChoice = RoutineDraftKind | "webhook";
 
-const TRIGGER_TEXT = {
+export const TRIGGER_TEXT = {
   once: { title: "mobile.agent.record.repeat.once", description: "mobile.agent.trigger.onceDescription" },
   hourly: { title: "mobile.agent.record.repeat.hourly", description: "mobile.agent.trigger.hourlyDescription" },
   daily: { title: "mobile.agent.record.repeat.daily", description: "mobile.agent.trigger.dailyDescription" },

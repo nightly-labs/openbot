@@ -150,7 +150,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "Переподключитесь, чтобы сохранить изменения.",
   "mobile.agent.info.noMemories": "Записей в памяти пока нет.",
   "mobile.agent.info.addMemory": "Добавить в память",
-  "mobile.agent.info.routineActive": "Активна",
   "mobile.agent.info.routinePaused": "Приостановлена",
   "mobile.agent.info.noRoutines": "Регулярных задач пока нет.",
   "mobile.agent.info.addRoutine": "Добавить регулярную задачу",

@@ -133,7 +133,6 @@ export const messages = {
   "mobile.agent.info.reconnectToSave": "変更を保存するには再接続してください。",
   "mobile.agent.info.noMemories": "メモリーはまだありません。",
   "mobile.agent.info.addMemory": "メモリーを追加",
-  "mobile.agent.info.routineActive": "有効",
   "mobile.agent.info.routinePaused": "一時停止中",
   "mobile.agent.info.noRoutines": "ルーティンはまだありません。",
   "mobile.agent.info.addRoutine": "ルーティンを追加",
