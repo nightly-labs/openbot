@@ -8,15 +8,20 @@ import {
 import { chatMathStart } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
+import * as Clipboard from "expo-clipboard";
 import * as Linking from "expo-linking";
+import { Button } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Blocks from "lucide-react-native/icons/blocks";
+import Check from "lucide-react-native/icons/check";
+import Copy from "lucide-react-native/icons/copy";
 import FileText from "lucide-react-native/icons/file-text";
 import Globe from "lucide-react-native/icons/globe";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import type { Token, Tokens } from "marked";
-import { Fragment, memo, type ReactNode, useMemo, useState } from "react";
+import { Fragment, memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   type ColorValue,
   Platform,
@@ -59,6 +64,7 @@ import {
 } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
+import { tableCsv } from "../model/table-copy";
 import { ChatCodeBlock } from "./chat-code-block";
 import { ChatCodePreview } from "./chat-code-preview";
 import { useOpenMessageFile } from "./chat-file-actions";
@@ -127,6 +133,8 @@ interface TextPresentation {
   chipBackground: string;
   /** A table at the top level stands out of the bubble, so its card takes the color of a bubble. */
   outside: boolean;
+  /** Lays the card of a table out of the bubble on the color of the bubble. The copy actions stay under it. */
+  tableFrame: ((card: ReactNode) => ReactNode) | undefined;
 }
 
 /** Each block reads in the direction of its own first letter, in an app of either direction. */
@@ -765,7 +773,7 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
       </Text>
     </View>
   );
-  return (
+  const tableCard = (
     <View
       onLayout={(event) => setFrameWidth(Math.floor(event.nativeEvent.layout.width))}
       style={{
@@ -831,6 +839,61 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
           )}
         </View>
       </ScrollView>
+    </View>
+  );
+  return (
+    <View className="gap-1">
+      {presentation.tableFrame ? presentation.tableFrame(tableCard) : tableCard}
+      <TableCopyActions token={token} color={presentation.outside ? undefined : tone?.muted} />
+    </View>
+  );
+}
+
+type TableCopyFormat = "markdown" | "csv";
+
+/**
+ * The copy actions under a table, as on desktop. Markdown keeps the source of the table; CSV is for a
+ * spreadsheet, so it takes the text of each cell as it shows.
+ */
+function TableCopyActions({ token, color }: { token: Tokens.Table; color: string | undefined }) {
+  const { t } = useText();
+  const themeMuted = useThemeColor("muted");
+  const iconColor = color ?? String(themeMuted);
+  const [copied, setCopied] = useState<TableCopyFormat | null>(null);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(null), 1_500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  async function copy(format: TableCopyFormat) {
+    const text =
+      format === "markdown"
+        ? token.raw.trim()
+        : tableCsv([token.header, ...token.rows].map((row) => row.map((cell) => markdownInlinePlainText(cell.text))));
+    try {
+      await Clipboard.setStringAsync(text);
+      setCopied(format);
+      void haptics.notification("success");
+    } catch (error) {
+      void haptics.notification("error");
+      showFailureAlert(error, "turn", t("mobile.chat.table.copyFailed"), t("mobile.chat.copyFailedMessage"));
+    }
+  }
+  const action = (format: TableCopyFormat, label: string) => {
+    const Icon = copied === format ? Check : Copy;
+    return (
+      <Button variant="ghost" size="sm" onPress={() => void copy(format)}>
+        <Icon size={14} color={iconColor} />
+        <Button.Label className="text-muted" style={color ? { color } : undefined}>
+          {copied === format ? t("common.copied") : label}
+        </Button.Label>
+      </Button>
+    );
+  };
+  return (
+    <View className="flex-row flex-wrap justify-end">
+      {action("markdown", t("mobile.chat.table.copyMarkdown"))}
+      {action("csv", t("mobile.chat.table.copyCsv"))}
     </View>
   );
 }
@@ -1046,6 +1109,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   tone,
   renderText,
   renderTable,
+  tableFrame,
 }: {
   body: string;
   color: ColorValue | undefined;
@@ -1062,6 +1126,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
    * table is as wide as the message, on the screen, in the colors of the theme.
    */
   renderTable?: (table: ReactNode, key: string) => ReactNode;
+  /** Lays the card of a table out of the bubble on the color of the bubble, with `tone`. */
+  tableFrame?: (card: ReactNode) => ReactNode;
   /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
   fontWeight?: TextStyle["fontWeight"];
   /** Only inline Markdown, in one paragraph: a line that starts with `1.` or `#` stays text. */
@@ -1121,6 +1187,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       tone,
       chipBackground,
       outside: false,
+      tableFrame: undefined,
     }),
     [
       linkFavicons,
@@ -1151,7 +1218,10 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     }),
     [presentation, fontWeight, themeForeground, textColor],
   );
-  const outsidePresentation = useMemo(() => ({ ...presentation, outside: true }), [presentation]);
+  const outsidePresentation = useMemo(
+    () => ({ ...presentation, outside: true, tableFrame }),
+    [presentation, tableFrame],
+  );
   if (!renderText) {
     return (
       <StreamRevealProvider>
