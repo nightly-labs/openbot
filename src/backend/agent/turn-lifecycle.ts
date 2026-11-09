@@ -682,7 +682,8 @@ export class TurnLifecycle {
         },
         true,
       );
-      // A process that does not answer the stop ends, and the runtime starts a new one.
+      // As a Stop does, the turn ends with Codex's `turn/completed`. A request that times out starts the
+      // probe that ends a process that does not answer (`CodexAppServerClient.#checkAnswering`).
       Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
     }, runMs);
     timer.unref?.();
@@ -1379,6 +1380,11 @@ export class TurnLifecycle {
               agentId,
               taskId: laneTaskId,
               deliveryIds: deliveries.map(({ delivery }) => delivery.id),
+              plan: snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null,
+              earlierPlan:
+                snapshot.messages.findLast(
+                  (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
+                )?.plan ?? null,
             })
           : null;
       // After work started, only a ready backup in the agent's order continues it. A turn refused before

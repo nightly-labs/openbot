@@ -213,11 +213,14 @@ export class PlanContinuation {
    * Decides whether a turn that a failed compaction stopped continues: the connection failed or
    * stopped while the provider compacted the context of the turn (#5822). Once for each request, and
    * within the limit of the chain. Returns null when it does not continue; null also ends the chain.
+   * `plan` and `earlierPlan` are as in `consider`, so a later plan continuation compares the same steps.
    */
   afterFailedCompaction(input: {
     agentId: string;
     taskId: string | null;
     deliveryIds: readonly string[];
+    plan: ConversationPlan | null;
+    earlierPlan: ConversationPlan | null;
   }): ({ kind: ContinuationKind } & ContinuationCount) | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
@@ -226,6 +229,12 @@ export class PlanContinuation {
       previous !== undefined && input.deliveryIds.some((deliveryId) => previous.deliveryIds.has(deliveryId));
     const count = chained ? previous.count : 0;
     if (count >= this.#limit || (chained && previous.compactionContinued)) return null;
+    const plan = input.plan ?? (chained ? previous.plan : null);
+    const earlierSteps = chained
+      ? previous.earlierSteps
+      : new Set(
+          (input.earlierPlan?.steps ?? []).filter((step) => step.status !== "completed").map((step) => stepKey(step)),
+        );
     const shown = { current: 1, limit: 1 };
     this.#chains.set(key, {
       deliveryIds: new Set(input.deliveryIds),
@@ -234,9 +243,9 @@ export class PlanContinuation {
       shown,
       nextSteps: chained ? previous.nextSteps : 0,
       compactionContinued: true,
-      plan: chained ? previous.plan : null,
-      openSteps: chained ? previous.openSteps : "[]",
-      earlierSteps: chained ? previous.earlierSteps : new Set(),
+      plan,
+      openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),
+      earlierSteps,
     });
     return { kind: "compaction", ...shown };
   }
