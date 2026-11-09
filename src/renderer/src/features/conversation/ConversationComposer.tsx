@@ -522,6 +522,11 @@ export function ConversationComposer() {
                       canSteer={Boolean(props.activeTurnId)}
                       onSteer={sendQueued()}
                       sendsNow={!steers()}
+                      routineRuns={props.queue?.deliveries.some(
+                        (delivery) =>
+                          delivery.sender.kind === "routine" &&
+                          (delivery.status === "starting" || delivery.status === "running"),
+                      )}
                       onRunAsTask={props.threads?.onRunQueuedMessage}
                       onCancel={props.onCancelQueuedMessage}
                       onEdit={editQueuedMessage}

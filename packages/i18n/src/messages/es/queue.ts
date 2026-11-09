@@ -21,6 +21,7 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "Este proveedor no puede orientar un turno en curso, así que el mensaje espera en la cola.",
   "queue.item.steerFallback.steerFailed": "No se pudo orientar, así que el mensaje espera en la cola.",
+  "queue.item.steerFallback.routineRun": "Ahora se ejecuta una rutina, así que el mensaje espera en la cola.",
   "queue.item.runAsTask": "Ejecutar en un hilo nuevo",
   "queue.item.runAsTaskLabel": "Ejecutar el mensaje en cola {position} en un hilo nuevo",
   "queue.item.deleteLabel": "Eliminar mensaje en cola {position}",
