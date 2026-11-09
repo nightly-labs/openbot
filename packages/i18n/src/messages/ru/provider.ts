@@ -141,6 +141,8 @@ export const messages = {
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
   "provider.picker.customPending":
     "Модели ваших эндпоинтов ещё не загружены. Провайдер прочитает их, когда завершится текущая задача.",
+  "provider.picker.customUnlisted": "{name} не показывает модели ваших эндпоинтов.",
+  "provider.picker.editEndpoints": "Изменить эндпоинты",
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.usageLimit": "Лимит использования исчерпан",
   "provider.picker.usageLimitWindow": "Лимит ({window})",

@@ -125,6 +125,8 @@ export const messages = {
     "OpenAI 호환 엔드포인트를 추가하세요. 이 컴퓨터의 모델 서버나 기본 URL과 키가 있는 서비스면 돼요.",
   "provider.picker.customPending":
     "엔드포인트의 모델을 아직 불러오지 않았어요. 제공자는 현재 작업이 끝난 후 모델을 읽어요.",
+  "provider.picker.customUnlisted": "{name}에 엔드포인트의 모델이 표시되지 않아요.",
+  "provider.picker.editEndpoints": "엔드포인트 편집",
   "provider.picker.defaultModelLabel": "{name}, 기본",
   "provider.picker.usageLimit": "사용 한도에 도달했어요",
   "provider.picker.usageLimitWindow": "{window} 한도",

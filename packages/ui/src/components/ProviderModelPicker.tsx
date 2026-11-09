@@ -290,6 +290,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return status(available ?? harnesses[0] ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
   };
   /**
+   * True when each provider that runs a saved endpoint has read every one of them, so an endpoint
+   * without models was left out by the provider and no restart will bring them. A host that does not
+   * report it counts as still reading.
+   */
+  const endpointsRead = (): boolean => {
+    const harnesses = new Set<string>(customIds().values());
+    const rows = props.agentStatus.providers?.filter((row) => harnesses.has(row.id)) ?? [];
+    return rows.length > 0 && rows.every((row) => row.endpointsPending === false);
+  };
+  /**
    * One provider status per tab. The Custom tab stands for OpenCode or Pi, which serve the endpoints,
    * and for `acp`, which runs the agents: it is available when either of the saved kinds is.
    */
@@ -1104,11 +1114,36 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}
-                                <span>
-                                  {props.customProviders?.length
-                                    ? t("provider.picker.customPending")
-                                    : t("provider.picker.customEmpty")}
-                                </span>
+                                <Show
+                                  when={props.customProviders?.length && endpointsRead()}
+                                  fallback={
+                                    <span>
+                                      {props.customProviders?.length
+                                        ? t("provider.picker.customPending")
+                                        : t("provider.picker.customEmpty")}
+                                    </span>
+                                  }
+                                >
+                                  <span>
+                                    {t("provider.picker.customUnlisted", { name: railName(endpointStatus().id, t) })}
+                                  </span>
+                                  <Show when={props.onManageProviders}>
+                                    {(manageProviders) => (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="outline"
+                                        onClick={() => {
+                                          trigger?.focus({ preventScroll: true });
+                                          setOpen(false);
+                                          if (trigger) manageProviders()(trigger);
+                                        }}
+                                      >
+                                        {t("provider.picker.editEndpoints")}
+                                      </Button>
+                                    )}
+                                  </Show>
+                                </Show>
                               </Show>
                             </div>
                           </Show>

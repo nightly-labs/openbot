@@ -132,6 +132,17 @@ export class CustomEndpoints {
     return !this.#released[provider].has(modelId.slice(0, separator));
   }
 
+  /**
+   * Whether a saved endpoint of `harness` waits for a process that reads it. Its models stay out of
+   * the catalogue until then. A removed id does not count: no model of it is to come.
+   */
+  pending(harness: CustomProviderHarness): boolean {
+    for (const providerId of this.#released[harness].keys()) {
+      if (this.#hooks.endpointHarness(providerId) === harness) return true;
+    }
+    return false;
+  }
+
   /** The newest revision a spawning process can read, taken when a provider client starts. */
   committedRevision(): number {
     return this.#committedRevision;

@@ -128,6 +128,8 @@ export const messages = {
     "Füge einen OpenAI-kompatiblen Endpunkt hinzu: einen Modellserver auf diesem Computer oder einen Dienst mit Basis-URL und Schlüssel.",
   "provider.picker.customPending":
     "Die Modelle deiner Endpunkte sind noch nicht geladen. Der Anbieter liest sie, sobald seine aktuelle Aufgabe beendet ist.",
+  "provider.picker.customUnlisted": "{name} listet die Modelle deiner Endpunkte nicht auf.",
+  "provider.picker.editEndpoints": "Endpunkte bearbeiten",
   "provider.picker.defaultModelLabel": "{name}, Standard",
   "provider.picker.usageLimit": "Nutzungslimit erreicht",
   "provider.picker.usageLimitWindow": "Limit ({window})",
