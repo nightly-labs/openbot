@@ -3,8 +3,17 @@ import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
 /** The tools of the drawer that the user can move and unpin. Server settings stays last and always shows. */
-/** `remoteDesktop` shows only for a host that shares its screen. */
-const DRAWER_TOOL_IDS = ["tasks", "routines", "workflows", "marketplace", "usage", "remoteDesktop", "members"] as const;
+/** `remoteDesktop` shows only for a host that shares its screen, and `library` for a host with `storage-v1`. */
+const DRAWER_TOOL_IDS = [
+  "tasks",
+  "routines",
+  "workflows",
+  "marketplace",
+  "usage",
+  "library",
+  "remoteDesktop",
+  "members",
+] as const;
 
 export type DrawerToolId = (typeof DRAWER_TOOL_IDS)[number];
 

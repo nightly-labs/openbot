@@ -30,7 +30,9 @@ codec in `team-protocol/storage-v1.ts`. The host advertises it only when its sto
 exists. Every member reads usage; delete and clear need an owner or admin (`requireAdmin`), and the
 renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
 download files travel only as category totals. A host without the capability reads as null, and the
-surface asks for an update; a change is refused before any request.
+surface asks for an update; a change is refused before any request. The desktop Library page and
+the phone Library (the server drawer) read the same `host` scope. The file types, the type filter
+and the order of both are in `@openbot/team-client/stored-files`.
 
 The optional `storage-disk-v1` capability adds `POST /v1/storage/disk` (`team-protocol/storage-disk-v1.ts`).
 It answers the free and total bytes of the disk that holds the host data, from one `statfs` call

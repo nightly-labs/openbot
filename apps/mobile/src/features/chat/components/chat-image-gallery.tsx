@@ -20,6 +20,7 @@ import Animated, {
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 import { FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
@@ -402,10 +403,13 @@ export function ChatGalleryTile({
   attachment,
   serverId,
   tile,
+  onLongPress,
 }: {
   attachment: AttachmentSummary;
   serverId: string;
   tile: GalleryTile;
+  /** Opens the menu of the tile. The native context menu does not cancel the tap without it. */
+  onLongPress?: () => void;
 }) {
   const { t } = useText();
   const muted = useThemeColor("muted");
@@ -451,6 +455,8 @@ export function ChatGalleryTile({
           setImageFailed(false);
           void query.refetch();
         }}
+        delayLongPress={longPressDelay}
+        onLongPress={onLongPress}
         style={FILL}
       >
         {failed ? (

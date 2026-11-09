@@ -34,6 +34,7 @@ export const messages = {
   "mobile.app.route.threads": "Ветки",
   "mobile.app.route.usage": "Использование",
   "mobile.app.route.marketplace": "Каталог",
+  "mobile.app.route.library": "Библиотека",
   "mobile.app.quickAction.search": "Поиск",
   "mobile.app.update.title": "OpenBot {version} уже здесь",
   "mobile.app.update.readyTitle": "Новый OpenBot готов",
