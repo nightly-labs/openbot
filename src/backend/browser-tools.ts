@@ -574,10 +574,9 @@ export type BrowserToolArguments<Name extends BrowserToolCall["tool"]> = Extract
 >["args"];
 
 export function parseBrowserToolCall(tool: string, value: unknown): BrowserToolCall {
-  const repaired = repairBrowserToolInput(tool, value);
-  const definition = BROWSER_TOOL_DEFINITIONS.find((candidate) => candidate.name === repaired.tool);
+  const definition = BROWSER_TOOL_DEFINITIONS.find((candidate) => candidate.name === tool);
   if (!definition) throw new Error(`Unknown browser tool: ${tool}`);
-  return definition.parse(repaired.value);
+  return definition.parse(repairBrowserToolInput(tool, value).value);
 }
 
 // Upload staging parses the same arguments before it resolves and authorizes local files.

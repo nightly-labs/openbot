@@ -247,25 +247,28 @@ transcripts show again and again. The advertised schemas do not change, and a fo
 things stays a refusal:
 
 - A target can be a ref string (`"3:main:12"`), a whole snapshot line (`3:main:12 link "Travel"`), a
-  role line (`link "Travel"`), `css #main`, or a CSS selector, which the `run_script` helpers also
-  take. An object without `kind` gets it from its fields (`ref`, `selector` or `css`, `role`, `text`,
+  role line (`link "Travel"`), `css #main`, or a CSS selector. The `run_script` helpers send a string
+  target as it is, so a step takes the same forms. An object without `kind` gets it from its fields (`ref`, `selector` or `css`, `role`, `text`,
   or `x` and `y`). A ref target without `revision` takes it from the ref, and a top-level `ref` on an
   action tool becomes its `target`.
-- `type` takes `replace: true` or `clear: true` as `mode: "replace"`.
+- `type` takes `replace` or `clear` as `mode`: `true` is `"replace"`, and `false` is `"append"`.
 - `wait_for` drops `snapshot` and a `condition` that names a field of the call
   (`{ condition: "text", text }`), maps the Playwright and Puppeteer states (`networkidle`, `idle`,
   `quiet` as `dom-quiet`; `complete` as `load`; `interactive` as `domcontentloaded`), and drops
   `visible` and `attached` on a target wait.
 - `fill_fields` takes `value` as `text`, and takes `revision` from the refs when they all have the
   same one.
-- `open` with a `tabId` and a `url` runs `navigate` in that tab. A call written as
+- `open` drops a `tabId` and opens a new tab, so the page in that tab stays. A call written as
   `{ name: "openbot_browser.<tool>", arguments }` is unwrapped, and a snake_case field such as
-  `tab_id` takes its camelCase name when the call does not also give that name.
+  `tab_id` takes its camelCase name when the call does not also give that name. The user-control
+  check reads the same repaired `tabId`.
+- `submit_secret` and `fill_card` get no repair: their targets must come from a snapshot.
 
 In `run_script`, `role(role, name, { exact })`, `waitFor(role(...))`, `waitFor("Done", "text")` and
 `waitFor("#done", "visible")` work. A `waitFor` function
 that calls `evaluate`, `snapshot` or `step` is written for the sandbox, so the script polls it once a
-second; other `waitFor` functions still run in the page. A `ReferenceError`
+second until its timeout; other `waitFor` functions, such as one that calls `document.evaluate`,
+still run in the page. A `ReferenceError`
 for `document`, `window`, `location`, `page` or `$` says that the script runs in a sandbox and reads
 the page with `evaluate`.
 

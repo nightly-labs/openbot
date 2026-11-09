@@ -62,7 +62,6 @@ interface BrowserScriptOptions {
 // with every check of the matching tool. They live in the sandbox, so a script can change them only
 // for itself.
 const PRELUDE = `
-const __target = (target) => (typeof target === "string" ? { kind: "css", selector: target } : target);
 // Models often pass timeout, as other browser libraries name it, or the timeout as a bare number.
 const __with = (step, options) => {
   const { timeout, ...rest } = typeof options === "number" ? { timeoutMs: options } : (options ?? {});
@@ -88,18 +87,18 @@ globalThis.step = async (step) => {
 };
 globalThis.navigate = (url, options) =>
   step(__with(typeof url === "string" ? { action: "navigate", url } : { action: "navigate", ...url }, options));
-globalThis.click = (target, options) => step(__with({ action: "click", target: __target(target) }, options));
+globalThis.click = (target, options) => step(__with({ action: "click", target }, options));
 globalThis.type = (target, text, options) =>
-  step(__with({ action: "type", ...(target == null ? {} : { target: __target(target) }), text }, options));
+  step(__with({ action: "type", ...(target == null ? {} : { target }), text }, options));
 globalThis.press = (key, target, options) =>
-  step(__with({ action: "press", key, ...(target == null ? {} : { target: __target(target) }) }, options));
-globalThis.hover = (target, options) => step(__with({ action: "hover", target: __target(target) }, options));
+  step(__with({ action: "press", key, ...(target == null ? {} : { target }) }, options));
+globalThis.hover = (target, options) => step(__with({ action: "hover", target }, options));
 globalThis.scroll = (deltaY, target, options) =>
-  step(__with({ action: "scroll", deltaY, ...(target == null ? {} : { target: __target(target) }) }, options));
+  step(__with({ action: "scroll", deltaY, ...(target == null ? {} : { target }) }, options));
 globalThis.selectOption = (target, values, options) =>
-  step(__with({ action: "select_option", target: __target(target), values: [].concat(values) }, options));
+  step(__with({ action: "select_option", target, values: [].concat(values) }, options));
 globalThis.setChecked = (target, checked = true, options) =>
-  step(__with({ action: "set_checked", target: __target(target), checked }, options));
+  step(__with({ action: "set_checked", target, checked }, options));
 globalThis.sleep = (ms) =>
   step({ action: "sleep", ms: Math.max(0, Math.min(Math.round(Number(ms) || 0), ${BROWSER_SCRIPT_MAX_SLEEP_MS})) });
 let __timer = 0;
@@ -127,14 +126,16 @@ globalThis.waitFor = (condition, options, more) => {
     const { timeoutMs: requested = 10000 } = __with({}, options);
     const timeoutMs = Math.min(requested, 25000);
     // A function that calls the helpers, such as evaluate, is written for this sandbox, not for the
-    // page: poll it here, once a second, so a 25-second wait takes about 50 steps.
-    if (/\\b(?:evaluate|snapshot|step)\\s*\\(/.test(String(condition)))
+    // page: poll it here, once a second, so a 25-second wait takes about 25 steps. The page's own
+    // document.evaluate is an XPath call, not the helper.
+    if (/(?<![.\\w$])(?:evaluate|snapshot|step)\\s*\\(/.test(String(condition)))
       return (async () => {
-        for (let waited = 0; ; waited += 1000) {
-          if (await condition()) return true;
-          if (waited >= timeoutMs) throw new Error("waitFor condition timed out.");
+        const end = Date.now() + timeoutMs;
+        while (!(await condition())) {
+          if (Date.now() >= end) throw new Error("waitFor condition timed out.");
           await sleep(1000);
         }
+        return true;
       })();
     return evaluate(
       "new Promise((resolve, reject) => { const end = Date.now() + " + timeoutMs + "; const check = async () => {" +
@@ -151,9 +152,7 @@ globalThis.waitFor = (condition, options, more) => {
     fields.target = fields.selector;
     delete fields.selector;
   }
-  const rest = __with(fields, options);
-  if (rest.target !== undefined) rest.target = __target(rest.target);
-  return step({ action: "wait_for", ...rest });
+  return step({ action: "wait_for", ...__with(fields, options) });
 };
 globalThis.evaluate = (expression, options) =>
   step(__with({

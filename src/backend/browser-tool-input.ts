@@ -25,6 +25,12 @@ const WAIT_STATES: Readonly<Record<string, string>> = {
 };
 const TARGET_WAIT_STATES = new Set(["visible", "attached"]);
 
+/**
+ * The tools that fill a secret or a card. Their targets must come from a snapshot, so their
+ * arguments stay as the agent sent them.
+ */
+const SECRET_TOOLS = new Set(["submit_secret", "fill_card"]);
+
 /** `tab_id`, as Python libraries name it. No browser tool field has an underscore. */
 const SNAKE_CASE = /_([a-z])/gu;
 
@@ -56,7 +62,8 @@ function repairTarget(value: unknown): DynamicRecord | undefined {
     if (css !== undefined) return { kind: "css", selector: css };
     const role = ROLE_LINE.exec(text);
     if (role) return { kind: "role", role: role[1], name: role[2] };
-    // The run_script helpers read a string target as a CSS selector, so a tool does the same.
+    // Any other string is a CSS selector, as other browser libraries read it. The run_script helpers
+    // send a string target as it is, so a step takes the same forms as a tool call.
     return { kind: "css", selector: text };
   }
   if (!isDynamicRecord(value)) return undefined;
@@ -99,10 +106,10 @@ function repairFields(tool: string, fields: DynamicRecord): DynamicRecord {
       targets: Object.fromEntries(Object.entries(targets).map(([key, value]) => [key, repairTarget(value) ?? value])),
     };
   if (tool === "type" && args.mode === undefined) {
-    // { replace: true } and { clear: true }: clear the field first, as Playwright's fill does.
+    // { replace: true } and { clear: true } clear the field first, as Playwright's fill does; false keeps the text.
     const { replace, clear, ...rest } = args;
-    if (typeof replace === "boolean" || typeof clear === "boolean")
-      args = { ...rest, ...(replace === true || clear === true ? { mode: "replace" } : {}) };
+    const flag = typeof replace === "boolean" ? replace : clear;
+    if (typeof flag === "boolean") args = { ...rest, mode: flag ? "replace" : "append" };
   }
   if (tool === "wait_for") {
     // wait_for always returns a fresh snapshot. { condition: "text", text: "Done" }: the field says it.
@@ -138,8 +145,8 @@ function repairFields(tool: string, fields: DynamicRecord): DynamicRecord {
  * Rewrites the arguments of a browser tool call to the form that its schema takes. The result is
  * still untrusted: the schema decodes it after this.
  */
-export function repairBrowserToolInput(tool: string, value: unknown): { tool: string; value: unknown } {
-  if (!isDynamicRecord(value)) return { tool, value };
+export function repairBrowserToolInput(tool: string, value: unknown): { value: unknown } {
+  if (!isDynamicRecord(value) || SECRET_TOOLS.has(tool)) return { value };
   let args = value;
   // { name: "openbot_browser.click", arguments: { ... } }: the call written inside the arguments.
   const wrapped = args.arguments;
@@ -158,10 +165,13 @@ export function repairBrowserToolInput(tool: string, value: unknown): { tool: st
         return [camel !== key && args[camel] === undefined ? camel : key, value];
       }),
     );
-  // open with a tabId: the agent asks to load the URL in that tab, which navigate does.
-  if (tool === "open" && typeof args.tabId === "string" && typeof args.url === "string")
-    return { tool: "navigate", value: { tabId: args.tabId, url: args.url } };
-  return { tool, value: repairFields(tool, args) };
+  // open always opens a new tab. A tabId does not change that, and a new tab keeps the page that the
+  // tab shows now.
+  if (tool === "open" && args.tabId !== undefined) {
+    const { tabId: _tabId, ...rest } = args;
+    args = rest;
+  }
+  return { value: repairFields(tool, args) };
 }
 
 /** Rewrites one `run_script` step to the form that the step schema takes. */
