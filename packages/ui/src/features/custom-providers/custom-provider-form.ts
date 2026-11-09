@@ -398,7 +398,9 @@ export interface DiscoveredModel {
 export function holdsFoundValues(row: CustomModelDraft, found: DiscoveredModel): boolean {
   const window = found.contextWindow !== undefined && contextWindowValue(row) === found.contextWindow;
   const inputs = found.inputs !== undefined && row.inputs?.join() === found.inputs.join();
-  return window || inputs;
+  const efforts =
+    found.reasoningEfforts !== undefined && row.reasoningEfforts?.join() === found.reasoningEfforts.join();
+  return window || inputs || efforts;
 }
 
 /**
@@ -420,6 +422,10 @@ export function fillFoundValues(row: CustomModelDraft, found: DiscoveredModel): 
     row.maxOutput = found.maxOutput.toString();
   }
   if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
+  // No checked effort is an empty field: the model keeps the efforts of the harness that runs it.
+  if (!row.reasoningEfforts?.length && found.reasoningEfforts !== undefined) {
+    row.reasoningEfforts = [...found.reasoningEfforts];
+  }
 }
 
 /** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */
