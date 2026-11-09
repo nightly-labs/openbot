@@ -524,6 +524,7 @@ export type BrowserUserControlOwner =
 /** The page that the main window shows, in window pixels, and the zoom of the window. */
 export interface BrowserMainPage {
   tabId: string;
+  /** The area of the page, with the room for the dock at its bottom. */
   bounds: Rectangle;
   zoomFactor: number;
 }
@@ -576,6 +577,8 @@ export class BrowserHost {
   #pictureInPictureWindow: BrowserWindow | null = null;
   #pictureInPictureOverlayView: WebContentsView | null = null;
   #mainPageListener: ((page: BrowserMainPage | null) => void) | null = null;
+  /** The window pixels at the bottom of the main window's page area that the dock takes. */
+  #mainPageDockRoom = 0;
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   /**
@@ -961,6 +964,16 @@ export class BrowserHost {
    */
   setMainPageListener(listener: ((page: BrowserMainPage | null) => void) | null): void {
     this.#mainPageListener = listener;
+    this.#syncAttachedView();
+  }
+
+  /**
+   * The page in the main window ends `height` window pixels above the bottom of its area. The dock is a
+   * view above the page and takes the clicks in its area, so it must not cover a control of the page.
+   */
+  setMainPageDockRoom(height: number): void {
+    if (height === this.#mainPageDockRoom) return;
+    this.#mainPageDockRoom = height;
     this.#syncAttachedView();
   }
 
@@ -3831,7 +3844,8 @@ export class BrowserHost {
       width: this.#bounds.width * zoomFactor,
       height: this.#bounds.height * zoomFactor,
     });
-    tab.view.setBounds(bounds);
+    const dockRoom = this.#target === "main" ? Math.min(this.#mainPageDockRoom, bounds.height - 1) : 0;
+    tab.view.setBounds({ ...bounds, height: bounds.height - dockRoom });
     tab.view.setVisible(true);
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();

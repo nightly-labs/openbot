@@ -1,7 +1,9 @@
 // The dock over a local page of the browser full view. The page is a native view above the renderer, so
-// the dock in the renderer is under it. A transparent view above the page draws the same dock, and one
-// native blur view under it for each glass shape blurs the page. The main renderer owns the conversation:
-// it publishes what the dock shows and does the actions that the overlay sends back.
+// the dock in the renderer is under it. A transparent view at the bottom of the page area draws the same
+// dock, and one native blur view under it for each glass shape blurs what is behind. The overlay takes
+// all clicks in its area, so the page ends above the dock. Only an open menu of the dock goes over the
+// page. The main renderer owns the conversation: it publishes what the dock shows and does the actions
+// that the overlay sends back.
 
 import { isDeepStrictEqual } from "node:util";
 import type {
@@ -41,6 +43,8 @@ export interface BrowserDockOverlayOptions {
   load: (contents: WebContents) => Promise<void>;
   /** The keys of the window that work while the overlay has the focus. True when the window takes the key. */
   forwardShortcut: (input: Input) => boolean;
+  /** The window pixels at the bottom of the page area that the dock takes. The page ends above them. */
+  setPageRoom: (height: number) => void;
 }
 
 /** The overlay and its glass shapes, in window pixels. */
@@ -103,6 +107,8 @@ export class BrowserDockOverlay {
   #page: BrowserMainPage | null = null;
   /** The height that the overlay has, in CSS pixels, and the glass of its last frame. */
   #height = INITIAL_HEIGHT;
+  /** The height of the dock without an open menu, in CSS pixels. A menu does not move the page. */
+  #room = INITIAL_HEIGHT;
   #glass: BrowserDockGlass[] = [];
   #seq = -1;
   #shrinkTimer: ReturnType<typeof setTimeout> | null = null;
@@ -238,6 +244,7 @@ export class BrowserDockOverlay {
       this.#loaded = false;
       this.#seq = -1;
       this.#height = INITIAL_HEIGHT;
+      this.#room = INITIAL_HEIGHT;
       this.#glass = [];
     }
     if (!window.isDestroyed()) window.contentView.removeChildView(view);
@@ -265,8 +272,11 @@ export class BrowserDockOverlay {
         view.setVisible(false);
       }
       this.#setShown(false);
+      this.#options.setPageRoom(0);
       return;
     }
+    // A dock with an open menu asks for the whole page.
+    if (this.#height < BROWSER_DOCK_LIMITS.frameSize) this.#room = this.#height;
     const layout = browserDockLayout(page, this.#height, this.#glass);
     // The page view was raised, so the glass and then the overlay go above it again, in this order.
     layout.glass.forEach((shape, index) => {
@@ -284,6 +294,8 @@ export class BrowserDockOverlay {
     // The overlay draws in the CSS pixels of the main window.
     if (view.webContents.getZoomFactor() !== page.zoomFactor) view.webContents.setZoomFactor(page.zoomFactor);
     this.#setShown(true);
+    const zoom = page.zoomFactor > 0 ? page.zoomFactor : 1;
+    this.#options.setPageRoom(Math.min(Math.round(this.#room * zoom), page.bounds.height));
   }
 
   #glassView(index: number): View {
