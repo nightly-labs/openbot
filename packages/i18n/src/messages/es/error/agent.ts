@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "El historial no está disponible para esta solicitud. Vuelve a leer el historial reciente o usa channel_history para el trabajo en canales.",
+  "error.agent.historyArgumentsInvalid":
+    "Argumentos de historial incorrectos: {detail} Corrige los argumentos y vuelve a intentarlo. openbot.tool_describe da el esquema.",
   "error.agent.toolRequestInvalid":
     "Los argumentos de descubrimiento de herramientas no son válidos. Usa el esquema declarado y un nombre de herramienta cualificado original.",
   "error.agent.approvalWhileDeleting": "No se puede conceder la aprobación mientras se elimina el agente.",

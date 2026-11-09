@@ -54,7 +54,11 @@ const searchShape = {
   taskId,
   // An empty query matches every message. `windowBound` limits `after`, which keeps the catalog schema small.
   query: z.string().trim().max(200).optional(),
-  after: z.string().trim().optional(),
+  after: z
+    .string()
+    .trim()
+    .refine((text) => windowBound(text, Date.now()) !== null, "Use 24h, 7d, a date or an ISO time.")
+    .optional(),
   cursor: cursorText.optional(),
   limit: z.number().int().min(1).max(10).optional(),
 };

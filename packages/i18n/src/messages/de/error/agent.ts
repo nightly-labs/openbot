@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Der Verlauf ist für diese Anfrage nicht verfügbar. Lies den aktuellen Verlauf erneut oder verwende channel_history für Arbeit in Kanälen.",
+  "error.agent.historyArgumentsInvalid":
+    "Ungültige Verlaufsargumente: {detail} Korrigiere die Argumente und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.toolRequestInvalid":
     "Ungültige Argumente für die Werkzeugsuche. Verwende das deklarierte Schema und einen originalen qualifizierten Werkzeugnamen.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",
