@@ -191,6 +191,7 @@ export class UsageLimitGate {
       spent: spent || previous?.spent === true,
       timer: this.#armFailure(key, endsAt),
     });
+    this.#hooks.emitRuntimeSnapshot();
   }
 
   /** Releases the failure at `endsAt`. A wait longer than `MAX_TIMER_MS` is armed again when it fires. */
@@ -219,6 +220,15 @@ export class UsageLimitGate {
       provider: limit.provider,
       model: limit.model,
       ...(limit.accountId ? { providerAccountId: limit.accountId } : {}),
+    }));
+  }
+
+  /** Each provider account and model that a provider error holds, for the runtime snapshot. */
+  failedModels(): NonNullable<AgentRuntimeSnapshot["failedModels"]> {
+    return [...this.#failures.values()].slice(0, INPUT_LIMITS.agents).map((failure) => ({
+      provider: failure.provider,
+      model: failure.model,
+      ...(failure.accountId ? { providerAccountId: failure.accountId } : {}),
     }));
   }
 
@@ -406,6 +416,7 @@ export class UsageLimitGate {
     if (!failure) return;
     clearTimeout(failure.timer);
     this.#failures.delete(key);
+    this.#hooks.emitRuntimeSnapshot();
     yield* this.#hooks.released({ provider: failure.provider, accountId: failure.accountId, model: failure.model });
   });
 
