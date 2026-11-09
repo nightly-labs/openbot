@@ -10,6 +10,8 @@ export interface ServerVaultOptions {
   store: VaultStore;
   /** False for a joined server without `vault-v2`: it cannot keep API keys. */
   apiKeys: boolean;
+  /** False for a joined server without `vault-v3`: it cannot keep two-step keys. */
+  twoStep: boolean;
   /** The Link account of this computer. Absent for a joined server: its host has no Link. */
   link?: LinkAccountStore | undefined;
 }
@@ -42,12 +44,14 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
       onDisconnect: link.disconnect,
     };
   };
+  const onCodes = () => (props.twoStep ? props.store.codes : undefined);
   return (
     <Show when={props.store.state.vault}>
       {(vault) => (
         <VaultPanel
           state={vault()}
           apiKeys={props.apiKeys}
+          onCodes={onCodes()}
           onSave={props.store.save}
           onDelete={props.store.remove}
           onReveal={props.store.reveal}

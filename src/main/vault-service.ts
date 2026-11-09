@@ -1,7 +1,8 @@
 // The Vault of this computer: logins, payment cards, contact info and API keys that the user saves in
 // Server settings. Agents fill logins through the `PasswordVault` port (`openbot:` IDs) and cards and
-// contact info through `VaultItems`; neither port gives an agent a password, a card number or a security
-// code. Agents can also add and change items through `VaultItems`, and save a password or an API key
+// contact info through `VaultItems`; neither port gives an agent a password, a two-step key, a card
+// number or a security code. `PasswordVault` enters a login's two-step code; the key stays here. Agents
+// can also add and change items through `VaultItems`, and save a password, a two-step key or an API key
 // that they have, but never read one back or set a card number. API keys reach an agent only as files
 // that `AgentApiKeys` writes.
 
@@ -19,7 +20,16 @@ import {
   type VaultSecretRequest,
   type VaultState,
   type VaultStatus,
+  type VaultTwoStepCode,
 } from "@openbot/contracts/ipc";
+import {
+  normalizeTwoStepKey,
+  parseTwoStepKey,
+  type TwoStepKey,
+  twoStepCode,
+  twoStepKeySecret,
+  twoStepRemainingMs,
+} from "@openbot/contracts/two-step-code";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { registerSecretValues } from "@openbot/logging";
 import { Effect } from "effect";
@@ -51,12 +61,21 @@ function refuse(key: VaultErrorKey): never {
 /**
  * Registers every secret of `record` for log redaction, in one pattern rebuild. A card number is
  * also redacted as the page may show it, in groups of four. The security code is not registered:
- * a three-digit pattern would remove numbers from every log line. It reaches only the page.
+ * a three-digit pattern would remove numbers from every log line. It reaches only the page. A two-step
+ * key is also redacted as sites show it: in lower case, and in groups of four.
  */
 function registerSecrets(record: VaultRecord): void {
   registerSecretValues(
     record.logins.map((login) => login.password),
     { allowShort: true },
+  );
+  registerSecretValues(
+    record.logins.flatMap(({ twoStepKey }) => {
+      const secret = twoStepKey ? twoStepKeySecret(twoStepKey) : null;
+      if (!twoStepKey || !secret) return [];
+      const grouped = secret.replace(/(.{4})(?=.)/gu, "$1 ");
+      return [twoStepKey, secret, secret.toLowerCase(), grouped, grouped.toLowerCase()];
+    }),
   );
   registerSecretValues(
     record.cards.flatMap(({ number }) => [
@@ -69,6 +88,11 @@ function registerSecrets(record: VaultRecord): void {
     record.apiKeys.map(({ key }) => key),
     { allowShort: true },
   );
+}
+
+/** The code of a saved key. The key was checked when it was saved, so a failure is a platform fault. */
+function makeCode(key: TwoStepKey, at: number): Effect.Effect<string, PasswordVaultError> {
+  return Effect.tryPromise({ try: () => twoStepCode(key, at), catch: (cause) => new PasswordVaultError({ cause }) });
 }
 
 function loginTitle(website: string): string {
@@ -149,6 +173,7 @@ function agentSaveInput(record: VaultRecord, change: VaultAgentChange): VaultSav
         username: change.username ?? existing.username,
         notes: existing.notes,
         password: change.password ?? null,
+        twoStepKey: change.twoStepKey,
       });
     }
     case "card": {
@@ -179,6 +204,7 @@ function summary(record: VaultRecord): VaultItemSummary[] {
         username: login.username,
         notes: login.notes,
         hasPassword: login.password.length > 0,
+        hasTwoStep: Boolean(login.twoStepKey),
       }),
     ),
     ...record.cards.map(
@@ -327,12 +353,15 @@ export class VaultService {
           skipped += 1;
           continue;
         }
+        // A two-step key that is not a TOTP key is left out; the login is still imported.
+        const twoStepKey = row.twoStepKey ? normalizeTwoStepKey(row.twoStepKey) : null;
         logins.push({
           id: randomUUID(),
           website,
           username: row.username,
           password: row.password,
           notes: row.notes.slice(0, VAULT_NOTES_LIMIT),
+          ...(twoStepKey ? { twoStepKey } : {}),
         });
         imported += 1;
       }
@@ -354,6 +383,20 @@ export class VaultService {
     return this.state();
   });
 
+  /** The current two-step code of each login that has a key, for the Vault page. */
+  readonly codes = Effect.fn("VaultService.codes")(function* (this: VaultService) {
+    if (this.#status !== "ready") return { codes: [] };
+    const at = Date.now();
+    const codes: VaultTwoStepCode[] = [];
+    for (const login of this.#store.read().logins) {
+      const key = login.twoStepKey ? parseTwoStepKey(login.twoStepKey) : null;
+      if (!key) continue;
+      const code = yield* makeCode(key, at);
+      codes.push({ id: login.id, code, period: key.period, remainingMs: twoStepRemainingMs(key.period, at) });
+    }
+    return { codes };
+  });
+
   /** The built-in logins, for the password vault router under the `openbot:` prefix. */
   readonly logins: PasswordVault = {
     connected: () => this.#status === "ready" && this.#store.read().logins.length > 0,
@@ -367,16 +410,18 @@ export class VaultService {
             id: login.id,
             title: loginTitle(login.website),
             username: login.username || null,
-            hasOneTimePassword: false,
+            hasOneTimePassword: Boolean(login.twoStepKey),
           }));
       }),
     secretFor: (loginId, origin, kind) =>
-      Effect.sync(() => {
-        if (this.#status !== "ready" || kind !== "password") return null;
+      Effect.suspend(() => {
+        if (this.#status !== "ready") return Effect.succeed(null);
         const login = this.#store.read().logins.find((item) => item.id === loginId);
-        if (!login?.password || !websiteMatchesOrigin({ url: login.website, autofill: "anywhere" }, origin))
-          return null;
-        return login.password;
+        if (!login || !websiteMatchesOrigin({ url: login.website, autofill: "anywhere" }, origin))
+          return Effect.succeed(null);
+        if (kind === "password") return Effect.succeed(login.password || null);
+        const key = login.twoStepKey ? parseTwoStepKey(login.twoStepKey) : null;
+        return key ? makeCode(key, Date.now()) : Effect.succeed(null);
       }),
   };
 
@@ -532,6 +577,7 @@ export class VaultService {
           id: login.id,
           website: login.website,
           username: login.username,
+          hasTwoStepKey: Boolean(login.twoStepKey),
           ...origin(login, undefined),
         })),
         cards: record.cards.map((card) => ({
@@ -621,12 +667,15 @@ export class VaultService {
     const existing = input.id === null ? undefined : this.#find(record.logins, input.id);
     const password = input.password ?? existing?.password;
     if (!password) return refuse("error.vault.passwordRequired");
+    // Omitted keeps the saved key, and "" removes it.
+    const twoStepKey = input.twoStepKey === undefined ? existing?.twoStepKey : input.twoStepKey;
     return {
       id: existing?.id ?? randomUUID(),
       website: input.website,
       username: input.username,
       notes: input.notes,
       password,
+      ...(twoStepKey ? { twoStepKey } : {}),
       ...origin(existing, addedBy),
     };
   }
