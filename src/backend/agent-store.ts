@@ -1260,9 +1260,7 @@ export class AgentStore {
     logger.warn("An agent workspace path from another computer was changed to this computer.");
     // An exclusion in the old workspace applies to the same folder in the new one, as for a duplicate.
     if (agent.excludedFolders)
-      agent.excludedFolders = agent.excludedFolders.map((folder) =>
-        isPathInside(stored, folder) ? join(targetPath, relative(stored, folder)) : folder,
-      );
+      agent.excludedFolders = agent.excludedFolders.map((folder) => rebasedFolder(folder, stored, targetPath));
     agent.workspacePath = targetPath;
     return true;
   });
@@ -1936,6 +1934,18 @@ function isApplicationWorkspacePath(workspacePath: string, agentId: string): boo
   const folder = parts.at(-2);
   if (folder === "Agents") return name === agentId;
   return folder === "Bots" && (name === agentId || name === legacyAgentId(agentId));
+}
+
+/**
+ * `folder` moved from `from` to `to` when it is inside `from`, else `folder`. A Windows path on macOS or
+ * Linux has no native separator, so its segments are compared when the native check does not match.
+ */
+function rebasedFolder(folder: string, from: string, to: string): string {
+  if (isPathInside(from, folder)) return join(to, relative(from, folder));
+  const fromParts = from.split(/[\\/]+/);
+  const parts = folder.split(/[\\/]+/);
+  const inside = parts.length > fromParts.length && fromParts.every((part, index) => part === parts[index]);
+  return inside ? join(to, ...parts.slice(fromParts.length)) : folder;
 }
 
 function titleFromId(id: string): string {
