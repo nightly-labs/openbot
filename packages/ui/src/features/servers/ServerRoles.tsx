@@ -166,9 +166,10 @@ function AgentAccessRow(props: {
           disabled={props.disabled}
           placement="bottom-end"
           optionDisabled={below}
+          disallowEmptySelection={true}
           onChange={(option) => {
             if (option === "everyone") props.onOpenEveryone();
-            else if (option && option !== props.level) props.onChange(option);
+            else if (option) props.onChange(option);
           }}
           itemComponent={(item) => {
             const option = item.item.rawValue;
@@ -181,7 +182,7 @@ function AgentAccessRow(props: {
             );
           }}
         >
-          <SelectTrigger size="sm" class="server-roles-level" aria-label={props.label}>
+          <SelectTrigger size="sm" class="server-roles-level server-roles-agent-level" aria-label={props.label}>
             <SelectValue<LevelOption>>
               {() => (
                 <>

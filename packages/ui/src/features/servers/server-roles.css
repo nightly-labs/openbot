@@ -9,8 +9,12 @@
   text-align: end;
 }
 
-/* Wide enough for "Can manage · Everyone", so the levels of a role page line up. */
 .server-roles-level {
+  min-width: 128px;
+}
+
+/* Wide enough for "Can manage · Everyone", so the levels of a role page line up. */
+.server-roles-agent-level {
   min-width: 176px;
 }
 
