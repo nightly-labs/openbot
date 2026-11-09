@@ -1239,7 +1239,7 @@ class GatewayError extends Error {
  */
 function loopbackFailure(cause: unknown): GatewayError {
   const code = isDynamicRecord(cause) && isDynamicRecord(cause.cause) ? cause.cause.code : undefined;
-  return code === "UND_ERR_HEADERS_TIMEOUT" || code === "UND_ERR_BODY_TIMEOUT"
+  return code === "UND_ERR_HEADERS_TIMEOUT"
     ? new GatewayError(504, "remote_timeout", sourceText("error.remote.requestTimeout"), { cause })
     : new GatewayError(500, "host_error", sourceText("error.remote.hostRequestFailed"), { cause });
 }
