@@ -63,7 +63,9 @@ export function ChannelsProvider(props: ParentProps) {
     deletesAnyMessage: () => activeServer()?.kind === "local" || serverRoleCanAdminister(activeServer()),
     // The picture is a file on this computer. Until the server is known, the editor stays hidden.
     pictureSupported: () => activeServer()?.kind === "local",
-    contextActionsSupported: () => activeServerSupportsCapability(CHAT_HISTORY_CAPABILITY),
+    // Until the server is known, the rows stay hidden.
+    contextActionsSupported: () =>
+      activeServer() !== undefined && activeServerSupportsCapability(CHAT_HISTORY_CAPABILITY),
     beforeOpen: () => {
       setAgentSetupOpen(false);
       // The channel covers the workspace, and a direct conversation left selected under it is read

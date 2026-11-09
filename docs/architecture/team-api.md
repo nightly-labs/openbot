@@ -364,9 +364,8 @@ peer. `src/main/team-api/route-chat-history.ts` owns the authorization. An agent
 a visible agent (else 404) and `manage` on it (else 403). A member who sees a channel starts a new
 conversation or compacts it; only owners and admins delete its history (else 403
 `membersCannotDeleteChannelHistory`). A host without channels answers the channel routes with 400
-`channelsUnsupported`. Work that still runs or waits, or a compaction that no member session can do,
-gets 409 with the host's sentence for the agent routes and for compaction; the channel service
-refuses a busy new conversation or history delete with its own sentence.
+`channelsUnsupported`. Work that still runs or waits, an archived channel, or a compaction that no
+member session can do, gets 409 with the host's sentence.
 
 The optional `agent-welcome-v1` capability (protocol 9 only) changes no route shape. A client that
 sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The

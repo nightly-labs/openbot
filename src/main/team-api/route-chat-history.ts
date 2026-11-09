@@ -77,11 +77,25 @@ export async function routeChatHistory(
       await runCauseEffect(agents.deleteChannelHistory(channelId));
     }
   } catch (error) {
-    // Work that still runs or waits, or a provider that cannot compact, is a sentence for the member.
-    // Any other error is a host fault.
-    if (error instanceof ContextResetBusyError || error instanceof ContextCompactRefusedError)
+    // Work that still runs or waits, an archived channel, or a provider that cannot compact, is a
+    // sentence for the member. Any other error is a host fault.
+    if (
+      error instanceof ContextResetBusyError ||
+      error instanceof ContextCompactRefusedError ||
+      (error instanceof Error && channelRefusals().has(error.message))
+    )
       throw new HttpError(409, error.message);
     throw error;
   }
   return json(200, {});
+}
+
+/** The sentences with which `ChannelService` refuses these actions. It throws a plain `Error` with them. */
+function channelRefusals(): ReadonlySet<string> {
+  return new Set([
+    sourceText("error.backend.channelWaitBeforeNewConversation"),
+    sourceText("error.backend.channelWaitBeforeCompact"),
+    sourceText("error.backend.channelWaitBeforeDeleteHistory"),
+    sourceText("error.backend.channelArchived"),
+  ]);
 }
