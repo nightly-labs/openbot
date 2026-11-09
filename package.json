@@ -515,7 +515,8 @@
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
     "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
     "expo-widgets@58.0.22": "patches/expo-widgets@58.0.22.patch",
-    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch"
+    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
+    "@norbert_bodziony/bloub@0.6.4": "patches/@norbert_bodziony%2Fbloub@0.6.4.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",
