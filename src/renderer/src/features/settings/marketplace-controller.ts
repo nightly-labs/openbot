@@ -1571,7 +1571,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
 
     apps,
     canConnectApps: () => Boolean(props.pluginServerId),
-    appsBlocked: () => (props.pluginServerId ? undefined : props.pluginsBlocked),
+    appsBlocked: () => props.pluginsBlocked,
     appBusy: (id) => Boolean(busy[`app:${id}`]) || connector(id)?.busy() === true,
     connectApp: (app) => installPlugin(app.plugin),
     reconnectApp: (app, appId, accountId) => reconnectPluginApp(app.plugin, appId, accountId),

@@ -45,7 +45,7 @@ export type MarketplaceAppStatus = "connected" | "attention" | "connecting" | "i
 
 /**
  * Why this account cannot connect catalog apps on the joined server. `checking`: the app has not read
- * what the host serves yet, and connects when it has. `update`: the host is too old for apps.
+ * what the host serves yet; Connect is available when it has. `update`: the host is too old for apps.
  * `member`: only an owner or admin connects apps on that host.
  */
 export type MarketplaceAppsBlock = { reason: "checking" } | { reason: "update" | "member"; host: string };

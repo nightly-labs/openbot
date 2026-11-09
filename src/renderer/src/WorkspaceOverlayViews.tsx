@@ -94,11 +94,13 @@ export function MarketplaceOverlay(props: {
      browses the listings and installs nothing. */
   const pluginServerId = createMemo(() => (serverCanManageMcp(props.server) ? props.server.id : undefined));
   /* Why a joined server's apps do not connect, so the app page says it rather than hide Connect. A
-     host always lists capabilities, so an empty list is one that this app has not read yet. */
+     host always lists capabilities, so an empty list on a live connection is one that this app has
+     not read yet. An offline, failed or incompatible server has its own notice. */
   const pluginsBlocked = createMemo((): MarketplaceAppsBlock | undefined => {
     const server = props.server;
     if (server?.kind !== "remote" || pluginServerId()) return undefined;
-    if (!server.compatibility?.capabilities.length) return { reason: "checking" };
+    if (!server.compatibility?.capabilities.length)
+      return server.state === "connecting" || server.state === "online" ? { reason: "checking" } : undefined;
     const member = serverSupportsCapability(server, "mcp-servers-v1") && !serverRoleCanAdminister(server);
     return { reason: member ? "member" : "update", host: server.name };
   });
