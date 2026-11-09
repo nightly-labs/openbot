@@ -144,6 +144,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "{name} masaüstü uygulamasında {address} adresinde çalışır.",
   "marketplace.app.setup.desktopConnected": "{address} adresine bağlı.",
   "marketplace.app.setup.open": "Oturum açma veya anahtar gerekmez.",
+  "marketplace.app.blocked.update":
+    "{host} uygulama bağlayamayan eski bir OpenBot sürümü çalıştırıyor. {host} üzerindeki OpenBot'u güncelleyin veya sahibinden güncellemesini isteyin.",
+  "marketplace.app.blocked.member":
+    "{host} üzerinde yalnızca bir sahip veya yönetici uygulama bağlayabilir. Onlardan {name} uygulamasını bağlamalarını ya da üyelerin uygulama bağlayabilmesi için {host} üzerindeki OpenBot'u güncellemelerini isteyin.",
   "marketplace.app.connectAgain": "Tekrar bağlan",
   "marketplace.app.automation.askOnInstall": "Yüklerken macOS'ten erişim iste",
   "marketplace.app.automation.title": "Apple uygulamalarına erişim",

@@ -376,6 +376,10 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
   const description = () => {
     const name = props.entry.name;
     const held = connection().held;
+    // An app that this account cannot connect here says why, and what to do, in place of how it connects.
+    const blocked = held ? undefined : model().appsBlocked?.();
+    if (blocked?.reason === "update") return t("marketplace.app.blocked.update", { host: blocked.host });
+    if (blocked?.reason === "member") return t("marketplace.app.blocked.member", { name, host: blocked.host });
     switch (setup()) {
       case "account":
         return held && !connection().signInNeeded
