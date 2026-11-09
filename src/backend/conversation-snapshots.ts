@@ -174,7 +174,10 @@ export function promptMessage(
     // Marked as the mailbox marks it: a side thread reads no mailbox copy, and a message between
     // agents does not make the chat unread (#5794) and shows as an agent message (#5812).
     ...(delivery?.sender.kind === "agent"
-      ? { itemType: AGENT_EXCHANGE_ITEM_TYPE, exchange: incomingAgentExchange(delivery, delivery.sender.agentId) }
+      ? {
+          itemType: AGENT_EXCHANGE_ITEM_TYPE,
+          exchange: incomingAgentExchange(delivery, delivery.sender.agentId, context?.senderTaskId),
+        }
       : {}),
   };
 }
@@ -184,7 +187,11 @@ export function promptMessage(
  * copy, so its row carries this itself; without it the message shows as an ordinary bubble (#5812).
  * The recipient's own state stays on `delivery`, as in `teammateMessage`.
  */
-export function incomingAgentExchange(delivery: QueueDelivery, senderAgentId: string): AgentExchangeSummary {
+export function incomingAgentExchange(
+  delivery: QueueDelivery,
+  senderAgentId: string,
+  senderTaskId: string | undefined,
+): AgentExchangeSummary {
   return {
     direction: "incoming",
     messageId: delivery.messageId,
@@ -193,6 +200,7 @@ export function incomingAgentExchange(delivery: QueueDelivery, senderAgentId: st
     replyToMessageId: delivery.replyToMessageId,
     deliveries: [],
     ...(delivery.expectsReply === false ? { expectsReply: false } : {}),
+    ...(senderTaskId ? { senderTaskId } : {}),
   };
 }
 

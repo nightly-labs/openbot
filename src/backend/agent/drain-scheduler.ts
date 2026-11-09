@@ -894,7 +894,7 @@ export class DrainScheduler {
         );
       };
 
-      for (const { delivery: item } of batch) {
+      for (const { delivery: item, senderTaskId } of batch) {
         if (snapshot.messages.some((message) => message.id === item.id)) continue;
         snapshot.messages.push({
           id: item.id,
@@ -910,7 +910,10 @@ export class DrainScheduler {
           // Marked as the mailbox marks it, so no client shows the setup message, and a message
           // between agents does not make a side thread unread (#5794) and shows as one (#5812).
           ...(item.sender.kind === "agent"
-            ? { itemType: AGENT_EXCHANGE_ITEM_TYPE, exchange: incomingAgentExchange(item, item.sender.agentId) }
+            ? {
+                itemType: AGENT_EXCHANGE_ITEM_TYPE,
+                exchange: incomingAgentExchange(item, item.sender.agentId, senderTaskId),
+              }
             : this.#mailbox.isWelcomeDelivery(item.id)
               ? { itemType: AGENT_WELCOME_ITEM_TYPE }
               : {}),
