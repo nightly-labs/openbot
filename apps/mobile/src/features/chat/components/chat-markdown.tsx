@@ -124,6 +124,8 @@ interface TextPresentation {
    * color of the agent's bubble.
    */
   chipBackground: string;
+  /** A table at the top level stands out of the bubble, so its card takes the color of a bubble. */
+  outside: boolean;
 }
 
 /** Each block reads in the direction of its own first letter, in an app of either direction. */
@@ -701,16 +703,23 @@ function withAlpha(color: string, alpha: string): string {
  * bubble's colors.
  */
 function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentation: TextPresentation }) {
-  const [canvas, textColor = "", headerText, text] = useCSSVariable([
+  const [canvas, textColor = "", control = "", headerText, text] = useCSSVariable([
     "--openbot-bg-native-canvas",
     "--openbot-text-primary",
+    "--openbot-bg-control",
     "--openbot-data-table-header-text",
     "--openbot-data-table-text",
   ]).map(String);
   const { tone } = presentation;
   // The card has the background of a code block, and the lines between the rows have its color.
   // The rows are on the darker canvas. A message color gives its own surfaces; see `BubbleTone`.
-  const card = tone?.panel ?? withAlpha(textColor, "0f");
+  // Out of a bubble, the card is the bubble: the message color under it shows through, or else it has
+  // the grey of a bubble.
+  const card = presentation.outside
+    ? tone
+      ? "transparent"
+      : withAlpha(control, "99")
+    : (tone?.panel ?? withAlpha(textColor, "0f"));
   const rowsBackground = tone?.deep ?? canvas;
   const rowLine = tone?.line ?? card;
   const [frameWidth, setFrameWidth] = useState(0);
@@ -1105,6 +1114,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       direction: layoutDirection(),
       tone,
       chipBackground,
+      outside: false,
     }),
     [
       linkFavicons,
@@ -1131,9 +1141,11 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       codeColor: themeForeground,
       tone: undefined,
       chipBackground: withAlpha(textColor, "14"),
+      outside: true,
     }),
     [presentation, fontWeight, themeForeground, textColor],
   );
+  const outsidePresentation = useMemo(() => ({ ...presentation, outside: true }), [presentation]);
   if (!renderText) {
     return (
       <StreamRevealProvider>
@@ -1151,7 +1163,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
                 <MarkdownBlock
                   key={group.offset}
                   token={token}
-                  presentation={tone ? presentation : screenPresentation}
+                  presentation={tone ? outsidePresentation : screenPresentation}
                   inList={false}
                 />
               )),
