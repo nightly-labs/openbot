@@ -121,6 +121,7 @@ import {
   listModelsPayload,
   modelList,
   type ProviderAccountRows,
+  type ProviderStatusRow,
   requestedBackupModels,
   requestedRuntime,
   requestedToolModel,
@@ -237,6 +238,8 @@ export interface OpenBotToolRouterHooks {
   listModels(): AgentModelOption[];
   /** The accounts of a signed-in provider, as the settings page lists them. */
   providerAccounts: ProviderAccountRows;
+  /** The provider rows of the settings page. */
+  providerStatuses(): readonly ProviderStatusRow[];
   preferredProvider(): AgentProvider;
   createAgent(
     input: CreateAgentInput,
@@ -1410,6 +1413,7 @@ export class OpenBotToolRouter {
         this.#hooks.listModels(),
         this.#hooks.preferredProvider(),
         this.#hooks.providerAccounts,
+        this.#hooks.providerStatuses(),
         {
           provider: args.provider,
           query: args.query,
