@@ -376,8 +376,8 @@ const BROWSER_WEB_PREFERENCES = {
   backgroundThrottling: false,
 };
 
-/** The platforms whose minimized or hidden main window draws no page (#5580, #5991). */
-const DRAWS_HIDDEN_VIEWS_IN_BACKGROUND = process.platform === "darwin" || process.platform === "win32";
+/** macOS and Windows draw no page of a minimized or hidden window, so they use `#backgroundWindow`. */
+const USES_BACKGROUND_WINDOW = process.platform === "darwin" || process.platform === "win32";
 
 /** The window of `BrowserHost.#backgroundWindow`. It has no page of its own. */
 function createBackgroundWindow(): BaseWindow {
@@ -579,10 +579,11 @@ export class BrowserHost {
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   /**
-   * macOS and Windows draw no page of a hidden or minimized window. A page that loads there gives no
-   * image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991). While the main window is hidden or
-   * minimized, the views of its tabs are in this window: shown, but transparent, click-through and
-   * never focused. `#mountedViews` still names the main window for them.
+   * macOS and Windows draw no page of a hidden or minimized window. A page that loads there gives
+   * no image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991).
+   * While the main window is hidden or minimized, the views of its tabs are in this window: shown,
+   * but transparent, click-through and never focused. `#mountedViews` still names the main window
+   * for them.
    */
   #backgroundWindow: BaseWindow | null = null;
   #mainViewsInBackground = false;
@@ -642,7 +643,7 @@ export class BrowserHost {
     } = {},
   ) {
     this.#window = window;
-    if (DRAWS_HIDDEN_VIEWS_IN_BACKGROUND) {
+    if (USES_BACKGROUND_WINDOW) {
       const syncBackgroundWindow = () => {
         if (this.#syncBackgroundWindow()) this.#syncAttachedView();
       };
@@ -3928,7 +3929,7 @@ export class BrowserHost {
     const window = this.#window;
     // Hide OpenBot (⌘H) also hides the background window. Showing it then would show OpenBot again.
     if (
-      !DRAWS_HIDDEN_VIEWS_IN_BACKGROUND ||
+      !USES_BACKGROUND_WINDOW ||
       window.isDestroyed() ||
       this.#destroying ||
       (process.platform === "darwin" && app.isHidden())
@@ -4318,7 +4319,7 @@ function boundedCaptureDataUrl(image: NativeImage): string {
   // A typed failure in `browserSync`, so the agent reads the reason, not a failed tool request (#5991).
   if (size.width <= 0 || size.height <= 0)
     throw new Error(
-      "Browser screenshot is empty: the page drew no image. This happens while the OpenBot window is minimized or hidden. Ask the person to open the OpenBot window, then try again.",
+      "Browser screenshot is empty: the page drew no image. This can happen while the OpenBot window is minimized or hidden. If it is, ask the person to open the OpenBot window, then try again.",
     );
   const area = size.width * size.height;
   if (area <= MAX_ENCODED_CAPTURE_PIXELS) return image.toDataURL();
