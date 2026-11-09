@@ -121,7 +121,6 @@ export const messages = {
   "vault.request.addLogin": "إضافة بيانات دخول",
   "vault.request.addCard": "إضافة بطاقة",
   "vault.request.addContact": "إضافة عنوان",
-  "vault.request.notNow": "ليس الآن",
   "vault.request.saved": "حُفظ في الخزنة",
   "vault.twoStep.title": "رمز التحقق بخطوتين",
   "vault.twoStep.on": "مفعّل",

@@ -209,6 +209,7 @@ export function UiFormBlock(props: UiFormBlockProps) {
       status={state().status}
       outcome={outcome()}
       busy={props.busy}
+      waiting={props.disabled !== true}
       error={cardError()}
       onSkip={props.disabled ? undefined : props.onSkip}
       footerStart={footerSelectOrNone()}

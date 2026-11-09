@@ -121,7 +121,6 @@ export const messages = {
   "vault.request.addLogin": "הוספת התחברות",
   "vault.request.addCard": "הוספת כרטיס",
   "vault.request.addContact": "הוספת כתובת",
-  "vault.request.notNow": "לא עכשיו",
   "vault.request.saved": "נשמר בכספת",
   "vault.twoStep.title": "קוד אימות דו־שלבי",
   "vault.twoStep.on": "פועל",

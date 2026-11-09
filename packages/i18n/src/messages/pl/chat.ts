@@ -527,7 +527,6 @@ export const messages = {
   "chat.suggestion.saveReply": "Tak, zapisz to jako umiejętność.",
   "chat.suggestion.updateReply": "Tak, dodaj to do umiejętności.",
   "chat.suggestion.detailsNamed": "Otwórz {name} w Marketplace",
-  "chat.suggestion.dismissNamed": "Odrzuć {name}",
   "chat.suggestion.dismissed": "Odrzucono propozycję: {name}.",
   "chat.suggestion.undo": "Cofnij",
   "chat.suggestion.localOnly": "Połącz {name} w OpenBot na swoim komputerze.",

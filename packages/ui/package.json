@@ -180,7 +180,6 @@
     "./features/conversation/ui-blocks/UiBlockCard": "./src/features/conversation/ui-blocks/UiBlockCard.tsx",
     "./features/conversation/ui-blocks/UiConfirmBlock": "./src/features/conversation/ui-blocks/UiConfirmBlock.tsx",
     "./features/conversation/ui-blocks/UiChoiceBlock": "./src/features/conversation/ui-blocks/UiChoiceBlock.tsx",
-    "./features/conversation/ui-blocks/UiQuickReplies": "./src/features/conversation/ui-blocks/UiQuickReplies.tsx",
     "./features/conversation/ui-blocks/UiFormBlock": "./src/features/conversation/ui-blocks/UiFormBlock.tsx",
     "./features/conversation/ui-blocks/UiBlockingBlock": "./src/features/conversation/ui-blocks/UiBlockingBlock.tsx",
     "./features/conversation/ui-blocks/ui-block-support": "./src/features/conversation/ui-blocks/ui-block-support.ts",

@@ -99,22 +99,10 @@
   flex: none;
 }
 
+/* The frame is a UiBlockCard (ui-blocks.css). */
 .usage-limit-ask-card {
-  display: flex;
   max-width: 560px;
-  flex-direction: column;
-  gap: var(--openbot-space-3);
   margin: var(--openbot-space-4) 0 0;
-}
-
-.usage-limit-ask-body {
-  margin: 0;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-}
-
-.usage-limit-ask-select {
-  max-width: 320px;
 }
 
 .usage-limit-ask-remember {
@@ -130,10 +118,4 @@
   margin: 0;
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
-}
-
-.usage-limit-ask-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--openbot-space-2);
 }

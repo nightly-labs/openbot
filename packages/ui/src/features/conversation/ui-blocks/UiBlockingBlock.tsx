@@ -4,7 +4,6 @@ import { Match, Switch } from "solid-js";
 import { UiChoiceBlock } from "./UiChoiceBlock";
 import { UiConfirmBlock } from "./UiConfirmBlock";
 import { UiFormBlock } from "./UiFormBlock";
-import { UiQuickReplies } from "./UiQuickReplies";
 import type { UiBlockProps } from "./ui-block-support";
 
 export interface UiBlockingBlockProps extends UiBlockProps<UiBlockSpec> {
@@ -14,7 +13,7 @@ export interface UiBlockingBlockProps extends UiBlockProps<UiBlockSpec> {
   footerFieldId?: string | undefined;
 }
 
-/** The card for any blocking block type: confirm, choice, quick replies or form. */
+/** The card for any blocking block type: confirm, choice or form. An old quick replies block shows as a choice. */
 export function UiBlockingBlock(props: UiBlockingBlockProps) {
   const shared = {
     get state() {
@@ -47,11 +46,8 @@ export function UiBlockingBlock(props: UiBlockingBlockProps) {
       <Match when={props.spec.type === "confirm" && props.spec}>
         {(spec) => <UiConfirmBlock {...shared} spec={spec()} renderPreview={props.renderPreview} />}
       </Match>
-      <Match when={props.spec.type === "choice" && props.spec}>
+      <Match when={(props.spec.type === "choice" || props.spec.type === "quick_replies") && props.spec}>
         {(spec) => <UiChoiceBlock {...shared} spec={spec()} />}
-      </Match>
-      <Match when={props.spec.type === "quick_replies" && props.spec}>
-        {(spec) => <UiQuickReplies {...shared} spec={spec()} />}
       </Match>
       <Match when={props.spec.type === "form" && props.spec}>
         {(spec) => <UiFormBlock {...shared} spec={spec()} footerFieldId={props.footerFieldId} />}

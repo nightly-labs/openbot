@@ -3,6 +3,7 @@ import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
   "uiBlock.status.answered": "Отвечено",
+  "uiBlock.status.waiting": "Ждём вас",
   "uiBlock.outcome.expired": "Ответ не пришёл вовремя",
   "uiBlock.outcome.closed": "Закрыто без ответа",
   "uiBlock.outcome.autoAnswered": "{outcome} (никто не ответил вовремя)",
@@ -17,9 +18,6 @@ export const messages = {
   "uiBlock.choice.submit": "Отправить",
   "uiBlock.choice.shortcutHint": "Нажмите {first}–{last}, чтобы выбрать",
   "uiBlock.quick.label": "Быстрые ответы",
-  "uiBlock.quick.textLabel": "Свой ответ",
-  "uiBlock.quick.textPlaceholder": "Или напишите свой ответ",
-  "uiBlock.quick.send": "Отправить",
   "uiBlock.form.submit": "Отправить",
   "uiBlock.form.required": "Заполните это поле",
   "uiBlock.form.choose": "Выберите вариант",

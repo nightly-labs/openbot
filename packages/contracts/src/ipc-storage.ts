@@ -140,7 +140,11 @@ export interface ClearStorageInput {
 
 export interface OpenStoredFileInput {
   fileId: string;
-  action: "open" | "reveal" | "download";
+  /**
+   * `save` puts the file in the Downloads folder with no dialog, so the Library can download many files
+   * at once. A file there keeps its name; the new file gets a number after its name.
+   */
+  action: "open" | "reveal" | "download" | "save";
 }
 
 /**
@@ -220,7 +224,7 @@ export function parseClearStorageInput(value: unknown): ClearStorageInput {
 
 export function parseOpenStoredFileInput(value: unknown): OpenStoredFileInput {
   const input = record(value, "file request");
-  if (!isOneOf(["open", "reveal", "download"] as const, input.action)) invalid("file action");
+  if (!isOneOf(["open", "reveal", "download", "save"] as const, input.action)) invalid("file action");
   return { fileId: identifier(input.fileId, "file"), action: input.action };
 }
 

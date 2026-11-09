@@ -3,6 +3,7 @@ import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
   "uiBlock.status.answered": "تمت الإجابة",
+  "uiBlock.status.waiting": "في انتظارك",
   "uiBlock.outcome.expired": "لم تُقدَّم إجابة في الوقت المحدد",
   "uiBlock.outcome.closed": "أُغلق دون إجابة",
   "uiBlock.outcome.autoAnswered": "{outcome} (لم يُجب أحد في الوقت المحدد)",
@@ -17,9 +18,6 @@ export const messages = {
   "uiBlock.choice.submit": "إرسال",
   "uiBlock.choice.shortcutHint": "اضغط من {first} إلى {last} للاختيار",
   "uiBlock.quick.label": "ردود سريعة",
-  "uiBlock.quick.textLabel": "ردّك الخاص",
-  "uiBlock.quick.textPlaceholder": "أو اكتب ردّك الخاص",
-  "uiBlock.quick.send": "إرسال",
   "uiBlock.form.submit": "إرسال",
   "uiBlock.form.required": "هذا الحقل مطلوب",
   "uiBlock.form.choose": "اختر خيارًا",
