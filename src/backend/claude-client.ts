@@ -379,6 +379,10 @@ interface ThreadRuntime {
   config: ThreadConfig;
   /** The effort the `claude` process runs with; undefined when the model takes no effort setting. */
   appliedEffort: string | undefined;
+  /** The `fastMode` flag setting of the `claude` process; undefined until a turn sets it. */
+  appliedFastMode: boolean | undefined;
+  /** The last reason the CLI gave for no fast mode while the setting is on, so the log says it once. */
+  fastModeDisabledReason: string | null;
   input: AsyncMessageQueue;
   query: ClaudeQuery;
   activeTurn: ActiveTurn | null;
@@ -407,6 +411,9 @@ interface ThreadRuntime {
   /** The end of the CLI's stderr when OpenBot starts the CLI. See `spawnClaudeProcessGroup`. */
   stderr: ClaudeStderrTail;
 }
+
+/** The fast tier id of a Claude model in the model list. Claude Code has one fast speed. */
+const CLAUDE_FAST_SERVICE_TIER = "fast";
 
 /** The limit of `claude auth status` when the caller names none. */
 const AUTH_STATUS_TIMEOUT_MS = 5_000;
@@ -465,6 +472,8 @@ interface ClaudeStreamMessage {
   error_status?: unknown;
   /** `api_retry`: set when the server sent no headers in time, with a retry limit of its own. */
   no_response?: unknown;
+  /** `result`: why the CLI cannot run fast mode, such as `not_first_party` or `extra_usage_disabled`. */
+  fast_mode_disabled_reason?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -473,7 +482,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   getContextUsage?(options: { detail: "summary" }): Promise<unknown>;
   initializationResult?(): Promise<unknown>;
   setModel(model?: string): Promise<void>;
-  applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null }): Promise<void>;
+  applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null; fastMode?: boolean }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(options?: { skipBehaviors?: boolean }): Promise<unknown>;
   close(): void;
 }
@@ -920,6 +929,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           displayName: model.displayName,
           defaultReasoningEffort,
           supportedReasoningEfforts: supportedReasoningEfforts.map((reasoningEffort) => ({ reasoningEffort })),
+          // The CLI runs these models in fast mode when its `fastMode` flag setting is on. See `#applyFastMode`.
+          ...(model.supportsFastMode ? { serviceTiers: [{ id: CLAUDE_FAST_SERVICE_TIER, name: "Fast" }] } : {}),
         };
       });
       this.#modelEffortCapabilities.clear();
@@ -1330,6 +1341,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       compacting: false,
       config,
       appliedEffort,
+      appliedFastMode: undefined,
+      fastModeDisabledReason: null,
       input,
       query: claudeQuery,
       activeTurn: null,
@@ -1367,6 +1380,25 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       .pipe(toProviderClientOperationError);
   });
 
+  /**
+   * The fast mode of the turn. `serviceTier` is the fast tier, `null` is the standard speed, and no
+   * value keeps the speed of the process. In the Agent SDK only the `fastMode` flag setting opts in
+   * (`sdk_opt_in_required`). The CLI keeps it for the next turns of the process; a new process
+   * starts at the standard speed, so its first turn sets it again. Claude Code serves fast mode only
+   * on the Anthropic API, and tells why it cannot in `fast_mode_disabled_reason`.
+   */
+  readonly #applyFastMode = Effect.fn("ClaudeAgentClient.applyFastMode")(function* (
+    runtime: ThreadRuntime,
+    params: unknown,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    if (!isRecord(params) || !("serviceTier" in params)) return;
+    const fastMode = params.serviceTier === CLAUDE_FAST_SERVICE_TIER;
+    // A new process can start in fast mode from a Claude settings file, so the first turn also sends off.
+    if (fastMode === runtime.appliedFastMode) return;
+    yield* providerCall(() => runtime.query.applyFlagSettings({ fastMode }));
+    runtime.appliedFastMode = fastMode;
+  });
+
   readonly #openTurn = Effect.fn("ClaudeAgentClient.openTurn")(function* (
     this: ClaudeAgentClient,
     threadId: string,
@@ -1395,6 +1427,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.appliedEffort = appliedEffort;
     }
     if (requestedEffort) runtime.config.effort = requestedEffort;
+    yield* this.#applyFastMode(runtime, params);
 
     const clientId = getString(params, "clientUserMessageId");
     const requestedTurnId = getString(params, "clientTurnId") ?? clientId;
@@ -1810,6 +1843,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type !== "result") return;
     // A turn that ended with no output must not give its uuid to a later turn of the CLI's own.
     runtime.nextTurnId = null;
+    const fastModeDisabledReason =
+      runtime.appliedFastMode && isString(message.fast_mode_disabled_reason) ? message.fast_mode_disabled_reason : null;
+    if (fastModeDisabledReason && fastModeDisabledReason !== runtime.fastModeDisabledReason) {
+      queryLogger.warn("Claude ran a fast mode turn at the standard speed.", { reason: fastModeDisabledReason });
+      // The chat says it once for each new reason, because the price and speed the user chose did not apply.
+      const warning = claudeFastModeWarning(fastModeDisabledReason);
+      if (warning && runtime.activeTurn) {
+        this.emit("notification", {
+          method: "warning",
+          params: { threadId: runtime.id, turnId: runtime.activeTurn.id, message: warning },
+        });
+        runtime.fastModeDisabledReason = fastModeDisabledReason;
+      }
+    } else runtime.fastModeDisabledReason = fastModeDisabledReason;
     if (
       message.subtype === "success" &&
       message.total_cost_usd !== undefined &&
@@ -2541,6 +2588,31 @@ const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? S
  * backup model (#4616).
  */
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
+
+/**
+ * The chat text for a fast mode turn that Claude Code ran at the standard speed. `pending` and
+ * `sdk_opt_in_required` are states of the client itself, so only the log keeps them.
+ */
+function claudeFastModeWarning(reason: string): string | null {
+  switch (reason) {
+    case "extra_usage_disabled":
+      return sourceText("status.provider.claudeFastModeNeedsUsageCredits");
+    case "free":
+      return sourceText("status.provider.claudeFastModeNotOnPlan");
+    case "not_first_party":
+      return sourceText("status.provider.claudeFastModeNotFirstParty");
+    case "model_not_allowed":
+      return sourceText("status.provider.claudeFastModeModelNotAllowed");
+    case "disabled_by_env":
+    case "preference":
+      return sourceText("status.provider.claudeFastModeTurnedOff");
+    case "pending":
+    case "sdk_opt_in_required":
+      return null;
+    default:
+      return sourceText("status.provider.claudeFastModeUnavailable");
+  }
+}
 
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);

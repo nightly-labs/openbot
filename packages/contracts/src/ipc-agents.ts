@@ -191,6 +191,8 @@ export interface AgentUsageLimitReturn extends AgentModelChoice {
    * value, from a newer build, reads as a usage limit, so the agent still goes back.
    */
   cause?: string | undefined;
+  /** True when fast mode was on at the model the agent left. The return turns it on again. */
+  fastMode?: boolean | undefined;
 }
 
 export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimitReturn {
@@ -198,7 +200,8 @@ export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimi
     isDynamicRecord(value) &&
     isAgentModelChoice(value) &&
     isReasoningEffort(value.reasoningEffort) &&
-    (value.cause === undefined || isString(value.cause))
+    (value.cause === undefined || isString(value.cause)) &&
+    (value.fastMode === undefined || isBoolean(value.fastMode))
   );
 }
 
@@ -322,8 +325,8 @@ export interface AgentSummary {
    */
   browserProfileId?: string;
   /**
-   * Whether the agent asks Codex for the fast service tier of its model. Local-only, like `access`.
-   * Absent means that OpenBot leaves the tier to Codex.
+   * Whether the agent asks its provider (Codex or Claude) for the fast service tier of its model. Local-only, like `access`.
+   * Absent means that OpenBot leaves the tier to the provider. A provider change turns it off.
    */
   fastMode?: boolean;
   /**

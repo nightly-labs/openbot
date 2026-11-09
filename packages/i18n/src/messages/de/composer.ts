@@ -121,6 +121,10 @@ export const messages = {
   "composer.error.changeModel": "Das Modell konnte nicht geändert werden. Versuche es erneut.",
   "composer.error.changeEffort": "Der Denkaufwand konnte nicht geändert werden. Versuche es erneut.",
   "composer.error.changeFastMode": "Der Schnellmodus konnte nicht geändert werden. Versuche es erneut.",
+  "composer.fastMode.confirmTitle": "Schnellmodus einschalten?",
+  "composer.fastMode.confirmDescription":
+    "Claude antwortet schneller, aber jeder Token kostet mehr. Mit einem Claude-Abo nutzt der Schnellmodus immer Nutzungsguthaben, auch wenn dein Plan noch Nutzung übrig hat.",
+  "composer.fastMode.confirm": "Einschalten",
   "composer.context.label": "Kontext zu {percent} voll",
   "composer.context.labelEstimated": "Kontext zu etwa {percent} voll",
   "composer.context.labelCompacting": "Kontext wird komprimiert",
