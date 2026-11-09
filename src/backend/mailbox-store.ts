@@ -3216,6 +3216,11 @@ export class MailboxStore {
     };
   }
 
+  /** The queue position of each queued delivery, by delivery id. */
+  queuedPositions(): Map<string, number> {
+    return this.#queuedPositions();
+  }
+
   #queuedPositions(): Map<string, number> {
     const counts = new Map<string, number>();
     const positions = new Map<string, number>();
