@@ -9,16 +9,14 @@ export const readVideoToolShape = {
   url: z
     .url({ protocol: /^https?$/u, error: "Use an http or https link." })
     .max(4_096)
-    .describe("The link of the video page or the video file, such as a Facebook, Instagram, TikTok or YouTube link."),
+    .describe("The video page or file link."),
   frames: z
     .number()
     .int()
     .min(0)
     .max(READ_VIDEO_MAX_FRAMES)
     .optional()
-    .describe(
-      `How many still frames, spread over the video, to get as images. The default is ${READ_VIDEO_DEFAULT_FRAMES}; 0 gives only the text.`,
-    ),
+    .describe(`Still frames as images; 0 for text only. Default ${READ_VIDEO_DEFAULT_FRAMES}.`),
 };
 
 export const readVideoToolSchema = z.strictObject(readVideoToolShape);

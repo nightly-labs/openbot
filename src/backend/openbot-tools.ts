@@ -396,7 +396,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "read_video",
     description:
-      "Watch an online video from its link, such as a Facebook, Instagram, TikTok, X or YouTube video: get its title, author, counts, description, a transcript of what is said with times, and still frames as images. Use it when a task needs what a video says or shows; the browser shows only the page around the video. It reads public videos only. The first call can take a few minutes while OpenBot gets its video tools and speech model.",
+      "Watch a video link, such as Facebook, Instagram, TikTok, X or YouTube: title, author, counts, description, a timed transcript and still frames. Use it for what a video says or shows. Public videos only.",
     shape: readVideoToolShape,
   },
   {
