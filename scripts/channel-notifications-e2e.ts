@@ -11,6 +11,9 @@
 // It also checks channel-isolation-v1 (#5380): only a protocol 9 peer with the capability reads and
 // saves "Keep memories in this channel", a save without the field keeps the stored value, and the host
 // ignores the field from a peer without the capability.
+// It also checks the channel routes of chat-history-v1: an owner starts a new conversation, a compaction
+// with no member session is refused with 409, a member who is not an admin gets 403 for a history
+// delete, an owner deletes the history, and an archived channel is refused with 409.
 // Run: `bun scripts/channel-notifications-e2e.ts`.
 // Writes .openbot-build/channel-notifications-e2e/report.json.
 
@@ -41,6 +44,7 @@ import {
   teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES, channelResponse } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import {
   CHANNEL_ISOLATION_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
@@ -782,6 +786,88 @@ try {
     const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
     assert.deepEqual(read, { list: false, page: false, command: false, stored: false });
     return read;
+  });
+
+  const withoutHistory = V9_PEER_CAPABILITIES.filter((capability) => capability !== CHAT_HISTORY_CAPABILITY);
+  const historyRequest = (path: string, capabilities: readonly string[] = V9_PEER_CAPABILITIES) =>
+    wire(port, {
+      method: "POST",
+      path,
+      capabilities,
+      token,
+      protocol: TEAM_PROTOCOL_V9,
+      body: { channelId: channel.id },
+    });
+  const readPage = async () => {
+    const page = await v9(true, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    assert.equal(page.status, 200, `The page failed: ${JSON.stringify(page.body)}`);
+    return decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, page.body, { channelAttention: true }));
+  };
+
+  await step("A peer without chat-history-v1 cannot start a new conversation in the channel", async () => {
+    const before = (await readPage()).messages.length;
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelClear, withoutHistory);
+    assert.equal(response.status, 400, `The host accepted the request: ${JSON.stringify(response.body)}`);
+    assert.equal((await readPage()).messages.length, before, "The host changed the channel.");
+    return { status: response.status, body: response.body };
+  });
+
+  await step("An owner starts a new conversation in the channel over the Team API", async () => {
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelClear);
+    assert.equal(response.status, 200, `The new conversation failed: ${JSON.stringify(response.body)}`);
+    const last = (await readPage()).messages.at(-1);
+    assert.equal(last?.message.itemType, "context-reset", "The channel has no new conversation marker.");
+    return { status: response.status, marker: last?.message.itemType ?? null };
+  });
+
+  await step("A compaction with no member session gets 409 with a sentence", async () => {
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelCompact);
+    assert.equal(response.status, 409, `The host did not refuse: ${JSON.stringify(response.body)}`);
+    return { status: response.status, body: response.body };
+  });
+
+  await step("A member who is not an admin gets 403 for a channel history delete, and the messages stay", async () => {
+    const invite = await runCauseEffect(team.createInvite("member"));
+    const memberCredentials = { username: "member-user", password: "member-password-123" };
+    await runCauseEffect(team.acceptInvite(invite.token, memberCredentials.username, memberCredentials.password));
+    const memberLogin = await wire(port, {
+      method: "POST",
+      path: "/v1/auth/login",
+      capabilities: V8_PEER_CAPABILITIES,
+      body: memberCredentials,
+    });
+    assert.ok(isDynamicRecord(memberLogin.body) && typeof memberLogin.body.sessionToken === "string");
+    const before = (await readPage()).messages.length;
+    const response = await wire(port, {
+      method: "POST",
+      path: CHAT_HISTORY_ROUTES.channelDelete,
+      capabilities: V9_PEER_CAPABILITIES,
+      token: memberLogin.body.sessionToken,
+      protocol: TEAM_PROTOCOL_V9,
+      body: { channelId: channel.id },
+    });
+    assert.equal(response.status, 403, `The host did not refuse the member: ${JSON.stringify(response.body)}`);
+    assert.equal((await readPage()).messages.length, before, "The host changed the channel.");
+    return { status: response.status, body: response.body };
+  });
+
+  await step("An owner deletes the channel history over the Team API", async () => {
+    assert.ok((await readPage()).messages.length > 0, "The channel starts without messages.");
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelDelete);
+    assert.equal(response.status, 200, `The delete failed: ${JSON.stringify(response.body)}`);
+    const shown = (await readPage()).messages.filter((message) => message.message.text !== "");
+    assert.equal(shown.length, 0, `The channel still shows messages: ${JSON.stringify(shown)}`);
+    return { status: response.status, shown: shown.length };
+  });
+
+  await step("A new conversation in an archived channel gets 409 with a sentence", async () => {
+    const command = (type: "archive" | "restore") =>
+      v9(true, "POST", CHANNEL_ROUTES.command, { type, operationId: randomUUID(), channelId: channel.id });
+    assert.equal((await command("archive")).status, 200, "The archive failed.");
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelClear);
+    assert.equal((await command("restore")).status, 200, "The restore failed.");
+    assert.equal(response.status, 409, `The host did not refuse: ${JSON.stringify(response.body)}`);
+    return { status: response.status, body: response.body };
   });
 
   report.passed = true;

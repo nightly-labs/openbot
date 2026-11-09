@@ -67,6 +67,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "Diese Verbindung unterstützt das Löschen des Verlaufs nicht.",
   "error.team.channelTaskCancelUnsupported": "Diese Verbindung unterstützt das Abbrechen von Kanalaufgaben nicht.",
   "error.team.membersCannotDeleteChannels": "Mitglieder können keine Kanäle löschen.",
+  "error.team.membersCannotDeleteChannelHistory": "Mitglieder können den Kanalverlauf nicht löschen.",
   "error.team.membersCannotArchiveChannels": "Mitglieder können keine Kanäle archivieren.",
   "error.team.membersCannotRestoreChannels": "Mitglieder können keine Kanäle wiederherstellen.",
   "error.team.sharedDataUnsupported": "Diese Verbindung unterstützt keine geteilten Daten.",

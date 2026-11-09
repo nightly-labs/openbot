@@ -63,6 +63,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "Geçmiş silme bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelTaskCancelUnsupported": "Kanal görevlerini iptal etme bu bağlantı tarafından desteklenmiyor.",
   "error.team.membersCannotDeleteChannels": "Üyeler kanalları silemez.",
+  "error.team.membersCannotDeleteChannelHistory": "Üyeler kanal geçmişini silemez.",
   "error.team.membersCannotArchiveChannels": "Üyeler kanalları arşivleyemez.",
   "error.team.membersCannotRestoreChannels": "Üyeler kanalları geri yükleyemez.",
   "error.team.sharedDataUnsupported": "Paylaşılan veriler bu bağlantı tarafından desteklenmiyor.",
