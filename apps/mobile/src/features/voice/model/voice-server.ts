@@ -18,6 +18,9 @@ import {
   voiceServerVoiceNames,
 } from "@openbot/contracts/voice-server";
 import { sourceText } from "@openbot/i18n/source";
+// Not the logged fetch: its log line keeps the path, and the path of a voice server address can
+// hold a token. The global fetch of React Native follows redirects; `expo/fetch` obeys `manual`.
+import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import { File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";

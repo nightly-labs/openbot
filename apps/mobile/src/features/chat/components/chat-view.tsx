@@ -665,12 +665,8 @@ export function ChatView({
     startSession: (input) => workspace().startLiveVoice(input, target.serverId),
     stopSession: (sessionId) => workspace().stopLiveVoice(sessionId, target.serverId),
   });
-  // A phone conversation that runs keeps the call bar until it ends, also when the server starts to
-  // serve GPT live voice during it, such as at its first connection or after a host update.
-  const phoneLiveOpen = useRef(false);
-  const usesGptLive = gptLive.open || (gptLive.available && !phoneLiveOpen.current);
   const phoneLive = useLiveConversation({
-    enabled: isFocused && writable && !usesGptLive,
+    enabled: isFocused && writable && !gptLive.open,
     online: serverOnline,
     focused: isFocused,
     foreground: foregroundVisit,
@@ -681,7 +677,9 @@ export function ChatView({
     outboxMessages,
     send: (text) => (writable ? deliver(text, null, []) : null),
   });
-  phoneLiveOpen.current = phoneLive.open;
+  // A phone conversation that runs keeps the call bar until it ends, also when the server starts to
+  // serve GPT live voice during it, such as at its first connection or after a host update.
+  const usesGptLive = gptLive.open || (gptLive.available && !phoneLive.open);
   const live = usesGptLive ? gptLive : phoneLive;
   // The agent who speaks in a voice conversation: the agent of the chat, or the channel's leader, who
   // gives out the channel's tasks.
