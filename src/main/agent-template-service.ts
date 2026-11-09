@@ -130,7 +130,7 @@ interface AgentTemplateSkills {
     skillId: string;
     versionId: string;
   }): Effect.Effect<unknown, SkillMarketplaceFailure>;
-  library(): Pick<LocalSkillLibrary, "list" | "create" | "bundle" | "withdraw">;
+  library(): Pick<LocalSkillLibrary, "list" | "create" | "revise" | "bundle" | "withdraw">;
   installLocal(input: {
     agentId: string;
     skillId: string;
@@ -254,11 +254,11 @@ export class AgentTemplateService {
           cause: new Error(sourceText("error.marketplace.changedSinceOpened")),
         });
       // Every embedded skill is checked before the agent exists, so a bad one creates nothing. A local
-      // skill with the same name is reused only when its text is the same: a template never revises a
-      // skill the user already has.
+      // skill with the same name is reused when its text is the same. Otherwise the template's text
+      // becomes its next revision: earlier revisions stay, and other agents keep the one they installed.
       const library = yield* templateSync(() => this.skills.library());
       const localSkills = yield* library.list().pipe(toAgentTemplateFailure);
-      const reused = new Map<string, { id: string; revision: number }>();
+      const existingSkills = new Map<string, { id: string; revision: number; sameText: boolean }>();
       for (const skill of detail.skills) {
         if (skill.kind !== "embedded") continue;
         const { slug } = yield* templateSync(() => inspectSkillMarkdown(skill.markdown));
@@ -267,11 +267,7 @@ export class AgentTemplateService {
         const text = new TextDecoder().decode(
           normalizedFiles(yield* library.bundle(current.id, current.version).pipe(toAgentTemplateFailure))["SKILL.md"],
         );
-        if (text !== skill.markdown)
-          return yield* new AgentTemplateFailure({
-            cause: new Error(sourceText("error.marketplace.skillNameConflict", { name: current.name })),
-          });
-        reused.set(slug, { id: current.id, revision: current.version });
+        existingSkills.set(slug, { id: current.id, revision: current.version, sameText: text === skill.markdown });
       }
       let avatar: AvatarImageInput | null = null;
       if (detail.avatarUrl) {
@@ -303,8 +299,8 @@ export class AgentTemplateService {
                   .pipe(toAgentTemplateFailure);
                 continue;
               }
-              const existing = reused.get(inspectSkillMarkdown(skill.markdown).slug);
-              if (existing) {
+              const existing = existingSkills.get(inspectSkillMarkdown(skill.markdown).slug);
+              if (existing?.sameText) {
                 yield* this.skills
                   .installLocal({ agentId: agent.id, skillId: existing.id, revision: existing.revision })
                   .pipe(toAgentTemplateFailure);
@@ -315,8 +311,16 @@ export class AgentTemplateService {
               yield* Effect.gen({ self: this }, function* () {
                 yield* templateIO(() => mkdir(target, { recursive: true }));
                 yield* templateIO(() => writeFile(join(target, "SKILL.md"), skill.markdown, { flag: "wx" }));
-                const revision = yield* library.create(agent.id, folder).pipe(toAgentTemplateFailure);
-                published.push({ id: revision.id, revision: revision.version });
+                // Recorded in the same step, so a failed install can always withdraw what it published.
+                const revision = yield* Effect.gen(function* () {
+                  const revision = yield* (
+                    existing
+                      ? library.revise(agent.id, existing.id, existing.revision, folder)
+                      : library.create(agent.id, folder)
+                  ).pipe(toAgentTemplateFailure);
+                  published.push({ id: revision.id, revision: revision.version });
+                  return revision;
+                }).pipe(Effect.uninterruptible);
                 yield* this.skills
                   .installLocal({ agentId: agent.id, skillId: revision.id, revision: revision.version })
                   .pipe(toAgentTemplateFailure);

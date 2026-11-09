@@ -43,6 +43,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} мин",
   "account.usage.window.cursorModels": "Модели Cursor",
   "account.usage.window.otherModels": "Другие модели",
+  "account.usage.window.total": "Всего",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "Не удалось обновить. Повторите попытку.",
   "account.update.managedByHost": "Управляется хостом",

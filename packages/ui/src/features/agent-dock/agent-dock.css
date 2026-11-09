@@ -247,6 +247,14 @@
   height: var(--openbot-icon-md);
 }
 
+/* The add menu lists every agent that is not on the dock. With many agents it is taller than the dock
+ * window, so it fits the space left and scrolls. The base class is named so that this rule outranks
+ * the `overflow: hidden` of `.ui-action-menu`. */
+.agent-dock-add-menu.ui-action-menu {
+  max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
+  overflow-y: auto;
+}
+
 .agent-dock-menu-avatar.agent-avatar {
   width: 20px;
   height: 20px;

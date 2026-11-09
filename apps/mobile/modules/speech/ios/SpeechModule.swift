@@ -624,6 +624,22 @@ public class SpeechModule: Module {
       allowHapticsWhileRecording()
     }
 
+    /// GPT live voice: WebRTC sets the session to voice chat, which plays on the earpiece. This keeps
+    /// the voice chat mode, so echo cancellation stays on, and adds the loudspeaker as the output when
+    /// no headset is connected. WebRTC sets its own options again when it starts its audio, so
+    /// JavaScript calls this after that; a call when the options are already set changes nothing.
+    /// `false` changes nothing: WebRTC ends its session, and the next capture or reply sets its own.
+    Function("setCallAudio") { (active: Bool) in
+      guard active else { return }
+      let session = AVAudioSession.sharedInstance()
+      let options: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetoothHFP]
+      if session.category == .playAndRecord && session.mode == .voiceChat && session.categoryOptions.contains(options) {
+        return
+      }
+      try? session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
+      allowHapticsWhileRecording()
+    }
+
     /// Closes the microphone, sends the text of the speech that is left, then `onCaptureEnd`.
     Function("finishCapture") {
       let capture = self.capture

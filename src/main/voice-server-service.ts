@@ -9,7 +9,6 @@ import { EventEmitter } from "node:events";
 import {
   AUTOMATIC_VOICE_LANGUAGE,
   isVoiceServerRoutes,
-  type SpeechAudio,
   sameCustomProviderOrigin,
   VOICE_SERVER_LIMITS,
   type VoiceLanguage,
@@ -23,6 +22,14 @@ import {
   type VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  decodeVoiceServerWav,
+  OPENAI_VOICES,
+  VOICE_SERVER_VOICE_PATHS,
+  voiceServerHost,
+  voiceServerModelLists,
+  voiceServerVoiceNames,
+} from "@openbot/contracts/voice-server";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { Effect, Schema } from "effect";
@@ -42,16 +49,6 @@ const SPEECH_TIMEOUT_MS = 120_000;
 const LIST_BODY_LIMIT = 1024 * 1024;
 /** A minute of 48 kHz stereo 16-bit WAV is 11 MB. */
 const SPEECH_BODY_LIMIT = 32 * 1024 * 1024;
-
-/**
- * The voices of the OpenAI speech API. A server that lists no voices gets these, because a server
- * that copies the OpenAI API usually accepts its voice names.
- */
-const OPENAI_VOICES = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"];
-
-/** Model names that are speech recognition or speech synthesis, for a server that does not say. */
-const TRANSCRIPTION_MODEL = /whisper|transcri|stt|asr|parakeet|scribe|canary|sensevoice|speech-to-text/i;
-const SPEECH_MODEL = /tts|kokoro|piper|orpheus|xtts|kitten|chatterbox|melo|zonos|supertonic|text-to-speech/i;
 
 interface StoredVoiceServer {
   server: { address: string; routes: VoiceServerRoutes } | null;
@@ -194,7 +191,7 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
       (response, host) =>
         readBody(response, host, SPEECH_BODY_LIMIT).pipe(
           Effect.flatMap((wav) => {
-            const audio = decodeWav(wav);
+            const audio = decodeVoiceServerWav(wav);
             return audio ? Effect.succeed(audio) : Effect.fail(invalidAudio(host));
           }),
         ),
@@ -267,15 +264,6 @@ export function transcribeRecording(
   );
 }
 
-/** The part of an address that an error may name. */
-function hostOf(address: string): string {
-  try {
-    return new URL(address).host;
-  } catch {
-    return "?";
-  }
-}
-
 function routeOff() {
   return new VoiceOperationError({ cause: new Error(sourceText("error.voice.server.routeOff")) });
 }
@@ -283,7 +271,7 @@ function routeOff() {
 function invalidAnswer(address: string) {
   return new VoiceServerFailure({
     field: "address",
-    message: sourceText("error.voice.server.invalidAnswer", { host: hostOf(address) }),
+    message: sourceText("error.voice.server.invalidAnswer", { host: voiceServerHost(address) }),
   });
 }
 
@@ -305,7 +293,7 @@ function exchange<A>(
   read: (response: Response, host: string) => Effect.Effect<A, VoiceServerFailure>,
   refused?: StatusText,
 ): Effect.Effect<A, VoiceServerFailure> {
-  const host = hostOf(target.address);
+  const host = voiceServerHost(target.address);
   const fail = (field: VoiceServerProbeField, message: string) => new VoiceServerFailure({ field, message });
   return Effect.acquireUseRelease(
     Effect.sync(() => new AbortController()),
@@ -383,30 +371,13 @@ function listModels(fetcher: typeof fetch, target: ServerTarget): Effect.Effect<
     const body = yield* exchange(fetcher, target, "models", { method: "GET" }, PROBE_TIMEOUT_MS, (response, host) =>
       readJson(response, host, LIST_BODY_LIMIT),
     );
-    if (!isDynamicRecord(body) || !Array.isArray(body.data))
+    const lists = voiceServerModelLists(body);
+    if (!lists)
       return yield* new VoiceServerFailure({
         field: "address",
-        message: sourceText("error.provider.discoveryInvalid", { host: hostOf(target.address) }),
+        message: sourceText("error.provider.discoveryInvalid", { host: voiceServerHost(target.address) }),
       });
-    const transcription: string[] = [];
-    const speech: string[] = [];
-    for (const entry of body.data) {
-      if (!isDynamicRecord(entry) || !isString(entry.id)) continue;
-      const id = entry.id.trim();
-      if (!id || id.length > VOICE_SERVER_LIMITS.name) continue;
-      const task = isString(entry.task) ? entry.task : "";
-      const route =
-        task === "automatic-speech-recognition"
-          ? transcription
-          : task === "text-to-speech"
-            ? speech
-            : TRANSCRIPTION_MODEL.test(id)
-              ? transcription
-              : SPEECH_MODEL.test(id)
-                ? speech
-                : null;
-      if (route && !route.includes(id) && route.length < VOICE_SERVER_LIMITS.entries) route.push(id);
-    }
+    const { transcription, speech } = lists;
     const voices = speech.length > 0 ? yield* listVoices(fetcher, target) : [];
     return { transcription, speech, voices };
   });
@@ -421,98 +392,14 @@ function listVoices(fetcher: typeof fetch, target: ServerTarget): Effect.Effect<
     exchange(fetcher, target, path, { method: "GET" }, PROBE_TIMEOUT_MS, (response, host) =>
       readJson(response, host, LIST_BODY_LIMIT),
     ).pipe(
-      Effect.map(voiceNames),
+      Effect.map(voiceServerVoiceNames),
       Effect.catch(() => Effect.succeed([])),
     );
   return Effect.gen(function* () {
-    for (const path of ["audio/voices", "audio/speech/voices"]) {
+    for (const path of VOICE_SERVER_VOICE_PATHS) {
       const voices = yield* attempt(path);
       if (voices.length > 0) return voices;
     }
     return [...OPENAI_VOICES];
   });
-}
-
-/** `["af_heart"]`, `{ voices: [...] }` or `{ data: [...] }`, with names or `{ id }`, `{ voice_id }`, `{ name }`. */
-function voiceNames(body: unknown): string[] {
-  const list = Array.isArray(body)
-    ? body
-    : isDynamicRecord(body) && Array.isArray(body.voices)
-      ? body.voices
-      : isDynamicRecord(body) && Array.isArray(body.data)
-        ? body.data
-        : [];
-  const names: string[] = [];
-  for (const entry of list) {
-    const name = isString(entry)
-      ? entry
-      : isDynamicRecord(entry)
-        ? [entry.voice_id, entry.id, entry.name].find(isString)
-        : undefined;
-    const trimmed = name?.trim();
-    if (!trimmed || trimmed.length > VOICE_SERVER_LIMITS.name || names.includes(trimmed)) continue;
-    names.push(trimmed);
-    if (names.length >= VOICE_SERVER_LIMITS.entries) break;
-  }
-  return names;
-}
-
-/**
- * The samples of a WAV file as 16-bit mono PCM. It takes 16-bit or 32-bit float samples, mixes
- * channels down, and reads a streamed file whose data size is unknown to its end.
- */
-function decodeWav(wav: Uint8Array): SpeechAudio | null {
-  const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
-  const tag = (offset: number) => String.fromCharCode(...wav.subarray(offset, offset + 4));
-  if (wav.byteLength < 12 || tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
-  let format: { code: number; channels: number; sampleRate: number; bits: number } | null = null;
-  let offset = 12;
-  while (offset + 8 <= wav.byteLength) {
-    const id = tag(offset);
-    const declared = view.getUint32(offset + 4, true);
-    const start = offset + 8;
-    if (id === "fmt " && declared >= 16 && start + 16 <= wav.byteLength) {
-      const code = view.getUint16(start, true);
-      format = {
-        // WAVE_FORMAT_EXTENSIBLE names the real format in its sub-format GUID.
-        code:
-          code === 0xfffe && declared >= 26 && start + 26 <= wav.byteLength ? view.getUint16(start + 24, true) : code,
-        channels: view.getUint16(start + 2, true),
-        sampleRate: view.getUint32(start + 4, true),
-        bits: view.getUint16(start + 14, true),
-      };
-    } else if (id === "data") {
-      if (!format) return null;
-      const end = declared === 0 || start + declared > wav.byteLength ? wav.byteLength : start + declared;
-      return toMonoPcm16(view, start, end, format);
-    }
-    offset = start + declared + (declared % 2);
-  }
-  return null;
-}
-
-function toMonoPcm16(
-  view: DataView,
-  start: number,
-  end: number,
-  format: { code: number; channels: number; sampleRate: number; bits: number },
-): SpeechAudio | null {
-  const { code, channels, sampleRate, bits } = format;
-  const pcm16 = code === 1 && bits === 16;
-  const float32 = code === 3 && bits === 32;
-  if ((!pcm16 && !float32) || channels < 1 || channels > 8 || sampleRate < 8_000 || sampleRate > 192_000) return null;
-  const frameBytes = (bits / 8) * channels;
-  const frames = Math.floor((end - start) / frameBytes);
-  const output = new Uint8Array(frames * 2);
-  const out = new DataView(output.buffer);
-  for (let frame = 0; frame < frames; frame += 1) {
-    let sum = 0;
-    for (let channel = 0; channel < channels; channel += 1) {
-      const at = start + frame * frameBytes + channel * (bits / 8);
-      sum += pcm16 ? view.getInt16(at, true) / 32_768 : view.getFloat32(at, true);
-    }
-    const sample = Math.max(-1, Math.min(1, sum / channels));
-    out.setInt16(frame * 2, Math.round(sample * 32_767), true);
-  }
-  return { pcm: output, sampleRate };
 }

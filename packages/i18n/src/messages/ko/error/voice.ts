@@ -29,6 +29,10 @@ export const messages = {
   "error.voice.live.timedOut": "Codex 라이브 음성이 제시간에 시작되지 않았어요. 다시 시도하세요.",
   "error.voice.live.failed": "라이브 음성이 중지되었어요: {reason}",
   "error.voice.live.disconnected": "라이브 음성 연결이 끊어졌어요.",
+  "error.voice.live.hostFailed":
+    "서버의 Codex가 라이브 음성을 시작하지 못했어요. 소유자에게 그 컴퓨터의 Codex를 업데이트하고 ChatGPT로 로그인해 달라고 요청한 다음 다시 시도하세요.",
   "error.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
+  "error.voice.live.unavailable":
+    "OpenAI가 라이브 음성을 시작하지 못했습니다. OpenAI 측 문제입니다. 나중에 다시 시도하세요.",
   "error.voice.live.off": "Codex 라이브 음성이 꺼져 있습니다. 설정 → 음성에서 켜세요.",
 } as const satisfies PartialTranslation<typeof source>;

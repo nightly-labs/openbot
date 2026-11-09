@@ -1,5 +1,4 @@
 import {
-  type AgentEvent,
   type AvatarColor,
   canAdministerServer,
   isQueuedMessageReceipt,
@@ -7,7 +6,6 @@ import {
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
   type SidebarPin,
-  type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -30,7 +28,11 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
-import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_WELCOME_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
@@ -42,6 +44,7 @@ import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-up
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
@@ -85,7 +88,7 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -180,6 +183,7 @@ import {
   restoreDrawerSnapshot,
   startDrawerSnapshots,
 } from "@/features/workspace/model/drawer-snapshot";
+import { publishLiveVoiceEvent } from "@/features/workspace/model/live-voice-events";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import {
   dropApproval,
@@ -1473,8 +1477,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [servers, activeServerId, startupWaitOver, sortByPreference, conversationStore]);
 
   const handleTeamEvent = useCallback(
-    (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
+    (serverId: string, event: RemoteTeamEvent) => {
       if (removedServers.current.has(serverId)) return;
+      // The voice conversation that started the session reads its events; no cache keeps them.
+      if (event.type === LIVE_VOICE_EVENT) {
+        publishLiveVoiceEvent(serverId, event);
+        return;
+      }
       applyLiveActivityEvent(serverId, event);
       liveState.update("approvalRequests", (current) => {
         const previous = current[serverId] ?? [];
@@ -2345,6 +2354,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           hasCapability(serverCapabilities.current, serverId, capability),
       );
     };
+    /**
+     * The same rule as `serverCanManageMcp` on the desktop: an owner or admin of an online host that
+     * serves `mcp-servers-v1`, or a member when the host also serves `mcp-member-access-v1`. The host
+     * lets a member change only the servers that the member added.
+     */
+    const managesMcp = (serverId: string) =>
+      administers(serverId, MCP_SERVERS_CAPABILITY) ||
+      Boolean(
+        servers.some((server) => server.id === serverId && showsOnline(server)) &&
+          hasCapability(serverCapabilities.current, serverId, MCP_SERVERS_CAPABILITY) &&
+          hasCapability(serverCapabilities.current, serverId, MCP_MEMBER_ACCESS_CAPABILITY),
+      );
     return {
       ...hostRequests.checks,
       browserViewSupport: browser.browserViewSupport,
@@ -2425,9 +2446,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         hasCapability(serverCapabilities.current, serverId, HOSTED_SITES_CAPABILITY),
       canDeleteHostedSites: (serverId) => administers(serverId, HOSTED_SITES_CAPABILITY),
       canManageProviders: (serverId) => administers(serverId, PROVIDERS_ADMIN_CAPABILITY),
-      canManageMcpServers: (serverId) => administers(serverId, MCP_SERVERS_CAPABILITY),
+      canManageMcpServers: managesMcp,
       canRelayMcpSignIn: (serverId) =>
-        administers(serverId, MCP_SERVERS_CAPABILITY) && administers(serverId, SIGN_IN_RELAY_CAPABILITY),
+        managesMcp(serverId) && hasCapability(serverCapabilities.current, serverId, SIGN_IN_RELAY_CAPABILITY),
       canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
       canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),
       canSendNotifications: (serverId) =>

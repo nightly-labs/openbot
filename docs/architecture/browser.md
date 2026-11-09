@@ -239,6 +239,55 @@ accept come from failed scripts in the bench transcripts.
 On the 10 default tasks (3 runs each), all 30 runs were correct before and after. Tool calls went
 from 97 to 84 and input tokens from 1.12M to 0.97M; 23 of 30 runs made no `tool_search`.
 
+### Repair argument forms that agents write
+
+Each refused call costs the agent one turn of about 27k input tokens. Before the decoder of a tool or
+a `run_script` step reads the arguments, `browser-tool-input.ts` rewrites the forms that agent
+transcripts show again and again. The advertised schemas do not change, and a form that can mean two
+things stays a refusal:
+
+- A target can be a ref string (`"3:main:12"`), a whole snapshot line (`3:main:12 link "Travel"`), a
+  role line (`link "Travel"`), `css #main`, or a CSS selector. The `run_script` helpers send a string
+  target as it is, so a step takes the same forms. An object without `kind` gets it from its fields (`ref`, `selector` or `css`, `role`, `text`,
+  or `x` and `y`). A ref target without `revision` takes it from the ref, and a top-level `ref` on an
+  action tool becomes its `target`.
+- `type` takes `replace` or `clear` as `mode`: `true` is `"replace"`, and `false` is `"append"`.
+- `wait_for` drops `snapshot` and a `condition` that names a field of the call
+  (`{ condition: "text", text }`), maps the Playwright and Puppeteer states (`networkidle`, `idle`,
+  `quiet` as `dom-quiet`; `complete` as `load`; `interactive` as `domcontentloaded`), and drops
+  `visible` and `attached` on a target wait.
+- `fill_fields` takes `value` as `text`, and takes `revision` from the refs when they all have the
+  same one.
+- `open` drops a `tabId` and opens a new tab, so the page in that tab stays. A call written as
+  `{ name: "openbot_browser.<tool>", arguments }` is unwrapped, and a snake_case field such as
+  `tab_id` takes its camelCase name when the call does not also give that name. The user-control
+  check reads the same repaired `tabId`.
+- The Vault, secret and payment tools (`submit_secret`, `fill_card`, `list_logins`,
+  `list_vault_items`, `save_vault_item`, `request_vault_item`, `delete_vault_item`,
+  `request_link_payment`) get no repair. Their targets must come from a snapshot, and
+  `save_vault_item` registers the raw `password` for redaction before the decoder runs.
+
+In `run_script`, `role(role, name, { exact })`, `waitFor(role(...))`, `waitFor("Done", "text")` and
+`waitFor("#done", "visible")` work. A `waitFor` function
+that calls `evaluate`, `snapshot` or `step` is written for the sandbox, so the script polls it once a
+second until its timeout; other `waitFor` functions, such as one that calls `document.evaluate`,
+still run in the page. A `ReferenceError`
+for `document`, `window`, `location`, `page` or `$` says that the script runs in a sandbox and reads
+the page with `evaluate`.
+
+A replay of the 173 failed calls since 2026-10-30 that the current tools can run again (from the
+desktop agent transcripts, against the current decoders and a fake page) gave 79 accepted calls
+before this change and 140 after. Most of the others read page globals in the sandbox, call removed
+tools, or fail on the fake page.
+
+`bun run bench:browser-tools --variants=S --tasks=herokuapp-dynamic,herokuapp-add-remove,books-travel,wikipedia-rust,spa-skeleton,click-wait,quotes-love-tag --repeats=3`
+(Haiku, 2026-11-08) counts failed calls in each run. All 21 runs were correct before and after.
+Tool calls went from 72 to 64 and input tokens from 2.07M to 1.95M; failed calls stayed at 6, because
+each run fails on different forms. `herokuapp-dynamic` went from 4–6 calls and 116k median input
+tokens to 2 calls and 63k in all 3 runs. The failures that stay are agent mistakes: an ambiguous
+target, which the tools refuse on purpose, `document` read in the sandbox, and the Playwright
+`>> nth=N` selector, which has no CSS form.
+
 ### Fill inspected ordinary fields
 
 `openbot_browser.fill_fields` is a deferred tool in the original browser catalog. It replaces
@@ -294,7 +343,9 @@ task takes fewer turns.
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
 `snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB.
+helper sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
+step gives its value to the script, not to the model, so it can return up to 1 MB, such as the whole
+text of a page.
 
 An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
 site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and

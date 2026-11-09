@@ -20,6 +20,7 @@ export const messages = {
   "queue.item.notSteered": "未引导",
   "queue.item.steerFallback.providerUnsupported": "该服务商无法在运行中引导，消息会留在队列中等待。",
   "queue.item.steerFallback.steerFailed": "引导未成功，消息会留在队列中等待。",
+  "queue.item.steerFallback.routineRun": "自动化任务正在运行，消息会留在队列中等待。",
   "queue.item.runAsTask": "在新话题中运行",
   "queue.item.runAsTaskLabel": "在新话题中运行排队消息 {position}",
   "queue.item.deleteLabel": "删除排队消息 {position}",

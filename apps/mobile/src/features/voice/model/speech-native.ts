@@ -54,6 +54,12 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
    * from before it does not have it. No-op on Android.
    */
   allowHapticsWhileRecording?(): void;
+  /**
+   * GPT live voice: `true` plays the WebRTC call on the loudspeaker, or on a connected headset, with
+   * echo cancellation on; `false` gives the audio back after the call. Optional: an app binary from
+   * before it does not have it.
+   */
+  setCallAudio?(active: boolean): void;
 }
 
 /**

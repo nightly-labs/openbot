@@ -29,6 +29,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES, MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import { TELEGRAM_LINK_CODE_TTL_SECONDS } from "@openbot/contracts/signal-protocol/telegram-route";
 import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
@@ -311,7 +312,8 @@ export class MessagingService {
     this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
-      post: (connectionId, target, markdown, files) => this.#outboundPost(connectionId, target, markdown, files),
+      post: (connectionId, target, markdown, files, embeds) =>
+        this.#outboundPost(connectionId, target, markdown, files, embeds),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
       slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
@@ -1711,9 +1713,13 @@ export class MessagingService {
     target: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[] = [],
+    embeds: DiscordEmbed[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
+    const postEmbeds = live.adapter.postEmbeds;
+    if (embeds.length && !postEmbeds)
+      return { error: "Only a Discord post can have embeds. Post the text alone.", failure: "refused" as const };
     // Signal accepts every chat linked to this host, but the chat's own adapter keeps its reply chains.
     if (live.record.platform === "telegram" && target.platformChannelId !== live.identity.workspaceId)
       return {
@@ -1727,7 +1733,11 @@ export class MessagingService {
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
-    const posted = yield* live.adapter.postAnswer(target, text, null).pipe(
+    const posted = yield* (
+      postEmbeds && embeds.length
+        ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
+        : live.adapter.postAnswer(target, text, null)
+    ).pipe(
       Effect.map((messageId) => ({
         posted: true as const,
         messageId,
@@ -2317,6 +2327,34 @@ function integrationsSection(layout: SidebarLayoutSnapshot): SidebarSection | un
 /** Where to answer when the message that started the work is not known: the conversation's thread. */
 function linkTarget(link: MessagingLink): MessageTarget {
   return { platformChannelId: link.platformChannelId, replyThreadId: link.threadKey };
+}
+
+/**
+ * The embed with a secret in each text or link masked, as in the post's text. Discord refuses a link
+ * that the mask breaks, so the post fails and the secret stays here.
+ */
+function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
+  const mask = (value: string | undefined) => (value === undefined ? undefined : redactText(value));
+  return {
+    title: mask(embed.title),
+    description: mask(embed.description),
+    url: mask(embed.url),
+    color: embed.color,
+    timestamp: embed.timestamp,
+    author: embed.author && {
+      name: redactText(embed.author.name),
+      url: mask(embed.author.url),
+      icon_url: mask(embed.author.icon_url),
+    },
+    footer: embed.footer && { text: redactText(embed.footer.text), icon_url: mask(embed.footer.icon_url) },
+    thumbnail: embed.thumbnail && { url: redactText(embed.thumbnail.url) },
+    image: embed.image && { url: redactText(embed.image.url) },
+    fields: embed.fields?.map((field) => ({
+      name: redactText(field.name),
+      value: redactText(field.value),
+      inline: field.inline,
+    })),
+  };
 }
 
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */

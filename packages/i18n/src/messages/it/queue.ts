@@ -21,6 +21,7 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "Questo provider non può indirizzare un turno in corso, quindi il messaggio resta in coda.",
   "queue.item.steerFallback.steerFailed": "L'indirizzamento non è riuscito, quindi il messaggio resta in coda.",
+  "queue.item.steerFallback.routineRun": "È in corso una routine, quindi il messaggio resta in coda.",
   "queue.item.runAsTask": "Esegui in un nuovo thread",
   "queue.item.runAsTaskLabel": "Esegui il messaggio in coda {position} in un nuovo thread",
   "queue.item.deleteLabel": "Elimina il messaggio in coda {position}",

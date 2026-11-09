@@ -38,6 +38,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} min",
   "account.usage.window.cursorModels": "Modèles Cursor",
   "account.usage.window.otherModels": "Autres modèles",
+  "account.usage.window.total": "Total",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "La mise à jour a échoué. Réessayez.",
   "account.update.managedByHost": "Gérée par l’hôte",
