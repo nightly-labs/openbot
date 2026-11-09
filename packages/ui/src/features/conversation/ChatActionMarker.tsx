@@ -1042,6 +1042,7 @@ function markerLabel(
     return sourceText(marker.text);
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
   if (marker.kind === "marketplace-suggestion") return t("chat.marker.marketplaceSuggestion");
+  if (marker.kind === "skill-suggestion") return t("chat.marker.skillSuggestion");
   if (marker.kind === "mcp-sign-in") return t("chat.marker.mcpSignIn");
   if (marker.kind === "skill-lifecycle") return t(SKILL_ACTION_LABELS[marker.action]);
   if (marker.kind === "agent-message") {
@@ -1126,7 +1127,8 @@ function markerAccessibleLabel(
     marker.kind === "instructions-change"
   )
     return label;
-  if (marker.kind === "skill-lifecycle") return t("chat.marker.accessible.named", { label, name: marker.skillName });
+  if (marker.kind === "skill-lifecycle" || marker.kind === "skill-suggestion")
+    return t("chat.marker.accessible.named", { label, name: marker.skillName });
   const unavailable = t("chat.marker.unavailableAgent");
   if (marker.kind === "agent-message") {
     const agent = counterpartName(marker, agents, t);

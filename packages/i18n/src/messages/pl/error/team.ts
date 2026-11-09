@@ -110,6 +110,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "To połączenie nie obsługuje folderów agentów.",
   "error.team.folderUnavailable": "Ten folder nie jest dostępny na komputerze hosta.",
   "error.team.memoryReviewUnsupported": "To połączenie nie obsługuje przeglądu wspomnień.",
+  "error.team.skillLearningUnsupported": "To połączenie nie obsługuje uczenia się umiejętności.",
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
@@ -120,6 +121,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "Podgląd przeglądarki na żywo jest niedostępny.",
   "error.team.browserSessionNotFound": "Nie znaleziono sesji podglądu przeglądarki.",
   "error.team.mcpUnsupported": "To połączenie nie obsługuje serwerów MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Zaktualizuj OpenBot na tym urządzeniu, aby używać na tym serwerze więcej niż {limit} serwerów MCP.",
   "error.team.storageUnsupported": "To połączenie nie obsługuje pamięci dyskowej.",
   "error.team.machineResourcesUnsupported": "To połączenie nie obsługuje użycia maszyny.",
   "error.team.machineAlertMemberInvalid":

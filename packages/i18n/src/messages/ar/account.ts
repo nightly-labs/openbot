@@ -45,6 +45,7 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} دقيقة",
   "account.usage.window.cursorModels": "نماذج Cursor",
   "account.usage.window.otherModels": "نماذج أخرى",
+  "account.usage.window.total": "الإجمالي",
   "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "فشل التحديث. حاول مرة أخرى.",
   "account.update.managedByHost": "يديره المضيف",

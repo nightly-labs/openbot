@@ -74,6 +74,7 @@ import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
+import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
@@ -218,6 +219,12 @@ export interface ServerSettingsModalProps {
    * only for the local server or a remote host with `memory-review-v1` that this member administers.
    */
   memoryReview?: ServerMemoryReviewOptions | undefined;
+  /**
+   * General shows whether the memory review saves the skills it learns only when a caller supplies
+   * this, and only for the local server or a remote host with `skill-learning-v1` that this member
+   * administers.
+   */
+  skillLearning?: ServerSkillLearningOptions | undefined;
   /**
    * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
    * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member

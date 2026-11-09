@@ -32,5 +32,7 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex na serwerze nie mógł uruchomić głosu na żywo. Poproś właściciela, aby zaktualizował Codex na tym komputerze i zalogował się przez ChatGPT, a potem spróbuj ponownie.",
   "error.voice.live.signIn": "Zaloguj się do Codex kontem ChatGPT, aby używać głosu na żywo.",
+  "error.voice.live.unavailable":
+    "OpenAI nie mogło uruchomić głosu na żywo. Problem leży po stronie OpenAI. Spróbuj ponownie później.",
   "error.voice.live.off": "Głos na żywo Codex jest wyłączony. Włącz go w Ustawienia → Głos.",
 } as const satisfies PartialTranslation<typeof source>;

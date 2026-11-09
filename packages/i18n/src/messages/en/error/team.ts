@@ -110,6 +110,7 @@ export const messages = defineMessages("error.team", {
   "error.team.agentFoldersUnsupported": "The agent folders are not supported by this connection.",
   "error.team.folderUnavailable": "This folder is not available on the host computer.",
   "error.team.memoryReviewUnsupported": "The memory review is not supported by this connection.",
+  "error.team.skillLearningUnsupported": "Skill learning is not supported by this connection.",
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
   "error.team.modelVisibilityUnsupported": "The model list is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
@@ -125,6 +126,8 @@ export const messages = defineMessages("error.team", {
   "error.team.browserViewUnavailable": "The live browser view is unavailable.",
   "error.team.browserSessionNotFound": "Browser view session not found.",
   "error.team.mcpUnsupported": "MCP servers are not supported by this connection.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Update OpenBot on this device to use more than {limit} MCP servers on this server.",
   "error.team.storageUnsupported": "Storage is not supported by this connection.",
   "error.team.machineResourcesUnsupported": "Machine use is not supported by this connection.",
   "error.team.machineAlertMemberInvalid": "Only an owner or admin of this server can get machine alerts.",

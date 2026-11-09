@@ -45,6 +45,7 @@ import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CODECS } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_CODECS } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
@@ -95,11 +96,13 @@ import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
+import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
+import { VAULT_V3_CODECS } from "./vault-v3";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
@@ -123,6 +126,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_V5_CODECS,
   ...PROVIDERS_V8_CODECS,
   ...CUSTOM_PROVIDER_HARNESS_CODECS,
+  ...CUSTOM_PROVIDER_EDIT_CODECS,
   ...CUSTOM_AGENTS_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,
@@ -134,6 +138,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...LOCAL_SERVERS_CODECS,
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
+  ...SKILL_LEARNING_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
   ...MODEL_VISIBILITY_CODECS,
   ...SERVER_AUDIT_CODECS,
@@ -214,6 +219,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_SECRET_VAULT_CODECS,
   ...VAULT_IMPORT_CODECS,
   ...VAULT_V2_CODECS,
+  ...VAULT_V3_CODECS,
 ]);
 
 export function optionalRouteCodec(path: string): OptionalRouteCodec | undefined {

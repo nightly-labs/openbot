@@ -1147,6 +1147,13 @@
   object-fit: cover;
 }
 
+/* An image that opens in the image viewer. */
+.composer-attachment-preview.ui-button {
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+}
+
 /* A pasted image that is still importing: its local preview, dimmed, under a spinner. */
 .composer-attachment[data-pending] .composer-attachment-preview img {
   opacity: 0.5;

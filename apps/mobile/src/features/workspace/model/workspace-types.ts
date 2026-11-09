@@ -83,6 +83,7 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  MachineMetrics,
   MarkAgentTaskReadInput,
   McpServerConfig,
   McpSignInState,
@@ -780,6 +781,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
+  canReadMachineMetrics: (serverId: string) => boolean;
+  /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
+  loadMachineMetrics: (serverId: string) => Promise<MachineMetrics>;
   /** True when the host advertises `remote-desktop`. The host decides which members it lets in. */
   canControlComputer: (serverId: string) => boolean;
   /** The connected peer's path for the remote desktop viewer, or null while the server is not connected. */
@@ -1142,6 +1147,7 @@ type MobileWorkspaceStateKey =
   | "canCreateLocalServers"
   | "localServerKind"
   | "canManageServerTimezone"
+  | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
   | "canReadServerAudit"

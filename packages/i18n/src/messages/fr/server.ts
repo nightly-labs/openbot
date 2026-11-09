@@ -329,6 +329,13 @@ export const messages = {
   "server.settings.memoryReviewOff": "Désactivée",
   "server.settings.memoryReviewTurns": { one: "Tous les {count} tour", other: "Tous les {count} tours" },
   "server.settings.memoryReviewLoadFailed": "Impossible de charger le réglage de revue des souvenirs.",
+  "server.settings.skillLearning": "Apprentissage des compétences",
+  "server.settings.skillLearningDescription":
+    "Indique si les agents de ce serveur enregistrent ce qu’ils apprennent sous forme de compétences.",
+  "server.settings.skillLearningAutomatic": "Automatique",
+  "server.settings.skillLearningAsk": "Demander d’abord",
+  "server.settings.skillLearningOff": "Désactivé",
+  "server.settings.skillLearningLoadFailed": "Impossible de charger le réglage d’apprentissage des compétences.",
   "server.settings.remoteOnline": "L’hôte est en ligne. Son propriétaire contrôle la publication.",
   "server.settings.remoteOffline": "L’hôte est hors ligne. Son propriétaire contrôle la publication.",
   "server.settings.reachable": "Accessible en ligne. Seules les personnes invitées peuvent se connecter.",

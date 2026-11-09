@@ -7,6 +7,7 @@ import { HttpError } from "./http-error";
 import { requireMcpAccess, requireOwnMcpAddress, requireOwnMcpSignIn } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
+import { requireMcpListFits } from "./route-mcp";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(MCP_SIGN_IN_ROUTES));
 
@@ -51,9 +52,13 @@ export async function routeMcpSignIn(
     case MCP_SIGN_IN_ROUTES.signOut: {
       const input = parseRemoveMcpServer(body);
       requireOwnMcpSignIn(access, servers(), input.mcpServerId);
+      requireMcpListFits(capabilities, signIns.list().length);
       return json(200, await runCauseEffect(signIns.signOut(input)));
     }
-    default:
-      return json(200, signIns.list());
+    default: {
+      const list = signIns.list();
+      requireMcpListFits(capabilities, list.length);
+      return json(200, list);
+    }
   }
 }

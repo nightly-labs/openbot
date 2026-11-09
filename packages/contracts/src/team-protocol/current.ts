@@ -63,6 +63,7 @@ import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
@@ -81,6 +82,7 @@ import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
+import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
@@ -119,6 +121,7 @@ import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
@@ -131,6 +134,7 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } 
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
+import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
@@ -245,6 +249,7 @@ export {
   CONVERSATION_FILE_SEARCH_CAPABILITY,
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -260,6 +265,7 @@ export {
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
+  MCP_MANY_SERVERS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
@@ -294,6 +300,7 @@ export {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -318,6 +325,7 @@ export {
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
+  VAULT_V3_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -486,6 +494,10 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  MCP_MANY_SERVERS_CAPABILITY,
+  VAULT_V3_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -662,7 +674,11 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HOST_PERSONALITY_CAPABILITY &&
     capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
     capability !== LIVE_VOICE_CAPABILITY &&
-    capability !== AGENT_WELCOME_CAPABILITY,
+    capability !== AGENT_WELCOME_CAPABILITY &&
+    capability !== SKILL_LEARNING_CAPABILITY &&
+    capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
+    capability !== MCP_MANY_SERVERS_CAPABILITY &&
+    capability !== VAULT_V3_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -715,6 +731,10 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  MCP_MANY_SERVERS_CAPABILITY,
+  VAULT_V3_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -850,6 +870,10 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_PERSONALITY_CAPABILITY &&
       capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
       capability !== LIVE_VOICE_CAPABILITY &&
-      capability !== AGENT_WELCOME_CAPABILITY,
+      capability !== AGENT_WELCOME_CAPABILITY &&
+      capability !== SKILL_LEARNING_CAPABILITY &&
+      capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
+      capability !== MCP_MANY_SERVERS_CAPABILITY &&
+      capability !== VAULT_V3_CAPABILITY,
   );
 }

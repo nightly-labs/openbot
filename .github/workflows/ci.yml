@@ -397,9 +397,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:messaging-discord-access
 
+      - name: Run the Discord embeds E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-discord-embeds
+
       - name: Run the Telegram answer mentions E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-telegram-mentions
+
+      - name: Run the Slack ping reply E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-slack-ping-reply
 
       - name: Run the turn input E2E test
         if: ${{ !cancelled() }}
@@ -444,6 +452,10 @@ jobs:
       - name: Run the hung Codex app-server E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-hung-app-server
+
+      - name: Run the Codex mid-turn compaction E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-midturn-compaction
 
       - name: Run the Codex missing rollout backfill E2E test
         if: ${{ !cancelled() }}
@@ -641,6 +653,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:remote-connect-analytics
 
+      - name: Run the memory review E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:memory-review
+
+      - name: Run the local skill revision E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:skill-revision
+
       - name: Upload the reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -664,7 +684,9 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
+            .openbot-build/messaging-discord-embeds-e2e/
             .openbot-build/messaging-telegram-mentions-e2e/
+            .openbot-build/messaging-slack-ping-reply-e2e/
             .openbot-build/turn-input-e2e/
             .openbot-build/zero-filled-settings-e2e/
             .openbot-build/provider-update-busy-e2e/
@@ -675,6 +697,7 @@ jobs:
             .openbot-build/codex-subagent-steps-e2e/
             .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
+            .openbot-build/codex-midturn-compaction-e2e/
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-idle-thread-release-e2e/
             .openbot-build/codex-usage-metering-e2e/
@@ -721,6 +744,8 @@ jobs:
             .openbot-build/pi-sign-in-watch-e2e/
             .openbot-build/agent-api-keys-e2e/
             .openbot-build/remote-connect-analytics-e2e/
+            .openbot-build/memory-review-e2e/
+            .openbot-build/skill-revision-e2e.json
           if-no-files-found: ignore
 
   provider-fakes-e2e:

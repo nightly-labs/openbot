@@ -289,6 +289,7 @@ export function ConversationThread() {
             }}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onSelectAgent={props.onSelectAgent}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             mediaSource={props.runtime?.attachmentMedia}

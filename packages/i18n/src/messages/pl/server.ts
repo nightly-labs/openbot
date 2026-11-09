@@ -334,7 +334,14 @@ export const messages = {
     other: "Co {count} tury",
   },
   "server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
-  "server.settings.rolesTitle": "Role",
+  "server.settings.skillLearning": "Uczenie się umiejętności",
+  "server.settings.skillLearningDescription":
+    "Czy agenci na tym serwerze zapisują to, czego się nauczą, jako umiejętności.",
+  "server.settings.skillLearningAutomatic": "Automatycznie",
+  "server.settings.skillLearningAsk": "Najpierw zapytaj",
+  "server.settings.skillLearningOff": "Wyłączone",
+  "server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
+  "server.settings.rolesTitle": "Uprawnienia",
   "server.settings.rolesDescription":
     "Wybierz agentów, których mogą używać członkowie. Członek dostaje najwyższy dostęp spośród roli Wszyscy i swoich ról. Właściciele i administratorzy mogą używać wszystkich agentów.",
   "server.settings.remoteOnline": "Host jest online. Publikacją zarządza jego właściciel.",
@@ -440,6 +447,7 @@ export const messages = {
   },
   "server.roles.agentList": "Agenci: {names}",
   "server.roles.agentLevel": "Dostęp roli {role} do agenta {agent}",
+  "server.roles.changeInEveryone": "Zmień w roli Wszyscy",
   "server.roles.setAll": "Ustaw wszystkie",
   "server.roles.setAllLabel": "Ustaw wszystkie: dostęp roli {role} do wszystkich agentów",
   "server.roles.loadFailed": "Nie udało się wczytać ról tego serwera.",

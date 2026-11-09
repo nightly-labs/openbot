@@ -308,6 +308,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "בטלפון הזה · אנגלית בלבד",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified רץ בטלפון הזה, כמו בשולחן העבודה. הוא שומע אנגלית בלבד, עם סימני פיסוק ופחות שגיאות מ-Parakeet v3, והדיבור נשאר בטלפון. עד שהמודל יורד, מזהה הדיבור של הטלפון מאזין.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "בטלפון הזה · גם סינית מעורבת באנגלית",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR רץ בטלפון הזה. הוא מזהה את השפה שבה אתה מדבר, מתוך 30 שפות ו-22 ניבים סיניים, גם כשאתה מערבב סינית ואנגלית באותו משפט. הדיבור נשאר בטלפון. עד שהמודל יורד, מזהה הדיבור של הטלפון מאזין.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "יותר מ-90 שפות · שולח את הדיבור שלך ל-ElevenLabs",
   "mobile.settings.voice.recognition.model": "מודל דיבור",

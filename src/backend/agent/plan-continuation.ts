@@ -1,13 +1,16 @@
 import type { ConversationPlan, ConversationPlanStep } from "@openbot/contracts/ipc";
-import { nextStepContinuationPrompt, planContinuationPrompt } from "./delivery-content";
+import { compactionContinuationPrompt, nextStepContinuationPrompt, planContinuationPrompt } from "./delivery-content";
 
 export interface PlanContinuationOptions {
   /** The most automatic continuations of one request. */
   limit: number;
 }
 
-/** Why a turn continues: open steps in its plan, or a next step that it named but did not do. */
-type ContinuationKind = "plan" | "nextStep";
+/**
+ * Why a turn continues: open steps in its plan, a next step that it named but did not do, or a
+ * compaction that lost the connection and stopped the turn.
+ */
+type ContinuationKind = "plan" | "nextStep" | "compaction";
 
 /** The most next-step continuations of one request. Each one has no plan to measure progress. */
 const NEXT_STEP_LIMIT = 2;
@@ -104,6 +107,8 @@ interface Chain {
   shown: ContinuationCount;
   /** The next-step continuations of the chain. */
   nextSteps: number;
+  /** Whether a failed compaction continued the chain already. A second one ends it. */
+  compactionContinued: boolean;
   /** The plan of the last turn of the chain. A turn that sends no plan update keeps it. */
   plan: ConversationPlan | null;
   /** The open steps of that plan, by text and status, to see whether a turn made progress. */
@@ -181,7 +186,8 @@ export class PlanContinuation {
     let kind: ContinuationKind;
     if (open.length > 0) {
       const signature = JSON.stringify(open.map(stepKey));
-      if (chained && previous.kind === "plan" && previous.openSteps === signature) return null;
+      // A continuation after a failed compaction keeps the plan of the turn before it.
+      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return null;
       kind = "plan";
     } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
     else return null;
@@ -195,11 +201,53 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
+      compactionContinued: chained ? previous.compactionContinued : false,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
       earlierSteps,
     });
     return { kind, ...shown };
+  }
+
+  /**
+   * Decides whether a turn that a failed compaction stopped continues: the connection failed or
+   * stopped while the provider compacted the context of the turn (#5822). Once for each request, and
+   * within the limit of the chain. Returns null when it does not continue; null also ends the chain.
+   * `plan` and `earlierPlan` are as in `consider`, so a later plan continuation compares the same steps.
+   */
+  afterFailedCompaction(input: {
+    agentId: string;
+    taskId: string | null;
+    deliveryIds: readonly string[];
+    plan: ConversationPlan | null;
+    earlierPlan: ConversationPlan | null;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    const key = laneKey(input.agentId, input.taskId);
+    const previous = this.#chains.get(key);
+    this.#chains.delete(key);
+    const chained =
+      previous !== undefined && input.deliveryIds.some((deliveryId) => previous.deliveryIds.has(deliveryId));
+    const count = chained ? previous.count : 0;
+    if (count >= this.#limit || (chained && previous.compactionContinued)) return null;
+    const plan = input.plan ?? (chained ? previous.plan : null);
+    const earlierSteps = chained
+      ? previous.earlierSteps
+      : new Set(
+          (input.earlierPlan?.steps ?? []).filter((step) => step.status !== "completed").map((step) => stepKey(step)),
+        );
+    const shown = { current: 1, limit: 1 };
+    this.#chains.set(key, {
+      deliveryIds: new Set(input.deliveryIds),
+      count: count + 1,
+      kind: "compaction",
+      shown,
+      nextSteps: chained ? previous.nextSteps : 0,
+      compactionContinued: true,
+      plan,
+      openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),
+      earlierSteps,
+    });
+    return { kind: "compaction", ...shown };
   }
 
   /**
@@ -214,6 +262,7 @@ export class PlanContinuation {
       this.#chains.delete(key);
       return null;
     }
+    if (chain.kind === "compaction") return compactionContinuationPrompt();
     return chain.kind === "plan" && chain.plan
       ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.shown.current, chain.shown.limit)
       : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);

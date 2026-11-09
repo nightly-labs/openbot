@@ -1,3 +1,4 @@
+import { isCompanySignInReturn } from "@/features/auth/model/company-sign-in-return";
 import { acceptDevelopmentConnectLink } from "@/features/auth/model/development-connect-link";
 import { redirectIncomingLink } from "@/features/links/model/incoming-links";
 import { isLiveActivityLink, liveActivityRoute } from "@/features/live-activity/model/live-activity-link";
@@ -10,6 +11,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   // The browser session of the Slack or Discord connector page takes the return of a Slack or Discord install.
   // The same link from another place has no install to finish, so it opens nothing.
   if (isMessagingInstallReturn(path)) return null;
+  // The browser session of a company sign-in takes its return. Another copy of the link opens nothing.
+  if (isCompanySignInReturn(path)) return null;
   try {
     if (isLiveActivityLink(path)) return liveActivityRoute(path, initial);
     if (isIncomingShareLink(path)) return "/incoming-share";

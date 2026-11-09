@@ -45,13 +45,31 @@ const PRESENTATION: AgentDockPresentation = {
   edge: "right",
   autoHide: false,
   offsets: [{ displayId: 1, offset: 0.25 }],
-  seats: [{ agent: AGENT, mood: "working", state: { kind: "working" } }],
+  seats: [
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" } },
+    {
+      kind: "channel",
+      channel: { id: "channel-1", name: "Launch", title: "", members: ["agent-1"], icon: null, imageUrl: null },
+      state: { kind: "unread", count: 1 },
+    },
+  ],
   available: [],
+  availableChannels: [],
   agents: [AGENT],
   chats: [
     {
-      agentId: "agent-1",
-      messages: [{ id: "m1", author: "agent", kind: "text", body: "Hello", attachments: [] }],
+      seat: { kind: "agent", id: "agent-1" },
+      messages: [
+        {
+          id: "m1",
+          author: "agent",
+          senderAgentId: null,
+          senderMember: null,
+          kind: "text",
+          body: "Hello",
+          attachments: [],
+        },
+      ],
       working: true,
       wait: null,
     },
@@ -64,7 +82,7 @@ const DISPLAYS = [{ id: 1, label: "Built-in Retina Display", primary: true, inte
 const SEND: AgentDockAction = {
   type: "send",
   serverId: "local",
-  agentId: "agent-1",
+  seat: { kind: "agent", id: "agent-1" },
   text: "Hello",
   clientMessageId: "draft-1",
 };
@@ -187,11 +205,14 @@ describe("agent dock handlers", () => {
     const { actions, interactive, call } = register();
     expect(() => call("getPresentation", MAIN_ID)).toThrow("outside the agent dock window");
     expect(call("getPresentation", DOCK_ID)).toEqual(PRESENTATION);
+    const channelSend: AgentDockAction = { ...SEND, seat: { kind: "channel", id: "channel-1" } };
     await call("performAction", DOCK_ID, SEND);
+    await call("performAction", DOCK_ID, channelSend);
     await call("performAction", DOCK_ID, { type: "open-settings" });
     call("setInteractive", DOCK_ID, { interactive: true, keyboard: true });
     expect(actions).toEqual([
       [DOCK_ID, SEND],
+      [DOCK_ID, channelSend],
       [DOCK_ID, { type: "open-settings" }],
     ]);
     expect(interactive).toEqual([[DOCK_ID, { interactive: true, keyboard: true }]]);
@@ -200,6 +221,9 @@ describe("agent dock handlers", () => {
   it("refuses an empty message, a link that is too long and too many seats", () => {
     const { published, actions, call } = register();
     expect(() => call("performAction", DOCK_ID, { ...SEND, text: "   " })).toThrow("action is invalid");
+    expect(() => call("performAction", DOCK_ID, { ...SEND, seat: { kind: "group", id: "agent-1" } })).toThrow(
+      "action is invalid",
+    );
     expect(() => call("performAction", DOCK_ID, { type: "open-link", url: "x".repeat(8193) })).toThrow(
       "action is invalid",
     );

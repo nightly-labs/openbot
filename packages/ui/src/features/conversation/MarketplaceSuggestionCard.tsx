@@ -9,6 +9,12 @@ import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 export type MarketplaceSuggestionKind = "app" | "skill";
 
 /**
+ * What the action of a skill card does: install a listing, save a new skill from the chat, or add
+ * the chat's lesson to a skill the agent has.
+ */
+export type MarketplaceSuggestionSkillAction = "install" | "save" | "update";
+
+/**
  * Where the suggested listing is for this user. `attention` is an app whose connection needs a new
  * sign-in. `unavailable` cannot be connected here, for example by a member of a joined server.
  */
@@ -17,8 +23,15 @@ export type MarketplaceSuggestionState = "available" | "busy" | "connected" | "a
 export interface MarketplaceSuggestionCardProps {
   kind: MarketplaceSuggestionKind;
   name: string;
-  /** The one line under the name: the listing tagline. */
+  /** The line under the name: the listing tagline. */
   description: string;
+  /**
+   * The description is a question that the user answers with the action. It shows in full under the
+   * name, and the action goes under it, so a long question keeps the width of the card.
+   */
+  fullDescription?: boolean;
+  /** The action of a skill card. Install when absent. */
+  skillAction?: MarketplaceSuggestionSkillAction;
   iconUrl: string | null;
   /** Drawn instead of the icon: the mark of an app with no listing icon, such as GitHub. */
   mark?: JSX.Element | undefined;
@@ -49,6 +62,8 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
   const [moving, setMoving] = createSignal(false);
   // Several suggestions can be in one chat: each Skip says which one it skips.
   const nameId = createUniqueId();
+  // A question shows in full in the body, and its action goes to the footer under it.
+  const subtitle = () => (props.fullDescription ? undefined : props.description);
   return (
     <Show
       when={!props.dismissed}
@@ -76,7 +91,7 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
         class="marketplace-suggestion"
         // The action stays on the card when it is done: the same button turns into Connected.
         status="pending"
-        inlineActions
+        inlineActions={!props.fullDescription}
         title={
           <Show when={props.onOpenDetails} fallback={props.name}>
             <Button
@@ -90,7 +105,7 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
             </Button>
           </Show>
         }
-        subtitle={props.description}
+        subtitle={subtitle()}
         icon={
           <Show
             when={props.mark}
@@ -106,39 +121,44 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
           </Show>
         }
         actions={
-          // The controls carry the state and the motion flag for the stylesheet; they add no box.
-          <span
-            class="marketplace-suggestion-controls"
-            data-state={props.state}
-            data-motion={moving() ? "" : undefined}
-          >
-            {/* A connected card has nothing to skip. The stylesheet folds the button away, so the
-                action moves to the edge instead of a jump. */}
-            <Show when={props.onDismiss}>
-              <span id={nameId} hidden>
-                {props.name}
+          <Show when={suggestionControlsShown(props)}>
+            {/* The controls carry the state and the motion flag for the stylesheet; they add no box. */}
+            <span
+              class="marketplace-suggestion-controls"
+              data-state={props.state}
+              data-motion={moving() ? "" : undefined}
+            >
+              {/* A connected card has nothing to skip. The stylesheet folds the button away, so the
+                  action moves to the edge instead of a jump. */}
+              <Show when={props.onDismiss}>
+                <span id={nameId} hidden>
+                  {props.name}
+                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="ui-block-skip marketplace-suggestion-dismiss"
+                  aria-describedby={nameId}
+                  ref={(element) => (dismissButton = element)}
+                  onClick={() => {
+                    props.onDismiss?.();
+                    onSettled(() => undoButton?.focus());
+                  }}
+                >
+                  {t("uiBlock.skip")}
+                </Button>
+              </Show>
+              <span class="marketplace-suggestion-action" role="status">
+                <SuggestionAction {...props} onStart={() => setMoving(true)} />
               </span>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                class="ui-block-skip marketplace-suggestion-dismiss"
-                aria-describedby={nameId}
-                ref={(element) => (dismissButton = element)}
-                onClick={() => {
-                  props.onDismiss?.();
-                  onSettled(() => undoButton?.focus());
-                }}
-              >
-                {t("uiBlock.skip")}
-              </Button>
-            </Show>
-            <span class="marketplace-suggestion-action" role="status">
-              <SuggestionAction {...props} onStart={() => setMoving(true)} />
             </span>
-          </span>
+          </Show>
         }
       >
+        <Show when={props.fullDescription}>
+          <p class="marketplace-suggestion-question">{props.description}</p>
+        </Show>
         <Show when={props.state === "unavailable" && props.unavailableText}>
           <p class="marketplace-suggestion-unavailable">
             <Lock aria-hidden="true" />
@@ -160,20 +180,34 @@ function SuggestionAction(props: MarketplaceSuggestionCardProps & { onStart: () 
   const done = () => props.state === "connected";
   const busy = () => props.state === "busy";
   const startable = () => props.state === "available" || props.state === "attention";
-  const shown = () => done() || Boolean(props.onConnect && props.state !== "unavailable");
+  const shown = () => suggestionActionShown(props);
   const variant = () => (props.state === "attention" ? "outline" : "default");
+  const skillAction = () => props.skillAction ?? "install";
   const label = () => {
     if (done()) return undefined;
-    if (!app()) return t("chat.suggestion.installNamed", { name: props.name });
+    if (!app()) {
+      if (skillAction() === "save") return t("chat.suggestion.saveNamed", { name: props.name });
+      if (skillAction() === "update") return t("chat.suggestion.updateNamed", { name: props.name });
+      return t("chat.suggestion.installNamed", { name: props.name });
+    }
     return props.state === "attention"
       ? t("marketplace.app.reconnectNamed", { name: props.name })
       : t("marketplace.app.connectNamed", { name: props.name });
   };
   const text = () => {
-    if (!app()) return t("chat.suggestion.install");
+    if (!app()) {
+      if (skillAction() === "save") return t("chat.suggestion.save");
+      if (skillAction() === "update") return t("chat.suggestion.update");
+      return t("chat.suggestion.install");
+    }
     return props.state === "attention" ? t("marketplace.app.reconnect") : t("marketplace.app.connect");
   };
-  const doneText = () => (app() ? t("marketplace.app.connected") : t("chat.suggestion.installed"));
+  const doneText = () => {
+    if (app()) return t("marketplace.app.connected");
+    if (skillAction() === "save") return t("chat.suggestion.saved");
+    if (skillAction() === "update") return t("chat.suggestion.updated");
+    return t("chat.suggestion.installed");
+  };
   const [widths, setWidths] = createStore({ start: 0, done: 0 });
   // `Show` builds the button again when it comes back, so a layer drops the observer of its old element.
   const observers: Partial<Record<"start" | "done", ResizeObserver>> = {};
@@ -241,4 +275,14 @@ function SuggestionAction(props: MarketplaceSuggestionCardProps & { onStart: () 
       </Button>
     </Show>
   );
+}
+
+/** The action shows when it is done, or when the user can start it here. */
+function suggestionActionShown(props: MarketplaceSuggestionCardProps): boolean {
+  return props.state === "connected" || Boolean(props.onConnect && props.state !== "unavailable");
+}
+
+/** The card has controls when it has Skip or an action: with none, a question card has no footer. */
+function suggestionControlsShown(props: MarketplaceSuggestionCardProps): boolean {
+  return Boolean(props.onDismiss) || suggestionActionShown(props);
 }

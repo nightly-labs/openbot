@@ -64,6 +64,7 @@ import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protoc
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
+import type { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
@@ -79,6 +80,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
@@ -148,6 +150,7 @@ import {
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
+  decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeHostVaultImport,
@@ -186,6 +189,7 @@ import {
   type HostProviderAccounts,
   type HostReleaseStatus,
   type HostSetMessagingEnabledInput,
+  type HostSkillLearning,
   type HostTimezoneSettings,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
@@ -246,6 +250,7 @@ import {
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentBrowserProfileInput,
   type UpdateBrowserProfileInput,
+  type UpdateCustomProviderInput,
   type UpdateHostIdentityInput,
   type UpdateRestartMode,
   type VaultHostImportResult,
@@ -832,6 +837,18 @@ export function setHostMemoryReview(
   return adminCall(() => request("POST", MEMORY_REVIEW_ROUTES.update, decodeHostMemoryReview, { interval }));
 }
 
+export function getHostSkillLearning(request: TeamApiRequest): Effect.Effect<HostSkillLearning, TeamAdminRequestError> {
+  return adminCall(() => request("POST", SKILL_LEARNING_ROUTES.settings, decodeHostSkillLearning, {}));
+}
+
+/** The host refuses a value that its snapshot does not list in `choices`. */
+export function setHostSkillLearning(
+  request: TeamApiRequest,
+  mode: string,
+): Effect.Effect<HostSkillLearning, TeamAdminRequestError> {
+  return adminCall(() => request("POST", SKILL_LEARNING_ROUTES.update, decodeHostSkillLearning, { mode }));
+}
+
 /** The roles of the host (`agent-access-v1`). A member reads only `mine`. */
 export function getHostAgentAccess(request: TeamApiRequest): Effect.Effect<AgentAccessSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", AGENT_ACCESS_ROUTES.read, decodeAgentAccessSnapshot, {}));
@@ -1382,10 +1399,14 @@ export function checkProviderRuntimeUpdates(
 }
 
 /**
- * The custom endpoint routes of a host: `custom-provider-harness-v1` names the harness of each
- * endpoint, and `providers-v1` does not. The caller picks by the host's capabilities.
+ * The custom endpoint routes of a host: `custom-provider-edit-v1` also names the header names of each
+ * endpoint and can edit one, `custom-provider-harness-v1` names the harness of each endpoint, and
+ * `providers-v1` does neither. The caller picks by the host's capabilities.
  */
-export type CustomProviderRoutes = typeof CUSTOM_PROVIDER_HARNESS_ROUTES | typeof PROVIDERS_ADMIN_ROUTES;
+export type CustomProviderRoutes =
+  | typeof CUSTOM_PROVIDER_EDIT_ROUTES
+  | typeof CUSTOM_PROVIDER_HARNESS_ROUTES
+  | typeof PROVIDERS_ADMIN_ROUTES;
 
 export function listCustomProviders(
   request: TeamApiRequest,
@@ -1404,6 +1425,28 @@ export function saveCustomProvider(
       ...input,
       models: input.models.map(({ id, name }) => ({ id, name })),
       headers: input.headers.map(({ name, value }) => ({ name, value })),
+    }),
+  );
+}
+
+/**
+ * `custom-provider-edit-v1`: changes a saved endpoint in place. An absent key or header list keeps the
+ * saved one, and a header with a `null` value keeps its saved value. The host keeps the harness and
+ * the model settings, so neither goes on the wire.
+ */
+export function updateCustomProvider(
+  request: TeamApiRequest,
+  input: UpdateCustomProviderInput,
+  routes: typeof CUSTOM_PROVIDER_EDIT_ROUTES,
+): Effect.Effect<CustomProviderResult, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", routes.customUpdate, decodeCustomProviderResult, {
+      id: input.id,
+      name: input.name,
+      baseUrl: input.baseUrl,
+      models: input.models.map(({ id, name }) => ({ id, name })),
+      ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+      ...(input.headers !== undefined ? { headers: input.headers.map(({ name, value }) => ({ name, value })) } : {}),
     }),
   );
 }
@@ -1743,15 +1786,15 @@ export function saveHostVaultItem(
   input: VaultSaveInput,
   v2: boolean,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
-  // Only a card has approved sites, and an absent list keeps them all.
-  const { fillSites, ...item } = { fillSites: undefined, ...input };
+  // Only a card has approved sites, and an absent list keeps them all. Only a login has a two-step
+  // key, and an absent key keeps the saved one. JSON has no undefined, so an absent field stays out.
+  const { fillSites, twoStepKey, ...item } = { fillSites: undefined, twoStepKey: undefined, ...input };
   return adminCall(() =>
-    request(
-      "POST",
-      vaultRoutes(v2).save,
-      decodeHostVaultState,
-      fillSites === undefined ? item : { ...item, fillSites },
-    ),
+    request("POST", vaultRoutes(v2).save, decodeHostVaultState, {
+      ...item,
+      ...(fillSites === undefined ? {} : { fillSites }),
+      ...(twoStepKey === undefined ? {} : { twoStepKey }),
+    }),
   );
 }
 

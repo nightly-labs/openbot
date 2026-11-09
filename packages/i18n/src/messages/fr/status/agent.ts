@@ -81,5 +81,7 @@ export const messages = {
     "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés, {notChanged} non modifiés, car un autre fil les a modifiés avant.",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
+  "status.agent.compactionContinues":
+    "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
   "status.agent.branchTitle": "Chat dérivé",
 } as const satisfies PartialTranslation<typeof source>;

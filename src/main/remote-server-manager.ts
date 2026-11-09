@@ -1455,6 +1455,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const blockedState = this.#connections.hasIssue(serverId)
         ? (this.#connections.stateFor(serverId) ?? "error")
         : "error";
+      // A Retry after a failed read also comes here for a server that reads online (#5912). The server
+      // stays online while the check runs. Only a host that does not answer replaces the connection.
+      const online = this.#connections.stateFor(serverId) === "online" && !this.#connections.hasIssue(serverId);
       const attempt1 = yield* Effect.gen({ self: this }, function* () {
         if (server.transport === "webrtc-v2") {
           if (!transport)
@@ -1464,8 +1467,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           // because `scheduleReconnect` still sees the host paused -- the HTTPS arm below gets the
           // same reset from `restart(serverId, true)`.
           this.#events.resumeReconnect(serverId);
-          this.#connections.setState(serverId, "connecting");
-          this.#emitChanged();
+          if (!online || !transport.isConnected(serverId)) {
+            this.#connections.setState(serverId, "connecting");
+            this.#emitChanged();
+          }
           yield* transport.retry(serverId);
           // The `connected` handler is what turns that "connecting" back into "online", and a host
           // that was already connected raises no such event -- the session it would announce is the
@@ -1480,6 +1485,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           }
           return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
         }
+        // The check is for a WebRTC connection. An online HTTPS server keeps its state and event stream.
+        if (online) return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
         this.#connections.setState(serverId, "connecting");
         this.#emitChanged();
         yield* this.#client.ensureCompatibility(server, true);

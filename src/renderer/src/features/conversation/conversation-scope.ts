@@ -39,6 +39,7 @@ import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
+import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import type {
   AgentSettingsRequest,
@@ -353,6 +354,21 @@ export function createConversationViewScope(props: ConversationProps) {
     askSideQuestion,
     deleteSideQuestion,
   } = sideQuestions;
+  /**
+   * Save on a skill question: the host writes the skill in the background, not in a turn of the
+   * agent. False when the host saved nothing or cannot be asked; then the card sends the user's yes.
+   */
+  async function saveSkillSuggestion(messageId: string): Promise<boolean> {
+    const agentId = props.agent?.id;
+    if (!agentId) return false;
+    const input = { agentId, messageId };
+    const save = props.runtime
+      ? props.runtime.saveSkillSuggestion?.(input)
+      : conversationPort().agent.saveSkillSuggestion(input, props.server?.id);
+    // A failed request falls back to the yes, so the lesson is not lost.
+    const result = await save?.catch(() => null);
+    return result?.saved === true;
+  }
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills, installedSkillsLoadFailed } = skills;
   const { mcpServers } = createMcpServersStore({ props });
@@ -1239,11 +1255,14 @@ export function createConversationViewScope(props: ConversationProps) {
     boundaryId: string | null | undefined;
     /** The chat opened at the divider and keeps it in view until the reader or a jump moves the chat. */
     holding: boolean;
+    /** The opening frames are done, so a later growth is new content, not the opening layout. */
+    settled: boolean;
   } = {
     identity: undefined,
     pending: false,
     boundaryId: undefined,
     holding: false,
+    settled: false,
   };
   let conversationPanel: HTMLElement | undefined;
   const [browserSurface, setBrowserSurface] = createSignal<HTMLDivElement>();
@@ -1591,13 +1610,22 @@ export function createConversationViewScope(props: ConversationProps) {
       const viewportGrowth = scrollElement ? scrollElement.clientHeight - viewportHeight : 0;
       viewportHeight = scrollElement?.clientHeight ?? 0;
       if (scrollElement && stickToLatest && viewportGrowth < 0) scrollElement.scrollTop -= viewportGrowth;
+      const contentGrew =
+        scrollElement !== undefined && scrollElement.scrollHeight - scrollElement.clientHeight > lastMaxScrollTop;
       const readerAbove = scrollElement !== undefined && readerAboveShrinkingContent(scrollElement);
       if (scrollElement && stickToLatest) {
         if (!readerAbove) glideConversationBottom(scrollElement);
       }
       // An image or a preview that lays out after the opening grows a row above the divider. The chat
       // has no browser scroll anchoring, so without this the divider moves down out of view.
-      else if (scrollElement && unreadOpening.holding) scrollToUnreadDivider(scrollElement);
+      else if (scrollElement && unreadOpening.holding) {
+        // A reply that the agent still writes grows below the view. The reader did not move the chat
+        // since it opened, so the chat follows the reply, and the divider can go above the view.
+        if (unreadOpening.settled && contentGrew && props.activeTurnId) {
+          setStickToLatest(true);
+          glideConversationBottom(scrollElement);
+        } else scrollToUnreadDivider(scrollElement);
+      }
       updateScrollFade();
       updateUnreadDividerVisibility();
     });
@@ -1858,7 +1886,7 @@ export function createConversationViewScope(props: ConversationProps) {
     },
     ({ identity, loaded, boundaryId, boundaryIndex }) => {
       if (identity !== unreadOpening.identity) {
-        unreadOpening = { identity, pending: true, boundaryId: undefined, holding: false };
+        unreadOpening = { identity, pending: true, boundaryId: undefined, holding: false, settled: false };
       }
       // A later boundary, such as a message that arrived while the reader was away, is not where they opened.
       if (boundaryId !== unreadOpening.boundaryId) unreadOpening.holding = false;
@@ -1888,7 +1916,8 @@ export function createConversationViewScope(props: ConversationProps) {
           scrollToUnreadDivider(scrollElement);
           updateScrollFade(scrollElement);
           updateUnreadDividerVisibility();
-          if (!settle) openAtDivider(true);
+          if (settle) opening.settled = true;
+          else openAtDivider(true);
         });
       openAtDivider(false);
     },
@@ -2598,6 +2627,7 @@ export function createConversationViewScope(props: ConversationProps) {
     selectAndConfirmReasoning,
     sendSelectionInstruction,
     sendCardMessage,
+    saveSkillSuggestion,
     quoteRequest,
     quoteSelection,
     openQuote,

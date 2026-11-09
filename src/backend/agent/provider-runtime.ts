@@ -598,13 +598,15 @@ export class ProviderRuntime implements ProviderPort {
             const temp = provider === "antigravity" ? antigravityTemp(this.#credentials) : undefined;
             return temp && { ...temp, provider: providerLabel(provider) };
           },
-          // The sign-in process waits for a slow start, so the check after it waits as long (#3546).
-          // A cancel or a removal must not wait for that start: the accounts start it uninterruptibly.
-          authenticate: (provider, cli, accountEnvironment, afterSignIn) =>
+          // An account check waits for a slow start as the sign-in process does (#3546): the checks of
+          // all accounts start together, and on a busy computer each took longer than the request
+          // timeout (#5927). A cancel or a removal must not wait for that start: the accounts start it
+          // uninterruptibly.
+          authenticate: (provider, cli, accountEnvironment, longStart) =>
             this.#authenticateClient(provider, cli, {
               accountEnvironment,
               interruptibleStart: true,
-              ...(afterSignIn ? { startTimeoutMs: this.#longStartWaitMs(provider) } : {}),
+              ...(longStart ? { startTimeoutMs: this.#longStartWaitMs(provider) } : {}),
             }).pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause }))),
           stopClient: (client) =>
             Effect.gen({ self: this }, function* () {
@@ -3810,6 +3812,14 @@ export class ProviderRuntime implements ProviderPort {
         // stderr is the Python log, `2026-11-02 10:00:00 [WARNING] mcp: …`, which repeats them as
         // records and tracebacks, one "Hermes error" toast per line at each start.
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "mistral") {
+        // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
+        // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the
+        // Python log, such as `WARNING:...:Retrying model completion (attempt 1, ...): ReadError('')`
+        // for a request that it sends again by itself, one "Mistral error" toast per line (#5923).
+        stderrLogger.warn("Mistral Vibe logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (isGlogBelowErrorDiagnostic(message) || isRustLogBelowErrorDiagnostic(message)) {

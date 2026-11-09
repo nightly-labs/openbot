@@ -3,7 +3,9 @@ import {
   type AgentDockDisplay,
   type AgentDockEdge,
   type AgentDockOffset,
+  type AgentDockSeatRef,
 } from "@openbot/contracts/ipc";
+import { agentDockSeatKey } from "@openbot/ui/features/agent-dock/AgentDock";
 import { createSignal } from "solid-js";
 import { z } from "zod";
 
@@ -60,11 +62,40 @@ const preferenceSchema = z
       .catch(DEFAULT_PREFERENCE.offsets),
   })
   .catch(DEFAULT_PREFERENCE);
-const seatsSchema = z.array(z.string().trim().min(1).nullable().catch(null));
+/*
+ * An agent seat is saved as its id, as before channels could be seats. A channel seat is saved as an
+ * object, which an older version reads as a damaged entry and skips.
+ */
+const seatsSchema = z.array(
+  z
+    .union([z.string().trim().min(1), z.object({ channel: z.string().trim().min(1) })])
+    .nullable()
+    .catch(null),
+);
+type SavedSeat = string | { channel: string };
+
+function savedSeat(seat: AgentDockSeatRef): SavedSeat {
+  return seat.kind === "agent" ? seat.id : { channel: seat.id };
+}
+
+function seatOf(saved: SavedSeat): AgentDockSeatRef {
+  return typeof saved === "string" ? { kind: "agent", id: saved } : { kind: "channel", id: saved.channel };
+}
+
+/** The seats without a second copy of a seat, in order. */
+function uniqueSeats(seats: readonly AgentDockSeatRef[]): AgentDockSeatRef[] {
+  const seen = new Set<string>();
+  return seats.filter((seat) => {
+    const key = agentDockSeatKey(seat);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 /* The values that blocked or full storage did not save. They win over older saved values. */
 let unsavedPreference: AgentDockPreference | undefined;
-const unsavedSeats = new Map<string, string[]>();
+const unsavedSeats = new Map<string, AgentDockSeatRef[]>();
 
 function readPreference(): AgentDockPreference {
   if (unsavedPreference) return unsavedPreference;
@@ -76,15 +107,15 @@ function readPreference(): AgentDockPreference {
   }
 }
 
-/** The saved agents of a server's dock. Null when the user never changed that dock. */
-function readSeats(serverId: string): string[] | null {
+/** The saved seats of a server's dock. Null when the user never changed that dock. */
+function readSeats(serverId: string): AgentDockSeatRef[] | null {
   const unsaved = unsavedSeats.get(serverId);
   if (unsaved) return unsaved;
   try {
     const raw = window.localStorage.getItem(SEATS_PREFIX + serverId);
     if (raw === null) return null;
     const parsed = seatsSchema.parse(JSON.parse(raw));
-    return [...new Set(parsed.flatMap((id) => (id ? [id] : [])))];
+    return uniqueSeats(parsed.flatMap((saved) => (saved ? [seatOf(saved)] : [])));
   } catch {
     // Blocked storage or a damaged value: the dock shows the default agents.
     return null;
@@ -143,33 +174,34 @@ export function saveAgentDockOffset(moved: AgentDockOffset): void {
 const AGENT_DOCK_DEFAULT_SEATS = 3;
 
 /**
- * The agents on the dock of a server, in order. Until the user adds or removes an agent, the dock
- * shows the first agents of the sidebar that the user did not hide. `sidebarOrder` runs only then.
- * Read it in a memo: each read parses the saved list.
+ * The agents and channels on the dock of a server, in order. Until the user adds or removes a seat,
+ * the dock shows the first agents of the sidebar that the user did not hide. `sidebarOrder` runs only
+ * then. Read it in a memo: each read parses the saved list.
  */
 export function agentDockSeats(
   serverId: string,
   sidebarOrder: () => readonly string[],
   hiddenAgentIds: ReadonlySet<string>,
-): string[] {
+): AgentDockSeatRef[] {
   seatsVersion();
   return (
     readSeats(serverId) ??
     sidebarOrder()
       .filter((id) => !hiddenAgentIds.has(id))
       .slice(0, AGENT_DOCK_DEFAULT_SEATS)
+      .map((id) => ({ kind: "agent", id }))
   );
 }
 
-/** Two seat lists with the same agents in the same order. */
-export function sameAgentDockSeats(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((id, index) => id === b[index]);
+/** Two seat lists with the same seats in the same order. */
+export function sameAgentDockSeats(a: readonly AgentDockSeatRef[], b: readonly AgentDockSeatRef[]): boolean {
+  return a.length === b.length && a.every((seat, index) => seat.kind === b[index]?.kind && seat.id === b[index]?.id);
 }
 
-export function setAgentDockSeats(serverId: string, seats: readonly string[]): void {
-  const next = [...new Set(seats)];
+export function setAgentDockSeats(serverId: string, seats: readonly AgentDockSeatRef[]): void {
+  const next = uniqueSeats(seats);
   try {
-    window.localStorage.setItem(SEATS_PREFIX + serverId, JSON.stringify(next));
+    window.localStorage.setItem(SEATS_PREFIX + serverId, JSON.stringify(next.map(savedSeat)));
     unsavedSeats.delete(serverId);
   } catch {
     unsavedSeats.set(serverId, next);

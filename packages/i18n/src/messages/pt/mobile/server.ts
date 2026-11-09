@@ -1145,6 +1145,14 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "Este computador anfitrião não oferece análises de uso. Atualize-o para usar esta tela.",
   "mobile.server.usage.planLimitsNote": "Os limites atuais de cada provedor. O período abaixo não os altera.",
+  "mobile.server.machine.title": "Máquina",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Memória",
+  "mobile.server.machine.disk": "Disco",
+  "mobile.server.machine.cores": { one: "{cores} núcleo", other: "{cores} núcleos" },
+  "mobile.server.machine.sizeDetail": "{used} de {total}",
+  "mobile.server.machine.unknown": "Indisponível",
+  "mobile.server.machine.unsupported": "Este computador anfitrião não informa o uso da máquina. Atualize-o para ver.",
   "mobile.server.planLimits.title": "Limites do plano",
   "mobile.server.planLimits.button": "Limites do plano: {summary}",
   "mobile.server.planLimits.left": "{percent}% restante",
@@ -1262,7 +1270,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Não foi possível abrir o site.",
   "mobile.server.sites.unsupported": "Atualize o OpenBot neste servidor para ver os sites dele aqui.",
   "mobile.server.sites.offline": "Conecte-se a este servidor para ver os sites dele.",
-  "mobile.server.route.roles": "Funções",
+  "mobile.server.route.roles": "Permissões",
   "mobile.server.route.role": "Função",
   "mobile.server.roles.description":
     "Escolha os agentes que os membros podem usar. Proprietários e administradores podem usar todos os agentes.",

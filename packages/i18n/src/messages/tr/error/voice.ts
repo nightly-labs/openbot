@@ -34,5 +34,6 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "error.voice.live.unavailable": "OpenAI canlı sesi başlatamadı. Sorun OpenAI tarafında. Daha sonra yeniden deneyin.",
   "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
 } as const satisfies PartialTranslation<typeof source>;

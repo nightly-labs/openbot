@@ -12,6 +12,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
@@ -112,7 +113,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
   }
   if (value !== undefined) {
     const input = value;
-    value = yield* Effect.try({
+    const decodedValue = yield* Effect.try({
       try: () =>
         sideRoute
           ? sideRoute.response(path, response.status, input, {
@@ -120,11 +121,15 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelAttention: true,
               agentTaskUiBlocks: true,
               channelIsolation: true,
+              mcpManyServers: true,
             })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>
         new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
     });
+    // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
+    if (options.capabilities?.includes(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(decodedValue, input);
+    value = decodedValue;
   }
   if (!response.ok) {
     const message =

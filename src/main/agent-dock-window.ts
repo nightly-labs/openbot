@@ -240,16 +240,18 @@ export class AgentDockWindowController {
     return Effect.suspend(() => {
       if (action.type === "send") return this.#send(action);
       if (action.type === "open-chat") {
-        if (action.agentId === null && this.#chatOwner !== rendererId) return Effect.void;
+        if (action.seat === null && this.#chatOwner !== rendererId) return Effect.void;
         const previous = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
         if (previous && previous.rendererId !== rendererId) {
           sendToRenderer(previous.window, IPC_ENDPOINTS.agentDock.closeChat);
         }
-        this.#chatOwner = action.agentId === null ? null : rendererId;
+        this.#chatOwner = action.seat === null ? null : rendererId;
       }
       return Effect.gen({ self: this }, function* () {
         const window = yield* this.#ensureMainWindow();
-        if (action.type === "open-agent" || action.type === "open-settings") this.#options.presentMainWindow(window);
+        if (action.type === "open-agent" || action.type === "open-channel" || action.type === "open-settings") {
+          this.#options.presentMainWindow(window);
+        }
         if (!sendToRenderer(window, IPC_ENDPOINTS.agentDock.action, action)) {
           return yield* new AgentDockFailed({
             cause: new Error(sourceText("error.backend.windowTemporarilyUnavailable")),
@@ -260,7 +262,7 @@ export class AgentDockWindowController {
   }
 
   #send(action: AgentDockSendAction): Effect.Effect<void, AgentDockFailed> {
-    const key = [action.serverId, action.agentId, action.clientMessageId].join("\u0000");
+    const key = [action.serverId, action.seat.kind, action.seat.id, action.clientMessageId].join("\u0000");
     const existing = this.#sends.get(key);
     if (existing) return Deferred.await(existing);
     const done = Deferred.makeUnsafe<void, AgentDockFailed>();
@@ -422,7 +424,7 @@ export class AgentDockWindowController {
     const main = this.#options.getMainWindow();
     const serverId = this.#presentation?.serverId;
     if (main && !main.isDestroyed() && serverId !== undefined) {
-      sendToRenderer(main, IPC_ENDPOINTS.agentDock.action, { type: "open-chat", serverId, agentId: null });
+      sendToRenderer(main, IPC_ENDPOINTS.agentDock.action, { type: "open-chat", serverId, seat: null });
     }
   }
 }

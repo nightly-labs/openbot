@@ -1,4 +1,10 @@
-import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "@openbot/contracts/ipc";
+import type {
+  VaultImportResult,
+  VaultSaveInput,
+  VaultSecretRequest,
+  VaultState,
+  VaultTwoStepCodes,
+} from "@openbot/contracts/ipc";
 
 /**
  * The Vault of one server. Desktop reaches this computer's Vault and a joined server's through main;
@@ -13,6 +19,8 @@ export interface VaultCalls {
   /** Absent for a joined server: the CSV file is on this computer, not on the host. */
   importCsv?: (() => Promise<VaultImportResult>) | undefined;
   reset(): Promise<VaultState>;
+  /** The current two-step code of each login that has a key. Empty for a host without `vault-v3`. */
+  codes(): Promise<VaultTwoStepCodes>;
   /** Returns the function that stops the subscription. */
   onChanged(listener: (state: VaultState) => void): () => void;
 }
@@ -28,6 +36,7 @@ export function desktopVaultCalls(): VaultCalls {
     copy: (request) => vault().copy(request),
     importCsv: () => vault().importCsv(),
     reset: () => vault().reset(),
+    codes: () => vault().codes(),
     onChanged: (listener) => vault().onChanged(listener),
   };
 }
@@ -80,6 +89,7 @@ export function hostVaultCalls(serverId: string): VaultCalls {
       reveal: (request) => vault().hostReveal(request, serverId),
       copy: (request) => vault().hostCopy(request, serverId),
       reset: () => vault().hostReset(serverId),
+      codes: () => vault().hostCodes(serverId),
     },
     (read) => {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {

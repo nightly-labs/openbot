@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
+import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import {
   type ProviderAccountRelay,
   providerAccountRelay,
@@ -122,10 +123,21 @@ const Providers = createSimpleContext({
       if (providerAdminServerId()) return hostCustomProviders.customProviders();
       return undefined;
     }
-    createEffect(providerAdminServerId, (serverId) => {
-      // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
-      if (serverId) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
-    });
+    // Read again when the host's capabilities arrive: the `custom-provider-edit-v1` list has the
+    // header names that Edit needs, and a list read before it has none.
+    const hostEditsCustomProviders = createMemo(() =>
+      serverSupportsCapability(activeServer(), CUSTOM_PROVIDER_EDIT_CAPABILITY),
+    );
+    createEffect(
+      () => {
+        const serverId = providerAdminServerId();
+        return serverId ? `${serverId}:${hostEditsCustomProviders()}` : undefined;
+      },
+      (key) => {
+        // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
+        if (key) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
+      },
+    );
     /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<
       AgentProviderId,

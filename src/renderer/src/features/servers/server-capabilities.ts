@@ -50,6 +50,7 @@ export function serverSupportsCapability(
       capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
       capability === "vault-v2" ||
+      capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||
       capability === "provider-host-sign-in-v1" ||
       capability === "storage-v1" ||
@@ -73,6 +74,7 @@ export function serverSupportsCapability(
       capability === "providers-v4" ||
       capability === "providers-v5" ||
       capability === "custom-provider-harness-v1" ||
+      capability === "custom-provider-edit-v1" ||
       capability === "agent-session-settings-v1" ||
       capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
@@ -82,6 +84,7 @@ export function serverSupportsCapability(
       capability === "host-timezone-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
+      capability === "skill-learning-v1" ||
       capability === "prompt-cache-ttl-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||

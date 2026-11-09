@@ -215,8 +215,10 @@ export interface AccountUsageLimit {
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
   /**
-   * OpenCode only: the weekly or monthly window that `secondary` does not hold. `secondary` is the one
-   * that stops work first, so only the usage list shows this one. The Team API does not send this field.
+   * OpenCode: the weekly or monthly window that `secondary` does not hold. `secondary` is the one that
+   * stops work first, so only the usage list shows this one. Cursor: the total of a plan split into
+   * Cursor's own models (`primary`) and the others (`secondary`), which the ring shows. No usage limit
+   * check reads this field. The Team API does not send it.
    */
   tertiary?: AccountUsageWindow;
   /**

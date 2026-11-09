@@ -108,6 +108,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "مجلدات الوكيل غير مدعومة في هذا الاتصال.",
   "error.team.folderUnavailable": "هذا المجلد غير متاح على حاسوب المضيف.",
   "error.team.memoryReviewUnsupported": "مراجعة الذاكرة غير مدعومة في هذا الاتصال.",
+  "error.team.skillLearningUnsupported": "تعلّم المهارات غير مدعوم في هذا الاتصال.",
   "error.team.promptCacheTtlUnsupported": "مدة ذاكرة التخزين المؤقت للموجّه غير مدعومة في هذا الاتصال.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",
@@ -123,6 +124,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "العرض المباشر للمتصفح غير متاح.",
   "error.team.browserSessionNotFound": "لم يُعثر على جلسة عرض المتصفح.",
   "error.team.mcpUnsupported": "خوادم MCP غير مدعومة في هذا الاتصال.",
+  "error.team.mcpServerListNeedsUpdate":
+    "حدّث OpenBot على هذا الجهاز لاستخدام أكثر من {limit} من خوادم MCP على هذا الخادم.",
   "error.team.storageUnsupported": "التخزين غير مدعوم في هذا الاتصال.",
   "error.team.machineResourcesUnsupported": "استخدام الجهاز غير مدعوم في هذا الاتصال.",
   "error.team.machineAlertMemberInvalid": "يمكن فقط لمالك هذا الخادم أو مسؤوله تلقي تنبيهات الجهاز.",

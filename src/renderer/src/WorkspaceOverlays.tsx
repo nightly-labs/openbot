@@ -8,6 +8,7 @@ import {
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { classifyFailure } from "@openbot/telemetry";
 import { isAgentAccount } from "@openbot/ui/components/provider-accounts";
 import type { AcpRegistrySettingsApi } from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
@@ -505,6 +506,7 @@ function ServerSettings() {
   });
   // A host that updates or rolls back keeps its id, so the API key kind follows this capability too.
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
+  const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
   const vault = createMemo(() => {
     const serverId = vaultServerId();
     if (serverId === undefined) return undefined;
@@ -512,6 +514,7 @@ function ServerSettings() {
     return {
       store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
       apiKeys: vaultApiKeys(),
+      twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
     };
@@ -585,8 +588,16 @@ function ServerSettings() {
       },
       onAddCustomProvider: endpoints.saveCustomProvider,
       onDeleteCustomProvider: endpoints.deleteCustomProvider,
-      // The Team API has no edit route, so only this computer's endpoints have Edit.
-      onUpdateCustomProvider: local ? localEndpoints.updateCustomProvider : undefined,
+      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`. A list read
+      // before the host's capabilities arrived has no header names, and an edit from it would send no
+      // headers and delete the saved ones, so Edit waits for the list of that route.
+      get onUpdateCustomProvider() {
+        if (local) return endpoints.updateCustomProvider;
+        const editable =
+          serverSupportsCapability(server, "custom-provider-edit-v1") &&
+          endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
+        return editable ? endpoints.updateCustomProvider : undefined;
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },
@@ -814,6 +825,7 @@ function ServerSettings() {
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
+          skillLearning={{}}
           hostPromptCacheTtl={{}}
           claudeUserSetup
           hostModelVisibility={{}}

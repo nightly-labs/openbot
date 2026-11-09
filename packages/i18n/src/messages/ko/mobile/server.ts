@@ -1085,6 +1085,14 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "이 호스트는 사용량 분석을 지원하지 않아요. 이 화면을 쓰려면 호스트를 업데이트해 주세요.",
   "mobile.server.usage.planLimitsNote": "각 제공자의 현재 한도입니다. 아래의 기간은 한도를 바꾸지 않습니다.",
+  "mobile.server.machine.title": "머신",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "메모리",
+  "mobile.server.machine.disk": "디스크",
+  "mobile.server.machine.cores": { other: "코어 {cores}개" },
+  "mobile.server.machine.sizeDetail": "{used} / {total}",
+  "mobile.server.machine.unknown": "사용할 수 없음",
+  "mobile.server.machine.unsupported": "이 호스트는 머신 사용량을 알려 주지 않아요. 보려면 호스트를 업데이트하세요.",
   "mobile.server.planLimits.title": "요금제 한도",
   "mobile.server.planLimits.button": "요금제 한도: {summary}",
   "mobile.server.planLimits.left": "{percent}% 남음",
@@ -1201,7 +1209,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "사이트를 열지 못했어요.",
   "mobile.server.sites.unsupported": "여기에서 사이트를 보려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.sites.offline": "사이트를 보려면 이 서버에 연결하세요.",
-  "mobile.server.route.roles": "역할",
+  "mobile.server.route.roles": "권한",
   "mobile.server.route.role": "역할",
   "mobile.server.roles.description":
     "멤버가 사용할 수 있는 에이전트를 선택하세요. 소유자와 관리자는 모든 에이전트를 사용할 수 있어요.",

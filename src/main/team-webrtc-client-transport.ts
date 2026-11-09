@@ -5,6 +5,7 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -23,7 +24,7 @@ import {
   decodeTeamProtocolV8CurrentEvent,
   encodeTeamProtocolV8WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v8-webrtc-adapter";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { decodeTeamProtocolV9WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
@@ -605,6 +606,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelAttention: true,
                     agentTaskUiBlocks: true,
                     channelIsolation: true,
+                    mcpManyServers: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
@@ -619,6 +621,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                   }),
               ),
             );
+        // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
+        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportV9(body));
           this.#hostProtocols.set(hostId, support.protocol.maximum);
@@ -1483,7 +1487,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, sourceText("error.remote.malformedKnownEvent"));
         return;
       }
-      if (decoded.status === "known") this.emit("event", hostId, decoded.event);
+      if (decoded.status === "known") {
+        // The frozen event codec leaves the skill name of a skill question out; the wire frame has it.
+        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(decoded.event, frame.payload);
+        this.emit("event", hostId, decoded.event);
+      }
       this.#lastEventSequence.set(hostId, frame.sequence);
       this.#sendRecoverable(
         hostId,
@@ -1493,6 +1501,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     } catch {
       this.#failProtocol(hostId, "The host returned an invalid event frame.");
     }
+  }
+
+  /** A protocol 9 host adds `skillSuggestion` for this client, which advertises skill-learning-v1. */
+  #sendsSkillSuggestionNames(hostId: string): boolean {
+    return (this.#hostProtocols.get(hostId) ?? 0) >= TEAM_PROTOCOL_V9;
   }
 
   #failProtocol(hostId: string, message: string): void {

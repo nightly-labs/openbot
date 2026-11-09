@@ -111,6 +111,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
+  "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
@@ -121,6 +122,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "Просмотр браузера в реальном времени недоступен.",
   "error.team.browserSessionNotFound": "Сессия вида браузера не найдена.",
   "error.team.mcpUnsupported": "Это подключение не поддерживает серверы MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} серверов MCP.",
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.machineResourcesUnsupported": "Это подключение не поддерживает данные о машине.",
   "error.team.machineAlertMemberInvalid":

@@ -324,6 +324,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "На этом телефоне · только английский",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified работает на этом телефоне, как на компьютере. Он распознаёт только английский, с пунктуацией и с меньшим числом ошибок, чем Parakeet v3, а ваша речь остаётся на телефоне. Пока модель не загружена, слушает распознавание речи телефона.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "На этом телефоне · и китайский вперемешку с английским",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR работает на этом телефоне. Он сам определяет язык речи среди 30 языков и 22 китайских диалектов, даже если вы смешиваете китайский и английский в одной фразе. Ваша речь остаётся на телефоне. Пока модель не загружена, слушает распознавание речи телефона.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "Более 90 языков · отправляет вашу речь в ElevenLabs",
   "mobile.settings.voice.recognition.model": "Речевая модель",

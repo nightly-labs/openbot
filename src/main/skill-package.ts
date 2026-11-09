@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { SKILL_DESCRIPTION_MAX_LENGTH, type SkillPackagePreview } from "@openbot/contracts/ipc";
@@ -8,7 +9,10 @@ import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 
-const MAX_BYTES = 10 * 1024 * 1024;
+/** The YAML frontmatter at the start of a `SKILL.md`; group 1 is the YAML. */
+export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
+
+export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
 export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
@@ -55,7 +59,7 @@ export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "dr
   const skillFile = files["SKILL.md"];
   if (!skillFile) throw new Error(sourceText("error.skill.missingSkillFile"));
   const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
-  const match = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u);
+  const match = text.match(SKILL_FRONTMATTER);
   if (!match) throw new Error(sourceText("error.skill.frontmatterMissing"));
   const metadata = parseYaml(match[1] ?? "");
   if (!isDynamicRecord(metadata)) throw new Error(sourceText("error.skill.metadataInvalid"));
@@ -122,8 +126,11 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/gu, "-")
     .replace(/^-|-$/gu, "")
     .slice(0, 64);
-  if (!value) throw new Error(sourceText("error.skill.slugInvalid"));
-  return value;
+  if (value) return value;
+  // A name with no Latin letter or digit, such as one in Japanese, gets a slug from its hash.
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error(sourceText("error.skill.slugInvalid"));
+  return `skill-${createHash("sha256").update(trimmed).digest("hex").slice(0, 12)}`;
 }
 
 export class SkillArchiveFailure extends Schema.TaggedError<SkillArchiveFailure>()("SkillArchiveFailure", {

@@ -247,9 +247,26 @@
   height: var(--openbot-icon-md);
 }
 
+/* The add menu lists every agent that is not on the dock. With many agents it is taller than the dock
+ * window, so it fits the space left and scrolls. The base class is named so that this rule outranks
+ * the `overflow: hidden` of `.ui-action-menu`. */
+.agent-dock-add-menu.ui-action-menu {
+  max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
+  overflow-y: auto;
+}
+
 .agent-dock-menu-avatar.agent-avatar {
   width: 20px;
   height: 20px;
+}
+
+.agent-dock-menu-channel {
+  display: inline-flex;
+}
+
+.agent-dock-menu-channel .channel-avatar-cluster {
+  --channel-avatar-size: 20px;
+  --agent-avatar-outline-width: 1px;
 }
 
 /* The chat, over the liquid panel. */
@@ -293,6 +310,15 @@
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
+}
+
+.agent-dock-chat-channel {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.agent-dock-chat-channel .channel-avatar-cluster {
+  --channel-avatar-size: 34px;
 }
 
 .agent-dock-chat-title {
@@ -435,6 +461,15 @@
 
 .agent-dock-bubble[data-error] {
   color: var(--openbot-danger-text);
+}
+
+/* The author of a channel message from someone else. */
+.agent-dock-author {
+  display: block;
+  margin-block-end: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
 }
 
 .agent-dock-text {
@@ -709,4 +744,15 @@
 /* The screen edge is the frame there, so the strip of frame on the right of the dock is past the window. */
 :root[data-surface="agent-dock"] .agent-dock {
   right: -5px;
+}
+
+/* A channel draws its member cluster in the square of an agent face. It is last so that it
+ * outranks the face sizes of the rules above. */
+.agent-dock-seat-button .channel-avatar-cluster .agent-avatar,
+.agent-dock-chat-channel .channel-avatar-cluster .agent-avatar,
+.agent-dock-menu-channel .channel-avatar-cluster .agent-avatar {
+  --agent-avatar-optical-offset: calc(var(--channel-avatar-face) * -0.14);
+
+  width: var(--channel-avatar-face);
+  height: var(--channel-avatar-face);
 }

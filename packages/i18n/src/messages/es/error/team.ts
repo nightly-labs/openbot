@@ -112,6 +112,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
+  "error.team.skillLearningUnsupported": "Esta conexión no admite el aprendizaje de habilidades.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
@@ -122,6 +123,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vista del navegador en directo no está disponible.",
   "error.team.browserSessionNotFound": "No se encontró la sesión de vista del navegador.",
   "error.team.mcpUnsupported": "Esta conexión no admite servidores MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Actualiza OpenBot en este dispositivo para usar más de {limit} servidores MCP en este servidor.",
   "error.team.storageUnsupported": "Esta conexión no admite almacenamiento.",
   "error.team.machineResourcesUnsupported": "Esta conexión no admite el uso de la máquina.",
   "error.team.machineAlertMemberInvalid":

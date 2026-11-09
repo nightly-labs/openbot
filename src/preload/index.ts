@@ -40,6 +40,7 @@ import {
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
   decodeHostPersonality,
+  decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeInstanceExportResult,
@@ -69,6 +70,7 @@ import {
   decodeRegistryOperations,
   decodeRemovableRuntimes,
   decodeSaveAgentProfileResult,
+  decodeSaveSkillSuggestionResult,
   decodeServerAuditLog,
   decodeTestCompanySignInResult,
   decodeWorkspaceDirectory,
@@ -334,7 +336,7 @@ import {
   decodeTeamPresenceSnapshot,
   decodeTeamSessions,
 } from "./team-decoding";
-import { decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
+import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
   decodeWorkflowGitHubCatalog,
@@ -621,6 +623,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   generateProfile: decodeAgentProfileDraft,
   saveProfile: decodeSaveAgentProfileResult,
   askSideQuestion: decodeSideQuestionAnswer,
+  saveSkillSuggestion: decodeSaveSkillSuggestionResult,
   createAgent: decodeAgent,
   duplicateAgent: decodeDuplicateAgentResultFromMain,
   updateAgent: decodeAgent,
@@ -1046,6 +1049,7 @@ const openbotApi: OpenBotDesktopApi = {
     copy: decodeVoid,
     importCsv: decodeVaultImportResult,
     reset: decodeVaultState,
+    codes: decodeVaultCodes,
     changed: decodeVaultState,
     hostList: decodeVaultState,
     hostSave: decodeVaultState,
@@ -1053,6 +1057,7 @@ const openbotApi: OpenBotDesktopApi = {
     hostReveal: decodeVaultSecret,
     hostCopy: decodeVoid,
     hostReset: decodeVaultState,
+    hostCodes: decodeVaultCodes,
   }),
   onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
     status: decodeOnePasswordConnectorStatus,
@@ -1161,6 +1166,7 @@ const openbotApi: OpenBotDesktopApi = {
     checkRuntimeUpdates: decodeProviderRuntimeSnapshot,
     listCustomProviders: decodeCustomProviders,
     saveCustomProvider: decodeCustomProviderResult,
+    updateCustomProvider: decodeCustomProviderResult,
     deleteCustomProvider: decodeCustomProviderResult,
   }),
   messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {
@@ -1239,6 +1245,8 @@ const openbotApi: OpenBotDesktopApi = {
     setAgentMemoryLimit: decodeHostAgentMemoryLimit,
     getMemoryReview: decodeHostMemoryReview,
     setMemoryReview: decodeHostMemoryReview,
+    getSkillLearning: decodeHostSkillLearning,
+    setSkillLearning: decodeHostSkillLearning,
     getMachineAlerts: decodeMachineAlertSettings,
     setMachineAlerts: decodeMachineAlertSettings,
     getPromptCacheTtl: decodePromptCacheTtlSetting,

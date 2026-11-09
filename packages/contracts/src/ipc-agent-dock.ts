@@ -1,4 +1,4 @@
-// The agent dock: a column of agents at the right edge of the screen, in a window of its own above the
+// The agent dock: a column of agents and channels at the right edge of the screen, in a window of its own above the
 // other apps. The main renderer owns the conversations: it publishes what the dock shows and does the
 // actions that the dock window sends back. Main sends the messages typed in the dock.
 
@@ -12,12 +12,14 @@ import {
   isIdentifier,
   isNullableBoundedString,
 } from "./ipc-bounded-values";
+import { type ChannelIcon, isChannelIcon } from "./ipc-chat-channels";
+import { type ConversationMessageSender, isConversationMessageSender } from "./ipc-conversation-messages";
 import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 /** The bounds of one presentation. A larger value is not valid, so main rejects the whole presentation. */
 export const AGENT_DOCK_LIMITS = {
   seats: 24,
-  /** The panel shows the newest text messages of each agent; the main window has the full history. */
+  /** The panel shows the newest text messages of each seat; the main window has the full history. */
   messages: 60,
   count: 10_000,
   displays: 16,
@@ -25,7 +27,14 @@ export const AGENT_DOCK_LIMITS = {
   /** The finished-work shelf shows only the newest results; the seats keep the unread count. */
   results: 24,
   resultLabel: 200,
+  /** The add menu offers at most this many channels; the renderer sends the first ones. */
+  channels: 100,
+  /** The bound of a channel image URL, the same as the channel contract. */
+  channelImageUrl: 2048,
 } as const;
+
+/** A seat of the dock: an agent or a channel. The ids of the two kinds can be equal. */
+export type AgentDockSeatRef = { kind: "agent"; id: string } | { kind: "channel"; id: string };
 
 /** The agent fields that the dock, its chat and the mentions in the chat read. */
 export interface AgentDockAgent {
@@ -45,7 +54,17 @@ export type AgentDockMood = (typeof AGENT_DOCK_MOODS)[number];
 export const AGENT_DOCK_WAIT_REASONS = ["question", "approval", "takeover"] as const;
 export type AgentDockWaitReason = (typeof AGENT_DOCK_WAIT_REASONS)[number];
 
-/** The badge on a seat: the same state as the agent's badge in the sidebar. */
+/** The channel fields that a channel seat and its chat read. `members` are agent ids, in channel order. */
+export interface AgentDockChannel {
+  id: string;
+  name: string;
+  title: string;
+  members: string[];
+  icon: ChannelIcon | null;
+  imageUrl: string | null;
+}
+
+/** The badge on a seat: the same state as the agent's or channel's badge in the sidebar. */
 export type AgentDockSeatState =
   | { kind: "waiting"; reason: AgentDockWaitReason; detail: string | null }
   | { kind: "working" }
@@ -54,23 +73,27 @@ export type AgentDockSeatState =
   | { kind: "routine"; phase: "running" | "queued" | "failed"; count: number }
   | { kind: "limited"; resetsAt: number | null };
 
-export interface AgentDockSeat {
-  agent: AgentDockAgent;
-  mood: AgentDockMood;
-  state: AgentDockSeatState | null;
-}
+export type AgentDockSeat =
+  | { kind: "agent"; agent: AgentDockAgent; mood: AgentDockMood; state: AgentDockSeatState | null }
+  | { kind: "channel"; channel: AgentDockChannel; state: AgentDockSeatState | null };
 
-/** A text message of the chat. `error` is a message that the app wrote because an action failed. */
+/**
+ * A text message of the chat. `error` is a message that the app wrote because an action failed.
+ * In a channel, `senderAgentId` names the agent of an agent message, and `senderMember` names another
+ * person who wrote a `you` message. Both are null for the reader's own messages and in an agent chat.
+ */
 export interface AgentDockMessage {
   id: string;
   author: "you" | "agent";
+  senderAgentId: string | null;
+  senderMember: ConversationMessageSender | null;
   kind: "text" | "error";
   body: string;
   attachments: AttachmentSummary[];
 }
 
 export interface AgentDockChat {
-  agentId: string;
+  seat: AgentDockSeatRef;
   /** The newest text messages, oldest first. */
   messages: AgentDockMessage[];
   working: boolean;
@@ -135,23 +158,27 @@ export interface AgentDockPresentation {
   seats: AgentDockSeat[];
   /** The agents that the add menu offers. */
   available: AgentDockAgent[];
+  /** The channels that the add menu offers. */
+  availableChannels: AgentDockChannel[];
   /** All agents of the server, so that mentions in a chat show as chips. */
   agents: AgentDockAgent[];
   /** One chat for each seat. */
   chats: AgentDockChat[];
-  /** The unread results of the seated agents, oldest first. Empty when the user turned the shelf off. */
+  /** The unread results of the seated agents, oldest first. Channels have none. Empty when the user turned the shelf off. */
   results: AgentDockResult[];
 }
 
 export type AgentDockAction =
   /** The chat that the panel shows, or null when the panel closes. */
-  | { type: "open-chat"; serverId: string; agentId: string | null }
-  | { type: "add"; serverId: string; agentId: string }
-  | { type: "remove"; serverId: string; agentId: string }
-  /** Main sends it. A retry of the same draft keeps its `clientMessageId`, so the agent gets the message once. */
-  | { type: "send"; serverId: string; agentId: string; text: string; clientMessageId: string }
+  | { type: "open-chat"; serverId: string; seat: AgentDockSeatRef | null }
+  | { type: "add"; serverId: string; seat: AgentDockSeatRef }
+  | { type: "remove"; serverId: string; seat: AgentDockSeatRef }
+  /** Main sends it. A retry of the same draft keeps its `clientMessageId`, so the seat gets the message once. */
+  | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
   /** Shows the agent in the main window. */
   | { type: "open-agent"; serverId: string; agentId: string }
+  /** Shows the channel in the main window. */
+  | { type: "open-channel"; serverId: string; channelId: string }
   /** Opens the agent in its own chat window. */
   | { type: "open-window"; serverId: string; agentId: string }
   | { type: "open-link"; url: string }
@@ -175,6 +202,7 @@ export function isAgentDockPresentation(value: unknown): value is AgentDockPrese
     isList(value.offsets, AGENT_DOCK_LIMITS.displays, isAgentDockOffset) &&
     isList(value.seats, AGENT_DOCK_LIMITS.seats, isSeat) &&
     isList(value.available, INPUT_LIMITS.agents, isAgent) &&
+    isList(value.availableChannels, AGENT_DOCK_LIMITS.channels, isChannel) &&
     isList(value.agents, INPUT_LIMITS.agents, isAgent) &&
     isList(value.chats, AGENT_DOCK_LIMITS.seats, isChat) &&
     isList(value.results, AGENT_DOCK_LIMITS.results, isResult)
@@ -188,15 +216,18 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
   if (!isIdentifier(value.serverId)) return false;
   switch (value.type) {
     case "open-chat":
-      return value.agentId === null || isIdentifier(value.agentId);
+      return value.seat === null || isSeatRef(value.seat);
     case "add":
     case "remove":
+      return isSeatRef(value.seat);
     case "open-agent":
     case "open-window":
       return isIdentifier(value.agentId);
+    case "open-channel":
+      return isIdentifier(value.channelId);
     case "send":
       return (
-        isIdentifier(value.agentId) &&
+        isSeatRef(value.seat) &&
         isBoundedString(value.text, INPUT_LIMITS.messageText) &&
         value.text.trim().length > 0 &&
         isIdentifier(value.clientMessageId)
@@ -265,13 +296,26 @@ function isAgent(value: unknown): value is AgentDockAgent {
   );
 }
 
-function isSeat(value: unknown): value is AgentDockSeat {
+function isChannel(value: unknown): value is AgentDockChannel {
   return (
     isDynamicRecord(value) &&
-    isAgent(value.agent) &&
-    isOneOf(AGENT_DOCK_MOODS, value.mood) &&
-    (value.state === null || isSeatState(value.state))
+    isIdentifier(value.id) &&
+    isBoundedString(value.name, INPUT_LIMITS.agentName) &&
+    isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
+    isList(value.members, INPUT_LIMITS.agents, isIdentifier) &&
+    (value.icon === null || isChannelIcon(value.icon)) &&
+    isNullableBoundedString(value.imageUrl, AGENT_DOCK_LIMITS.channelImageUrl)
   );
+}
+
+function isSeatRef(value: unknown): value is AgentDockSeatRef {
+  return isDynamicRecord(value) && (value.kind === "agent" || value.kind === "channel") && isIdentifier(value.id);
+}
+
+function isSeat(value: unknown): value is AgentDockSeat {
+  if (!isDynamicRecord(value) || !(value.state === null || isSeatState(value.state))) return false;
+  if (value.kind === "agent") return isAgent(value.agent) && isOneOf(AGENT_DOCK_MOODS, value.mood);
+  return value.kind === "channel" && isChannel(value.channel);
 }
 
 function isSeatState(value: unknown): value is AgentDockSeatState {
@@ -299,7 +343,7 @@ function isSeatState(value: unknown): value is AgentDockSeatState {
 function isChat(value: unknown): value is AgentDockChat {
   return (
     isDynamicRecord(value) &&
-    isIdentifier(value.agentId) &&
+    isSeatRef(value.seat) &&
     isList(value.messages, AGENT_DOCK_LIMITS.messages, isMessage) &&
     isBoolean(value.working) &&
     (value.wait === null || isOneOf(AGENT_DOCK_WAIT_REASONS, value.wait))
@@ -311,6 +355,8 @@ function isMessage(value: unknown): value is AgentDockMessage {
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
     isOneOf(["you", "agent"] as const, value.author) &&
+    (value.senderAgentId === null || isIdentifier(value.senderAgentId)) &&
+    (value.senderMember === null || isConversationMessageSender(value.senderMember)) &&
     isOneOf(["text", "error"] as const, value.kind) &&
     isBoundedString(value.body, INPUT_LIMITS.messageText) &&
     isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary)

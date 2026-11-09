@@ -115,7 +115,7 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       await skills.localInstall({ agentId, skillId: skill.id, revision: 1 });
       return clone(skill);
     },
-    localRevise: async ({ skillId, expectedRevision }) => {
+    localRevise: async ({ agentId, skillId, expectedRevision }) => {
       const index = localSkills.findIndex((item) => item.id === skillId);
       const current = localSkills[index];
       if (!current || current.version !== expectedRevision)
@@ -123,6 +123,8 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       const skill = { ...current, version: expectedRevision + 1, versionId: String(expectedRevision + 1) };
       localSkills[index] = skill;
       localRevisions.set(`${skill.id}:${skill.version}`, skill);
+      if (readInstalledSkills(agentId).some((item) => item.skillId === skillId))
+        await skills.localInstall({ agentId, skillId, revision: skill.version });
       return clone(skill);
     },
     localInstall: async ({ agentId, skillId, revision }) => {

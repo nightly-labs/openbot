@@ -24,6 +24,8 @@ interface QueuePanelProps {
   onSteer?: ((deliveryId: string) => void) | undefined;
   /** The agent's provider cannot steer, so the row action is Send now. */
   sendsNow?: boolean | undefined;
+  /** A routine run holds this chat's turn. A message cannot steer it, so its row names the routine. */
+  routineRuns?: boolean | undefined;
   /** Starts a separate task with a queued message. Absent where the host keeps no tasks. */
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
@@ -504,12 +506,20 @@ export function QueuePanel(props: QueuePanelProps) {
                         <span class="agent-queue-editing-badge">{t("queue.item.editing")}</span>
                       </Show>
                       <Show when={!editing && delivery.status === "queued" && delivery.steerFallback}>
-                        {(fallback) => (
-                          <span class="agent-queue-editing-badge" title={t(STEER_FALLBACK_REASON[fallback()])}>
-                            {t("queue.item.notSteered")}
-                            <span class="sr-only"> {t(STEER_FALLBACK_REASON[fallback()])}</span>
-                          </span>
-                        )}
+                        {(fallback) => {
+                          const reason = () =>
+                            t(
+                              fallback() === "steer-failed" && props.routineRuns
+                                ? "queue.item.steerFallback.routineRun"
+                                : STEER_FALLBACK_REASON[fallback()],
+                            );
+                          return (
+                            <span class="agent-queue-editing-badge" title={reason()}>
+                              {t("queue.item.notSteered")}
+                              <span class="sr-only"> {reason()}</span>
+                            </span>
+                          );
+                        }}
                       </Show>
                       <Show when={props.onSteer}>
                         {(steer) => (

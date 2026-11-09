@@ -112,6 +112,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Deze verbinding ondersteunt de mappen van agents niet.",
   "error.team.folderUnavailable": "Deze map is niet beschikbaar op de hostcomputer.",
   "error.team.memoryReviewUnsupported": "Deze verbinding ondersteunt de geheugencontrole niet.",
+  "error.team.skillLearningUnsupported": "Vaardigheden leren wordt niet ondersteund door deze verbinding.",
   "error.team.promptCacheTtlUnsupported": "Deze verbinding ondersteunt de cachetijd van prompts niet.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
@@ -127,6 +128,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "De live browserweergave is niet beschikbaar.",
   "error.team.browserSessionNotFound": "Sessie van de browserweergave niet gevonden.",
   "error.team.mcpUnsupported": "Deze verbinding ondersteunt geen MCP-servers.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Werk OpenBot op dit apparaat bij om meer dan {limit} MCP-servers op deze server te gebruiken.",
   "error.team.storageUnsupported": "Deze verbinding ondersteunt geen opslag.",
   "error.team.machineResourcesUnsupported": "Deze verbinding ondersteunt geen machinegebruik.",
   "error.team.machineAlertMemberInvalid":

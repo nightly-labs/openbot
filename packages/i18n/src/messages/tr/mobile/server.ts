@@ -1132,6 +1132,15 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "Bu ana makine kullanım analizlerini desteklemiyor. Bu görünümü kullanmak için ana makineyi güncelleyin.",
   "mobile.server.usage.planLimitsNote": "Her sağlayıcının güncel limitleri. Aşağıdaki aralık bunları değiştirmez.",
+  "mobile.server.machine.title": "Makine",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Bellek",
+  "mobile.server.machine.disk": "Disk",
+  "mobile.server.machine.cores": { one: "{cores} çekirdek", other: "{cores} çekirdek" },
+  "mobile.server.machine.sizeDetail": "{used} / {total}",
+  "mobile.server.machine.unknown": "Kullanılamıyor",
+  "mobile.server.machine.unsupported":
+    "Bu ana makine, makine kullanımını bildirmiyor. Görmek için ana makineyi güncelle.",
   "mobile.server.planLimits.title": "Plan limitleri",
   "mobile.server.planLimits.button": "Plan limitleri: {summary}",
   "mobile.server.planLimits.left": "%{percent} kaldı",
@@ -1249,7 +1258,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Site açılamadı.",
   "mobile.server.sites.unsupported": "Sitelerini burada görmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.sites.offline": "Sitelerini görmek için bu sunucuya bağlanın.",
-  "mobile.server.route.roles": "Roller",
+  "mobile.server.route.roles": "İzinler",
   "mobile.server.route.role": "Rol",
   "mobile.server.roles.description":
     "Üyelerin kullanabileceği ajanları seçin. Sahipler ve yöneticiler tüm ajanları kullanabilir.",

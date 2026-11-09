@@ -108,5 +108,6 @@ export const messages = {
   "status.agent.vaultField.email": "邮箱地址",
   "status.agent.nextStepContinues": "助手在下一步之前停下了。继续工作（{current}/{limit}）。",
   "status.agent.planContinues": "计划还有未完成的步骤。助手继续工作（{current}/{limit}）。",
+  "status.agent.compactionContinues": "助手压缩上下文时连接中断。助手将继续工作。",
   "status.agent.branchTitle": "分支聊天",
 } as const satisfies PartialTranslation<typeof source>;
