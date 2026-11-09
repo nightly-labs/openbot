@@ -1,21 +1,19 @@
-import { type Spring, springKeyframes, springProgress } from "@openbot/ui/spring-motion";
+import {
+  EASE_OUT,
+  ISLAND_CLOSE,
+  ISLAND_CONTENT,
+  ISLAND_OPEN,
+  type Spring,
+  springKeyframes,
+  springProgress,
+} from "@openbot/ui/spring-motion";
 import { clamp, mix, motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
 
 /** The send motion: a spring with no visible bounce. It starts at rest, so a motion does not jump at its first frame. */
 const SEND_SPRING: Spring = { response: 0.43, dampingFraction: 0.78 };
 
-/**
- * The island springs, as the product island and the voice morph use them: the island opens with a small
- * overshoot and closes with none. The content comes and goes on its own, shorter spring.
- */
-const ISLAND_OPEN: Spring = { response: 0.5, dampingFraction: 0.8 };
-const ISLAND_CLOSE: Spring = { response: 0.45, dampingFraction: 1 };
-const ISLAND_CONTENT: Spring = { response: 0.34, dampingFraction: 0.88 };
-
 /** With reduced motion, the island does not change size, and its content changes with this short fade. */
 const ISLAND_FADE_MS = 150;
-
-const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 
 /** Where `spring` is at `time`, from 0 to 1 of a motion that lasts `length` seconds. It ends at exactly 1. */
 function springAt(time: number, spring: Spring, length: number): number {
