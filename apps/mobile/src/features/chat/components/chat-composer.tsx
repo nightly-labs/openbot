@@ -23,7 +23,6 @@ import {
   TextInput,
   type TextInputInstance,
   useColorScheme,
-  useWindowDimensions,
   View,
   type ViewStyle,
 } from "react-native";
@@ -57,6 +56,7 @@ import {
   composerBottomGap,
   restingComposerHeight,
 } from "@/shared/lib/composer-metrics";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
@@ -446,7 +446,7 @@ export const ChatComposer = memo(function ChatComposer({
     setSkillsOnly(true);
     inputRef.current?.focus();
   }, [skillPickerVersion, onChangeDraft]);
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const insets = useSafeAreaInsets();
   // The bar keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const barWidth = useColumnWidth() - insets.left - insets.right;

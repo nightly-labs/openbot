@@ -72,9 +72,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Clair",
   "mobile.settings.appearance.dark": "Sombre",
   "mobile.settings.appearance.theme": "Thème",
-  "mobile.settings.appearance.agentColorMessages": "Couleur de l’agent sur mes messages",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Vos messages dans une discussion avec un agent prennent la couleur de cet agent. Désactivez cette option si le texte est difficile à lire.",
+  "mobile.settings.appearance.textSize": "Taille du texte",
+  "mobile.settings.appearance.textSizeFooter":
+    "Modifie la taille du texte dans l’app, en plus de la taille du texte des réglages de votre téléphone. Les éléments que le système dessine, comme les menus, les barres d’onglets et les barres de navigation, utilisent uniquement le réglage du téléphone.",
+  "mobile.settings.appearance.messageColor": "Couleur des messages",
+  "mobile.settings.appearance.messageColorNone": "Aucune couleur",
+  "mobile.settings.appearance.messageColorAgent": "Couleur de l’agent",
+  "mobile.settings.appearance.messageColorCustom": "Couleur personnalisée",
+  "mobile.settings.appearance.messageColorPick": "Couleur",
+  "mobile.settings.appearance.messageColorHue": "Teinte",
+  "mobile.settings.appearance.messageColorSaturation": "Saturation",
+  "mobile.settings.appearance.messageColorLightness": "Luminosité",
+  "mobile.settings.appearance.messageColorFooter":
+    "Avec Couleur de l’agent, vos messages dans une discussion avec un agent prennent la couleur de cet agent. Avec Couleur personnalisée, vos messages dans toutes les discussions prennent la couleur choisie. La couleur du texte change pour rester lisible.",
   "mobile.settings.animations.title": "Animations",
   "mobile.settings.animations.footer":
     "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",

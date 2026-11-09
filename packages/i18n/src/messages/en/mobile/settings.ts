@@ -70,9 +70,19 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.light": "Light",
   "mobile.settings.appearance.dark": "Dark",
   "mobile.settings.appearance.theme": "Theme",
-  "mobile.settings.appearance.agentColorMessages": "Agent color on my messages",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Your messages in an agent chat use that agent’s color. Turn off if the text is hard to read.",
+  "mobile.settings.appearance.textSize": "Text size",
+  "mobile.settings.appearance.textSizeFooter":
+    "Changes the size of text in the app, on top of the text size in your phone settings. Parts that the system draws, such as menus, tab bars and navigation bars, use only the phone setting.",
+  "mobile.settings.appearance.messageColor": "Message color",
+  "mobile.settings.appearance.messageColorNone": "No color",
+  "mobile.settings.appearance.messageColorAgent": "Agent color",
+  "mobile.settings.appearance.messageColorCustom": "Custom color",
+  "mobile.settings.appearance.messageColorPick": "Color",
+  "mobile.settings.appearance.messageColorHue": "Hue",
+  "mobile.settings.appearance.messageColorSaturation": "Saturation",
+  "mobile.settings.appearance.messageColorLightness": "Lightness",
+  "mobile.settings.appearance.messageColorFooter":
+    "With Agent color, your messages in an agent chat use the color of that agent. With Custom color, your messages in all chats use the color that you select. The text color changes so that it stays readable.",
   "mobile.settings.animations.title": "Animations",
   "mobile.settings.animations.footer":
     "Turn off Animations to reduce motion in the whole app. When Reduce Motion is on in your phone settings, the app also reduces motion. The animations below then stay off.",

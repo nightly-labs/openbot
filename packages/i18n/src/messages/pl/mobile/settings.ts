@@ -76,9 +76,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Jasny",
   "mobile.settings.appearance.dark": "Ciemny",
   "mobile.settings.appearance.theme": "Motyw",
-  "mobile.settings.appearance.agentColorMessages": "Kolor agenta w moich wiadomościach",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Twoje wiadomości w czacie z agentem mają kolor tego agenta. Wyłącz, jeśli tekst jest trudny do odczytania.",
+  "mobile.settings.appearance.textSize": "Rozmiar tekstu",
+  "mobile.settings.appearance.textSizeFooter":
+    "Zmienia rozmiar tekstu w aplikacji, dodatkowo do rozmiaru tekstu w ustawieniach telefonu. Elementy rysowane przez system, takie jak menu, paski kart i paski nawigacji, używają tylko ustawienia telefonu.",
+  "mobile.settings.appearance.messageColor": "Kolor wiadomości",
+  "mobile.settings.appearance.messageColorNone": "Bez koloru",
+  "mobile.settings.appearance.messageColorAgent": "Kolor agenta",
+  "mobile.settings.appearance.messageColorCustom": "Własny kolor",
+  "mobile.settings.appearance.messageColorPick": "Kolor",
+  "mobile.settings.appearance.messageColorHue": "Odcień",
+  "mobile.settings.appearance.messageColorSaturation": "Nasycenie",
+  "mobile.settings.appearance.messageColorLightness": "Jasność",
+  "mobile.settings.appearance.messageColorFooter":
+    "Z kolorem agenta Twoje wiadomości w czacie z agentem mają kolor tego agenta. Z własnym kolorem Twoje wiadomości we wszystkich czatach mają wybrany kolor. Kolor tekstu zmienia się, aby tekst był czytelny.",
   "mobile.settings.animations.title": "Animacje",
   "mobile.settings.animations.footer":
     "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",

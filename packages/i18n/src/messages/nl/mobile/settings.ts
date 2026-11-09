@@ -71,9 +71,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Licht",
   "mobile.settings.appearance.dark": "Donker",
   "mobile.settings.appearance.theme": "Thema",
-  "mobile.settings.appearance.agentColorMessages": "Agentkleur op mijn berichten",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Je berichten in een agentchat gebruiken de kleur van die agent. Zet dit uit als de tekst moeilijk te lezen is.",
+  "mobile.settings.appearance.textSize": "Tekstgrootte",
+  "mobile.settings.appearance.textSizeFooter":
+    "Wijzigt de tekstgrootte in de app, bovenop de tekstgrootte in de instellingen van je telefoon. Onderdelen die het systeem tekent, zoals menu's, tabbalken en navigatiebalken, gebruiken alleen de instelling van de telefoon.",
+  "mobile.settings.appearance.messageColor": "Berichtkleur",
+  "mobile.settings.appearance.messageColorNone": "Geen kleur",
+  "mobile.settings.appearance.messageColorAgent": "Agentkleur",
+  "mobile.settings.appearance.messageColorCustom": "Eigen kleur",
+  "mobile.settings.appearance.messageColorPick": "Kleur",
+  "mobile.settings.appearance.messageColorHue": "Tint",
+  "mobile.settings.appearance.messageColorSaturation": "Verzadiging",
+  "mobile.settings.appearance.messageColorLightness": "Lichtheid",
+  "mobile.settings.appearance.messageColorFooter":
+    "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
   "mobile.settings.animations.title": "Animaties",
   "mobile.settings.animations.footer":
     "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",

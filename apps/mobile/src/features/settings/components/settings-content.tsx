@@ -6,11 +6,11 @@ import {
   type AccessibilityActionInfo,
   type LayoutChangeEvent,
   type ScrollViewProps,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
@@ -126,7 +126,7 @@ export function SettingsRow({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const measures = Boolean(trailing) && fontScale >= STACKED_FONT_SCALE;
   const [rowWidth, setRowWidth] = useState(0);
   const [trailingWidth, setTrailingWidth] = useState(0);

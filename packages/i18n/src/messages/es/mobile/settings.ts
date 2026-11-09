@@ -75,9 +75,19 @@ export const messages = {
   "mobile.settings.appearance.light": "Claro",
   "mobile.settings.appearance.dark": "Oscuro",
   "mobile.settings.appearance.theme": "Tema",
-  "mobile.settings.appearance.agentColorMessages": "Color del agente en mis mensajes",
-  "mobile.settings.appearance.agentColorMessagesFooter":
-    "Tus mensajes en el chat de un agente usan su color. Desactívalo si el texto es difícil de leer.",
+  "mobile.settings.appearance.textSize": "Tamaño del texto",
+  "mobile.settings.appearance.textSizeFooter":
+    "Cambia el tamaño del texto en la app, además del tamaño de texto de los ajustes de tu teléfono. Las partes que dibuja el sistema, como los menús, las barras de pestañas y las barras de navegación, usan solo el ajuste del teléfono.",
+  "mobile.settings.appearance.messageColor": "Color de mensajes",
+  "mobile.settings.appearance.messageColorNone": "Sin color",
+  "mobile.settings.appearance.messageColorAgent": "Color del agente",
+  "mobile.settings.appearance.messageColorCustom": "Color personalizado",
+  "mobile.settings.appearance.messageColorPick": "Color",
+  "mobile.settings.appearance.messageColorHue": "Tono",
+  "mobile.settings.appearance.messageColorSaturation": "Saturación",
+  "mobile.settings.appearance.messageColorLightness": "Luminosidad",
+  "mobile.settings.appearance.messageColorFooter":
+    "Con Color del agente, tus mensajes en el chat de un agente usan su color. Con Color personalizado, tus mensajes en todos los chats usan el color que elijas. El color del texto cambia para que siga siendo legible.",
   "mobile.settings.animations.title": "Animaciones",
   "mobile.settings.animations.footer":
     "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
