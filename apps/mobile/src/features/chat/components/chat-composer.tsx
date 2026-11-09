@@ -867,10 +867,14 @@ export const ChatComposer = memo(function ChatComposer({
   // Stop opens it on the words when it was closed.
   const editAfterDictation = useRef(false);
   useEffect(() => {
-    if (dictationBusy || !editAfterDictation.current) return;
+    if (dictationBusy) return;
+    // The recognizer writes the draft without onChangeText, so its words are an edit that opens the gate
+    // the last send closed. Without this, Send waited for a focus that an Android Stop does not always give.
+    sendGate.edit();
+    if (!editAfterDictation.current) return;
     editAfterDictation.current = false;
     inputRef.current?.focus();
-  }, [dictationBusy]);
+  }, [dictationBusy, sendGate]);
   const finishDictation = useCallback(() => {
     if (!dictation) return;
     editAfterDictation.current = true;
