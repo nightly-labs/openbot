@@ -16,7 +16,7 @@ import FileText from "lucide-react-native/icons/file-text";
 import Globe from "lucide-react-native/icons/globe";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import type { Token, Tokens } from "marked";
-import { Fragment, memo, type ReactNode, useMemo } from "react";
+import { Fragment, memo, type ReactNode, useMemo, useState } from "react";
 import {
   type ColorValue,
   Platform,
@@ -50,6 +50,7 @@ import {
   textDirection,
   textDirectionStyle,
 } from "@/shared/lib/text-direction";
+import type { BubbleTone } from "../model/bubble-tone";
 import {
   parseFinishedChatMarkdown,
   parseInlineChatMarkdown,
@@ -115,6 +116,8 @@ interface TextPresentation {
   linkFavicons: boolean;
   /** The layout direction of the view that holds the block. A list item or a quote can change it. */
   direction: TextDirection;
+  /** The colors of code in a bubble with a message color. */
+  tone: BubbleTone | undefined;
 }
 
 /** Each block reads in the direction of its own first letter, in an app of either direction. */
@@ -346,8 +349,8 @@ function CodeSpan({
     <View
       key={offset}
       collapsable={false}
-      className={`max-w-full self-start bg-control py-px ${index === 0 ? "rounded-l-xl pl-1" : ""} ${index === pieces.length - 1 ? "rounded-r-xl pr-1" : ""}`}
-      style={chipStyle}
+      className={`max-w-full self-start py-px ${presentation.tone ? "" : "bg-control"} ${index === 0 ? "rounded-l-xl pl-1" : ""} ${index === pieces.length - 1 ? "rounded-r-xl pr-1" : ""}`}
+      style={[chipStyle, presentation.tone ? { backgroundColor: presentation.tone.panel } : undefined]}
     >
       <Text
         selectable={presentation.selectable}
@@ -370,6 +373,7 @@ function CodeSpan({
  * their bottom edge, so the chip moves down until it is centred on the letters around it.
  */
 function mentionChip(presentation: TextPresentation) {
+  const { tone } = presentation;
   const size = CHAT_TEXT_STYLES[presentation.type].fontSize - 1;
   const lineHeight = Math.round(size * 1.25);
   const padding = 1;
@@ -379,10 +383,12 @@ function mentionChip(presentation: TextPresentation) {
   return {
     label: [CHAT_TEXT_STYLES[presentation.type], presentation.style, { fontSize: size, lineHeight, flexShrink: 1 }],
     mark: (size + 1) * presentation.fontScale,
+    className: `max-w-full flex-row items-center gap-1 rounded-full pr-1.5 pl-1 ${tone ? "" : "bg-control/30"}`,
     style: {
       paddingVertical: padding * presentation.fontScale,
       transform: [{ translateY: below * presentation.fontScale }],
       borderCurve: "circular" as const,
+      ...(tone ? { backgroundColor: tone.chip } : null),
     },
   };
 }
@@ -390,11 +396,7 @@ function mentionChip(presentation: TextPresentation) {
 function AgentMention({ agent, presentation }: { agent: MobileAgent; presentation: TextPresentation }) {
   const chip = mentionChip(presentation);
   return (
-    <View
-      collapsable={false}
-      className="max-w-full flex-row items-center gap-1 rounded-full bg-control/30 pr-1.5 pl-1"
-      style={chip.style}
-    >
+    <View collapsable={false} className={chip.className} style={chip.style}>
       <BloubAvatarThumbnail
         agentId={agent.id}
         serverId={agent.serverId}
@@ -416,11 +418,7 @@ function SkillMention({ name, app, presentation }: { name: string; app: boolean;
   const Mark = app ? Blocks : Sparkles;
   const chip = mentionChip(presentation);
   return (
-    <View
-      collapsable={false}
-      className="max-w-full flex-row items-center gap-1 rounded-full bg-control/30 pr-1.5 pl-1"
-      style={chip.style}
-    >
+    <View collapsable={false} className={chip.className} style={chip.style}>
       <Mark
         color={presentation.style.color === undefined ? undefined : String(presentation.style.color)}
         size={chip.mark - 2 * presentation.fontScale}
@@ -448,7 +446,7 @@ function TabMention({ id, name, presentation }: { id: string; name: string; pres
       <Text style={chip.label}>{name}</Text>
     </>
   );
-  const className = "max-w-full flex-row items-center gap-1 rounded-full bg-control/30 pr-1.5 pl-1";
+  const { className } = chip;
   if (!openTab)
     return (
       <View collapsable={false} className={className} style={chip.style}>
@@ -673,6 +671,119 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
   );
 }
 
+/** The width of a column. A narrow message scrolls the table sideways; a wide one widens the columns. */
+const TABLE_COLUMN_WIDTH = 176;
+/** The space between the edge of the table card and its panel of rows. */
+const TABLE_INSET = 3;
+
+/** A colour with the alpha of an `#rrggbb` suffix. Other colour forms stay as they are. */
+function withAlpha(color: string, alpha: string): string {
+  return /^#[0-9a-f]{6}$/iu.test(color) ? `${color}${alpha}` : color;
+}
+
+/**
+ * A table as the desktop data table: a card with the header row on it in muted text, and the rows on
+ * an inset panel with a line between them. In a bubble with a message color, the text keeps the
+ * bubble's colors.
+ */
+function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentation: TextPresentation }) {
+  const [canvas, textColor = "", headerText, text] = useCSSVariable([
+    "--openbot-bg-native-canvas",
+    "--openbot-text-primary",
+    "--openbot-data-table-header-text",
+    "--openbot-data-table-text",
+  ]).map(String);
+  const { tone } = presentation;
+  // The card has the background of a code block, and the lines between the rows have its color.
+  // The rows are on the darker canvas. A message color gives its own surfaces; see `BubbleTone`.
+  const card = tone?.panel ?? withAlpha(textColor, "0f");
+  const rowsBackground = tone?.deep ?? canvas;
+  const rowLine = tone?.line ?? card;
+  const [frameWidth, setFrameWidth] = useState(0);
+  // A column is at least `TABLE_COLUMN_WIDTH` wide; the columns of a narrow table share the width of
+  // the card. The rows are inset by `TABLE_INSET` on each side.
+  const columns = Math.max(1, token.header.length);
+  const columnWidth = Math.max(TABLE_COLUMN_WIDTH, (frameWidth - TABLE_INSET * 2) / columns);
+  // The columns run in the direction of the header, so an English table in an Arabic chat keeps
+  // its first column at the left. Each cell reads in the direction of its own text.
+  const tableDirection = textDirection(token.header.map((cell) => cell.text).join(" "), presentation.direction);
+  const cellPresentation = withDirection(presentation, tableDirection);
+  const header = { ...cellPresentation, style: { ...cellPresentation.style, color: tone?.muted ?? headerText } };
+  const body = { ...cellPresentation, style: { ...cellPresentation.style, color: tone?.foreground ?? text } };
+  const cell = (item: Tokens.TableCell, offset: number, rowPresentation: TextPresentation) => (
+    <View
+      key={offset}
+      className={rowPresentation === header ? "px-3 py-2" : "px-3 py-3"}
+      style={{ width: columnWidth }}
+    >
+      <Text
+        selectable={presentation.selectable}
+        style={[
+          CHAT_TEXT_STYLES[presentation.type],
+          textContainerStyle(item.text, rowPresentation),
+          {
+            writingDirection: textDirection(item.text, tableDirection),
+            textAlign: cellAlignment(item.align, tableDirection),
+          },
+          { fontWeight: rowPresentation === header ? "500" : "400" },
+        ]}
+      >
+        {blockDirectionMark(item.text, rowPresentation)}
+        {inline(item.tokens, rowPresentation)}
+      </Text>
+    </View>
+  );
+  return (
+    <View
+      onLayout={(event) => setFrameWidth(Math.floor(event.nativeEvent.layout.width))}
+      style={{
+        borderRadius: 16,
+        borderCurve: "continuous",
+        overflow: "hidden",
+        backgroundColor: card,
+      }}
+    >
+      <ScrollView horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
+        <View style={{ direction: tableDirection }}>
+          {/* The header has the inset of the rows, so its columns line up with theirs. */}
+          <View className="flex-row" style={{ paddingHorizontal: TABLE_INSET }}>
+            {sourceEntries(token.header, (item) => item.text).map(({ value: item, offset }) =>
+              cell(item, offset, header),
+            )}
+          </View>
+          {token.rows.length ? (
+            <View
+              style={{
+                marginHorizontal: TABLE_INSET,
+                marginBottom: TABLE_INSET,
+                borderRadius: 13,
+                borderCurve: "continuous",
+                overflow: "hidden",
+                backgroundColor: rowsBackground,
+              }}
+            >
+              {sourceEntries(token.rows, (row) => row.map((item) => item.text).join("|")).map(
+                ({ value: row, offset: rowOffset }, rowIndex) => (
+                  <View
+                    key={rowOffset}
+                    className="flex-row"
+                    style={{
+                      borderBottomWidth: rowIndex < token.rows.length - 1 ? 1 : 0,
+                      borderColor: rowLine,
+                    }}
+                  >
+                    {sourceEntries(row, (item) => item.text).map(({ value: item, offset }) => cell(item, offset, body))}
+                  </View>
+                ),
+              )}
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 function MarkdownBlocks({
   tokens,
   presentation,
@@ -756,6 +867,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
               text={token.text}
               language="latex"
               finished={presentation.finished}
+              tone={presentation.tone}
             />
           }
         />
@@ -767,13 +879,20 @@ const MarkdownBlock = memo(function MarkdownBlock({
     return (
       <StreamingBlock enabled={presentation.animateTail}>
         {preview ? (
-          <ChatCodePreview kind={preview} text={token.text} language={token.lang} streaming={presentation.streaming} />
+          <ChatCodePreview
+            kind={preview}
+            text={token.text}
+            language={token.lang}
+            streaming={presentation.streaming}
+            tone={presentation.tone}
+          />
         ) : (
           <ChatCodeBlock
             selectable={presentation.selectable}
             text={token.text}
             language={token.lang}
             finished={presentation.finished}
+            tone={presentation.tone}
           />
         )}
       </StreamingBlock>
@@ -818,43 +937,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
       </View>
     );
   }
-  if (tokenIs(token, "table")) {
-    // The columns run in the direction of the header, so an English table in an Arabic chat keeps
-    // its first column at the left. Each cell reads in the direction of its own text.
-    const tableDirection = textDirection(token.header.map((cell) => cell.text).join(" "), presentation.direction);
-    const cellPresentation = withDirection(presentation, tableDirection);
-    return (
-      <ScrollView horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
-        <View style={{ direction: tableDirection }}>
-          {sourceEntries([token.header, ...token.rows], (row) => row.map((cell) => cell.text).join("|")).map(
-            ({ value: row, offset: rowOffset }) => (
-              <View key={rowOffset} className="flex-row border-b border-separator">
-                {sourceEntries(row, (cell) => cell.text).map(({ value: cell, offset: cellOffset }) => (
-                  <View key={cellOffset} className="w-44 px-2 py-2">
-                    <Text
-                      selectable={presentation.selectable}
-                      style={[
-                        CHAT_TEXT_STYLES[presentation.type],
-                        textContainerStyle(cell.text, presentation),
-                        {
-                          writingDirection: textDirection(cell.text, tableDirection),
-                          textAlign: cellAlignment(cell.align, tableDirection),
-                        },
-                        { fontWeight: cell.header ? "600" : "400" },
-                      ]}
-                    >
-                      {blockDirectionMark(cell.text, cellPresentation)}
-                      {inline(cell.tokens, cellPresentation)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ),
-          )}
-        </View>
-      </ScrollView>
-    );
-  }
+  if (tokenIs(token, "table")) return <MarkdownTable token={token} presentation={presentation} />;
   if (token.type === "hr") return <View className="h-px bg-separator" />;
   return (
     <Text
@@ -882,9 +965,12 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   linkFavicons = true,
   fontWeight,
   inline: inlineOnly = false,
+  tone,
 }: {
   body: string;
   color: ColorValue | undefined;
+  /** The colors of code in a bubble with a message color. */
+  tone?: BubbleTone;
   /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
   fontWeight?: TextStyle["fontWeight"];
   /** Only inline Markdown, in one paragraph: a line that starts with `1.` or `#` stays text. */
@@ -919,7 +1005,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     [tokens, finished],
   );
   const { tokens: visibleTokens, flushed } = useReplyPlayback(reveal, playback);
-  const codeColor = useThemeColor("foreground");
+  const themeForeground = useThemeColor("foreground");
+  const codeColor = tone?.foreground ?? themeForeground;
   const { t } = useText();
   const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
   // One object while its values stay, so each block keeps its memo when the message renders again.
@@ -938,6 +1025,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       animateTail,
       linkFavicons,
       direction: layoutDirection(),
+      tone,
     }),
     [
       linkFavicons,
@@ -952,6 +1040,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       streaming,
       finished,
       animateTail,
+      tone,
     ],
   );
   return (

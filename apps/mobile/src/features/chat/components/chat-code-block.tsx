@@ -11,6 +11,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
+import type { BubbleTone } from "../model/bubble-tone";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 import { useListSettled } from "./use-list-settled";
 
@@ -23,6 +24,11 @@ interface ChatCodeBlockProps {
   selectable?: boolean;
   /** The text will not change, so its highlight is kept for the app run. */
   finished?: boolean;
+  /**
+   * The colors of a bubble with a message color. The code is in the bubble's text color: the theme
+   * colors of highlighted code do not read on every message color.
+   */
+  tone?: BubbleTone;
 }
 
 export const ChatCodeBlock = memo(function ChatCodeBlock(props: ChatCodeBlockProps) {
@@ -36,10 +42,18 @@ const CodeBlockBody = memo(function CodeBlockBody({
   language,
   selectable = true,
   finished = false,
+  tone,
   highlight: highlightAllowed,
 }: ChatCodeBlockProps & { highlight: boolean }) {
   const { t } = useText();
-  const { foreground, muted, colors } = useCodeTokenColors();
+  const theme = useCodeTokenColors();
+  const muted = tone?.muted ?? theme.muted;
+  // A clear layer of the text color, so the block shows on every surface: the screen, an agent's
+  // bubble or a card. The grey of a control was the color of the agent's bubble.
+  const textColor = String(useCSSVariable("--openbot-text-primary"));
+  const background = tone?.panel ?? `${textColor}0f`;
+  const foreground = tone?.foreground ?? theme.foreground;
+  const colors: Partial<Record<ShjToken, ColorValue>> = tone ? { cmnt: tone.muted } : theme.colors;
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
     const tokens = cachedHighlight(text, language);
     return tokens ? { text, language, tokens } : null;
@@ -93,9 +107,17 @@ const CodeBlockBody = memo(function CodeBlockBody({
     }
   }
   return (
-    <View className="overflow-hidden bg-control/50" style={{ borderRadius: 18, borderCurve: "continuous" }}>
+    <View
+      className="overflow-hidden"
+      style={{ borderRadius: 18, borderCurve: "continuous", backgroundColor: background }}
+    >
       <View className="flex-row items-center justify-between gap-3 pl-3 pr-1 pt-1">
-        <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
+        <Typography.Paragraph
+          type="body-xs"
+          className="shrink text-muted"
+          numberOfLines={1}
+          style={tone ? { color: tone.muted } : undefined}
+        >
           {codeLanguageLabel(language, t)}
         </Typography.Paragraph>
         <Button

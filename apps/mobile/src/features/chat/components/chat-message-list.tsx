@@ -95,6 +95,7 @@ import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
@@ -362,6 +363,8 @@ interface MessageRowShared {
   userBubbleStyle: ComponentProps<typeof Animated.View>["style"] | undefined;
   /** The message color for the controls of an attachment, unset with the same setting. */
   attachmentTint: AttachmentTint | undefined;
+  /** The colors of code in the user's bubble, unset with the same setting. */
+  bubbleTone: BubbleTone | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   /** Arriving replies animate: the screen is focused, online, active, and shows the response. */
   animationActive: boolean;
@@ -783,10 +786,11 @@ const MessageRow = memo(function MessageRow({
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
     message.kind === "message" && message.sender ? avatarHeadColor(message.sender.id, null) : undefined;
-  const textColor =
+  const tone =
     message.kind === "message" && message.author === "user" && userBubbleStyle && !memberColor
-      ? userForeground
-      : foreground;
+      ? shared.bubbleTone
+      : undefined;
+  const textColor = tone ? userForeground : foreground;
   // A generation owns its first attachment, the image; any further files follow in order.
   const files =
     message.kind === "message"
@@ -935,6 +939,7 @@ const MessageRow = memo(function MessageRow({
                     finished={!isStreamingReply(message)}
                     selectable={message.author === "user" && !bubble}
                     color={textColor}
+                    tone={tone}
                     playback={playback}
                     animationEnabled={shared.animationActive && arriving}
                   />
@@ -1515,6 +1520,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       userForeground,
       userBubbleStyle: coloredMessages ? userBubbleStyle : undefined,
       attachmentTint: coloredMessages ? { color: userBubbleColor, foreground: userForeground } : undefined,
+      bubbleTone: coloredMessages ? bubbleTone(userForeground) : undefined,
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
