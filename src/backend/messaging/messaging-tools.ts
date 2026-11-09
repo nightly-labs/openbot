@@ -72,14 +72,14 @@ const embedSchema = z
       ),
     "An embed needs a title, description, author, footer, image, thumbnail or field.",
   );
+// An empty list is no embeds: a model can fill each optional argument.
 const embedsSchema = z
   .array(embedSchema)
-  .min(1)
   .max(DISCORD_EMBEDS_LIMIT)
   .refine(
     (embeds) => discordEmbedTextLength(embeds) <= DISCORD_EMBED_TEXT_LIMIT,
     `The text of all embeds is longer than ${DISCORD_EMBED_TEXT_LIMIT} characters.`,
-  );
+  ) satisfies z.ZodType<DiscordEmbed[]>;
 // The tool shows an embed as any object: models know Discord's embed object, and its full schema
 // would add a kilobyte to each catalog answer. `postSchema` decodes the call with the full one.
 const postShape = {
@@ -92,7 +92,7 @@ const postShape = {
 };
 const postSchema = z
   .strictObject({ ...postShape, embeds: embedsSchema.optional() })
-  .refine((post) => post.text !== undefined || post.embeds !== undefined, "Give text, embeds, or both.");
+  .refine((post) => post.text !== undefined || Boolean(post.embeds?.length), "Give text, embeds, or both.");
 
 /** The tools that post on the agent's own initiative. They work in any turn, and they name the place. */
 export const MESSAGING_OUTBOUND_TOOLS = new Set(["messaging_list_places", "messaging_post"]);

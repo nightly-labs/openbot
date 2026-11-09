@@ -293,7 +293,7 @@ try {
     });
 
     await step("a plain post sends no embeds key, so an older Signal accepts it", async () => {
-      const sent = await post(threads, connection, { text: "Plain text" });
+      const sent = await post(threads, connection, { text: "Plain text", embeds: [] });
       assert.ok(sent.success, JSON.stringify(sent.result));
       assert.equal(sent.requests.length, 1);
       assert.equal("embeds" in (sent.requests[0] ?? {}), false);
@@ -301,23 +301,36 @@ try {
       return { embedsKey: false };
     });
 
-    await step("a long text goes in more than one post, and the embeds go on the last", async () => {
+    await step("a long text goes in more than one post, and the embeds go on the first", async () => {
       const long = Array.from({ length: 60 }, (_, index) => `Line ${index} ${"x".repeat(60)}`).join("\n");
       assert.ok(long.length > DISCORD_MESSAGE_TEXT_LIMIT);
       const sent = await post(threads, connection, { text: long, embeds: [{ title: "Summary" }] });
       assert.ok(sent.success, JSON.stringify(sent.result));
       assert.ok(sent.bodies.length > 1, "The long text was not split.");
+      assert.deepEqual(sent.bodies[0]?.embeds, [{ title: "Summary" }]);
       assert.ok(
-        sent.bodies.slice(0, -1).every((body) => !("embeds" in body)),
-        "An earlier part has embeds.",
+        sent.bodies.slice(1).every((body) => !("embeds" in body)),
+        "A later part has embeds.",
       );
-      assert.deepEqual(sent.bodies.at(-1)?.embeds, [{ title: "Summary" }]);
       return { posts: sent.bodies.length };
+    });
+
+    await step("Signal refuses the embeds of a long text, and nothing is posted", async () => {
+      const long = Array.from({ length: 60 }, (_, index) => `Line ${index} ${"x".repeat(60)}`).join("\n");
+      // A link that the host accepts and that a mask breaks, as `redactEmbed` can.
+      const sent = await post(threads, connection, {
+        text: long,
+        embeds: [{ title: "Report", url: `https://openbot.run/${SECRET}` }],
+      });
+      assert.equal(sent.success, false, "A post with a broken link was accepted.");
+      assert.equal(sent.requests.length, 1);
+      assert.equal(sent.bodies.length, 0, "A part of the text was posted.");
+      return { posted: 0 };
     });
 
     await step("the tool refuses an invalid embed and posts nothing", async () => {
       const cases: DynamicRecord[] = [
-        {},
+        { embeds: [] },
         { embeds: [{}] },
         { embeds: [{ title: "Link", url: "javascript:alert(1)" }] },
         { embeds: [{ title: "Color", color: 0x1000000 }] },

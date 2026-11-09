@@ -226,22 +226,20 @@ class DiscordAdapter implements MessagingAdapter {
     return firstId;
   });
 
-  /** The text in as many posts as it needs, and the embeds on the last one. Returns the id of the first. */
+  /**
+   * The text in as many posts as it needs, with the embeds on the first one: when Signal or Discord
+   * refuses the embeds, nothing is posted. Returns the id of the first post.
+   */
   readonly postEmbeds = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     target: MessageTarget,
     markdown: string,
     embeds: DiscordEmbed[],
   ) {
-    const chunks = markdown ? chunkMarkdown(markdown, CHUNK_CHARACTERS) : [];
-    const last = chunks.pop() ?? "";
-    let firstId: string | null = null;
-    for (const chunk of chunks) {
-      const id = yield* this.post(target, { text: chunk });
-      firstId ??= id;
-    }
-    const lastId = yield* this.post(target, { text: last, embeds });
-    return firstId ?? lastId;
+    const [first = "", ...rest] = markdown ? chunkMarkdown(markdown, CHUNK_CHARACTERS) : [];
+    const firstId = yield* this.post(target, { text: first, embeds });
+    for (const chunk of rest) yield* this.post(target, { text: chunk });
+    return firstId;
   });
 
   readonly upload = Effect.fnUntraced(function* (
