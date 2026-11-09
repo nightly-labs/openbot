@@ -308,4 +308,9 @@ export const messages = {
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot 使用一次性令牌将你的语音流式传输给 ElevenLabs，费用由 ElevenLabs 从你的账户扣除。密钥保存在此手机上。",
+  "mobile.settings.voice.elevenLabs.model.title": "模型",
+  "mobile.settings.voice.elevenLabs.model.footer": "ElevenLabs 对每个模型单独计价。更改从下一条回复开始生效。",
+  "mobile.settings.voice.elevenLabs.model.flash": "最快",
+  "mobile.settings.voice.elevenLabs.model.multilingual": "更自然 · 更慢",
+  "mobile.settings.voice.elevenLabs.model.v3": "表现力最强 · 最慢",
 } as const satisfies PartialTranslation<typeof source>;
