@@ -377,6 +377,7 @@
     "test:agent-waits-tools": "bun scripts/agent-waits-tools-e2e.ts",
     "test:agent-hide-restore": "bun scripts/agent-hide-restore-e2e.ts",
     "test:memory-review": "bun scripts/memory-review-e2e.ts",
+    "test:skill-revision": "bun scripts/skill-revision-e2e.ts",
     "test:plan-continuation": "bun scripts/plan-continuation-e2e.ts",
     "test:messaging-pause-resume": "bun scripts/messaging-pause-resume-e2e.ts",
     "test:messaging-discord-access": "bun scripts/messaging-discord-access-e2e.ts",

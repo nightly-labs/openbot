@@ -138,6 +138,7 @@
     "./team-protocol/agent-host-settings-v1": "./src/team-protocol/agent-host-settings-v1.ts",
     "./team-protocol/agent-memory-limit-v1": "./src/team-protocol/agent-memory-limit-v1.ts",
     "./team-protocol/memory-review-v1": "./src/team-protocol/memory-review-v1.ts",
+    "./team-protocol/skill-learning-v1": "./src/team-protocol/skill-learning-v1.ts",
     "./team-protocol/prompt-cache-ttl-v1": "./src/team-protocol/prompt-cache-ttl-v1.ts",
     "./team-protocol/model-visibility-v1": "./src/team-protocol/model-visibility-v1.ts",
     "./team-protocol/server-audit-v1": "./src/team-protocol/server-audit-v1.ts",

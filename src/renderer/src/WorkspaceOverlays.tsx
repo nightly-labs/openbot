@@ -811,6 +811,7 @@ function ServerSettings() {
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
+          skillLearning={{}}
           hostPromptCacheTtl={{}}
           claudeUserSetup
           hostModelVisibility={{}}

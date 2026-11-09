@@ -331,6 +331,13 @@ export const messages = {
   "server.settings.memoryReviewOff": "Kapalı",
   "server.settings.memoryReviewTurns": { one: "Her {count} turda", other: "Her {count} turda" },
   "server.settings.memoryReviewLoadFailed": "Bellek incelemesi ayarı yüklenemedi.",
+  "server.settings.skillLearning": "Beceri öğrenme",
+  "server.settings.skillLearningDescription":
+    "Bu sunucudaki ajanların öğrendiklerini beceri olarak kaydedip kaydetmeyeceği.",
+  "server.settings.skillLearningAutomatic": "Otomatik",
+  "server.settings.skillLearningAsk": "Önce sor",
+  "server.settings.skillLearningOff": "Kapalı",
+  "server.settings.skillLearningLoadFailed": "Beceri öğrenme ayarı yüklenemedi.",
   "server.settings.remoteOnline": "Ana makine çevrim içi. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.remoteOffline": "Ana makine çevrim dışı. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.reachable": "Çevrim içi erişilebilir. Yalnızca davet edilen kişiler oturum açabilir.",

@@ -44,6 +44,7 @@ import {
 } from "./hosted-update-adapter";
 import { LicenseDesktopService } from "./license-service";
 import { LocalSignInWindows } from "./local-sign-in-window";
+import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -363,6 +364,7 @@ import { SidebarPinStore } from "./sidebar-pin-store";
 import { SignInRelayClient } from "./sign-in-relay-client";
 import { agentPrintedLink, SignInRelayHost } from "./sign-in-relay-host";
 import { SignalIngress } from "./signal-ingress";
+import { SkillLearningPreferenceStore } from "./skill-learning-preference-store";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
@@ -427,6 +429,7 @@ const PROVIDER_CLI_APP_VERSION_FILE = "openbot-provider-cli-app-version-v1.json"
 const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
+const SKILL_LEARNING_PREFERENCE_FILE = "openbot-skill-learning-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
@@ -676,6 +679,7 @@ export interface ApplicationServices {
   agentDefaults: AgentDefaultsPreferenceStore;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
+  skillLearning: SkillLearningPreferenceStore;
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
@@ -1378,6 +1382,8 @@ export async function createApplicationServices({
   const sidebarPins = new SidebarPinStore(join(app.getPath("userData"), SIDEBAR_PINS_FILE));
   await runCauseEffect(sidebarPins.load());
   await runCauseEffect(memoryReview.load());
+  const skillLearning = new SkillLearningPreferenceStore(join(app.getPath("userData"), SKILL_LEARNING_PREFERENCE_FILE));
+  await runCauseEffect(skillLearning.load());
   const serverAudit = new ServerAuditStore(join(app.getPath("userData"), SERVER_AUDIT_FILE));
   await runCauseEffect(serverAudit.load());
   const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE), {
@@ -2041,6 +2047,8 @@ export async function createApplicationServices({
     linkWallet: linkAccount,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
+    // The local read: `listInstalled` asks the marketplace for each skill's latest version.
+    reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
     // `events` is built later, after the account service and the relay.
@@ -2049,6 +2057,8 @@ export async function createApplicationServices({
     busyMessageMode: () => busyMessageMode.get().mode,
     agentMemoryLimit: () => agentMemoryLimit.get().limit,
     memoryReviewInterval: () => memoryReview.get().interval,
+    skillLearning: () => skillLearning.get().mode,
+    skillLearner: () => localSkillLearner(skills),
     responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),
     // `workflowTriggers` is built later, after the workflows.
@@ -2893,6 +2903,7 @@ export async function createApplicationServices({
       personality: serverPersonality,
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
+      skillLearning,
       promptCacheTtl,
       modelVisibility,
       // The local Settings save does the same two steps (`saveSetup`).
@@ -3932,6 +3943,7 @@ export async function createApplicationServices({
     agentDefaults,
     agentMemoryLimit: agentMemoryLimitSetting,
     memoryReview,
+    skillLearning,
     agentNotificationLevels,
     sidebarPins,
     agentAccess,

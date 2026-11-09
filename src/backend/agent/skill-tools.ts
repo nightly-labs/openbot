@@ -54,13 +54,13 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   {
     name: "create_skill",
     description:
-      "Create a reusable local skill from a folder inside your workspace after the user asks to create a skill. Follow openbot-skill-creator. Saves to the shared local library and installs for you. Does not publish or execute scripts.",
+      "Create a reusable local skill from a folder inside your workspace after the user asks to create a skill or agrees to a suggested one. Follow openbot-skill-creator. Saves to the shared local library and installs for you. Does not publish or execute scripts.",
     shape: createSkillSchema.shape,
   },
   {
     name: "revise_skill",
     description:
-      "Publish a new local skill revision from a workspace folder when the user asks to revise it. Read first and supply expectedRevision. Installed copies stay unchanged until explicitly updated.",
+      "Publish a new local skill revision from a workspace folder when the user asks to revise it, agrees to a suggested change, or corrects how you did a task that the skill covers. Read first and supply expectedRevision. Installs the new revision for you when you have the skill; other agents keep their copies until explicitly updated.",
     shape: reviseSkillSchema.shape,
   },
   {

@@ -204,6 +204,8 @@ export interface ThreadLifecycleOptions {
   serverHost?: boolean;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
+  /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
+  memoryReview?: () => boolean;
   /** The other agents in an agent's sidebar section, read at each start and resume of a session. */
   sectionTeammates?: (agentId: string) => SectionTeammates | null;
   /** Whether a public thread is a channel member's thread. */
@@ -243,6 +245,7 @@ export class ThreadLifecycle {
   readonly #vaultItems: () => VaultContents;
   readonly #serverHost: boolean;
   readonly #responseStyle: () => ResponseStyle;
+  readonly #memoryReview: () => boolean;
   readonly #sectionTeammates: (agentId: string) => SectionTeammates | null;
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
@@ -293,6 +296,7 @@ export class ThreadLifecycle {
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
     this.#serverHost = options.serverHost ?? false;
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
+    this.#memoryReview = options.memoryReview ?? (() => false);
     this.#sectionTeammates = options.sectionTeammates ?? (() => null);
     this.#channelThread = options.channelThread ?? (() => false);
     this.#branchThread = options.branchThread ?? (() => false);
@@ -1301,6 +1305,7 @@ export class ThreadLifecycle {
       vaultItems: this.#vaultItems(),
       serverHost: this.#serverHost,
       responseStyle: this.#responseStyle(),
+      memoryReview: this.#memoryReview(),
       memoryLimit: this.#memories.limit(),
       storedMemoryCount: this.#memories.listFor(agent.id).length,
       memoriesInTurns: client.turnContext === true,

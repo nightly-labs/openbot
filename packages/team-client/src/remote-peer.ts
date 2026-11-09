@@ -27,6 +27,7 @@ import {
 } from "@openbot/contracts/team-protocol";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import { addUiBlockVaultRequests } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import {
@@ -1608,11 +1609,12 @@ export function createRemoteTeamPeer(
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
       state.lastEventSequence = frame.sequence;
       if (decoded.status === "known") {
-        // The frozen event codec leaves the automatic answer and the Vault request of a block out; the
-        // wire frame has them.
+        // The frozen event codec leaves the automatic answer and the Vault request of a block, and the
+        // skill name of a skill question, out; the wire frame has them.
         if (sendsBlockExtensions(state)) {
           addUiBlockAutoAnswers(decoded.event, frame.payload);
           addUiBlockVaultRequests(decoded.event, frame.payload);
+          addSkillSuggestionNames(decoded.event, frame.payload);
         }
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
       }
@@ -2303,22 +2305,23 @@ function signalErrorCode(data: string): string | null {
 }
 
 /**
- * Whether the host can send `ui-block-auto-answer-v1` and `ui-block-vault-v1`: the client advertises
- * them only on protocol 9, so the walk is skipped for every older host.
+ * Whether the host can send `ui-block-auto-answer-v1`, `ui-block-vault-v1` and `skill-learning-v1`:
+ * the client advertises them only on protocol 9, so the walk is skipped for every older host.
  */
 function sendsBlockExtensions(state: PeerState): boolean {
   return (state.hostProtocol ?? 0) >= TEAM_PROTOCOL_V9;
 }
 
 /**
- * A decoded response with the automatic answer and the Vault request of each block, which the frozen
- * response codec leaves out. Only a host that the client told `ui-block-auto-answer-v1` or
- * `ui-block-vault-v1` puts them on the wire.
+ * A decoded response with the automatic answer and the Vault request of each block, and the skill name
+ * of each skill question, which the frozen response codec leaves out. Only a host that the client told
+ * `ui-block-auto-answer-v1`, `ui-block-vault-v1` or `skill-learning-v1` puts them on the wire.
  */
 function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown): T {
   if (sendsBlockExtensions(state)) {
     addUiBlockAutoAnswers(decoded, wire);
     addUiBlockVaultRequests(decoded, wire);
+    addSkillSuggestionNames(decoded, wire);
   }
   return decoded;
 }

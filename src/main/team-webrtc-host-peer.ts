@@ -25,6 +25,11 @@ import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/c
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
+  addSkillSuggestionNames,
+  SKILL_LEARNING_CAPABILITY,
+  withSkillSuggestionNames,
+} from "@openbot/contracts/team-protocol/skill-learning-v1";
+import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
@@ -895,6 +900,7 @@ export class TeamWebRtcHostPeer {
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
           frame = withUiBlockAutoAnswers(frame, event);
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) frame = withUiBlockVaultRequests(frame, event);
+        if (this.#peerCapabilities.has(SKILL_LEARNING_CAPABILITY)) frame = withSkillSuggestionNames(frame, event);
       } catch {
         return;
       }
@@ -1233,7 +1239,8 @@ class GatewayError extends Error {
 
 /**
  * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
- * and its Vault request, for a peer with `ui-block-vault-v1`.
+ * its Vault request, for a peer with `ui-block-vault-v1`, and the skill name of each skill question,
+ * for a peer with `skill-learning-v1`.
  */
 function withBlockExtensions(
   capabilities: ReadonlySet<string>,
@@ -1242,5 +1249,6 @@ function withBlockExtensions(
 ): TeamProtocolV2Json {
   if (capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)) addUiBlockAutoAnswers(encoded, source);
   if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
+  if (capabilities.has(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(encoded, source);
   return encoded;
 }

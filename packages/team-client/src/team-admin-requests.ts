@@ -79,6 +79,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
@@ -148,6 +149,7 @@ import {
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
+  decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeHostVaultImport,
@@ -186,6 +188,7 @@ import {
   type HostProviderAccounts,
   type HostReleaseStatus,
   type HostSetMessagingEnabledInput,
+  type HostSkillLearning,
   type HostTimezoneSettings,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
@@ -830,6 +833,18 @@ export function setHostMemoryReview(
   interval: number,
 ): Effect.Effect<HostMemoryReview, TeamAdminRequestError> {
   return adminCall(() => request("POST", MEMORY_REVIEW_ROUTES.update, decodeHostMemoryReview, { interval }));
+}
+
+export function getHostSkillLearning(request: TeamApiRequest): Effect.Effect<HostSkillLearning, TeamAdminRequestError> {
+  return adminCall(() => request("POST", SKILL_LEARNING_ROUTES.settings, decodeHostSkillLearning, {}));
+}
+
+/** The host refuses a value that its snapshot does not list in `choices`. */
+export function setHostSkillLearning(
+  request: TeamApiRequest,
+  mode: string,
+): Effect.Effect<HostSkillLearning, TeamAdminRequestError> {
+  return adminCall(() => request("POST", SKILL_LEARNING_ROUTES.update, decodeHostSkillLearning, { mode }));
 }
 
 /** The roles of the host (`agent-access-v1`). A member reads only `mine`. */

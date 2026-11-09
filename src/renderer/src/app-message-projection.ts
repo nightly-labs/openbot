@@ -17,6 +17,7 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
   skillConversationEvent,
+  skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -366,6 +367,8 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const skillSuggestion = skillSuggestionEvent(message);
+  if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
   if (signIn) return { kind: "mcp-sign-in", mcpServerId: signIn.mcpServerId, timestamp: message.createdAt };
   if (routineEvent) {

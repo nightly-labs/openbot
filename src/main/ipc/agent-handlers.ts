@@ -42,6 +42,7 @@ import {
   decodeChannelPage,
   decodeChannelSummaries,
   decodeSaveAgentProfileResult,
+  decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
   isAgentModelOption,
   LOCAL_SERVER_ID,
@@ -54,6 +55,7 @@ import {
   parseLocalBrowserSecretResponse,
   parseResetAgentSessionSetting,
   parseSaveAgentProfile,
+  parseSaveSkillSuggestion,
   parseSetAgentHiddenInput,
   parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
@@ -110,6 +112,7 @@ import {
   SIDE_QUESTION_CAPABILITY,
   SIDE_QUESTION_ROUTES,
 } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -644,6 +647,20 @@ export function agentIpcHandlers({
                 question: input.question,
                 earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
               },
+              timeoutMs: 150_000,
+            }),
+          );
+        },
+      }),
+      saveSkillSuggestion: scopedHandler(parseSaveSkillSuggestion, {
+        local: (input) => runCauseEffect(service.saveSkillSuggestion(input)),
+        remote: async (input, serverId) => {
+          // An older host has no route: the card then sends the user's yes to the agent.
+          if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY)) return { saved: false };
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+              method: "POST",
+              body: { agentId: input.agentId, messageId: input.messageId },
               timeoutMs: 150_000,
             }),
           );

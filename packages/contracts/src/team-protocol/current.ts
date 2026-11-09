@@ -119,6 +119,7 @@ import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
@@ -294,6 +295,7 @@ export {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -486,6 +488,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -662,7 +665,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HOST_PERSONALITY_CAPABILITY &&
     capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
     capability !== LIVE_VOICE_CAPABILITY &&
-    capability !== AGENT_WELCOME_CAPABILITY,
+    capability !== AGENT_WELCOME_CAPABILITY &&
+    capability !== SKILL_LEARNING_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -715,6 +719,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MCP_MEMBER_ACCESS_CAPABILITY,
   LIVE_VOICE_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -850,6 +855,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_PERSONALITY_CAPABILITY &&
       capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
       capability !== LIVE_VOICE_CAPABILITY &&
-      capability !== AGENT_WELCOME_CAPABILITY,
+      capability !== AGENT_WELCOME_CAPABILITY &&
+      capability !== SKILL_LEARNING_CAPABILITY,
   );
 }

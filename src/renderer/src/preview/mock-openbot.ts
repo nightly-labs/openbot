@@ -94,6 +94,7 @@ import {
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
   DEFAULT_REMOTE_NETWORK_ROUTE,
   DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE,
+  DEFAULT_SKILL_LEARNING_MODE,
   DEFAULT_TRANSPARENT_WINDOW,
   type DirectConversationSnapshot,
   type DirectMessageRealtimeEvent,
@@ -110,11 +111,13 @@ import {
   type HostStatus,
   hostAgentMemoryLimit,
   hostMemoryReview,
+  hostSkillLearning,
   isAgentMemoryLimit,
   isAgentSummary,
   isMemoryReviewInterval,
   isPromptCacheTtl,
   isReleasedRoutineSchedule,
+  isSkillLearningMode,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type MacPermissionId,
@@ -155,6 +158,7 @@ import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
   type SidebarPinsSnapshot,
+  type SkillLearningPreference,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
@@ -473,6 +477,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
+  let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
   // The disk level is below the preview disk use (82%), so Storage shows a passed level.
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
@@ -2470,6 +2475,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         sectionId: input.draft?.sectionId ?? null,
       }),
       askSideQuestion: async (input) => `You asked: ${input.question}`,
+      // The preview has no writer, so the card sends the yes to the agent.
+      saveSkillSuggestion: async () => ({ saved: false }),
       saveProfile: async (input) => {
         const agent = input.agentId
           ? await api.agent.updateAgent({ agentId: input.agentId, ...input.draft })
@@ -3468,6 +3475,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isMemoryReviewInterval(interval)) throw new Error("Memory review interval is required.");
         memoryReview = { interval };
         return hostMemoryReview(memoryReview);
+      },
+      getSkillLearning: async () => hostSkillLearning(skillLearning),
+      setSkillLearning: async (mode) => {
+        if (!isSkillLearningMode(mode)) throw new Error("Skill learning mode is required.");
+        skillLearning = { mode };
+        return hostSkillLearning(skillLearning);
       },
       // Preview has one host, so every server shares one set of machine alerts.
       getMachineAlerts: async () => clone(machineAlerts),

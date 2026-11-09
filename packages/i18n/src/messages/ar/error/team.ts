@@ -108,6 +108,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "مجلدات الوكيل غير مدعومة في هذا الاتصال.",
   "error.team.folderUnavailable": "هذا المجلد غير متاح على حاسوب المضيف.",
   "error.team.memoryReviewUnsupported": "مراجعة الذاكرة غير مدعومة في هذا الاتصال.",
+  "error.team.skillLearningUnsupported": "تعلّم المهارات غير مدعوم في هذا الاتصال.",
   "error.team.promptCacheTtlUnsupported": "مدة ذاكرة التخزين المؤقت للموجّه غير مدعومة في هذا الاتصال.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",

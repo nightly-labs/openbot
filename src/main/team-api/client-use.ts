@@ -46,6 +46,7 @@ import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routi
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
@@ -76,6 +77,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   HOST_PERSONALITY_ROUTES.settings,
   AGENT_MEMORY_LIMIT_ROUTES.settings,
   MEMORY_REVIEW_ROUTES.settings,
+  SKILL_LEARNING_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,

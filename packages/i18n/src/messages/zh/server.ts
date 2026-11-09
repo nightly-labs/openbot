@@ -335,6 +335,12 @@ export const messages = {
   "server.settings.memoryReviewOff": "关闭",
   "server.settings.memoryReviewTurns": { other: "每 {count} 轮" },
   "server.settings.memoryReviewLoadFailed": "无法加载记忆整理设置。",
+  "server.settings.skillLearning": "技能学习",
+  "server.settings.skillLearningDescription": "此服务器上的智能体是否将学到的内容保存为技能。",
+  "server.settings.skillLearningAutomatic": "自动",
+  "server.settings.skillLearningAsk": "先询问",
+  "server.settings.skillLearningOff": "关闭",
+  "server.settings.skillLearningLoadFailed": "无法加载技能学习设置。",
   "server.settings.rolesTitle": "角色",
   "server.settings.rolesDescription":
     "选择成员可以使用的助手。成员拥有“所有人”和自己所属角色中最高的访问权限。所有者和管理员可以使用所有助手。",

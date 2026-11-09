@@ -29,6 +29,7 @@ import type {
   RoutineConversationEvent,
   RoutineRunConversationEvent,
   SkillConversationEvent,
+  SkillSuggestionEvent,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
@@ -151,6 +152,8 @@ export type ChatActionMarkerModel =
   | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
+  /** A memory review asks to save a skill from the chat. The chat shows a card to save it. */
+  | (SkillSuggestionEvent & { kind: "skill-suggestion"; timestamp: string })
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
   | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */

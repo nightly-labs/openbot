@@ -339,6 +339,12 @@ export const messages = {
   "server.settings.memoryReviewOff": "끄기",
   "server.settings.memoryReviewTurns": { other: "{count}턴마다" },
   "server.settings.memoryReviewLoadFailed": "메모리 검토 설정을 불러올 수 없었어요.",
+  "server.settings.skillLearning": "스킬 학습",
+  "server.settings.skillLearningDescription": "이 서버의 에이전트가 배운 내용을 스킬로 저장할지 여부입니다.",
+  "server.settings.skillLearningAutomatic": "자동",
+  "server.settings.skillLearningAsk": "먼저 묻기",
+  "server.settings.skillLearningOff": "끄기",
+  "server.settings.skillLearningLoadFailed": "스킬 학습 설정을 불러오지 못했습니다.",
   "server.settings.rolesTitle": "역할",
   "server.settings.rolesDescription":
     "멤버가 사용할 수 있는 에이전트를 선택하세요. 멤버는 모든 사용자와 자신의 역할 중 가장 높은 접근 권한을 받아요. 소유자와 관리자는 모든 에이전트를 사용할 수 있어요.",
