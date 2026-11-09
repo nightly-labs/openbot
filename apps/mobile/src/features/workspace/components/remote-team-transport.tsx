@@ -50,8 +50,11 @@ import { currentText } from "@/shared/lib/text";
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
 
 export interface RemoteTeamTransportRef {
-  connect(hostId: string, hostPublicKey: string): Promise<void>;
+  /** `kept`: the authenticated connection from before stays, and its event stream lost no event. */
+  connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
+  /** The phone moved to another network, such as from Wi-Fi to mobile data. The peer makes a new connection. */
+  networkChanged(): void;
   request<T>(
     method: string,
     path: string,
@@ -234,6 +237,12 @@ export const RemoteTeamTransport = memo(
               result.error ?? currentText().t("mobile.workspace.error.connectFailed"),
               result.reference,
             );
+          return { kept: result.kept === true };
+        },
+        networkChanged: () => {
+          // The handle has the method only after the page has registered it.
+          const networkChanged = bridge.current?.networkChanged;
+          if (typeof networkChanged === "function") networkChanged(null);
         },
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });

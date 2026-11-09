@@ -18,6 +18,7 @@ import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
+import { subscribeNetworkMoves } from "@/shared/lib/network-path";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
 /**
@@ -50,6 +51,11 @@ export interface ServerConnectionHandle {
 export interface ServerLoadContext {
   isCurrent(): boolean;
   stage: RemoteConnectionStage;
+  /**
+   * The first attempt after a return to the app with an online connection. When the peer kept that
+   * connection, its event stream continued, and a check of the path is enough: no full load.
+   */
+  check: boolean;
 }
 
 interface Props {
@@ -133,6 +139,22 @@ export const ServerConnection = memo(function ServerConnection({
     supportLog.add("info", "connection", `${hostId} network restored`);
     controller.current?.networkRestored();
   }, [hostId]);
+  // A move to another network can leave the path and the Signal socket open with no data. The peer
+  // renews them at once, and its `onNetworkRestored` ends a wait of the recovery.
+  // A move seen before the app is active again, such as in the read at the return, waits for the return.
+  const networkMoved = useRef(false);
+  const clientRef = useRef(client);
+  clientRef.current = client;
+  useEffect(() => {
+    if (!client) return;
+    return subscribeNetworkMoves(() => {
+      supportLog.add("info", "connection", `${hostId} network changed${activeRef.current ? "" : " while inactive"}`);
+      if (activeRef.current) client.networkChanged();
+      else networkMoved.current = true;
+    });
+  }, [client, hostId]);
+  /** From the last online update: after this long in the background, the host has dropped the connection. */
+  const lostAfterMs = useRef(REMOTE_PEER_LOST_AFTER_MS);
   const handleConnectionUpdate = useCallback(
     (update: RemoteTeamConnectionUpdate) => {
       if (update.hostId !== hostId) return;
@@ -142,6 +164,7 @@ export const ServerConnection = memo(function ServerConnection({
         `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.reference ? ` [${update.reference}]` : ""}${update.hostOffline ? ", host not on Signal" : ""}${update.resync ? ", resync" : ""}`,
       );
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
+      if (update.state === "online" && update.lostAfterMs !== undefined) lostAfterMs.current = update.lostAfterMs;
       if (update.state === "offline") {
         if (activeRef.current) analytics.lost();
         if (update.code === "session_revoked") {
@@ -162,18 +185,19 @@ export const ServerConnection = memo(function ServerConnection({
     let disposed = false;
     let failure: RemoteConnectionFailure | null = null;
     let loggedStatus = "";
-    let context: ServerLoadContext = { stage: "connection", isCurrent: () => false };
+    let context: ServerLoadContext = { stage: "connection", isCurrent: () => false, check: false };
     const recovery = createRemoteConnectionRecovery(
-      () => {
+      (check) => {
         const attempt = ++generation.current;
         context = {
           stage: "connection",
           isCurrent: () => !disposed && activeRef.current && attempt === generation.current,
+          check,
         };
         const finish = analytics.attempt();
         const initiatingContext = context;
         const started = Date.now();
-        supportLog.add("info", "connection", `${hostId} attempt ${attempt} started`);
+        supportLog.add("info", "connection", `${hostId} attempt ${attempt} started${check ? ", check" : ""}`);
         return load(hostId, publicKey, client, initiatingContext).then(
           () => {
             if (initiatingContext.isCurrent()) finish("succeeded", initiatingContext.stage);
@@ -255,10 +279,15 @@ export const ServerConnection = memo(function ServerConnection({
       // After this long the peer replaces its connection when it becomes active, so the first attempt
       // shows that it connects instead of an online server whose requests fail. In the quiet time
       // the server still shows online, and its requests wait for the new connection.
-      if (Date.now() - inactiveSince.current >= REMOTE_PEER_LOST_AFTER_MS) controller.current?.offline();
+      if (Date.now() - inactiveSince.current >= lostAfterMs.current) controller.current?.offline();
       inactiveSince.current = null;
     }
     controller.current?.setActive(active);
+    // After the peer knows that it is active: the transport sends that in its own effect, which runs first.
+    if (active && networkMoved.current) {
+      networkMoved.current = false;
+      clientRef.current?.networkChanged();
+    }
     // The user opened the app to use this server. A wait from before, such as the cooldown after five
     // failed attempts, does not continue: one attempt starts now, and a failure starts the backoff again.
     const phase = lastStatus.current?.status.phase;

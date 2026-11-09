@@ -29,6 +29,8 @@ import {
   encodeSignalServerMessage,
   type IceServer,
   type RemoteTicketClaims,
+  SIGNAL_CLIENT_RECONNECT_GRACE_MS,
+  SIGNAL_DEFAULT_RECONNECT_GRACE_MS,
   SIGNAL_MESSAGE_BYTES_LIMIT,
   type SignalClientMessage,
   type SignalErrorCode,
@@ -317,7 +319,6 @@ const REFUSED_FORMAT = { status: 401 } as const;
 
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
-const SIGNAL_RECONNECT_GRACE_MILLISECONDS = 30_000;
 // A socket must send its hello in this time. Signal closes an idle socket that does not, so it cannot
 // keep a connection slot of its address for the proxy's read timeout. The desktop app opens a socket
 // before its ticket is ready and keeps it without a hello for at most 30 seconds.
@@ -1633,6 +1634,7 @@ export class SignalService {
           connectionId,
           resumeToken,
           iceServers: this.#tokens.iceServers(claims),
+          reconnectGraceMs: this.#reconnectGrace(host),
         });
         this.#send(host.socket, {
           type: "peer-ready",
@@ -1718,6 +1720,7 @@ export class SignalService {
           connectionId,
           resumeToken,
           iceServers: this.#tokens.iceServers(client.claims),
+          reconnectGraceMs: this.#reconnectGrace(host),
         });
         this.#send(host.socket, {
           type: "peer-ready",
@@ -1808,11 +1811,21 @@ export class SignalService {
     this.#peerExpirationTimers.delete(socketId);
   }
 
+  /**
+   * How long a client connection of `host` waits for the client's next socket. A phone app that iOS
+   * suspends stops answering pings, and its socket closes after the idle timeout; with the longer
+   * grace, a return within minutes resumes the connection instead of making a new one. A host that
+   * does not multiplex serves one session, and a kept connection would hold off the others.
+   */
+  #reconnectGrace(host: AuthenticatedPeer | undefined): number {
+    return host?.multiplex ? SIGNAL_CLIENT_RECONNECT_GRACE_MS : SIGNAL_DEFAULT_RECONNECT_GRACE_MS;
+  }
+
   #scheduleConnectionDrop(connection: ActiveConnection): void {
     this.#clearConnectionDrop(connection.id);
     const timer = setTimeout(
       () => this.#dropConnection(connection.id, connection.client.id),
-      SIGNAL_RECONNECT_GRACE_MILLISECONDS,
+      this.#reconnectGrace(this.#peers.get(connection.host.id)),
     );
     timer.unref?.();
     this.#connectionDropTimers.set(connection.id, timer);
