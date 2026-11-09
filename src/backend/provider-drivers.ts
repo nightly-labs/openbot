@@ -1479,7 +1479,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     signIn: { kind: "external" },
     // A custom agent can need more than 5 s to start and open a probe session in `initialize` and
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
-    catalog: { slowList: true },
+    // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
+    // the list is read once more after each start.
+    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
