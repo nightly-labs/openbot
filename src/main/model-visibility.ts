@@ -197,10 +197,14 @@ type ModelMatch = { id: string; match: CatalogMatch };
  * `claude-fable-#` and the version `[5, 2]`; `gpt-6.1-sol` gives `gpt-#-sol` and `[6, 1]`, so
  * `gpt-6-sol` and `gpt-7-sol` have the same shape. A release stamp, such as the `20251001` of
  * `claude-haiku-4-5-20251001`, names a build of the model, not a version, and is left out.
+ *
+ * A version stands between separators, so the `1` of `deepseek-r1` and the `70` of `llama-3-1-70b`
+ * are not part of one. Each part has at most three digits, so a date such as the `0528` of
+ * `deepseek-r1-0528` is not a version either.
  */
 function versionedName(match: CatalogMatch): { shape: string; version: number[] } | null {
   const name = modelName(match.base).replace(/-\d{8}(?=-|$)/gu, "");
-  const version = /\d+(?:-\d+)*/u.exec(name);
+  const version = /(?<=^|-)\d{1,3}(?:-\d{1,3})*(?=-|$)/u.exec(name);
   if (!version) return null;
   return {
     shape: `${match.service}/${name.slice(0, version.index)}#${name.slice(version.index + version[0].length)}`,
@@ -217,37 +221,52 @@ function compareVersions(left: readonly number[], right: readonly number[]): num
 }
 
 /**
- * Gives a model that the catalog does not have yet the release of the catalogued model that it is a
- * newer version of, dated one day after the newest model of that family. models.dev adds a release
- * some days after a CLI lists it, and until then a new release such as `claude-fable-5-2`,
- * `gpt-7-sol` or `grok-4.8` was folded under Older models while the version before it led the list.
+ * Gives a model that the catalog does not have yet the family of the catalogued model that it is a
+ * newer version of. models.dev adds a release some days after a CLI lists it, and until then a new
+ * release such as `claude-fable-5-2`, `gpt-7-sol` or `grok-4.8` was folded under Older models while
+ * the version before it led the list.
+ *
  * Only an id with the same service and the same text around its version counts, and only when it is
- * newer than every catalogued model with that shape.
+ * newer than every catalogued model with that shape. The newest of these new versions is dated one
+ * day after the newest model of the family, so it leads the family. Another new version takes the
+ * date of the version before it, so it folds as an older version does. The family is agent-ready
+ * when one of its catalogued models is.
  */
 function withNewerVersions(matches: readonly ModelMatch[]): ModelMatch[] {
-  const known = matches.flatMap(({ match }) => {
-    const named = match.release ? versionedName(match) : null;
-    return match.release && named ? [{ ...named, service: match.service, release: match.release }] : [];
-  });
-  return matches.map((entry) => {
-    const named = entry.match.release ? null : versionedName(entry.match);
-    if (!named) return entry;
-    const siblings = known.filter((other) => other.shape === named.shape);
-    if (!siblings.length || siblings.some((other) => compareVersions(named.version, other.version) <= 0)) return entry;
-    const previous = siblings.reduce((left, right) =>
-      compareVersions(right.version, left.version) > 0 ? right : left,
-    );
-    const family = previous.release.family;
-    // The newest model of the family, which can have another shape: `gpt-6.1-sol` for `gpt-7-sol`.
-    const newest = family
-      ? known
-          .filter((other) => other.service === previous.service && other.release.family === family)
-          .reduce((left, right) => (right.release.date > left.release.date ? right : left)).release
-      : previous.release;
-    const released = Date.parse(newest.date);
-    if (Number.isNaN(released)) return entry;
-    const date = new Date(released + DAY_MS).toISOString().slice(0, 10);
-    return { ...entry, match: { ...entry.match, release: { ...previous.release, date } } };
+  const named = matches.map((entry) => ({ entry, name: versionedName(entry.match) }));
+  const shapes = new Map<string, { version: number[]; release: ModelRelease | undefined }[]>();
+  const families = new Map<string, ModelRelease[]>();
+  for (const { entry, name } of named) {
+    const { release, service } = entry.match;
+    if (release?.family) {
+      const key = `${service}/${release.family}`;
+      families.set(key, [...(families.get(key) ?? []), release]);
+    }
+    if (name) shapes.set(name.shape, [...(shapes.get(name.shape) ?? []), { version: name.version, release }]);
+  }
+  return named.map(({ entry, name }) => {
+    if (entry.match.release || !name) return entry;
+    const siblings = shapes.get(name.shape) ?? [];
+    let previous: { version: number[]; release: ModelRelease } | undefined;
+    for (const { version, release } of siblings) {
+      if (!release) continue;
+      if (compareVersions(name.version, version) <= 0) return entry;
+      if (!previous || compareVersions(version, previous.version) > 0) previous = { version, release };
+    }
+    if (!previous) return entry;
+    const family = previous.release.family
+      ? (families.get(`${entry.match.service}/${previous.release.family}`) ?? [previous.release])
+      : [previous.release];
+    const newest = siblings.every(({ version, release }) => release || compareVersions(name.version, version) >= 0);
+    const latest = Date.parse(family.reduce((left, right) => (right.date > left.date ? right : left)).date);
+    if (Number.isNaN(latest)) return entry;
+    const date = newest ? new Date(latest + DAY_MS).toISOString().slice(0, 10) : previous.release.date;
+    const release = {
+      family: previous.release.family,
+      agentReady: family.some((member) => member.agentReady),
+      date,
+    };
+    return { ...entry, match: { ...entry.match, release } };
   });
 }
 
