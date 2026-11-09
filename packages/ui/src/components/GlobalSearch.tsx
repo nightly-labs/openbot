@@ -1,3 +1,4 @@
+import { agentMentionRank } from "@openbot/contracts/agent-mention-rank";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AppTextKey } from "@openbot/i18n";
@@ -248,6 +249,17 @@ function indexed<T extends ResultData>(results: T[]): Array<T & Option> {
 
 function matching<T extends GlobalSearchResult>(items: T[], query: string): T[] {
   return query ? items.filter((item) => item.text.includes(query)) : items;
+}
+
+/** A name match first, as in an `@` mention. A match only in the last message goes last. */
+function matchingAgents(items: Array<AgentResult & Option>, query: string): Array<AgentResult & Option> {
+  const ranked = matching(items, query).map((item) => ({
+    item,
+    rank: agentMentionRank(item.agent, query) ?? Number.MAX_VALUE,
+  }));
+  // Array sort is stable, so agents of one rank keep the sidebar order.
+  ranked.sort((left, right) => left.rank - right.rank);
+  return ranked.map(({ item }) => item);
 }
 
 function section(
@@ -695,7 +707,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
       more: search.hasMore() && search.total() === undefined,
     });
     let groups: GlobalSearchSection[];
-    if (category === "agents") groups = list("agents", matching(agentItems(), value));
+    if (category === "agents") groups = list("agents", matchingAgents(agentItems(), value));
     else if (category === "channels") groups = list("channels", matching(channelItems(), value));
     else if (category === "messages")
       groups = [section("messages", value ? matching(messageItems(), value) : [], remote(messageSearch))];
@@ -707,7 +719,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
       const actions = matching(actionItems(), value);
       const preview = { limit: ALL_SECTION_LIMIT };
       groups = [
-        section("agents", matching(agentItems(), value), preview),
+        section("agents", matchingAgents(agentItems(), value), preview),
         section("channels", matching(channelItems(), value), preview),
         section("messages", matching(messageItems(), value), remote(messageSearch, ALL_SECTION_LIMIT)),
         section("files", matching(fileItems(), value), remote(fileSearch, ALL_SECTION_LIMIT)),
