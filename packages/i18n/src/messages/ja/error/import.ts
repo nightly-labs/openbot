@@ -34,13 +34,17 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} はすでに存在するため、このコピーを {saved} として保存します。",
   "error.import.fileSkipped": "{name}: ファイル {file} をスキップします。{reason}",
   "error.import.chooseZip": ".zip ファイルを選択してください。",
-  "error.import.zipTooLarge": "エクスポートは 2 GB 未満の .zip である必要があります。",
   "error.import.unsafeFile": "エクスポートに安全でないファイルが含まれています: {name}",
-  "error.import.expandedTooLarge": "エクスポートは展開後に 2 GB 未満かつ {limit} ファイル未満である必要があります。",
+  "error.import.tooManyFiles": "エクスポートのファイル数は {limit} 以下である必要があります。",
+  "error.import.diskSpace":
+    "{name}: ファイルには {size} GB の空きディスク容量が必要ですが、空きは {free} GB です。空き容量を確保してから、エージェントをもう一度インポートしてください。",
   "error.import.remoteExpandedTooLarge":
     "エクスポートは展開後に 500 MB 未満かつ {limit} ファイル未満である必要があります。",
   "error.import.zipInvalid":
     "選択したファイルは有効な .zip ではありません。Grok Bot がまだ保存中の場合は、待ってからもう一度選択してください。",
+  "error.import.entryDamaged": "エクスポート内のファイルが破損しています。",
+  "error.import.foldersSkipped":
+    ".git と node_modules フォルダー内の {number} 個のファイルは除外されます。ツールで再作成できます。",
   "error.import.empty": "エクスポートが空です。",
   "error.import.remoteZipTooLarge":
     "参加しているサーバーにインポートするには、エクスポートは 100 MB 未満の .zip である必要があります。",

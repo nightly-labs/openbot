@@ -142,7 +142,7 @@ function safeBytes(value: number): number | null {
 }
 
 /** One statfs call and no scan, so the sidebar can ask often. */
-const diskSpace = Effect.fn("StorageUsage.diskSpace")((path: string) =>
+export const diskSpace = Effect.fn("StorageUsage.diskSpace")((path: string) =>
   storedIO(() => statfs(path)).pipe(
     Effect.map(
       (filesystem): StorageDisk => ({

@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
   type AgentImportPreviewAgent,
@@ -58,18 +58,20 @@ import {
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Result } from "effect";
-import { Zip, ZipPassThrough, zipSync } from "fflate";
+import { Zip, ZipPassThrough } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
 import { isPathInside } from "../backend/path-containment";
 import {
+  type ArchiveFile,
   type ArchiveLimits,
   avatarImage,
-  executableEntries,
-  extract,
+  extractEntryEffect,
   isUnsafeEntry,
-  listEntries,
+  MANIFEST_MAX_BYTES,
   readArchiveEffect,
-  sha256,
+  readEntriesEffect,
+  readSkillEffect,
+  withArchive,
   writeImportedFilesEffect,
   writeTreeEffect,
 } from "./agent-archive";
@@ -90,12 +92,11 @@ import {
 } from "./instance-transfer-manifest";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
-import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
+import { isUnsafeArchivePath } from "./skill-package";
 
 const ARCHIVE: ArchiveLimits = {
-  archiveBytes: INSTANCE_TRANSFER_LIMITS.archiveBytes,
   files: INSTANCE_TRANSFER_LIMITS.files,
-  tooLarge: sourceText("error.import.transferTooLarge"),
+  bytes: { limit: INSTANCE_TRANSFER_LIMITS.archiveBytes, tooLarge: sourceText("error.import.transferTooLarge") },
   expandedTooLarge: sourceText("error.import.transferTooLarge"),
   invalid: sourceText("error.import.transferNotFile"),
 };
@@ -106,9 +107,8 @@ const ARCHIVE: ArchiveLimits = {
 const SHARED_DATA = "data";
 /** A file sent to or from a member of a joined client: one WebRTC file transfer. */
 const REMOTE_ARCHIVE: ArchiveLimits = {
-  archiveBytes: INSTANCE_TRANSFER_REMOTE_BYTES,
   files: INSTANCE_TRANSFER_LIMITS.files,
-  tooLarge: sourceText("error.import.transferRemoteTooLarge"),
+  bytes: { limit: INSTANCE_TRANSFER_REMOTE_BYTES, tooLarge: sourceText("error.import.transferRemoteTooLarge") },
   expandedTooLarge: sourceText("error.import.transferRemoteTooLarge"),
   invalid: sourceText("error.import.transferNotFile"),
 };
@@ -192,7 +192,8 @@ interface StagedTransfer {
   /** A file the service wrote for a member, removed when the token ends. */
   temporary: boolean;
   path: string;
-  sha256: string;
+  /** The archive `apply` reads must be the one the preview checked. */
+  fingerprint: string;
   manifest: TransferManifest;
   avatars: Map<string, AvatarImageInput>;
 }
@@ -363,8 +364,9 @@ export class InstanceTransferService {
         });
       }
     }
-    if (entries.length + 1 > limits.files || bytes > limits.archiveBytes)
-      return yield* archiveFailure(new Error(limits.tooLarge));
+    // A transfer file has the same text for both limits.
+    if (entries.length + 1 > limits.files || bytes > (limits.bytes?.limit ?? Number.POSITIVE_INFINITY))
+      return yield* archiveFailure(new Error(limits.expandedTooLarge));
 
     const manifest: TransferManifestFile = {
       format: INSTANCE_TRANSFER_FORMAT,
@@ -517,15 +519,16 @@ export class InstanceTransferService {
     limits: ArchiveLimits,
   ): Effect.fn.Return<InstanceTransferPreview, ArchiveOperationError> {
     // The file read before stays staged until this one is checked, so a bad file keeps it.
-    const bytes = yield* readArchiveEffect(path, limits);
-    const entries = yield* archiveSync(() => listEntries(bytes, limits));
+    const archive = yield* readArchiveEffect(path, limits);
+    const entries = archive.entries;
     if (!entries.has(INSTANCE_TRANSFER_MANIFEST))
       return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
-    const { manifest, warnings } = yield* archiveSync(() =>
-      decodeTransferManifest(
-        extract(bytes, (name) => name === INSTANCE_TRANSFER_MANIFEST)[INSTANCE_TRANSFER_MANIFEST] ?? new Uint8Array(),
-      ),
-    );
+    const manifestBytes =
+      (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST], MANIFEST_MAX_BYTES))[
+        INSTANCE_TRANSFER_MANIFEST
+      ] ?? new Uint8Array();
+    const { manifest, warnings } = yield* archiveSync(() => decodeTransferManifest(manifestBytes));
+    if (archive.skipped) warnings.push(sourceText("error.import.foldersSkipped", { number: archive.skipped }));
     // An agent whose skill has no SKILL.md cannot import, so it is not offered.
     const agents = manifest.agents.filter((agent) => {
       const missing = agent.skills.find((skill) => !entries.has(`${skill}/SKILL.md`));
@@ -533,7 +536,7 @@ export class InstanceTransferService {
       return !missing;
     });
     const avatarPaths = new Set(agents.flatMap((agent) => (agent.avatar ? [agent.avatar] : [])));
-    const avatarBytes = yield* archiveSync(() => extract(bytes, (name) => avatarPaths.has(name)));
+    const avatarBytes = yield* readEntriesEffect(archive, avatarPaths, AVATAR_IMAGE_LIMITS.sourceBytes);
     const avatars = new Map<string, AvatarImageInput>();
     for (const agent of agents) {
       if (!agent.avatar) continue;
@@ -547,7 +550,7 @@ export class InstanceTransferService {
       owner,
       temporary,
       path,
-      sha256: sha256(bytes),
+      fingerprint: archive.fingerprint,
       manifest: { ...manifest, agents },
       avatars,
     };
@@ -635,9 +638,10 @@ export class InstanceTransferService {
       return yield* archiveFailure(
         new Error(sourceText("error.import.serverAgentLimit", { limit: INPUT_LIMITS.agents })),
       );
-    // The file is read again rather than held since `stage`, and only the same bytes are accepted.
-    const bytes = yield* readArchiveEffect(staged.path, staged.temporary ? REMOTE_ARCHIVE : ARCHIVE);
-    if (sha256(bytes) !== staged.sha256)
+    // The file can change after `stage`, so only the same central directory is accepted. Each entry
+    // is checked against its size and CRC there when it is read.
+    const archive = yield* readArchiveEffect(staged.path, staged.temporary ? REMOTE_ARCHIVE : ARCHIVE);
+    if (archive.fingerprint !== staged.fingerprint)
       return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
 
     const warnings: string[] = [];
@@ -653,7 +657,7 @@ export class InstanceTransferService {
     const routineIds = new Map<string, string>();
     for (const agent of selected) {
       const result = yield* Effect.result(
-        this.#importAgent(bytes, staged, agent, routineIds, warnings, fallbackTimezone),
+        this.#importAgent(archive, staged, agent, routineIds, warnings, fallbackTimezone),
       );
       if (Result.isFailure(result)) {
         skipped.push({ key: agent.key, name: agent.name, reason: message(result.failure.cause) });
@@ -663,7 +667,7 @@ export class InstanceTransferService {
       }
     }
     if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
-    if (staged.manifest.shared) yield* this.#importShared(bytes, staged.manifest.shared, warnings);
+    if (staged.manifest.shared) yield* this.#importShared(archive, staged.manifest.shared, warnings);
 
     const signedIn = new Set(this.options.settings.signedInProviders());
     return {
@@ -794,32 +798,36 @@ export class InstanceTransferService {
   /** Copies `~/OpenBot/Shared` files. A file that is already here is kept as it is. */
   readonly #importShared = Effect.fn("InstanceTransfer.importShared")(function* (
     this: InstanceTransferService,
-    bytes: Uint8Array,
+    archive: ArchiveFile,
     folder: string,
     warnings: string[],
   ) {
-    const files = yield* archiveSync(() => extract(bytes, (name) => name.startsWith(`${folder}/`)));
-    const executable = yield* archiveSync(() => executableEntries(bytes));
+    const files = [...archive.entries.values()].filter((entry) => entry.name.startsWith(`${folder}/`));
     const base = resolve(this.options.sharedRoot);
     let kept = 0;
-    for (const [name, data] of Object.entries(files)) {
-      const inner = name.slice(folder.length + 1);
-      const target = resolve(base, inner);
-      if (isUnsafeEntry(inner) || isSharedData(inner) || !isPathInside(base, target)) continue;
-      const written = yield* Effect.result(
+    if (files.length)
+      yield* withArchive(archive.path, (handle) =>
         Effect.gen(function* () {
-          yield* archiveCall(() => mkdir(dirname(target), { recursive: true }));
-          yield* archiveCall(() => writeFile(target, data, { flag: "wx", mode: executable.has(name) ? 0o777 : 0o666 }));
+          for (const entry of files) {
+            const inner = entry.name.slice(folder.length + 1);
+            const target = resolve(base, inner);
+            if (isUnsafeEntry(inner) || isSharedData(inner) || !isPathInside(base, target)) continue;
+            const written = yield* Effect.result(
+              Effect.gen(function* () {
+                yield* archiveCall(() => mkdir(dirname(target), { recursive: true }));
+                yield* extractEntryEffect(handle, entry, target, entry.executable ? 0o777 : 0o666);
+              }),
+            );
+            if (Result.isFailure(written)) kept += 1;
+          }
         }),
       );
-      if (Result.isFailure(written)) kept += 1;
-    }
     if (kept > 0) warnings.push(sourceText("error.import.transferSharedKept", { number: kept }));
   });
 
   readonly #importAgent = Effect.fn("InstanceTransfer.importAgent")(function* (
     this: InstanceTransferService,
-    bytes: Uint8Array,
+    archive: ArchiveFile,
     staged: StagedTransfer,
     source: TransferAgent,
     routineIds: Map<string, string>,
@@ -827,18 +835,15 @@ export class InstanceTransferService {
     fallbackTimezone: string,
   ): Effect.fn.Return<AgentSummary, ArchiveOperationError> {
     const prefix = agentPrefix(source.key);
-    const files = yield* archiveSync(() => extract(bytes, (name) => name.startsWith(prefix)));
-    const read = (path: string) =>
-      Object.entries(files)
-        .filter(([name]) => name.startsWith(`${path}/`))
-        .map(([name, data]) => [name.slice(path.length + 1), data] as const);
+    const agentEntries = [...archive.entries.values()].filter((entry) => entry.name.startsWith(prefix));
+    /** The entries under a folder of the file, by their names in that folder. */
+    const under = (path: string) =>
+      agentEntries
+        .filter((entry) => entry.name.startsWith(`${path}/`))
+        .map((entry) => [entry.name.slice(path.length + 1), entry] as const);
     // Every skill is checked before the agent exists, so a bad one publishes nothing.
-    const skills = yield* archiveSync(() =>
-      source.skills.map((skill) => {
-        const skillFiles = read(skill);
-        return { files: skillFiles, slug: inspectArchive(zipSync(Object.fromEntries(skillFiles))).slug };
-      }),
-    );
+    const skills: Array<{ files: Array<readonly [string, Uint8Array]>; slug: string }> = [];
+    for (const skill of source.skills) skills.push(yield* readSkillEffect(archive, under(skill)));
     // The model is kept when this computer offers it, and the provider is on.
     const model = this.options.agents
       .listModels()
@@ -867,14 +872,13 @@ export class InstanceTransferService {
         Effect.gen({ self: this }, function* () {
           let agent = created;
           if (source.files) {
-            const folder = source.files;
-            const executable = yield* archiveSync(() => executableEntries(bytes));
             yield* writeImportedFilesEffect(
               agent.workspacePath,
-              read(folder).filter(([name]) => !isWorkspaceSkipped(name)),
+              archive,
+              under(source.files).filter(([name]) => !isWorkspaceSkipped(name)),
               source.name,
               warnings,
-              (name) => executable.has(`${folder}/${name}`),
+              true,
             );
           }
           const library = this.options.skills.library();

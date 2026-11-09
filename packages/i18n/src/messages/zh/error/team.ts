@@ -120,6 +120,7 @@ export const messages = {
   "error.team.browserViewUnavailable": "浏览器实时视图不可用。",
   "error.team.browserSessionNotFound": "未找到浏览器视图会话。",
   "error.team.mcpUnsupported": "当前连接不支持 MCP 服务器。",
+  "error.team.mcpServerListNeedsUpdate": "请在此设备上更新 OpenBot，才能在此服务器上使用超过 {limit} 个 MCP 服务器。",
   "error.team.storageUnsupported": "当前连接不支持存储。",
   "error.team.machineResourcesUnsupported": "当前连接不支持机器使用情况。",
   "error.team.machineAlertMemberInvalid": "只有该服务器的所有者或管理员可以接收机器警报。",

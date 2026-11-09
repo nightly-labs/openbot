@@ -122,6 +122,7 @@ export const messages = {
   "error.team.browserViewUnavailable": "תצוגת הדפדפן החיה אינה זמינה.",
   "error.team.browserSessionNotFound": "סשן תצוגת הדפדפן לא נמצא.",
   "error.team.mcpUnsupported": "שרתי MCP אינם נתמכים בחיבור הזה.",
+  "error.team.mcpServerListNeedsUpdate": "יש לעדכן את OpenBot במכשיר הזה כדי להשתמש ביותר מ-{limit} שרתי MCP בשרת הזה.",
   "error.team.storageUnsupported": "אחסון אינו נתמך בחיבור הזה.",
   "error.team.machineResourcesUnsupported": "מעקב אחר שימוש במחשב אינו נתמך בחיבור הזה.",
   "error.team.machineAlertMemberInvalid": "רק בעלים או מנהל של השרת הזה יכולים לקבל התראות מחשב.",

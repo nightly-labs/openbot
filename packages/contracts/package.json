@@ -83,6 +83,7 @@
     "./team-protocol/queue-edit-v1": "./src/team-protocol/queue-edit-v1.ts",
     "./team-protocol/browser-view-v1": "./src/team-protocol/browser-view-v1.ts",
     "./team-protocol/mcp-sign-in-app-v1": "./src/team-protocol/mcp-sign-in-app-v1.ts",
+    "./team-protocol/mcp-many-servers-v1": "./src/team-protocol/mcp-many-servers-v1.ts",
     "./team-protocol/mcp-sign-in-v1": "./src/team-protocol/mcp-sign-in-v1.ts",
     "./team-protocol/message-delete-v1": "./src/team-protocol/message-delete-v1.ts",
     "./team-protocol/provider-account-relay-v1": "./src/team-protocol/provider-account-relay-v1.ts",
