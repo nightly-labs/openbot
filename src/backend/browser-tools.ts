@@ -5,6 +5,7 @@ import {
   VAULT_TEXT_LIMIT,
   type VaultContactFields,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { UI_BLOCK_LIMITS, UI_VAULT_REQUEST_KINDS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
@@ -13,6 +14,7 @@ import {
   BROWSER_FILL_FIELDS_MAX_TEXT_BYTES,
   BROWSER_FILL_FIELDS_MAX_TIMEOUT_MS,
 } from "./browser-fill-fields";
+import { repairBrowserStep, repairBrowserToolInput } from "./browser-tool-input";
 
 export const OPENBOT_BROWSER_NAMESPACE = "openbot_browser";
 
@@ -168,6 +170,8 @@ export const BROWSER_SCRIPT_MAX_STEPS = 200;
 export const BROWSER_SCRIPT_MAX_SLEEP_MS = 25_000;
 const BROWSER_SCRIPT_MAX_CHARS = 20_000;
 export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
+/** An evaluate step gives its value to the script only, so it can read a whole page, such as its text. */
+export const BROWSER_SCRIPT_EVALUATE_MAX_BYTES = 1024 * 1024;
 const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
 
 const browserStepSchema = z.discriminatedUnion("action", [
@@ -190,7 +194,7 @@ export type BrowserStep = z.infer<typeof browserStepSchema>;
 
 /** Steps from a `run_script` sandbox are untrusted values, so each one is decoded before it runs. */
 export function parseBrowserStep(value: unknown): BrowserStep {
-  const result = browserStepSchema.safeParse(value);
+  const result = browserStepSchema.safeParse(isDynamicRecord(value) ? repairBrowserStep(value) : value);
   if (!result.success) throw new Error(`Invalid browser step: ${z.prettifyError(result.error)}`);
   return result.data;
 }
@@ -570,9 +574,10 @@ export type BrowserToolArguments<Name extends BrowserToolCall["tool"]> = Extract
 >["args"];
 
 export function parseBrowserToolCall(tool: string, value: unknown): BrowserToolCall {
-  const definition = BROWSER_TOOL_DEFINITIONS.find((candidate) => candidate.name === tool);
+  const repaired = repairBrowserToolInput(tool, value);
+  const definition = BROWSER_TOOL_DEFINITIONS.find((candidate) => candidate.name === repaired.tool);
   if (!definition) throw new Error(`Unknown browser tool: ${tool}`);
-  return definition.parse(value);
+  return definition.parse(repaired.value);
 }
 
 // Upload staging parses the same arguments before it resolves and authorizes local files.
