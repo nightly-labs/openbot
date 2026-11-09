@@ -389,6 +389,12 @@ export interface AuthRepository {
     createdAt: number;
     expiresAt: number;
   }): Effect.Effect<void, AuthStoreError>;
+  createServerClaimForUser(input: {
+    claimHash: string;
+    userId: string;
+    createdAt: number;
+    expiresAt: number;
+  }): Effect.Effect<void, AuthStoreError>;
   /** Spends the claim and makes a desktop session. Null when the claim is unknown, used or expired. */
   redeemServerClaim(input: {
     claimHash: string;

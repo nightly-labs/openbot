@@ -295,6 +295,16 @@ export const webSearchToolSchema = z.strictObject({
   query: z.string().trim().min(1).max(1_000).describe("The whole question, with its context."),
 });
 
+/** `openbot.create_server_install_command`: a one-time command for a new server of this account. */
+export const serverInstallCommandToolSchema = z.strictObject({
+  name: z
+    .string()
+    .trim()
+    .min(INPUT_LIMITS.serverNameMin)
+    .max(INPUT_LIMITS.serverName)
+    .describe("The server name, such as the host name."),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -385,6 +395,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
     shape: webSearchToolSchema.shape,
+  },
+  {
+    name: "create_server_install_command",
+    description:
+      'Make a one-time command that installs OpenBot as a server on a Linux computer or VPS, signed in to the user\'s account. Get the SSH address from the user. Run it as root over SSH; it asks nothing and ends with "OpenBot is connected to your account." It works once, for 15 minutes: never save, show or share it.',
+    shape: serverInstallCommandToolSchema.shape,
   },
   {
     name: "read_video",

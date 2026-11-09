@@ -78,6 +78,7 @@ import { createMessageImageFiles } from "./message-image-files";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
+import { ServerInstallChatCard } from "./ServerInstallChatCard";
 import { SkillSuggestionChatCard, skillSuggestionOutcome } from "./SkillSuggestionChatCard";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 import { createSubagentDock } from "./subagent-dock";
@@ -595,6 +596,11 @@ export function ConversationTimeline() {
     marker.kind === "mcp-sign-in"
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
+  /** An install command card, where this client can watch its server list. Elsewhere it keeps the marker. */
+  const serverInstallCard = (marker: ChatActionMarkerModel) => {
+    const watch = props.serverInstall;
+    return marker.kind === "server-install" && watch ? { marker, watch } : undefined;
+  };
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
   let timelineScrollElement: HTMLDivElement | undefined;
   const subagentDock = createSubagentDock({
@@ -1039,34 +1045,48 @@ export function ConversationTimeline() {
                                               <Show
                                                 when={webhookRoutineCard(message() ?? initialMessage, marker())}
                                                 fallback={
-                                                  <ChatActionMarker
-                                                    onOpenSkill={
-                                                      agentSkillsMode(props.server, props.runtime) === "hidden"
-                                                        ? undefined
-                                                        : openSkillSettings
+                                                  <Show
+                                                    when={serverInstallCard(marker())}
+                                                    fallback={
+                                                      <ChatActionMarker
+                                                        onOpenSkill={
+                                                          agentSkillsMode(props.server, props.runtime) === "hidden"
+                                                            ? undefined
+                                                            : openSkillSettings
+                                                        }
+                                                        marker={marker()}
+                                                        agents={props.agents}
+                                                        announce={arrives}
+                                                        routineAvailable={routineMarkerAvailable(
+                                                          marker(),
+                                                          availableRoutineIds(),
+                                                        )}
+                                                        onSelectAgent={props.onSelectAgent}
+                                                        onOpenRoutine={openRoutineSettings}
+                                                        openRoutineThread={openRoutineThread}
+                                                        onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                        onOpenLink={(url) => void openExternalMessageUrl(url)}
+                                                        onToggleRoutineRun={toggleRoutineRun}
+                                                        onToggleAgentMessage={toggleAgentMessage}
+                                                        agentMessageText={agentMessageText}
+                                                        instructions={localInstructionsCalls()}
+                                                        onOpenInstructions={
+                                                          channel || !localInstructionsCalls()
+                                                            ? undefined
+                                                            : openInstructionsSettings
+                                                        }
+                                                      />
                                                     }
-                                                    marker={marker()}
-                                                    agents={props.agents}
-                                                    announce={arrives}
-                                                    routineAvailable={routineMarkerAvailable(
-                                                      marker(),
-                                                      availableRoutineIds(),
+                                                  >
+                                                    {(card) => (
+                                                      <ServerInstallChatCard
+                                                        messageId={message()?.id ?? initialMessage.id}
+                                                        name={card().marker.name}
+                                                        expiresAt={card().marker.expiresAt}
+                                                        watch={card().watch}
+                                                      />
                                                     )}
-                                                    onSelectAgent={props.onSelectAgent}
-                                                    onOpenRoutine={openRoutineSettings}
-                                                    openRoutineThread={openRoutineThread}
-                                                    onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                                    onOpenLink={(url) => void openExternalMessageUrl(url)}
-                                                    onToggleRoutineRun={toggleRoutineRun}
-                                                    onToggleAgentMessage={toggleAgentMessage}
-                                                    agentMessageText={agentMessageText}
-                                                    instructions={localInstructionsCalls()}
-                                                    onOpenInstructions={
-                                                      channel || !localInstructionsCalls()
-                                                        ? undefined
-                                                        : openInstructionsSettings
-                                                    }
-                                                  />
+                                                  </Show>
                                                 }
                                               >
                                                 {(card) => (

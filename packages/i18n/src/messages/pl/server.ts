@@ -125,6 +125,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot zatrzyma serwer i przeniesie jego agentów, czaty i pliki do kosza.",
   "server.local.deleting": "Kasowanie serwera…",
   "server.local.deletedTitle": "Skasowano: {name}",
+  "server.install.title": "Nowy serwer na innym komputerze",
+  "server.install.description":
+    "Uruchom to polecenie na komputerze z Linuksem lub serwerze VPS, który należy do Ciebie. Polecenie instaluje OpenBot i dodaje serwer do tego konta.",
+  "server.install.making": "Tworzenie polecenia dla tego konta…",
+  "server.install.failed": "OpenBot nie może utworzyć polecenia. Sprawdź połączenie z internetem.",
+  "server.install.copyForAgent": "Kopiuj dla agenta AI",
+  "server.install.expiresIn": "Działa raz. Wygasa za {time}.",
+  "server.install.newCommand": "Nowe polecenie",
+  "server.install.waiting": "Czekam, aż polecenie uruchomi się na serwerze…",
+  "server.install.starting": "{name} jest zalogowany. Uruchamianie serwera…",
+  "server.install.connected": "{name} jest połączony.",
+  "server.install.offline": "{name} jest offline.",
+  "server.install.expired": "To polecenie wygasło. Utwórz nowe.",
+  "server.install.agentPrompt":
+    'Zainstaluj OpenBot na tym serwerze z Linuksem i zaloguj go do mojego konta OpenBot.\nUruchom to polecenie jako root. Nie zadaje pytań i trwa kilka minut:\n\n{command}\n\nKończy się wierszem "OpenBot is connected to your account." i kodem wyjścia 0.\nPolecenie działa raz, przez 15 minut. Nigdzie go nie zapisuj.',
+  "server.install.setUpWithAgent": "Skonfiguruj z agentem",
+  "server.install.sshAgentPrompt":
+    "Połącz się przez SSH z moim serwerem z Linuksem i zainstaluj na nim OpenBot jako serwer.\n\nAdres SSH (user@host):",
   "server.add.limit.title": "To konto ma maksymalną liczbę serwerów",
   "server.add.limit.description": {
     one: "Konto może mieć {count} płatny serwer. Aby dodać serwer, najpierw usuń jeden z istniejących.",

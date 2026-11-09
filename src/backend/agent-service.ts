@@ -199,7 +199,7 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { type AgentFeedback, OpenBotToolRouter } from "./agent/openbot-tool-router";
+import { type AgentFeedback, type AgentServerClaims, OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -354,6 +354,8 @@ export interface AgentServiceOptions {
   feedbackFacts?: FeedbackFacts | null;
   /** Sends approved `send_feedback` text to the account service. */
   feedback?: AgentFeedback | null;
+  /** Makes one-time claims for `create_server_install_command` with the account session. */
+  serverClaims?: AgentServerClaims | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -1779,6 +1781,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
+      serverClaims: options.serverClaims ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       hooks: {

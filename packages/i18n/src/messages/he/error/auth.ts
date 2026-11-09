@@ -16,6 +16,7 @@ export const messages = {
   "error.auth.serviceTimeout": "שירות החשבון לא הגיב בזמן. יש לנסות שוב.",
   "error.auth.serviceStatus": "שירות החשבון החזיר שגיאה ({status}). יש לנסות שוב מאוחר יותר.",
   "error.auth.invalidHostedServer": "שירות החשבון החזיר שרת מאוחסן לא תקין.",
+  "error.auth.invalidServerClaim": "שירות החשבון החזיר קוד שרת לא תקין.",
   "error.auth.codeNotSent": "OpenBot לא הצליח לשלוח את קוד ההתחברות.",
   "error.auth.deliveryTimeout":
     "OpenBot לא הצליח לאשר את המשלוח בזמן. ייתכן שהקוד עדיין יגיע. יש לבדוק את המשלוח לפני שליחה חוזרת.",

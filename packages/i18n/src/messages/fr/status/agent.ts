@@ -29,6 +29,9 @@ export const messages = {
     "Ceci devient une issue GitHub publique, avec la version de l'app et ton système. Ton nom n'apparaît pas.",
   "status.agent.sendIdea": "Ceci devient une issue GitHub publique. Votre nom n'est pas affiché.",
   "status.agent.feedbackSent": "Envoyé à l'équipe OpenBot : {title}",
+  "status.agent.serverInstallCommand":
+    "Créer une commande à usage unique qui installe OpenBot sur un autre ordinateur comme serveur {name} et le connecte à ton compte. L'agent l'exécute là-bas.",
+  "status.agent.serverInstallCard": "Commande d'installation pour le serveur {name}",
   "status.agent.feedbackSending": "Envoi de vos commentaires à l’équipe OpenBot…",
   "status.agent.workflowDelete":
     "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",

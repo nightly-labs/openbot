@@ -18,6 +18,12 @@ import {
   feedbackSentItemType,
   parseFeedback,
 } from "@openbot/contracts/feedback";
+import {
+  installServerCommand,
+  parseHostedServerName,
+  type ServerClaim,
+  serverInstallItemType,
+} from "@openbot/contracts/hosted-servers";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelChoice,
@@ -74,6 +80,7 @@ import {
   routineReportFailureToolSchema,
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
+  serverInstallCommandToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
@@ -209,6 +216,13 @@ export interface AgentFeedback {
   send(feedback: Feedback): Effect.Effect<FeedbackSendResult, ToolOperationFailed>;
 }
 
+/** Makes one-time claims for new servers of the signed-in account (`POST /v2/server-claims`). */
+export interface AgentServerClaims {
+  /** The owner is signed in to an account, so a claim can be made. */
+  signedIn(): boolean;
+  create(): Effect.Effect<ServerClaim, ToolOperationFailed>;
+}
+
 const FEEDBACK_SIGNED_OUT_NEXT =
   "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
 
@@ -316,6 +330,8 @@ export interface OpenBotToolRouterOptions {
   feedbackFacts?: FeedbackFacts | null | undefined;
   /** Sends approved `send_feedback` text; null where this process has no account service. */
   feedback?: AgentFeedback | null | undefined;
+  /** Makes claims for `create_server_install_command`; null where this process has no account service. */
+  serverClaims?: AgentServerClaims | null | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -361,6 +377,7 @@ export class OpenBotToolRouter {
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #feedbackFacts: FeedbackFacts | null;
   readonly #feedback: AgentFeedback | null;
+  readonly #serverClaims: AgentServerClaims | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -404,6 +421,7 @@ export class OpenBotToolRouter {
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
+    this.#serverClaims = options.serverClaims ?? null;
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -711,7 +729,8 @@ export class OpenBotToolRouter {
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
               tool === "messaging_post" ||
-              tool === "web_search";
+              tool === "web_search" ||
+              tool === "create_server_install_command";
             // A workflow tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
               correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
@@ -1098,6 +1117,95 @@ export class OpenBotToolRouter {
       next: Result.isFailure(card)
         ? "The issue is open on GitHub. Give the user this link."
         : "The issue is open on GitHub. A card in the chat thanks the user and links the issue, so do not repeat the link: thank the user in one short sentence.",
+    });
+  });
+
+  /**
+   * `create_server_install_command`: a one-time command that installs OpenBot on another computer and
+   * signs it in to this account. The claim gives that computer a session of the account, so only the
+   * owner approves it, and only for a person's request. The claim goes only to the agent, which runs
+   * it over SSH; logs redact it, and the chat card holds only the name and the expiry.
+   */
+  readonly #serverInstallCommand = Effect.fn("OpenBotToolRouter.serverInstallCommand")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const args = serverInstallCommandToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+    const name = parseHostedServerName(args.name);
+    if (!name) return openBotToolFailure("Use a server name of 6 to 32 characters, with letters or digits.");
+    const claims = this.#serverClaims;
+    if (!claims)
+      return openBotToolFailure(
+        "This OpenBot cannot make install commands. Tell the user to open Add a server, Other options, in OpenBot on their computer.",
+      );
+    // A routine, a channel task, an external chat or another agent must not wait on the owner's card.
+    if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can ask for an install command.",
+      );
+    // The owner does not approve a card that cannot give a command.
+    if (!claims.signedIn())
+      return openBotToolFailure(
+        "The user is not signed in to OpenBot, so OpenBot cannot make a command. Ask them to sign in, then try again.",
+      );
+    const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const decision = yield* this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId,
+        turnId: params.turnId,
+        kind: "permissions",
+        // The claim does not exist yet. The card shows the command with its place.
+        command: installServerCommand("<one-time code>", name),
+        cwd: null,
+        reason: sourceText("status.agent.serverInstallCommand", { name }),
+        grantRoot: null,
+        permissions: null,
+      },
+      // The command signs a computer in to the owner's account, and Full access does not answer for that.
+      { ownerOnly: true },
+    );
+    if (decision === "cancel")
+      return openBotToolResult({
+        status: "cancelled",
+        next: "Nobody answered the card, so OpenBot made no command. Do not install OpenBot another way.",
+      });
+    if (decision !== "accept")
+      return openBotToolResult({
+        status: "declined",
+        next: "The user selected Not now. Do not install OpenBot another way, and do not ask again for this server.",
+      });
+    const created = yield* Effect.result(claims.create());
+    if (Result.isFailure(created)) {
+      logger.warn("A server claim could not be made.", { error: toLogValue(created.failure.cause) });
+      return openBotToolFailure(
+        "OpenBot could not make a command. Tell the user to check that they are signed in to OpenBot and online, then try again.",
+      );
+    }
+    const claim = created.success;
+    registerSecretValue(claim.claim);
+    const card = yield* Effect.result(
+      toolStep(() =>
+        this.#postSystemCard(senderAgentId, threadId, params.turnId, {
+          itemType: serverInstallItemType({ expiresAt: claim.expiresAt, name }),
+          text: sourceText("status.agent.serverInstallCard", { name }),
+          eventType: "server_install.command",
+          detail: {},
+        }),
+      ),
+    );
+    if (Result.isFailure(card))
+      logger.warn("The server install card could not be added.", { error: toLogValue(card.failure.cause) });
+    return openBotToolResult({
+      command: installServerCommand(claim.claim, name),
+      expiresAt: new Date(claim.expiresAt).toISOString(),
+      next: 'Run the command on the server over SSH, as one command, and wait for it to end. Send it to the shell of the server on standard input (for example `ssh <user@host> bash -s` with the command as input), not as an argument of ssh: other users of the server can see arguments. Do not show the command to the user or save it: it works once and signs a computer in to the user\'s account. When it ends with "OpenBot is connected to your account.", tell the user in one short sentence that the server is installed; the card in the chat shows when it connects. When it fails, show the user the last lines of the output without the command. A new command needs this tool again.',
     });
   });
 
@@ -1631,6 +1739,9 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "send_feedback") return yield* this.#sendFeedback(client, request, params, senderAgentId);
+
+    if (params.tool === "create_server_install_command")
+      return yield* this.#serverInstallCommand(client, request, params, senderAgentId);
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 

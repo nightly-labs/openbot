@@ -20,6 +20,7 @@ export const messages = {
   "error.auth.serviceTimeout": "Hesap hizmeti zamanında yanıt vermedi. Tekrar deneyin.",
   "error.auth.serviceStatus": "Hesap hizmeti bir hata döndürdü ({status}). Daha sonra tekrar deneyin.",
   "error.auth.invalidHostedServer": "Hesap hizmeti geçersiz bir barındırılan sunucu döndürdü.",
+  "error.auth.invalidServerClaim": "Hesap hizmeti geçersiz bir sunucu kodu döndürdü.",
   "error.auth.codeNotSent": "OpenBot giriş kodunu gönderemedi.",
   "error.auth.deliveryTimeout":
     "OpenBot teslimatı zamanında onaylayamadı. Kod yine de gelebilir; tekrar göndermeden önce teslimatı kontrol edin.",

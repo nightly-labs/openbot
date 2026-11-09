@@ -131,6 +131,33 @@ export const messages = defineMessages("server", {
     "OpenBot stops the server and moves its agents, chats and files to the trash.",
   "server.local.deleting": "Deleting server…",
   "server.local.deletedTitle": "Deleted {name}",
+  // A server that the user installs on a Linux computer or VPS of their own with one command.
+  "server.install.title": "New server on another computer",
+  "server.install.description":
+    "Run this command on a Linux computer or VPS that you own. It installs OpenBot and adds the server to this account.",
+  "server.install.making": "Making a command for this account…",
+  "server.install.failed": "OpenBot could not make a command. Check the internet connection.",
+  // Copies the command with the instructions that an AI agent needs.
+  "server.install.copyForAgent": "Copy for an AI agent",
+  // {time} is minutes and seconds, such as 14:52.
+  "server.install.expiresIn": "Works once. Expires in {time}.",
+  "server.install.newCommand": "New command",
+  "server.install.waiting": "Waiting for the command to run on your server…",
+  // {name} is the new server.
+  "server.install.starting": "{name} signed in. Starting the server…",
+  "server.install.connected": "{name} is connected.",
+  // {name} is a server that signed in earlier with the command. The app is not connected to it now.
+  "server.install.offline": "{name} is offline.",
+  "server.install.expired": "This command expired. Make a new one.",
+  // The text that "Copy for an AI agent" copies. The last line of the command output stays in English.
+  "server.install.agentPrompt":
+    'Install OpenBot on this Linux server and sign it in to my OpenBot account.\nRun this command as root. It asks no questions and takes a few minutes:\n\n{command}\n\nIt ends with the line "OpenBot is connected to your account." and exit code 0.\nThe command works once, for 15 minutes. Do not save it anywhere.',
+  // Puts an SSH task into the composer of the open chat.
+  "server.install.setUpWithAgent": "Set up with an agent",
+  // The task that "Set up with an agent" puts into the composer. The user adds the SSH address at the end.
+  // The agent gets the command from OpenBot, after the user approves it.
+  "server.install.sshAgentPrompt":
+    "Connect over SSH to my Linux server and install OpenBot on it as a server.\n\nSSH address (user@host):",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {

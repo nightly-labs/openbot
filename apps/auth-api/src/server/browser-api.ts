@@ -52,6 +52,7 @@ export interface BrowserApiServices {
     | "updateAvatar"
     | "listAccountSessions"
     | "revokeAccountSession"
+    | "createServerClaimForUser"
   >;
   remote: Pick<
     RemoteControlPlane,
@@ -417,6 +418,9 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     return json(yield* removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
   if (path === "v1/me/sessions" && request.method === "GET")
     return json({ sessions: yield* services.auth.listAccountSessions(token) });
+  // The install command of a self-hosted server. Never log the claim.
+  if (path === "v2/server-claims" && request.method === "POST")
+    return json(yield* services.auth.createServerClaimForUser(user.id));
   if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
     return yield* handleBilling(request, path, user, services);
   // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
