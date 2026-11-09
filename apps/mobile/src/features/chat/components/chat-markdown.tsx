@@ -728,7 +728,7 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
     "--openbot-bg-control",
     "--openbot-data-table-header-text",
     "--openbot-data-table-text",
-  ]).map(String);
+  ]).map((value) => (value === undefined ? "" : String(value)));
   const { tone } = presentation;
   // The card has the background of a code block, and the lines between the rows have its color.
   // The rows are on the darker canvas. A message color gives its own surfaces; see `BubbleTone`.
