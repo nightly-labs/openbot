@@ -437,10 +437,11 @@ function createController({
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
     // A streamed message that a later step marks as commentary is not part of the spoken answer.
+    // Progress updates are read on purpose, so only a message read as the answer counts.
     if (
-      readIds.length > 0 &&
       readIds.some(
         (id) =>
+          !readUpdates?.ids.has(id) &&
           !conversation.messages.some(
             (message) => message.id === id && message.turnId === turnId && isAgentAnswer(message),
           ),
