@@ -232,6 +232,8 @@ export function useEmailSignIn({
       if (session) await finish(session);
     } catch (error) {
       const issue = issueFrom(error, t("error.auth.companySignInFailed"));
+      // The company turned the sign-in off: the next send asks for an email code again.
+      if (issue.code === "company_sign_in_not_found") setCompanyEmail(null);
       if (issue.retryAfterSeconds) setBlockedUntil(Date.now() + issue.retryAfterSeconds * 1_000);
       setEmailIssue(issue);
       reject();
