@@ -653,8 +653,6 @@ export const messages = {
   "settings.transfer.old.text": "エージェントとサーバー設定をファイルに保存します。",
   "settings.transfer.new.title": "このサーバーにインポート",
   "settings.transfer.new.text": "ファイルからエージェントとサーバー設定を追加します。",
-  "settings.transfer.notMoved":
-    "API キー、サインイン、コネクター、アプリの環境設定、チャット履歴は移動されません。新しいサーバーで設定し直してください。",
   "settings.transfer.back": "戻る",
   "settings.transfer.loading": "エージェントを読み込んでいます…",
   "settings.transfer.summary.label": "ファイルの内容",

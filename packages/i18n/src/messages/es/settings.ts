@@ -669,8 +669,6 @@ export const messages = {
   "settings.transfer.old.text": "Guarda sus agentes y los ajustes del servidor en un archivo.",
   "settings.transfer.new.title": "Importar en este servidor",
   "settings.transfer.new.text": "Añade los agentes y los ajustes del servidor desde un archivo.",
-  "settings.transfer.notMoved":
-    "Las claves de API, los inicios de sesión, los conectores, las preferencias de la app y el historial de chats no se trasladan. Vuelve a configurarlos en el servidor nuevo.",
   "settings.transfer.back": "Atrás",
   "settings.transfer.loading": "Leyendo tus agentes…",
   "settings.transfer.summary.label": "Contenido del archivo",

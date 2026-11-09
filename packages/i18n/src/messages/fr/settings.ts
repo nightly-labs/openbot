@@ -678,8 +678,6 @@ export const messages = {
   "settings.transfer.old.text": "Enregistrez ses agents et ses réglages de serveur dans un fichier.",
   "settings.transfer.new.title": "Importer dans ce serveur",
   "settings.transfer.new.text": "Ajoutez les agents et les réglages de serveur d’un fichier.",
-  "settings.transfer.notMoved":
-    "Les clés API, les connexions aux comptes, les connecteurs, les préférences de l’app et l’historique des discussions ne sont pas déplacés. Configurez-les de nouveau sur le nouveau serveur.",
   "settings.transfer.back": "Retour",
   "settings.transfer.loading": "Lecture de vos agents…",
   "settings.transfer.summary.label": "Contenu du fichier",

@@ -845,7 +845,7 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider) }
+              ? { onSignIn: (provider) => void connection.connect(provider), history: true }
               : serverCanAdminister(server(), "instance-transfer-v1")
                 ? {}
                 : undefined

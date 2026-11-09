@@ -688,8 +688,6 @@ export const messages = {
   "settings.transfer.old.text": "Zapisz agentów i ustawienia serwera w pliku.",
   "settings.transfer.new.title": "Importuj na ten serwer",
   "settings.transfer.new.text": "Dodaj agentów i ustawienia serwera z pliku.",
-  "settings.transfer.notMoved":
-    "Klucze API, logowania, konektory, preferencje aplikacji i historia czatów nie są przenoszone. Skonfiguruj je ponownie na nowym serwerze.",
   "settings.transfer.back": "Wstecz",
   "settings.transfer.loading": "Wczytywanie twoich agentów…",
   "settings.transfer.summary.label": "Zawartość pliku",

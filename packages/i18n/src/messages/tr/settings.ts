@@ -661,8 +661,6 @@ export const messages = {
   "settings.transfer.old.text": "Ajanlarını ve sunucu ayarlarını bir dosyaya kaydedin.",
   "settings.transfer.new.title": "Bu sunucuya içe aktar",
   "settings.transfer.new.text": "Bir dosyadaki ajanları ve sunucu ayarlarını ekleyin.",
-  "settings.transfer.notMoved":
-    "API anahtarları, açık oturumlar, bağlayıcılar, uygulama tercihleri ve sohbet geçmişi taşınmaz. Bunları yeni sunucuda yeniden ayarlayın.",
   "settings.transfer.back": "Geri",
   "settings.transfer.loading": "Ajanlarınız okunuyor…",
   "settings.transfer.summary.label": "Dosyanın içeriği",

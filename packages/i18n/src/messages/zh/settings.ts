@@ -641,7 +641,6 @@ export const messages = {
   "settings.transfer.old.text": "把它的助手和服务器设置保存到文件。",
   "settings.transfer.new.title": "导入到该服务器",
   "settings.transfer.new.text": "从文件添加助手和服务器设置。",
-  "settings.transfer.notMoved": "API 密钥、登录状态、连接器、应用偏好和对话记录不会迁移，请在新服务器上重新设置。",
   "settings.transfer.back": "返回",
   "settings.transfer.loading": "正在读取你的助手…",
   "settings.transfer.summary.label": "文件内容",

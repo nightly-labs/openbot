@@ -670,8 +670,6 @@ export const messages = {
   "settings.transfer.old.text": "שמירת הסוכנים והגדרות השרת בקובץ.",
   "settings.transfer.new.title": "ייבוא לשרת הזה",
   "settings.transfer.new.text": "הוספת הסוכנים והגדרות השרת מקובץ.",
-  "settings.transfer.notMoved":
-    "מפתחות API, התחברויות, מחברים, העדפות אפליקציה והיסטוריית צ'אט אינם מועברים. יש להגדיר אותם שוב בשרת החדש.",
   "settings.transfer.back": "חזרה",
   "settings.transfer.loading": "קורא את הסוכנים שלך…",
   "settings.transfer.summary.label": "מה הקובץ מכיל",

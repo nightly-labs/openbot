@@ -654,8 +654,6 @@ export const messages = {
   "settings.transfer.old.text": "Bewaar de agents en serverinstellingen ervan in een bestand.",
   "settings.transfer.new.title": "Importeer in deze server",
   "settings.transfer.new.text": "Voeg de agents en serverinstellingen uit een bestand toe.",
-  "settings.transfer.notMoved":
-    "API-sleutels, aanmeldingen, connectors, app-voorkeuren en chatgeschiedenis worden niet verplaatst. Stel ze opnieuw in op de nieuwe server.",
   "settings.transfer.back": "Terug",
   "settings.transfer.loading": "Je agents lezen…",
   "settings.transfer.summary.label": "Wat het bestand bevat",

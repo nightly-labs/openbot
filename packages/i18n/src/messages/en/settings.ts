@@ -725,8 +725,8 @@ export const messages = defineMessages("settings", {
   "settings.transfer.old.text": "Save its agents and server settings to a file.",
   "settings.transfer.new.title": "Import into this server",
   "settings.transfer.new.text": "Add the agents and server settings from a file.",
-  "settings.transfer.notMoved":
-    "API keys, sign-ins, connectors, app preferences, and chat history are not moved. Set them up again on the new server.",
+  "settings.transfer.notMovedSecrets":
+    "API keys, sign-ins, connectors, and app preferences are not moved. Set them up again on the new server.",
   "settings.transfer.back": "Back",
   "settings.transfer.loading": "Reading your agents…",
   "settings.transfer.summary.label": "What the file contains",
@@ -742,6 +742,9 @@ export const messages = defineMessages("settings", {
   "settings.transfer.export.settings": "Include server settings",
   "settings.transfer.export.settingsDescription":
     "MCP servers, custom model providers, sidebar sections, and routine flows.",
+  "settings.transfer.export.history": "Include chat history",
+  "settings.transfer.export.historyDescription":
+    "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
   "settings.transfer.export.hideAgents": "Hide agents",
   "settings.transfer.export.agentsLabel": "Agents to export",
