@@ -372,7 +372,7 @@
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
     background: var(--openbot-danger-hover);
-    color: var(--openbot-text-primary);
+    color: var(--openbot-text-on-accent);
   }
 }
 
