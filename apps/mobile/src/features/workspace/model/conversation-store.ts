@@ -280,11 +280,7 @@ export class MobileConversationStore {
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
             if (!isCurrent() || this.#loads.get(agentId) !== load) return page;
-            const last = !load.dirty;
-            if (last) this.#loads.delete(agentId);
             this.applyPage(page, undefined, load.attach);
-            // The page can be older than the window, and then it changes nothing: the held deltas still apply.
-            if (last && this.#deltas.has(agentId)) this.flush();
           } while (load.dirty);
           this.#upToDate.add(agentId);
           return page;
@@ -292,6 +288,7 @@ export class MobileConversationStore {
         .finally(() => {
           if (this.#loads.get(agentId) === load) {
             this.#loads.delete(agentId);
+            // The held deltas apply after the page, also when the page is older than the window and changes nothing.
             if (this.#deltas.has(agentId)) this.flush();
           }
         }),
