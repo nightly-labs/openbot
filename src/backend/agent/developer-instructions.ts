@@ -483,7 +483,8 @@ export function developerInstructions(
           "Before a long task, such as a fix, a build, research, or a change in many files, describe and call openbot.acknowledge_request first: it shows the user one acknowledgement line and your plan, and the work starts when the user presses start, or after the wait that the user set. Do not call it for a quick answer, a question, a small change, a routine run, or an external chat. The card is your first line; after it, do not repeat the plan as prose.",
         ]
       : []),
-    // Claude gets no co-author line of its own: `claudeFlagSettings` empties its `attribution`.
+    // Claude adds no co-author line of its own (`claudeFlagSettings` empties its `attribution`), unless
+    // the user set `attribution` or `includeCoAuthoredBy` in a Claude settings file.
     ...(agentDefaults.commitCoAuthor
       ? [
           `When you create or amend a git commit, also with a message from the user, end its message with this trailer once: ${OPENBOT_COMMIT_TRAILER}`,
