@@ -95,6 +95,48 @@ docker logs openbot-remote-capacity-report-1 2>&1 | tail -5
 
 A failed sample writes only `Capacity report failed.` and its source (`turn`, `signal` or `openpanel`).
 
+### coturn configuration update
+
+A change to `remote/coturn/` needs a new coturn container. The restart ends the relay allocations of
+that machine: its clients that use the relay lose their path, get the other relay from Signal, and
+restart ICE. Do it in a quiet hour, one machine at a time, and only with approval.
+
+1. Open the relay range of the new `turnserver.conf` in the firewall of both machines first. If coturn
+   gets ports before the firewall allows them, the firewall drops the first packets of the peers:
+
+   ```sh
+   ufw allow 16384:65535/udp comment 'OpenBot TURN relay UDP'
+   ```
+
+   A narrower older rule, such as `49152:65535/udp`, is then not necessary. Remove it after both
+   machines run the new range.
+2. Stage the release directory as above. In it, keep the running image and build coturn:
+
+   ```sh
+   docker image tag "$(docker inspect openbot-coturn --format '{{.Image}}')" openbot-remote-coturn:before-<sha>
+   remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+     docker compose -p openbot-remote -f remote/compose.yaml build coturn
+   remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+     docker compose -p openbot-remote -f remote/compose.yaml up -d --no-build --no-deps --force-recreate coturn
+   ```
+
+   `--no-deps` keeps `acme` as it is. coturn depends on it, and without the option Compose can
+   recreate it too.
+3. Check the configuration that coturn uses, then the relay:
+
+   ```sh
+   docker exec openbot-coturn grep -E '^(min-port|max-port|total-quota)=' /tmp/openbot-turnserver.conf
+   curl --fail --silent --show-error https://signal1.openbot.run/health/turn
+   curl --fail --silent --show-error https://signal2.openbot.run/health/turn
+   curl -s 127.0.0.1:9641/metrics | grep '^turn_total_allocations'
+   ```
+
+   The allocations come back in a few minutes. Wait until `openbot_remote_turn_relay_available` is 1
+   for this relay on both Signals, then do the other machine.
+
+To roll back, tag `openbot-remote-coturn:before-<sha>` as `openbot-remote-coturn` and recreate coturn
+with the same `up` command.
+
 Signal replacement closes signaling WebSockets. Existing WebRTC data channels should continue while
 signaling reconnects. The first resume after a restart checks the durable control plane. When the
 account service does not answer, Signal closes the socket with 1013 and no error frame, and the peer
@@ -135,8 +177,12 @@ hosts, the Worker, Slack, Telegram and routine webhooks all use `signal.openbot.
 - The IOTA node uses ports 8080 and 8081, so Signal listens on `127.0.0.1:8091`. Apache uses port 80.
 - Nginx uses `remote/nginx/signal.openbot.run.conf` with `signal2.openbot.run` added to `server_name`,
   `proxy_pass` to port 8091, and no port 80 server. The reload units are the ones in `remote/nginx`.
-- The firewall (ufw) allows 443/tcp, 3478/tcp, 3478/udp and 5349/tcp, as on production. Neither
-  host opens the coturn relay range UDP 49152-65535 that `remote/README.md` lists.
+- The firewall (ufw) allows 443/tcp, 3478/tcp, 3478/udp, 5349/tcp and the coturn relay range UDP
+  16384-65535, as on production (see [coturn configuration update](#coturn-configuration-update)).
+- Nginx has `worker_rlimit_nofile 65535`, `worker_connections 8192` and `reuseport`, as on production
+  ([production requirements](../remote/README.md#production-requirements)). With the Nginx default of
+  768 connections, this machine holds only about 12,000 Signal sockets, less than both machines have
+  together.
 - Tags before `ACME_EXTRA_DOMAINS` lack it in `remote/acme/renew.sh` and `remote/compose.yaml`. For
   such a tag, copy these two files from `main` into the release directory before the build.
 
