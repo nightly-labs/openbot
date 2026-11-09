@@ -373,6 +373,11 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-remote-visual",
     privileges: { standard: true, secure: true },
   },
+  // The decode window of `read_video`, in its own session. It fetches the downloaded files.
+  {
+    scheme: "openbot-video",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
   {
     scheme: "openbot-avatar",
     privileges: { standard: true, secure: true, supportFetchAPI: true },

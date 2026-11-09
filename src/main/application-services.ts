@@ -389,6 +389,7 @@ import {
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 import { VaultService } from "./vault-service";
 import { VaultStore } from "./vault-store";
+import { VideoReader } from "./video-reader";
 import { VoiceApiKeyStore } from "./voice-api-key-store";
 import { openScribeSocket } from "./voice-cloud-stream";
 import {
@@ -1936,6 +1937,12 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    videoReader: new VideoReader({
+      runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
+      target: runtimeTarget(process.platform, process.arch),
+      // The voice service starts after the agents; an agent turn runs only later.
+      transcribe: (audio) => voice.transcribe(audio),
+    }),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),
     marketplaceAppServer: (appId) => {

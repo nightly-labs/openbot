@@ -34,6 +34,7 @@ import {
   renameSectionToolSchema,
 } from "./agent/sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
+import { readVideoToolShape } from "./agent/video-reader";
 import { CREATE_WEBHOOK_ROUTINE_TOOL, UPDATE_WEBHOOK_ROUTINE_TOOL } from "./agent/webhook-routine-tool";
 import { START_TASK_TOOL, startTaskToolSchema } from "./agent-tasks/agent-tasks";
 import {
@@ -391,6 +392,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
     shape: webSearchToolSchema.shape,
+  },
+  {
+    name: "read_video",
+    description:
+      "Watch an online video from its link, such as a Facebook, Instagram, TikTok, X or YouTube video: get its title, author, counts, description, a transcript of what is said with times, and still frames as images. Use it when a task needs what a video says or shows; the browser shows only the page around the video. It reads public videos only. The first call can take a few minutes while OpenBot gets its video tools and speech model.",
+    shape: readVideoToolShape,
   },
   {
     name: "list_sections",
