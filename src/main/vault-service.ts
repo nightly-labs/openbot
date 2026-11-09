@@ -320,7 +320,8 @@ export class VaultService {
 
   /**
    * Adds the logins of a CSV export. A row is skipped when its website is not HTTPS, it has no
-   * password, or the same login is already saved.
+   * password, or the same login is already saved. A row of a saved login adds only its two-step key,
+   * when the saved login has none.
    */
   readonly importCsv = Effect.fn("VaultService.importCsv")(function* (this: VaultService, source: string) {
     const parsed = yield* Effect.try({
@@ -341,20 +342,29 @@ export class VaultService {
           website.length <= VAULT_TEXT_LIMIT &&
           row.username.length <= VAULT_TEXT_LIMIT &&
           row.password.length <= VAULT_PASSWORD_LIMIT;
-        const duplicate =
-          valid &&
-          logins.some(
-            (login) =>
-              loginTitle(login.website) === loginTitle(website) &&
-              login.username === row.username &&
-              login.password === row.password,
-          );
-        if (!valid || duplicate) {
+        if (!valid) {
           skipped += 1;
           continue;
         }
         // A two-step key that is not a TOTP key is left out; the login is still imported.
         const twoStepKey = row.twoStepKey ? normalizeTwoStepKey(row.twoStepKey) : null;
+        const duplicate = logins.findIndex(
+          (login) =>
+            loginTitle(login.website) === loginTitle(website) &&
+            login.username === row.username &&
+            login.password === row.password,
+        );
+        if (duplicate >= 0) {
+          // An export imported again adds the two-step key to a saved login that has none.
+          const saved = logins[duplicate];
+          if (saved && twoStepKey && !saved.twoStepKey) {
+            logins[duplicate] = { ...saved, twoStepKey };
+            imported += 1;
+          } else {
+            skipped += 1;
+          }
+          continue;
+        }
         logins.push({
           id: randomUUID(),
           website,
