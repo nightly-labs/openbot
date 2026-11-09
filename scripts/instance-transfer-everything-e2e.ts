@@ -1,0 +1,463 @@
+// Moves a whole setup between two OpenBot profiles with the real transfer service and checks what
+// arrives. Two real agent services run on temporary profiles with a fake Codex app-server.
+//
+// The source has two agents with memories, routines, a chat with a file, a side thread made by a
+// branch, settings that only restrict, and a channel with both agents, a lead, a memory and a routine.
+// The export includes workspace files, server settings and chat history. The import goes into the
+// second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
+// messages in order with the file's bytes, the side thread, and that the first turn of an imported
+// agent gets the imported history. It also checks that `Shared/Transfers` is not copied as files.
+// `bun scripts/instance-transfer-everything-e2e.ts`. Writes .openbot-build/instance-transfer-everything-e2e/report.json.
+import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
+import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
+
+const OUT = resolve(import.meta.dirname, "../.openbot-build/instance-transfer-everything-e2e");
+const root = await mkdtemp(join(tmpdir(), "openbot-transfer-everything-"));
+const fakeCodex = join(root, "codex");
+const fakeLog = join(root, "codex.jsonl");
+const home = join(root, "home");
+
+// Before the service modules load: the Codex process reads these.
+process.env.HOME = home;
+process.env.CODEX_HOME = join(home, ".codex");
+process.env.OPENBOT_CODEX_PATH = fakeCodex;
+mkdirSync(home, { recursive: true });
+
+const { AgentService } = await import("../src/backend/agent-service");
+const { AgentStore } = await import("../src/backend/agent-store");
+const { runCauseEffect } = await import("../src/backend/effect-boundary");
+const { MailboxStore } = await import("../src/backend/mailbox-store");
+const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { HISTORY_IMPORTED_EVENT } = await import("../src/backend/agent-history-transfer");
+const { InstanceTransferService } = await import("../src/main/instance-transfer-service");
+const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
+
+const HISTORY_MARK = "the blue notebook is on the second shelf";
+
+/** A Codex app-server that answers each turn with "Done." and logs what each turn starts with. */
+const FAKE_CODEX = `#!/usr/bin/env node
+const { appendFileSync } = require("node:fs");
+if (process.argv.includes("--version")) {
+  process.stdout.write("codex-cli 0.160.1\\n");
+  process.exit(0);
+}
+const LOG = ${JSON.stringify(fakeLog)};
+const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
+let buffer = "";
+let threads = 0;
+let turns = 0;
+process.stdout.on("error", (error) => {
+  if (error.code === "EPIPE") process.exit(0);
+  throw error;
+});
+const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+const answer = (message) => {
+  const params = message.params || {};
+  switch (message.method) {
+    case "initialize": return write({ id: message.id, result: {} });
+    case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
+    case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
+    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-6-luna", displayName: "GPT-6 Luna" }] } });
+    case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
+    case "config/read": return write({ id: message.id, result: config });
+    case "config/batchWrite": return write({ id: message.id, result: {} });
+    case "thread/start":
+      appendFileSync(LOG, JSON.stringify({ method: "thread/start", params }) + "\\n");
+      return write({ id: message.id, result: { thread: { id: "thread-" + process.pid + "-" + (++threads), turns: [] } } });
+    case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
+    case "thread/turns/list":
+    case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
+    case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "turn/start": {
+      appendFileSync(LOG, JSON.stringify({ method: "turn/start", params }) + "\\n");
+      const turnId = "turn-" + process.pid + "-" + (++turns);
+      write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
+      write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      return setTimeout(() => {
+        const item = { type: "agentMessage", id: "message-" + turnId, text: "Done.", phase: "final_answer" };
+        write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
+        write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
+      }, 20);
+    }
+    case "turn/interrupt": {
+      write({ id: message.id, result: {} });
+      return write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
+    }
+    default:
+      return write({ id: message.id, error: { code: -32601, message: "Method not found: " + message.method } });
+  }
+};
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let newline = buffer.indexOf("\\n");
+  while (newline >= 0) {
+    const line = buffer.slice(0, newline);
+    buffer = buffer.slice(newline + 1);
+    if (line) {
+      const message = JSON.parse(line);
+      if (message.method && message.id !== undefined) answer(message);
+    }
+    newline = buffer.indexOf("\\n");
+  }
+});
+`;
+
+const unused = () => Effect.die(new Error("Not used by this check."));
+const browser: AgentBrowserHost = {
+  listTabs: () => [],
+  beginTakeover: unused,
+  endTakeover: () => {},
+  resolveUploadTarget: unused,
+  handleDynamicTool: unused,
+  userControlTabFor: () => null,
+  awaitUserControlRelease: unused,
+  onChanged: () => () => {},
+  onControlChanged: () => () => {},
+  onDocumentChanged: () => () => {},
+  clearControls: () => {},
+  endControl: () => {},
+  close: () => Effect.void,
+  clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
+};
+
+const report: {
+  checks: { name: string; passed: boolean; detail?: string }[];
+  exportWarnings?: string[];
+  importWarnings?: string[];
+  archiveEntries?: number;
+  passed: boolean;
+  error?: string;
+} = { checks: [], passed: false };
+
+function pass(name: string, condition: boolean, detail?: string) {
+  report.checks.push({ name, passed: condition, ...(detail ? { detail } : {}) });
+  assert.ok(condition, detail ? `${name}: ${detail}` : name);
+}
+
+async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = read();
+    if (value) return value;
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}.`);
+    await new Promise((done) => setTimeout(done, 25));
+  }
+}
+
+function codexLog(): Array<{ method: string; params: unknown }> {
+  try {
+    return readFileSync(fakeLog, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
+}
+
+/** One OpenBot profile: its database, stores, agent service and transfer service. */
+function profile(name: string) {
+  const userData = join(root, name, "user-data");
+  const profileHome = join(root, name, "home");
+  mkdirSync(profileHome, { recursive: true });
+  const database = new OpenBotDatabase(userData);
+  const store = new AgentStore(userData, profileHome, database);
+  const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
+  const agents = new AgentService({
+    store,
+    mailbox,
+    browser,
+    preferredProvider: "codex",
+    offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+    timezone: () => "UTC",
+  });
+  const library = new LocalSkillLibrary(join(userData, "local-skills"), () => agents.listAgents());
+  const pins = new Set<string>();
+  const levels = new Map<string, "all" | "needs-me" | "nothing">();
+  const approvals = new Map<string, boolean>();
+  const transfer = new InstanceTransferService({
+    agents,
+    skills: { library: () => library, installLocal: () => Effect.void },
+    sharedRoot: store.sharedRoot,
+    channelActor: () => ({ id: "local", name: "You" }),
+    preferences: {
+      notificationLevel: (agentId) => levels.get(agentId) ?? null,
+      setNotificationLevel: (agentId, level) => Effect.sync(() => levels.set(agentId, level)),
+      pinned: (agentId) => pins.has(agentId),
+      pin: (agentId) => Effect.sync(() => pins.add(agentId)),
+      autoApproves: (agentId) => approvals.get(agentId) ?? true,
+      setAutoApprove: (agentId, value) => Effect.sync(() => approvals.set(agentId, value)),
+      apiKeyNames: () => Effect.succeed(["WEATHER_API_KEY"]),
+    },
+    appVersion: "e2e",
+    timezone: () => "UTC",
+    settings: {
+      mcpServers: () => [],
+      saveMcpServer: () => Effect.void,
+      customProviders: () => [],
+      saveCustomProvider: () => Effect.void,
+      customAgents: () => Effect.succeed([]),
+      providersOff: () => AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+      sidebar: () => ({ revision: 0, sections: [], order: [], agentAssignments: {}, agentOrder: [] }),
+      mutateSidebar: () => Effect.die("The check has no sidebar sections."),
+      routineFlowLinks: () => Effect.succeed([]),
+      connectRoutineFlow: () => Effect.die("The check has no routine flows."),
+      signedInProviders: () => [],
+    },
+  });
+  return { database, store, mailbox, agents, transfer, pins, levels, approvals };
+}
+
+function idle(agents: InstanceType<typeof AgentService>, agentId: string) {
+  return waitFor("the turn to end", () =>
+    agents
+      .listQueue(agentId)
+      .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status)),
+  );
+}
+
+const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+
+try {
+  await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+  const source = profile("source");
+  const target = profile("target");
+  await runCauseEffect(source.agents.initialize());
+  await runCauseEffect(target.agents.initialize());
+
+  // --- The source setup.
+  const create = (name: string) =>
+    runCauseEffect(
+      source.agents.createAgentProfile({
+        name,
+        description: `${name} agent.`,
+        avatarSeed: name.toLowerCase(),
+        avatarHue: null,
+      }),
+    );
+  const writer = await create("Writer");
+  const editor = await create("Editor");
+  source.agents.createMemory({ agentId: writer.id, text: "The user writes in British English." });
+  const routine = source.agents.createRoutine({
+    agentId: writer.id,
+    name: "Morning notes",
+    instruction: "Summarise yesterday's notes.",
+    active: true,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "08:00" },
+  });
+  await runCauseEffect(source.agents.updateAgent({ agentId: editor.id, computerUse: false, allowAutomation: true }));
+  source.pins.add(writer.id);
+  source.levels.set(writer.id, "needs-me");
+  source.approvals.set(editor.id, false);
+
+  // A real chat turn with a file, then a branch of it as a side thread.
+  const notePath = join(root, "shelf-note.txt");
+  const noteBytes = new TextEncoder().encode(`Note: ${HISTORY_MARK}.\n`);
+  await writeFile(notePath, noteBytes);
+  const drafts = await runCauseEffect(source.mailbox.prepareAttachments([notePath]));
+  await runCauseEffect(
+    source.agents.sendMessage({
+      agentId: writer.id,
+      text: `Remember: ${HISTORY_MARK}.`,
+      attachmentDraftIds: drafts.map((draft) => draft.id),
+    }),
+  );
+  await idle(source.agents, writer.id);
+  const sourceHistory = source.agents.readTransferHistory(writer.id);
+  const sourceMain = sourceHistory.find((thread) => thread.main);
+  assert.ok(sourceMain, "The source chat has no messages.");
+  const answer = sourceMain.messages.findLast((message) => message.author === "assistant");
+  assert.ok(answer, "The source chat has no answer.");
+  await runCauseEffect(
+    source.agents.branchTask(
+      { agentId: writer.id, taskId: null, messageId: answer.id, requestId: randomUUID() },
+      "local",
+    ),
+  );
+  const sourceThreads = source.agents.readTransferHistory(writer.id);
+  pass("source has its chat and a side thread", sourceThreads.length === 2, `${sourceThreads.length} chats`);
+
+  const channel = await runCauseEffect(
+    source.agents.channels.command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId: randomUUID(),
+        draft: {
+          name: "Newsroom",
+          title: "Daily paper",
+          instructions: "Write and edit the daily paper.",
+          members: [{ agentId: writer.id }, { agentId: editor.id }],
+          leadAgentId: editor.id,
+          isolated: true,
+          icon: { name: "book", hue: 210 },
+        },
+      },
+      { id: "local", name: "You" },
+    ),
+  );
+  source.agents.createChannelMemory({ channelId: channel.id, text: "Headlines stay under ten words." });
+  source.agents.createChannelRoutine({
+    channelId: channel.id,
+    name: "Evening edition",
+    instruction: "Plan the evening edition.",
+    active: true,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "17:00" },
+  });
+
+  // --- Export everything.
+  const file = join(root, "transfer.zip");
+  const exported = await runCauseEffect(
+    source.transfer.exportTo(file, {
+      agentIds: [writer.id, editor.id],
+      includeFiles: true,
+      includeSettings: true,
+      includeHistory: true,
+    }),
+  );
+  report.exportWarnings = exported.warnings;
+  const { unzipSync } = await import("fflate");
+  const archive = unzipSync(new Uint8Array(await readFile(file)));
+  report.archiveEntries = Object.keys(archive).length;
+  pass(
+    "Shared/Transfers is not copied as files",
+    !Object.keys(archive).some((name) => name.toLowerCase().startsWith("shared/transfers/")),
+  );
+
+  // --- Import into the second profile.
+  const preview = await runCauseEffect(target.transfer.stage(file));
+  pass("preview offers both agents", preview.agents.length === 2);
+  const result = await runCauseEffect(
+    target.transfer.apply({
+      token: preview.token,
+      keys: preview.agents.map((agent) => agent.key),
+      includeSettings: true,
+    }),
+  );
+  report.importWarnings = result.warnings;
+  pass("both agents are imported", result.agents.length === 2 && result.skipped.length === 0);
+  const byName = (name: string): AgentSummary => {
+    const agent = target.agents.listAgents().find((candidate) => candidate.name === name);
+    assert.ok(agent, `${name} is missing.`);
+    return agent;
+  };
+  const newWriter = byName("Writer");
+  const newEditor = byName("Editor");
+
+  pass(
+    "memories move",
+    target.agents.listMemories(newWriter.id).some((memory) => memory.text === "The user writes in British English."),
+  );
+  pass(
+    "routines move",
+    target.agents.listRoutines(newWriter.id).some((item) => item.name === routine.name && item.active),
+  );
+  pass("a restriction moves: Computer Use off", newEditor.computerUse === false);
+  pass("a permission does not move: Local scripts stay off", newEditor.allowAutomation !== true);
+  pass(
+    "the user is told to turn Local scripts on again",
+    result.warnings.some((warning) => warning.includes("Local scripts")),
+  );
+  pass(
+    "the pin and the notification level move",
+    target.pins.has(newWriter.id) && target.levels.get(newWriter.id) === "needs-me",
+  );
+  pass("an approval choice that restricts moves", target.approvals.get(newEditor.id) === false);
+  pass(
+    "no approval warning when this computer already allows the agent",
+    !result.warnings.some((warning) => warning.startsWith("Writer:") && warning.includes("always allowed")),
+  );
+  pass(
+    "API key names are listed",
+    result.warnings.some((warning) => warning.includes("WEATHER_API_KEY")),
+  );
+
+  const channels = target.agents.channels.store.ids().map((id) => target.agents.channels.store.get(id));
+  const newChannel = channels.find((item) => item.name === "Newsroom");
+  pass("the channel moves", newChannel !== undefined);
+  assert.ok(newChannel);
+  pass(
+    "channel members and lead are the new agents",
+    newChannel.members.length === 2 &&
+      newChannel.members.every((member) => [newWriter.id, newEditor.id].includes(member.agentId)) &&
+      newChannel.leadAgentId === newEditor.id,
+  );
+  pass("channel settings move", newChannel.isolated === true && newChannel.icon?.name === "book");
+  pass(
+    "channel memory moves",
+    target.agents
+      .listChannelMemories(newChannel.id)
+      .some((memory) => memory.text === "Headlines stay under ten words."),
+  );
+  pass(
+    "channel routine moves",
+    target.agents.listChannelRoutines(newChannel.id).some((item) => item.name === "Evening edition"),
+  );
+
+  // --- The chats.
+  const page = await runCauseEffect(target.agents.readConversationPageFor(newWriter.id, "local"));
+  const texts = (messages: readonly { text: string }[]) => messages.map((message) => message.text);
+  pass(
+    "the chat shows the same messages in order",
+    JSON.stringify(texts(page.messages)) === JSON.stringify(texts(sourceMain.messages)),
+    JSON.stringify({ source: texts(sourceMain.messages), target: texts(page.messages) }),
+  );
+  const imported = page.messages.find((message) => message.attachments?.length);
+  const attachment = imported?.attachments?.[0];
+  assert.ok(attachment, "The imported message has no file.");
+  const stored = await runCauseEffect(target.mailbox.resolveAttachment(attachment.id));
+  pass(
+    "the file of the message opens with the same bytes",
+    stored !== null && sha(new Uint8Array(await readFile(stored.path))) === sha(noteBytes),
+  );
+  const targetThreads = target.agents.readTransferHistory(newWriter.id);
+  const side = targetThreads.find((thread) => !thread.main);
+  pass("the side thread moves", side !== undefined && side.messages.length > 0);
+  pass(
+    "the side thread is in the side-thread list",
+    target.agents.listTasks(newWriter.id).tasks.some((task) => task.title === side?.title),
+  );
+  pass(
+    "the imported chat has the import event",
+    newWriter.threadId !== null && target.database.threadHasEvent(newWriter.threadId, HISTORY_IMPORTED_EVENT),
+  );
+
+  // --- The first turn of the imported agent gets the history.
+  const before = codexLog().length;
+  await runCauseEffect(target.agents.sendMessage({ agentId: newWriter.id, text: "Where is the notebook?" }));
+  await idle(target.agents, newWriter.id);
+  const started = codexLog()
+    .slice(before)
+    .map((entry) => JSON.stringify(entry.params));
+  pass(
+    "the first turn of the imported agent gets the imported history",
+    started.some((params) => params.includes(HISTORY_MARK)),
+  );
+
+  report.passed = true;
+} catch (error) {
+  report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  process.exitCode = 1;
+} finally {
+  mkdirSync(OUT, { recursive: true });
+  writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ passed: report.passed, checks: report.checks.length, error: report.error }, null, 2)}\n`,
+  );
+  await rm(root, { recursive: true, force: true }).catch(() => undefined);
+  process.exit();
+}

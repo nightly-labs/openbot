@@ -192,6 +192,9 @@ try {
     setAvatar: () => Effect.die("The agent has no avatar."),
     deleteAgent: () => Effect.die("A successful import deletes no agent."),
     setAgentHidden: () => Effect.die("The agent is not hidden."),
+    readTransferHistory: () => [],
+    resolveTransferFile: () => Effect.succeed(null),
+    importTransferHistory: () => Effect.die("The export has no chat history."),
     channels: {
       store: { ids: () => [], get: () => assert.fail("The instance has no channels.") },
       images: { resolve: () => null },

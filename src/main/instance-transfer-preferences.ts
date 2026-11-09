@@ -117,7 +117,9 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
     if (value.pinned === true) yield* step(port.pin(agent.id));
     if (value.autoApprove === false && port.autoApproves(agent.id)) yield* step(port.setAutoApprove(agent.id, false));
   }
-  if (value.autoApprove === true) warnings.push(sourceText("error.import.transferAlwaysAllow", { name }));
+  // Only when this computer asks first: its default can already allow the agent.
+  if (value.autoApprove === true && !port?.autoApproves(agent.id))
+    warnings.push(sourceText("error.import.transferAlwaysAllow", { name }));
 
   const names = Array.isArray(value.apiKeyNames)
     ? value.apiKeyNames.filter((item): item is string => typeof item === "string").slice(0, API_KEY_NAMES)

@@ -94,7 +94,9 @@ export function instanceTransferIpcHandlers({
     requireRemote(serverId);
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
-    const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, input));
+    // `instance-transfer-v1` carries no chat history.
+    const { includeHistory: _history, ...v1 } = input;
+    const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, v1));
     // The file appears only when it is complete, as a local export does.
     const part = `${path}.part`;
     try {

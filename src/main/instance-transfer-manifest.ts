@@ -98,6 +98,8 @@ const Agent = Schema.Struct({
    * here: the import checks each value on its own, so that a newer value cannot refuse the agent.
    */
   preferences: Schema.optionalKey(Schema.Unknown),
+  /** Added after version 1 shipped: the archive path of the chat history index, inside `agents/<key>/history/`. */
+  history: Schema.optionalKey(text(512)),
 });
 
 const Settings = Schema.Struct({
@@ -306,7 +308,9 @@ export function channelPrefix(key: string): string {
 /** Every path an agent names is inside its own `agents/<key>/` folder. */
 function hasSafePaths(agent: TransferAgent): boolean {
   const prefix = `agents/${agent.key}/`;
-  const paths = [agent.avatar, agent.files, ...agent.skills].filter((path): path is string => path !== null);
+  const paths = [agent.avatar, agent.files, agent.history ?? null, ...agent.skills].filter(
+    (path): path is string => path !== null,
+  );
   return paths.every((path) => path.startsWith(prefix) && !isUnsafeArchivePath(path));
 }
 

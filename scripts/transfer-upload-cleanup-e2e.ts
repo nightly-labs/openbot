@@ -96,6 +96,11 @@ function service(uploadDirectory: string): InstanceTransferService {
     setAvatar: (_agentId, _image) => Effect.fail(unexpected("setAvatar")),
     deleteAgent: (_agentId) => Effect.fail(unexpected("deleteAgent")),
     setAgentHidden: (_input) => Effect.fail(unexpected("setAgentHidden")),
+    readTransferHistory: (_agentId) => {
+      throw unexpected("readTransferHistory");
+    },
+    resolveTransferFile: (_attachmentId) => Effect.die(unexpected("resolveTransferFile")),
+    importTransferHistory: (_input) => Effect.die(unexpected("importTransferHistory")),
     channels: {
       store: {
         ids: () => [],

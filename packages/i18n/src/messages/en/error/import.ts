@@ -87,6 +87,11 @@ export const messages = defineMessages("error.import", {
     "{number} files in the Shared folder are already here, so they are kept as they are.",
   "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
   "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
+  "error.import.transferHistorySkipped": "{name}: the chat history in the file is invalid, so it is not imported.",
+  "error.import.transferChatsSkipped": {
+    one: "{name}: {count} chat is not imported.",
+    other: "{name}: {count} chats are not imported.",
+  },
   "error.import.transferLocalScripts":
     "{name}: “Local scripts” was on for this agent. Turn it on again in its settings if you trust the file.",
   "error.import.transferAgentNewChats":

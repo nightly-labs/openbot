@@ -12,6 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -86,6 +87,7 @@ import {
 import type { AgentImportSkills, ChannelActor } from "./agent-import-service";
 import { validTimezone } from "./agent-marketplace-service";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
+import { exportHistory, importHistory, type TransferHistoryAgents } from "./instance-transfer-history";
 import {
   agentPrefix,
   channelPrefix,
@@ -149,7 +151,7 @@ const AVATAR_EXTENSIONS: Record<AvatarImageInput["mimeType"], string> = {
 };
 
 /** The agent operations a transfer uses, as `AgentService` offers them. */
-interface InstanceTransferAgents extends TransferPreferenceAgents {
+interface InstanceTransferAgents extends TransferPreferenceAgents, TransferHistoryAgents {
   listAgents(): AgentSummary[];
   listRoutines(agentId: string): Routine[];
   listMemories(agentId: string): AgentMemory[];
@@ -291,9 +293,11 @@ export class InstanceTransferService {
     const keys = new Map<string, string>();
     const manifestAgents: TransferAgent[] = [];
     let bytes = 0;
-    for (const [index, agent] of agents.entries()) {
-      const key = isAgentImportKey(agent.id) ? agent.id : `agent-${index + 1}`;
-      keys.set(agent.id, key);
+    // Every key first: a message of one agent can name another agent of the file.
+    for (const [index, agent] of agents.entries())
+      keys.set(agent.id, isAgentImportKey(agent.id) ? agent.id : `agent-${index + 1}`);
+    for (const agent of agents) {
+      const key = keys.get(agent.id) ?? agent.id;
       const prefix = agentPrefix(key);
 
       let avatar: string | null = null;
@@ -352,6 +356,12 @@ export class InstanceTransferService {
       const preferences = this.options.preferences
         ? yield* readPreferences(agent, this.options.preferences)
         : undefined;
+      let history: string | null = null;
+      if (input.includeHistory) {
+        const exported = yield* exportHistory(this.options.agents, agent.id, prefix, keys, entries);
+        history = exported.index;
+        bytes += exported.bytes;
+      }
       manifestAgents.push({
         key,
         name: agent.name,
@@ -377,6 +387,7 @@ export class InstanceTransferService {
           return { text: memory.text, ...(inclusion ? { inclusion } : {}) };
         }),
         ...(preferences ? { preferences } : {}),
+        ...(history ? { history } : {}),
       });
     }
 
@@ -734,6 +745,29 @@ export class InstanceTransferService {
         imported.push(result.success);
         agentIds.set(agent.key, result.success.id);
       }
+    }
+    // Chats after every agent and routine exists, so each link in a message finds its copy.
+    for (const agent of selected) {
+      const agentId = agentIds.get(agent.key);
+      if (!agentId || !agent.history) continue;
+      yield* importHistory(
+        archive,
+        this.options.agents,
+        {
+          index: agent.history,
+          agentId,
+          agentName: agent.name,
+          prefix: agentPrefix(agent.key),
+          agentIds,
+          routineIds,
+          scratch: join(tmpdir(), "openbot-transfer-history"),
+        },
+        warnings,
+      ).pipe(
+        Effect.catch(() =>
+          Effect.sync(() => warnings.push(sourceText("error.import.transferHistorySkipped", { name: agent.name }))),
+        ),
+      );
     }
     for (const channel of staged.manifest.channels) {
       const result = yield* Effect.result(
