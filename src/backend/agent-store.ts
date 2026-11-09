@@ -175,6 +175,9 @@ const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "low";
 const LEGACY_AGENTS_STATE_FILE = "bots.json";
 const LEGACY_AGENTS_STATE_KEY = "bots";
 const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
+// The `command_id` of the one-time reset of Claude fast mode. Its receipt stops the reset from running
+// again, so the id never changes.
+const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
@@ -328,6 +331,7 @@ export class AgentStore {
           this.#database.deactivateProviderSessions(threadId);
         }
       }
+      this.#resetClaudeFastModeOnce();
       yield* this.#reconcileLegacyDirectoriesEffect();
       yield* this.#recoverPendingDuplicationsEffect();
       yield* this.#profileCreationRecovery.recover(this.#database, (agentId) =>
@@ -1726,6 +1730,45 @@ export class AgentStore {
     this.#state = { ...this.#state, agents: [...this.#state.agents, ...restored] };
     this.#persist("agents.replaced");
     logger.warn("Agents were restored to the roster from the event log.", restored.length);
+  }
+
+  /**
+   * Turns fast mode off one time for each Claude agent. Before Claude fast mode existed, only Codex read
+   * `fastMode`, so a Claude agent has `true` only from a provider change. The user never confirmed the
+   * Claude price for it. The receipt of the command is the marker that stops a second run: the event of
+   * its own aggregate stays, so no roster write or sweep deletes the receipt.
+   */
+  #resetClaudeFastModeOnce(): void {
+    if (this.#database.commandResult(CLAUDE_FAST_MODE_RESET_COMMAND_ID) !== undefined) return;
+    const agentIds = this.#state.agents
+      .filter((agent) => agent.provider === "claude" && agent.fastMode)
+      .map((agent) => agent.id);
+    const previous = this.#state.agents;
+    try {
+      this.#database.dispatch(
+        CLAUDE_FAST_MODE_RESET_COMMAND_ID,
+        [
+          {
+            aggregateType: "agent-fast-mode",
+            aggregateId: "claude-reset",
+            eventType: "agent-fast-mode.claude-reset",
+            payload: { agentIds },
+          },
+        ],
+        () => {
+          if (agentIds.length === 0) return null;
+          this.#state.agents = previous.map((agent) =>
+            agentIds.includes(agent.id) ? { ...agent, fastMode: false } : agent,
+          );
+          this.#persist("agents.claude-fast-mode-reset");
+          return null;
+        },
+      );
+    } catch (cause) {
+      this.#state.agents = previous;
+      throw cause;
+    }
+    if (agentIds.length > 0) logger.info("Fast mode was turned off for Claude agents.", { count: agentIds.length });
   }
 
   #persist(eventType: string, modelChange?: AgentModelChange): void {
