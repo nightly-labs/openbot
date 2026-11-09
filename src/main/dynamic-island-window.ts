@@ -55,7 +55,7 @@ export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFaile
  * dock window on X11 or XWayland: its shape takes the pointer, so it follows the island. Null: this
  * process can put no window above the other apps, as on native Wayland.
  */
-export type DynamicIslandWindowKind = "panel" | "tool" | "x11";
+type DynamicIslandWindowKind = "panel" | "tool" | "x11";
 
 export interface DynamicIslandWindowControllerOptions {
   windowKind: DynamicIslandWindowKind | null;

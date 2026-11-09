@@ -44,7 +44,7 @@ export const { rewrap: toAgentDockFailed } = causeHelpers(AgentDockFailed);
  * the pointer, so it follows the dock. Null: this process can put no window at a screen edge above the
  * other apps, as on native Wayland.
  */
-export type AgentDockWindowKind = "panel" | "tool" | "x11";
+type AgentDockWindowKind = "panel" | "tool" | "x11";
 
 export interface AgentDockWindowControllerOptions {
   windowKind: AgentDockWindowKind | null;
