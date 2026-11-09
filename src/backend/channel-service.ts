@@ -886,9 +886,18 @@ export class ChannelService {
         // open work, such as a task that failed days ago, does not make it ambiguous: the request of
         // the newest stopped task chooses, and every stopped task of that request continues. A task
         // that the user stopped comes before one that failed, and a member named as the recipient
-        // continues its own stopped task before it takes over the task of another member.
+        // continues its own stopped task before it takes over the task of another member. A restart
+        // or a failed turn can stop a subtask while its parent waits for it, and that subtask is the
+        // stopped work of the request (#6010).
         const failedRoots = roots.filter((task) => task.state === "failed");
-        const stoppedRoots = pausedRoots.length ? pausedRoots : failedRoots;
+        const heldSubtasks = open.filter(
+          (task) =>
+            task.parentTaskId !== null &&
+            open.some((parent) => parent.id === task.parentTaskId && parent.state === "waiting"),
+        );
+        const paused = [...pausedRoots, ...heldSubtasks.filter((task) => task.state === "paused")];
+        const failed = [...failedRoots, ...heldSubtasks.filter((task) => task.state === "failed")];
+        const stoppedTasks = paused.length ? paused : failed;
         const sequence = (task: ChannelTask) =>
           messages.find((message) => message.id === task.sourceMessageIds[0])?.sequence ?? 0;
         const newest = (tasks: ChannelTask[]) =>
@@ -896,10 +905,10 @@ export class ChannelService {
             (found, task) => (!found || sequence(task) > sequence(found) ? task : found),
             undefined,
           );
-        const newestStopped = newest(stoppedRoots);
-        const stoppedRequest = newestStopped ? stoppedRoots.filter((task) => sameRequest(task, newestStopped)) : [];
+        const newestStopped = newest(stoppedTasks);
+        const stoppedRequest = newestStopped ? stoppedTasks.filter((task) => sameRequest(task, newestStopped)) : [];
         const own = (tasks: ChannelTask[]) => newest(tasks.filter((task) => task.ownerAgentId === recipients[0]));
-        const recipientStopped = own(pausedRoots) ?? own(failedRoots);
+        const recipientStopped = own(paused) ?? own(failed);
         const continued: ChannelTask[] =
           recipients.length > 1
             ? []
