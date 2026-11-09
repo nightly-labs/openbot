@@ -427,7 +427,8 @@ export function AgentDock(props: AgentDockProps) {
   const addSearch = () => props.available.length >= ADD_SEARCH_MIN;
   const addMenuClass = () => (addSearch() ? "agent-dock-add-menu agent-dock-add-menu-search" : "agent-dock-add-menu");
   const addMatches = createMemo(() => {
-    const text = addQuery().trim().toLocaleLowerCase();
+    // A list that becomes short while the menu is open drops the field, and with it the search.
+    const text = addSearch() ? addQuery().trim().toLocaleLowerCase() : "";
     return text ? props.available.filter((agent) => agent.name.toLocaleLowerCase().includes(text)) : props.available;
   });
   const addEmptyText = () =>
@@ -438,9 +439,11 @@ export function AgentDock(props: AgentDockProps) {
   let addList: HTMLDivElement | undefined;
   const addFirstRow = () => addList?.querySelector<HTMLElement>('[role="menuitem"]:not([data-disabled])');
   const onAddSearchKey = (event: KeyboardEvent) => {
-    if (event.key === "Escape" || event.key === "Tab" || event.isComposing) return;
+    if (event.key === "Escape" || event.key === "Tab") return;
     // The menu reads a letter as a jump to a row. In the field, letters are the search.
     event.stopPropagation();
+    // A key that chooses an input method candidate stays in the field.
+    if (event.isComposing) return;
     const enter = event.key === "Enter" && addQuery().trim() !== "";
     if (!enter && event.key !== "ArrowDown") return;
     const row = addFirstRow();
@@ -454,6 +457,8 @@ export function AgentDock(props: AgentDockProps) {
    * Applies a new search, and morphs the list to its new rows: the height follows them, rows that
    * stay slide to their new places, and new rows fade in. A row keeps its element while it matches.
    */
+  /** The morph animations that run, so a new search stops them and no other animation in the list. */
+  let addMorphs: Animation[] = [];
   const searchAdd = (value: string) => {
     const list = addList;
     if (!list || typeof list.animate !== "function" || prefersReducedMotion()) {
@@ -467,7 +472,8 @@ export function AgentDock(props: AgentDockProps) {
     const listTop = list.getBoundingClientRect().top;
     const fromHeight = list.getBoundingClientRect().height;
     const fromTops = new Map(rows().map((row) => [row, row.getBoundingClientRect().top - listTop]));
-    for (const animation of list.getAnimations({ subtree: true })) animation.cancel();
+    for (const animation of addMorphs) animation.cancel();
+    addMorphs = [];
     setAddQuery(value);
     flush();
     list.scrollTop = 0;
@@ -475,32 +481,38 @@ export function AgentDock(props: AgentDockProps) {
     const timing = { duration: ADD_MORPH_MS, easing: ADD_MORPH_EASE };
     const toHeight = list.getBoundingClientRect().height;
     if (Math.abs(toHeight - fromHeight) > 0.5)
-      list.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], timing);
+      addMorphs.push(list.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], timing));
     const top = list.getBoundingClientRect().top;
     for (const row of rows()) {
       const from = fromTops.get(row);
       if (from === undefined) {
-        row.animate(
-          [
-            { opacity: 0, filter: "blur(2px)", transform: "translateY(4px)" },
-            { opacity: 1, filter: "blur(0)", transform: "none" },
-          ],
-          timing,
+        addMorphs.push(
+          row.animate(
+            [
+              { opacity: 0, filter: "blur(2px)", transform: "translateY(4px)" },
+              { opacity: 1, filter: "blur(0)", transform: "none" },
+            ],
+            timing,
+          ),
         );
         continue;
       }
       const shift = from - (row.getBoundingClientRect().top - top);
-      if (Math.abs(shift) > 0.5) row.animate([{ transform: `translateY(${shift}px)` }, { transform: "none" }], timing);
+      if (Math.abs(shift) > 0.5)
+        addMorphs.push(row.animate([{ transform: `translateY(${shift}px)` }, { transform: "none" }], timing));
     }
   };
   const bindAddList = (element: HTMLDivElement) => {
     addList = element;
     addFades.bind(element);
-    // A letter typed on a row goes to the field, so typing always searches.
+    // A letter or Backspace typed on a row goes to the field, so typing always edits the search.
+    // A plain list has no field, and keeps the jump to a row.
     element.addEventListener(
       "keydown",
       (event) => {
-        if (!addField || event.key.length !== 1 || event.key === " ") return;
+        if (!addSearch() || !addField) return;
+        const text = event.key !== " " && Array.from(event.key).length === 1;
+        if (!text && event.key !== "Backspace") return;
         if (event.metaKey || event.ctrlKey || event.altKey) return;
         event.stopPropagation();
         addField.focus();
@@ -1062,13 +1074,13 @@ export function AgentDock(props: AgentDockProps) {
                       }}
                     >
                       <Show when={addSearch()}>
-                        <div class="agent-dock-add-search">
+                        <div class="ui-search-select-search agent-dock-add-search">
                           <Search aria-hidden="true" />
                           <Input
                             ref={(element: HTMLInputElement) => {
                               addField = element;
                             }}
-                            class="agent-dock-add-search-input"
+                            class="ui-search-select-input agent-dock-add-search-input"
                             aria-label={t("agent.dock.search")}
                             placeholder={t("agent.dock.search")}
                             autocomplete="off"

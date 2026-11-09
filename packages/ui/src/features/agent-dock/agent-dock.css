@@ -274,33 +274,16 @@
   display: none;
 }
 
-/* The search field row, as in the shared search select: a full-width row with a line under it. */
+/* The shared search select row. Its line goes from edge to edge of the menu, as the separator does. */
 .agent-dock-add-search {
-  position: relative;
-  flex: none;
-  margin: calc(var(--openbot-space-1) * -1) calc(var(--openbot-space-1) * -1) var(--openbot-space-1);
-  border-bottom: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-1);
-}
-
-.agent-dock-add-search > svg {
-  position: absolute;
-  top: 50%;
-  inset-inline-start: var(--openbot-space-3);
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  color: var(--openbot-text-muted);
-  transform: translateY(-50%);
-  pointer-events: none;
+  margin: calc(var(--ui-menu-padding) * -1) calc(var(--ui-menu-padding) * -1) var(--openbot-space-1);
 }
 
 /* The field takes the focus each time the menu opens, so it shows no border or focus ring. */
 .agent-dock-add-search .agent-dock-add-search-input {
-  width: 100%;
   border: 0;
   background: transparent;
   box-shadow: none;
-  padding-inline-start: var(--openbot-space-8);
 }
 
 .agent-dock-add-search .agent-dock-add-search-input:focus-visible {
