@@ -77,6 +77,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
+import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
@@ -262,6 +263,7 @@ export {
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
@@ -498,6 +500,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -678,7 +681,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== SKILL_LEARNING_CAPABILITY &&
     capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
-    capability !== VAULT_V3_CAPABILITY,
+    capability !== VAULT_V3_CAPABILITY &&
+    capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -735,6 +739,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -874,6 +879,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== SKILL_LEARNING_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
-      capability !== VAULT_V3_CAPABILITY,
+      capability !== VAULT_V3_CAPABILITY &&
+      capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   );
 }

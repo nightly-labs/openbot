@@ -99,6 +99,7 @@ import {
 import type { AgentImportSkills, ChannelActor } from "./agent-import-service";
 import { validTimezone } from "./agent-marketplace-service";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
+import { InstanceTransferChunks } from "./instance-transfer-chunks";
 import {
   exportChannelMessages,
   exportHistory,
@@ -289,10 +290,21 @@ export class InstanceTransferService {
   readonly #timezone: () => string;
   readonly #now: () => Date;
   #uploadDirectoryReady: Deferred.Deferred<void, ArchiveOperationError> | null = null;
+  /** `instance-transfer-chunks-v1`: a file for a member of a joined client, in parts, up to the local limits. */
+  readonly chunks: InstanceTransferChunks;
 
   constructor(private readonly options: InstanceTransferOptions) {
     this.#timezone = options.timezone ?? (() => Intl.DateTimeFormat().resolvedOptions().timeZone);
     this.#now = options.now ?? (() => new Date());
+    this.chunks = new InstanceTransferChunks({
+      directory: () => {
+        const directory = options.uploadDirectory;
+        if (!directory) return Effect.fail(archiveFailure(new Error("Instance transfer uploads are not available.")));
+        return this.#prepareUploadDirectory(directory).pipe(Effect.as(directory));
+      },
+      stage: (path, owner) => this.#stageFile(path, owner, true, ARCHIVE),
+      exportTo: (path, input) => this.exportTo(path, input),
+    });
   }
 
   /** What each agent would carry: the export screen shows it before anything is written. */

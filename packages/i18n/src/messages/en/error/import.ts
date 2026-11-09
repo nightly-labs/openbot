@@ -107,4 +107,8 @@ export const messages = defineMessages("error.import", {
     "{name}: you always allowed this agent on the other computer. Here it asks first until you allow it again.",
   "error.import.transferFolders":
     "{name}: it used {number} folders outside its workspace. Add them again in its settings, in Folders.",
+  // A transfer file that goes to or from a joined server in parts.
+  "error.import.transferPartsClosed": "The transfer with the server stopped. Try again.",
+  "error.import.transferPartInvalid": "Part of the transfer file did not arrive correctly. Try again.",
+  "error.import.transferNoSpace": "There is not enough free disk space on the server for this transfer file.",
 });

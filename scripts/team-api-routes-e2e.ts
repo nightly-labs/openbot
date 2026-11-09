@@ -10,12 +10,24 @@
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
+// a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits, and the error
 // codes. Writes .openbot-build/team-api-routes-e2e/report.json.
 // Run: `bun run test:team-api-routes` (the preload gives the server's import graph an `electron`).
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { request as httpRequest } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join, parse, resolve } from "node:path";
@@ -44,6 +56,7 @@ import {
   decodeHostWhatsAppOverview,
   disconnectedPasswordManager,
   type HiddenAgentsSnapshot,
+  INSTANCE_TRANSFER_LIMITS,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
   type QueueSnapshot,
@@ -135,6 +148,15 @@ import {
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import {
+  INSTANCE_TRANSFER_CHUNK_BYTES,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import {
+  INSTANCE_TRANSFER_CAPABILITY,
+  INSTANCE_TRANSFER_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import {
   LIVE_VOICE_CAPABILITY,
   LIVE_VOICE_ROUTES,
   type LiveVoiceEvent,
@@ -197,6 +219,7 @@ import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
+import { strToU8, unzipSync, zipSync } from "fflate";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
@@ -218,10 +241,17 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
+import {
+  INSTANCE_TRANSFER_FORMAT,
+  INSTANCE_TRANSFER_MANIFEST,
+  INSTANCE_TRANSFER_VERSION,
+} from "../src/main/instance-transfer-manifest";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
+import { downloadTransferInParts, uploadTransferInParts } from "../src/main/remote-instance-transfer-chunks";
+import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
@@ -240,6 +270,7 @@ import { TeamApiServer } from "../src/main/team-api-server";
 import { TeamStore } from "../src/main/team-store";
 import { VaultService } from "../src/main/vault-service";
 import { VaultStore } from "../src/main/vault-store";
+import { emptyInstanceTransferService } from "./instance-transfer-e2e-fixture";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/team-api-routes-e2e");
 const APP_VERSION = "0.43.0";
@@ -282,6 +313,7 @@ interface RecordedCall {
 
 mkdirSync(OUT, { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "openbot-team-api-routes-"));
+const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
 const logged: string[] = [];
@@ -413,6 +445,10 @@ const agents = [
   agent("agent-oc", "Oscar", "opencode", "anthropic/claude-sonnet-4-5"),
   agent("agent-pi", "Pia", "pi", "anthropic/claude-sonnet-4-5"),
 ];
+// Only the transfer service lists this agent. Its workspace file makes an export of two parts.
+const transferAgent = agent("agent-transfer", "Tess", "claude", "claude-sonnet-4-5");
+mkdirSync(transferAgent.workspacePath, { recursive: true });
+writeFileSync(join(transferAgent.workspacePath, "random.bin"), randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096));
 
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
@@ -1555,6 +1591,8 @@ try {
     passwordManagers,
     connectors,
     vault,
+    // The real transfer service and parts over an empty instance, with its upload folder on disk.
+    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent]),
     browserProfiles,
     machine,
     liveVoice,
@@ -6414,6 +6452,324 @@ try {
       "an admin deletes the login through vault-v3",
       isDeepStrictEqual(deleted.body, { status: "ready", items: [] }) && vault.state().items.length === 0,
       summary(deleted),
+    );
+  }
+
+  // ---- A transfer file in parts (instance-transfer-chunks-v1), applied with instance-transfer-v1 ----
+  {
+    const capabilities = [INSTANCE_TRANSFER_CAPABILITY, INSTANCE_TRANSFER_CHUNKS_CAPABILITY];
+    const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+    const partsCall = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities });
+    const sendPart = (
+      token: string,
+      uploadId: string,
+      index: number,
+      bytes: Uint8Array<ArrayBuffer>,
+      digest?: string,
+    ) =>
+      call(
+        "POST",
+        `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${new URLSearchParams({
+          uploadId,
+          index: String(index),
+          sha256: digest ?? sha256(bytes),
+        })}`,
+        { token, bytes, capabilities, headers: { "Content-Type": "application/octet-stream" } },
+      );
+    /** One export part as bytes: `call` reads the body as text. */
+    const readPart = async (token: string, exportId: string, index: number) => {
+      const response = await fetch(`${base}${INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk}`, {
+        method: "POST",
+        headers: { ...protocolHeaders({ token, capabilities }), "Content-Type": "application/json" },
+        body: JSON.stringify({ exportId, index }),
+      });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const text = new TextDecoder().decode(bytes);
+      return {
+        status: response.status,
+        bytes,
+        body: response.headers.get("content-type")?.startsWith("application/json") ? parseJson(text) : null,
+        text,
+        headers: response.headers,
+      };
+    };
+    const uploads = () => (existsSync(transferUploads) ? readdirSync(transferUploads).sort() : []);
+    const manifest = {
+      format: INSTANCE_TRANSFER_FORMAT,
+      version: INSTANCE_TRANSFER_VERSION,
+      source: { appVersion: "e2e", exportedAt: "2026-11-09T00:00:00.000Z" },
+      agents: [],
+      settings: { mcpServers: [], customProviders: [], customAgents: [], sidebarSections: [], routineFlows: [] },
+      shared: null,
+      signedIn: [],
+    };
+    // Random bytes that the zip stores as they are, so the file has two parts.
+    const file = zipSync({
+      [INSTANCE_TRANSFER_MANIFEST]: strToU8(JSON.stringify(manifest)),
+      "padding.bin": [new Uint8Array(randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096)), { level: 0 }],
+    });
+    const firstPart = file.slice(0, INSTANCE_TRANSFER_CHUNK_BYTES);
+    const lastPart = file.slice(INSTANCE_TRANSFER_CHUNK_BYTES);
+    const begin = { size: file.length, sha256: sha256(file) };
+
+    const unsupported = await call("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, {
+      token: adaToken,
+      json: begin,
+      capabilities: [INSTANCE_TRANSFER_CAPABILITY],
+    });
+    const member = await partsCall(bobToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, begin);
+    const tooLarge = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, {
+      size: INSTANCE_TRANSFER_LIMITS.archiveBytes + 1,
+      sha256: begin.sha256,
+    });
+    check(
+      "the parts routes need instance-transfer-chunks-v1 and an owner or admin, and a file over 2 GiB is refused",
+      errorIs(unsupported, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(tooLarge, 400, sourceText("error.import.transferTooLarge")) &&
+        uploads().length === 0,
+      [summary(unsupported), summary(member), summary(tooLarge)],
+    );
+
+    const started = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, begin);
+    const uploadId = field(started.body, "uploadId");
+    assert.ok(typeof uploadId === "string", "the upload did not start.");
+    check(
+      "an admin starts an upload: the host answers the part size and no parts, and writes one private .part file",
+      started.status === 200 &&
+        field(started.body, "chunkBytes") === INSTANCE_TRANSFER_CHUNK_BYTES &&
+        isDeepStrictEqual(field(started.body, "received"), []) &&
+        isDeepStrictEqual(uploads(), [`${uploadId}.part`]) &&
+        (statSync(join(transferUploads, `${uploadId}.part`)).mode & 0o777) === 0o600,
+      summary(started),
+    );
+    const wrongDigest = await sendPart(adaToken, uploadId, 0, firstPart, "0".repeat(64));
+    const otherAdmin = await sendPart(owner.sessionToken, uploadId, 0, firstPart);
+    const pastEnd = await sendPart(adaToken, uploadId, 2, lastPart);
+    check(
+      "a part with a wrong SHA-256 or index is refused, and another admin cannot use the upload id",
+      errorIs(wrongDigest, 400, sourceText("error.import.transferPartInvalid")) &&
+        errorIs(pastEnd, 400, sourceText("error.import.transferPartInvalid")) &&
+        errorIs(otherAdmin, 400, sourceText("error.import.transferPartsClosed")),
+      [summary(wrongDigest), summary(otherAdmin), summary(pastEnd)],
+    );
+    const first = await sendPart(adaToken, uploadId, 0, firstPart);
+    const early = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, { uploadId });
+    const resumed = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, begin);
+    check(
+      "the host keeps a part, refuses to finish without all parts, and the same file resumes the same upload",
+      first.status === 200 &&
+        field(first.body, "receivedBytes") === INSTANCE_TRANSFER_CHUNK_BYTES &&
+        errorIs(early, 400, sourceText("error.import.transferPartInvalid")) &&
+        field(resumed.body, "uploadId") === uploadId &&
+        isDeepStrictEqual(field(resumed.body, "received"), [0]),
+      [summary(first), summary(early), summary(resumed)],
+    );
+    const second = await sendPart(adaToken, uploadId, 1, lastPart);
+    const otherFinish = await partsCall(owner.sessionToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, { uploadId });
+    const finished = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, { uploadId });
+    const token = field(finished.body, "token");
+    check(
+      "after the last part the admin finishes the upload and gets the instance-transfer-v1 preview; another admin cannot",
+      field(second.body, "receivedBytes") === file.length &&
+        errorIs(otherFinish, 400, sourceText("error.import.transferPartsClosed")) &&
+        finished.status === 200 &&
+        typeof token === "string" &&
+        isDeepStrictEqual(field(finished.body, "agents"), []) &&
+        !finished.text.includes("avatarUrl") &&
+        uploads().length === 1 &&
+        uploads()[0]?.endsWith(".zip") === true,
+      [summary(second), summary(otherFinish), summary(finished)],
+    );
+    // The file has no agents and no settings, so only apply's owner check and discard can run on it.
+    const otherApply = await call("POST", INSTANCE_TRANSFER_ROUTES.apply, {
+      token: owner.sessionToken,
+      json: { token, keys: ["agent-1"], includeSettings: false, timezone: "UTC" },
+      capabilities,
+    });
+    const otherDiscard = await call("POST", INSTANCE_TRANSFER_ROUTES.discard, {
+      token: owner.sessionToken,
+      json: { token },
+      capabilities,
+    });
+    const keptForOwner = uploads().length === 1;
+    const discarded = await call("POST", INSTANCE_TRANSFER_ROUTES.discard, {
+      token: adaToken,
+      json: { token },
+      capabilities,
+    });
+    check(
+      "the token goes to instance-transfer-v1: another admin cannot apply or discard it, its owner discards it and the file goes",
+      errorIs(otherApply, 409, sourceText("error.import.exportClosed")) &&
+        otherDiscard.status === 200 &&
+        keptForOwner &&
+        discarded.status === 200 &&
+        uploads().length === 0,
+      [summary(otherApply), summary(otherDiscard), summary(discarded)],
+    );
+
+    const again = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, begin);
+    const againId = String(field(again.body, "uploadId"));
+    const otherAbort = await partsCall(owner.sessionToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadAbort, {
+      uploadId: againId,
+    });
+    const keptAfterOtherAbort = uploads().length === 1;
+    const aborted = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadAbort, { uploadId: againId });
+    const afterAbort = await sendPart(adaToken, againId, 0, firstPart);
+    check(
+      "abort ends the admin's own upload and removes its file; another admin's abort changes nothing",
+      againId !== uploadId &&
+        otherAbort.status === 200 &&
+        keptAfterOtherAbort &&
+        aborted.status === 200 &&
+        uploads().length === 0 &&
+        errorIs(afterAbort, 400, sourceText("error.import.transferPartsClosed")),
+      [summary(again), summary(otherAbort), summary(aborted), summary(afterAbort)],
+    );
+
+    const exportInput = { agentIds: [transferAgent.id], includeFiles: true, includeSettings: false };
+    const memberExport = await partsCall(bobToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, exportInput);
+    const exported = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, exportInput);
+    const exportId = String(field(exported.body, "exportId"));
+    const exportSize = field(exported.body, "size");
+    const exportParts = [await readPart(adaToken, exportId, 0), await readPart(adaToken, exportId, 1)];
+    const whole = Buffer.concat(exportParts.map((part) => part.bytes));
+    const otherPart = await readPart(owner.sessionToken, exportId, 0);
+    const missingPart = await readPart(adaToken, exportId, 2);
+    check(
+      "an admin exports in parts: each part matches its SHA-256 and the whole file; another admin and a missing part are refused",
+      errorIs(memberExport, 403, sourceText("error.team.adminRequired")) &&
+        exported.status === 200 &&
+        field(exported.body, "chunkBytes") === INSTANCE_TRANSFER_CHUNK_BYTES &&
+        typeof exportSize === "number" &&
+        exportParts.every((part) => part.status === 200) &&
+        exportParts[0]?.bytes.length === INSTANCE_TRANSFER_CHUNK_BYTES &&
+        whole.length === exportSize &&
+        isDeepStrictEqual(
+          field(exported.body, "chunks"),
+          exportParts.map((part) => sha256(part.bytes)),
+        ) &&
+        field(exported.body, "sha256") === sha256(whole) &&
+        exportParts[0]?.headers.get("content-type") === "application/octet-stream" &&
+        unzipSync(whole)["agents/agent-transfer/workspace/random.bin"]?.length ===
+          INSTANCE_TRANSFER_CHUNK_BYTES + 4096 &&
+        errorIs(otherPart, 400, sourceText("error.import.transferPartsClosed")) &&
+        errorIs(missingPart, 400, sourceText("error.import.transferPartInvalid")) &&
+        isDeepStrictEqual(uploads(), [`${exportId}.zip`]),
+      [
+        summary(memberExport),
+        summary(exported),
+        exportParts.map((part) => ({ status: part.status, bytes: part.bytes.length })),
+        summary(otherPart),
+        summary(missingPart),
+      ],
+    );
+    const done = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, { exportId });
+    const afterDone = await readPart(adaToken, exportId, 0);
+    check(
+      "done removes the export file, and its id is closed",
+      done.status === 200 &&
+        uploads().length === 0 &&
+        errorIs(afterDone, 400, sourceText("error.import.transferPartsClosed")),
+      [summary(done), summary(afterDone)],
+    );
+
+    // The desktop workflow over this host: the three calls of `RemoteServerManager` that it uses go
+    // over loopback HTTP as ada. The first send of part 1 fails as a lost connection does.
+    const remoteFailure = async (response: Response) => {
+      const text = await response.text();
+      const message = String((text && field(parseJson(text), "error")) || "failed");
+      return new RemoteWorkflowError({ cause: new RemoteRequestError(response.status, message) });
+    };
+    const hostFetch = (path: string, init: RequestInit) =>
+      Effect.tryPromise({
+        try: async () => {
+          const response = await fetch(`${base}${path}`, {
+            ...init,
+            headers: { ...protocolHeaders({ token: adaToken, capabilities }), ...init.headers },
+          });
+          if (!response.ok) throw await remoteFailure(response);
+          return response;
+        },
+        catch: (error) => (error instanceof RemoteWorkflowError ? error : new RemoteWorkflowError({ cause: error })),
+      });
+    const sentParts: number[] = [];
+    let dropNextPartOne = true;
+    const remote = {
+      request: <T>(_serverId: string, path: string, decoder: (value: unknown) => T, init: { body?: unknown } = {}) =>
+        hostFetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(init.body ?? {}),
+        }).pipe(
+          Effect.flatMap((response) => Effect.promise(() => response.json())),
+          Effect.map((value: unknown) => decoder(value)),
+        ),
+      sendInstanceTransferPart: (
+        _serverId: string,
+        part: { uploadId: string; index: number; sha256: string },
+        bytes: Uint8Array,
+      ) =>
+        // Lazy, as the `Effect.fn` of the manager is: each retry runs it again.
+        Effect.suspend(() => {
+          sentParts.push(part.index);
+          if (part.index === 1 && dropNextPartOne) {
+            dropNextPartOne = false;
+            return Effect.fail(new RemoteWorkflowError({ cause: new Error("The connection closed.") }));
+          }
+          const query = new URLSearchParams({
+            uploadId: part.uploadId,
+            index: String(part.index),
+            sha256: part.sha256,
+          });
+          return hostFetch(`${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: Buffer.from(bytes),
+          }).pipe(Effect.asVoid);
+        }),
+      readInstanceTransferPart: (_serverId: string, part: { exportId: string; index: number }) =>
+        hostFetch(INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(part),
+        }).pipe(Effect.flatMap((response) => Effect.promise(async () => new Uint8Array(await response.arrayBuffer())))),
+    };
+    const localFile = join(root, "transfer-upload.zip");
+    writeFileSync(localFile, file);
+    // A part that the host already has from an earlier try is not sent again.
+    const earlier = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, begin);
+    await sendPart(adaToken, String(field(earlier.body, "uploadId")), 0, firstPart);
+    const preview = await Effect.runPromise(uploadTransferInParts(remote, "host", localFile).pipe(Effect.result));
+    const previewToken = preview._tag === "Success" ? preview.success.token : null;
+    const stagedFiles = uploads();
+    if (previewToken)
+      await call("POST", INSTANCE_TRANSFER_ROUTES.discard, {
+        token: adaToken,
+        json: { token: previewToken },
+        capabilities,
+      });
+    check(
+      "the desktop upload resumes: it sends only the missing part, sends it again after a lost connection, and gets the preview",
+      typeof previewToken === "string" &&
+        isDeepStrictEqual(sentParts, [1, 1]) &&
+        stagedFiles.length === 1 &&
+        uploads().length === 0,
+      { preview: preview._tag === "Success" ? "preview" : String(preview.failure), sentParts, stagedFiles },
+    );
+    const destination = join(root, "transfer-download.zip");
+    const download = await Effect.runPromise(
+      downloadTransferInParts(remote, "host", exportInput, destination).pipe(Effect.result),
+    );
+    const downloaded = existsSync(destination) ? unzipSync(readFileSync(destination)) : {};
+    check(
+      "the desktop download writes the whole file, checked part by part, and the host removes its copy",
+      download._tag === "Success" &&
+        downloaded["agents/agent-transfer/workspace/random.bin"]?.length === INSTANCE_TRANSFER_CHUNK_BYTES + 4096 &&
+        !existsSync(`${destination}.part`) &&
+        uploads().length === 0,
+      { download: download._tag === "Success" ? "saved" : String(download.failure), files: Object.keys(downloaded) },
     );
   }
 

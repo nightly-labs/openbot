@@ -81,6 +81,7 @@ import {
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
+import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -274,6 +275,8 @@ const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISE
 const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 /** An export of up to 100 MB goes up and is read in one request, and apply creates many agents. */
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+/** One part of 8 MiB of a transfer file, at 64 KB/s with time to spare. A part that fails is sent again. */
+export const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 // How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
 // host that is not back by then is offline, as any other host. A hosted server restarts its whole
 // machine and restores its disk; one took 18 minutes.
@@ -2249,6 +2252,53 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) },
         true,
         AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+      );
+      yield* this.#rejectHostError(response, url);
+      return new Uint8Array(yield* remoteCall(() => response.arrayBuffer()));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Sends one part of a transfer file with `instance-transfer-chunks-v1`. */
+  readonly sendInstanceTransferPart = Effect.fn("RemoteManager.sendInstanceTransferPart")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      part: { uploadId: string; index: number; sha256: string },
+      bytes: Uint8Array,
+    ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const url = new URL(INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk, server.apiUrl);
+      url.searchParams.set("uploadId", part.uploadId);
+      url.searchParams.set("index", String(part.index));
+      url.searchParams.set("sha256", part.sha256);
+      const response = yield* this.#client.fetch(
+        server,
+        url,
+        { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: Buffer.from(bytes) },
+        true,
+        INSTANCE_TRANSFER_PART_TIMEOUT_MS,
+      );
+      yield* this.#rejectHostError(response, url);
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** One part of the host's transfer file, made with `instance-transfer-chunks-v1`. */
+  readonly readInstanceTransferPart = Effect.fn("RemoteManager.readInstanceTransferPart")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      part: { exportId: string; index: number },
+    ): Effect.fn.Return<Uint8Array, RemoteWorkflowError, RemoteRequest> {
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const url = new URL(INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, server.apiUrl);
+      const response = yield* this.#client.fetch(
+        server,
+        url,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(part) },
+        true,
+        INSTANCE_TRANSFER_PART_TIMEOUT_MS,
       );
       yield* this.#rejectHostError(response, url);
       return new Uint8Array(yield* remoteCall(() => response.arrayBuffer()));

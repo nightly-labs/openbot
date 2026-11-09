@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,9 +15,7 @@ import {
   INSTANCE_TRANSFER_MANIFEST,
   INSTANCE_TRANSFER_VERSION,
 } from "../src/main/instance-transfer-manifest";
-import { type InstanceTransferOptions, InstanceTransferService } from "../src/main/instance-transfer-service";
-import { LocalSkillFailure } from "../src/main/local-skill-library";
-import { SkillMarketplaceFailure } from "../src/main/skill-marketplace-service";
+import { emptyInstanceTransferService as service } from "./instance-transfer-e2e-fixture";
 
 const run = Effect.runPromise;
 const exportInput = { agentIds: [], includeFiles: false, includeSettings: false };
@@ -30,6 +29,7 @@ const manifest = {
   signedIn: [],
 };
 const bytes = zipSync({ [INSTANCE_TRANSFER_MANIFEST]: strToU8(JSON.stringify(manifest)) });
+const sha256 = createHash("sha256").update(bytes).digest("hex");
 // Empty exports omit settings and cannot be imported. Check their wire manifest too.
 const decodeArchiveManifest = Schema.decodeUnknownSync(
   Schema.fromJsonString(
@@ -53,137 +53,6 @@ const decodeArchiveManifest = Schema.decodeUnknownSync(
   ),
 );
 
-function unexpected(operation: string): Error {
-  return new Error(`Unexpected boundary call: ${operation}`);
-}
-
-function service(uploadDirectory: string): InstanceTransferService {
-  // These checks transfer an empty instance. Other boundary calls must fail.
-  const agents: InstanceTransferOptions["agents"] = {
-    listAgents: () => [],
-    listRoutines: (_agentId) => {
-      throw unexpected("listRoutines");
-    },
-    listMemories: (_agentId) => {
-      throw unexpected("listMemories");
-    },
-    getMemorySelection: (_agentId) => {
-      throw unexpected("getMemorySelection");
-    },
-    setMemoryInclusion: (_input) => {
-      throw unexpected("setMemoryInclusion");
-    },
-    resolveAvatar: (_agentId) => {
-      throw unexpected("resolveAvatar");
-    },
-    listModels: () => {
-      throw unexpected("listModels");
-    },
-    createAgentProfile: (_input) => Effect.fail(unexpected("createAgentProfile")),
-    updateAgent: (_input) => Effect.fail(unexpected("updateAgent")),
-    createRoutine: (_input, _options) => {
-      throw unexpected("createRoutine");
-    },
-    createMemory: (_input) => {
-      throw unexpected("createMemory");
-    },
-    memoryLimit: () => {
-      throw unexpected("memoryLimit");
-    },
-    initializeMemorySelection: (_agentId) => {
-      throw unexpected("initializeMemorySelection");
-    },
-    setAvatar: (_agentId, _image) => Effect.fail(unexpected("setAvatar")),
-    deleteAgent: (_agentId) => Effect.fail(unexpected("deleteAgent")),
-    setAgentHidden: (_input) => Effect.fail(unexpected("setAgentHidden")),
-    readTransferHistory: (_agentId) => {
-      throw unexpected("readTransferHistory");
-    },
-    resolveTransferFile: (_attachmentId) => Effect.die(unexpected("resolveTransferFile")),
-    importTransferHistory: (_input, _readerId) => Effect.die(unexpected("importTransferHistory")),
-    channels: {
-      store: {
-        ids: () => [],
-        get: (_channelId) => {
-          throw unexpected("channels.get");
-        },
-        messages: (_channelId) => {
-          throw unexpected("channels.messages");
-        },
-        update: (_channel, _changes) => {
-          throw unexpected("channels.update");
-        },
-        markRead: (_channelId, _memberId, _sequence, _operationId) => {
-          throw unexpected("channels.markRead");
-        },
-      },
-      images: {
-        resolve: (_channel) => {
-          throw unexpected("channels.images.resolve");
-        },
-      },
-      command: (_command, _actor) => Effect.fail(unexpected("channels.command")),
-      setImage: (_channelId, _image) => Effect.fail(unexpected("channels.setImage")),
-    },
-    listChannelMemories: (_channelId) => {
-      throw unexpected("listChannelMemories");
-    },
-    listChannelRoutines: (_channelId) => {
-      throw unexpected("listChannelRoutines");
-    },
-    createChannelMemory: (_input) => {
-      throw unexpected("createChannelMemory");
-    },
-    createChannelRoutine: (_input) => {
-      throw unexpected("createChannelRoutine");
-    },
-    deleteChannel: (_channelId) => Effect.fail(unexpected("deleteChannel")),
-  };
-  const library: ReturnType<InstanceTransferOptions["skills"]["library"]> = {
-    list: () => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.list") })),
-    create: (_agentId, _folder) => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.create") })),
-    revise: (_agentId, _id, _revision, _folder) =>
-      Effect.fail(new LocalSkillFailure({ cause: unexpected("library.revise") })),
-    withdraw: (_id, _revision) => Effect.fail(new LocalSkillFailure({ cause: unexpected("library.withdraw") })),
-  };
-  const skills: InstanceTransferOptions["skills"] = {
-    library: () => library,
-    installLocal: (_input) => Effect.fail(new SkillMarketplaceFailure({ cause: unexpected("installLocal") })),
-  };
-  const settings: InstanceTransferOptions["settings"] = {
-    mcpServers: () => {
-      throw unexpected("mcpServers");
-    },
-    saveMcpServer: (_config) => Effect.fail(unexpected("saveMcpServer")),
-    customProviders: () => {
-      throw unexpected("customProviders");
-    },
-    saveCustomProvider: (_input) => Effect.fail(unexpected("saveCustomProvider")),
-    customAgents: () => Effect.fail(unexpected("customAgents")),
-    providersOff: () => {
-      throw unexpected("providersOff");
-    },
-    sidebar: () => {
-      throw unexpected("sidebar");
-    },
-    mutateSidebar: (_action) => Effect.fail(unexpected("mutateSidebar")),
-    routineFlowLinks: (_agentId) => Effect.fail(unexpected("routineFlowLinks")),
-    connectRoutineFlow: (_input) => Effect.fail(unexpected("connectRoutineFlow")),
-    signedInProviders: () => [],
-  };
-  const options: InstanceTransferOptions = {
-    uploadDirectory,
-    channelActor: () => ({ id: "local", name: "You" }),
-    sharedRoot: join(dirname(uploadDirectory), "shared"),
-    appVersion: "e2e",
-    agents,
-    skills,
-    settings,
-    timezone: () => "UTC",
-  };
-  return new InstanceTransferService(options);
-}
-
 async function names(directory: string): Promise<string[]> {
   return (await readdir(directory)).sort();
 }
@@ -206,6 +75,12 @@ async function seed(directory: string): Promise<string[]> {
   await run(previous.stageUpload(async () => bytes, "previous-owner"));
   await run(previous.exportForMember(exportInput));
   await writeFile(join(directory, "interrupted.zip.part"), bytes);
+  // An upload in parts that the previous process did not finish, and one that it finished.
+  const upload = await run(previous.chunks.beginUpload({ size: bytes.length, sha256 }, "parts-owner"));
+  await run(
+    previous.chunks.writePart({ uploadId: upload.uploadId, index: 0, sha256 }, async () => bytes, "parts-owner"),
+  );
+  await run(previous.chunks.beginExport(exportInput, "parts-owner"));
   return names(directory);
 }
 
@@ -217,7 +92,7 @@ async function restart(directory: string): Promise<string[]> {
   );
   assert.equal(child.status, 0, child.stderr);
   const orphans = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(Schema.String)))(child.stdout);
-  assert.equal(orphans.length, 3);
+  assert.equal(orphans.length, 5);
   return [...orphans];
 }
 
@@ -300,6 +175,32 @@ async function checkLocal(root: string): Promise<void> {
   assert.deepEqual(await readFile(path), Buffer.from(bytes));
 }
 
+/** Parts of an upload and an export are files of the same folder: a restart removes them too. */
+async function checkChunks(root: string): Promise<void> {
+  const directory = join(root, "chunks", "instance-transfer-uploads");
+  const orphans = await restart(directory);
+  const current = service(directory);
+  const upload = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  for (const orphan of orphans) {
+    await assert.rejects(readFile(join(directory, orphan)), { code: "ENOENT" }, `Old file remains: ${orphan}`);
+  }
+  assert.deepEqual(await names(directory), [`${upload.uploadId}.part`]);
+  const part = { uploadId: upload.uploadId, index: 0, sha256 };
+  await assert.rejects(run(current.chunks.writePart(part, async () => bytes, "bob")));
+  await run(current.chunks.writePart(part, async () => bytes, "alice"));
+  await assert.rejects(run(current.chunks.finishUpload(upload.uploadId, "bob")));
+  const preview = await run(current.chunks.finishUpload(upload.uploadId, "alice"));
+  await verifyArchives(directory, 1);
+  await run(current.apply({ token: preview.token, keys: [], includeSettings: false }, "alice"));
+  assert.deepEqual(await names(directory), []);
+  const exported = await run(current.chunks.beginExport(exportInput, "alice"));
+  await verifyArchives(directory, 1);
+  await run(current.chunks.finishExport(exported.exportId, "bob"));
+  await verifyArchives(directory, 1);
+  await run(current.chunks.finishExport(exported.exportId, "alice"));
+  assert.deepEqual(await names(directory), []);
+}
+
 interface Report {
   status: "running" | "passed" | "failed";
   checks: Array<{ name: string; status: "passed" | "failed" }>;
@@ -322,6 +223,7 @@ if (process.argv[2] === "--seed") {
       ["concurrent-writers", () => checkConcurrent(root)],
       ["preparation-retry", () => checkRetry(root)],
       ["local-file-and-invalid-upload", () => checkLocal(root)],
+      ["parts-restart-and-owner", () => checkChunks(root)],
     ];
     for (const [name, check] of checks) {
       activeCheck = name;
