@@ -1743,15 +1743,15 @@ export function saveHostVaultItem(
   input: VaultSaveInput,
   v2: boolean,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
-  // Only a card has approved sites, and an absent list keeps them all.
-  const { fillSites, ...item } = { fillSites: undefined, ...input };
+  // Only a card has approved sites, and an absent list keeps them all. Only a login has a two-step
+  // key, and an absent key keeps the saved one. JSON has no undefined, so an absent field stays out.
+  const { fillSites, twoStepKey, ...item } = { fillSites: undefined, twoStepKey: undefined, ...input };
   return adminCall(() =>
-    request(
-      "POST",
-      vaultRoutes(v2).save,
-      decodeHostVaultState,
-      fillSites === undefined ? item : { ...item, fillSites },
-    ),
+    request("POST", vaultRoutes(v2).save, decodeHostVaultState, {
+      ...item,
+      ...(fillSites === undefined ? {} : { fillSites }),
+      ...(twoStepKey === undefined ? {} : { twoStepKey }),
+    }),
   );
 }
 

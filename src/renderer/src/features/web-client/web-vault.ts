@@ -28,7 +28,7 @@ export function webVaultCalls(
   return remoteVaultCalls(
     {
       list: () => post(routes.list, decodeHostVaultState),
-      save: (input) => post(routes.save, decodeHostVaultState, input.kind === "card" ? cardBody(input) : { ...input }),
+      save: (input) => post(routes.save, decodeHostVaultState, saveBody(input)),
       remove: (id) => post(routes.delete, decodeHostVaultState, { id }),
       reveal,
       // The write starts in the click, with the value still on its way: Safari refuses a clipboard
@@ -52,4 +52,15 @@ export function webVaultCalls(
 /** A card with no `fillSites` keeps them all; the key stays out of the body, as JSON has no undefined. */
 function cardBody({ fillSites, ...card }: Extract<VaultSaveInput, { kind: "card" }>) {
   return fillSites === undefined ? card : { ...card, fillSites };
+}
+
+/** A login with no `twoStepKey` keeps its saved key; the key stays out of the body, as for `fillSites`. */
+function loginBody({ twoStepKey, ...login }: Extract<VaultSaveInput, { kind: "login" }>) {
+  return twoStepKey === undefined ? login : { ...login, twoStepKey };
+}
+
+function saveBody(input: VaultSaveInput) {
+  if (input.kind === "card") return cardBody(input);
+  if (input.kind === "login") return loginBody(input);
+  return { ...input };
 }
