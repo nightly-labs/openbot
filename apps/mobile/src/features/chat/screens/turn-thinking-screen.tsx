@@ -6,7 +6,17 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import Puzzle from "lucide-react-native/icons/puzzle";
-import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import Animated, {
@@ -36,6 +46,10 @@ const FOLLOW_SLACK = 48;
 const STEP_PAGE = 30;
 /** How near the top or the end, in points, the window grows. */
 const WINDOW_EDGE = 600;
+/** How long, in milliseconds, the window waits for the steps it added above to lay out. */
+const ANCHOR_WAIT_MS = 1000;
+/** A running turn that the reader follows keeps at most this many steps drawn. */
+const FOLLOW_STEPS = STEP_PAGE * 2;
 const NO_MESSAGES: never[] = [];
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -274,19 +288,19 @@ export function TurnThinkingScreen() {
   };
   const topIndex = indexOf(shownWindow.topId, 0, lastIndices.current.top);
   const endIndex = Math.max(topIndex, indexOf(shownWindow.bottomId, steps.length - 1, lastIndices.current.bottom) + 1);
-  lastIndices.current = { top: topIndex, bottom: endIndex - 1 };
   const shownSteps = steps.slice(topIndex, endIndex);
 
-  // Steps that come after the sheet opened animate in. Steps above the window and older pages do not.
-  const lastSeenId = useRef<string | null | undefined>(undefined);
-  const arrived = useRef(new Set<string>()).current;
-  useMemo(() => {
-    const last = lastSeenId.current;
-    lastSeenId.current = steps.at(-1)?.id ?? null;
-    if (last === undefined || (last === null && !running)) return;
-    const from = last === null ? 0 : steps.findIndex((step) => step.id === last) + 1;
-    if (last === null || from > 0) for (const step of steps.slice(from)) arrived.add(step.id);
-  }, [steps, running, arrived]);
+  // Steps that come after the newest step that the sheet already showed animate in. Steps above the
+  // window and steps of older pages do not.
+  const seen = useRef<Set<string> | null>(null);
+  seen.current ??= new Set(steps.map((step) => step.id));
+  let newestSeen = steps.length - 1;
+  while (newestSeen >= 0 && !seen.current.has(steps[newestSeen]?.id ?? "")) newestSeen -= 1;
+  const arrivedFrom = newestSeen + 1;
+  useLayoutEffect(() => {
+    lastIndices.current = { top: topIndex, bottom: endIndex - 1 };
+    for (const step of steps) seen.current?.add(step.id);
+  }, [steps, topIndex, endIndex]);
 
   const scroll = useRef<KeyboardAwareScrollViewRef>(null);
   const following = useRef(true);
@@ -295,7 +309,7 @@ export function TurnThinkingScreen() {
   const offset = useRef(0);
   const atTop = useRef(true);
   const positions = useRef(new Map<string, number>()).current;
-  const anchor = useRef<{ id: string; y: number } | null>(null);
+  const anchor = useRef<{ id: string; y: number; at: number } | null>(null);
   const onStepLayout = useCallback(
     (id: string, y: number) => {
       positions.set(id, y);
@@ -306,10 +320,11 @@ export function TurnThinkingScreen() {
     },
     [positions],
   );
+  // A step that is not laid out yet keeps the anchor of the last call, which then moves by both.
   const holdFirstStep = () => {
     const first = shownSteps[0];
     const y = first && positions.get(first.id);
-    if (first && y !== undefined) anchor.current = { id: first.id, y };
+    if (first && y !== undefined) anchor.current = { id: first.id, y, at: Date.now() };
   };
   const loadEarlier = () => {
     if (topIndex !== 0 || !needsEarlier || olderLoading) return;
@@ -318,8 +333,9 @@ export function TurnThinkingScreen() {
   };
   const showEarlier = () => {
     if (topIndex === 0) return loadEarlier();
-    // The steps of the last call are not laid out yet.
-    if (anchor.current) return;
+    // The steps of the last call are not laid out yet. An anchor that never moves, such as of a step
+    // that left the phone, stops blocking after a short time.
+    if (anchor.current && Date.now() - anchor.current.at < ANCHOR_WAIT_MS) return;
     holdFirstStep();
     const top = Math.max(0, topIndex - STEP_PAGE);
     setStepWindow({ ...shownWindow, topId: top === 0 ? null : (steps[top]?.id ?? null) });
@@ -329,6 +345,16 @@ export function TurnThinkingScreen() {
     const bottom = endIndex - 1 + STEP_PAGE;
     setStepWindow({ ...shownWindow, bottomId: bottom >= steps.length - 1 ? null : (steps[bottom]?.id ?? null) });
   };
+  // A sheet that stays open on a run of hours gets new steps at the end. While the reader follows
+  // them, the steps far above leave the window, and they come back when the reader scrolls up.
+  const followTopId =
+    running && shownWindow.bottomId === null && endIndex - topIndex > FOLLOW_STEPS
+      ? (steps[endIndex - STEP_PAGE]?.id ?? null)
+      : null;
+  useEffect(() => {
+    if (followTopId !== null && following.current && !atTop.current)
+      setStepWindow({ topId: followTopId, bottomId: null });
+  }, [followTopId]);
   // A sheet that opens at the top, or whose steps all fit, reads the older page of the turn at once.
   const loadEarlierNow = useRef(loadEarlier);
   loadEarlierNow.current = loadEarlier;
@@ -431,7 +457,7 @@ export function TurnThinkingScreen() {
                 key={step.id}
                 step={step}
                 last={topIndex + index === steps.length - 1}
-                arrived={arrived.has(step.id)}
+                arrived={topIndex + index >= arrivedFrom}
                 foreground={foreground}
                 muted={muted}
                 accent={accent}
