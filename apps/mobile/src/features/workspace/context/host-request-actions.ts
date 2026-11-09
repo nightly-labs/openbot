@@ -17,6 +17,7 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   decodeInstalledSkills,
+  decodeMachineMetrics,
   decodeStorageUsage,
   type HiddenAgent,
   isAgentMemory,
@@ -120,6 +121,10 @@ import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import {
+  MACHINE_RESOURCES_CAPABILITY,
+  MACHINE_RESOURCES_ROUTES,
+} from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -365,6 +370,7 @@ type HostRequestActions = Pick<
   | "uninstallAgentSkill"
   | "loadAgentStorage"
   | "loadServerStorage"
+  | "loadMachineMetrics"
   | "clearServerStorage"
   | "loadAgentAdminSettings"
   | "updateAgentAdminSettings"
@@ -1117,6 +1123,10 @@ export function createHostRequestActions({
         await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
         input,
       );
+    },
+    loadMachineMetrics: async (serverId) => {
+      requireCapability(capabilities, serverId, MACHINE_RESOURCES_CAPABILITY, "mobile.server.machine.unsupported");
+      return request("POST", MACHINE_RESOURCES_ROUTES.metrics, decodeMachineMetrics, {}, serverId);
     },
     clearServerStorage: async (category, serverId) => {
       requireCapability(capabilities, serverId, STORAGE_CAPABILITY, "mobile.workspace.error.filesUnsupported");

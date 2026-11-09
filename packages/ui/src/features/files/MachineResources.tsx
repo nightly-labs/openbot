@@ -7,6 +7,8 @@ import {
   type MachineMetric,
   type MachineMetrics,
   machineAlertLevel,
+  machineMetricPercent,
+  machineMetricTone,
   type TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -22,13 +24,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
-import {
-  MACHINE_METRIC_ICONS,
-  MACHINE_METRIC_LABELS,
-  machineMetricPercent,
-  machineMetricTone,
-  useMachineMetricDetail,
-} from "./machine-metric";
+import { MACHINE_METRIC_ICONS, MACHINE_METRIC_LABELS, useMachineMetricDetail } from "./machine-metric";
 
 export interface MachineResourcesProps {
   /** Null until the first reading arrives. */

@@ -1518,6 +1518,15 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.usage.noAgents": "No agent usage recorded in this range.",
   "mobile.server.usage.unsupported": "This host does not support usage analytics. Update the host to use this view.",
   "mobile.server.usage.planLimitsNote": "The current limits of each provider. The range below does not change them.",
+  // The machine use of the host on the Usage screen, for owners and admins (`machine-resources-v1`).
+  "mobile.server.machine.title": "Machine",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Memory",
+  "mobile.server.machine.disk": "Disk",
+  "mobile.server.machine.cores": { one: "{cores} core", other: "{cores} cores" },
+  "mobile.server.machine.sizeDetail": "{used} of {total}",
+  "mobile.server.machine.unknown": "Not available",
+  "mobile.server.machine.unsupported": "This host does not report its machine use. Update the host to see it.",
   // The plan limits of the host's providers: the rings in the home header, their sheet and the Usage screen. {time} is a date.
   "mobile.server.planLimits.title": "Plan limits",
   "mobile.server.planLimits.button": "Plan limits: {summary}",
