@@ -194,7 +194,8 @@ export function SettingsModal(props: SettingsModalProps) {
     },
   );
   const agentDockShown = () =>
-    props.appInfo?.platform === "darwin" && props.chatWindow !== true && props.agentDock !== undefined;
+    settingsTabShown("agent-dock", { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
+    props.agentDock !== undefined;
   const visibleNavItems = () =>
     navItems.filter(
       (item) =>

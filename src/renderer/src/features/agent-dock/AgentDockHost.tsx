@@ -63,20 +63,20 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 
 /**
  * Where this window shows the dock. Null hides the dock: the user turned it off, the platform is not
- * known yet, or it is not macOS. The agent dock is a macOS feature.
+ * known yet, or it is not macOS or Windows.
  */
 export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const platform = usePlatform();
   const preference = useAgentDockPreference();
   return () => {
-    const info = platform.appInfo();
-    if (info?.platform !== "darwin" || !preference().shown) return null;
+    const os = platform.appInfo()?.platform;
+    if ((os !== "darwin" && os !== "win32") || !preference().shown) return null;
     return preference().placement;
   };
 }
 
 /**
- * The agent dock of the active server, on macOS only. Each server has its own dock. By default the dock
+ * The agent dock of the active server, on macOS and Windows. Each server has its own dock. By default the dock
  * is a window of its own at the right edge of the screen, above the other apps; this renderer publishes
  * what it shows. The user can keep it in the main window instead.
  */
