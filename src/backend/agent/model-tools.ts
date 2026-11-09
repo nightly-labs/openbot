@@ -2,6 +2,8 @@ import type {
   AgentBackupModels,
   AgentModelChoice,
   AgentModelOption,
+  AgentProviderState,
+  AgentProviderStatus,
   AgentReasoningEffort,
   AgentSummary,
   ProviderAccountStatus,
@@ -46,6 +48,14 @@ interface ProviderModels {
   accounts?: Pick<ProviderAccountStatus, "id" | "label" | "state">[];
 }
 
+/** A provider row of the settings page, as `list_models` reads it. */
+export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message">;
+
+/** The states in which a provider that is on lists no model until the user acts in its settings. */
+const NEEDS_USER_STATES: ReadonlySet<AgentProviderState> = new Set(["sign-in-required", "outdated", "error"]);
+/** Where the user fixes such a provider. It is in the payload, not in the tool description that each turn sends. */
+const FIX_IN = "Server settings > Providers";
+
 /** The models of each provider that a list with no query shows, before the models in use. */
 const SHORT_LIST_LENGTH = 8;
 /** The models that a `list_models` query returns at most, over all providers. */
@@ -83,14 +93,21 @@ function matchesQuery(model: AgentModelOption, words: readonly string[]): boolea
  * are the ones the model picker shows, so the ones `create_agent` accepts. With no query, a provider
  * shows its default model, the models in use, and its first models; `omittedModels` counts the rest.
  * A query searches all models. An account has its id and the name the user gave it, never its email,
- * its credentials or its folder.
+ * its credentials or its folder. A provider that is on but lists no model until the user signs in,
+ * updates or repairs it is in `unavailableProviders`, with the text of its settings row and where
+ * that row is: without it, the agent could not tell the user why the provider is missing (#6053).
  */
 export function listModelsPayload(
   models: AgentModelOption[],
   preferredProvider: AgentProvider,
   accounts: ProviderAccountRows,
+  statuses: readonly ProviderStatusRow[],
   request: ListModelsRequest = {},
-): { preferredProvider: AgentProvider; providers: ProviderModels[] } {
+): {
+  preferredProvider: AgentProvider;
+  providers: ProviderModels[];
+  unavailableProviders?: { provider: AgentProvider; state: AgentProviderState; message?: string; fixIn: string }[];
+} {
   const words = request.query?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   let resultRoom = QUERY_RESULT_LIMIT;
   const providers = AGENT_PROVIDERS.filter((id) => request.provider === undefined || id === request.provider).flatMap(
@@ -139,7 +156,15 @@ export function listModelsPayload(
       ];
     },
   );
-  return { preferredProvider, providers };
+  const unavailableProviders = statuses.flatMap((row) =>
+    !row.off &&
+    NEEDS_USER_STATES.has(row.state) &&
+    (request.provider === undefined || row.id === request.provider) &&
+    !providers.some((listed) => listed.provider === row.id)
+      ? [{ provider: row.id, state: row.state, ...(row.message ? { message: row.message } : {}), fixIn: FIX_IN }]
+      : [],
+  );
+  return { preferredProvider, providers, ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}) };
 }
 
 /** The account and backup models of an agent as `read_agent` and `update_profile` report them. */
