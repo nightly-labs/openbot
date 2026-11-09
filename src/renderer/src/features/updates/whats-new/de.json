@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agenten lernen nach einer Korrektur oder einem Vorgehen, das funktioniert hat, selbst neue Fähigkeiten. Wähle Automatisch, Zuerst fragen oder Aus unter Servereinstellungen → Allgemein.",
+          "Anmeldungen im Vault können einen Zwei-Faktor-Code speichern, und Agenten können sich damit anmelden.",
+          "Unter Windows zeigen Dynamic Island und das Agenten-Dock deine Agenten wie auf dem Mac. Das Agenten-Dock kann auch Kanäle enthalten.",
+          "Agenten können sich öffentliche Onlinevideos ansehen, zum Beispiel YouTube- oder TikTok-Links.",
+          "Wähle in der Bibliothek mehrere Dateien aus, um sie auf einmal herunterzuladen oder zu löschen.",
+          "Agenten können für dich einen Fehlerbericht oder eine Idee für eine Funktion an das OpenBot-Team senden."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kanalmitglieder antworten, während sie in ihrem eigenen Chat arbeiten, und eine Begrüßung oder eine unklare Nachricht geht an die Kanalleitung.",
+          "Ein neuer Agent öffnet sich mit einer kurzen Begrüßung und drei ersten Aufgaben, aus denen du wählen kannst.",
+          "Verbinde Composio mit einer Anmeldung im Browser. Du gibst keine URL und keinen API-Schlüssel mehr ein.",
+          "Einstellungen heißt jetzt Deine Einstellungen, und die Servereinstellungen haben ein Suchfeld.",
+          "Das App-Symbol für macOS hat eine neue Glasoptik."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Die Warteschlange eines Agenten startet dieselbe Nachricht nicht mehr immer wieder, während der Agent auf die Antwort auf seine eigene Frage wartet.",
+          "Ein ChatGPT-Agent komprimiert nicht mehr immer wieder und bleibt nicht mehr endlos bei „Kontext wird komprimiert“ stehen.",
+          "Agenten mit Cursor und einigen anderen Anbietern behalten ihre OpenBot-Werkzeuge nach einem Neustart von OpenBot.",
+          "Agenten können einen Remote-MCP-Server, bei dem du dich angemeldet hast, etwa n8n, auch mit der neuesten MCP-Version nutzen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],

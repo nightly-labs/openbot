@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gli agenti imparano da soli nuove skill dopo una correzione o un metodo che ha funzionato. Scegli Automatico, Chiedi prima o Disattivato in Impostazioni server → Generali.",
+          "Gli accessi del Vault possono conservare un codice di verifica in due passaggi, e gli agenti possono usarlo per accedere.",
+          "Su Windows, la Dynamic Island e il dock degli agenti mostrano i tuoi agenti, come su Mac. Il dock degli agenti può contenere anche i canali.",
+          "Gli agenti possono guardare video pubblici online, come i link di YouTube o TikTok.",
+          "Seleziona più file nella Libreria per scaricarli o eliminarli tutti insieme.",
+          "Gli agenti possono inviare per te una segnalazione di bug o un'idea per una funzione al team di OpenBot."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "I membri di un canale rispondono mentre lavorano nella propria chat, e un saluto o un messaggio poco chiaro va al responsabile del canale.",
+          "Un nuovo agente si apre con un breve benvenuto e tre prime attività tra cui puoi scegliere.",
+          "Collega Composio accedendo nel browser. Non digiti più un URL e una chiave API.",
+          "Impostazioni ora si chiama Le tue impostazioni, e Impostazioni server ha un campo di ricerca.",
+          "L'icona dell'app per macOS ha un nuovo aspetto in vetro."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La coda di un agente non avvia più lo stesso messaggio più e più volte mentre l'agente aspetta la risposta alla sua domanda.",
+          "Un agente ChatGPT non compatta più il contesto più e più volte, e non resta più all'infinito su «Compattazione del contesto».",
+          "Gli agenti su Cursor e su alcuni altri provider mantengono i loro tool di OpenBot dopo il riavvio di OpenBot.",
+          "Gli agenti possono usare un server MCP remoto a cui hai fatto l'accesso, come n8n, con la versione più recente di MCP."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],

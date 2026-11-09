@@ -1,10 +1,10 @@
 {
-  "version": "0.65.0",
+  "version": "0.66.0",
   "highlights": [
-    "A new Library page shows every picture and file from your chats, with search and filters.",
-    "Agents now use logins that you save in a password manager or the Vault, also after their chat started.",
-    "Read replies aloud with ElevenLabs or xAI, dictate with Groq, and add Mistral as a provider.",
-    "Agents use fewer tokens on most providers, and OpenBot uses less memory for tabs and idle agents.",
-    "Delete the history of a chat or a channel, and open an agent's page as a side panel tab."
+    "Agents now learn new skills by themselves after you correct them, and fix their own skills while they work.",
+    "Save two-step codes in the Vault, and let agents sign in with them.",
+    "The Dynamic Island and the agent dock now work on Windows, and the dock can hold channels.",
+    "Agents can watch public videos, such as YouTube or TikTok links, and read what is said in them.",
+    "Channel members answer while they work, and a greeting or an unclear message goes to the lead."
   ]
 }
