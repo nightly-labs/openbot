@@ -33,6 +33,8 @@
     --openbot-border-strong: rgba(20, 20, 20, 0.16);
     --openbot-text-primary: #141414;
     --openbot-text-secondary: rgba(20, 20, 20, 0.72);
+    /* Venice Deep Blue: its brand allows no near-black such as the primary text. */
+    --openbot-provider-venice: #0e2942;
     --openbot-text-muted: rgba(20, 20, 20, 0.64);
     --openbot-text-dim: rgba(20, 20, 20, 0.34);
     --openbot-text-on-accent: #ffffff;
@@ -110,6 +112,7 @@
     --openbot-border-strong: rgba(255, 255, 255, 0.045);
     --openbot-text-primary: #ffffff;
     --openbot-text-secondary: #dcdcdc;
+    --openbot-provider-venice: #ffffff;
     --openbot-text-muted: #979797;
     --openbot-text-dim: #6a6a6a;
     --openbot-text-on-accent: #ffffff;
