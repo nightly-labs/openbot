@@ -55,6 +55,13 @@ export interface AcpFlavor {
    * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
    */
   restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
+  /**
+   * A turn that the agent lost, after which it refuses each request of the session until the turn is
+   * discarded. `refusal` matches the text of that refusal, and `unsent` the refusal of a prompt that
+   * the agent did not take. `discard` gives the arguments of the agent's command that discards the
+   * lost turns of a session. OpenBot never sends a prompt again that the agent took.
+   */
+  lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   /** A failed model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
@@ -199,6 +206,19 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
 };
 
 /**
+ * Hermes Agent 0.22 marks a turn as lost when its gateway restarts during the turn. It then refuses
+ * each prompt, model change and MCP server change of that session with `unknown_execution` until the
+ * turn is discarded. An open of the session with new MCP tokens changes its MCP servers, so the open
+ * failed too, and the agent stopped answering (#6026). `sessions discard` is the Hermes command for
+ * scripts. The prompt that the gateway lost fails with the same code, and says that Hermes keeps it.
+ */
+const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
+  refusal: /\bunknown_execution\b/u,
+  unsent: /\(nothing was submitted\)/u,
+  discard: (sessionId) => ["sessions", "discard", sessionId, "--yes"],
+};
+
+/**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
  * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
  * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
@@ -206,6 +226,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
  */
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  lostTurns: HERMES_LOST_TURNS,
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
 };
@@ -319,7 +340,12 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   emptyAnswerFailure: customEmptyAnswerFailure,
 };
 
-const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = { omp: OMP_ACP_FLAVOR };
+const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
+  omp: OMP_ACP_FLAVOR,
+  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules, and its lost turns are
+  // discarded as for the Hermes provider.
+  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS },
+};
 
 /**
  * The flavor of a custom agent, from the exact name of its command: `omp`, `/usr/local/bin/omp`
