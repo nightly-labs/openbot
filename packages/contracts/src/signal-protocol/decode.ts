@@ -58,6 +58,7 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         resumeToken: identifier(value.resumeToken),
         iceServers: iceServers(value.iceServers),
         ...(value.capabilities === undefined ? {} : { capabilities: capabilities(value.capabilities) }),
+        ...(value.reconnectGraceMs === undefined ? {} : { reconnectGraceMs: duration(value.reconnectGraceMs) }),
       };
     case "host-waiting":
       return { type: kind, version, resumeToken: identifier(value.resumeToken) };
@@ -238,6 +239,13 @@ function timestamp(value: unknown): number {
 function mLineIndex(value: unknown): number {
   const candidate = integer(value);
   if (candidate < 0) invalid();
+  return candidate;
+}
+
+// Milliseconds, at most a day: a longer wait is no value that this peer can act on.
+function duration(value: unknown): number {
+  const candidate = integer(value);
+  if (candidate < 0 || candidate > 86_400_000) invalid();
   return candidate;
 }
 
