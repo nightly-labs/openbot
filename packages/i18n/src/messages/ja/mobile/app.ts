@@ -34,6 +34,7 @@ export const messages = {
   "mobile.app.route.threads": "スレッド",
   "mobile.app.route.usage": "使用量",
   "mobile.app.route.marketplace": "マーケットプレイス",
+  "mobile.app.route.library": "ライブラリ",
   "mobile.app.quickAction.search": "検索",
   "mobile.app.update.title": "OpenBot {version} が登場",
   "mobile.app.update.readyTitle": "新しい OpenBot の準備ができました",

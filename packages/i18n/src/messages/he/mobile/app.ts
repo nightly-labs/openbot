@@ -35,6 +35,7 @@ export const messages = {
   "mobile.app.route.usage": "שימוש",
   "mobile.app.route.remoteDesktop": "שליטה במחשב",
   "mobile.app.route.marketplace": "חנות",
+  "mobile.app.route.library": "ספרייה",
   "mobile.app.quickAction.search": "חיפוש",
   "mobile.app.update.title": "OpenBot {version} כאן",
   "mobile.app.update.readyTitle": "גרסה חדשה של OpenBot מוכנה",

@@ -38,6 +38,7 @@
     "./profile-stats": "./src/profile-stats.ts",
     "./plan-limits": "./src/plan-limits.ts",
     "./agent-tasks": "./src/agent-tasks.ts",
+    "./stored-files": "./src/stored-files.ts",
     "./workflow-decoding": "./src/workflow-decoding.ts"
   },
   "scripts": {
