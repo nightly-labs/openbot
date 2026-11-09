@@ -21,10 +21,21 @@ const teammate: TeamPresenceMember = {
   email: "me@example.com",
   role: "member",
 };
-// biome-ignore lint/nursery/noUnsafeTypeAssertion: Only identity fields are used by these fixtures.
-const localServer = { thisComputer: true, role: "owner" } as ServerSummary;
-// biome-ignore lint/nursery/noUnsafeTypeAssertion: Only identity fields are used by these fixtures.
-const remoteServer = { role: "owner" } as ServerSummary;
+const remoteServer: ServerSummary = {
+  id: "remote",
+  name: "Remote",
+  kind: "remote",
+  state: "online",
+  apiUrl: null,
+  notificationsMuted: false,
+  notificationsMutedUntil: null,
+  notificationLevel: "all",
+  remoteDesktopAvailable: false,
+  logoUrl: null,
+  role: "owner",
+  active: true,
+};
+const localServer: ServerSummary = { ...remoteServer, thisComputer: true };
 
 describe("currentReaderMember", () => {
   it("recognizes the local server owner regardless of cloud sign-in or a matching teammate", () => {
@@ -36,13 +47,42 @@ describe("currentReaderMember", () => {
   it("finds the stored owner message even when another member sends the same text", () => {
     const memberId = currentReaderMember([teammate, owner], localServer, "me@example.com")?.id ?? null;
     const reader = { memberId, accountUserId: null, onOwnComputer: false };
-    const page = {
+    const page: ChannelPage = {
+      channel: {
+        id: "channel",
+        name: "channel",
+        title: "",
+        instructions: "",
+        members: [],
+        leadAgentId: null,
+        archived: false,
+        revision: 1,
+        createdAt: "",
+      },
+      tasks: [],
+      olderCursor: null,
+      throughSequence: 3,
       messages: [
-        { id: "other", sequence: 2, author: { kind: "member", id: teammate.id }, message: { text: "hello" } },
-        { id: "mine", sequence: 3, author: { kind: "member", id: owner.id }, message: { text: "hello" } },
+        {
+          id: "other",
+          channelId: "channel",
+          sequence: 2,
+          author: { kind: "member", id: teammate.id, name: "Other" },
+          taskId: null,
+          superseded: false,
+          message: { id: "other", author: "user", text: "hello", createdAt: "", status: "completed" },
+        },
+        {
+          id: "mine",
+          channelId: "channel",
+          sequence: 3,
+          author: { kind: "member", id: owner.id, name: "Owner" },
+          taskId: null,
+          superseded: false,
+          message: { id: "mine", author: "user", text: "hello", createdAt: "", status: "completed" },
+        },
       ],
-      // biome-ignore lint/nursery/noUnsafeTypeAssertion: The lookup only reads message identity, sequence and text.
-    } as ChannelPage;
+    };
     expect(sentChannelMessageId(page, 1, "hello", (id) => isReaderAuthor(id, reader))).toBe("mine");
   });
 
