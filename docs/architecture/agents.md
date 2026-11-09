@@ -984,9 +984,13 @@ The format is `openbot-import.json` plus `agents/<key>/`
 folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
 reads it; both are a product contract, so add only optional fields and raise `version` for a change
 of meaning. The renderer never names a path: `agent-import:choose` opens the dialog in main, and
-`AgentImportService` keeps the checked export and its SHA-256 under a single-use token; `apply`
-refuses a file that changed. `stage` measures entries without inflating them and rejects paths that
-`isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` checks all
+`AgentImportService` keeps the checked export under a single-use token, with the SHA-256 of its size
+and central directory; `apply` refuses a file that changed. `src/main/agent-archive.ts` reads only the
+central directory (ZIP64 too) and inflates one entry at a time from disk, with its size and CRC
+checked, so a local import has no size limit, only 200,000 files. Files in `.git` and
+`node_modules` folders are left out with one warning, for this import and the transfer. `stage` rejects paths that
+`isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` skips an
+agent whose workspace files need more free disk space than there is, checks all
 skills of an agent, creates it through `AgentService` and publishes skills through the local skill
 library; an agent whose step fails is deleted with the skill revisions it published, and the others
 continue. An optional `channels` list carries Grok Bot group chats. After the agents, each selected
@@ -1038,8 +1042,9 @@ exported, so an imported agent gets the defaults of a new agent on the new compu
 
 `InstanceTransferService` (`src/main/instance-transfer-service.ts`) writes the archive one file at a
 time, stored and not compressed, to `<name>.zip.part`, and renames it when it is complete. Import uses
-the same checks as the agent import (`src/main/agent-archive.ts`): the file stays under a single-use
-token with its SHA-256, under 2 GB and 50,000 files. `apply` first adds the custom providers that are missing. It never saves a custom ACP agent:
+the same reader and checks as the agent import (`src/main/agent-archive.ts`): the file stays under a
+single-use token with the SHA-256 of its central directory, under 2 GB and 50,000 files, because the
+writer does not write ZIP64. `apply` first adds the custom providers that are missing. It never saves a custom ACP agent:
 a saved custom agent starts its command to list its models, so a warning names the agent and its command,
 and the user adds it again after checking it. The models of an added provider are not listed yet: a save does not wait for
 model discovery, and the provider has no key until the user enters it. So an agent on such a model starts

@@ -31,12 +31,16 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} zaten mevcut, bu nedenle bu kopya {saved} olarak kaydedildi.",
   "error.import.fileSkipped": "{name}: {file} dosyası atlandı. {reason}",
   "error.import.chooseZip": "Bir .zip dosyası seçin.",
-  "error.import.zipTooLarge": "Dışa aktarım 2 GB altında bir .zip olmalıdır.",
   "error.import.unsafeFile": "Dışa aktarım güvenli olmayan bir dosya içeriyor: {name}",
-  "error.import.expandedTooLarge": "Dışa aktarım açıldığında 2 GB ve {limit} dosyanın altında olmalıdır.",
+  "error.import.tooManyFiles": "Dışa aktarım en fazla {limit} dosya içermelidir.",
+  "error.import.diskSpace":
+    "{name}: dosyaları için {size} GB boş disk alanı gerekiyor, boş alan {free} GB. Yer açın, ardından ajanı yeniden içe aktarın.",
   "error.import.remoteExpandedTooLarge": "Dışa aktarım açıldığında 500 MB ve {limit} dosyanın altında olmalıdır.",
   "error.import.zipInvalid":
     "Seçilen dosya geçerli bir .zip değil. Grok Bot dosyayı hâlâ kaydediyorsa bekleyip yeniden seçin.",
+  "error.import.entryDamaged": "Dosya, dışa aktarımda bozuk.",
+  "error.import.foldersSkipped":
+    ".git ve node_modules klasörlerindeki {number} dosya dışarıda bırakıldı. Bir araç bunları yeniden oluşturabilir.",
   "error.import.empty": "Dışa aktarım boş.",
   "error.import.remoteZipTooLarge":
     "Katılınan bir sunucuya içe aktarmak için dışa aktarım 100 MB altında bir .zip olmalıdır.",
