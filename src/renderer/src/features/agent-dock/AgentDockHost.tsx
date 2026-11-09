@@ -47,7 +47,6 @@ import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
-import { agentDockPlatform } from "../settings/settings-tabs";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
@@ -72,7 +71,7 @@ export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const preference = useAgentDockPreference();
   return () => {
     const info = platform.appInfo();
-    if (!info || !agentDockPlatform(info.platform) || !preference().shown) return null;
+    if (!info || !preference().shown) return null;
     const placement = preference().placement;
     return placement === "screen" && info.aboveAppsSupport ? "window" : placement;
   };

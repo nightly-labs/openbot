@@ -34,6 +34,7 @@ import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { settingsPort } from "./settings-port";
+import { XWaylandRestartRow } from "./XWaylandRestartRow";
 
 const PREVIEW_NOTCH_SIZE: DynamicIslandNotchSize = { width: 192, height: 32 };
 /** The space the preview keeps on each side of an island that it scales down to fit. */
@@ -73,13 +74,6 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
   const linux = () => props.platform === "linux";
   /** Linux with Wayland windows: the island above other apps needs a start on XWayland. */
   const screenSupport = () => (linux() && props.value.macBookNotch ? platform.appInfo()?.aboveAppsSupport : undefined);
-  const [restarting, setRestarting] = createSignal(false);
-  function restartOnXWayland(): void {
-    setRestarting(true);
-    void settingsPort()
-      .dynamicIsland.setXWayland({ enabled: true })
-      .catch(() => setRestarting(false));
-  }
   const widthPercent = () => props.value.macBookNotchWidthPercent;
   const heightPercent = () => props.value.macBookNotchHeightPercent;
   const widestBuiltInWidth = () =>
@@ -129,33 +123,16 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
             label={i18n.t(showKey())}
             description={i18n.t("settings.notch.show.description")}
           />
-          <Show when={screenSupport()}>
-            {(support) => (
-              <Item data-settings-row="settings.notch.xwayland.title" class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>{i18n.t("settings.notch.xwayland.title")}</ItemTitle>
-                  <ItemDescription>
-                    {support() === "restart"
-                      ? i18n.t("settings.notch.xwayland.description")
-                      : i18n.t("settings.notch.xwayland.unsupported")}
-                  </ItemDescription>
-                </ItemContent>
-                <Show when={support() === "restart"}>
-                  <ItemActions>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={restarting()}
-                      onClick={restartOnXWayland}
-                    >
-                      {i18n.t("settings.notch.xwayland.restart")}
-                    </Button>
-                  </ItemActions>
-                </Show>
-              </Item>
-            )}
-          </Show>
+          <XWaylandRestartRow
+            support={screenSupport()}
+            keys={{
+              title: "settings.notch.xwayland.title",
+              description: "settings.notch.xwayland.description",
+              unsupported: "settings.notch.xwayland.unsupported",
+              restart: "settings.notch.xwayland.restart",
+            }}
+            onRestart={() => settingsPort().dynamicIsland.setXWayland({ enabled: true })}
+          />
           <SwitchField
             data-settings-row="settings.notch.idle.title"
             checked={props.value.macBookNotchIdle}

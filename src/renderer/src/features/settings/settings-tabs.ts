@@ -247,18 +247,8 @@ export function settingsTabShown(
 ): boolean {
   if (tab === "hosted-servers") return false;
   if (tab === "dynamic-island") return dynamicIslandSettingsShown(window.platform, window.chatWindow);
-  if (tab === "agent-dock") return agentDockPlatform(window.platform) && !window.chatWindow;
+  if (tab === "agent-dock") return window.platform !== undefined && !window.chatWindow;
   return true;
-}
-
-/** The agent dock exists on macOS, Windows and Linux. */
-export function agentDockPlatform(platform: AppInfo["platform"] | undefined): boolean {
-  return aboveAppsPlatform(platform);
-}
-
-/** The platforms whose island and dock can float above the other apps. */
-function aboveAppsPlatform(platform: AppInfo["platform"] | undefined): boolean {
-  return platform === "darwin" || platform === "win32" || platform === "linux";
 }
 
 /**
@@ -266,5 +256,5 @@ function aboveAppsPlatform(platform: AppInfo["platform"] | undefined): boolean {
  * its calls from a chat window.
  */
 export function dynamicIslandSettingsShown(platform: AppInfo["platform"] | undefined, chatWindow: boolean): boolean {
-  return aboveAppsPlatform(platform) && !chatWindow;
+  return platform !== undefined && !chatWindow;
 }
