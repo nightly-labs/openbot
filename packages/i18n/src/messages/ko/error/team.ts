@@ -123,6 +123,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "실시간 브라우저 화면을 사용할 수 없어요.",
   "error.team.browserSessionNotFound": "브라우저 화면 세션을 찾을 수 없어요.",
   "error.team.mcpUnsupported": "이 연결에서는 MCP 서버를 지원하지 않아요.",
+  "error.team.mcpServerListNeedsUpdate":
+    "이 서버에서 MCP 서버를 {limit}개보다 많이 사용하려면 이 기기의 OpenBot을 업데이트하세요.",
   "error.team.storageUnsupported": "이 연결에서는 스토리지를 지원하지 않아요.",
   "error.team.machineResourcesUnsupported": "이 연결에서는 머신 사용량을 지원하지 않아요.",
   "error.team.machineAlertMemberInvalid": "이 서버의 소유자나 관리자만 머신 알림을 받을 수 있어요.",

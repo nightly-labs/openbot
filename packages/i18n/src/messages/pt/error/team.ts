@@ -123,6 +123,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "A visualização ao vivo do navegador está indisponível.",
   "error.team.browserSessionNotFound": "Sessão de visualização do navegador não encontrada.",
   "error.team.mcpUnsupported": "Esta conexão não oferece suporte a servidores MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Atualize o OpenBot neste dispositivo para usar mais de {limit} servidores MCP neste servidor.",
   "error.team.storageUnsupported": "Esta conexão não oferece suporte a armazenamento.",
   "error.team.machineResourcesUnsupported": "Esta conexão não oferece suporte ao uso da máquina.",
   "error.team.machineAlertMemberInvalid":

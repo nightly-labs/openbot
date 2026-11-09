@@ -3812,6 +3812,14 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "mistral") {
+        // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
+        // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the
+        // Python log, such as `WARNING:...:Retrying model completion (attempt 1, ...): ReadError('')`
+        // for a request that it sends again by itself, one "Mistral error" toast per line (#5923).
+        stderrLogger.warn("Mistral Vibe logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
       if (isGlogBelowErrorDiagnostic(message) || isRustLogBelowErrorDiagnostic(message)) {
         stderrLogger.info("A provider logged an info or warning record.", { provider: client.provider, message });
         return;

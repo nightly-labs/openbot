@@ -121,6 +121,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "Просмотр браузера в реальном времени недоступен.",
   "error.team.browserSessionNotFound": "Сессия вида браузера не найдена.",
   "error.team.mcpUnsupported": "Это подключение не поддерживает серверы MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} серверов MCP.",
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.machineResourcesUnsupported": "Это подключение не поддерживает данные о машине.",
   "error.team.machineAlertMemberInvalid":

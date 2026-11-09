@@ -131,6 +131,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vue du navigateur en direct n’est pas disponible.",
   "error.team.browserSessionNotFound": "Session de vue du navigateur introuvable.",
   "error.team.mcpUnsupported": "Les serveurs MCP ne sont pas pris en charge par cette connexion.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Mettez à jour OpenBot sur cet appareil pour utiliser plus de {limit} serveurs MCP sur ce serveur.",
   "error.team.storageUnsupported": "Le stockage n’est pas pris en charge par cette connexion.",
   "error.team.machineResourcesUnsupported":
     "L’utilisation de la machine n’est pas prise en charge par cette connexion.",

@@ -54,6 +54,10 @@ const config: KnipConfig = {
     "vm_stat",
     // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
     "dbus-run-session",
+    // Find Icon Composer, and make the macOS `.icns` and Dock image in `compile-macos-icon.ts`.
+    "xcode-select",
+    "sips",
+    "iconutil",
   ],
   workspaces: {
     ".": {
