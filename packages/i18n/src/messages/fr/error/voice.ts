@@ -33,5 +33,7 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex sur le serveur n’a pas pu démarrer la voix en direct. Demandez à son propriétaire de mettre à jour Codex sur cet ordinateur et de se connecter avec ChatGPT, puis réessayez.",
   "error.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "error.voice.live.unavailable":
+    "OpenAI n'a pas pu démarrer la voix en direct. Le problème vient d'OpenAI. Réessayez plus tard.",
   "error.voice.live.off": "La voix en direct Codex est désactivée. Activez-la dans Réglages → Voix.",
 } as const satisfies PartialTranslation<typeof source>;

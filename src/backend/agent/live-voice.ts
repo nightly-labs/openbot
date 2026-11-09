@@ -10,6 +10,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import {
@@ -34,6 +35,11 @@ const ANSWER_TIMEOUT_MS = 20_000;
 const REASON_LIMIT = 1_000;
 /** How Codex reports that OpenAI refused the call: `unexpected status 401 Unauthorized: …`. */
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
+/**
+ * How Codex reports that OpenAI's server has no realtime call for a ChatGPT login:
+ * `unexpected status 404 Not Found: …, url: https://chatgpt.com/backend-api/codex/realtime/calls?…`.
+ */
+const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
 const RELAY_INSTRUCTIONS =
@@ -44,6 +50,8 @@ const RELAY_VOICE_RULE =
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Do not reply to this message.";
+
+const logger = createOpenBotLogger("live-voice");
 
 class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFailed", {
   cause: Schema.Defect(),
@@ -358,14 +366,23 @@ export class LiveVoice {
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    return UNAUTHORIZED.test(message) ? liveFailure(sourceText("error.voice.live.signIn")) : failure;
+    if (UNAUTHORIZED.test(message)) return liveFailure(sourceText("error.voice.live.signIn"));
+    if (CALL_NOT_FOUND.test(message)) return liveFailure(this.#unavailable(message));
+    return failure;
   }
 
   #reason(message: string | null): string {
     if (!message) return sourceText("error.voice.live.disconnected");
     // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
     if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+    if (CALL_NOT_FOUND.test(message)) return this.#unavailable(message);
     return sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
+  }
+
+  /** The user cannot fix this, so the screen gets plain text and the log keeps OpenAI's request details. */
+  #unavailable(message: string): string {
+    logger.warn("OpenAI refused the live voice call.", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
+    return sourceText("error.voice.live.unavailable");
   }
 
   readonly #stopSession = Effect.fn("LiveVoice.stopSession")(function* (this: LiveVoice, session: LiveSession) {
