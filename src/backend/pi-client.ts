@@ -1176,8 +1176,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       yield* stored.read(request, consume);
       return;
     }
-    const messages = yield* this.#opening.withPermit(
-      this.#readMessages(request.threadId, request.cwd ?? this.options.discoveryCwd?.() ?? process.cwd()),
+    const messages = yield* this.#readMessages(
+      request.threadId,
+      request.cwd ?? this.options.discoveryCwd?.() ?? process.cwd(),
     );
     // get_messages follows the active branch. get_entries also contains abandoned branches.
     for (let index = messages.length - 1; index >= 0; index--) {
@@ -1205,12 +1206,31 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     sessionFile: string,
     cwd: string,
   ) {
+    const fromThread = (thread: PiThread) =>
+      thread.rpc.request({ type: "get_messages" }).pipe(Effect.map((response) => getArray(response, "messages")));
     const live = this.#threads.get(sessionFile);
-    if (live) return getArray(yield* live.rpc.request({ type: "get_messages" }), "messages");
+    if (live) return yield* fromThread(live);
+    // The permit keeps a thread from opening this session while the short process has it open.
+    return yield* this.#opening.withPermit(
+      Effect.suspend(() => {
+        // A thread can open the session while this read waits for the permit.
+        const opened = this.#threads.get(sessionFile);
+        return opened ? fromThread(opened) : this.#readOnShortProcess(sessionFile, cwd);
+      }),
+    );
+  });
+
+  readonly #readOnShortProcess = Effect.fn("PiAgentClient.readOnShortProcess")(function* (
+    this: PiAgentClient,
+    sessionFile: string,
+    cwd: string,
+  ) {
     yield* requireSessionFile(sessionFile);
     if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
     const rpc = new PiRpc(this.#redact, this.provider);
-    rpc.on("diagnostic", (text) => this.emit("diagnostic", text));
+    // What Pi writes after the read, while OpenBot stops it, is not an error for the user.
+    let stopping = false;
+    rpc.on("diagnostic", (text) => this.emit("diagnostic", text, { duringStop: stopping }));
     return yield* Effect.acquireUseRelease(
       providerSync(() => {
         this.#spawn(rpc, cwd, ["--no-tools", "--no-extensions", "--no-mcp"], {});
@@ -1224,7 +1244,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
           return getArray(yield* rpc.request({ type: "get_messages" }), "messages");
         }),
-      () => rpc.stop().pipe(Effect.ensuring(Effect.sync(() => this.#starting.delete(rpc))), Effect.orDie),
+      () =>
+        Effect.sync(() => {
+          stopping = true;
+        }).pipe(
+          Effect.andThen(rpc.stop()),
+          Effect.ensuring(Effect.sync(() => this.#starting.delete(rpc))),
+          Effect.orDie,
+        ),
     );
   });
 
