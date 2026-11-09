@@ -8,7 +8,6 @@ export const messages = {
   "error.voice.removeBusy": "请等语音转写结束后再移除该模型。",
   "error.voice.removeFailed": "无法移除语音模型，请重试。",
   "error.voice.runtimeUnavailable": "该平台不支持本地语音转写。",
-  "error.voice.busy": "已有语音转写正在进行。",
   "error.voice.modelUnavailable": "语音模型不可用。",
   "error.voice.transcriptionTimedOut": "语音转写超时。",
   "error.voice.prepareRequired": "本地语音转写不可用。请运行 `bun run voice:prepare` 并重启 OpenBot。",
