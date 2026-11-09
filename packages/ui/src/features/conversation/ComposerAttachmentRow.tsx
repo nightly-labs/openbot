@@ -1,6 +1,6 @@
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { Button, CircleAlert, ImageRemoveButton, RadialProgress, RotateCcw, Spinner } from "@openbot/ui";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { fileBadge } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
@@ -45,23 +45,24 @@ export function ComposerAttachmentRow(props: {
 }) {
   const { t, format } = useText();
   const [lightbox, setLightbox] = createSignal<ImageLightboxOpening | null>(null);
-  const thumbnails = new Map<string, HTMLElement>();
+  let row: HTMLDivElement | undefined;
+  const thumbnail = (attachment: DraftAttachment) =>
+    row?.querySelector<HTMLElement>(`[data-attachment-id="${CSS.escape(attachment.id)}"]`) ?? undefined;
   const openImage = (attachment: DraftAttachment, origin: HTMLElement) => {
-    const images = props.attachments.filter(isLightboxImage);
+    const images = props.attachments.filter(opensInViewer);
     setLightbox({ images, index: images.findIndex((image) => image.id === attachment.id), origin });
   };
   return (
     <Show when={props.attachments.length > 0 || (props.pending?.length ?? 0) > 0 || (props.uploads?.length ?? 0) > 0}>
-      <div class="composer-attachments">
+      <div ref={row} class="composer-attachments">
         <For each={props.attachments}>
           {(attachment) => {
             // An image with no preview (the web client) shows as a file, with its name.
             const chip = () => (attachment.kind === "image" && attachment.previewUrl ? "image" : "file");
-            onCleanup(() => thumbnails.delete(attachment.id));
             return (
               <div class="composer-attachment ui-removable-image" data-kind={chip()}>
                 <Show
-                  when={isLightboxImage(attachment)}
+                  when={opensInViewer(attachment)}
                   fallback={
                     <span
                       class="composer-attachment-preview"
@@ -74,10 +75,10 @@ export function ComposerAttachmentRow(props: {
                   }
                 >
                   <Button
-                    ref={(element) => thumbnails.set(attachment.id, element)}
                     variant="ghost"
                     type="button"
                     class="composer-attachment-preview"
+                    data-attachment-id={attachment.id}
                     aria-label={t("chat.image.preview", { name: attachment.name })}
                     data-cuelume-tap="open"
                     onClick={(event) => openImage(attachment, event.currentTarget)}
@@ -120,7 +121,7 @@ export function ComposerAttachmentRow(props: {
           {(opening) => (
             <ImageLightbox
               opening={opening()}
-              thumbnail={(image) => thumbnails.get(image.id)}
+              thumbnail={thumbnail}
               macWindowControls={props.macWindowControls}
               onClose={() => setLightbox(null)}
             />
@@ -129,6 +130,11 @@ export function ComposerAttachmentRow(props: {
       </div>
     </Show>
   );
+}
+
+/** An image chip with a preview. An SVG has an image preview but is a file chip, so it does not open. */
+function opensInViewer(attachment: DraftAttachment): boolean {
+  return attachment.kind === "image" && isLightboxImage(attachment);
 }
 
 /** A file on its way to the server: a ring with the bytes, or the failure with Retry. */
