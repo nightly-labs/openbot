@@ -47,8 +47,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "Ajan bağlantısı geçersiz.",
   "error.marketplace.changedSinceOpened":
     "Bu ajan siz açtıktan sonra değişti. Yeni sürümü incelemek için bağlantıyı tekrar açın.",
-  "error.marketplace.skillNameConflict":
-    'Zaten "{name}" adında farklı bir yerel beceriniz var. Yeniden adlandırın veya kaldırın, ardından bu ajanı tekrar ekleyin.',
   "error.marketplace.avatarInvalid": "Ajan avatarı geçersiz.",
   "error.marketplace.secretInName": "Yayımlamadan önce addaki gizli anahtarı veya e-posta adresini kaldırın.",
   "error.marketplace.secretInTitle": "Yayımlamadan önce başlıktaki gizli anahtarı veya e-posta adresini kaldırın.",
