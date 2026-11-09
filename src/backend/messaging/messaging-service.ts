@@ -1352,8 +1352,9 @@ export class MessagingService {
     const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
     // In a thread that an agent's post pinged people in, a reply without a mention counts only from a
     // pinged person: the first one starts the conversation. Other threads need a link, as before.
+    // A first reply with a mention, which comes only as `app_mention`, also gets the post that pinged its author.
     const pings =
-      message.requiresLink && live.record.platform === "slack"
+      live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)
         ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
         : [];
     const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;

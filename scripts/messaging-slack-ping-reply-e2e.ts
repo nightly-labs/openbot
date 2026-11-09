@@ -8,7 +8,8 @@
 //    and the agent that posted it as the message that the reply answers. The thread gets its link.
 // 4. After that, a reply without a mention still counts only from the pinged person. Another person
 //    reaches the Orchestrator only with a mention.
-// 5. A thread reply that mentions OpenBot is left to its `app_mention` event.
+// 5. A pinged person's first reply that mentions OpenBot also gets the post as context.
+// 6. A thread reply that mentions OpenBot is left to its `app_mention` event.
 // Writes .openbot-build/messaging-slack-ping-reply-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -331,6 +332,19 @@ try {
     assert.equal(mailbox.messagingOrigin(mentioned.delivery.id)?.linkId, link?.linkId);
     assert.equal(delivery(ignored), null, "A reply of a person who was not pinged reached the linked thread.");
     return { ignored: true, pingedReply: origin?.linkId, mention: "reached" };
+  });
+
+  await step("a pinged person's first reply with a mention also gets the post as context", async () => {
+    const asked = await post(research.id, `<@${OTHER}> can you review the copy?`);
+    const key = deliver(event("app_mention", OTHER, asked.messageId, `<@${BOT}> yes, it reads well`));
+    const queued = await waitFor("the delivery of a pinged reply with a mention", () => delivery(key));
+    const origin = mailbox.messagingOrigin(queued.delivery.id);
+    assert.equal(
+      origin?.replyTo?.text,
+      `<@${OTHER}> can you review the copy?`,
+      "The reply lost the post that it answers.",
+    );
+    return { replyTo: origin?.replyTo?.authorName };
   });
 
   await step("a thread reply that mentions OpenBot is left to its app_mention event", async () => {
