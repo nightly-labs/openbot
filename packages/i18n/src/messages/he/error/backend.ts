@@ -68,6 +68,7 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "לערוץ יש התחלת הקצאה שלא אושרה. יש לבדוק את תוצאתה לפני המחיקה.",
   "error.backend.channelNotFound": "הערוץ לא נמצא.",
   "error.backend.channelMemberUnavailable": "חבר בערוץ אינו זמין.",
+  "error.backend.channelInstructionsTooLong": "קצרו את ההוראות ל-2,000 תווים. הוראות ארוכות יותר לא נשמרות.",
   "error.backend.channelWaitBeforeNewConversation": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז התחילו שיחה חדשה.",
   "error.backend.channelWaitBeforeCompact": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז דחסו אותו.",
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",

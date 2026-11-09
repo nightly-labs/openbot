@@ -69,6 +69,7 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "للقناة بدء تعيين غير مؤكد. تحقق من نتيجته قبل حذفها.",
   "error.backend.channelNotFound": "لم يتم العثور على القناة.",
   "error.backend.channelMemberUnavailable": "أحد أعضاء القناة غير متاح.",
+  "error.backend.channelInstructionsTooLong": "اختصر التعليمات إلى 2000 حرف. لا يتم حفظ التعليمات الأطول.",
   "error.backend.channelWaitBeforeNewConversation": "انتظر حتى يتوقف العمل في هذه القناة، ثم ابدأ محادثة جديدة.",
   "error.backend.channelWaitBeforeCompact": "انتظر حتى يتوقف العمل في هذه القناة، ثم اضغطها.",
   "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",

@@ -67,6 +67,7 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "该频道有一项未确认的派活启动，请在删除前确认其结果。",
   "error.backend.channelNotFound": "未找到该频道。",
   "error.backend.channelMemberUnavailable": "有频道成员不可用。",
+  "error.backend.channelInstructionsTooLong": "请将说明缩短到 2,000 个字符以内。更长的说明不会被保存。",
   "error.backend.channelWaitBeforeNewConversation": "请等此频道中的工作停止后再开始新对话。",
   "error.backend.channelWaitBeforeCompact": "请等此频道中的工作停止后再压缩。",
   "error.backend.channelWaitBeforeDeleteHistory": "请等此频道中的工作停止后再删除其历史记录。",

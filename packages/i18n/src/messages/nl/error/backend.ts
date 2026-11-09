@@ -74,6 +74,8 @@ export const messages = {
     "Het kanaal heeft een start van een opdracht die niet is bevestigd. Controleer het resultaat voordat je het verwijdert.",
   "error.backend.channelNotFound": "Kanaal niet gevonden.",
   "error.backend.channelMemberUnavailable": "Een lid van het kanaal is niet beschikbaar.",
+  "error.backend.channelInstructionsTooLong":
+    "Kort de instructies in tot 2.000 tekens. Langere instructies worden niet opgeslagen.",
   "error.backend.channelWaitBeforeNewConversation":
     "Wacht tot het werk in dit kanaal stopt en start dan een nieuw gesprek.",
   "error.backend.channelWaitBeforeCompact": "Wacht tot het werk in dit kanaal stopt en comprimeer het dan.",
