@@ -1148,6 +1148,15 @@ export const messages = {
     "Cet hôte ne prend pas en charge les statistiques d’utilisation. Mettez à jour l’hôte pour utiliser cette vue.",
   "mobile.server.usage.planLimitsNote":
     "Les limites actuelles de chaque fournisseur. La période ci-dessous ne les change pas.",
+  "mobile.server.machine.title": "Machine",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Mémoire",
+  "mobile.server.machine.disk": "Disque",
+  "mobile.server.machine.cores": { one: "{cores} cœur", other: "{cores} cœurs" },
+  "mobile.server.machine.sizeDetail": "{used} sur {total}",
+  "mobile.server.machine.unknown": "Non disponible",
+  "mobile.server.machine.unsupported":
+    "Cet hôte n’indique pas l’utilisation de sa machine. Mettez l’hôte à jour pour la voir.",
   "mobile.server.planLimits.title": "Limites du forfait",
   "mobile.server.planLimits.button": "Limites du forfait : {summary}",
   "mobile.server.planLimits.left": "{percent} % restants",

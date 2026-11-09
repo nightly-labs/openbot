@@ -1163,6 +1163,15 @@ export const messages = {
   "mobile.server.usage.unsupported":
     "Dieser Host unterstützt keine Nutzungsanalyse. Aktualisiere den Host, um diese Ansicht zu verwenden.",
   "mobile.server.usage.planLimitsNote": "Die aktuellen Limits jedes Anbieters. Der Zeitraum unten ändert sie nicht.",
+  "mobile.server.machine.title": "Maschine",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Arbeitsspeicher",
+  "mobile.server.machine.disk": "Datenträger",
+  "mobile.server.machine.cores": { one: "{cores} Kern", other: "{cores} Kerne" },
+  "mobile.server.machine.sizeDetail": "{used} von {total}",
+  "mobile.server.machine.unknown": "Nicht verfügbar",
+  "mobile.server.machine.unsupported":
+    "Dieser Host meldet die Nutzung seiner Maschine nicht. Aktualisiere den Host, um sie zu sehen.",
   "mobile.server.planLimits.title": "Tariflimits",
   "mobile.server.planLimits.button": "Tariflimits: {summary}",
   "mobile.server.planLimits.left": "{percent}% übrig",

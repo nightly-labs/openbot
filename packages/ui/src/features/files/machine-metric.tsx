@@ -1,4 +1,4 @@
-import { type MachineMetric, type MachineMetrics, machineMetricRatio } from "@openbot/contracts/ipc";
+import type { MachineMetric, MachineMetrics } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Cpu, HardDrive, MemoryStick } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
@@ -17,20 +17,6 @@ export const MACHINE_METRIC_ICONS: Record<MachineMetric, (props: { class: string
   memory: (props) => <MemoryStick class={props.class} aria-hidden="true" />,
   cpu: (props) => <Cpu class={props.class} aria-hidden="true" />,
 };
-
-export type MachineMetricTone = "normal" | "warning" | "danger";
-
-/** The whole percent in use, or null when the host could not read the metric. 0% is a reading too. */
-export function machineMetricPercent(metrics: MachineMetrics, metric: MachineMetric): number | null {
-  const ratio = machineMetricRatio(metrics, metric);
-  return ratio === null ? null : Math.floor(ratio * 100);
-}
-
-/** Warning from the alert level, and danger far above it: at 95%, or 10 points above a higher level. */
-export function machineMetricTone(percent: number | null, level: number | null): MachineMetricTone {
-  if (percent === null || level === null || percent < level) return "normal";
-  return percent >= Math.max(95, level + 10) ? "danger" : "warning";
-}
 
 /** "4 cores", "5.1 GB of 7.6 GB", or "31 GB of 76 GB · 45 GB free". */
 export function useMachineMetricDetail() {

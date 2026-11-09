@@ -46,6 +46,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/i
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
+import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -2402,6 +2403,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
         administers(serverId, LOCAL_SERVERS_CAPABILITY),
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+      canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
       canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),
