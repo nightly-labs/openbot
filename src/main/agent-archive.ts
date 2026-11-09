@@ -333,7 +333,7 @@ const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
   sink: Writable,
 ): Effect.fn.Return<void, ArchiveOperationError> {
   const damaged = () => archiveFailure(new Error(sourceText("error.import.entryDamaged")));
-  const header = yield* readAtEffect(handle, entry.localHeaderOffset, 30);
+  const header = yield* readAtEffect(handle, entry.localHeaderOffset, 30, sourceText("error.import.entryDamaged"));
   if (header.readUInt32LE(0) !== LOCAL) return yield* damaged();
   const start = entry.localHeaderOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
   let crc = 0;
