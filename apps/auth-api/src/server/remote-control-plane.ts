@@ -1,3 +1,4 @@
+import { BILLING_PLANS } from "@openbot/contracts/billing";
 import {
   HOST_KEY_HANDOVER_LIMIT,
   type HostKeyHandover,
@@ -146,6 +147,12 @@ function removedAtAfterChange(change: { revoke: boolean; leave: boolean; activat
 }
 
 export type { RemoteMemberRole };
+
+/** The plan storage of a hosted server, in GB. Nothing for a server without a known plan. */
+function hostedStorage(plan: string | null): { storageGb: number } | Record<string, never> {
+  const storageGb = BILLING_PLANS.find((candidate) => candidate.id === plan)?.storageGb;
+  return storageGb === undefined ? {} : { storageGb };
+}
 
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
   status: Schema.Number,
@@ -887,7 +894,9 @@ export class RemoteControlPlane {
           .prepare(
             `SELECT h.host_id, h.name, h.logo_key, h.device_public_key, h.auth_epoch, m.membership_id, m.role,
            EXISTS(SELECT 1 FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted,
+           (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
          WHERE m.user_id = ? AND m.status = 'active'
@@ -903,6 +912,7 @@ export class RemoteControlPlane {
             membership_id: string;
             role: RemoteMemberRole;
             hosted: number;
+            hosted_plan: string | null;
           }>(),
       );
       const keyHandovers = yield* this.#keyHandoversByHost({
@@ -929,6 +939,8 @@ export class RemoteControlPlane {
               memberLimit: license ? Math.min(limit, license.users) : limit,
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
               hosted: row.hosted === 1,
+              // The storage that the plan of a hosted server gives, so a client warns before the plan is full.
+              ...hostedStorage(row.hosted_plan),
             };
           }),
         { concurrency: "unbounded" },

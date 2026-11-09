@@ -244,7 +244,11 @@ import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryRepor
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
-import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
+import {
+  applyHostedServerAccount,
+  type HostedServerEnvironment,
+  hostedServerStorageGb,
+} from "./hosted-server-bootstrap";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
@@ -1968,6 +1972,8 @@ export async function createApplicationServices({
         : resolve(__dirname, "../../resources/plugin-catalog"),
     ),
   );
+  /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
+  let hostedStorageGb: number | null = null;
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -2027,6 +2033,7 @@ export async function createApplicationServices({
           getSources: (options) => desktopCapturer.getSources(options),
         }),
     hostMemory,
+    hostedStorageGb: () => hostedStorageGb,
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2656,6 +2663,24 @@ export async function createApplicationServices({
         Effect.sync(() => {
           hostedServerSignedIn = true;
         }),
+      ),
+      // In the background, so the start does not wait for it. Until it answers, the agent instructions
+      // name no disk limit.
+      Effect.tap(() =>
+        Effect.forkDetach(
+          hostedServerStorageGb(centralAuth, environment.hostId).pipe(
+            Effect.tap((storageGb) =>
+              Effect.sync(() => {
+                hostedStorageGb = storageGb;
+              }),
+            ),
+            Effect.catch((error) =>
+              Effect.sync(() =>
+                logger.warn("Could not read the plan storage of the hosted server.", toLogValue(error)),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   if (hostedServer) {

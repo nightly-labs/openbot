@@ -204,6 +204,8 @@ export interface ThreadLifecycleOptions {
   vaultItems?: () => VaultContents;
   /** OpenBot runs on a server. The prompt then names the sign-in on the user's computer. */
   serverHost?: boolean;
+  /** The plan storage in GB of a hosted server, read at each start and resume of a session. */
+  hostedStorageGb?: () => number | null;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
   /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
@@ -248,6 +250,7 @@ export class ThreadLifecycle {
   readonly #passwordVaultConnected: () => boolean;
   readonly #vaultItems: () => VaultContents;
   readonly #serverHost: boolean;
+  readonly #hostedStorageGb: () => number | null;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -300,6 +303,7 @@ export class ThreadLifecycle {
     this.#passwordVaultConnected = options.passwordVaultConnected ?? (() => false);
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
     this.#serverHost = options.serverHost ?? false;
+    this.#hostedStorageGb = options.hostedStorageGb ?? (() => null);
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -1352,6 +1356,7 @@ export class ThreadLifecycle {
       passwordVault: this.#passwordVaultConnected(),
       vaultItems: this.#vaultItems(),
       serverHost: this.#serverHost,
+      hostedStorageGb: this.#hostedStorageGb(),
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),
