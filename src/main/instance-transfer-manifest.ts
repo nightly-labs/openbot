@@ -22,6 +22,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Result, Schema } from "effect";
+import { TRANSFER_WORKFLOWS } from "./instance-transfer-workflows";
 import { isUnsafeArchivePath } from "./skill-package";
 
 export const INSTANCE_TRANSFER_MANIFEST = "openbot-transfer.json";
@@ -159,6 +160,11 @@ const Settings = Schema.Struct({
   ).check(Schema.isMaxLength(512)),
   /** MCP servers, providers and custom agents whose argument or URL values the export removed. */
   cleared: Schema.optionalKey(Schema.Array(name(128)).check(Schema.isMaxLength(128))),
+  /**
+   * Added after version 1 shipped: the workflows (`TransferWorkflow`). Each one is checked on import,
+   * so that one a newer app wrote cannot refuse the other settings.
+   */
+  workflows: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_WORKFLOWS))),
 });
 
 /**

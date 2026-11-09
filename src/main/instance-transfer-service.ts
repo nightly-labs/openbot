@@ -116,6 +116,7 @@ import {
   type TransferPreferenceAgents,
   type TransferPreferencePort,
 } from "./instance-transfer-preferences";
+import { exportWorkflows, importWorkflows, type TransferWorkflowPort } from "./instance-transfer-workflows";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
 import { isUnsafeArchivePath } from "./skill-package";
@@ -208,6 +209,8 @@ interface InstanceTransferSettings {
   connectRoutineFlow(input: ConnectRoutineFlowInput): Effect.Effect<unknown, unknown>;
   /** Providers that are signed in and ready on this computer. */
   signedInProviders(): AgentProviderId[];
+  /** Absent where the server runs no workflows. */
+  workflows?: TransferWorkflowPort;
 }
 
 export interface InstanceTransferOptions {
@@ -403,6 +406,7 @@ export class InstanceTransferService {
     }
 
     const channels: TransferChannel[] = [];
+    const channelKeys = new Map<string, string>();
     const channelPort = this.options.agents.channels;
     const channelMessages = (port: TransferChannelHistory, channelId: string, prefix: string) => {
       const exported = exportChannelMessages(port, channelId, prefix, keys, entries);
@@ -418,6 +422,7 @@ export class InstanceTransferService {
         break;
       }
       const key = isAgentImportKey(channel.id) ? channel.id : `channel-${channels.length + 1}`;
+      channelKeys.set(channel.id, key);
       let image: string | null = null;
       const resolved = channelPort.images.resolve(channel);
       if (resolved) {
@@ -464,7 +469,7 @@ export class InstanceTransferService {
       version: INSTANCE_TRANSFER_VERSION,
       source: { appVersion: this.options.appVersion, exportedAt: this.#now().toISOString() },
       agents: manifestAgents,
-      settings: input.includeSettings ? yield* this.#readSettings(keys, manifestAgents) : null,
+      settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents) : null,
       shared,
       signedIn: this.options.settings.signedInProviders(),
       ...(channels.length > 0 ? { channels, exporter: this.options.channelActor().id } : {}),
@@ -500,6 +505,7 @@ export class InstanceTransferService {
   readonly #readSettings = Effect.fn("InstanceTransfer.readSettings")(function* (
     this: InstanceTransferService,
     keys: ReadonlyMap<string, string>,
+    channelKeys: ReadonlyMap<string, string>,
     agents: readonly TransferAgent[],
   ): Effect.fn.Return<TransferSettings, ArchiveOperationError> {
     const settings = this.options.settings;
@@ -510,6 +516,9 @@ export class InstanceTransferService {
       for (const link of yield* settings.routineFlowLinks(agentId).pipe(Effect.mapError(failure)))
         links.set(link.id, link);
     const redact = createRedaction();
+    const workflows = settings.workflows
+      ? exportWorkflows(yield* settings.workflows.workflows().pipe(Effect.mapError(failure)), keys, channelKeys)
+      : [];
     const order = [
       ...layout.agentOrder,
       ...Object.keys(layout.agentAssignments).filter((id) => !layout.agentOrder.includes(id)),
@@ -555,6 +564,7 @@ export class InstanceTransferService {
           : [];
       }),
       cleared: redact.cleared(),
+      ...(workflows.length > 0 ? { workflows } : {}),
     };
   });
 
@@ -787,6 +797,7 @@ export class InstanceTransferService {
         ),
       );
     }
+    const channelIds = new Map<string, string>();
     for (const channel of staged.manifest.channels) {
       const result = yield* Effect.result(
         this.#importChannel(
@@ -807,7 +818,10 @@ export class InstanceTransferService {
             reason: message(result.failure.cause),
           }),
         );
+      else if (result.success) channelIds.set(channel.key, result.success);
     }
+    if (settings?.workflows && this.options.settings.workflows)
+      yield* importWorkflows(settings.workflows, this.options.settings.workflows, agentIds, channelIds, warnings);
     if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
     if (staged.manifest.shared) yield* this.#importShared(archive, staged.manifest.shared, warnings);
 
@@ -978,13 +992,13 @@ export class InstanceTransferService {
     exporter: string | null,
     warnings: string[],
     fallbackTimezone: string,
-  ): Effect.fn.Return<void, ArchiveOperationError> {
+  ): Effect.fn.Return<string | null, ArchiveOperationError> {
     const members = source.members.flatMap((key) => {
       const agentId = agentIds.get(key);
       return agentId ? [{ agentId }] : [];
     });
     // The user did not import any member: the channel is not offered.
-    if (members.length === 0) return;
+    if (members.length === 0) return null;
     const leadAgentId = source.lead ? (agentIds.get(source.lead) ?? null) : null;
     const draft = {
       name: source.name,
@@ -1003,7 +1017,7 @@ export class InstanceTransferService {
 
     const port = this.options.agents;
     let completed = false;
-    yield* Effect.acquireUseRelease(
+    return yield* Effect.acquireUseRelease(
       port.channels
         .command({ type: "save", operationId: randomUUID(), channelId: randomUUID(), draft }, actor)
         .pipe(Effect.mapError(failure)),
@@ -1055,6 +1069,7 @@ export class InstanceTransferService {
               .command({ type: "archive", operationId: randomUUID(), channelId: channel.id }, actor)
               .pipe(Effect.mapError(failure));
           completed = true;
+          return channel.id;
         }),
       (channel) => (completed ? Effect.void : port.deleteChannel(channel.id).pipe(Effect.ignore)),
     );

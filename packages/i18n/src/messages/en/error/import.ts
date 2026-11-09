@@ -87,6 +87,11 @@ export const messages = defineMessages("error.import", {
     "{number} files in the Shared folder are already here, so they are kept as they are.",
   "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
   "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
+  "error.import.transferWorkflowInvalid": "A workflow in the file is invalid, so it is skipped.",
+  "error.import.transferWorkflowWebhook":
+    "{name}: the workflow needs a new webhook address. Open it, make the address again, and give it to the sender.",
+  "error.import.transferWorkflowConnection":
+    "{name}: choose the Slack, Discord, or Telegram connection of the workflow again after you connect it here.",
   "error.import.transferHistorySkipped": "{name}: the chat history in the file is invalid, so it is not imported.",
   "error.import.transferChatsSkipped": {
     one: "{name}: {count} chat is not imported.",

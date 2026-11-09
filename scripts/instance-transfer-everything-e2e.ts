@@ -38,6 +38,8 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { HISTORY_IMPORTED_EVENT } = await import("../src/backend/agent-history-transfer");
 const { InstanceTransferService } = await import("../src/main/instance-transfer-service");
 const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
+const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
+const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
 
 const HISTORY_MARK = "the blue notebook is on the second shelf";
 
@@ -184,6 +186,7 @@ function profile(name: string) {
     timezone: () => "UTC",
   });
   const library = new LocalSkillLibrary(join(userData, "local-skills"), () => agents.listAgents());
+  const workflows = new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") });
   const pins = new Set<string>();
   const levels = new Map<string, "all" | "needs-me" | "nothing">();
   const approvals = new Map<string, boolean>();
@@ -214,10 +217,15 @@ function profile(name: string) {
       mutateSidebar: () => Effect.die("The check has no sidebar sections."),
       routineFlowLinks: () => Effect.succeed([]),
       connectRoutineFlow: () => Effect.die("The check has no routine flows."),
+      workflows: {
+        workflows: () =>
+          Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
+        createWorkflow: (input) => Effect.try(() => workflows.create(input)),
+      },
       signedInProviders: () => [],
     },
   });
-  return { database, store, mailbox, agents, transfer, pins, levels, approvals };
+  return { database, store, mailbox, agents, transfer, pins, levels, approvals, workflows };
 }
 
 function idle(agents: InstanceType<typeof AgentService>, agentId: string) {
@@ -340,6 +348,30 @@ try {
     return messages.some((entry) => entry.author.kind === "agent" && entry.message.status === "completed") && messages;
   });
 
+  // A workflow with an agent step, a channel output, a Slack trigger and a webhook trigger.
+  const at = { x: 0, y: 0 };
+  source.workflows.create({
+    title: "Paper pipeline",
+    graph: {
+      nodes: [
+        { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
+        {
+          id: "slack",
+          kind: "trigger",
+          at,
+          fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
+        },
+        { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
+        { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
+      ],
+      edges: [
+        { id: "e1", from: "hook", to: "write", type: "text" },
+        { id: "e2", from: "write", to: "post", type: "text" },
+      ],
+      strokes: [],
+    },
+  });
+
   // --- Export everything.
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
@@ -449,6 +481,21 @@ try {
     "imported channel messages are not unread",
     newSummary !== undefined && newSummary.unreadCount === 0,
     JSON.stringify(newSummary),
+  );
+
+  const newWorkflow = target.workflows.listWithGraphs().find((item) => item.summary.title === "Paper pipeline");
+  pass("the workflow moves", newWorkflow !== undefined);
+  const node = (id: string) => newWorkflow?.graph.nodes.find((item) => item.id === id)?.fields;
+  pass(
+    "workflow steps point to the new agent and channel",
+    node("write")?.agentId === newWriter.id && node("post")?.channelId === newChannel.id,
+    JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
+  );
+  pass("the workflow's messaging connection is left empty", node("slack")?.connectionId === "");
+  pass(
+    "the user is told to make the webhook address and choose the connection again",
+    result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("webhook")) &&
+      result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("connection")),
   );
 
   // --- The chats.
