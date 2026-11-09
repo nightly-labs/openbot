@@ -32,7 +32,7 @@ function reportDate(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
 }
 
-export function useProfileDates() {
+function useProfileDates() {
   const { t, format } = useText();
   const long = (date: string) =>
     format.date(reportDate(date), { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
