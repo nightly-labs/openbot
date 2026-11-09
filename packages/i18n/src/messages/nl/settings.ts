@@ -200,6 +200,12 @@ export const messages = {
   "settings.notch.show.titleTopOfScreen": "Toon status bovenaan het scherm",
   "settings.notch.show.description":
     "Toon activiteit van agents en items die aandacht nodig hebben bovenaan elk scherm.",
+  "settings.notch.xwayland.title": "Herstart nodig",
+  "settings.notch.xwayland.description":
+    "Onder Wayland moet OpenBot XWayland gebruiken om het Dynamic Island boven andere apps te tonen. Tot dan is het eiland niet te zien.",
+  "settings.notch.xwayland.unsupported":
+    "Onder Wayland zonder XWayland kan het Dynamic Island niet boven andere apps staan.",
+  "settings.notch.xwayland.restart": "Herstarten",
   "settings.notch.idle.title": "Toon inactief eiland",
   "settings.notch.idle.description": "Toon het OpenBot-logo en een begroeting wanneer er geen status actief is.",
   "settings.notch.displays.title": "Toon op extra schermen",
@@ -225,6 +231,12 @@ export const messages = {
     "‘Boven andere apps’ houdt het dock in beeld als OpenBot op de achtergrond is.",
   "settings.agentDock.placement.screen": "Boven andere apps",
   "settings.agentDock.placement.window": "In het OpenBot-venster",
+  "settings.agentDock.xwayland.title": "Herstart nodig",
+  "settings.agentDock.xwayland.description":
+    "Onder Wayland moet OpenBot XWayland gebruiken om het dock boven andere apps te tonen. Tot dan staat het dock in het OpenBot-venster.",
+  "settings.agentDock.xwayland.unsupported":
+    "Onder Wayland zonder XWayland kan het dock niet boven andere apps staan. Het staat in het OpenBot-venster.",
+  "settings.agentDock.xwayland.restart": "Herstarten",
   "settings.agentDock.display.title": "Scherm",
   "settings.agentDock.display.description":
     "Als dat scherm niet is aangesloten, gaat het dock naar het scherm van het OpenBot-venster.",

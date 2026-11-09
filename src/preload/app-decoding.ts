@@ -163,7 +163,8 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering, hourCycle } = info;
+  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering, hourCycle, aboveAppsSupport } =
+    info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
@@ -173,6 +174,8 @@ export function decodeAppInfo(value: unknown): AppInfo {
   if (softwareRendering !== undefined && !isBoolean(softwareRendering))
     throw new Error("Invalid software rendering flag.");
   if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
+  if (aboveAppsSupport !== undefined && !isOneOf(["restart", "unsupported"] as const, aboveAppsSupport))
+    throw new Error("Invalid agent dock screen support.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -182,6 +185,7 @@ export function decodeAppInfo(value: unknown): AppInfo {
     ...(analyticsInstallId === undefined ? {} : { analyticsInstallId }),
     ...(softwareRendering === undefined ? {} : { softwareRendering }),
     ...(hourCycle === undefined ? {} : { hourCycle }),
+    ...(aboveAppsSupport === undefined ? {} : { aboveAppsSupport }),
   };
 }
 

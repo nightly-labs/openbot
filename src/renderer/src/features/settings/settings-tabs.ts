@@ -239,7 +239,7 @@ export function navItem(tab: SettingsTab): SettingsNavItem {
 
 /**
  * Whether the settings panel and its search show the tab. Hosted servers opens from its own entry, not
- * from this panel. The Dynamic Island and the agent dock are macOS and Windows features of the main window.
+ * from this panel. The Dynamic Island and the agent dock are macOS, Windows and Linux features of the main window.
  */
 export function settingsTabShown(
   tab: SettingsTab,
@@ -247,14 +247,24 @@ export function settingsTabShown(
 ): boolean {
   if (tab === "hosted-servers") return false;
   if (tab === "dynamic-island") return dynamicIslandSettingsShown(window.platform, window.chatWindow);
-  if (tab === "agent-dock") return (window.platform === "darwin" || window.platform === "win32") && !window.chatWindow;
+  if (tab === "agent-dock") return agentDockPlatform(window.platform) && !window.chatWindow;
   return true;
 }
 
+/** The agent dock exists on macOS, Windows and Linux. */
+export function agentDockPlatform(platform: AppInfo["platform"] | undefined): boolean {
+  return aboveAppsPlatform(platform);
+}
+
+/** The platforms whose island and dock can float above the other apps. */
+function aboveAppsPlatform(platform: AppInfo["platform"] | undefined): boolean {
+  return platform === "darwin" || platform === "win32" || platform === "linux";
+}
+
 /**
- * The Dynamic Island exists only on macOS and Windows, and only the main window owns it: main
- * rejects its calls from a chat window.
+ * The Dynamic Island exists on macOS, Windows and Linux, and only the main window owns it: main rejects
+ * its calls from a chat window.
  */
 export function dynamicIslandSettingsShown(platform: AppInfo["platform"] | undefined, chatWindow: boolean): boolean {
-  return (platform === "darwin" || platform === "win32") && !chatWindow;
+  return aboveAppsPlatform(platform) && !chatWindow;
 }

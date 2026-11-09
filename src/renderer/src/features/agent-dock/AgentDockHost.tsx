@@ -47,6 +47,7 @@ import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
+import { agentDockPlatform } from "../settings/settings-tabs";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
@@ -63,26 +64,42 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 
 /**
  * Where this window shows the dock. Null hides the dock: the user turned it off, the platform is not
- * known yet, or it is not macOS or Windows.
+ * known yet, or it has no dock. On Linux with Wayland windows, the dock above other apps waits for a
+ * start on XWayland, and shows in the window until then.
  */
 export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const platform = usePlatform();
   const preference = useAgentDockPreference();
   return () => {
-    const os = platform.appInfo()?.platform;
-    if ((os !== "darwin" && os !== "win32") || !preference().shown) return null;
-    return preference().placement;
+    const info = platform.appInfo();
+    if (!info || !agentDockPlatform(info.platform) || !preference().shown) return null;
+    const placement = preference().placement;
+    return placement === "screen" && info.aboveAppsSupport ? "window" : placement;
   };
 }
 
 /**
- * The agent dock of the active server, on macOS and Windows. Each server has its own dock. By default the dock
+ * The agent dock of the active server, on macOS, Windows and Linux. Each server has its own dock. By default the dock
  * is a window of its own at the right edge of the screen, above the other apps; this renderer publishes
  * what it shows. The user can keep it in the main window instead.
  */
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
+  const platform = usePlatform();
+  const preference = useAgentDockPreference();
+
+  /* Linux: a dock that is off or in the window does not need XWayland, so the next start on a Wayland
+     session uses Wayland again. Without the restart file, this changes nothing. */
+  createEffect(
+    () => platform.appInfo()?.platform === "linux" && !(preference().shown && preference().placement === "screen"),
+    (off) => {
+      if (off)
+        void agentDockPort()
+          .agentDock.setXWayland({ enabled: false })
+          .catch(() => undefined);
+    },
+  );
 
   /* The window hides when no server is active, when the dock is off or in the main window, and when
      this renderer goes away. */

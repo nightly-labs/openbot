@@ -1,4 +1,5 @@
 import type { InstallerProviderId, ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
+import type { AboveAppsSupport } from "./ipc-agent-dock";
 import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
@@ -29,6 +30,8 @@ export interface AppInfo {
    * follow it only through this value. Not set when the language's own clock applies.
    */
   hourCycle?: HourCycle;
+  /** Set when the agent dock and the Dynamic Island cannot show above other apps now: on Linux with Wayland windows. */
+  aboveAppsSupport?: AboveAppsSupport;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */

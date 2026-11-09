@@ -198,6 +198,12 @@ export const messages = {
   "settings.notch.show.title": "Durumu MacBook çentiğinde göster",
   "settings.notch.show.titleTopOfScreen": "Durumu ekranın üst kısmında göster",
   "settings.notch.show.description": "Ajan etkinliğini ve dikkat gerektiren öğeleri her ekranın üst kısmında gösterin.",
+  "settings.notch.xwayland.title": "Yeniden başlatma gerekli",
+  "settings.notch.xwayland.description":
+    "Wayland'de OpenBot, Dynamic Island'ı diğer uygulamaların üstünde göstermek için XWayland kullanmalıdır. O zamana kadar ada görünmez.",
+  "settings.notch.xwayland.unsupported":
+    "XWayland olmayan Wayland'de Dynamic Island diğer uygulamaların üstünde görünemez.",
+  "settings.notch.xwayland.restart": "Yeniden başlat",
   "settings.notch.idle.title": "Boştaki adayı göster",
   "settings.notch.idle.description": "Hiçbir durum etkin olmadığında OpenBot logosunu ve selamlamasını gösterin.",
   "settings.notch.displays.title": "Ek ekranlarda göster",
@@ -223,6 +229,12 @@ export const messages = {
     "“Diğer uygulamaların üstünde” seçeneği, OpenBot arka plandayken yuvayı ekranda tutar.",
   "settings.agentDock.placement.screen": "Diğer uygulamaların üstünde",
   "settings.agentDock.placement.window": "OpenBot penceresinde",
+  "settings.agentDock.xwayland.title": "Yeniden başlatma gerekli",
+  "settings.agentDock.xwayland.description":
+    "Wayland'de OpenBot, dock'u diğer uygulamaların üstünde göstermek için XWayland kullanmalıdır. O zamana kadar dock OpenBot penceresinde görünür.",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland olmayan Wayland'de dock diğer uygulamaların üstünde görünemez. OpenBot penceresinde görünür.",
+  "settings.agentDock.xwayland.restart": "Yeniden başlat",
   "settings.agentDock.display.title": "Ekran",
   "settings.agentDock.display.description": "O ekran bağlı değilse yuva, OpenBot penceresinin ekranına geçer.",
   "settings.agentDock.display.window": "OpenBot penceresiyle",

@@ -1,6 +1,7 @@
 import type { AgentDockDisplay, AgentDockDisplayInfo, AgentDockEdge } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Button,
   Item,
   ItemActions,
   ItemContent,
@@ -22,6 +23,7 @@ import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { usePlatform } from "../../platform";
 import { agentDockPort } from "../agent-dock/agent-dock-port";
 import {
   type AgentDockPlacement,
@@ -51,6 +53,17 @@ const EDGE_LABEL = {
 export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; selectMount?: HTMLElement | undefined }) {
   const i18n = useI18n();
   const preference = useAgentDockPreference();
+  const platform = usePlatform();
+  /** Linux with Wayland windows: the dock above other apps needs a start on XWayland. */
+  const screenSupport = () =>
+    preference().shown && preference().placement === "screen" ? platform.appInfo()?.aboveAppsSupport : undefined;
+  const [restarting, setRestarting] = createSignal(false);
+  function restartOnXWayland(): void {
+    setRestarting(true);
+    void agentDockPort()
+      .agentDock.setXWayland({ enabled: true })
+      .catch(() => setRestarting(false));
+  }
   /** The display, the edge and hiding apply to the dock above the other apps. */
   const aboveApps = () => preference().shown && preference().placement === "screen";
   const seats = createMemo(() => {
@@ -99,6 +112,33 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
               />
             </ItemActions>
           </Item>
+          <Show when={screenSupport()}>
+            {(support) => (
+              <Item data-settings-row="settings.agentDock.xwayland.title" class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.agentDock.xwayland.title")}</ItemTitle>
+                  <ItemDescription>
+                    {support() === "restart"
+                      ? i18n.t("settings.agentDock.xwayland.description")
+                      : i18n.t("settings.agentDock.xwayland.unsupported")}
+                  </ItemDescription>
+                </ItemContent>
+                <Show when={support() === "restart"}>
+                  <ItemActions>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={restarting()}
+                      onClick={restartOnXWayland}
+                    >
+                      {i18n.t("settings.agentDock.xwayland.restart")}
+                    </Button>
+                  </ItemActions>
+                </Show>
+              </Item>
+            )}
+          </Show>
           <Item data-settings-row="settings.agentDock.display.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.agentDock.display.title")}</ItemTitle>

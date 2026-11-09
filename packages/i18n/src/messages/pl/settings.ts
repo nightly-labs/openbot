@@ -204,6 +204,11 @@ export const messages = {
   "settings.notch.show.title": "Pokazuj status w wycięciu MacBooka",
   "settings.notch.show.titleTopOfScreen": "Pokazuj status u góry ekranu",
   "settings.notch.show.description": "Pokazuj aktywność agentów i elementy wymagające uwagi u góry każdego ekranu.",
+  "settings.notch.xwayland.title": "Wymagane ponowne uruchomienie",
+  "settings.notch.xwayland.description":
+    "W Wayland OpenBot musi używać XWayland, aby pokazać Dynamic Island nad innymi aplikacjami. Do tego czasu wyspa się nie pokazuje.",
+  "settings.notch.xwayland.unsupported": "W Wayland bez XWayland Dynamic Island nie może być nad innymi aplikacjami.",
+  "settings.notch.xwayland.restart": "Uruchom ponownie",
   "settings.notch.idle.title": "Pokazuj bezczynną wyspę",
   "settings.notch.idle.description": "Pokazuj logo OpenBot i powitanie, gdy żaden status nie jest aktywny.",
   "settings.notch.displays.title": "Pokazuj na dodatkowych ekranach",
@@ -228,6 +233,12 @@ export const messages = {
     "„Nad innymi aplikacjami” zostawia dok na ekranie, gdy OpenBot działa w tle.",
   "settings.agentDock.placement.screen": "Nad innymi aplikacjami",
   "settings.agentDock.placement.window": "W oknie OpenBot",
+  "settings.agentDock.xwayland.title": "Wymagane ponowne uruchomienie",
+  "settings.agentDock.xwayland.description":
+    "W Wayland OpenBot musi używać XWayland, aby pokazać dok nad innymi aplikacjami. Do tego czasu dok jest w oknie OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "W Wayland bez XWayland dok nie może być nad innymi aplikacjami. Jest w oknie OpenBot.",
+  "settings.agentDock.xwayland.restart": "Uruchom ponownie",
   "settings.agentDock.display.title": "Ekran",
   "settings.agentDock.display.description":
     "Jeśli ten ekran nie jest podłączony, dok przechodzi na ekran okna OpenBot.",
