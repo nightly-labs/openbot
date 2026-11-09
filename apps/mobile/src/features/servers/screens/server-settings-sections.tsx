@@ -539,7 +539,7 @@ function ServerProvidersRow({ serverId }: { serverId: string }) {
   );
 }
 
-/** The MCP servers row, for an owner or admin of a host that serves `mcp-servers-v1`. */
+/** The MCP servers row, for a user who manages the MCP servers of the host (`canManageMcpServers`). */
 function ServerMcpRow({ serverId }: { serverId: string }) {
   const { t } = useText();
   const { list } = useMcpServerList(serverId);

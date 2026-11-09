@@ -670,7 +670,11 @@ export interface MobileWorkspaceContextValue {
   canManageProviders: (serverId: string) => boolean;
   /** The Providers admin of one host, with the newest route set that it serves. */
   providerAdmin: (serverId: string) => ProviderAdmin;
-  /** An owner or admin of an online host that serves `mcp-servers-v1`. The host checks the role again. */
+  /**
+   * An owner or admin of an online host that serves `mcp-servers-v1`, or a member when the host also
+   * serves `mcp-member-access-v1`. The host checks the role again, and refuses a member a row that
+   * another person added.
+   */
   canManageMcpServers: (serverId: string) => boolean;
   /** The MCP servers that the host gives its agents. Each change answers with the whole list. */
   listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
@@ -681,7 +685,7 @@ export interface MobileWorkspaceContextValue {
   /** Connects once with `config` on the host. Nothing is saved. */
   testMcpServer: (config: McpServerConfig, serverId: string) => Promise<McpTestResult>;
   /**
-   * An owner or admin of an online host that serves `mcp-servers-v1` and `sign-in-relay-v1`: the phone
+   * A user who manages the MCP servers of a host that serves `sign-in-relay-v1`: the phone
    * opens the browser sign-in of an MCP server, and the host keeps the grant.
    */
   canRelayMcpSignIn: (serverId: string) => boolean;
