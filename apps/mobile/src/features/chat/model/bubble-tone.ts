@@ -33,7 +33,7 @@ export function bubbleTone(foreground: string): BubbleTone {
     foreground,
     muted: `${foreground}b3`,
     panel: `${layer}${dark ? "4d" : "59"}`,
-    deep: `${layer}${dark ? "70" : "99"}`,
+    deep: `${layer}${dark ? "70" : "6b"}`,
     chip: `${layer}${dark ? "40" : "47"}`,
     line: `${foreground}17`,
   };
