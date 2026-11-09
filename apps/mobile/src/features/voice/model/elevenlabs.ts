@@ -7,6 +7,8 @@ const SPEECH_MODELS: Record<ElevenLabsSpeechModelId, string> = {
   "elevenlabs-flash-v2.5": "eleven_flash_v2_5",
   "elevenlabs-multilingual-v2": "eleven_multilingual_v2",
   "elevenlabs-v3": "eleven_v3",
+  "elevenlabs-v4-turbo": "eleven_v4_turbo",
+  "elevenlabs-v4": "eleven_v4",
 };
 /** The sample rate of `pcm_24000`, which every ElevenLabs plan has. */
 export const ELEVENLABS_SAMPLE_RATE = 24_000;

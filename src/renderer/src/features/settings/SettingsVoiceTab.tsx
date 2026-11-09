@@ -78,6 +78,8 @@ const SPEECH_MODEL_DESCRIPTION = {
   "elevenlabs-flash-v2.5": "settings.voice.speech.model.flash.description",
   "elevenlabs-multilingual-v2": "settings.voice.speech.model.multilingual.description",
   "elevenlabs-v3": "settings.voice.speech.model.v3.description",
+  "elevenlabs-v4-turbo": "settings.voice.speech.model.v4Turbo.description",
+  "elevenlabs-v4": "settings.voice.speech.model.v4.description",
   "xai-tts": "settings.voice.speech.model.xai.description",
 } as const satisfies Record<SpeechModelId, AppTextKey>;
 
