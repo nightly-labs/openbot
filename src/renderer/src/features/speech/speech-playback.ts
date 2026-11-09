@@ -310,7 +310,10 @@ export async function readAloud(
   });
   const voice = speechPort().voice;
   const preparedFirst = prepared?.text === text && prepared.language === language ? prepared.first : undefined;
-  let next: Promise<SpeechAudio> | undefined = preparedFirst ?? voice.speak({ text: first, language });
+  // A prepared part that failed is asked for again, as it was before the reading started.
+  let next: Promise<SpeechAudio> | undefined = preparedFirst
+    ? preparedFirst.catch(() => voice.speak({ text: first, language }))
+    : voice.speak({ text: first, language });
   try {
     for (let index = 1; next; index += 1) {
       const audio = await next;
