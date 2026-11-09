@@ -63,6 +63,7 @@ export const messages = defineMessages("error.team", {
   "error.team.historyDeleteUnsupported": "Deleting the history is not supported by this connection.",
   "error.team.channelTaskCancelUnsupported": "Cancelling channel tasks is not supported by this connection.",
   "error.team.membersCannotDeleteChannels": "Members cannot delete channels.",
+  "error.team.membersCannotDeleteChannelHistory": "Members cannot delete the channel history.",
   "error.team.membersCannotArchiveChannels": "Members cannot archive channels.",
   "error.team.membersCannotRestoreChannels": "Members cannot restore channels.",
   "error.team.sharedDataUnsupported": "Shared data is not supported by this connection.",

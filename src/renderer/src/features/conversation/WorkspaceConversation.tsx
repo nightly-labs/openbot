@@ -253,11 +253,18 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
-  /** "Delete history" of the active agent's own chat. The Team API has no route for it. */
+  /** This computer, an owner or admin, or a member with manage access to the agent. */
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
+
+  /**
+   * "Delete history" of the active agent's own chat: on this computer, or on a host that serves
+   * `chat-history-v1`, for a reader who can delete any message of the chat.
+   */
   const deleteActiveAgentHistory = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "chat-history-v1")) return undefined;
+    if (!deletesAnyAgentMessage(agent.id)) return undefined;
     return async () => {
       await turnsPort().agent.deleteHistory(agent.id, server.id);
       // A window around a search result keeps the messages that an empty snapshot does not name, so
@@ -412,7 +419,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onOwnComputer: activeServer()?.kind === "local",
     });
   };
-  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
   /** The host deletes messages only with `message-delete-v1`. This computer always can. */
   const messageDeleteSupported = () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY);
   /** Whether the reader may delete `message` in the active agent's chat or side threads. */

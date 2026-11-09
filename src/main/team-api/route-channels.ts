@@ -143,7 +143,11 @@ function seesChannel(members: readonly { agentId: string }[], hiddenAgentIds: Re
 }
 
 /** A channel that the list leaves out answers as a channel that does not exist. */
-function requireVisibleChannel(channels: ChannelService, channelId: string, hiddenAgentIds: ReadonlySet<string>): void {
+export function requireVisibleChannel(
+  channels: Pick<ChannelService, "store">,
+  channelId: string,
+  hiddenAgentIds: ReadonlySet<string>,
+): void {
   if (hiddenAgentIds.size === 0 || !channels.store.exists(channelId)) return;
   if (!seesChannel(channels.store.get(channelId).members, hiddenAgentIds))
     throw new HttpError(404, sourceText("error.backend.channelNotFound"));

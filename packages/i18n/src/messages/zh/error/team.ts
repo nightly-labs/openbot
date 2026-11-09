@@ -62,6 +62,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "当前连接不支持删除历史记录。",
   "error.team.channelTaskCancelUnsupported": "当前连接不支持取消频道任务。",
   "error.team.membersCannotDeleteChannels": "成员不能删除频道。",
+  "error.team.membersCannotDeleteChannelHistory": "成员不能删除频道历史记录。",
   "error.team.membersCannotArchiveChannels": "成员不能归档频道。",
   "error.team.membersCannotRestoreChannels": "成员不能恢复频道。",
   "error.team.sharedDataUnsupported": "当前连接不支持共享数据。",

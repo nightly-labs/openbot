@@ -355,6 +355,19 @@ message is in a running turn), with the host's sentence. A delete removes the me
 history, search and attachments; the provider session can still remember it. The host sends its
 usual change events (`conversation-invalidated` and `channels-changed`), so other members refresh.
 
+The optional `chat-history-v1` capability (protocol 9 only) adds four POST routes with an empty
+acknowledgement: `/v1/agent-history/delete` (`agentId`), `/v1/channels/context/clear`,
+`/v1/channels/context/compact` and `/v1/channels/history/delete` (each `channelId`). They do on a
+joined server what "Delete history" of an agent chat, and "New conversation", "Compact now" and
+"Delete history" of a channel do on this computer. The host always advertises it to a protocol 9
+peer. `src/main/team-api/route-chat-history.ts` owns the authorization. An agent history delete needs
+a visible agent (else 404) and `manage` on it (else 403). A member who sees a channel starts a new
+conversation or compacts it; only owners and admins delete its history (else 403
+`membersCannotDeleteChannelHistory`). A host without channels answers the channel routes with 400
+`channelsUnsupported`. Work that still runs or waits, or a compaction that no member session can do,
+gets 409 with the host's sentence for the agent routes and for compaction; the channel service
+refuses a busy new conversation or history delete with its own sentence.
+
 The optional `agent-welcome-v1` capability (protocol 9 only) changes no route shape. A client that
 sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The
 host stores that message with `welcome: true` in its mailbox JSON and the item type `agent_welcome`.
