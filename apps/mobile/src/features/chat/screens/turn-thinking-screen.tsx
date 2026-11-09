@@ -220,12 +220,14 @@ function useTurnConversation(agentId: string, serverId: string, taskId: string |
       activeTurnId: conversation?.activeTurnId ?? null,
       hasOlder: Boolean(conversation?.pageInfo.hasOlder && !conversation.detached),
       olderLoading: conversation?.olderLoading ?? false,
+      olderError: conversation?.olderError ?? false,
     };
   return {
     messages: taskConversation.data?.messages ?? NO_MESSAGES,
     activeTurnId: tasks.data?.tasks.find((task) => task.id === taskId)?.activeTurnId ?? null,
     hasOlder: false,
     olderLoading: false,
+    olderError: false,
   };
 }
 
@@ -255,7 +257,7 @@ export function TurnThinkingScreen() {
     ),
   );
   const serverId = serverParam ?? agent?.serverId ?? "";
-  const { messages, activeTurnId, hasOlder, olderLoading } = useTurnConversation(agentId, serverId, taskId);
+  const { messages, activeTurnId, hasOlder, olderLoading, olderError } = useTurnConversation(agentId, serverId, taskId);
   const loadOlderMessages = useMobileWorkspaceSelector((current) => current.loadOlderMessages);
   const lines = useTurnStepLines(serverId)[turnId];
   const steps = useMemo(() => turnThinkingSteps(messages, turnId, lines), [messages, turnId, lines]);
@@ -327,7 +329,8 @@ export function TurnThinkingScreen() {
     if (first && y !== undefined) anchor.current = { id: first.id, y, at: Date.now() };
   };
   const loadEarlier = () => {
-    if (topIndex !== 0 || !needsEarlier || olderLoading) return;
+    // A failed read stops here, as in the chat. The next page that the host sends clears the error.
+    if (topIndex !== 0 || !needsEarlier || olderLoading || olderError) return;
     holdFirstStep();
     void loadOlderMessages(agentId, serverId).catch(() => undefined);
   };
