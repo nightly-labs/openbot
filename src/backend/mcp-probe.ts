@@ -271,7 +271,7 @@ function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): Mcp
 }
 
 /** A header whose name says it holds a credential, such as `Authorization` or `x-api-key`, has a value. */
-function hasCredentialHeader(config: McpServerConfig): boolean {
+export function hasCredentialHeader(config: McpServerConfig): boolean {
   return config.headers.some(({ key, value }) => CREDENTIAL_HEADER.test(key) && value.trim().length > 0);
 }
 
