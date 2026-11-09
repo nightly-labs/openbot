@@ -29,10 +29,11 @@ import { loadDictationLanguage } from "@/features/settings/model/dictation-langu
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { offerLayoutRestart } from "@/features/settings/model/layout-direction";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
-import { loadAgentColorMessages } from "@/features/settings/model/message-color";
+import { loadMessageColor } from "@/features/settings/model/message-color";
 import { useMotionPreferences } from "@/features/settings/model/motion";
 import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
+import { loadTextSize } from "@/features/settings/model/text-size";
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { checkParakeetModels } from "@/features/voice/model/parakeet-model";
@@ -213,7 +214,8 @@ export default function RootLayout() {
     void untilForeground().then(() => {
       void loadAppearance().catch(() => undefined);
       void loadHapticsPreference().catch(() => undefined);
-      void loadAgentColorMessages().catch(() => undefined);
+      void loadMessageColor().catch(() => undefined);
+      void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);
       void loadMotionPreferences().catch(() => undefined);

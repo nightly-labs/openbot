@@ -1,4 +1,5 @@
 import {
+  type CloudSpeechModelId,
   type CodexLiveVoice,
   isCodexLiveVoice,
   isSpeechSpeed,
@@ -6,7 +7,7 @@ import {
   type SpeechSpeed,
   type SpeechVoice,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
@@ -52,11 +53,24 @@ export interface ElevenLabsVoice {
   name: string;
 }
 
+/**
+ * The ElevenLabs models that read replies, as on desktop, fastest first. Saved with the desktop
+ * IDs of `CLOUD_SPEECH_MODELS`; never rename one.
+ */
+export const ELEVENLABS_SPEECH_MODEL_IDS = [
+  "elevenlabs-flash-v2.5",
+  "elevenlabs-multilingual-v2",
+  "elevenlabs-v3",
+] as const satisfies readonly CloudSpeechModelId[];
+export type ElevenLabsSpeechModelId = (typeof ELEVENLABS_SPEECH_MODEL_IDS)[number];
+
 interface VoiceSettings {
   engine: VoiceEngine;
   recognition: RecognitionEngine;
   supertonicVoice: SpeechVoice;
   elevenLabsVoice: ElevenLabsVoice | null;
+  /** The ElevenLabs model that reads replies. Flash v2.5, the fastest, read every reply before the choice. */
+  elevenLabsModel: ElevenLabsSpeechModelId;
   /** The speed of each reply that is read aloud, as on desktop. The pitch stays the same. */
   speed: SpeechSpeed;
   turnPauseMs: number;
@@ -74,6 +88,7 @@ const DEFAULT_SETTINGS: VoiceSettings = {
   recognition: "system",
   supertonicVoice: "F1",
   elevenLabsVoice: null,
+  elevenLabsModel: "elevenlabs-flash-v2.5",
   speed: 1,
   turnPauseMs: 1_500,
   gptLive: false,
@@ -107,6 +122,9 @@ function decodeSettings(raw: string | null): VoiceSettings {
     supertonicVoice: isSpeechVoice(value.supertonicVoice) ? value.supertonicVoice : DEFAULT_SETTINGS.supertonicVoice,
     elevenLabsVoice:
       isDynamicRecord(voice) && isString(voice.id) && isString(voice.name) ? { id: voice.id, name: voice.name } : null,
+    elevenLabsModel: isOneOf(ELEVENLABS_SPEECH_MODEL_IDS, value.elevenLabsModel)
+      ? value.elevenLabsModel
+      : DEFAULT_SETTINGS.elevenLabsModel,
     speed: isSpeechSpeed(value.speed) ? value.speed : DEFAULT_SETTINGS.speed,
     turnPauseMs:
       typeof value.turnPauseMs === "number" && Number.isFinite(value.turnPauseMs)
@@ -134,7 +152,17 @@ export async function loadVoiceSettings(): Promise<void> {
 
 /** Applies at once, also when storage fails; the caller reports the failure. */
 export async function saveVoiceSettings(change: Partial<VoiceSettings>): Promise<void> {
-  const { engine, recognition, supertonicVoice, elevenLabsVoice, speed, turnPauseMs, gptLive, gptLiveVoice } = {
+  const {
+    engine,
+    recognition,
+    supertonicVoice,
+    elevenLabsVoice,
+    elevenLabsModel,
+    speed,
+    turnPauseMs,
+    gptLive,
+    gptLiveVoice,
+  } = {
     ...useVoiceSettings.getState(),
     ...change,
   };
@@ -143,6 +171,7 @@ export async function saveVoiceSettings(change: Partial<VoiceSettings>): Promise
     recognition,
     supertonicVoice,
     elevenLabsVoice,
+    elevenLabsModel,
     speed,
     turnPauseMs,
     gptLive,

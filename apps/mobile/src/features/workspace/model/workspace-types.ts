@@ -382,6 +382,13 @@ export interface MobileWorkspaceContextValue {
   toggleWorkflowPin: (workflowId: string, serverId: string) => ToggleAgentPinResult;
   /** Drops the pins of workflows that the host no longer lists. Call only with a complete list. */
   reconcileWorkflowPins: (serverId: string, workflowIds: readonly string[]) => void;
+  /** The sidebar sections of the active server that the user closed. Saved on this device. */
+  collapsedSectionIds: ReadonlySet<string>;
+  /**
+   * Opens or closes a sidebar section of a server. `sectionIds` are the sections of its layout now:
+   * the saved list drops the others.
+   */
+  toggleSectionCollapsed: (serverId: string, sectionId: string, sectionIds: readonly string[]) => void;
   conversationStore: MobileConversationStore;
   /** Activity, unread agents, and browser requests. Read them with a selector hook, not from the context. */
   liveState: LiveWorkspaceStore;
@@ -1122,6 +1129,7 @@ type MobileWorkspaceStateKey =
   | "pinnedAgentIds"
   | "pinnedChannelIds"
   | "pinnedWorkflowIds"
+  | "collapsedSectionIds"
   | "hiddenChannelIds"
   | "hidesAgentsOnServer"
   | "canUnhideAgent"

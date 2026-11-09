@@ -23,7 +23,6 @@ import {
   TextInput,
   type TextInputInstance,
   useColorScheme,
-  useWindowDimensions,
   View,
   type ViewStyle,
 } from "react-native";
@@ -57,6 +56,7 @@ import {
   composerBottomGap,
   restingComposerHeight,
 } from "@/shared/lib/composer-metrics";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
@@ -446,7 +446,7 @@ export const ChatComposer = memo(function ChatComposer({
     setSkillsOnly(true);
     inputRef.current?.focus();
   }, [skillPickerVersion, onChangeDraft]);
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const insets = useSafeAreaInsets();
   // The bar keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const barWidth = useColumnWidth() - insets.left - insets.right;
@@ -867,10 +867,14 @@ export const ChatComposer = memo(function ChatComposer({
   // Stop opens it on the words when it was closed.
   const editAfterDictation = useRef(false);
   useEffect(() => {
-    if (dictationBusy || !editAfterDictation.current) return;
+    if (dictationBusy) return;
+    // The recognizer writes the draft without onChangeText, so its words are an edit that opens the gate
+    // the last send closed. Without this, Send waited for a focus that an Android Stop does not always give.
+    sendGate.edit();
+    if (!editAfterDictation.current) return;
     editAfterDictation.current = false;
     inputRef.current?.focus();
-  }, [dictationBusy]);
+  }, [dictationBusy, sendGate]);
   const finishDictation = useCallback(() => {
     if (!dictation) return;
     editAfterDictation.current = true;

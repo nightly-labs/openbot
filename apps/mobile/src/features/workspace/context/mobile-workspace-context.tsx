@@ -521,6 +521,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? NO_IDS;
   const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? NO_IDS;
   const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? NO_IDS;
+  const savedCollapsedSections = (activeServerId ? preferences[activeServerId]?.collapsedSections : null) ?? NO_IDS;
+  const collapsedSectionIds = useMemo(() => new Set(savedCollapsedSections), [savedCollapsedSections]);
   const pinnedWorkflowIds = useMemo(() => {
     const pins: Record<string, readonly string[]> = {};
     for (const [serverId, saved] of Object.entries(preferences))
@@ -2250,6 +2252,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           pinnedWorkflows: (current.pinnedWorkflows ?? []).filter((id) => workflowIds.includes(id)),
         }));
       },
+      toggleSectionCollapsed: (serverId, sectionId, sectionIds) => {
+        updatePreferences(serverId, (current) => {
+          const collapsed = (current.collapsedSections ?? []).filter((id) => sectionIds.includes(id));
+          return {
+            ...current,
+            collapsedSections: collapsed.includes(sectionId)
+              ? collapsed.filter((id) => id !== sectionId)
+              : [...collapsed, sectionId],
+          };
+        });
+      },
       toggleAgentPin: (agentId) => {
         const pinned = currentPinnedAgentIds();
         const serverId = currentActiveServer().id;
@@ -2352,6 +2365,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       pinnedAgentIds,
       pinnedChannelIds,
       pinnedWorkflowIds,
+      collapsedSectionIds,
       hiddenChannelIds,
       hidesAgentsOnServer: (serverId) =>
         hostOwnsHide(serverCapabilities.current.get(serverId), servers.find((server) => server.id === serverId)?.role),
@@ -2459,6 +2473,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     pinnedAgentIds,
     pinnedChannelIds,
     pinnedWorkflowIds,
+    collapsedSectionIds,
     hiddenChannelIds,
     hostHiddenIds,
     supportsPushNotifications,

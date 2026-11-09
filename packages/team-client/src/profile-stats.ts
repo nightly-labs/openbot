@@ -1,5 +1,9 @@
-import { analyticsTokens, type ClientAgentSummary, type HostAnalytics } from "@openbot/contracts/ipc";
-import { usageProviders } from "../usage/usage-format";
+import {
+  type AnalyticsModel,
+  analyticsTokens,
+  type ClientAgentSummary,
+  type HostAnalytics,
+} from "@openbot/contracts/ipc";
 
 const DAY_MS = 86_400_000;
 
@@ -12,7 +16,8 @@ export interface ProfileDay {
   messages: number;
 }
 
-export interface ProfileStats {
+/** The desktop lists `ClientAgentSummary` rows; the phone lists its own agent rows. */
+export interface ProfileStats<Agent extends { id: string } = ClientAgentSummary> {
   days: ProfileDay[];
   tokens: number;
   messages: number;
@@ -27,7 +32,14 @@ export interface ProfileStats {
   busiestWeekday: number | null;
   providers: Array<{ provider: string; tokens: number; share: number }>;
   models: Array<{ provider: string; model: string; share: number }>;
-  teammates: Array<{ agent: ClientAgentSummary; tokens: number }>;
+  teammates: Array<{ agent: Agent; tokens: number }>;
+}
+
+function providerTokens(models: readonly AnalyticsModel[]): Array<{ provider: string; tokens: number }> {
+  const providers = new Map<string, number>();
+  for (const model of models)
+    providers.set(model.provider, (providers.get(model.provider) ?? 0) + analyticsTokens(model));
+  return [...providers].map(([provider, tokens]) => ({ provider, tokens }));
 }
 
 function active(day: ProfileDay): boolean {
@@ -76,7 +88,10 @@ export function heatmapMonths(weeks: ReadonlyArray<ReadonlyArray<ProfileDay | nu
  * The Profile tab's view of one host report: every day of the range, the streaks, and the
  * rankings. A teammate that was deleted has usage but no row in `agents`, so the ranking skips it.
  */
-export function profileStats(report: HostAnalytics, agents: readonly ClientAgentSummary[]): ProfileStats {
+export function profileStats<Agent extends { id: string }>(
+  report: HostAnalytics,
+  agents: readonly Agent[],
+): ProfileStats<Agent> {
   const byDate = new Map(report.daily.map((day) => [day.date, day]));
   const days: ProfileDay[] = [];
   const end = Date.parse(`${report.endDate}T00:00:00Z`);
@@ -92,7 +107,7 @@ export function profileStats(report: HostAnalytics, agents: readonly ClientAgent
   }
 
   let longestStreak = 0;
-  let longestStreakDates: ProfileStats["longestStreakDates"] = null;
+  let longestStreakDates: ProfileStats<Agent>["longestStreakDates"] = null;
   let run = 0;
   days.forEach((day, index) => {
     run = active(day) ? run + 1 : 0;
@@ -104,7 +119,7 @@ export function profileStats(report: HostAnalytics, agents: readonly ClientAgent
   const today = days.at(-1);
   const counted = today && !active(today) ? days.slice(0, -1) : days;
   let currentStreak = 0;
-  for (const day of counted.toReversed()) {
+  for (const day of [...counted].reverse()) {
     if (!active(day)) break;
     currentStreak += 1;
   }
@@ -127,7 +142,7 @@ export function profileStats(report: HostAnalytics, agents: readonly ClientAgent
     longestStreak,
     longestStreakDates,
     busiestWeekday: busiest > 0 ? weekdays.indexOf(busiest) : null,
-    providers: usageProviders(report.models)
+    providers: providerTokens(report.models)
       .map((row) => ({ provider: row.provider, tokens: row.tokens, share: tokens > 0 ? row.tokens / tokens : 0 }))
       .sort((a, b) => b.tokens - a.tokens),
     models: [...report.models]

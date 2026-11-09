@@ -82,7 +82,8 @@ import {
   type RoutineRunGroup,
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
-import { useAgentColorMessages } from "@/features/settings/model/message-color";
+import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useMessageColor } from "@/features/settings/model/message-color";
 import { stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -276,6 +277,8 @@ interface ChatMessageListProps {
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
+  /** True while the chat shows the messages that the phone kept and reads its latest page. */
+  catchingUp?: boolean;
   messages: ChatMessage[];
   messageAliases: ReadonlyMap<string, string>;
   referenceMessages: ChatMessage[];
@@ -355,9 +358,9 @@ interface MessageRowShared {
   themeMuted: string;
   foreground: ViewStyle["backgroundColor"];
   userForeground: string;
-  /** Unset when the user's messages do not use the agent color. */
+  /** Unset when the user's messages have no color. */
   userBubbleStyle: ComponentProps<typeof Animated.View>["style"] | undefined;
-  /** The agent color for the controls of an attachment, unset with the same setting. */
+  /** The message color for the controls of an attachment, unset with the same setting. */
   attachmentTint: AttachmentTint | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   /** Arriving replies animate: the screen is focused, online, active, and shows the response. */
@@ -1223,6 +1226,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onRespondApproval,
   foreground,
   historyState,
+  catchingUp = false,
   messages,
   messageAliases,
   referenceMessages,
@@ -1298,18 +1302,15 @@ export const ChatMessageList = memo(function ChatMessageList({
       );
     }
   }, [approvals, agentsById, target.name, t]);
-  const [userForegroundColor, themeForegroundColor, themeMutedColor] = useCSSVariable([
-    "--openbot-text-on-light",
-    "--openbot-text-primary",
-    "--openbot-text-muted",
-  ]);
-  const userForeground = String(userForegroundColor);
+  const [themeForegroundColor, themeMutedColor] = useCSSVariable(["--openbot-text-primary", "--openbot-text-muted"]);
   const themeForeground = String(themeForegroundColor);
   const themeMuted = String(themeMutedColor);
   const reducedMotion = useReducedMotion();
   const textReveal = useMotionPreference("textReveal");
   const animateMessages = isFocused && online && appActive;
-  const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
+  // The latest page that a kept chat reads brings messages that the user did not watch arrive.
+  const watchesArrivals = animateMessages && historyState === "ready" && !catchingUp;
+  const replyHaptics = useReplyHaptics(watchesArrivals && motion.responseVisible);
   const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
   const replySession = useMemo(
     () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
@@ -1328,13 +1329,21 @@ export const ChatMessageList = memo(function ChatMessageList({
     },
     [replySession],
   );
-  const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
-  const agentColorMessages = useAgentColorMessages((state) => state.enabled);
-  const userBubbleColor = avatarHeadColor(
-    target.kind === "agent" ? target.avatarSeed : target.id,
-    target.kind === "agent" ? target.avatarHue : null,
-    target.kind === "agent" ? target.avatarColor : null,
-  );
+  const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
+  const messageColorMode = useMessageColor((state) => state.mode);
+  const customMessageColor = useMessageColor((state) => state.customColor);
+  const userBubbleColor =
+    messageColorMode === "custom"
+      ? customMessageColor
+      : avatarHeadColor(
+          target.kind === "agent" ? target.avatarSeed : target.id,
+          target.kind === "agent" ? target.avatarHue : null,
+          target.kind === "agent" ? target.avatarColor : null,
+        );
+  // A channel has no one agent color for the reader's messages.
+  const coloredMessages = messageColorMode === "custom" || (messageColorMode === "agent" && target.kind === "agent");
+  // Dark text on a light color and white text on a dark one, so the text stays readable.
+  const userForeground = readableOn(userBubbleColor);
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
   const green = Number.parseInt(userBubbleColor.slice(3, 5), 16);
@@ -1504,12 +1513,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       themeMuted,
       foreground,
       userForeground,
-      // A channel has no one agent color for the reader's messages.
-      userBubbleStyle: target.kind === "agent" && agentColorMessages ? userBubbleStyle : undefined,
-      attachmentTint:
-        target.kind === "agent" && agentColorMessages
-          ? { color: userBubbleColor, foreground: userForeground }
-          : undefined,
+      userBubbleStyle: coloredMessages ? userBubbleStyle : undefined,
+      attachmentTint: coloredMessages ? { color: userBubbleColor, foreground: userForeground } : undefined,
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
@@ -1544,7 +1549,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       userForeground,
       userBubbleStyle,
       userBubbleColor,
-      agentColorMessages,
+      coloredMessages,
       motion.firstMessageStyle,
       screenReaderEnabled,
       animationActive,
@@ -1588,7 +1593,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   }, [branchDivider?.afterId, visibleMessages]);
   // The NEW line shows above the first unread row. A message without a row, such as a thinking step,
   // gives the line to the next row that has one.
-  const unreadLineColor = target.kind === "agent" && agentColorMessages ? userBubbleColor : undefined;
+  const unreadLineColor = coloredMessages ? userBubbleColor : undefined;
   const unreadLineAnimated = useRef(new Set<string>());
   const unreadLineRowId = useMemo(() => {
     if (!unreadLineMessageIds) return null;

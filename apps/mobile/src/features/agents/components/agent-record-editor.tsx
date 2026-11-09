@@ -41,7 +41,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
 import { type RoutineResultChoice, RoutineResultDestinationSection } from "./routine-result-destination";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
@@ -318,6 +318,7 @@ export function RoutineEditor({
   };
 }) {
   const { t } = useText();
+  const nativeLabelFont = useNativeLabelFont();
   const workspace = useMobileWorkspaceActions();
   const action = useRecordAction(port?.queryKey);
   const toggle = useRecordAction(port?.queryKey);
