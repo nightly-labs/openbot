@@ -20,6 +20,7 @@ import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { COMPUTER_ACTIVITY_ROUTES } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
+import { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
@@ -46,11 +47,13 @@ import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routi
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 
 /**
@@ -76,6 +79,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   HOST_PERSONALITY_ROUTES.settings,
   AGENT_MEMORY_LIMIT_ROUTES.settings,
   MEMORY_REVIEW_ROUTES.settings,
+  SKILL_LEARNING_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
@@ -114,6 +118,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   BROWSER_PROFILES_ROUTES.tabs,
   VAULT_ROUTES.list,
   VAULT_V2_ROUTES.list,
+  VAULT_V3_ROUTES.list,
+  VAULT_V3_ROUTES.codes,
   AGENT_MEMORIES_PAGE_ROUTE,
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
   SKILLS_ADMIN_ROUTES.list,
@@ -123,6 +129,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDERS_ADMIN_ROUTES.apiKeyState,
   PROVIDERS_ADMIN_ROUTES.customList,
   CUSTOM_PROVIDER_HARNESS_ROUTES.customList,
+  CUSTOM_PROVIDER_EDIT_ROUTES.customList,
   CUSTOM_AGENTS_ROUTES.list,
   PROVIDERS_ADMIN_ROUTES.runtimesStatus,
   PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus,

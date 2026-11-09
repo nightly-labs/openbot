@@ -75,6 +75,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.compactionConnectionLost":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",

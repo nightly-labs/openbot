@@ -81,5 +81,6 @@ export const messages = {
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
+  "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",
 } as const satisfies PartialTranslation<typeof source>;

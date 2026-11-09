@@ -9,6 +9,7 @@ export const messages = {
   "error.vault.valueTooLong": "إحدى القيم طويلة جدًا.",
   "error.vault.websiteInvalid": "أدخل عنوان موقع ويب يبدأ بـ HTTPS.",
   "error.vault.passwordRequired": "أدخل كلمة مرور.",
+  "error.vault.twoStepKeyInvalid": "هذا ليس مفتاح تحقق بخطوتين. أدخل مفتاح الإعداد أو رابط otpauth:// الخاص بالموقع.",
   "error.vault.cardNumberInvalid": "أدخل رقم بطاقة صالحًا.",
   "error.vault.securityCodeInvalid": "أدخل رمز أمان من 3 أو 4 أرقام.",
   "error.vault.expiryInvalid": "أدخل شهر وسنة انتهاء صالحين.",

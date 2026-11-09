@@ -57,8 +57,10 @@ import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/ro
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -80,6 +82,7 @@ import {
   getHostPersonality,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
+  getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
   getStorageUsage,
@@ -90,6 +93,7 @@ import {
   setHostModelVisibility,
   setHostPersonality,
   setHostPromptCacheTtl,
+  setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
   startHostUpdate,
@@ -209,6 +213,7 @@ import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
+import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import {
@@ -864,6 +869,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookSenderSecretEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
     () => workspace.state.capabilities.includes(ROUTINE_RUN_PLACE_CAPABILITY),
+    () => workspace.state.capabilities.includes(SKILL_LEARNING_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1285,6 +1291,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setMemoryReview: async (interval, serverId) =>
       runTeamEffect(setHostMemoryReview(hostRequest(serverId), interval).pipe(Effect.mapError((error) => error.cause))),
   };
+  const hostSkillLearningCalls: HostSkillLearningCalls = {
+    getSkillLearning: async (serverId) =>
+      runTeamEffect(getHostSkillLearning(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setSkillLearning: async (mode, serverId) =>
+      runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
+  };
   const hostPromptCacheTtlCalls: HostPromptCacheTtlCalls = {
     getPromptCacheTtl: async (serverId) =>
       runTeamEffect(getHostPromptCacheTtl(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1604,17 +1616,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return store ? { store, listAgents: async () => workspace.profiles() } : undefined;
   });
   // The Vault section, for an owner or admin of a host with `vault-v1`. The store follows the host id.
-  // With `vault-v2` it also keeps API keys.
+  // With `vault-v2` it also keeps API keys, and with `vault-v3` two-step keys.
   const vaultHostId = createMemo(() => {
     const current = server();
     return serverCanAdminister(current, VAULT_CAPABILITY) ? current?.id : undefined;
   });
   // A host that updates or rolls back keeps its id, so the store follows this capability too.
-  const vaultV2 = createMemo(() => serverCanAdminister(server(), VAULT_V2_CAPABILITY));
+  const vaultVersion = createMemo((): 1 | 2 | 3 => {
+    const current = server();
+    if (serverCanAdminister(current, VAULT_V3_CAPABILITY)) return 3;
+    return serverCanAdminister(current, VAULT_V2_CAPABILITY) ? 2 : 1;
+  });
   const vaultSettings = createMemo((): ServerVaultOptions | undefined => {
     if (vaultHostId() === undefined) return undefined;
-    const v2 = vaultV2();
-    return { store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, v2)), apiKeys: v2 };
+    const version = vaultVersion();
+    return {
+      store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, version)),
+      apiKeys: version > 1,
+      twoStep: version === 3,
+    };
   });
   const openBrowserProfileSettings = (trigger: HTMLElement) => {
     const current = server();
@@ -2566,6 +2586,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
+                        skillLearning={{ calls: hostSkillLearningCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}

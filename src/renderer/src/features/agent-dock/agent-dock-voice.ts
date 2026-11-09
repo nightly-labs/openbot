@@ -24,7 +24,9 @@ export function createAgentDockVoice(serverId: () => string): AgentDockVoice {
   let current: AgentDockVoiceTarget | undefined;
   const target = () => current;
   let mounted = true;
-  const recordingTarget = () => ({ agentId: target()?.agentId ?? "", serverId: serverId() });
+  /* The voice store keys its recording by agent id. The seat key stands in for it: it names an agent or
+     a channel seat, and nothing outside this adapter reads it. */
+  const recordingTarget = () => ({ agentId: target()?.seatKey ?? "", serverId: serverId() });
   const key = () => composerDraftKey(recordingTarget());
   const draft = (): ComposerDraft => ({ ...EMPTY_DRAFT, text: target()?.draft() ?? "" });
   const showError = (message: string | null) => {
@@ -49,8 +51,8 @@ export function createAgentDockVoice(serverId: () => string): AgentDockVoice {
   const store = createVoiceStore({
     props: {
       get agent() {
-        const agentId = target()?.agentId;
-        return agentId ? { id: agentId } : undefined;
+        const seatKey = target()?.seatKey;
+        return seatKey ? { id: seatKey } : undefined;
       },
       get server() {
         return { id: serverId() };
@@ -107,8 +109,8 @@ export function createAgentDockVoice(serverId: () => string): AgentDockVoice {
     get phase() {
       return phase();
     },
-    get agentId() {
-      return phase() === "idle" ? null : (target()?.agentId ?? null);
+    get seatKey() {
+      return phase() === "idle" ? null : (target()?.seatKey ?? null);
     },
     get levels() {
       return levels();

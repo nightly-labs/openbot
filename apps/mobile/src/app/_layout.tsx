@@ -36,7 +36,7 @@ import { loadPushNotificationPreference } from "@/features/settings/model/push-n
 import { loadTextSize } from "@/features/settings/model/text-size";
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
-import { checkParakeetModels } from "@/features/voice/model/parakeet-model";
+import { checkRecognitionModels } from "@/features/voice/model/recognition-models";
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
 import { loadVoiceServer } from "@/features/voice/model/voice-server";
 import { loadVoiceSettings } from "@/features/voice/model/voice-settings";
@@ -223,7 +223,7 @@ export default function RootLayout() {
       void loadVoiceSettings().catch(() => undefined);
       void loadVoiceServer().catch(() => undefined);
       supertonicModel.check();
-      checkParakeetModels();
+      checkRecognitionModels();
       // The layout direction follows the app language. A start with the other direction, such as the
       // first start or a start after the phone language changed, asks for a restart. A failed read
       // keeps the default language, which still sets the direction.

@@ -309,6 +309,10 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "On this phone · English only",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified runs on this phone, as on the desktop. It hears English only, with punctuation and fewer errors than Parakeet v3, and your speech stays on the phone. Until the model is downloaded, the phone recognizer listens.",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "On this phone · also mixed Chinese and English",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR runs on this phone. It finds the language you speak, in 30 languages and 22 Chinese dialects, also when you mix Chinese and English in one sentence. Your speech stays on the phone. Until the model is downloaded, the phone recognizer listens.",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "More than 90 languages · sends your speech to ElevenLabs",
   "mobile.settings.voice.recognition.model": "Speech model",

@@ -126,8 +126,8 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 |---|---|---|
 | `desktop_app_opened` | How many accounts/devices open OpenBot? | App state and identity have loaded |
 | `app_updated` | Did an update actually take effect? | A new version is observed on the next launch |
-| `account_sign_in_started` | Can visitors start authentication? | A code was sent. Mobile from generation 3 adds `method: email`, `duration_ms` and `cause_code`; a resend sends it again |
-| `account_sign_in_completed` | Can visitors become verified accounts? | Verified signed-in state returned. Mobile from generation 3 adds `method: email` |
+| `account_sign_in_started` | Can visitors start authentication? | A code was sent. Mobile from generation 3 adds `method: email`, `duration_ms` and `cause_code`; a resend sends it again. `result: company_sign_in` (desktop and mobile) is an email that signs in at its company provider |
+| `account_sign_in_completed` | Can visitors become verified accounts? | Verified signed-in state returned. Mobile from generation 3 adds `method: email`; `method: company` is a company sign-in, and `cancelled` a closed browser |
 | `account_sign_out` | Does sign-out complete? | Logout IPC returned successfully |
 | `onboarding_completed` | Which provider completes setup, and by which path? | Setup state was saved. `path` is `free` (a provider on this computer) or `plan` (a hosted server); `skipped` is true when the user skipped setup |
 | `onboarding_step` | At which setup step do users stop? | A setup step was shown (`viewed`) or left with `next`, `back` or `skipped`. Desktop `step`: `choose`, `plan`, `computer`, `language`; mobile `step`: `hello`, `server`, `agent`, `look`, `name`, `role`, `task`, `ready`. Optional `path` as on `onboarding_completed` |

@@ -98,8 +98,13 @@ interface ProviderSettingsSectionProps {
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
-  /** Without it the rows have no Edit. This computer only: the Team API has no edit route. */
+  /** Without it the rows have no Edit. A joined server's host edits only with `custom-provider-edit-v1`. */
   onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
+  /**
+   * The endpoints are this computer's, so the form offers "Runs on" and the model limits. A joined
+   * server's host keeps both as they are: the Team API has neither.
+   */
+  localEndpoints?: boolean | undefined;
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /** Adds, names and removes the accounts of each provider that can hold more than one. */
   accountActions?: ProviderAccountActions | undefined;
@@ -136,9 +141,9 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     const endpoint = customProviderOfModel(choice?.preferredModel, customProviders());
     return endpoint && choice?.preferredProvider === harnessOf(endpoint) ? (choice.preferredModel ?? null) : null;
   };
-  /** Edit and "Runs on" are both of this computer: a joined server's host runs each endpoint on OpenCode. */
+  /** "Runs on" is of this computer: a joined server's host keeps the harness of each endpoint. */
   const harnesses = () =>
-    props.onUpdateCustomProvider
+    props.localEndpoints
       ? CUSTOM_PROVIDER_HARNESSES.map((id) => {
           const option = props.store.providerOptions().find((item) => item.id === id);
           return { id, ready: servesCustomProvider(option), runtime: option?.runtimeStatus };
@@ -339,8 +344,8 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           draft={editDraft()}
           providerIdLocked={Boolean(editing())}
           apiKeyKept={Boolean(editing()?.hasApiKey)}
-          // Edit and the context window are both of this computer: the Team API has neither.
-          contextWindows={Boolean(props.onUpdateCustomProvider)}
+          // The model limits are of this computer: the Team API has none.
+          contextWindows={Boolean(props.localEndpoints)}
           harnesses={harnesses()}
           onDownloadHarness={downloadHarness()}
           harnessError={downloadError()}
@@ -536,7 +541,7 @@ export interface HostProviderSettings {
   customProviders?: readonly CustomProviderSummary[] | undefined;
   onAddCustomProvider?: ((value: SaveCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
-  /** This computer only: the Team API has no edit route, so a joined server's section has no Edit. */
+  /** Without it the rows have no Edit. A joined server's host edits only with `custom-provider-edit-v1`. */
   onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   providerKeys?: ProviderKeyApi | undefined;
   /** How each row signs in, from where the user connects. */
@@ -647,6 +652,7 @@ export function HostProviderSettingsPanel(
         customProviders={props.customProviders}
         onDeleteCustomProvider={props.onDeleteCustomProvider}
         onUpdateCustomProvider={props.onUpdateCustomProvider}
+        localEndpoints={props.hostName === undefined}
         accountActions={props.accountActions}
         // With detection off there is no list, not an empty one.
         providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}

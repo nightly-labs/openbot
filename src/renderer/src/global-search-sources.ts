@@ -203,6 +203,19 @@ export function useGlobalSearchSources(open: () => boolean) {
             run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
           });
         }
+        if (
+          serverCanAdminister(server, "skill-learning-v1") &&
+          (server.kind === "local" || server.state === "online")
+        ) {
+          list.push({
+            id: "server:skill-learning",
+            label: t("server.settings.skillLearning"),
+            detail: server.name,
+            group: "settings",
+            icon: BookMarked,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+          });
+        }
         if (activeServerHasProviderSettings(server)) {
           list.push({
             id: "server:providers",

@@ -2,6 +2,7 @@ import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-upd
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { Effect, Exit, Result, Scope } from "effect";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
@@ -577,6 +578,8 @@ export class RemoteEventStream {
               return;
             }
             const event = decoded.event;
+            // The frozen event codec leaves the skill name of a skill question out; the wire value has it.
+            if (this.#advertises(serverId, SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(event, value);
             if (event.type === "team-identity") {
               this.#onServerIdentity(serverId, { serverName: event.serverName, logoVersion: event.logoVersion });
             } else if (event.type === "team-presence") {
@@ -729,6 +732,14 @@ export class RemoteEventStream {
       return null;
     }).pipe(Effect.catch(({ cause: error }) => Effect.succeed(error instanceof RemoteRequestError ? error : null)));
   });
+
+  /** Whether the `agent-event-scope` message of this server names `capability`. */
+  #advertises(serverId: string, capability: TeamCurrentCapability): boolean {
+    if (!this.#appVersion) return false;
+    return teamCapabilitiesForProtocol(this.#connections.compatibilityFor(serverId)?.negotiatedProtocol).includes(
+      capability,
+    );
+  }
 
   #supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean {
     return this.#connections.compatibilityFor(serverId)?.capabilities.includes(capability) ?? false;

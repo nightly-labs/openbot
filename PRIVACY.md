@@ -615,6 +615,10 @@ recognizer chosen under **Speech recognition** in **Settings → Voice**:
   from `huggingface.co`, the same files as desktop, checks the SHA-256 of each file, and keeps it in
   the app's storage outside the device backup until you remove it. The request carries no user data.
   The audio and the recognized text stay on the phone.
+- Qwen3-ASR. When you press Download, the phone downloads the pinned Qwen3-ASR 0.6B model from
+  `huggingface.co`, checks the SHA-256 of each file, and keeps it in the app's storage outside the
+  device backup until you remove it. The request carries no user data. The audio and the recognized
+  text stay on the phone.
 - ElevenLabs Scribe, only with your own ElevenLabs API key. For each dictation, the phone asks
   `api.elevenlabs.io` for a single-use token with the key, then streams the microphone audio to
   ElevenLabs with that token, and receives the text. ElevenLabs handles the audio and the text under
@@ -863,16 +867,21 @@ server can change it.
 - The Vault (Server settings › Vault) is kept in
   `~/Library/Application Support/OpenBot/openbot-vault-v1.json`, encrypted by the operating system's
   secret storage. It holds the logins, payment cards (number, expiry, security code, name), contact
-  info and API keys (variable name, key, notes) that the user saves. On Linux with no keyring, OpenBot
+  info and API keys (variable name, key, notes) that the user saves. A login can also keep a two-step
+  (authenticator) setup key. OpenBot makes its sign-in codes on this computer; the key itself never
+  leaves it, and no window, phone or agent gets it back after it is saved. On Linux with no keyring, OpenBot
   encrypts it with its own key file, as [Data stored by the central account service](#data-stored-by-the-central-account-service)
   tells. The file never leaves this computer. An owner or admin of a joined
   server can open that server's Vault in Server settings, from the desktop app or the web app: the
-  list goes over the encrypted connection with no password, card number, security code or API key, and one of
-  those goes to them only when they show or copy it. The iPhone app shows the same list and never
+  list goes over the encrypted connection with no password, card number, security code, API key or
+  two-step key, and one of the first four goes to them only when they show or copy it. A server with
+  `vault-v3` also sends the current two-step codes, each valid for its short period. The iPhone app shows the same list and never
   asks for a password, a card number, a security code or an API key: a new one that the owner or admin types on
   the phone goes once to the server, and the phone does not keep it. Other team members cannot read it. An agent gets the login sites and usernames, the card names with their last
   four digits and expiry, and the contact info; it never gets a password, a card number, a security
-  code or login notes. An agent can add and change contact info, change the username of a login (not
+  code, two-step key or login notes. It can enter a two-step code into a sign-in page with the secure
+  sign-in card, as it does a password, and save a setup key that a site shows when the user asks it to
+  turn on two-step verification; only a person's message can start that save. An agent can add and change contact info, change the username of a login (not
   its site) and the name, expiry and billing address of a card, and delete items, with no approval: the
   chat shows each change, and an item that an agent adds keeps the agent's name. Agents cannot see,
   add, change or delete a Vault API key as an item. When an agent lists its API keys, OpenBot writes

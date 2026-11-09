@@ -39,6 +39,7 @@ import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
+import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import type {
   AgentSettingsRequest,
@@ -353,6 +354,21 @@ export function createConversationViewScope(props: ConversationProps) {
     askSideQuestion,
     deleteSideQuestion,
   } = sideQuestions;
+  /**
+   * Save on a skill question: the host writes the skill in the background, not in a turn of the
+   * agent. False when the host saved nothing or cannot be asked; then the card sends the user's yes.
+   */
+  async function saveSkillSuggestion(messageId: string): Promise<boolean> {
+    const agentId = props.agent?.id;
+    if (!agentId) return false;
+    const input = { agentId, messageId };
+    const save = props.runtime
+      ? props.runtime.saveSkillSuggestion?.(input)
+      : conversationPort().agent.saveSkillSuggestion(input, props.server?.id);
+    // A failed request falls back to the yes, so the lesson is not lost.
+    const result = await save?.catch(() => null);
+    return result?.saved === true;
+  }
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills, installedSkillsLoadFailed } = skills;
   const { mcpServers } = createMcpServersStore({ props });
@@ -2611,6 +2627,7 @@ export function createConversationViewScope(props: ConversationProps) {
     selectAndConfirmReasoning,
     sendSelectionInstruction,
     sendCardMessage,
+    saveSkillSuggestion,
     quoteRequest,
     quoteSelection,
     openQuote,

@@ -10,6 +10,7 @@ import { memo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { useUniwind } from "uniwind";
+import type { BubbleTone } from "@/features/chat/model/bubble-tone";
 import { type CodePreviewEntry, storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
@@ -43,12 +44,15 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   language,
   streaming = false,
   file,
+  tone,
 }: {
   kind: ChatPreviewKind;
   text: string;
   language?: string;
   streaming?: boolean;
   file?: CodePreviewEntry["file"];
+  /** The colors of a bubble with a message color, which the card and its header take. */
+  tone?: BubbleTone;
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
@@ -56,7 +60,10 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   const settled = useListSettled();
   // A web view starts only once the chat shows its history, so it does not slow the chat that opens.
   const historyShown = useHistoryShown();
-  const [muted, foreground] = useThemeColor(["muted", "foreground"]);
+  const [themeMuted, themeForeground] = useThemeColor(["muted", "foreground"]);
+  const muted = tone?.muted ?? themeMuted;
+  const foreground = tone?.foreground ?? themeForeground;
+  const line = tone ? { borderColor: tone.line } : undefined;
   const [pressed, setPressed] = useState(false);
   const [width, setWidth] = useState(0);
   const screen = useWindowDimensions();
@@ -81,8 +88,10 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       }}
     >
       <Animated.View
-        className="overflow-hidden border border-separator bg-control/50"
+        className={`overflow-hidden border ${tone ? "" : "border-separator bg-control/50"}`}
         style={{
+          ...line,
+          backgroundColor: tone?.panel,
           borderRadius: 18,
           borderCurve: "continuous",
           transform: [{ scale: pressed && !reducedMotion ? 0.97 : 1 }],
@@ -91,13 +100,26 @@ export const ChatCodePreview = memo(function ChatCodePreview({
           transitionTimingFunction: PRESS_EASING,
         }}
       >
-        <View className="flex-row items-center gap-2.5 border-b border-separator px-3 py-2.5">
+        <View
+          className={`flex-row items-center gap-2.5 border-b px-3 py-2.5 ${tone ? "" : "border-separator"}`}
+          style={line}
+        >
           <Icon size={18} color={String(foreground)} />
           <View className="min-w-0 shrink grow flex-row items-baseline gap-2">
-            <Typography.Paragraph type="body-sm" className="shrink font-semibold text-foreground" numberOfLines={1}>
+            <Typography.Paragraph
+              type="body-sm"
+              className="shrink font-semibold text-foreground"
+              numberOfLines={1}
+              style={tone ? { color: tone.foreground } : undefined}
+            >
               {title}
             </Typography.Paragraph>
-            <Typography.Paragraph type="body-xs" className="text-muted" numberOfLines={1}>
+            <Typography.Paragraph
+              type="body-xs"
+              className="text-muted"
+              numberOfLines={1}
+              style={tone ? { color: tone.muted } : undefined}
+            >
               {t("mobile.chat.preview.lines", { count: lineCount })}
             </Typography.Paragraph>
           </View>
@@ -105,7 +127,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
         </View>
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {streaming ? (
-            <CodeExcerpt text={text} />
+            <CodeExcerpt text={text} color={tone?.muted} />
           ) : width <= 0 ? null : !settled || (kind === "html" && !historyShown) ? (
             <View style={{ height: previewHeight }} />
           ) : kind === "html" ? (
@@ -119,7 +141,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   );
 });
 
-function CodeExcerpt({ text }: { text: string }) {
+function CodeExcerpt({ text, color }: { text: string; color?: string }) {
   // Each line keeps its row in the block, which is a stable key while the block streams.
   const excerpt = text
     .split("\n")
@@ -134,7 +156,11 @@ function CodeExcerpt({ text }: { text: string }) {
           numberOfLines={1}
           className="bg-transparent p-0 text-muted"
           // The last line fades, so the excerpt reads as the start of a longer block.
-          style={[CODE_TEXT_STYLE, { fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 }]}
+          style={[
+            CODE_TEXT_STYLE,
+            { fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 },
+            color ? { color } : undefined,
+          ]}
         >
           {line}
         </Typography.Code>

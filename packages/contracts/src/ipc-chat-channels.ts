@@ -280,7 +280,7 @@ export function isChannelDraft(value: unknown): value is ChannelDraft {
 
 const CHANNEL_ICON_NAME = /^[a-z][a-z0-9-]{0,39}$/;
 
-function isChannelIcon(value: unknown): value is ChannelIcon {
+export function isChannelIcon(value: unknown): value is ChannelIcon {
   return (
     isDynamicRecord(value) &&
     isString(value.name) &&

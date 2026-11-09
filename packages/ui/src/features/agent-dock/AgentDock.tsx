@@ -1,6 +1,6 @@
 /**
- * A liquid agent dock on the right or left edge of the window. The user adds agents to it and talks with
- * each one in a panel that grows out of the agent's seat. The dock, the panel, the neck between them
+ * A liquid agent dock on the right or left edge of the window. The user adds agents and channels to it
+ * and talks with each one in a panel that grows out of its seat. The dock, the panel, the neck between them
  * and the drop that carries an agent in or out are one shape under an SVG "goo" filter, so they flow
  * into each other. Text and controls sit on a layer above the filter and stay sharp.
  *
@@ -8,6 +8,7 @@
  * change, such as the first load, places the seats at once.
  */
 
+import type { ChannelIcon, ChannelMember } from "@openbot/contracts/ipc";
 import { AppWindow, ContextMenu, DropdownMenu, Maximize2, PanelRight, Plus, Settings } from "@openbot/ui";
 import {
   createEffect,
@@ -28,8 +29,9 @@ import type { ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { ChannelAvatar } from "../channels/ChannelAvatar";
 import type { VoicePhase } from "../conversation/VoiceRecordingMorph";
-import { SidebarPinnedAvatar } from "../sidebar/SidebarAgentIndicator";
+import { SidebarAgentIndicator, SidebarPinnedAvatar } from "../sidebar/SidebarAgentIndicator";
 import type { SidebarAgentState } from "../sidebar/sidebar-types";
 import {
   AgentDockChat,
@@ -84,18 +86,51 @@ import {
 export type { AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
 
-export interface AgentDockSeat {
-  agent: ComposerAgent;
-  mood: AvatarMood;
-  /** The badge on the seat: the same state as the agent's badge in the sidebar. */
-  state: SidebarAgentState | undefined;
+/** A seat of the dock: an agent or a channel. The ids of the two kinds can be equal. */
+export interface AgentDockSeatRef {
+  kind: "agent" | "channel";
+  id: string;
+}
+
+/** The channel fields that a channel seat and its chat show. */
+export interface AgentDockChannel {
+  id: string;
+  name: string;
+  title: string;
+  members: ChannelMember[];
+  icon: ChannelIcon | null;
+  imageUrl: string | null;
+}
+
+/** `state` is the badge on the seat: the same state as the agent's or channel's badge in the sidebar. */
+export type AgentDockSeat =
+  | { kind: "agent"; agent: ComposerAgent; mood: AvatarMood; state: SidebarAgentState | undefined }
+  | { kind: "channel"; channel: AgentDockChannel; state: SidebarAgentState | undefined };
+
+/** The key of a seat in the dock state, unique across the two kinds. */
+export function agentDockSeatKey(seat: AgentDockSeatRef): string {
+  return `${seat.kind}:${seat.id}`;
+}
+
+function seatRef(seat: AgentDockSeat): AgentDockSeatRef {
+  return seat.kind === "agent" ? { kind: "agent", id: seat.agent.id } : { kind: "channel", id: seat.channel.id };
+}
+
+function refOfKey(key: string): AgentDockSeatRef {
+  const kind = key.startsWith("channel:") ? "channel" : "agent";
+  return { kind, id: key.slice(kind.length + 1) };
+}
+
+function seatName(seat: AgentDockSeat): string {
+  return seat.kind === "agent" ? seat.agent.name : seat.channel.name;
 }
 
 export type AgentDockSendResult = { messageId: string } | { error: string };
 
 /** The chat that a recording is for. The words go into its draft. */
 export interface AgentDockVoiceTarget {
-  agentId: string;
+  /** The `agentDockSeatKey` of the chat. */
+  seatKey: string;
   draft: () => string;
   setDraft: (text: string) => void;
   /** Sends this text, as the send button sends the draft. The draft keeps it until the send starts. */
@@ -109,8 +144,8 @@ export interface AgentDockVoiceTarget {
 /** The microphone of the dock chats. The dock shows it; the app records and transcribes. */
 export interface AgentDockVoice {
   phase: VoicePhase;
-  /** The agent of the recording, or null when the microphone is idle. */
-  agentId: string | null;
+  /** The `agentDockSeatKey` of the recording's chat, or null when the microphone is idle. */
+  seatKey: string | null;
   levels: readonly number[];
   elapsedSeconds: number;
   /** The words the recording heard so far. */
@@ -132,15 +167,17 @@ export interface AgentDockProps {
   seats: readonly AgentDockSeat[];
   /** The agents that the add menu offers. */
   available: readonly ComposerAgent[];
-  /** The chat of an agent on the dock. */
-  chat: (agentId: string) => AgentDockChatModel;
-  /** Called with the agent whose chat the panel shows, and with null when the panel closes. */
-  onOpenChange?: ((agentId: string | null) => void) | undefined;
-  onAdd: (agentId: string) => void;
-  onRemove: (agentId: string) => void;
-  onSend: (agentId: string, text: string) => Promise<AgentDockSendResult>;
-  onOpenInMain: (agentId: string) => void;
-  /** Opens the agent in its own chat window. The menus show the item only when it is set. */
+  /** The channels that the add menu offers. */
+  availableChannels: readonly AgentDockChannel[];
+  /** The chat of a seat on the dock. */
+  chat: (seat: AgentDockSeatRef) => AgentDockChatModel;
+  /** Called with the seat whose chat the panel shows, and with null when the panel closes. */
+  onOpenChange?: ((seat: AgentDockSeatRef | null) => void) | undefined;
+  onAdd: (seat: AgentDockSeatRef) => void;
+  onRemove: (seat: AgentDockSeatRef) => void;
+  onSend: (seat: AgentDockSeatRef, text: string) => Promise<AgentDockSendResult>;
+  onOpenInMain: (seat: AgentDockSeatRef) => void;
+  /** Opens an agent in its own chat window. The agent menus show the item only when it is set. */
   onOpenWindow?: ((agentId: string) => void) | undefined;
   /** All agents of the server, so that mentions in a chat show as chips. */
   agents: ComposerAgent[];
@@ -164,10 +201,11 @@ export interface AgentDockProps {
   voice?: AgentDockVoice | undefined;
 }
 
+/** The seats, drafts and other records are keyed by `agentDockSeatKey`. */
 interface DockState {
   seats: string[];
   open: string | null;
-  /** The agent whose chat the panel shows. It stays set while the panel closes, so the chat fades out. */
+  /** The seat whose chat the panel shows. It stays set while the panel closes, so the chat fades out. */
   shown: string | null;
   drafts: Record<string, string>;
   pending: Record<string, AgentDockPendingMessage[]>;
@@ -189,7 +227,7 @@ const SEAT_FADE = 24;
 export function AgentDock(props: AgentDockProps) {
   const { t } = useText();
   const filterId = `agent-dock-goo-${createUniqueId()}`;
-  const initialSeats = untrack(() => props.seats.map((seat) => seat.agent.id));
+  const initialSeats = untrack(() => props.seats.map((seat) => agentDockSeatKey(seatRef(seat))));
   const [state, setState] = createStore<DockState>({
     seats: [...initialSeats],
     open: null,
@@ -203,10 +241,15 @@ export function AgentDock(props: AgentDockProps) {
   /* The last props of each seat, so a seat that leaves keeps its face while it shrinks away. */
   const seatProps = createMemo((previous?: Map<string, AgentDockSeat>) => {
     const next = new Map(previous);
-    for (const seat of props.seats) next.set(seat.agent.id, seat);
+    for (const seat of props.seats) next.set(agentDockSeatKey(seatRef(seat)), seat);
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  /** The agent of a seat. The list of all agents can be shorter than the seats. */
+  const seatAgent = (agentId: string) => {
+    const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
+    return seat?.kind === "agent" ? seat.agent : undefined;
+  };
   /* The seats that shrink away. They stay in `state.seats` until the shrink ends. */
   const leaving = new Set<string>();
 
@@ -503,7 +546,7 @@ export function AgentDock(props: AgentDockProps) {
       draft.shown = id;
       draft.focus += 1;
     });
-    props.onOpenChange?.(id);
+    props.onOpenChange?.(refOfKey(id));
     neckY.to(y);
     neckSize.to(1);
     if (!wasOpen) {
@@ -522,14 +565,14 @@ export function AgentDock(props: AgentDockProps) {
    */
   function finishRecording(keepFor?: string) {
     const voice = props.voice;
-    if (voice?.phase === "recording" && voice.agentId !== keepFor) voice.onFinish();
+    if (voice?.phase === "recording" && voice.seatKey !== keepFor) voice.onFinish();
   }
 
   /** The microphone of one chat. Only the chat of the recording shows its progress. */
   function chatVoice(id: string): AgentDockChatVoice | undefined {
     const voice = props.voice;
     if (!voice) return undefined;
-    const own = () => voice.agentId === id;
+    const own = () => voice.seatKey === id;
     return {
       get phase() {
         return own() ? voice.phase : "idle";
@@ -551,7 +594,7 @@ export function AgentDock(props: AgentDockProps) {
       },
       onStart: () =>
         voice.onStart({
-          agentId: id,
+          seatKey: id,
           draft: () => state.drafts[id] ?? "",
           setDraft: (text) =>
             setState((draft) => {
@@ -575,13 +618,14 @@ export function AgentDock(props: AgentDockProps) {
     };
   }
 
-  /** The chat menu's "Open in new window" action, or none when the app cannot open one. */
+  /** The chat menu's "Open in new window" action, or none for a channel or when the app cannot open one. */
   function openWindowFor(id: string): (() => void) | undefined {
     const open = props.onOpenWindow;
-    if (!open) return undefined;
+    const seat = refOfKey(id);
+    if (!open || seat.kind !== "agent") return undefined;
     return () => {
       closeChat(false);
-      open(id);
+      open(seat.id);
     };
   }
 
@@ -696,7 +740,7 @@ export function AgentDock(props: AgentDockProps) {
   /* The seats follow the props, in their order. One change moves: an added seat comes in at the
      bottom. More at once, such as the first load, or a new order, jump. */
   createEffect(
-    () => props.seats.map((seat) => seat.agent.id),
+    () => props.seats.map((seat) => agentDockSeatKey(seatRef(seat))),
     (ids) =>
       untrack(() => {
         const removed = state.seats.filter((id) => !leaving.has(id) && !ids.includes(id));
@@ -722,14 +766,15 @@ export function AgentDock(props: AgentDockProps) {
     const text = (draft ?? state.drafts[id] ?? "").trim();
     if (!text) return;
     const key = ++pendingKey;
-    const after = props.chat(id).messages.at(-1)?.id ?? null;
+    const seat = refOfKey(id);
+    const after = props.chat(seat).messages.at(-1)?.id ?? null;
     setState((draft) => {
       draft.drafts[id] = "";
       draft.errors[id] = null;
       draft.sending[id] = true;
       draft.pending[id] = [...(draft.pending[id] ?? []), { key, text, messageId: null, after }];
     });
-    const result = await props.onSend(id, text);
+    const result = await props.onSend(seat, text);
     setState((draft) => {
       draft.sending[id] = false;
       const pending = draft.pending[id] ?? [];
@@ -874,35 +919,31 @@ export function AgentDock(props: AgentDockProps) {
                             as="button"
                             type="button"
                             class="agent-dock-seat-button"
-                            aria-label={t("agent.dock.chatWith", { name: seat().agent.name })}
+                            aria-label={t("agent.dock.chatWith", { name: seatName(seat()) })}
                             aria-pressed={state.open === id ? "true" : "false"}
                             data-open={state.open === id ? "" : undefined}
                             onClick={() => toggleSeat(id)}
                             onKeyDown={closeOnEscape}
                           >
-                            <SidebarPinnedAvatar
-                              agent={seat().agent}
-                              mood={seat().mood}
-                              agentState={() => seat().state}
-                            />
+                            <SeatAvatar seat={seat()} agents={props.agents} />
                           </ContextMenu.Trigger>
                           <ContextMenu.Portal>
                             <ContextMenu.Content>
                               <ContextMenu.Item
                                 onSelectAfterClose={() => {
                                   if (state.open === id) closeChat(false);
-                                  props.onOpenInMain(id);
+                                  props.onOpenInMain(refOfKey(id));
                                 }}
                               >
                                 <Maximize2 aria-hidden="true" />
                                 {t("agent.dock.openInMain")}
                               </ContextMenu.Item>
-                              <Show when={props.onOpenWindow}>
+                              <Show when={seat().kind === "agent" ? props.onOpenWindow : undefined}>
                                 {(open) => (
                                   <ContextMenu.Item
                                     onSelectAfterClose={() => {
                                       if (state.open === id) closeChat(false);
-                                      open()(id);
+                                      open()(refOfKey(id).id);
                                     }}
                                   >
                                     <AppWindow aria-hidden="true" />
@@ -911,7 +952,7 @@ export function AgentDock(props: AgentDockProps) {
                                 )}
                               </Show>
                               <ContextMenu.Separator />
-                              <ContextMenu.Item onSelectAfterClose={() => props.onRemove(id)}>
+                              <ContextMenu.Item onSelectAfterClose={() => props.onRemove(refOfKey(id))}>
                                 <PanelRight aria-hidden="true" />
                                 {t("agent.dock.remove")}
                               </ContextMenu.Item>
@@ -939,17 +980,40 @@ export function AgentDock(props: AgentDockProps) {
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content class="agent-dock-add-menu">
-                      <For
-                        each={props.available}
+                      <Show
+                        when={props.available.length > 0 || props.availableChannels.length > 0}
                         fallback={<DropdownMenu.Item disabled>{t("agent.dock.allAdded")}</DropdownMenu.Item>}
                       >
-                        {(agent) => (
-                          <DropdownMenu.Item onSelectAfterClose={() => props.onAdd(agent.id)}>
-                            <AgentAvatar agent={agent} motion="idle" class="agent-dock-menu-avatar" />
-                            {agent.name}
-                          </DropdownMenu.Item>
-                        )}
-                      </For>
+                        <For each={props.available}>
+                          {(agent) => (
+                            <DropdownMenu.Item onSelectAfterClose={() => props.onAdd({ kind: "agent", id: agent.id })}>
+                              <AgentAvatar agent={agent} motion="idle" class="agent-dock-menu-avatar" />
+                              {agent.name}
+                            </DropdownMenu.Item>
+                          )}
+                        </For>
+                        <Show when={props.available.length > 0 && props.availableChannels.length > 0}>
+                          <DropdownMenu.Separator />
+                        </Show>
+                        <For each={props.availableChannels}>
+                          {(channel) => (
+                            <DropdownMenu.Item
+                              onSelectAfterClose={() => props.onAdd({ kind: "channel", id: channel.id })}
+                            >
+                              <span class="agent-dock-menu-avatar agent-dock-menu-channel">
+                                <ChannelAvatar
+                                  members={channel.members}
+                                  agents={props.agents}
+                                  layout="cluster"
+                                  icon={channel.icon}
+                                  imageUrl={channel.imageUrl}
+                                />
+                              </span>
+                              {channel.name}
+                            </DropdownMenu.Item>
+                          )}
+                        </For>
+                      </Show>
                       <Show when={props.onOpenSettings}>
                         {(open) => (
                           <>
@@ -971,10 +1035,10 @@ export function AgentDock(props: AgentDockProps) {
 
         <AgentDockShelf
           results={props.results ?? []}
-          agent={(id) => seatFor(id)?.agent ?? props.agents.find((agent) => agent.id === id)}
+          agent={(id) => seatAgent(id) ?? props.agents.find((agent) => agent.id === id)}
           hidden={state.open !== null}
           stage={() => stage}
-          onOpen={openChat}
+          onOpen={(agentId) => openChat(agentDockSeatKey({ kind: "agent", id: agentId }))}
           onShownChange={(shown) => props.onShelfChange?.(shown)}
           ref={(element) => {
             shelf = element;
@@ -987,7 +1051,10 @@ export function AgentDock(props: AgentDockProps) {
         <section
           class="agent-dock-panel"
           ref={(element) => (panelContent = element)}
-          aria-label={shownSeat() ? t("agent.dock.chatWith", { name: shownSeat()?.agent.name ?? "" }) : undefined}
+          aria-label={(() => {
+            const seat = shownSeat();
+            return seat ? t("agent.dock.chatWith", { name: seatName(seat) }) : undefined;
+          })()}
           data-open={state.open ? "" : undefined}
           inert={state.open ? undefined : true}
           onKeyDown={closeOnEscape}
@@ -1002,9 +1069,8 @@ export function AgentDock(props: AgentDockProps) {
               <Show when={seatFor(id)}>
                 {(seat) => (
                   <AgentDockChat
-                    agent={seat().agent}
-                    mood={seat().mood}
-                    chat={props.chat(id)}
+                    seat={seat()}
+                    chat={props.chat(refOfKey(id))}
                     draft={state.drafts[id] ?? ""}
                     pending={state.pending[id] ?? []}
                     error={state.errors[id] ?? null}
@@ -1017,10 +1083,10 @@ export function AgentDock(props: AgentDockProps) {
                     }
                     onSend={() => void send()}
                     onClose={() => closeChat()}
-                    onRemove={() => props.onRemove(id)}
+                    onRemove={() => props.onRemove(refOfKey(id))}
                     onOpenInMain={() => {
                       closeChat(false);
-                      props.onOpenInMain(id);
+                      props.onOpenInMain(refOfKey(id));
                     }}
                     onOpenWindow={openWindowFor(id)}
                     voice={chatVoice(id)}
@@ -1038,5 +1104,32 @@ export function AgentDock(props: AgentDockProps) {
         </section>
       </AmbientMotion>
     </div>
+  );
+}
+
+/** The face of a seat with its sidebar badge. A channel shows the member cluster of its sidebar row. */
+function SeatAvatar(props: { seat: AgentDockSeat; agents: readonly ComposerAgent[] }) {
+  return (
+    <Show
+      when={props.seat.kind === "channel" ? props.seat.channel : undefined}
+      fallback={
+        <Show when={props.seat.kind === "agent" ? props.seat : undefined}>
+          {(seat) => <SidebarPinnedAvatar agent={seat().agent} mood={seat().mood} agentState={() => seat().state} />}
+        </Show>
+      }
+    >
+      {(channel) => (
+        <span class="agent-row-avatar sidebar-pinned-avatar">
+          <ChannelAvatar
+            members={channel().members}
+            agents={props.agents}
+            layout="cluster"
+            icon={channel().icon}
+            imageUrl={channel().imageUrl}
+          />
+          <SidebarAgentIndicator state={() => props.seat.state} />
+        </span>
+      )}
+    </Show>
   );
 }

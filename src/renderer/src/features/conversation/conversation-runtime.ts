@@ -6,6 +6,8 @@ import type {
   FilePreview,
   OpenBotDesktopApi,
   ResetAgentSessionSettingInput,
+  SaveSkillSuggestionInput,
+  SaveSkillSuggestionResult,
   SetAgentSessionSettingInput,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
@@ -72,6 +74,8 @@ export interface ConversationRuntime {
   openUrl: OpenBotDesktopApi["openUrl"];
   /** Asks the connected host a side question. Absent, the host does not serve `side-question-v1`. */
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;
+  /** Save on a skill question. Absent, the host does not serve `skill-learning-v1`. */
+  saveSkillSuggestion?: ((input: SaveSkillSuggestionInput) => Promise<SaveSkillSuggestionResult>) | undefined;
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
   /** Loads attachment images and media for a client that gets no `previewUrl`. */
   attachmentMedia?: AttachmentMediaSource;

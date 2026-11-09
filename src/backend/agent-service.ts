@@ -90,6 +90,7 @@ import type {
   SaveAgentProfileResult,
   SaveMcpServerInput,
   SaveMcpSignInAppInput,
+  SaveSkillSuggestionInput,
   SendMessageInput,
   SentMessageStats,
   SetAgentHiddenInput,
@@ -135,6 +136,7 @@ import {
   type ModelSwitchReason,
   type QueueSteerFallback,
   type ResponseStyle,
+  type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOWS_USAGE_ID,
@@ -185,6 +187,7 @@ import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-to
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
+import type { ReviewSkill } from "./agent/memory-review-prompt";
 import { MessageDeletion } from "./agent/message-deletion";
 import {
   creationModel,
@@ -218,6 +221,7 @@ import type { ScreenCaptureHost } from "./agent/screen-capture";
 import { SessionSettings } from "./agent/session-settings";
 import { SIDE_QUESTION_CHAT_MESSAGES, sideQuestionPrompt } from "./agent/side-question";
 import type { AgentSidebar } from "./agent/sidebar-tools";
+import type { SkillLearner } from "./agent/skill-learning";
 import type { LocalSkillTools } from "./agent/skill-tools";
 import {
   agentProviderAccount,
@@ -362,6 +366,18 @@ export interface AgentServiceOptions {
   providerAccounts?: ProviderAccountStore;
   saveProviderUse?: (provider: AgentProvider, on: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
   localSkillTools?: (() => LocalSkillTools) | undefined;
+  /**
+   * The skills that an agent has, read from this computer only. A memory review reads them to suggest
+   * a new skill or a change to one. Omitted, a review does not suggest skills.
+   */
+  reviewSkills?: ((agentId: string) => Effect.Effect<readonly ReviewSkill[], unknown>) | undefined;
+  /**
+   * The server setting for the skills that a memory review finds: save them, ask first, or do not look
+   * for them. The main process owns the preference. Omitted, the review asks first.
+   */
+  skillLearning?: (() => SkillLearningMode) | undefined;
+  /** Saves a skill that a memory review finds. Built after the service, so read at each use. */
+  skillLearner?: (() => SkillLearner) | undefined;
   /** Built after the service, so read when a tool call needs it. */
   routineFlowTools?: () => RoutineFlowTools;
   /** Built after the service, so read when a tool call needs it. */
@@ -678,6 +694,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       ...(options.agentMemoryLimit ? { limit: options.agentMemoryLimit } : {}),
     });
+    const reviewSkills = options.reviewSkills;
+    const skillLearner = options.skillLearner;
     this.#memoryReview = new MemoryReview({
       memories: this.#memories,
       profileClients: this.#profileClients,
@@ -713,6 +731,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         sideThreadId
           ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "thread.memory-reviewed")
           : this.#appendSystemMessage(agentId, message, "thread.memory-reviewed"),
+      ...(reviewSkills ? { skills: reviewSkills } : {}),
+      ...(options.skillLearning ? { skillLearning: options.skillLearning } : {}),
+      ...(skillLearner
+        ? {
+            skillLearner: {
+              read: (skillId) => Effect.suspend(() => skillLearner().read(skillId)),
+              save: (agentId, draft) => Effect.suspend(() => skillLearner().save(agentId, draft)),
+            },
+          }
+        : {}),
       redact: (text) => this.#mcp.redact(text),
       stopping: () => this.#stopping,
       ...(options.memoryReviewIdleMs === undefined ? {} : { idleMs: options.memoryReviewIdleMs }),
@@ -1172,6 +1200,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // Only a server has a memory reading.
       serverHost: hostMemory !== null,
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
+      memoryReview: () => this.#memoryReview.running(),
+      skillRevision: () => options.skillLearning?.() === "automatic",
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
@@ -1886,6 +1916,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * Skill learning moved into or out of Automatic, which adds or removes the skill revision line.
+   * Each agent's next turn opens its session again with the new instructions.
+   */
+  skillRevisionChanged(): void {
+    for (const agent of this.#store.list()) this.#conversation.unloadAgentThreads(agent.id);
+  }
+
+  /**
    * The other agents in the agent's sidebar section, in sidebar order, for its instructions. Null when
    * the agent has no section of the user's, or is in the Integrations section: the orchestrators there
    * serve unrelated integrations and choose teammates by fit.
@@ -2568,6 +2606,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     },
     Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "ask side question", cause: failure.cause })),
   ).bind(this);
+
+  /**
+   * Save on a skill question of the `ask` mode in the agent's own chat. The memory review writes and
+   * saves the skill in the background. `saved: false` tells the card to send the user's yes to the
+   * agent instead.
+   */
+  readonly saveSkillSuggestion = Effect.fn("AgentService.saveSkillSuggestion")(function* (
+    this: AgentService,
+    input: SaveSkillSuggestionInput,
+  ) {
+    const agent = this.listAgents().find((candidate) => candidate.id === input.agentId);
+    if (!agent || this.#stopping) return { saved: false };
+    const saved = yield* this.#memoryReview.saveSuggestion(agent.id, null, input.messageId);
+    return { saved };
+  }).bind(this);
 
   /**
    * Answers one model step of a workflow. Like a side question, the generation has no tools, no

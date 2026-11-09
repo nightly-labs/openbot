@@ -139,6 +139,11 @@ export function createChannelsController(env: ChannelsEnvironment) {
    * and the read brings it up to date, as a chat app does. Before, each visit showed Loading.
    */
   const keptPages = new Map<string, ChannelPage>();
+  /** Other readers of channel pages, such as the agent dock. Null is a resync: every page can be old. */
+  const changeListeners = new Set<(channelId: string | null) => void>();
+  function announce(channelId: string | null): void {
+    for (const listener of changeListeners) listener(channelId);
+  }
   function keepPage(page: ChannelPage | null): void {
     if (!page) return;
     keptPages.delete(page.channel.id);
@@ -617,6 +622,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
      */
     changed: (channelId: string) => {
       if (channelId !== state.selectedId) keptPages.delete(channelId);
+      announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
     /**
@@ -625,7 +631,18 @@ export function createChannelsController(env: ChannelsEnvironment) {
      */
     resync: () => {
       keptPages.clear();
+      announce(null);
       return refresh();
+    },
+    /**
+     * Calls `listener` with the channel of each host event, and with null after a resync. Returns the
+     * function that removes it.
+     */
+    onChange: (listener: (channelId: string | null) => void) => {
+      changeListeners.add(listener);
+      return () => {
+        changeListeners.delete(listener);
+      };
     },
     command,
     send,

@@ -308,6 +308,10 @@ export const messages = {
   "mobile.settings.voice.recognition.parakeetUnifiedReady": "この端末で動作 · 英語のみ",
   "mobile.settings.voice.recognition.parakeetUnifiedFooter":
     "Parakeet Unified はデスクトップと同じく、この端末で動作します。英語のみを認識し、句読点を付け、Parakeet v3 より誤りが少なくなります。音声は端末の外に出ません。モデルをダウンロードするまでは、端末の音声認識が聞き取ります。",
+  "mobile.settings.voice.recognition.qwen": "Qwen3-ASR",
+  "mobile.settings.voice.recognition.qwenReady": "この端末で動作 · 中国語と英語の混在にも対応",
+  "mobile.settings.voice.recognition.qwenFooter":
+    "Qwen3-ASR はこの端末で動作します。30 の言語と 22 の中国語方言から話している言語を自動で判別し、1 つの文で中国語と英語を混ぜても認識します。音声は端末の外に出ません。モデルをダウンロードするまでは、端末の音声認識が聞き取ります。",
   "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
   "mobile.settings.voice.recognition.elevenLabsHint": "90 以上の言語 · 音声を ElevenLabs に送信",
   "mobile.settings.voice.recognition.model": "音声モデル",

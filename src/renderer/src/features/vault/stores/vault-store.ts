@@ -46,6 +46,7 @@ export function createVaultStore(calls: VaultCalls) {
         }
       : undefined,
     reset: async () => show(await calls.reset()),
+    codes: () => calls.codes(),
   };
 }
 
