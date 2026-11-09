@@ -31,6 +31,7 @@ import type {
   MarketplaceApp,
   MarketplaceAppConnection,
   MarketplaceAppStatus,
+  MarketplaceAppsBlock,
   MarketplaceMacAutomation,
   MarketplaceModel,
   MarketplaceSkillChange,
@@ -98,6 +99,8 @@ export interface MarketplaceControllerProps {
   plugins?: readonly MarketplacePluginDetail[] | undefined;
   /** The server that holds the MCP servers of an app. Absent: apps show, but do not connect. */
   pluginServerId?: string | undefined;
+  /** Why apps do not connect while `pluginServerId` is absent. */
+  pluginsBlocked?: MarketplaceAppsBlock | undefined;
   /** The joined server that keeps an app's credential. Absent when this computer keeps it. */
   pluginHostName?: string | undefined;
   /** The joined server in `pluginServerId` relays its sign-ins to this computer (`sign-in-relay-v1`). */
@@ -1568,6 +1571,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
 
     apps,
     canConnectApps: () => Boolean(props.pluginServerId),
+    appsBlocked: () => props.pluginsBlocked,
     appBusy: (id) => Boolean(busy[`app:${id}`]) || connector(id)?.busy() === true,
     connectApp: (app) => installPlugin(app.plugin),
     reconnectApp: (app, appId, accountId) => reconnectPluginApp(app.plugin, appId, accountId),

@@ -155,6 +155,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "يعمل في تطبيق {name} المكتبي على {address}.",
   "marketplace.app.setup.desktopConnected": "متصل بـ {address}.",
   "marketplace.app.setup.open": "لا يلزم تسجيل دخول أو مفتاح.",
+  "marketplace.app.blocked.update":
+    "يشغّل {host} إصدارًا أقدم من OpenBot لا يمكنه ربط التطبيقات. حدّث OpenBot على {host}، أو اطلب من مالكه تحديثه.",
+  "marketplace.app.blocked.member":
+    "يمكن لمالك {host} أو لمشرف فيه فقط ربط التطبيقات هناك. اطلب من أحدهم ربط {name}، أو تحديث OpenBot على {host} ليتمكن الأعضاء من ربط التطبيقات.",
   "marketplace.app.connectAgain": "الربط مرة أخرى",
   "marketplace.app.automation.askOnInstall": "طلب الوصول من macOS عند التثبيت",
   "marketplace.app.automation.title": "الوصول إلى تطبيقات Apple",

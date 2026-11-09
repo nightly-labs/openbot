@@ -123,6 +123,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "{name} デスクトップアプリの {address} で動作します。",
   "marketplace.app.setup.desktopConnected": "{address} に接続済みです。",
   "marketplace.app.setup.open": "サインインもキーも不要です。",
+  "marketplace.app.blocked.update":
+    "{host} の OpenBot は古いバージョンのため、アプリを接続できません。{host} の OpenBot をアップデートするか、オーナーにアップデートを依頼してください。",
+  "marketplace.app.blocked.member":
+    "{host} でアプリを接続できるのはオーナーまたは管理者だけです。{name} の接続か、メンバーもアプリを接続できるよう {host} の OpenBot のアップデートを依頼してください。",
   "marketplace.app.connectAgain": "もう一度接続",
   "marketplace.app.automation.askOnInstall": "インストール時に macOS にアクセスを求める",
   "marketplace.app.automation.title": "Apple アプリへのアクセス",
