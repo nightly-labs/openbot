@@ -12,7 +12,7 @@ import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-tex
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Clipboard from "expo-clipboard";
 import * as Linking from "expo-linking";
-import { Button } from "heroui-native";
+import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Blocks from "lucide-react-native/icons/blocks";
 import Check from "lucide-react-native/icons/check";
@@ -135,6 +135,8 @@ interface TextPresentation {
   outside: boolean;
   /** Lays the card of a table out of the bubble on the color of the bubble. The copy actions stay under it. */
   tableFrame: ((card: ReactNode) => ReactNode) | undefined;
+  /** The side of the message: the copy actions of a table go to it. */
+  align: "start" | "end";
 }
 
 /** Each block reads in the direction of its own first letter, in an app of either direction. */
@@ -850,9 +852,13 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
     </View>
   );
   return (
-    <View className="gap-1">
+    <View>
       {presentation.tableFrame ? presentation.tableFrame(tableCard) : tableCard}
-      <TableCopyActions token={token} color={presentation.outside ? undefined : tone?.muted} />
+      <TableCopyActions
+        token={token}
+        color={presentation.outside ? undefined : tone?.muted}
+        align={presentation.align}
+      />
     </View>
   );
 }
@@ -863,7 +869,15 @@ type TableCopyFormat = "markdown" | "csv";
  * The copy actions under a table, as on desktop. Markdown keeps the source of the table; CSV is for a
  * spreadsheet, so it takes the text of each cell as it shows.
  */
-function TableCopyActions({ token, color }: { token: Tokens.Table; color: string | undefined }) {
+function TableCopyActions({
+  token,
+  color,
+  align,
+}: {
+  token: Tokens.Table;
+  color: string | undefined;
+  align: "start" | "end";
+}) {
   const { t } = useText();
   const themeMuted = useThemeColor("muted");
   const iconColor = color ?? String(themeMuted);
@@ -890,16 +904,22 @@ function TableCopyActions({ token, color }: { token: Tokens.Table; color: string
   const action = (format: TableCopyFormat, label: string) => {
     const Icon = copied === format ? Check : Copy;
     return (
-      <Button variant="ghost" size="sm" onPress={() => void copy(format)}>
-        <Icon size={14} color={iconColor} />
-        <Button.Label className="text-muted" style={color ? { color } : undefined}>
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={() => void copy(format)}
+        className="flex-row items-center gap-1"
+        style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+      >
+        <Icon size={12} color={iconColor} />
+        <Typography.Paragraph type="body-xs" className="text-muted" style={color ? { color } : undefined}>
           {copied === format ? t("common.copied") : label}
-        </Button.Label>
-      </Button>
+        </Typography.Paragraph>
+      </Pressable>
     );
   };
   return (
-    <View className="flex-row flex-wrap justify-end">
+    <View className={`flex-row flex-wrap gap-4 px-1 pt-1.5 ${align === "end" ? "justify-end" : "justify-start"}`}>
       {action("markdown", t("mobile.chat.table.copyMarkdown"))}
       {action("csv", t("mobile.chat.table.copyCsv"))}
     </View>
@@ -1118,6 +1138,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   renderText,
   renderTable,
   tableFrame,
+  align = "start",
 }: {
   body: string;
   color: ColorValue | undefined;
@@ -1136,6 +1157,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   renderTable?: (table: ReactNode, key: string) => ReactNode;
   /** Lays the card of a table out of the bubble on the color of the bubble, with `tone`. */
   tableFrame?: (card: ReactNode) => ReactNode;
+  /** The side of the message, for the copy actions of a table. */
+  align?: "start" | "end";
   /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
   fontWeight?: TextStyle["fontWeight"];
   /** Only inline Markdown, in one paragraph: a line that starts with `1.` or `#` stays text. */
@@ -1196,6 +1219,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       chipBackground,
       outside: false,
       tableFrame: undefined,
+      align,
     }),
     [
       linkFavicons,
@@ -1212,6 +1236,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       animateTail,
       tone,
       chipBackground,
+      align,
     ],
   );
   // A table out of the bubble is on the screen, so it takes the colors of the theme.

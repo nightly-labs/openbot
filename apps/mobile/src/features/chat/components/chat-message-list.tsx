@@ -816,6 +816,7 @@ const MessageRow = memo(function MessageRow({
     tone,
     playback,
     animationEnabled: shared.animationActive && arriving,
+    align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
   };
   const bubbleFor = (children: ReactNode, key?: string) =>
     message.kind === "message" ? (
