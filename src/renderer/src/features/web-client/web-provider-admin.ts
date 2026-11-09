@@ -336,10 +336,16 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       managesRuntimes: () => serverId() !== undefined,
     },
   );
+  // A boolean, so that a server-list update that keeps the capability does not read the list again.
+  const editsCustomProviders = createMemo(() =>
+    serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY),
+  );
   // One store for each host: a list read or changed on the previous host stays in its own store, so
-  // it is never shown next to a Delete that goes to this one.
+  // it is never shown next to a Delete that goes to this one. The list is read again when the edit
+  // capability arrives: only the `custom-provider-edit-v1` list has the header names that Edit needs.
   const customProviders = createMemo(() => {
     const id = serverId();
+    editsCustomProviders();
     if (!id) return undefined;
     const store = createCustomProvidersStore(() => hostCustomProvidersApi(() => admin, id));
     // As in the desktop app: a failure leaves the list empty, and nothing retries it from here.
@@ -566,8 +572,12 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       if (!store) throw new Error(currentText().t("webClient.error.removeEndpointOffline"));
       return store.deleteCustomProvider(id);
     },
+    // As in the desktop app: an edit from a list with no header names would delete the saved headers.
     get onUpdateCustomProvider() {
-      return serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY) ? updateEndpoint : undefined;
+      const editable =
+        editsCustomProviders() &&
+        (customProviders()?.customProviders() ?? []).every((provider) => provider.headerNames !== undefined);
+      return editable ? updateEndpoint : undefined;
     },
     get providerKeys() {
       return providerKeys();
