@@ -11,6 +11,7 @@ export interface AppPort {
   getAppInterfaceSizePreference: OpenBotDesktopApi["getAppInterfaceSizePreference"];
   getAppLanguagePreference: OpenBotDesktopApi["getAppLanguagePreference"];
   getAppLogoColorPreference: OpenBotDesktopApi["getAppLogoColorPreference"];
+  getInstalledFontFamilies: OpenBotDesktopApi["getInstalledFontFamilies"];
   onAppAppearancePreference: OpenBotDesktopApi["onAppAppearancePreference"];
   onAppInterfaceSizePreference: OpenBotDesktopApi["onAppInterfaceSizePreference"];
   onAppLanguagePreference: OpenBotDesktopApi["onAppLanguagePreference"];

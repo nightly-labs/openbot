@@ -32,6 +32,7 @@ import type { ApprovalAutomation } from "../approval-automation-store";
 import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
 import type { ExternalLinkOpener, ExternalLinkPreferenceStore } from "../external-link-opener";
 import { feedbackFacts } from "../feedback";
+import { listInstalledFontFamilies } from "../installed-fonts";
 import type { InterfaceSizeService } from "../interface-size-service";
 import type { LanguageService } from "../language-service";
 import type { LogoColorService } from "../logo-color-service";
@@ -300,6 +301,7 @@ export function appIpcHandlers({
         runCauseEffect(appearance.set(parsed)),
       ),
       getAppInterfaceSizePreference: handler(() => interfaceSize.preference),
+      getInstalledFontFamilies: handler(() => listInstalledFontFamilies()),
       setAppInterfaceSizePreference: payloadHandler(parseAppInterfaceSizePreference, (parsed) =>
         runCauseEffect(interfaceSize.set(parsed)),
       ),

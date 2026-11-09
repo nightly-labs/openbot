@@ -1287,6 +1287,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return () => languageListeners.delete(listener);
     },
     getAppLogoColorPreference: async () => clone(logoColorPreference),
+    getInstalledFontFamilies: async () => [
+      "American Typewriter",
+      "Arial",
+      "Georgia",
+      "Helvetica Neue",
+      "Inter",
+      "Menlo",
+      "Times New Roman",
+      "Vazirmatn",
+    ],
     setAppLogoColorPreference: async ({ color }) => {
       logoColorPreference = { color };
       for (const listener of logoColorListeners) listener(clone(logoColorPreference));
