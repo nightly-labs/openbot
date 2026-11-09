@@ -392,6 +392,11 @@ try {
         "turn/start",
         "memory edit: the queue started another compaction instead of the message",
       );
+      // The memory edit marked the session for reload, so the message opened it again.
+      assert.ok(
+        protocol().some((line) => line.method === "thread/resume" && line.threadId === threadId),
+        "memory edit: the session was not marked for reload",
+      );
     }
 
     const finalStatus = await waitFor("the second message to end", () => {
