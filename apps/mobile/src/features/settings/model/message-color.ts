@@ -18,7 +18,7 @@ const key = "openbot.mobile.message-color.v1";
 /** The earlier on/off switch for the agent color. `"false"` was no color. */
 const agentColorKey = "openbot.mobile.agent-color-messages.v1";
 
-export const DEFAULT_CUSTOM_MESSAGE_COLOR: AvatarColor =
+const DEFAULT_CUSTOM_MESSAGE_COLOR: AvatarColor =
   CHAT_COLOR_PRESETS.find((preset) => preset.id === "blue")?.value ?? "#4699fe";
 
 export const useMessageColor = create<MessageColorValue & { ready: boolean }>(() => ({

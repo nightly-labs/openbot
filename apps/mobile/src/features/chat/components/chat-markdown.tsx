@@ -24,7 +24,6 @@ import {
   ScrollView,
   Text,
   type TextStyle,
-  useWindowDimensions,
   View,
   type ViewStyle,
 } from "react-native";
@@ -38,6 +37,7 @@ import {
   StreamRevealProvider,
 } from "@/features/chat/components/streaming-tail-text";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { graphemes } from "@/shared/lib/graphemes";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";
@@ -904,7 +904,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   linkFavicons?: boolean;
 }) {
   const textReveal = useMotionPreference("textReveal");
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const tokens = useMemo(
     () =>
       inlineOnly
