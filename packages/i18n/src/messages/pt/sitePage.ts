@@ -90,6 +90,9 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "Servidores maiores, mais de {count} membros ou o que mais você precisar. Com suporte empresarial.",
   "sitePage.pricing.enterprise.contact": "Fale com vendas",
+  "sitePage.pricing.consent.statement": "Declaro que aceito {policy}, {terms}.",
+  "sitePage.pricing.consent.policy": "a política de privacidade",
+  "sitePage.pricing.consent.terms": "os termos e o direito de arrependimento",
   "sitePage.teams.title": "OpenBot para Equipes",
   "sitePage.teams.description":
     "Execute o OpenBot em infraestrutura gerenciada ou deixe a gente criar uma implantação sob medida para sua equipe, seus fluxos de trabalho e os sistemas que você já usa.",

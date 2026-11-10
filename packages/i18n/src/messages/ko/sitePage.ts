@@ -85,6 +85,9 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "더 큰 서버, {count}명이 넘는 멤버 등 필요한 것은 무엇이든 제공해요. 엔터프라이즈 지원도 포함돼요.",
   "sitePage.pricing.enterprise.contact": "영업팀에 문의",
+  "sitePage.pricing.consent.statement": "{policy}, {terms}에 동의합니다.",
+  "sitePage.pricing.consent.policy": "개인정보 처리방침",
+  "sitePage.pricing.consent.terms": "이용약관 및 청약 철회권",
   "sitePage.marketplace.agents.title": "에이전트 — OpenBot 마켓플레이스",
   "sitePage.marketplace.agents.description":
     "다른 사람이 OpenBot에서 만든 에이전트예요. 스킬과 루틴과 함께 OpenBot에 추가할 수 있어요.",

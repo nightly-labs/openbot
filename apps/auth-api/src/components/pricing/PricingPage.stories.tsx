@@ -33,6 +33,8 @@ rootRoute.addChildren(
     "/pricing",
     "/contact",
     "/app",
+    "/privacy",
+    "/terms",
   ].map((path) => createRoute({ getParentRoute: () => rootRoute, path })),
 );
 const router = createRouter({ routeTree: rootRoute });
