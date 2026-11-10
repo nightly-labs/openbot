@@ -276,27 +276,52 @@ function requireTool(name: string, catalog = BUILTIN_TOOL_CATALOG) {
   return tool;
 }
 
-// A model that leaves out one level of escapes writes a line break as a control character, so a `\n` or `\t`
-// in such text is part of a Windows path, such as `C:\new` or `C:\temp`.
-const KEPT_ESCAPES = new Set(['"', "\\", "/"]);
+const JSON_ESCAPES = new Set(['"', "\\", "/", "b", "f", "n", "r", "t"]);
+const PATH_ESCAPES = new Set(["b", "f", "n", "r", "t"]);
+
+function startsUnicodeEscape(text: string, index: number): boolean {
+  return text.charAt(index + 1) === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(index + 2, index + 6));
+}
+
+/**
+ * The end of the word at `start`, up to a space or a quote, and whether it holds an escaped backslash
+ * or a backslash that starts no valid escape, as a path such as `C:\Users` does. In such a word, `\n` or
+ * `\t` is part of the path, such as `C:\new`.
+ */
+function pathWord(text: string, start: number): { end: number; path: boolean } {
+  let index = start;
+  let path = false;
+  while (index < text.length && !/[\s"]/.test(text.charAt(index))) {
+    if (text.charAt(index) === "\\") {
+      const next = text.charAt(index + 1);
+      if (next === "\\" || (!JSON_ESCAPES.has(next) && !startsUnicodeEscape(text, index))) path = true;
+      index++;
+    }
+    index++;
+  }
+  return { end: index, path };
+}
 
 /**
  * Inside the strings of JSON text, escapes each control character and each backslash that does not
- * start a quote, backslash, slash or `\u` escape. Models write a Windows path such as `C:\Users` or a
- * line break in `arguments` text without the escape that JSON needs, so the text did not parse (#6243).
+ * start a valid escape. In a word with such a backslash, it also escapes the backslash of `\b`, `\f`,
+ * `\n`, `\r` and `\t`. Models write a Windows path such as `C:\Users` or a line break in `arguments`
+ * text without the escape that JSON needs, so the text did not parse (#6243).
  */
 function repairJsonText(text: string): string {
   let repaired = "";
   let inString = false;
+  let word = { end: 0, path: false };
   for (let index = 0; index < text.length; index++) {
     const char = text.charAt(index);
     if (char === '"') inString = !inString;
+    if (inString && index >= word.end) word = pathWord(text, index);
     if (!inString || char === '"') {
       repaired += char;
     } else if (char === "\\") {
       const next = text.charAt(index + 1);
-      const unicode = next === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(index + 2, index + 6));
-      if (KEPT_ESCAPES.has(next) || unicode) {
+      const path = word.path && PATH_ESCAPES.has(next);
+      if (!path && (JSON_ESCAPES.has(next) || startsUnicodeEscape(text, index))) {
         repaired += char + next;
         index++;
       } else {
