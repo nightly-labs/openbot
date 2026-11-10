@@ -1084,11 +1084,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       confinedWritesAllowed: (agentId, paths) => {
         const agent = store.list().find((candidate) => candidate.id === agentId);
-        return (
-          agent !== undefined &&
-          agentProviderDescriptor(providerForAgent(agent)).workspaceEnforcement === "confined-process" &&
-          confinedWritesAllowed(agent, store.sharedRoot, paths)
-        );
+        return agent !== undefined && confinedWritesAllowed(agent, store.sharedRoot, paths);
       },
       messagingThread: (threadId) => this.messaging.store.linkForThread(threadId) !== null,
       messagingRequestTurn: (agentId, turnId) => this.#mailbox.answersMessagingRequest(agentId, turnId),

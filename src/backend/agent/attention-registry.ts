@@ -435,8 +435,9 @@ export interface AttentionRegistryOptions {
    */
   workspaceSandboxed?(agentId: string): boolean;
   /**
-   * Whether the agent's own confined process may write all these files. Its provider asks for a file
-   * outside its session folder, such as an added folder, and the sandbox already allows that write.
+   * Whether the agent may write all these files with no card. Only the agent's own confined process
+   * sends them: its provider asks for a file outside its session folder, such as an added folder, that
+   * the sandbox already allows.
    */
   confinedWritesAllowed?(agentId: string, paths: readonly string[]): boolean;
   /**
@@ -952,7 +953,7 @@ export class AttentionRegistry {
   /** A file change that the agent's confined process may already write (#6176). */
   #confinedWrite(request: AppServerRequest, approval: AgentApproval): boolean {
     if (approval.kind !== "file-change") return false;
-    const paths = getArray(request.params, "filePaths").filter(isString);
+    const paths = getArray(request.params, "confinedWritePaths").filter(isString);
     return this.#confinedWritesAllowed(approval.agentId, paths);
   }
 

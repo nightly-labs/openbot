@@ -3277,7 +3277,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           permissions: requestedPermissions,
           // The card names the file; without it the card says "Agent workspace" for any folder.
           grantRoot: filePaths.length === 1 ? filePaths[0] : null,
-          filePaths,
+          // Only the agent's own confined process sends the paths that OpenBot may accept for it: a
+          // shared process has no sandbox to stop a link. A move can name only its source.
+          ...(this.options.confine && params.toolCall.kind !== "move" ? { confinedWritePaths: filePaths } : {}),
         },
         turn?.stop.signal,
       ),

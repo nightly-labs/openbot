@@ -77,7 +77,7 @@ export function workspaceExcludedFolders(agent: Pick<AgentSummary, "access" | "e
 
 /**
  * Whether a Workspace only agent may change these files with no approval card: each one is in a
- * writable root and in no excluded folder. Use it only for a provider that runs in its own confined
+ * writable root and in no excluded folder. Use it only for paths from the agent's own confined
  * process, where the operating system and not the answer limits the write. A provider asks there for
  * files outside its own session folder, such as Cursor for the added folders (#6176). Only the path
  * text is compared: a link to another place gets the answer, and the sandbox then refuses the write.
