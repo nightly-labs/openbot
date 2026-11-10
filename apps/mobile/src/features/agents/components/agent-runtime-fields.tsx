@@ -12,12 +12,13 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { useQuery } from "@tanstack/react-query";
+import { type Href, router } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useState } from "react";
-import { Keyboard, Platform } from "react-native";
-import { useCSSVariable, useUniwind } from "uniwind";
+import { Platform } from "react-native";
+import { useUniwind } from "uniwind";
 import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
+import { useAgentModelPicker } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   PLAN_LIMIT_RESET_FORMAT,
@@ -33,7 +34,6 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
 
 const EFFORT_LABELS = {
@@ -57,17 +57,13 @@ const EFFORT_LABELS = {
  * names, so a cap only removes the part of a name that tells two models apart.
  */
 const MAX_PICKER_LABEL = 28;
-function pickerLabel(text: string, selected: boolean): string {
-  if (Platform.OS === "android" || !selected) return text;
+function shortLabel(text: string): string {
   const characters = Array.from(text);
   return characters.length > MAX_PICKER_LABEL ? `${characters.slice(0, MAX_PICKER_LABEL).join("").trimEnd()}…` : text;
 }
-
-/**
- * A provider with this many models gets a search under the rows. A menu does not filter, and
- * OpenRouter lists hundreds of models, so the user scrolled the whole menu to find one.
- */
-const MODEL_SEARCH_MIN = 9;
+function pickerLabel(text: string, selected: boolean): string {
+  return Platform.OS === "android" || !selected ? text : shortLabel(text);
+}
 
 /**
  * The accounts of the host's providers, and the agents on an account after the first. Null for a
@@ -116,8 +112,11 @@ export function AgentRuntimeFields({
   onChange,
   onAccountChange,
   fastMode,
+  modelPickerRoute,
 }: {
   serverId: string;
+  /** The model list page in the stack of this form. */
+  modelPickerRoute: Href;
   available: boolean;
   saving: boolean;
   provider?: AgentProviderId;
@@ -155,18 +154,7 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
-  const accent = String(useCSSVariable("--openbot-accent"));
-  const [query, setQuery] = useState("");
-  const searches = showsModel && options.length >= MODEL_SEARCH_MIN;
-  const words = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
-  // The search also reads the model id, as the backup model search does.
-  const matches =
-    searches && words.length > 0
-      ? options.filter((option) => {
-          const text = `${option.name} ${option.id}`.toLocaleLowerCase();
-          return words.every((word) => text.includes(word));
-        })
-      : null;
+  const openModelPicker = useAgentModelPicker((state) => state.open);
   const chooseModel = (id: string) => {
     const next = options.find((option) => option.id === id);
     if (!next) return;
@@ -251,30 +239,15 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
         {showsModel ? (
+          // A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
           <SettingsRow
-            trailing={
-              <SettingsPicker<string>
-                value={model ?? ""}
-                options={[
-                  ...(!selected
-                    ? [
-                        {
-                          value: model ?? "",
-                          label: model ? pickerLabel(model, true) : t("mobile.agent.runtime.unavailable"),
-                        },
-                      ]
-                    : []),
-                  ...options.map((option) => ({
-                    value: option.id,
-                    label: pickerLabel(option.name, option.id === model),
-                  })),
-                ]}
-                enabled={enabled}
-                dark={theme === "dark"}
-                label={t("mobile.agent.runtime.model")}
-                onChange={chooseModel}
-              />
-            }
+            disabled={!enabled}
+            value={shortLabel(selected?.name ?? model ?? t("mobile.agent.runtime.unavailable"))}
+            onPress={() => {
+              if (!provider) return;
+              openModelPicker({ serverId, provider, model, choose: chooseModel });
+              router.push(modelPickerRoute);
+            }}
           >
             <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
           </SettingsRow>
@@ -312,45 +285,6 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
       </SettingsSection>
-      {searches ? (
-        <SheetFormField
-          label={t("mobile.agent.runtime.searchModels")}
-          hideLabel
-          appearance="soft"
-          placeholder={t("mobile.agent.runtime.searchModels")}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          editable={enabled}
-          value={query}
-          onChangeText={setQuery}
-        />
-      ) : null}
-      {matches?.length === 0 ? (
-        <Typography.Paragraph className="px-4 text-grouped-secondary">
-          {t("mobile.agent.runtime.noMatches")}
-        </Typography.Paragraph>
-      ) : null}
-      {matches?.length ? (
-        <SettingsSection>
-          {matches.map((option) => (
-            <SettingsRow
-              key={option.id}
-              checked={option.id === model}
-              disclosure={false}
-              disabled={!enabled}
-              trailing={option.id === model ? <Check size={18} color={accent} strokeWidth={2} /> : null}
-              onPress={() => {
-                chooseModel(option.id);
-                setQuery("");
-                Keyboard.dismiss();
-              }}
-            >
-              <Typography.Paragraph numberOfLines={2}>{option.name}</Typography.Paragraph>
-            </SettingsRow>
-          ))}
-        </SettingsSection>
-      ) : null}
       {fastMode && showsModel && selected?.fastServiceTier ? <AgentFastModeField {...fastMode} /> : null}
       {models.isError ? (
         <Button variant="ghost" onPress={() => void models.refetch()}>
