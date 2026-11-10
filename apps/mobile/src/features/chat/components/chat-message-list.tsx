@@ -1353,7 +1353,10 @@ export const ChatMessageList = memo(function ChatMessageList({
     [messages, turnSummaries, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
-  const dayLabels = useMemo(() => chatDayLabels(visibleMessages, { t, format }), [visibleMessages, t, format]);
+  const dayLabels = useMemo(
+    () => chatDayLabels(visibleMessages, { t, format }, { hasOlder }),
+    [visibleMessages, t, format, hasOlder],
+  );
   // Every image of the loaded messages, in chat order, for the viewer's carousel.
   const images = useMemo(() => conversationImages(visibleMessages), [visibleMessages]);
   // On Android the first commit of the chat has no rows, so the open animation starts at once. The

@@ -470,7 +470,10 @@ export function groupExchangeMarkers<T extends ChatMessage>(messages: readonly T
 
 /** Consecutive routine markers, drawn as one closed row. */
 export interface RoutineRunGroup {
-  /** The ID of the first marker, so the row stays the same while new markers join. */
+  /**
+   * The row ID that the group had when it first showed, so the row keeps its key, size and open state
+   * while markers join it: new markers at the end, and markers of an older page at the start.
+   */
   id: string;
   kind: "routine-run-group";
   /** The name of the newest marker when all markers are of one routine, else null. */
@@ -489,6 +492,8 @@ function rowMarkers(row: ChatRow): readonly { id: string }[] {
 }
 
 const routineRunGroups = new WeakMap<RoutineMarker, RoutineRunGroup>();
+/** The row ID that each routine marker last showed in, by marker ID. */
+const routineRowIds = new Map<string, string>();
 
 /** The rows where a routine run group must stop, so a line or a focused run keeps a row of its own. */
 export interface RoutineRunGroupStops {
@@ -524,10 +529,17 @@ export function groupRoutineRunMarkers<T extends ChatRow>(
     if (branch >= 0) starts.add(branch + 1);
   }
   const result: (T | RoutineRunGroup)[] = [];
+  // A group never takes the ID of a marker in another row: a marker alone uses its own ID.
+  const markerIds = new Set(rows.flatMap((row) => (row.kind === "routine" ? [row.id] : [])));
+  const usedIds = new Set<string>();
   let run: (T & RoutineMarker)[] = [];
   const closeRun = () => {
     const [first] = run;
-    if (first) result.push(run.length === 1 ? first : routineRunGroup(first, run));
+    if (!first) return;
+    const id = run.length === 1 ? first.id : routineRowId(first, run, markerIds, usedIds);
+    usedIds.add(id);
+    for (const marker of run) routineRowIds.set(marker.id, id);
+    result.push(run.length === 1 ? first : routineRunGroup(id, first, run));
     run = [];
   };
   rows.forEach((row, index) => {
@@ -549,13 +561,37 @@ function groupableRoutine<T extends ChatRow>(row: T): row is T & RoutineMarker {
   return row.kind === "routine" && !LIVE_ROUTINE_EVENTS.has(row.event);
 }
 
+/**
+ * The row ID of a group: the ID of a row that one of its markers showed in, so an older page that
+ * joins the top group does not give the list a new row of an unknown size. Else the ID of its first
+ * marker. A group that splits keeps the ID in its first part.
+ */
+function routineRowId(
+  first: RoutineMarker,
+  run: readonly RoutineMarker[],
+  markerIds: ReadonlySet<string>,
+  usedIds: ReadonlySet<string>,
+): string {
+  for (const marker of run) {
+    const id = routineRowIds.get(marker.id);
+    if (id === undefined || usedIds.has(id)) continue;
+    if (!markerIds.has(id) || run.some((item) => item.id === id)) return id;
+  }
+  return first.id;
+}
+
 /** Reuse the group of the same markers, so a streamed reply does not draw the group row again. */
-function routineRunGroup(first: RoutineMarker, runs: RoutineMarker[]): RoutineRunGroup {
+function routineRunGroup(id: string, first: RoutineMarker, runs: RoutineMarker[]): RoutineRunGroup {
   const cached = routineRunGroups.get(first);
-  if (cached?.runs.length === runs.length && cached.runs.every((item, index) => item === runs[index])) return cached;
+  if (
+    cached?.id === id &&
+    cached.runs.length === runs.length &&
+    cached.runs.every((item, index) => item === runs[index])
+  )
+    return cached;
   const newest = runs.at(-1) ?? first;
   const group: RoutineRunGroup = {
-    id: first.id,
+    id,
     kind: "routine-run-group",
     routineName: runs.every((item) => item.routineId === first.routineId) ? newest.routineName : null,
     runs,
