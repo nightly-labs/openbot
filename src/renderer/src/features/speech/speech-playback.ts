@@ -61,9 +61,16 @@ const SPOKEN_AUDIO_SECONDS = 3 * 60;
  */
 const DECODED_RECORDING_LIMIT = 4;
 
+/** An agent on one server. Agent ids repeat across servers. */
+export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
+
 /** One text that is read aloud. Stopping it ends the part that plays and skips the rest. */
 interface Reading {
   stopped: boolean;
+  /** The agent whose words it reads, or null for a recording or a text of no agent. */
+  agent: SpeechAgent | null;
+  /** A hold paused it, so the end of the hold plays it again. */
+  held: boolean;
   /** A plain copy of the paused state, because a store read can lag behind its write. */
   paused: boolean;
   /** A reply plays at the speed that the user chose; the user's own recording plays at normal speed. */
@@ -94,6 +101,8 @@ let audioContext: AudioContext | undefined;
 let analyser: AnalyserNode | undefined;
 let reading: Reading | undefined;
 let upcoming: UpcomingReading | undefined;
+/** The agent whose readings stay paused until `releaseSpeech`. */
+let heldAgent: SpeechAgent | undefined;
 /** The speed of replies. A change applies to the reply that plays now. */
 let replyRate = 1;
 const [state, setState] = createStore<{
@@ -217,6 +226,31 @@ export function resumeSpeech(): void {
   });
 }
 
+function sameAgent(first: SpeechAgent | null | undefined, second: SpeechAgent | undefined): boolean {
+  return !!first && !!second && first.serverId === second.serverId && first.agentId === second.agentId;
+}
+
+/**
+ * Pauses the reading of this agent, and each reading of it that starts, until `releaseSpeech`. The
+ * user can speak over the agent; their words decide if its reply goes on.
+ */
+export function holdSpeech(agent: SpeechAgent): void {
+  heldAgent = agent;
+  if (!reading || reading.paused || !sameAgent(reading.agent, agent)) return;
+  reading.held = true;
+  pauseSpeech();
+}
+
+/** Ends the hold of this agent. When `resume` is true, the reading that the hold paused plays on. */
+export function releaseSpeech(agent: SpeechAgent, resume: boolean): void {
+  if (!sameAgent(heldAgent, agent)) return;
+  heldAgent = undefined;
+  const own = reading;
+  if (!own?.held) return;
+  own.held = false;
+  if (resume) resumeSpeech();
+}
+
 /** Moves the recording that plays now to a position, in seconds. A paused recording stays paused. */
 export function seekSpeech(seconds: number): void {
   const own = reading;
@@ -295,7 +329,12 @@ export async function readAloud(
   const parts = speechParts(text, language);
   const first = parts[0];
   if (first === undefined) return result;
-  const own = newReading(true);
+  const own = newReading(true, source);
+  // A reading of an agent on hold waits for the end of the hold.
+  if (sameAgent(own.agent, heldAgent)) {
+    own.paused = true;
+    own.held = true;
+  }
   setState((draft) => {
     draft.reading = {
       serverId: source?.serverId ?? null,
@@ -303,7 +342,7 @@ export async function readAloud(
       messageId: source?.messageId ?? null,
       part: first,
       levels: new Array(SPEECH_LEVEL_COUNT).fill(0),
-      paused: false,
+      paused: own.paused,
       duration: null,
       elapsed: 0,
     };
@@ -448,9 +487,11 @@ function keepSpokenAudio(messageId: string, parts: AudioBuffer[]): void {
   });
 }
 
-function newReading(reply: boolean): Reading {
+function newReading(reply: boolean, agent: SpeechAgent | null = null): Reading {
   const own: Reading = {
     stopped: false,
+    agent: agent && { serverId: agent.serverId, agentId: agent.agentId },
+    held: false,
     paused: false,
     reply,
     element: undefined,
