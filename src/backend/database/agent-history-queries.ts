@@ -98,7 +98,7 @@ export class AgentHistoryQueries {
       this.#core.connection
         .prepare(
           `SELECT json_extract(message_json, '$.trace') AS trace FROM projection_thread_messages
-          WHERE thread_id = ? AND turn_id = ? AND json_extract(message_json, '$.trace') IS NOT NULL LIMIT 1`,
+          WHERE thread_id = ? AND turn_id = ? AND json_type(message_json, '$.trace') = 'object' LIMIT 1`,
         )
         .get(threadId, turnId),
     );
