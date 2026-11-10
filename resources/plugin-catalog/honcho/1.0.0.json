@@ -36,13 +36,6 @@
                 "prefix": "Bearer ",
                 "placeholder": "hch-…",
                 "hint": "Create a key at app.honcho.dev."
-              },
-              {
-                "id": "workspace-id",
-                "label": "Workspace ID",
-                "header": "X-Honcho-Workspace-ID",
-                "hint": "The workspace agents use when they do not name one.",
-                "optional": true
               }
             ],
             "docsUrl": "https://honcho.dev/docs/v3/guides/integrations/mcp",

@@ -196,6 +196,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
+  "marketplace.plugin.honcho.tagline": "AI ツールをまたぐあなたの記憶",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs の Honcho は、接続した他の AI ツールとも共有できる、あなたについての長期記憶をエージェントに与えます。エージェントは学んだことを保存し、Honcho はそれをもとに推論して、あなたの好み、目標、仕事の進め方のモデルを作ります。エージェントは作業を始める前に Honcho に質問します。OpenBot のエージェントにも独自の記憶があります。Honcho は他のツールでもあなたについていく記憶です。エージェントが保存したメッセージはあなたの Honcho アカウントに送られます。",
+  "marketplace.plugin.honcho.app": "1 つの MCP サーバーで、Honcho のワークスペースに長期記憶を保存して照会します。",
+  "marketplace.plugin.honcho.prompt.recall":
+    "始める前に、私の好きな仕事の進め方について Honcho が何を知っているか聞いてください。",
+  "marketplace.plugin.honcho.prompt.save": "このスレッドの決定事項を Honcho に保存してください。",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho は私の文章のスタイルについて何と言っていますか？この下書きに活かしてください。",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev でキーを作成してください。",
+  "marketplace.plugin.hindsight.tagline": "時間とともに学ぶ記憶",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize の Hindsight は、Hindsight Cloud にある長期記憶をエージェントに与えます。エージェントは事実や出来事を保持し、意味、時間、エンティティで呼び出し、それを振り返ってメンタルモデルを作ります。記憶はバンクに保管され、エージェントはプロジェクトや人ごとにバンクを作れます。OpenBot のエージェントにも独自の記憶があります。Hindsight は接続した他の AI ツールと共有できる記憶です。エージェントが保持した内容はあなたの Hindsight Cloud アカウントに送られます。",
+  "marketplace.plugin.hindsight.app":
+    "1 つの MCP サーバーで、Hindsight Cloud のバンクにある記憶を保持、呼び出し、振り返ります。",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "始める前に、このプロジェクトについて分かっていることを Hindsight から呼び出してください。",
+  "marketplace.plugin.hindsight.prompt.retain": "このスレッドの決定事項と未解決の質問を Hindsight に保持してください。",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "私の Hindsight の記憶を振り返ってください。この 1 か月の私の仕事にどんなパターンがありますか？",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud の Connect ページでキーを作成してください。",
   "marketplace.plugin.figma.tagline": "デザインとプロトタイプ",
   "marketplace.plugin.figma.description":
     "Figma を使うと、エージェントはデザインファイルを読み取り、コンポーネント、スタイル、変数を調べ、本番用の仕様をエンジニアに渡せます。このコンピューターの Figma デスクトップアプリにある MCP サーバーに接続します。サーバーはデザインの読み取りのみ可能で、書き込みには現在対応中です。",

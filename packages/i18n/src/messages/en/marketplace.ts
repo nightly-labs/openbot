@@ -222,6 +222,26 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.cobrain.prompt.startSession": "Load my Cobrain context for this project before we start.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "Search my Cobrain notes for what we decided about pricing.",
   "marketplace.plugin.cobrain.prompt.saveNote": "Save a note in Cobrain with what we did today and what is left.",
+  "marketplace.plugin.honcho.tagline": "Your memory across AI tools",
+  "marketplace.plugin.honcho.description":
+    "Honcho by Plastic Labs gives agents a long-term memory of you that other AI tools you connect can share. Agents save what they learn, and Honcho reasons over it to build a model of your preferences, goals and ways of working. Agents ask it questions before they start. OpenBot agents keep their own memory too; Honcho is the memory that follows you to other tools. Messages that agents save go to your Honcho account.",
+  "marketplace.plugin.honcho.app": "Save and query long-term memory in your Honcho workspaces over one MCP server.",
+  "marketplace.plugin.honcho.prompt.recall": "Ask Honcho what it knows about how I like to work before we start.",
+  "marketplace.plugin.honcho.prompt.save": "Save the decisions from this thread to Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences": "What does Honcho say about my writing style? Use it for this draft.",
+  "marketplace.plugin.honcho.hint.apiKey": "Create a key at app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Memory that learns over time",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight by Vectorize gives agents a long-term memory in Hindsight Cloud. Agents retain facts and events, recall them by meaning, time and entity, and reflect on them to form mental models. Memories are kept in banks, and agents can make a bank for each project or person. OpenBot agents keep their own memory too; Hindsight is the memory that other AI tools you connect can share. What agents retain goes to your Hindsight Cloud account.",
+  "marketplace.plugin.hindsight.app":
+    "Retain, recall and reflect on memories in your Hindsight Cloud banks over one MCP server.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Recall from Hindsight what we know about this project before we start.",
+  "marketplace.plugin.hindsight.prompt.retain":
+    "Retain the decisions and open questions from this thread in Hindsight.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Reflect on my Hindsight memories: what patterns do you see in my last month of work?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Create a key on the Connect page of Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Designs and prototypes",
   "marketplace.plugin.figma.description":
     "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",

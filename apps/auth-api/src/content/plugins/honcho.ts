@@ -31,7 +31,7 @@ export const HONCHO_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Which workspace does the agent use?",
       answer:
-        "Each Honcho tool that works on a workspace takes a workspace_id. With an API key, you can type a default Workspace ID, which OpenBot sends in the X-Honcho-Workspace-ID header. Without one, the agent names the workspace on each call, and it can use list_workspaces to find it.",
+        "Each Honcho tool that works on a workspace takes a workspace_id. The agent names the workspace on each call, and it can use list_workspaces to find it. To keep one workspace, tell the agent its name, for example in its instructions.",
     },
     {
       question: "How is Honcho different from the memory of an OpenBot agent?",

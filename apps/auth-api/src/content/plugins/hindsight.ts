@@ -32,7 +32,7 @@ export const HINDSIGHT_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Which memory bank does the agent use?",
       answer:
-        'The agent can name a bank on each call. With an API key, you can type a default Bank, which OpenBot sends in the X-Bank-Id header. With no bank, Hindsight uses the bank "default" and makes it on first use. Memories in "default" do not show in other banks, so a named bank is better.',
+        'The agent names a bank on each call, and it can use list_banks to find one. When the agent names no bank, Hindsight uses the bank "default" and makes it on first use. Memories in "default" do not show in other banks, so tell the agent which bank to use, for example in its instructions.',
     },
     {
       question: "Does Hindsight Cloud cost anything?",

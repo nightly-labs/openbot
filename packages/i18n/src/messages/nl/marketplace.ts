@@ -188,6 +188,27 @@ export const messages = {
     "Zoek in mijn Cobrain-notities wat we over de prijzen hebben besloten.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Sla een notitie op in Cobrain met wat we vandaag hebben gedaan en wat er nog moet.",
+  "marketplace.plugin.honcho.tagline": "Je geheugen in al je AI-tools",
+  "marketplace.plugin.honcho.description":
+    "Honcho van Plastic Labs geeft agents een langetermijngeheugen over jou dat andere gekoppelde AI-tools kunnen delen. Agents slaan op wat ze leren, en Honcho redeneert erover om een model te maken van je voorkeuren, doelen en manier van werken. Agents stellen het vragen voordat ze beginnen. OpenBot-agents hebben ook hun eigen geheugen; Honcho is het geheugen dat je naar andere tools volgt. Berichten die agents opslaan, gaan naar je Honcho-account.",
+  "marketplace.plugin.honcho.app":
+    "Langetermijngeheugen in je Honcho-werkruimten opslaan en bevragen via één MCP-server.",
+  "marketplace.plugin.honcho.prompt.recall": "Vraag Honcho voordat we beginnen wat het weet over hoe ik graag werk.",
+  "marketplace.plugin.honcho.prompt.save": "Sla de beslissingen uit deze thread op in Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Wat zegt Honcho over mijn schrijfstijl? Gebruik het voor dit concept.",
+  "marketplace.plugin.honcho.hint.apiKey": "Maak een sleutel op app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Geheugen dat leert met de tijd",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight van Vectorize geeft agents een langetermijngeheugen in Hindsight Cloud. Agents onthouden feiten en gebeurtenissen, halen ze op naar betekenis, tijd en entiteit, en denken erover na om mentale modellen te vormen. Herinneringen staan in banken, en agents kunnen een bank maken voor elk project of elke persoon. OpenBot-agents hebben ook hun eigen geheugen; Hindsight is het geheugen dat andere gekoppelde AI-tools kunnen delen. Wat agents onthouden, gaat naar je Hindsight Cloud-account.",
+  "marketplace.plugin.hindsight.app":
+    "Herinneringen in je Hindsight Cloud-banken onthouden, ophalen en overdenken via één MCP-server.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Haal voordat we beginnen uit Hindsight op wat we over dit project weten.",
+  "marketplace.plugin.hindsight.prompt.retain": "Onthoud de beslissingen en open vragen uit deze thread in Hindsight.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Denk na over mijn herinneringen in Hindsight: welke patronen zie je in mijn werk van de afgelopen maand?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Maak een sleutel op de pagina Connect van Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Ontwerpen en prototypes",
   "marketplace.plugin.figma.description":
     "Met Figma kunnen agents ontwerpbestanden lezen, componenten, stijlen en variabelen inspecteren en productiespecificaties aan ontwikkelaars overdragen. Het koppelt met de MCP-server in de Figma-desktopapp op deze computer. De server kan alleen ontwerpen lezen; ondersteuning voor schrijven komt eraan.",

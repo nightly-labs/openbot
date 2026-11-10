@@ -39,13 +39,6 @@
                 "prefix": "Bearer ",
                 "placeholder": "hsk_…",
                 "hint": "Create a key on the Connect page of Hindsight Cloud."
-              },
-              {
-                "id": "bank-id",
-                "label": "Bank",
-                "header": "X-Bank-Id",
-                "optional": true,
-                "hint": "The bank agents use when they do not name one. Without it, Hindsight uses the bank \"default\"."
               }
             ],
             "docsUrl": "https://ui.hindsight.vectorize.io/connect",

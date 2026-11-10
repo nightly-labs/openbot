@@ -191,6 +191,22 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "开始之前，请先加载我在 Cobrain 中的这个项目的上下文。",
   "marketplace.plugin.cobrain.prompt.searchDecision": "在我的 Cobrain 笔记中搜索我们关于定价的决定。",
   "marketplace.plugin.cobrain.prompt.saveNote": "在 Cobrain 中保存一条笔记，记下我们今天做了什么、还剩什么。",
+  "marketplace.plugin.honcho.tagline": "跨 AI 工具的个人记忆",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs 的 Honcho 为智能体提供关于你的长期记忆，你连接的其他 AI 工具也可以共享。智能体保存所学内容，Honcho 据此推理，构建你的偏好、目标和工作方式的模型。智能体在开始前会向它提问。OpenBot 智能体也有自己的记忆；Honcho 是跟随你到其他工具的记忆。智能体保存的消息会发送到你的 Honcho 账户。",
+  "marketplace.plugin.honcho.app": "通过一个 MCP 服务器，在 Honcho 工作区中保存和查询长期记忆。",
+  "marketplace.plugin.honcho.prompt.recall": "开始之前，问问 Honcho 它对我喜欢的工作方式了解多少。",
+  "marketplace.plugin.honcho.prompt.save": "把这个对话中的决定保存到 Honcho。",
+  "marketplace.plugin.honcho.prompt.preferences": "Honcho 对我的写作风格怎么说？把它用在这份草稿里。",
+  "marketplace.plugin.honcho.hint.apiKey": "在 app.honcho.dev 创建密钥。",
+  "marketplace.plugin.hindsight.tagline": "随时间学习的记忆",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize 的 Hindsight 为智能体提供 Hindsight Cloud 中的长期记忆。智能体保留事实和事件，按含义、时间和实体回忆它们，并对其进行反思以形成心智模型。记忆保存在记忆库中，智能体可以为每个项目或每个人创建一个记忆库。OpenBot 智能体也有自己的记忆；Hindsight 是你连接的其他 AI 工具可以共享的记忆。智能体保留的内容会发送到你的 Hindsight Cloud 账户。",
+  "marketplace.plugin.hindsight.app": "通过一个 MCP 服务器，在 Hindsight Cloud 记忆库中保留、回忆和反思记忆。",
+  "marketplace.plugin.hindsight.prompt.recall": "开始之前，从 Hindsight 中回忆我们对这个项目的了解。",
+  "marketplace.plugin.hindsight.prompt.retain": "把这个对话中的决定和未解决的问题保留到 Hindsight。",
+  "marketplace.plugin.hindsight.prompt.reflect": "反思我在 Hindsight 中的记忆：你在我上个月的工作中看到了哪些规律？",
+  "marketplace.plugin.hindsight.hint.apiKey": "在 Hindsight Cloud 的 Connect 页面创建密钥。",
   "marketplace.plugin.figma.tagline": "设计与原型",
   "marketplace.plugin.figma.description":
     "Figma 让助手读取设计文件、检查组件、样式与变量，并把生产规格交给工程师。它连接这台电脑上 Figma 桌面应用里的 MCP 服务器。该服务器目前只能读取设计，写入支持仍在开发中。",
