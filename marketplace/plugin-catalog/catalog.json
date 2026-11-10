@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "v1",
-  "updatedAt": "2026-09-30T00:00:00.000Z",
+  "updatedAt": "2026-11-10T00:00:00.000Z",
   "order": [
     "aave",
     "canva",
@@ -38,6 +38,7 @@
     "brave-search",
     "resend",
     "omnisend",
+    "rankreactor",
     "composio",
     "clickup",
     "coinbase",

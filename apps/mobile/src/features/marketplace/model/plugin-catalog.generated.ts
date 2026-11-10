@@ -1340,6 +1340,57 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "rankreactor",
+    name: "RankReactor",
+    tagline: "SEO articles, keywords and site audits",
+    description:
+      "RankReactor lets agents read one project's plan, quotas and stored SEO metrics, list generated articles and UGC videos, refresh metrics, and queue new articles or short videos after you confirm. A project API key from the RankReactor dashboard goes into one Authorization header. The key reaches that one project. Agents cannot publish to YouTube or Blogger, delete project content, or change billing. Article and video generation uses the same plan limits as the dashboard.",
+    category: "automation",
+    creatorName: "Sierra Dynamics LLC",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-status", text: "How many articles are left on this RankReactor project today?" },
+      { id: "prompt-metrics", text: "Show the stored search metrics for this RankReactor site." },
+      { id: "prompt-articles", text: "List the generated articles for this RankReactor project." },
+    ],
+    websiteUrl: "https://www.rankreactor.ai",
+    privacyPolicyUrl: "https://www.rankreactor.ai/privacy-policy",
+    termsUrl: "https://www.rankreactor.ai/tos",
+    featured: false,
+    apps: [
+      {
+        id: "app-rankreactor-mcp",
+        name: "RankReactor",
+        description:
+          "Project status, SEO metrics, articles and UGC video, over RankReactor's MCP server with a project API key.",
+        server: {
+          name: "rankreactor",
+          transport: "http",
+          url: "https://www.rankreactor.ai/mcp",
+          auth: [
+            {
+              id: "rankreactor-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "rr_live_…",
+                  hint: "RankReactor dashboard → API Key → Generate",
+                },
+              ],
+              docsUrl: "https://www.rankreactor.ai/docs/ai-assistants",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Gmail, Slack, GitHub and 1,000+ more apps",

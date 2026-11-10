@@ -321,6 +321,18 @@ const PLUGIN_TEXT = {
       "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
     },
   },
+  rankreactor: {
+    tagline: "marketplace.plugin.rankreactor.tagline",
+    description: "marketplace.plugin.rankreactor.description",
+    apps: {
+      "app-rankreactor-mcp": "marketplace.plugin.rankreactor.app",
+    },
+    prompts: {
+      "prompt-status": "marketplace.plugin.rankreactor.prompt.status",
+      "prompt-metrics": "marketplace.plugin.rankreactor.prompt.metrics",
+      "prompt-articles": "marketplace.plugin.rankreactor.prompt.articles",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",

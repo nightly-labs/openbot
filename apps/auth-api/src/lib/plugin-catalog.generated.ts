@@ -16,7 +16,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   plugins: [
     {
       slug: "aave",
@@ -227,6 +227,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80",
+    },
+    {
+      slug: "rankreactor",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "04db9c12d8e8f9d65247d1ce45f103064124e6d1e05c11e5144ed16c06bd5e2c",
     },
     {
       slug: "composio",
@@ -1628,6 +1634,59 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.omnisend.com",
     privacyPolicyUrl: "https://www.omnisend.com/privacy/",
     termsUrl: "https://www.omnisend.com/terms/",
+    skills: [],
+  },
+  rankreactor: {
+    slug: "rankreactor",
+    name: "RankReactor",
+    tagline: "SEO articles, keywords and site audits",
+    description:
+      "RankReactor lets agents read one project's plan, quotas and stored SEO metrics, list generated articles and UGC videos, refresh metrics, and queue new articles or short videos after you confirm. A project API key from the RankReactor dashboard goes into one Authorization header. The key reaches that one project. Agents cannot publish to YouTube or Blogger, delete project content, or change billing. Article and video generation uses the same plan limits as the dashboard.",
+    category: "automation",
+    creatorName: "Sierra Dynamics LLC",
+    iconUrl: "https://www.rankreactor.ai/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-status", text: "How many articles are left on this RankReactor project today?" },
+      { id: "prompt-metrics", text: "Show the stored search metrics for this RankReactor site." },
+      { id: "prompt-articles", text: "List the generated articles for this RankReactor project." },
+    ],
+    apps: [
+      {
+        id: "app-rankreactor-mcp",
+        name: "RankReactor",
+        description:
+          "Project status, SEO metrics, articles and UGC video, over RankReactor's MCP server with a project API key.",
+        iconUrl: "https://www.rankreactor.ai/apple-touch-icon.png",
+        server: {
+          name: "rankreactor",
+          transport: "http",
+          url: "https://www.rankreactor.ai/mcp",
+          auth: [
+            {
+              id: "rankreactor-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "rr_live_…",
+                  hint: "RankReactor dashboard → API Key → Generate",
+                },
+              ],
+              docsUrl: "https://www.rankreactor.ai/docs/ai-assistants",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://www.rankreactor.ai",
+    privacyPolicyUrl: "https://www.rankreactor.ai/privacy-policy",
+    termsUrl: "https://www.rankreactor.ai/tos",
     skills: [],
   },
   composio: {

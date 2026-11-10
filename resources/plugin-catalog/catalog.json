@@ -213,6 +213,12 @@
       "detailSha256": "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80"
     },
     {
+      "slug": "rankreactor",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "04db9c12d8e8f9d65247d1ce45f103064124e6d1e05c11e5144ed16c06bd5e2c"
+    },
+    {
       "slug": "composio",
       "version": "1.2.0",
       "featured": false,
