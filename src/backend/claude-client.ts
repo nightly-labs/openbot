@@ -10,7 +10,9 @@ import { promisify } from "node:util";
 import {
   type CanUseTool,
   createSdkMcpServer,
+  type ElicitationResult,
   type ModelInfo,
+  type OnElicitation,
   type Options,
   type PermissionResult,
   query,
@@ -1158,6 +1160,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           return yield* this.#requestUserInputEffect(threadId, toolInput, options.toolUseID ?? randomUUID());
         }),
       );
+    // Without this callback the SDK declines each MCP server question, so the user never saw it (#6166).
+    const onElicitation: OnElicitation = (request, { signal }) =>
+      runCauseEffect(this.#requestElicitationEffect(threadId, request, signal));
     // OpenBot's own servers spread last: Claude keys this record by name, so a user configuration
     // that reached one of those names would take the agent's own tools away. Profile generation
     // asks one question and must not act, so it gets neither set.
@@ -1298,6 +1303,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           persistSession: config.persistSession,
           additionalDirectories: config.additionalDirectories,
           canUseTool,
+          onElicitation,
           ...(settingsFile
             ? { settings: settingsFile }
             : Object.keys(flagSettings).length > 0
@@ -2465,6 +2471,43 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }),
     );
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
+  });
+
+  /**
+   * An MCP server's question, shown on the same card as a Codex one. The card declines what it
+   * cannot show, such as a sign-in on a web page. When Claude stops waiting, the card closes.
+   */
+  readonly #requestElicitationEffect = Effect.fn("ClaudeAgentClient.requestElicitation")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+    request: Parameters<OnElicitation>[0],
+    signal: AbortSignal,
+  ): Effect.fn.Return<ElicitationResult> {
+    const result = yield* this.#serverRequests
+      .call(
+        "mcpServer/elicitation/request",
+        {
+          threadId,
+          turnId: this.#threads.get(threadId)?.activeTurn?.id ?? randomUUID(),
+          serverName: request.serverName,
+          mode: request.mode ?? "form",
+          message: request.message,
+          requestedSchema: request.requestedSchema ?? null,
+          url: request.url ?? null,
+          elicitationId: request.elicitationId ?? null,
+        },
+        signal,
+      )
+      .pipe(Effect.orElseSucceed(() => ({ action: "cancel" })));
+    const action = getString(result, "action");
+    if (action !== "accept") return { action: action === "decline" ? "decline" : "cancel" };
+    const content: NonNullable<ElicitationResult["content"]> = {};
+    const answers = isRecord(result) && isRecord(result.content) ? result.content : {};
+    for (const [id, value] of Object.entries(answers)) {
+      if (isString(value) || isNumber(value) || typeof value === "boolean") content[id] = value;
+      else if (Array.isArray(value) && value.every(isString)) content[id] = value;
+    }
+    return { action, content };
   });
 
   /**
