@@ -141,7 +141,9 @@ export class ModelCatalog {
     const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
     // Tier first, then newest first. Sort is stable, so the CLI's own order still decides
     // between models of one version.
-    const sorted = [...models].sort((left, right) => rank(left) - rank(right) || compareModelVersions(left, right));
+    const sorted = catalog.ownOrder
+      ? models
+      : [...models].sort((left, right) => rank(left) - rank(right) || compareModelVersions(left, right));
     return { models: sorted, listed: serverModels.size };
   });
 

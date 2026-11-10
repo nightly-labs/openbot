@@ -690,6 +690,12 @@ the rest, then OpenCode's own paid models, then everything behind a separate sig
 tier the newest version comes first. The sort is stable, so the CLI's order stays between models of
 one version.
 
+When a fresh catalog no longer lists an agent's model, `moveAgentsOffUnlistedModels`
+(`src/backend/agent/custom-endpoints.ts`) moves the agent on the same provider: to the listed model
+whose effort the saved id names (`effortVariant`), else to the newest listed model of the same family
+(`newestOfFamily`: the id without versions, dates and effort words, so `claude-opus-4-6-thinking` goes to
+`claude-opus-5-5` with its effort when that model has it), else to the default or the first model.
+
 Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
 `isFreeOpencodeModel` in `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
@@ -757,6 +763,13 @@ version with `--version`. OpenBot never searches `PATH`, because the Antigravity
 
 The 1.5 CLI offers its Claude and GPT models to every client, so the flavor sends OpenBot's own
 `clientInfo`. (1.4 offered them only to a client named `zed`.)
+
+The CLI lists the plan's models best first, and the catalog keeps that order (`ownOrder`): an Ultra
+plan on 1.5.5 lists Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5 and GPT-OSS
+120B, a free plan Gemini 3.8 Flash first. The provider has no `defaultProviderModel`, so a new agent
+runs the first one. Sorted by version, "GPT-OSS 120B" read as version 120 and came first. Gemini 4
+Carbon is offered only with an Application Default Credentials sign-in (`AGY_ADC_AUTH`), which
+OpenBot does not use.
 
 The CLI ignores `GEMINI_HOME`. It takes its folders as flags: `--gemini-dir` as an absolute path
 and `--app-data-dir` relative to the Gemini home (`antigravityArgv`). A relative `--gemini-dir` logs
