@@ -192,7 +192,8 @@ with an invalid schedule and tells the user; the rest of the agent still imports
 
 A routine has one schedule. When a task has more than one schedule, make one routine for each
 schedule, with the same instruction, time zone, and on or off state. Add a number to each name,
-such as `Gmail check (1/3)`. Do not merge schedules into one, and do not leave one out.
+such as `Gmail check (1/3)`, and shorten the name if necessary to keep it 80 characters or fewer. Do
+not merge schedules into one, and do not leave one out.
 
 A task that starts on an event, such as a webhook, an email, or a new message, has no schedule. Do
 not put it in `routines`, and do not make up a schedule for it. For an agent, write each such task
