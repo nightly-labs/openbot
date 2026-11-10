@@ -37,6 +37,7 @@ import {
   ContextUsageMeter,
   contextUsageView,
 } from "@openbot/ui/features/conversation/ContextUsage";
+import { composerHistory } from "@openbot/ui/features/conversation/composer-history";
 import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/OpenWaits";
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
@@ -148,6 +149,8 @@ export function ConversationComposer() {
         : t("composer.placeholder.messageAgent");
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  /** The prompts that Arrow Up and Arrow Down recall in the message box, oldest first. */
+  const composerHistoryPrompts = createMemo(() => composerHistory(props.messages, channel?.ownMessage));
   /** A skill belongs to one agent, and a channel message goes to the agents it routes to. */
   const pickSkill = () => (channel ? undefined : () => setSkillPickerRequest((current) => current + 1));
   /**
@@ -708,6 +711,7 @@ export function ConversationComposer() {
               mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
+              history={composerHistoryPrompts()}
               disabled={submitting() || voicePhase() === "transcribing" || editorLocked() || savePending()}
               placeholder={
                 !agentReady()

@@ -94,6 +94,12 @@ interface ComposerEditorProps {
   /** Shows the browser tab, or opens the thread by its task id, that a chip in the draft names. */
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   value: string;
+  /**
+   * The user's earlier messages in this conversation, oldest first. Arrow Up recalls them into an
+   * empty draft, one per press, and Arrow Down walks forward to the draft that the recall replaced.
+   * Absent, the arrow keys keep their usual caret movement.
+   */
+  history?: readonly string[] | undefined;
   placeholder: string;
   ariaLabel: string;
   disabled: boolean;
@@ -174,6 +180,7 @@ interface MentionContext {
 const DICTATION_INTERIM_WORDS = 2;
 const EMPTY_TABS: ComposerBrowserTab[] = [];
 const EMPTY_THREADS: ComposerThread[] = [];
+const EMPTY_HISTORY: readonly string[] = [];
 /** The name of the file that a long text paste becomes, as on mobile. */
 const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
 
@@ -360,6 +367,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastQuoteRequest = untrack(() => props.quoteRequest?.id ?? 0);
   /* Where the caret was when the editor last had it. A selection in a message takes the caret away. */
   let savedCaret: number | null = null;
+  /*
+   * The index of the prompt that the arrow keys show, or -1 for the draft. The keys enter the
+   * history only from an empty draft, and pass it again into an empty draft. Typing, a paste or a
+   * draft switch leaves history mode, because the recalled text is then the user's own draft.
+   */
+  let historyIndex = -1;
   let isComposing = false;
   const [compositionRevision, setCompositionRevision] = createSignal(0);
   const attachmentTokenActions: AttachmentTokenActions = {
@@ -464,6 +477,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       if (contentChanged) {
         lastAgentId = agentId;
         lastEmittedValue = value;
+        // Text that comes from outside, such as a send that clears the draft, is the draft again.
+        leaveHistory();
         setAttachmentTooltip(null);
         renderEditorValue(
           editor,
@@ -629,7 +644,69 @@ export function ComposerEditor(props: ComposerEditorProps) {
     }
     lastEmittedValue = value;
     props.onValueChange(value);
+    // The edited text is the draft again, so the arrow keys stop showing a recalled prompt.
+    leaveHistory();
     scheduleCaretScroll();
+  }
+
+  /** The user's earlier prompts, oldest first. */
+  const historyPrompts = () => props.history ?? EMPTY_HISTORY;
+
+  function leaveHistory() {
+    historyIndex = -1;
+  }
+
+  /**
+   * Shows a prompt that the arrow keys recalled, or the empty draft that they return to. The caret
+   * goes to the end, so the user continues what they wrote the last time, as in a shell.
+   */
+  function showHistoryText(value: string) {
+    if (!editor) return;
+    renderEditorValue(editor, value, tagSources(), attachmentTokenActions);
+    lastEmittedValue = value;
+    setMention(null);
+    props.onValueChange(value);
+    editor.focus({ preventScroll: true });
+    placeCaretAtEnd(editor);
+    scheduleCaretScroll();
+  }
+
+  /**
+   * Arrow Up and Arrow Down walk the user's earlier prompts, as Codex does. The keys work only from
+   * an empty draft, so a draft in progress keeps its usual caret movement. After the newest prompt,
+   * Arrow Down gives back the empty draft.
+   */
+  function handleHistoryKeyDown(event: KeyboardEvent): boolean {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return false;
+    if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
+    if (mention() !== null) return false;
+    // A draft with attachments keeps its caret keys: a recalled prompt must not take those files.
+    if (props.attachments?.length) return false;
+    const prompts = historyPrompts();
+    if (historyIndex === -1) {
+      if (event.key === "ArrowDown" || props.value !== "" || prompts.length === 0) return false;
+      historyIndex = prompts.length - 1;
+      event.preventDefault();
+      showHistoryText(prompts[historyIndex] ?? "");
+      return true;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (historyIndex > 0) {
+        historyIndex -= 1;
+        showHistoryText(prompts[historyIndex] ?? "");
+      }
+      return true;
+    }
+    event.preventDefault();
+    if (historyIndex < prompts.length - 1) {
+      historyIndex += 1;
+      showHistoryText(prompts[historyIndex] ?? "");
+      return true;
+    }
+    leaveHistory();
+    showHistoryText("");
+    return true;
   }
 
   /*
@@ -872,6 +949,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
      */
     if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
     if (handleMentionPickerKeyDown(event)) return;
+    if (handleHistoryKeyDown(event)) return;
     if (event.key === "Tab" && props.onSteer && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
       event.preventDefault();
       props.onSteer();

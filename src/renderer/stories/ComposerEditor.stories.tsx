@@ -332,3 +332,11 @@ export const WithTabAndThreadTags: Story = {
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px", compact: true }),
 };
+
+/** An empty draft that recalls three earlier prompts with Arrow Up and Arrow Down. */
+export const WithHistory: Story = {
+  args: {
+    history: ["First question", "Second question, which is longer", "Third question"],
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};

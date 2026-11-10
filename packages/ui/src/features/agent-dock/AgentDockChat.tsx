@@ -25,6 +25,7 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { composerHistory } from "../conversation/composer-history";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
@@ -132,6 +133,8 @@ export function AgentDockChat(props: {
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
+  /** The prompts that Arrow Up and Arrow Down recall, from every message that the panel loaded. */
+  const history = createMemo(() => composerHistory(props.chat.messages, isOwn));
   const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
   const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
   const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
@@ -415,6 +418,7 @@ export function AgentDockChat(props: {
             agentId={undefined}
             agents={props.agents}
             value={props.draft}
+            history={history()}
             placeholder={t("composer.placeholder.message", { name: name() })}
             ariaLabel={t("composer.placeholder.message", { name: name() })}
             disabled={transcribing()}
