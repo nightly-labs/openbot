@@ -1779,6 +1779,8 @@ export class ChannelService {
               ),
             ),
           );
+          // Each member that a person's message reaches gets its one try at a usage limit.
+          if (this.#tryTasks.has(task.id)) for (const sibling of siblings) this.#tryTasks.add(sibling.id);
           // The owner used to be stamped without a publish, because nothing the renderer shows had
           // changed. The dispatch message has, so the channel has to be republished here.
           this.publish(channelId);
