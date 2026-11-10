@@ -388,20 +388,22 @@ async function main(): Promise<void> {
     recordCases("script-names-the-sandbox-for-page-globals", "script-names-camel-case-helpers");
 
     // Scripts resolve the links that they read, as in a browser, and can navigate to a URL object.
+    // location is the tab address after each step, and it is read-only.
     const resolved = await runScript({
       tabId: list.tab.id,
       finalSnapshot: false,
       script: [
         "const next = new URL('../b?x=1&x=2#h', 'https://example.com/a/c');",
         "next.searchParams.set('page', '2');",
-        "const moved = new URL('/list?page=1', location0);",
+        "const moved = new URL('/list?page=1', location.href);",
         "moved.search = '?page=2';",
         "await navigate(moved);",
+        "let assigned = 'assigned';",
+        "try { location.href = '/elsewhere'; } catch (error) { assigned = error.message; }",
         "return [next.href, next.pathname, next.searchParams.getAll('x'), next.origin, URL.canParse('no scheme'),",
-        "  String(new URLSearchParams({ q: 'a b&c' })), (await evaluate(() => location.href))];",
-      ]
-        .join("\n")
-        .replace("location0", JSON.stringify(origin)),
+        "  String(new URLSearchParams({ q: 'a b&c' })), location.href, location.search, String(location), assigned,",
+        "  await evaluate(() => location.href)];",
+      ].join("\n"),
     });
     assert.equal(resolved.outcome.status, "completed", resolved.outcome.error);
     assert.deepEqual(resolved.outcome.value, [
@@ -412,8 +414,12 @@ async function main(): Promise<void> {
       false,
       "q=a+b%26c",
       `${origin}/list?page=2`,
+      "?page=2",
+      `${origin}/list?page=2`,
+      "location is read-only in the script: call await navigate(url).",
+      `${origin}/list?page=2`,
     ]);
-    recordCases("script-resolves-urls");
+    recordCases("script-resolves-urls", "script-reads-tab-location");
 
     // A wait needs one match: each of these targets matches several elements of the list page.
     const waitedForMany = await runScript({

@@ -56,6 +56,8 @@ interface BrowserScriptOptions {
   maxSteps: number;
   /** Runs one step on the tab. A failed step is an outcome, not an error. */
   runStep: (step: BrowserStep) => Effect.Effect<BrowserStepOutcome>;
+  /** The tab's address now, as the result of a script shows it, or undefined when the tab is gone. */
+  currentUrl: () => string | undefined;
 }
 
 // The helpers the script awaits. Each one sends a single step through `__step`, which the host runs
@@ -275,12 +277,29 @@ globalThis.URL = class URL {
   toString() { return this.href; }
   toJSON() { return this.href; }
 };
-for (const field of ["href", "protocol", "username", "password", "host", "hostname", "port", "pathname", "search", "hash"]) {
+const __urlFields = ["href", "protocol", "username", "password", "host", "hostname", "port", "pathname", "search", "hash"];
+for (const field of __urlFields) {
   Object.defineProperty(URL.prototype, field, {
     get() { return __urlStates.get(this)[field]; },
     set(value) { __setUrl(this, __parseUrl(this.href, undefined, field, value)); },
   });
 }
+// Scripts read the tab address as location.href, as in the page, to resolve the links that they read.
+// It is read-only: a navigation is a step, so a script calls navigate(url).
+const __readOnlyLocation = () => {
+  throw new TypeError("location is read-only in the script: call await navigate(url).");
+};
+const __tabUrl = () => {
+  const href = __location();
+  if (href === undefined) throw new Error("The tab has no address.");
+  return new URL(href);
+};
+const __locationObject = { assign: __readOnlyLocation, replace: __readOnlyLocation, reload: __readOnlyLocation };
+for (const field of [...__urlFields, "origin"]) {
+  Object.defineProperty(__locationObject, field, { get: () => __tabUrl()[field], set: __readOnlyLocation });
+}
+__locationObject.toString = () => __tabUrl().href;
+Object.defineProperty(globalThis, "location", { get: () => __locationObject, set: __readOnlyLocation });
 `;
 
 let quickJsModule: Promise<QuickJSWASMModule> | undefined;
@@ -301,7 +320,7 @@ type SandboxState =
   | { kind: "step"; request: string; deferred: QuickJSDeferredPromise }
   | { kind: "stuck" };
 
-/** One QuickJS runtime and context with no host access except the `__step`, `__log`, and `__url` functions. */
+/** One QuickJS runtime and context with no host access except the `__step`, `__log`, `__url`, and `__location` functions. */
 class BrowserScriptSandbox {
   readonly #runtime: QuickJSRuntime;
   readonly #context: QuickJSContext;
@@ -311,7 +330,7 @@ class BrowserScriptSandbox {
   #logChars = 0;
   #promise: QuickJSHandle | undefined;
 
-  constructor(module: QuickJSWASMModule, deadline: number) {
+  constructor(module: QuickJSWASMModule, deadline: number, currentUrl: () => string | undefined) {
     this.#runtime = module.newRuntime();
     this.#runtime.setMemoryLimit(MEMORY_LIMIT_BYTES);
     this.#runtime.setMaxStackSize(STACK_LIMIT_BYTES);
@@ -339,6 +358,12 @@ class BrowserScriptSandbox {
     });
     context.setProp(context.global, "__url", url);
     url.dispose();
+    const location = context.newFunction("__location", () => {
+      const href = currentUrl();
+      return href === undefined ? context.undefined : context.newString(href);
+    });
+    context.setProp(context.global, "__location", location);
+    location.dispose();
   }
 
   /** Starts the script. Returns the error of a script that does not parse or fails at once. */
@@ -444,7 +469,7 @@ function scriptUrl(input: string, base: string | undefined, field: string | unde
 
 // The page globals and page objects of other browser libraries, which the script does not have.
 const PAGE_GLOBAL =
-  /^ReferenceError: '?(?:document|window|location|navigator|localStorage|sessionStorage|fetch|page|browser|\$\$?)'? is not defined/u;
+  /^ReferenceError: '?(?:document|window|navigator|localStorage|sessionStorage|fetch|page|browser|\$\$?)'? is not defined/u;
 const PAGE_GLOBAL_HINT =
   " The script runs in a sandbox, not in the page: read the page in evaluate(() => ...), and call the helpers, such as click(target), directly.";
 
@@ -470,7 +495,7 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
   const module = yield* loadQuickJs();
   const deadline = Date.now() + options.timeoutMs;
   return yield* Effect.acquireUseRelease(
-    browserSync(() => new BrowserScriptSandbox(module, deadline)),
+    browserSync(() => new BrowserScriptSandbox(module, deadline, options.currentUrl)),
     (sandbox) =>
       Effect.gen(function* () {
         let steps = 0;

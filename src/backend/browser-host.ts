@@ -2440,6 +2440,11 @@ export class BrowserHost {
                   ),
                   this.#rendererGone(tabId),
                 ),
+          currentUrl: () => {
+            const tab = this.#tabs.get(tabId);
+            // A page can put a typed card value in its address, as in the result URL below.
+            return tab ? tab.engine.scrubText(currentTabUrl(tab)) : undefined;
+          },
         });
         // A secret, a typed card, or a person's control keeps the crashed page, and a snapshot of it
         // gets no answer.
