@@ -66,6 +66,8 @@ export const messages = {
   "sidebar.agentMenu.edit": "에이전트 편집",
   "sidebar.agentMenu.duplicate": "에이전트 복제",
   "sidebar.agentMenu.duplicating": "복제 중…",
+  "sidebar.agentMenu.markRead": "읽음으로 표시",
+  "sidebar.agentMenu.markUnread": "읽지 않음으로 표시",
   "sidebar.agentMenu.delete": "에이전트 삭제",
   "sidebar.agentMenu.hide": "에이전트 숨기기",
   "sidebar.agentMenu.restore": "복원",

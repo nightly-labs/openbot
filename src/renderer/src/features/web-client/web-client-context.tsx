@@ -56,6 +56,7 @@ import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
+import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
 import {
@@ -1813,35 +1814,63 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
+  /** Marks one agent's chat read through its newest message, loaded or not. Writes for one agent run in order. */
+  function markAgentRead(id: string) {
+    const current = generation;
+    const write = (readWrites.get(id) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        if (disposed || current !== generation) return;
+        const page = await runtime.conversation(id);
+        const latestMessageId = page.messages.at(-1)?.id;
+        if (!latestMessageId || disposed || current !== generation) return;
+        const readState = await runtime.markRead(id, latestMessageId);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[id]?.page;
+          if (value?.threadId === page.threadId) value.readState = readState;
+          draft.reads[id] = readState;
+        });
+      });
+    readWrites.set(id, write);
+    return write;
+  }
   /** Marks every agent with unread messages read through its newest one, loaded or not. */
   async function markAllRead() {
     if (state.status !== "online") return;
     const current = generation;
     const reads = await runtime.conversationReads();
     if (disposed || current !== generation) return;
-    const unread = Object.entries(reads)
-      .filter(([, read]) => read.unreadCount > 0)
-      .map(([id]) => id);
-    const writes = unread.map((id) => {
-      const write = (readWrites.get(id) ?? Promise.resolve())
-        .catch(() => undefined)
-        .then(async () => {
-          if (disposed || current !== generation) return;
-          const page = await runtime.conversation(id);
-          const latestMessageId = page.messages.at(-1)?.id;
-          if (!latestMessageId || disposed || current !== generation) return;
-          const readState = await runtime.markRead(id, latestMessageId);
-          if (disposed || current !== generation) return;
-          setState((draft) => {
-            const value = draft.conversations[id]?.page;
-            if (value?.threadId === page.threadId) value.readState = readState;
-            draft.reads[id] = readState;
-          });
+    await Promise.all(
+      Object.entries(reads)
+        .filter(([, read]) => read.unreadCount > 0)
+        .map(([id]) => markAgentRead(id)),
+    );
+  }
+  /**
+   * Marks one message of an agent's chat and the messages after it unread, with
+   * `conversation-unread-from-v1`. Writes for one agent run in order. A failure throws to the caller.
+   */
+  async function markUnreadFrom(agentId: string, messageId: string): Promise<void> {
+    const current = generation;
+    const write = (readWrites.get(agentId) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const readState = await runtime.markUnreadFrom(agentId, messageId);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[agentId]?.page;
+          if (value) value.readState = readState;
+          draft.reads[agentId] = readState;
         });
-      readWrites.set(id, write);
-      return write;
-    });
-    await Promise.all(writes);
+      });
+    readWrites.set(agentId, write);
+    await write;
+  }
+  /** Marks the newest agent reply of a chat unread, loaded or not. A failure throws to the caller. */
+  async function markLatestReplyUnread(agentId: string): Promise<void> {
+    const reply = latestIncomingConversationMessage((await runtime.conversation(agentId)).messages);
+    if (reply) await markUnreadFrom(agentId, reply.id);
   }
   /** The connected host and its connection, as the restart notices and the update dialog read them. */
   const hostViews = (): HostRestartView[] =>
@@ -1989,27 +2018,10 @@ export function createWebWorkspace(
       }
     },
     markRead,
+    markAgentRead,
     markAllRead,
-    /**
-     * Marks one message of an agent's chat and the messages after it unread, with
-     * `conversation-unread-from-v1`. Writes for one agent run in order. A failure throws to the caller.
-     */
-    async markUnreadFrom(agentId: string, messageId: string): Promise<void> {
-      const current = generation;
-      const write = (readWrites.get(agentId) ?? Promise.resolve())
-        .catch(() => undefined)
-        .then(async () => {
-          const readState = await runtime.markUnreadFrom(agentId, messageId);
-          if (disposed || current !== generation) return;
-          setState((draft) => {
-            const value = draft.conversations[agentId]?.page;
-            if (value) value.readState = readState;
-            draft.reads[agentId] = readState;
-          });
-        });
-      readWrites.set(agentId, write);
-      await write;
-    },
+    markUnreadFrom,
+    markLatestReplyUnread,
     /**
      * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
      * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
