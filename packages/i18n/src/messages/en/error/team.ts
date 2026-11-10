@@ -122,6 +122,7 @@ export const messages = defineMessages("error.team", {
   "error.team.browsingMemoryUnsupported": "Learning from browsing is not supported by this connection.",
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
   "error.team.claudeUserSetupUnsupported": "This connection does not support the Claude Code setup switch.",
+  "error.team.claudeCompactWindowUnsupported": "This connection does not support the Claude compaction size.",
   "error.team.modelVisibilityUnsupported": "The model list is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
   "error.team.agentAccessUnsupported": "Roles are not supported by this connection.",

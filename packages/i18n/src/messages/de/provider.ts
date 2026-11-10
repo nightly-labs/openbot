@@ -252,6 +252,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "Agenten laden CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude auf dem Server. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Die Claude-Code-Einstellung konnte nicht geladen werden.",
+  "provider.settings.context": "Kontext",
+  "provider.settings.compactWindow": "Chats komprimieren bei",
+  "provider.settings.compactWindowDescription":
+    "Claude Code fasst die älteren Runden eines Chats zusammen, wenn der Chat diese Größe erreicht. Weniger hält Runden schnell und günstig. Mehr behält mehr Details. Ein Modell mit kleinerem Fenster komprimiert an seiner eigenen Grenze.",
+  "provider.settings.compactWindowDefault": "Claude Code-Standard",
+  "provider.settings.compactWindowTokens": "{size} Tokens",
+  "provider.settings.compactWindowLoadFailed": "Die Komprimierungsgröße dieses Servers konnte nicht geladen werden.",
   "provider.settings.models": "Modelle",
   "provider.settings.modelsDescription": {
     one: "{shown} von {count} Modell erscheint in der Modellauswahl.",

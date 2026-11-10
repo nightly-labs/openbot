@@ -338,6 +338,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude على الخادم. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
   "provider.settings.claudeUserSetupLoadFailed": "تعذّر تحميل إعداد Claude Code.",
+  "provider.settings.context": "السياق",
+  "provider.settings.compactWindow": "ضغط المحادثات عند",
+  "provider.settings.compactWindowDescription":
+    "يلخّص Claude Code الأدوار الأقدم في المحادثة عندما تصل إلى هذا الحجم. القيمة الأقل تبقي الأدوار سريعة ورخيصة. القيمة الأعلى تحتفظ بتفاصيل أكثر. النموذج ذو النافذة الأصغر يضغط عند حده الخاص.",
+  "provider.settings.compactWindowDefault": "الافتراضي في Claude Code",
+  "provider.settings.compactWindowTokens": "{size} رمز",
+  "provider.settings.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",

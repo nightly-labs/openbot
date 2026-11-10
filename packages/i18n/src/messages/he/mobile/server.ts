@@ -1305,6 +1305,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "ברירת המחדל של Claude Code",
   "mobile.server.providers.promptCacheHour": "שעה",
   "mobile.server.providers.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון הפרומפט של השרת הזה.",
+  "mobile.server.providers.compactWindow": "כיווץ צ׳אטים ב־",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
+  "mobile.server.providers.compactWindowDefault": "ברירת המחדל של Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} טוקנים",
+  "mobile.server.providers.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
   "mobile.server.providers.disconnect": "ניתוק",
   "mobile.server.providers.disconnectTitle": "לנתק את {name}?",
   "mobile.server.providers.disconnectBody":

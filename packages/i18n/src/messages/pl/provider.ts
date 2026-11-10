@@ -270,6 +270,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "Agenci wczytują CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude na serwerze. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
   "provider.settings.claudeUserSetupLoadFailed": "Nie udało się wczytać ustawienia Claude Code.",
+  "provider.settings.context": "Kontekst",
+  "provider.settings.compactWindow": "Kompaktuj czaty przy",
+  "provider.settings.compactWindowDescription":
+    "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
+  "provider.settings.compactWindowDefault": "Domyślne Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokenów",
+  "provider.settings.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {
     one: "{shown} z {count} modelu jest w wyborze modelu.",

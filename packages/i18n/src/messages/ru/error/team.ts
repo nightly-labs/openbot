@@ -123,6 +123,7 @@ export const messages = {
   "error.team.browsingMemoryUnsupported": "Это подключение не поддерживает обучение на браузинге.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
+  "error.team.claudeCompactWindowUnsupported": "Это подключение не поддерживает размер сжатия Claude.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
   "error.team.attachmentNameRequired": "Нужно безопасное имя вложения.",

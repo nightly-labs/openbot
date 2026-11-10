@@ -285,6 +285,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "에이전트가 서버의 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러와요. 끄면 각 턴에서 더 짧은 프롬프트를 보내요. 워크스페이스 파일은 계속 불러와요.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code 설정을 불러오지 못했습니다.",
+  "provider.settings.context": "컨텍스트",
+  "provider.settings.compactWindow": "채팅 압축 크기",
+  "provider.settings.compactWindowDescription":
+    "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
+  "provider.settings.compactWindowDefault": "Claude Code 기본값",
+  "provider.settings.compactWindowTokens": "토큰 {size}",
+  "provider.settings.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
   "provider.settings.models": "모델",
   "provider.settings.modelsDescription": { other: "모델 {count}개 중 {shown}개가 모델 선택에 보여요." },
   "provider.settings.modelsSearch": "모델 검색",

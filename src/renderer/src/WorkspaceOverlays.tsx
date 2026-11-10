@@ -986,6 +986,7 @@ function ServerSettings() {
           browsingMemory={{}}
           hostPromptCacheTtl={{}}
           claudeUserSetup={{}}
+          claudeCompactWindow={{}}
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}

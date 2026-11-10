@@ -1048,6 +1048,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Par défaut de Claude Code",
   "mobile.server.providers.promptCacheHour": "1 heure",
   "mobile.server.providers.promptCacheLoadFailed": "Impossible de charger la durée du cache des prompts de ce serveur.",
+  "mobile.server.providers.compactWindow": "Compacter les chats à",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code résume les anciens tours d’un chat quand le chat atteint cette taille. Plus bas garde des tours rapides et économiques. Plus haut garde plus de détails. Un modèle avec une fenêtre plus petite compacte à sa propre limite.",
+  "mobile.server.providers.compactWindowDefault": "Défaut de Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} jetons",
+  "mobile.server.providers.compactWindowLoadFailed": "Impossible de charger la taille de compactage de ce serveur.",
   "mobile.server.providers.disconnect": "Déconnecter",
   "mobile.server.providers.disconnectTitle": "Déconnecter {name} ?",
   "mobile.server.providers.disconnectBody":

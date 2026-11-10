@@ -247,6 +247,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "Ajanlar sunucudaki ~/.claude konumundan CLAUDE.md, beceriler, ajanlar, hook’lar ve eklentileri yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code ayarı yüklenemedi.",
+  "provider.settings.context": "Bağlam",
+  "provider.settings.compactWindow": "Sohbetleri sıkıştırma boyutu",
+  "provider.settings.compactWindowDescription":
+    "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",
+  "provider.settings.compactWindowDefault": "Claude Code varsayılanı",
+  "provider.settings.compactWindowTokens": "{size} token",
+  "provider.settings.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
   "provider.settings.models": "Modeller",
   "provider.settings.modelsDescription": {
     one: "{count} modelden {shown} tanesi model seçicide görünür.",

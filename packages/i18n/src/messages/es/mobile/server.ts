@@ -1054,6 +1054,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Predeterminado de Claude Code",
   "mobile.server.providers.promptCacheHour": "1 hora",
   "mobile.server.providers.promptCacheLoadFailed": "No se pudo cargar el tiempo de caché de prompts de este servidor.",
+  "mobile.server.providers.compactWindow": "Compactar chats en",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code resume los turnos antiguos de un chat cuando el chat alcanza este tamaño. Menos mantiene los turnos rápidos y baratos. Más conserva más detalle. Un modelo con una ventana más pequeña compacta en su propio límite.",
+  "mobile.server.providers.compactWindowDefault": "Predeterminado de Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} tokens",
+  "mobile.server.providers.compactWindowLoadFailed": "No se pudo cargar el tamaño de compactación de este servidor.",
   "mobile.server.providers.disconnect": "Desconectar",
   "mobile.server.providers.disconnectTitle": "¿Desconectar {name}?",
   "mobile.server.providers.disconnectBody":

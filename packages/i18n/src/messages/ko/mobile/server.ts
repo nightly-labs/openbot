@@ -991,6 +991,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Claude Code 기본값",
   "mobile.server.providers.promptCacheHour": "1시간",
   "mobile.server.providers.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없습니다.",
+  "mobile.server.providers.compactWindow": "채팅 압축 크기",
+  "mobile.server.providers.compactWindowHint":
+    "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
+  "mobile.server.providers.compactWindowDefault": "Claude Code 기본값",
+  "mobile.server.providers.compactWindowTokens": "토큰 {size}",
+  "mobile.server.providers.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
   "mobile.server.providers.disconnect": "연결 해제",
   "mobile.server.providers.disconnectTitle": "{name} 연결을 해제할까요?",
   "mobile.server.providers.disconnectBody":

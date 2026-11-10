@@ -554,6 +554,11 @@ export interface ProviderClientContext {
    * reason as `reportMcpDrops`: without it Claude does not load the setup, as the default is.
    */
   readonly claudeUserSetup?: () => boolean;
+  /**
+   * The size in tokens at which Claude Code compacts a chat, read at each spawn. `null` and absent
+   * leave Claude Code's own size for each model.
+   */
+  readonly claudeCompactWindow?: () => number | null;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -570,15 +575,26 @@ function withAccountEnvironment(
  * CLI's own choice. `1h` sets `ENABLE_PROMPT_CACHING_1H`, which the CLI reads last: a `promptCacheTtl`
  * in the Claude settings or `CLAUDE_CODE_PROMPT_CACHE_TTL` still wins. The CLI reads the flag before
  * its subscription rules, so subagents, an API key and a subscription on extra usage also get 1 hour.
+ *
+ * A compaction size sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. The CLI reads it before the
+ * `autoCompactWindow` of the Claude settings, and lowers it to the context window of a smaller model.
+ * The default sets nothing, so the user's own Claude settings and environment still apply. An agent's
+ * own environment values come after both, so they still win.
  */
 function claudeAgentEnvironment(
   context: ProviderClientContext,
 ): (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>> {
   const environment = withAccountEnvironment(context);
-  return (inherited) => ({
-    ...((context.promptCacheTtl?.() ?? DEFAULT_PROMPT_CACHE_TTL.ttl) === "1h" ? { ENABLE_PROMPT_CACHING_1H: "1" } : {}),
-    ...environment?.(inherited),
-  });
+  return (inherited) => {
+    const compactWindow = context.claudeCompactWindow?.() ?? null;
+    return {
+      ...((context.promptCacheTtl?.() ?? DEFAULT_PROMPT_CACHE_TTL.ttl) === "1h"
+        ? { ENABLE_PROMPT_CACHING_1H: "1" }
+        : {}),
+      ...(compactWindow === null ? {} : { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(compactWindow) }),
+      ...environment?.(inherited),
+    };
+  };
 }
 
 /**
