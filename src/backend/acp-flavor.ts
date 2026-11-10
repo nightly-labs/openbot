@@ -50,6 +50,8 @@ export interface AcpFlavor {
    * Absent: such a turn succeeds.
    */
   emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
+  /** The agent supports session/resume even when it does not advertise it. */
+  canResumeSession?: true;
   /**
    * The failure text of a prompt that the agent failed because the model gave no answer. The turn
    * then ends as a turn with no answer does, not with the agent's own error text.
