@@ -2643,14 +2643,20 @@ export class OpenBotToolRouter {
           idempotencyKey: toolCallIdempotencyKey(params),
         })
         .pipe(toToolOperationFailed);
-      const deliveries: SentDelivery[] = [];
-      for (const delivery of receipt.deliveries) {
-        // Waits for the provider, so the sender can tell the user if the message joined the turn.
-        const steer = yield* this.#hooks.steerAgentMessage(delivery.recipientAgentId, delivery.id);
-        deliveries.push(sentDelivery(delivery, steer));
-        this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-        this.#drain.scheduleDrain(delivery.recipientAgentId);
-      }
+      // Waits for each provider, so the sender can tell the user if the message joined the turn. The
+      // recipients are steered together, so one slow provider does not hold the others.
+      const deliveries = yield* Effect.forEach(
+        receipt.deliveries,
+        (delivery) =>
+          this.#hooks.steerAgentMessage(delivery.recipientAgentId, delivery.id).pipe(
+            Effect.map((steer) => {
+              this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+              this.#drain.scheduleDrain(delivery.recipientAgentId);
+              return sentDelivery(delivery, steer);
+            }),
+          ),
+        { concurrency: "unbounded" },
+      );
       const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.emitConversation(snapshot);
