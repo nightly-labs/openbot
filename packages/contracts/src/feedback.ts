@@ -19,6 +19,9 @@ export const FEEDBACK_REPOSITORY = "nightly-labs/openbot";
 export const FEEDBACK_KINDS = ["bug", "idea"] as const;
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
 
+/** The label of each issue that the app sends, so that triage can find feedback from the app. */
+const FEEDBACK_SENT_LABEL = "from-app";
+
 const ISSUE_FORMS = {
   bug: { template: "bug_report.yml", titlePrefix: "[Bug]: ", labels: ["bug", "needs-triage"] },
   idea: { template: "feature_request.yml", titlePrefix: "[Feature]: ", labels: ["enhancement", "needs-triage"] },
@@ -274,7 +277,7 @@ export function feedbackIssue(feedback: Feedback): { title: string; body: string
       "---",
       "Sent from the OpenBot app. An agent wrote this text, and the user approved it before it was sent.",
     ].join("\n\n"),
-    labels: [...form.labels],
+    labels: [...form.labels, FEEDBACK_SENT_LABEL],
   };
 }
 
