@@ -1131,7 +1131,10 @@ function ChatRow({ message }: { message: VisibleMessage }) {
   const day = row.dayLabels.get(message.id);
   return (
     <Animated.View
-      style={[ROW_STYLE, response ? row.responseStyle : undefined]}
+      // The row takes the list width itself. The list gives its item containers the width it last
+      // measured, and a measure of 0 (a fold, a split change, the app in the background) left rows at
+      // no width: right-aligned bubbles then showed only at the left edge, and the rest was blank.
+      style={[ROW_STYLE, { width: row.shared.listWidth }, response ? row.responseStyle : undefined]}
       accessibilityElementsHidden={response && !row.responseVisible}
       importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
     >
@@ -1804,8 +1807,10 @@ export const ChatMessageList = memo(function ChatMessageList({
               <KeyboardAwareLegendList
                 ref={motion.listRef}
                 data={rows}
-                // A new data set when the latest messages replace a window around a searched message.
-                dataKey={`${conversationKey}:${motion.latestGeneration}`}
+                // A new data set when the latest messages replace a window around a searched message, and
+                // when the column changes width (a fold, a split change): every row then wraps to a new
+                // height, and the list kept the old positions, so the rows were drawn out of view.
+                dataKey={`${conversationKey}:${motion.latestGeneration}:${Math.round(listWidth)}`}
                 keyExtractor={rowKey}
                 getItemType={rowType}
                 renderItem={renderRow}
