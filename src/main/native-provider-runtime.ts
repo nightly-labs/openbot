@@ -10,7 +10,7 @@ import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 
 /** Native provider archives share staging and verification, not their wire protocols. */
 export function nativeProviderRuntime(
-  runtime: "pi" | "muse" | "devin" | "copilot" | "mistral",
+  runtime: "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity",
 ): ProviderRuntimeDescriptor {
   return {
     runtime,
@@ -35,8 +35,9 @@ export function nativeProviderRuntime(
       if (runtime === "muse") {
         yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
         yield* runtimeIO(() => copyFile(downloadedPath, join(staging, "bin", spec.executableName)));
-      } else if (runtime === "copilot") {
-        // GitHub Copilot CLI 1.0.105 archives hold only the program, `copilot` or `copilot.exe`.
+      } else if (runtime === "copilot" || runtime === "antigravity") {
+        // GitHub Copilot CLI 1.0.105 and Antigravity CLI 1.5.4 archives hold only the program, such as
+        // `copilot` or `antigravity.exe`.
         const bin = join(staging, "bin");
         yield* runtimeIO(() => mkdir(bin, { recursive: true }));
         if (spec.target === "win32-x64") {
@@ -95,5 +96,8 @@ export function nativeProviderRuntime(
       }
     }),
     parseVersion: NATIVE_VERSION_PARSERS[runtime],
+    // Antigravity 1.4.5 and earlier were the ACP server `agy_acp_server`, which OpenBot can no longer
+    // start.
+    ...(runtime === "antigravity" ? { legacyExecutableNames: ["agy_acp_server.par", "agy_acp_server.exe"] } : {}),
   };
 }

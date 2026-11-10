@@ -220,9 +220,6 @@ export const messages = {
   "error.provider.noAgentProcess": "ל-{provider} אין תהליך שרץ עבור הסוכן הזה.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} נעצר לפני שהתהליך של הסוכן התחיל.",
   "error.provider.archiveUnreadable": "לא ניתן לקרוא את ארכיון סביבת ההרצה או שהוא בפורמט שאינו נתמך.",
-  "error.provider.antigravityArchivePath": "בארכיון של Gemini יש קובץ לא צפוי.",
-  "error.provider.antigravityChecksum": "סכום הביקורת של סביבת ההרצה של Gemini אינו תואם.",
-  "error.provider.antigravityReleaseShape": "לגרסה של Gemini יש מבנה לא צפוי.",
   "error.provider.antigravityMissing": "Gemini לא הורד. יש להוריד אותו ב-OpenBot כדי להמשיך.",
   "error.provider.antigravityNotStarted": "שרת Gemini נמצא, אך לא ניתן לקרוא את הגרסה שלו.",
   "error.provider.antigravityOverrideInvalid":
@@ -238,6 +235,8 @@ export const messages = {
   "error.provider.antigravityServiceFailure":
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "במארח Windows, ‏Gemini פותח את דף Google במארח עצמו. יש לחבר את Gemini במחשב המארח.",
   "error.provider.cursorArchivePath": "בארכיון של Cursor יש קובץ לא צפוי.",
   "error.provider.cursorChecksum": "סכום הביקורת של סביבת ההרצה של Cursor אינו תואם.",
   "error.provider.cursorReleaseShape": "לגרסה של Cursor יש מבנה לא צפוי.",

@@ -2,7 +2,8 @@
 // higgsfield servers". An agent saved an http MCP server that asks for a sign-in OpenBot does not
 // hold. OpenBot gives such a row to the provider as written, the server answers 401, and Antigravity
 // ends every turn with "The MCP server 'higgsfield' failed to initialize". Other providers start
-// without that server. Runs the real Antigravity driver over a fake server that acts as 1.4.4 does.
+// without that server. Runs the real Antigravity driver for CLI 1.5.4 over a fake that sends the
+// failure as 1.4.4 does, a form that OpenBot still accepts.
 // Cases: the turn resumes the session without the server and answers, the server is reported as a
 // drop, a new session gets the server again (a sign-in or a fix can have changed it) and leaves it
 // out the same way, and a failed server that OpenBot did not give
@@ -43,6 +44,8 @@ interface Report {
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-mcp-load-failure-e2e-"));
 const report: Report = { passed: false, turns: {} };
 const clients: AgentClient[] = [];
+// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(root, "gemini");
 
 function httpServer(id: string, name: string, url: string): McpServerConfig {
   return {
@@ -61,7 +64,7 @@ function httpServer(id: string, name: string, url: string): McpServerConfig {
 }
 
 try {
-  const executable = join(root, "agy", "bin", "agy_acp_server");
+  const executable = join(root, "agy", "bin", "antigravity");
   const workspace = join(root, "workspace");
   const release = join(root, "release");
   const log = join(root, "requests.jsonl");
@@ -74,7 +77,7 @@ try {
     httpServer("higgsfield", "higgsfield", "https://mcp.higgsfield.example/mcp"),
     httpServer("docs", "docs", "https://docs.example/mcp"),
   ];
-  const cli: AgentCliInfo = { executable, version: "1.4.4", source: "managed" };
+  const cli: AgentCliInfo = { executable, version: "1.5.4", source: "managed" };
   const client = requireProviderDriver("antigravity").createClient(cli, 20_000, {
     apiKey: () => null,
     customProviders: () => [],
@@ -157,13 +160,13 @@ try {
   );
 
   // 4. The failure message comes before the stderr line.
-  const stdoutFirst = join(root, "agy-stdout-first", "bin", "agy_acp_server");
+  const stdoutFirst = join(root, "agy-stdout-first", "bin", "antigravity");
   await installFakeAgent(stdoutFirst, "antigravity-mcp-load-failure", {
     FAKE_LOG: join(root, "stdout-first.jsonl"),
     FAKE_STDOUT_FIRST: "1",
   });
   const late = requireProviderDriver("antigravity").createClient(
-    { executable: stdoutFirst, version: "1.4.4", source: "managed" },
+    { executable: stdoutFirst, version: "1.5.4", source: "managed" },
     20_000,
     { apiKey: () => null, customProviders: () => [], mcpServers: () => servers },
   );
