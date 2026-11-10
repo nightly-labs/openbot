@@ -7,7 +7,8 @@
 // list_models lists a short list of models with the models in use and finds the others with a query, that
 // create_agent accepts a model that the short list leaves out, that the
 // account and the backup models are written and read back, that an unknown account or model is a tool
-// failure that changes nothing, that a reset returns both to their defaults, and that a delete stops the
+// failure that changes nothing, that a reset returns both to their defaults, that a model that only the
+// second account lists is listed and accepted for that account only (#6109), and that a delete stops the
 // process that the agent runs on with the second account.
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
@@ -55,6 +56,8 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const CALL_MARK = "PROFILE-CALL";
 const MODEL = "gpt-6-luna";
 const OTHER_MODEL = "gpt-6-sol";
+/** A model that only the second account lists, as a plan can serve more than the own sign-in (#6109). */
+const ACCOUNT_MODEL = "gpt-6.1-sol";
 /** More models than the short list of list_models holds: 8 a provider. OTHER_MODEL is last in the catalog. */
 const EXTRA_MODELS = Array.from({ length: 10 }, (_, index) => `gpt-6-extra-${index + 1}`);
 const CATALOG = [
@@ -62,6 +65,7 @@ const CATALOG = [
   ...EXTRA_MODELS.map((model, index) => ({ model, displayName: `GPT-6 Extra ${index + 1}` })),
   { model: OTHER_MODEL, displayName: "GPT-6 Sol" },
 ];
+const ACCOUNT_CATALOG = [...CATALOG, { model: ACCOUNT_MODEL, displayName: "GPT-6.1 Sol" }];
 
 /**
  * A Codex app-server with the methods that the service calls. A turn whose input has
@@ -98,7 +102,7 @@ const answer = (message) => {
     case "initialize": return write({ id: message.id, result: {} });
     case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: process.env.CODEX_HOME.startsWith(${JSON.stringify(accountsRoot)}) ? "team-b@example.com" : "codex@example.com" } } });
     case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
-    case "model/list": return write({ id: message.id, result: { data: ${JSON.stringify(CATALOG)} } });
+    case "model/list": return write({ id: message.id, result: { data: process.env.CODEX_HOME.startsWith(${JSON.stringify(accountsRoot)}) ? ${JSON.stringify(ACCOUNT_CATALOG)} : ${JSON.stringify(CATALOG)} } });
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
@@ -179,7 +183,7 @@ interface ProfileToolBody {
     provider: string;
     models?: { id: string }[];
     omittedModels?: number;
-    accounts?: { id: string; label: string | null; state: string }[];
+    accounts?: { id: string; label: string | null; state: string; models?: { id: string }[] }[];
   }[];
   model?: string;
   name?: string;
@@ -319,7 +323,9 @@ try {
     agents
       .getStatus()
       .providers?.find((row) => row.id === "codex")
-      ?.accounts?.some((account) => account.id === second.id && account.state === "connected"),
+      ?.accounts?.some(
+        (account) => account.id === second.id && account.state === "connected" && account.models?.length === 1,
+      ),
   );
 
   // 1. list_models lists both accounts, the provider's own sign-in first, without emails or folders.
@@ -343,6 +349,13 @@ try {
     codexModels(listed)
       ?.models?.map((model) => model.id)
       .join(",") === [MODEL, ...EXTRA_MODELS.slice(0, 7)].join(",") && codexModels(listed)?.omittedModels === 4,
+    listed.text,
+  );
+  pass(
+    "list_models lists the model that only the second account serves under that account",
+    listedAccounts[1]?.models?.map((model) => model.id).join(",") === ACCOUNT_MODEL &&
+      listedAccounts[0]?.models === undefined &&
+      codexModels(listed)?.models?.some((model) => model.id === ACCOUNT_MODEL) === false,
     listed.text,
   );
   pass(
@@ -489,7 +502,49 @@ try {
     reset.text,
   );
 
-  // 7. A delete stops the agent's own process. On Windows a live process in the workspace makes the
+  // 7. A model that only the second account serves is refused on the own sign-in, as a model and as a
+  // backup model, and accepted with that account, as the model picker offers it (#6109).
+  const ownSignIn = await callTool("account model on the own sign-in", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    model: ACCOUNT_MODEL,
+  });
+  const ownSignInBackup = await callTool("account model backup on the own sign-in", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    backupModels: { automatic: false, order: [{ provider: "codex", model: ACCOUNT_MODEL }] },
+  });
+  pass(
+    "A model that only the second account serves is refused on the own sign-in",
+    refused(ownSignIn, "Available models") &&
+      refused(ownSignInBackup, "Available models") &&
+      storedAgent(worker.id).model === MODEL &&
+      storedAgent(worker.id).backupModels === undefined,
+    [ownSignIn, ownSignInBackup].map((call) => call.text).join("\n"),
+  );
+  const accountModel = await callTool("account model with its account", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    providerAccountId: second.id,
+    model: ACCOUNT_MODEL,
+    backupModels: {
+      automatic: false,
+      order: [
+        { provider: "codex", model: ACCOUNT_MODEL, providerAccountId: second.id },
+        { provider: "codex", model: MODEL },
+      ],
+    },
+  });
+  const afterAccountModel = storedAgent(worker.id);
+  pass(
+    "update_profile sets a model that only the agent's account serves",
+    accountModel.success &&
+      accountModel.body?.model === ACCOUNT_MODEL &&
+      afterAccountModel.model === ACCOUNT_MODEL &&
+      afterAccountModel.providerAccountId === second.id &&
+      JSON.stringify(afterAccountModel.backupModels) ===
+        JSON.stringify({ automatic: false, order: [{ provider: "codex", model: MODEL }] }),
+    `${accountModel.text}\n${JSON.stringify(afterAccountModel.backupModels)}`,
+  );
+
+  // 8. A delete stops the agent's own process. On Windows a live process in the workspace makes the
   // folder removal fail with EBUSY until the app restarts (#3205).
   const reassigned = await callTool("set account again", coordinator.id, "update_profile", {
     agentId: worker.id,
