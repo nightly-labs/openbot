@@ -395,6 +395,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.omnisend.prompt.segment":
     "How many contacts are in the VIP segment, and how did it change this month?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
+  "marketplace.plugin.rankreactor.tagline": "SEO articles, keywords and site audits",
+  "marketplace.plugin.rankreactor.description":
+    "RankReactor lets agents read one project's plan, quotas and stored SEO metrics, list generated articles and UGC videos, refresh metrics, and queue new articles or short videos after you confirm. A project API key from the RankReactor dashboard goes into one Authorization header. The key reaches that one project. Agents cannot publish to YouTube or Blogger, delete project content, or change billing. Article and video generation uses the same plan limits as the dashboard.",
+  "marketplace.plugin.rankreactor.app":
+    "Project status, SEO metrics, articles and UGC video, over RankReactor's MCP server with a project API key.",
+  "marketplace.plugin.rankreactor.prompt.status": "How many articles are left on this RankReactor project today?",
+  "marketplace.plugin.rankreactor.prompt.metrics": "Show the stored search metrics for this RankReactor site.",
+  "marketplace.plugin.rankreactor.prompt.articles": "List the generated articles for this RankReactor project.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
     "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",

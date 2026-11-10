@@ -24,6 +24,7 @@ import type { PluginGuide } from "./plugin-guide";
 import { POSTHOG_PLUGIN_GUIDE } from "./posthog";
 import { PRISMA_PLUGIN_GUIDE } from "./prisma";
 import { RAILWAY_PLUGIN_GUIDE } from "./railway";
+import { RANKREACTOR_PLUGIN_GUIDE } from "./rankreactor";
 import { RENDER_PLUGIN_GUIDE } from "./render";
 import { RESEND_PLUGIN_GUIDE } from "./resend";
 import { REVENUECAT_PLUGIN_GUIDE } from "./revenuecat";
@@ -56,6 +57,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
   omnisend: OMNISEND_PLUGIN_GUIDE,
+  rankreactor: RANKREACTOR_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   gitlab: GITLAB_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,

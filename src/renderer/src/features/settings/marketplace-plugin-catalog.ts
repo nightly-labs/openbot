@@ -72,7 +72,7 @@ const AAVE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/aave",
 };
 
@@ -113,7 +113,7 @@ const CANVA: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/canva",
 };
 
@@ -154,7 +154,7 @@ const LINEAR: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/linear",
 };
 
@@ -195,7 +195,7 @@ const NOTION: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/notion",
 };
 
@@ -252,7 +252,7 @@ const OBSIDIAN: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/obsidian",
 };
 
@@ -292,7 +292,7 @@ const ATLASSIAN: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/atlassian",
 };
 
@@ -332,7 +332,7 @@ const TODOIST: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/todoist",
 };
 
@@ -372,7 +372,7 @@ const TICKTICK: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/ticktick",
 };
 
@@ -412,7 +412,7 @@ const TRELLO: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/trello",
 };
 
@@ -452,7 +452,7 @@ const COBRAIN: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/cobrain",
 };
 
@@ -507,7 +507,7 @@ const FIGMA: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/figma",
 };
 
@@ -543,7 +543,7 @@ const PAPER: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/paper",
 };
 
@@ -584,7 +584,7 @@ const HIGGSFIELD: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/higgsfield",
 };
 
@@ -625,7 +625,7 @@ const ELEVENLABS: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/elevenlabs",
 };
 
@@ -665,7 +665,7 @@ const APPLE_APPS: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/apple-apps",
 };
 
@@ -705,7 +705,7 @@ const SENTRY: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/sentry",
 };
 
@@ -746,7 +746,7 @@ const GITLAB: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/gitlab",
 };
 
@@ -787,7 +787,7 @@ const VERCEL: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/vercel",
 };
 
@@ -827,7 +827,7 @@ const CLOUDFLARE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/cloudflare",
 };
 
@@ -867,7 +867,7 @@ const SUPABASE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/supabase",
 };
 
@@ -910,7 +910,7 @@ const NEON: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/neon",
 };
 
@@ -950,7 +950,7 @@ const PRISMA: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/prisma",
 };
 
@@ -991,7 +991,7 @@ const NETLIFY: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/netlify",
 };
 
@@ -1031,7 +1031,7 @@ const RAILWAY: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/railway",
 };
 
@@ -1089,7 +1089,7 @@ const RENDER: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/render",
 };
 
@@ -1124,7 +1124,7 @@ const CONTEXT7: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/context7",
 };
 
@@ -1159,7 +1159,7 @@ const HUGGINGFACE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/huggingface",
 };
 
@@ -1199,7 +1199,7 @@ const STRIPE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/stripe",
 };
 
@@ -1258,7 +1258,7 @@ const REVENUECAT: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/revenuecat",
 };
 
@@ -1316,7 +1316,7 @@ const POSTHOG: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/posthog",
 };
 
@@ -1366,7 +1366,7 @@ const AIRTABLE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/airtable",
 };
 
@@ -1424,7 +1424,7 @@ const FIRECRAWL: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/firecrawl",
 };
 
@@ -1476,7 +1476,7 @@ const BRAVE_SEARCH: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/brave-search",
 };
 
@@ -1528,7 +1528,7 @@ const RESEND: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/resend",
 };
 
@@ -1569,8 +1569,67 @@ const OMNISEND: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/omnisend",
+};
+
+const RANKREACTOR: MarketplacePluginDetail = {
+  id: "plugin-rankreactor",
+  slug: "rankreactor",
+  name: "RankReactor",
+  tagline: "SEO articles, keywords and site audits",
+  description:
+    "RankReactor lets agents read one project's plan, quotas and stored SEO metrics, list generated articles and UGC videos, refresh metrics, and queue new articles or short videos after you confirm. A project API key from the RankReactor dashboard goes into one Authorization header. The key reaches that one project. Agents cannot publish to YouTube or Blogger, delete project content, or change billing. Article and video generation uses the same plan limits as the dashboard.",
+  category: "automation",
+  creatorName: "Sierra Dynamics LLC",
+  iconUrl: "https://www.rankreactor.ai/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-status", text: "How many articles are left on this RankReactor project today?" },
+    { id: "prompt-metrics", text: "Show the stored search metrics for this RankReactor site." },
+    { id: "prompt-articles", text: "List the generated articles for this RankReactor project." },
+  ],
+  apps: [
+    {
+      id: "app-rankreactor-mcp",
+      name: "RankReactor",
+      description:
+        "Project status, SEO metrics, articles and UGC video, over RankReactor's MCP server with a project API key.",
+      iconUrl: "https://www.rankreactor.ai/apple-touch-icon.png",
+      server: {
+        name: "rankreactor",
+        transport: "http",
+        url: "https://www.rankreactor.ai/mcp",
+        auth: [
+          {
+            id: "rankreactor-key",
+            kind: "key",
+            label: "API key",
+            fields: [
+              {
+                id: "token",
+                label: "API key",
+                header: "Authorization",
+                prefix: "Bearer ",
+                placeholder: "rr_live_…",
+                hint: "RankReactor dashboard → API Key → Generate",
+              },
+            ],
+            docsUrl: "https://www.rankreactor.ai/docs/ai-assistants",
+            docsLabel: "Create a key",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://www.rankreactor.ai",
+  privacyPolicyUrl: "https://www.rankreactor.ai/privacy-policy",
+  termsUrl: "https://www.rankreactor.ai/tos",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/rankreactor",
 };
 
 const COMPOSIO: MarketplacePluginDetail = {
@@ -1627,7 +1686,7 @@ const COMPOSIO: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/composio",
 };
 
@@ -1667,7 +1726,7 @@ const CLICKUP: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/clickup",
 };
 
@@ -1708,7 +1767,7 @@ const COINBASE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/coinbase",
 };
 
@@ -1748,7 +1807,7 @@ const ROBINHOOD: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/robinhood",
 };
 
@@ -1788,6 +1847,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   BRAVE_SEARCH,
   RESEND,
   OMNISEND,
+  RANKREACTOR,
   COMPOSIO,
   CLICKUP,
   COINBASE,
