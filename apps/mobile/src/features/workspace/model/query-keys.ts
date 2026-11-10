@@ -176,6 +176,8 @@ export const queryKeys = {
   ],
   /** How long Claude keeps the prompt cache of a host's agents (`prompt-cache-ttl-v1`). */
   providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  /** The size at which Claude Code compacts the chats of a host's agents (`claude-compact-window-v1`). */
+  providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
   /** The usage reset credits of each account of one provider of a host (`provider-usage-reset-v1`). */
   providerUsageResets: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-usage-resets",

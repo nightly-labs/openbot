@@ -164,6 +164,11 @@ import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import {
+  CLAUDE_COMPACT_WINDOW_CAPABILITY,
+  CLAUDE_COMPACT_WINDOW_CODECS,
+  CLAUDE_COMPACT_WINDOW_ROUTES,
+} from "@openbot/contracts/team-protocol/claude-compact-window-v1";
+import {
   CLAUDE_USER_SETUP_CAPABILITY,
   CLAUDE_USER_SETUP_CODECS,
   CLAUDE_USER_SETUP_ROUTES,
@@ -317,6 +322,10 @@ import { AgentNotificationLevelStore } from "../src/main/agent-notification-leve
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
+import {
+  claudeCompactWindowControl,
+  createClaudeCompactWindowPreferenceStore,
+} from "../src/main/claude-compact-window-preference-store";
 import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
@@ -1964,6 +1973,11 @@ try {
       claudeUserSetup: claudeUserSetupControl(
         createClaudeUserSetupPreferenceStore(join(root, "claude-user-setup.json")),
         () => record("claudeUserSetupChanged"),
+      ),
+      // The real size over a file of the test folder; a change records the provider status event.
+      claudeCompactWindow: claudeCompactWindowControl(
+        createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
+        () => record("claudeCompactWindowChanged"),
       ),
       // The host's scan: one model server, one agent, and a model list that echoes no key.
       providerDetection: {
@@ -6048,6 +6062,69 @@ try {
         isDeepStrictEqual(off.body, { enabled: false }) &&
         callsOf("claudeUserSetupChanged").length === 2,
       [summary(member), summary(memberRead), summary(noCapability), summary(off)],
+    );
+  }
+
+  // ---- The size at which Claude Code compacts chats, from a joined server (claude-compact-window-v1) ----
+  {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V9, capabilities: [CLAUDE_COMPACT_WINDOW_CAPABILITY] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    const before = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.settings, { ...setup, json: {} });
+    const set = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, { ...setup, json: { tokens: 400_000 } });
+    const again = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, { ...setup, json: { tokens: 400_000 } });
+    const after = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.settings, { ...setup, json: {} });
+    const saved = parseJson(readFileSync(join(root, "claude-compact-window.json"), "utf8"));
+    check(
+      "the host advertises claude-compact-window-v1 to protocol 9 only, and an admin reads and sets the size, which the host saves and announces once",
+      list(field(compatibility.body, "capabilities")).includes(CLAUDE_COMPACT_WINDOW_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CLAUDE_COMPACT_WINDOW_CAPABILITY) &&
+        isDeepStrictEqual(before.body, { tokens: null }) &&
+        isDeepStrictEqual(set.body, { tokens: 400_000 }) &&
+        isDeepStrictEqual(again.body, { tokens: 400_000 }) &&
+        isDeepStrictEqual(after.body, { tokens: 400_000 }) &&
+        CLAUDE_COMPACT_WINDOW_CODECS.get(CLAUDE_COMPACT_WINDOW_ROUTES.update)?.response(200, set.body) !== undefined &&
+        isDeepStrictEqual(saved, { version: 1, tokens: 400_000 }) &&
+        callsOf("claudeCompactWindowChanged").length === 1,
+      [summary(before), summary(set), summary(after)],
+    );
+    const tooSmall = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, { ...setup, json: { tokens: 50_000 } });
+    const tooLarge = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, { ...setup, json: { tokens: 2_000_000 } });
+    const fraction = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, { ...setup, json: { tokens: 150_000.5 } });
+    const unchanged = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.settings, { ...setup, json: {} });
+    check(
+      "the host refuses a size below 100,000, above 1,000,000 or not whole, and keeps the saved size",
+      tooSmall.status === 400 &&
+        tooLarge.status === 400 &&
+        fraction.status === 400 &&
+        isDeepStrictEqual(unchanged.body, { tokens: 400_000 }) &&
+        callsOf("claudeCompactWindowChanged").length === 1,
+      [summary(tooSmall), summary(tooLarge), summary(fraction), summary(unchanged)],
+    );
+    const member = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, {
+      ...setup,
+      token: bobToken,
+      json: { tokens: null },
+    });
+    const memberRead = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.settings, {
+      ...setup,
+      token: bobToken,
+      json: {},
+    });
+    const noCapability = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      json: { tokens: null },
+    });
+    const reset = await call("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, { ...setup, json: { tokens: null } });
+    check(
+      "a member cannot read or set the size (403), a client without claude-compact-window-v1 gets 400, and an admin sets Claude Code's own size again",
+      member.status === 403 &&
+        memberRead.status === 403 &&
+        errorIs(noCapability, 400, sourceText("error.team.claudeCompactWindowUnsupported")) &&
+        isDeepStrictEqual(reset.body, { tokens: null }) &&
+        callsOf("claudeCompactWindowChanged").length === 2,
+      [summary(member), summary(memberRead), summary(noCapability), summary(reset)],
     );
   }
 

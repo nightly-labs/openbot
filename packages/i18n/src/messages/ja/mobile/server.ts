@@ -1013,6 +1013,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Claude Code のデフォルト",
   "mobile.server.providers.promptCacheHour": "1 時間",
   "mobile.server.providers.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "mobile.server.providers.compactWindow": "チャットを圧縮するサイズ",
+  "mobile.server.providers.compactWindowHint":
+    "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
+  "mobile.server.providers.compactWindowDefault": "Claude Code の既定",
+  "mobile.server.providers.compactWindowTokens": "{size} トークン",
+  "mobile.server.providers.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
   "mobile.server.providers.disconnect": "接続を解除",
   "mobile.server.providers.disconnectTitle": "{name} の接続を解除しますか？",
   "mobile.server.providers.disconnectBody":

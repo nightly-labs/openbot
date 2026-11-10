@@ -118,6 +118,7 @@ export const messages = {
   "error.team.skillLearningUnsupported": "החיבור הזה אינו תומך בלמידת מיומנויות.",
   "error.team.promptCacheTtlUnsupported": "זמן מטמון ההנחיות אינו נתמך בחיבור הזה.",
   "error.team.claudeUserSetupUnsupported": "החיבור הזה לא תומך במתג ההגדרות של Claude Code.",
+  "error.team.claudeCompactWindowUnsupported": "החיבור הזה לא תומך בגודל הכיווץ של Claude.",
   "error.team.modelVisibilityUnsupported": "רשימת המודלים אינה נתמכת בחיבור הזה.",
   "error.team.providerDefaultUnsupported": "ספק ברירת המחדל אינו נתמך בחיבור הזה.",
   "error.team.agentAccessUnsupported": "תפקידים אינם נתמכים בחיבור הזה.",

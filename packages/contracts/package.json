@@ -241,6 +241,7 @@
     "./team-protocol/provider-use-v1": "./src/team-protocol/provider-use-v1.ts",
     "./team-protocol/routine-run-command-v1": "./src/team-protocol/routine-run-command-v1.ts",
     "./team-protocol/claude-user-setup-v1": "./src/team-protocol/claude-user-setup-v1.ts",
+    "./team-protocol/claude-compact-window-v1": "./src/team-protocol/claude-compact-window-v1.ts",
     "./team-protocol/agent-thread-queue-v1": "./src/team-protocol/agent-thread-queue-v1.ts",
     "./team-protocol/agent-usage-limit-v1": "./src/team-protocol/agent-usage-limit-v1.ts",
     "./team-protocol/hermes-import-v1": "./src/team-protocol/hermes-import-v1.ts",

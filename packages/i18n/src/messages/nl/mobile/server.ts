@@ -1009,6 +1009,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Standaard van Claude Code",
   "mobile.server.providers.promptCacheHour": "1 uur",
   "mobile.server.providers.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "mobile.server.providers.compactWindow": "Chats comprimeren bij",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code vat de oudere beurten van een chat samen wanneer de chat deze grootte bereikt. Lager houdt beurten snel en goedkoop. Hoger bewaart meer details. Een model met een kleiner venster comprimeert bij zijn eigen limiet.",
+  "mobile.server.providers.compactWindowDefault": "Standaard van Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} tokens",
+  "mobile.server.providers.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
   "mobile.server.providers.disconnect": "Ontkoppelen",
   "mobile.server.providers.disconnectTitle": "{name} ontkoppelen?",
   "mobile.server.providers.disconnectBody":

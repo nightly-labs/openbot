@@ -121,6 +121,7 @@ export const messages = {
   "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
+  "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",

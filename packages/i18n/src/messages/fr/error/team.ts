@@ -139,6 +139,8 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Cette connexion ne prend pas en charge la durée du cache de prompt.",
   "error.team.claudeUserSetupUnsupported":
     "Cette connexion ne prend pas en charge l’option de configuration Claude Code.",
+  "error.team.claudeCompactWindowUnsupported":
+    "Cette connexion ne prend pas en charge la taille de compactage de Claude.",
   "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",
   "error.team.attachmentNameRequired": "Un nom de pièce jointe sûr est requis.",

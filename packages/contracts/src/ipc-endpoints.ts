@@ -276,6 +276,7 @@ import type {
   DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
+import type { ClaudeCompactWindowSetting } from "./ipc-claude-compact-window";
 import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
@@ -1383,6 +1384,14 @@ export const IPC_ENDPOINTS = {
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
       "host-admin:set-claude-user-setup",
+    ),
+    // The size at which Claude Code compacts the chats of the server's agents
+    // (`claude-compact-window-v1`). `null` is Claude Code's own size. An owner or admin sets it.
+    getClaudeCompactWindow: scopedQuery<ClaudeCompactWindowSetting, "required">()(
+      "host-admin:get-claude-compact-window",
+    ),
+    setClaudeCompactWindow: scopedRequest<number | null, ClaudeCompactWindowSetting, "required">()(
+      "host-admin:set-claude-compact-window",
     ),
     // The models that the model picker of the server shows for one provider. An owner or admin sets them.
     getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(

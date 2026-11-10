@@ -32,6 +32,7 @@ import {
   hostAgentMemoryLimit,
   hostMemoryReview,
   hostSkillLearning,
+  isClaudeCompactWindowTokens,
   isPromptCacheTtl,
   isSkillLearningMode,
   LEGACY_RESPONSE_STYLE,
@@ -55,6 +56,11 @@ import {
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_MEMORY_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  CLAUDE_COMPACT_WINDOW_CAPABILITY,
+  CLAUDE_COMPACT_WINDOW_ROUTES,
+  decodeClaudeCompactWindowResponse,
+} from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import {
   CLAUDE_USER_SETUP_CAPABILITY,
   CLAUDE_USER_SETUP_ROUTES,
@@ -91,6 +97,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
+import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
@@ -132,6 +139,7 @@ interface HostAdminIpcDependencies {
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
+  claudeCompactWindow: ClaudeCompactWindowControl;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
@@ -159,6 +167,7 @@ export function hostAdminIpcHandlers({
   machineAlerts,
   promptCacheTtl,
   claudeUserSetup,
+  claudeCompactWindow,
   modelVisibility,
   agentAccess,
   serverAudit,
@@ -218,6 +227,13 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.claudeUserSetupUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodeClaudeUserSetupResponse, { method: "POST", body }),
+    );
+  }
+  function remoteClaudeCompactWindow(serverId: string, route: string, body: { tokens?: number | null }) {
+    if (!remoteServers.supportsCapability(serverId, CLAUDE_COMPACT_WINDOW_CAPABILITY))
+      throw new Error(sourceText("error.team.claudeCompactWindowUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeClaudeCompactWindowResponse, { method: "POST", body }),
     );
   }
   function remoteModelVisibility(
@@ -422,6 +438,15 @@ export function hostAdminIpcHandlers({
         local: (enabled) => runCauseEffect(claudeUserSetup.set(enabled)),
         remote: (enabled, serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.update, { enabled }),
       }),
+      getClaudeCompactWindow: scopedQueryHandler({
+        local: () => claudeCompactWindow.get(),
+        remote: (serverId) => remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.settings, {}),
+      }),
+      setClaudeCompactWindow: scopedHandler(parseClaudeCompactWindow, {
+        local: (tokens) => runCauseEffect(claudeCompactWindow.set(tokens)),
+        remote: (tokens, serverId) =>
+          remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.update, { tokens }),
+      }),
       getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
         local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
         remote: (provider, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.settings, { provider }),
@@ -489,6 +514,11 @@ function wireIdentity(input: UpdateHostIdentityInput) {
 
 function parseClaudeUserSetup(value: unknown): boolean {
   if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
+  return value;
+}
+
+function parseClaudeCompactWindow(value: unknown): number | null {
+  if (!isClaudeCompactWindowTokens(value)) throw new Error("Invalid Claude compaction size.");
   return value;
 }
 

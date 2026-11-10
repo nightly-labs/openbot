@@ -197,6 +197,11 @@ import {
 } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
+  type ClaudeCompactWindowControl,
+  claudeCompactWindowControl,
+  createClaudeCompactWindowPreferenceStore,
+} from "./claude-compact-window-preference-store";
+import {
   type ClaudeUserSetupControl,
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
@@ -453,6 +458,7 @@ const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
+const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const MODEL_VISIBILITY_PREFERENCE_FILE = "openbot-model-visibility-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const EXTERNAL_LINK_PREFERENCE_FILE = "openbot-external-link-preference-v1.json";
@@ -705,6 +711,7 @@ export interface ApplicationServices {
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
+  claudeCompactWindow: ClaudeCompactWindowControl;
   modelVisibility: ModelVisibility;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   externalLinkPreference: ExternalLinkPreferenceStore;
@@ -1452,6 +1459,10 @@ export async function createApplicationServices({
     join(app.getPath("userData"), CLAUDE_USER_SETUP_PREFERENCE_FILE),
   );
   await runCauseEffect(claudeUserSetup.load());
+  const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
+    join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
+  );
+  await runCauseEffect(claudeCompactWindow.load());
   const remoteSessionReuse = createRemoteSessionReusePreferenceStore(
     join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
   );
@@ -2070,6 +2081,8 @@ export async function createApplicationServices({
       promptCacheTtl: () => promptCacheTtl.get().ttl,
       // Also read at each Claude spawn, from Settings > Providers > Claude of this computer.
       claudeUserSetup: () => claudeUserSetup.get().enabled,
+      // Also read at each Claude spawn: the size at which Claude Code compacts a chat.
+      claudeCompactWindow: () => claudeCompactWindow.get().tokens,
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
       customProviders: () => customProviders.configs(),
@@ -2164,6 +2177,9 @@ export async function createApplicationServices({
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
   promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
   const claudeUserSetupSetting = claudeUserSetupControl(claudeUserSetup, () => service.notifyProviderSettingsChanged());
+  const claudeCompactWindowSetting = claudeCompactWindowControl(claudeCompactWindow, () =>
+    service.notifyProviderSettingsChanged(),
+  );
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
   const modelVisibility = new ModelVisibility({
     path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
@@ -3059,6 +3075,7 @@ export async function createApplicationServices({
       skillLearning,
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
+      claudeCompactWindow: claudeCompactWindowSetting,
       providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
       modelVisibility,
       // The local Settings save does the same two steps (`saveSetup`).
@@ -4111,6 +4128,7 @@ export async function createApplicationServices({
     serverPersonality,
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,
+    claudeCompactWindow: claudeCompactWindowSetting,
     modelVisibility,
     remoteSessionReuse,
     externalLinkPreference,

@@ -137,6 +137,7 @@ export function serverSupportsCapability(
       capability === "routines-once-v1" ||
       capability === "routine-run-command-v1" ||
       capability === "claude-user-setup-v1" ||
+      capability === "claude-compact-window-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
       capability === "provider-detection-v1") &&

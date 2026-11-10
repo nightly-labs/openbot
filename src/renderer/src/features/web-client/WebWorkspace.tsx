@@ -97,6 +97,7 @@ import {
   getHostAgentAccess,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostClaudeCompactWindow,
   getHostMemoryReview,
   getHostModelVisibility,
   getHostPersonality,
@@ -110,6 +111,7 @@ import {
   listHostedSites,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
+  setHostClaudeCompactWindow,
   setHostMemoryReview,
   setHostModelVisibility,
   setHostPersonality,
@@ -266,6 +268,7 @@ import {
   showServerUpdate,
 } from "../servers/server-update-flow";
 import { licenseContactUs, trackLicenseEvent } from "../settings/license-analytics";
+import type { HostClaudeCompactWindowCalls } from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupCalls } from "../settings/provider-claude-user-setup";
 import type { HostModelVisibilityCalls } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
@@ -1551,6 +1554,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       hostRequest(serverId)("POST", CLAUDE_USER_SETUP_ROUTES.settings, decodeClaudeUserSetupResponse, {}),
     setClaudeUserSetup: (enabled, serverId) =>
       hostRequest(serverId)("POST", CLAUDE_USER_SETUP_ROUTES.update, decodeClaudeUserSetupResponse, { enabled }),
+  };
+  const hostClaudeCompactWindowCalls: HostClaudeCompactWindowCalls = {
+    getClaudeCompactWindow: async (serverId) =>
+      runTeamEffect(getHostClaudeCompactWindow(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setClaudeCompactWindow: async (tokens, serverId) =>
+      runTeamEffect(
+        setHostClaudeCompactWindow(hostRequest(serverId), tokens).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const hostModelVisibilityCalls: HostModelVisibilityCalls = {
     getModelVisibility: async (provider, serverId) =>
@@ -3142,6 +3153,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         skillLearning={{ calls: hostSkillLearningCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         claudeUserSetup={{ calls: hostClaudeUserSetupCalls }}
+                        claudeCompactWindow={{ calls: hostClaudeCompactWindowCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}

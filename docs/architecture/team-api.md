@@ -451,6 +451,15 @@ that start after it, and the host sends the provider status event, so open setti
 again. `src/main/team-api/route-claude-user-setup.ts` owns them. Without the capability a client hides
 the switch for that host.
 
+The optional `claude-compact-window-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
+(`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are
+"Compact chats at" of the host on the Claude page of Server Settings > Providers. Only owners and
+admins can use them (else 403); the wire codec refuses a size outside the range with 400. A change
+applies to the Claude processes that start after it, and the host sends the provider status event, so
+open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
+Without the capability a client hides the row for that host.
+
 The optional `agent-thread-queue-v1` capability (protocol 9 only) adds
 `POST /v1/agent-thread-queue/list` (`agentId`) and `POST /v1/agent-thread-queue/reorder` (`agentId`,
 `taskId`, `deliveryIds`). The list gives, in full, the waiting messages of each open side thread of

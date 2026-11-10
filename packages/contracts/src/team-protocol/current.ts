@@ -62,6 +62,7 @@ import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "./claude-user-setup-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
@@ -546,6 +547,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HERMES_IMPORT_CAPABILITY,
   PROVIDER_DETECTION_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
+  CLAUDE_COMPACT_WINDOW_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -744,7 +746,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_USAGE_LIMIT_CAPABILITY &&
     capability !== HERMES_IMPORT_CAPABILITY &&
     capability !== PROVIDER_DETECTION_CAPABILITY &&
-    capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY,
+    capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY &&
+    capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -819,6 +822,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HERMES_IMPORT_CAPABILITY,
   PROVIDER_DETECTION_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
+  CLAUDE_COMPACT_WINDOW_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -976,6 +980,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_USAGE_LIMIT_CAPABILITY &&
       capability !== HERMES_IMPORT_CAPABILITY &&
       capability !== PROVIDER_DETECTION_CAPABILITY &&
-      capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY,
+      capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY &&
+      capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY,
   );
 }

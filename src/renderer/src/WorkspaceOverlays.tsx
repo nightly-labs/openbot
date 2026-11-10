@@ -985,6 +985,7 @@ function ServerSettings() {
           skillLearning={{}}
           hostPromptCacheTtl={{}}
           claudeUserSetup={{}}
+          claudeCompactWindow={{}}
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}

@@ -1038,6 +1038,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Claude Code varsayılanı",
   "mobile.server.providers.promptCacheHour": "1 saat",
   "mobile.server.providers.promptCacheLoadFailed": "Bu sunucunun istem önbelleği süresi yüklenemedi.",
+  "mobile.server.providers.compactWindow": "Sohbetleri sıkıştırma boyutu",
+  "mobile.server.providers.compactWindowHint":
+    "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",
+  "mobile.server.providers.compactWindowDefault": "Claude Code varsayılanı",
+  "mobile.server.providers.compactWindowTokens": "{size} token",
+  "mobile.server.providers.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
   "mobile.server.providers.disconnect": "Bağlantıyı kes",
   "mobile.server.providers.disconnectTitle": "{name} bağlantısı kesilsin mi?",
   "mobile.server.providers.disconnectBody":
