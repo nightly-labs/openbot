@@ -192,7 +192,7 @@ export function declinedMcpElicitationText(params: unknown): string {
   }
   if (!serverName) return sourceText("error.backend.mcpRequestDeclined");
   return sourceText(signIn ? "error.backend.mcpServerSignInPage" : "error.backend.mcpServerRequestDeclined", {
-    name: serverName,
+    name: serverName === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : serverName,
   });
 }
 
