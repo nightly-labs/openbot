@@ -200,6 +200,22 @@
     "tr",
     "zh"
   ],
+  "error.import.transferAgentSettingSkipped": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.import.transferAlwaysAllow": [
     "ar",
     "de",

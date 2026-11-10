@@ -95,7 +95,7 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
   const step = function* (effect: Effect.Effect<unknown, unknown>) {
     const result = yield* Effect.result(effect);
     if (Result.isFailure(result))
-      warnings.push(sourceText("error.import.transferSettingSkipped", { name, reason: reason(result.failure) }));
+      warnings.push(sourceText("error.import.transferAgentSettingSkipped", { name, reason: reason(result.failure) }));
   };
 
   // Off is never more than a new agent has. On is applied only where a new agent has it on too.
