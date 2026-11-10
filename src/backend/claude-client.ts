@@ -1252,7 +1252,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
-      usable?.flatMap((server) => (server.proxied ? [server.config.name] : [])) ?? [],
+      usable?.flatMap((server) =>
+        server.proxied || (server.url && server.config.headers.length > 0) ? [server.config.name] : [],
+      ) ?? [],
     );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
@@ -2703,7 +2705,10 @@ export function claudeBrowserTools(call: (name: string, args: unknown) => Promis
  * folder, and for 15 minutes each new process skips a server of that name without a connection,
  * whatever its URL and headers are now. The names are the rows that go through the sign-in proxy,
  * which never answers 401, so their marks are from before the sign-in, when the row's own URL
- * refused the CLI. The file is the CLI's own: a missing or unknown file stays as it is.
+ * refused the CLI. The names also include the http rows that send headers the user typed, such as
+ * an API key: a mark can be from before the key, and the CLI keeps it for the new key too (#6556).
+ * When the key is wrong, the CLI asks the server once and marks the row again. The file is the
+ * CLI's own: a missing or unknown file stays as it is.
  */
 const clearClaudeNeedsAuthMarks = Effect.fn("ClaudeAgentClient.clearNeedsAuthMarks")(
   function* (configDirectory: string, names: readonly string[]) {
