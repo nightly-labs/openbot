@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { useAgentModelPicker } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -18,6 +19,11 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+
+/** The page adds this many rows at a time, so a provider with hundreds of models opens at once. */
+const PAGE_SIZE = 100;
+/** The next rows come when the reader is this close to the end. */
+const END_DISTANCE = 600;
 
 /**
  * Agent settings > Model, and Create agent > Model: the models of the chosen provider, with a search.
@@ -38,6 +44,11 @@ export function AgentModelPickerScreen() {
     enabled: request !== null,
     retry: false,
   });
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  // Only the Model row opens the page. Without its request there is no form to give the pick to.
+  useEffect(() => {
+    if (!request && router.canGoBack()) router.back();
+  }, [request]);
   const words = search.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   const options = models.data?.filter((option) => option.provider === request?.provider) ?? [];
   // The search also reads the model id, as the backup model search does.
@@ -45,9 +56,17 @@ export function AgentModelPickerScreen() {
     const text = `${option.name} ${option.id}`.toLocaleLowerCase();
     return words.every((word) => text.includes(word));
   });
+  const changeSearch = (text: string) => {
+    setSearch(text);
+    setLimit(PAGE_SIZE);
+  };
+  function onScroll({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) {
+    const end = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height - nativeEvent.contentOffset.y;
+    if (end < END_DISTANCE && limit < matches.length) setLimit((current) => current + PAGE_SIZE);
+  }
 
   return (
-    <SettingsContent>
+    <SettingsContent onScroll={onScroll}>
       <Stack.Screen options={{ title: t("mobile.agent.runtime.model") }} />
       {isIOS ? (
         <Stack.SearchBar
@@ -56,8 +75,8 @@ export function AgentModelPickerScreen() {
           hideWhenScrolling={false}
           // In a sheet, the header and its back button stay while the search has focus.
           hideNavigationBar={false}
-          onChangeText={(event) => setSearch(event.nativeEvent.text)}
-          onCancelButtonPress={() => setSearch("")}
+          onChangeText={(event) => changeSearch(event.nativeEvent.text)}
+          onCancelButtonPress={() => changeSearch("")}
         />
       ) : (
         // The Android blur header cannot draw a `Stack.SearchBar`, so the field is in the content.
@@ -70,12 +89,10 @@ export function AgentModelPickerScreen() {
           autoCorrect={false}
           returnKeyType="search"
           value={search}
-          onChangeText={setSearch}
+          onChangeText={changeSearch}
         />
       )}
-      {!request ? (
-        <SettingsNote>{t("mobile.agent.edit.gone")}</SettingsNote>
-      ) : models.isError ? (
+      {!request ? null : models.isError ? (
         <SettingsSection>
           <SettingsRow disclosure={false} onPress={() => void models.refetch()}>
             <Typography.Paragraph>{t("mobile.agent.runtime.retryModels")}</Typography.Paragraph>
@@ -89,7 +106,7 @@ export function AgentModelPickerScreen() {
         <SettingsNote>{t("mobile.agent.runtime.noMatches")}</SettingsNote>
       ) : (
         <SettingsSection>
-          {matches.map((option) => {
+          {matches.slice(0, limit).map((option) => {
             const on = option.id === request.model;
             return (
               <SettingsRow
