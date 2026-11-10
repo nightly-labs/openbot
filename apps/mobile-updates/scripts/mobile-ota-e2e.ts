@@ -11,6 +11,8 @@
 // - a publish with a key that the certificate does not accept changes nothing;
 // - a manifest that someone changes in the bucket no longer has a valid signature;
 // - other runtime versions and channels are not affected, and the answers come from the cache;
+// - a rollout change and a rollback find the binary that has an update from the store builds, also
+//   when only one platform has an update, and stop when two store versions have one;
 // - the publish guard of `scripts/mobile-ota.ts` passes a commit whose runtime version a store build
 //   has, and refuses one that no store build has.
 //
@@ -28,12 +30,14 @@ import { getPlatformProxy } from "wrangler";
 import {
   changeRollout,
   fingerprint,
+  liveUpdateScopes,
   multipartParts,
   publishUpdate,
   readExport,
   readPointer,
   rollBack,
   type SigningKeys,
+  type StoreBuild,
   storeBuildTag,
   type UpdateScope,
   type UpdateStore,
@@ -192,10 +196,17 @@ try {
     const response = await request("/manifest", init);
     return response.status === 200 ? ((await signedPart(response, "manifest"))?.json.id ?? null) : null;
   }
-  const publish = async (directory: string, rollout: number, message: string, minute: number, signer = keys) =>
+  const publish = async (
+    directory: string,
+    rollout: number,
+    message: string,
+    minute: number,
+    signer = keys,
+    of: UpdateScope = scope,
+  ) =>
     publishUpdate(store, {
-      scope,
-      update: await readExport(directory, scope.platform),
+      scope: of,
+      update: await readExport(directory, of.platform),
       assetBaseUrl: `${SERVER}/assets`,
       expoClient: { name: "OpenBot", version: "9.9.9" },
       commit: "0".repeat(40),
@@ -381,7 +392,91 @@ try {
     (await request("/manifest", phone({}, { ...scope, runtimeVersion: "runtime-c" }))).status === 204,
   );
 
-  // 9. The publish guard, with the real runtime version of this checkout and a local tag remote.
+  // 9. A rollout change and a rollback find the binary from the store builds, not from the checkout.
+  const androidBuild: UpdateScope = { channel: "production", platform: "android", runtimeVersion: "store-android-1" };
+  const build = (of: UpdateScope, number: string): StoreBuild => ({
+    platform: of.platform,
+    version: "9.9.9",
+    build: number,
+    runtimeVersion: of.runtimeVersion,
+    commit: "0".repeat(40),
+  });
+  const iosBuild: UpdateScope = { ...androidBuild, platform: "ios", runtimeVersion: "store-ios-1" };
+  const builds = [build(iosBuild, "7"), build(androidBuild, "7")];
+  const androidUpdate = await publish(
+    await writeExport("export-5", "bundle five"),
+    100,
+    "android only",
+    8,
+    keys,
+    androidBuild,
+  );
+  const live = await liveUpdateScopes(store, {
+    channel: "production",
+    platforms: ["ios", "android"],
+    runtime: null,
+    builds,
+  });
+  check(
+    "a change for all platforms finds the platform that has an update and names the one that has none",
+    live.scopes.length === 1 &&
+      live.scopes[0]?.runtimeVersion === androidBuild.runtimeVersion &&
+      live.skipped.join() === "ios",
+    live,
+  );
+  for (const found of live.scopes) {
+    await rollBack(store, { scope: found, toEmbedded: false, keys, now: new Date(Date.UTC(2026, 10, 10, 12, 9)) });
+  }
+  const androidBack = await signedPart(
+    await request("/manifest", phone({ "expo-current-update-id": androidUpdate.update.id }, androidBuild)),
+    "directive",
+  );
+  check(
+    "the rollback for all platforms takes back the update of the one platform that has it",
+    androidBack?.json.type === "rollBackToEmbedded" && androidBack.valid,
+  );
+  const outcome = (operation: Promise<object>) =>
+    operation.then(
+      () => null,
+      (error: Error) => error.message,
+    );
+  const noUpdate = await outcome(
+    liveUpdateScopes(store, { channel: "production", platforms: ["ios", "android"], runtime: null, builds }),
+  );
+  check("a change with no update on any platform stops", noUpdate !== null, noUpdate);
+
+  const olderAndroid: UpdateScope = { ...androidBuild, runtimeVersion: "store-android-0" };
+  await publish(await writeExport("export-6", "bundle six"), 100, "newer store version", 10, keys, androidBuild);
+  await publish(await writeExport("export-7", "bundle seven"), 100, "older store version", 11, keys, olderAndroid);
+  const twoBuilds = [...builds, build(olderAndroid, "6")];
+  const ambiguous = await outcome(
+    liveUpdateScopes(store, { channel: "production", platforms: ["android"], runtime: null, builds: twoBuilds }),
+  );
+  check(
+    "two store versions with an update need the runtime version",
+    ambiguous?.includes("--runtime") === true && ambiguous.includes(olderAndroid.runtimeVersion),
+    ambiguous,
+  );
+  const named = await liveUpdateScopes(store, {
+    channel: "production",
+    platforms: ["android"],
+    runtime: olderAndroid.runtimeVersion,
+    builds: [],
+  });
+  check(
+    "a runtime version names one binary, with no tag",
+    named.scopes.length === 1 && named.scopes[0]?.runtimeVersion === olderAndroid.runtimeVersion,
+  );
+  const twoPlatforms = await outcome(
+    liveUpdateScopes(store, { channel: "production", platforms: ["ios", "android"], runtime: "store-ios-1", builds }),
+  );
+  check(
+    "a runtime version with two platforms is refused",
+    twoPlatforms?.includes("one platform") === true,
+    twoPlatforms,
+  );
+
+  // 10. The publish guard, with the real runtime version of this checkout and a local tag remote.
   const android = await fingerprint("android", MOBILE);
   const remote = join(temp, "remote");
   await mkdir(remote);

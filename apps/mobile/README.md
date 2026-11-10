@@ -659,6 +659,12 @@ that its store build accepts.
 
 ### Rollout and rollback
 
+- A rollout change and a rollback do not use the runtime version of the branch. They find the store
+  builds of each platform that have an update now, from the `mobile-build/` tags. So they work from
+  `main` also after a native change, and `--platform all` changes each platform that has an update
+  and names a platform that has none. When two store versions of one platform have an update, or for
+  a build with no tag such as a `preview` build, name the binary: `--platform ios --runtime <version>`.
+  `bun run mobile:ota:status` prints the runtime version of each store build.
 - With `--rollout`, each install has a fixed place, so the same phones stay in the rollout while the
   percentage grows. The other phones keep the earlier update.
 - A phone does not go back to an older update. So a rollback publishes the earlier bundle again as a

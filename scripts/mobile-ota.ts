@@ -7,9 +7,11 @@
 //   bun scripts/mobile-ota.ts status [--channel production]
 //       shows what the update server gives the phones of each recorded store build; read-only
 //   bun scripts/mobile-ota.ts dispatch publish --platform <p> --message <text> [--rollout 1-100] [--dry-run]
-//   bun scripts/mobile-ota.ts dispatch rollout --platform <p> --rollout 1-100
-//   bun scripts/mobile-ota.ts dispatch rollback --platform <p> [--to-embedded]
-//       starts the `Mobile OTA update` workflow for the current branch
+//   bun scripts/mobile-ota.ts dispatch rollout --platform <p> --rollout 1-100 [--runtime <version>]
+//   bun scripts/mobile-ota.ts dispatch rollback --platform <p> [--to-embedded] [--runtime <version>]
+//       starts the `Mobile OTA update` workflow for the current branch. A rollout change and a
+//       rollback find the update of the recorded store builds, so the branch can have another runtime
+//       version. `--runtime`, with one platform, names a binary that has no tag or one of two updates.
 //
 // The workflow runs these. They need the signing key and the bucket credentials:
 //   bun scripts/mobile-ota.ts publish --platform <p> --message <text> [--channel <c>] [--rollout 1-100] [--dry-run]
@@ -33,10 +35,16 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { S3Client } from "bun";
-import { CHANNEL_PATTERN, UPDATE_PLATFORMS, type UpdatePlatform } from "../apps/mobile-updates/src/protocol";
+import {
+  CHANNEL_PATTERN,
+  RUNTIME_VERSION_PATTERN,
+  UPDATE_PLATFORMS,
+  type UpdatePlatform,
+} from "../apps/mobile-updates/src/protocol";
 import {
   changeRollout,
   fingerprint,
+  liveUpdateScopes,
   parseStoreBuilds,
   probeManifest,
   publishUpdate,
@@ -397,34 +405,48 @@ async function commandPublish(options: Options) {
   return served ? 0 : 1;
 }
 
-async function scopesOf(options: Options): Promise<UpdateScope[]> {
-  const channel = channelOf(options);
-  const runtime = options.values.get("runtime");
-  const scopes: UpdateScope[] = [];
-  for (const platform of platformsOf(options)) {
-    scopes.push({ channel, platform, runtimeVersion: runtime ?? (await fingerprint(platform, MOBILE)) });
+/**
+ * The binaries of a rollout change or a rollback. All of them are found before one of them changes,
+ * so an error for one platform leaves the other platform as it was.
+ */
+async function liveScopes(options: Options, store: UpdateStore) {
+  const runtime = options.values.get("runtime") ?? null;
+  if (runtime !== null && !RUNTIME_VERSION_PATTERN.test(runtime)) {
+    throw new UsageError(`The runtime version ${runtime} is not valid.`);
   }
-  return scopes;
+  return liveUpdateScopes(store, {
+    channel: channelOf(options),
+    platforms: platformsOf(options),
+    runtime,
+    // With --runtime, the tags are not necessary.
+    builds: runtime === null ? await storeBuilds() : [],
+  });
+}
+
+function skippedLines(skipped: UpdatePlatform[]): string[] {
+  return skipped.map((platform) => `- ${platform}: no store build has an update. Nothing changed.`);
 }
 
 async function commandRollout(options: Options) {
   const rollout = rolloutOf(options);
   const store = s3Store();
+  const { scopes, skipped } = await liveScopes(options, store);
   const lines = ["## Mobile OTA rollout changed"];
-  for (const scope of await scopesOf(options)) {
+  for (const scope of scopes) {
     const pointer = await changeRollout(store, scope, rollout);
     const id = pointer.target.kind === "update" ? pointer.target.id : "";
     lines.push(`- ${scopeName(scope)}: update \`${id}\` now goes to ${rollout}% of the phones.`);
   }
-  summarize(lines);
+  summarize([...lines, ...skippedLines(skipped)]);
   return 0;
 }
 
 async function commandRollback(options: Options) {
   const keys = signingKeys(appConfig());
   const store = s3Store();
+  const { scopes, skipped } = await liveScopes(options, store);
   const lines = ["## Mobile OTA update taken back"];
-  for (const scope of await scopesOf(options)) {
+  for (const scope of scopes) {
     const before = await readPointer(store, scope);
     const result = await rollBack(store, { scope, toEmbedded: options.flags.has("to-embedded"), keys });
     const from = before?.target.kind === "update" ? before.target.id : "";
@@ -434,7 +456,7 @@ async function commandRollback(options: Options) {
         : `- ${scopeName(scope)}: \`${from}\` is taken back. Phones return to the bundle in their binary.`,
     );
   }
-  summarize(lines);
+  summarize([...lines, ...skippedLines(skipped)]);
   return 0;
 }
 
@@ -649,6 +671,8 @@ async function commandDispatch(action: string | undefined, options: Options) {
   }
   if (action === "rollout") fields.push(`rollout=${rolloutOf(options)}`);
   if (action === "rollback") fields.push(`to_embedded=${options.flags.has("to-embedded")}`);
+  const runtime = options.values.get("runtime");
+  if (runtime !== undefined && action !== "publish") fields.push(`runtime=${runtime}`);
   await run("gh", ["workflow", "run", WORKFLOW, "--ref", branch, ...fields.flatMap((field) => ["-f", field])], {
     cwd: ROOT,
   });

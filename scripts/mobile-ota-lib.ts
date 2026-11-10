@@ -459,6 +459,58 @@ export function parseStoreBuilds(lsRemote: string): StoreBuild[] {
   return builds.sort((a, b) => Number(b.build) - Number(a.build));
 }
 
+/**
+ * The binaries that a rollout change or a rollback must reach: those that have an update now. They
+ * come from the recorded store builds, not from the checkout. After a native change is on `main`,
+ * the checkout has another runtime version than the binaries in the stores, and an update must
+ * still be easy to take back.
+ *
+ * A platform with no update is in `skipped`, so a change for all platforms still reaches the
+ * platform that has one. With `runtime`, the one platform and that runtime version are the scope;
+ * a build of a channel with no tags, such as `preview`, needs it.
+ */
+export async function liveUpdateScopes(
+  store: UpdateStore,
+  input: { channel: string; platforms: readonly UpdatePlatform[]; runtime: string | null; builds: StoreBuild[] },
+): Promise<{ scopes: UpdateScope[]; skipped: UpdatePlatform[] }> {
+  const hasUpdate = async (scope: UpdateScope) => (await readPointer(store, scope))?.target.kind === "update";
+  const [onlyPlatform] = input.platforms;
+  if (input.runtime !== null) {
+    if (!onlyPlatform || input.platforms.length !== 1) {
+      throw new Error("With --runtime, give one platform: iOS and Android have different runtime versions.");
+    }
+    const scope = { channel: input.channel, platform: onlyPlatform, runtimeVersion: input.runtime };
+    if (!(await hasUpdate(scope))) throw new Error(`${scopeName(scope)} has no update.`);
+    return { scopes: [scope], skipped: [] };
+  }
+  const scopes: UpdateScope[] = [];
+  const skipped: UpdatePlatform[] = [];
+  for (const platform of input.platforms) {
+    const runtimes = new Set(
+      input.builds.filter((build) => build.platform === platform).map((build) => build.runtimeVersion),
+    );
+    const live: UpdateScope[] = [];
+    for (const runtimeVersion of runtimes) {
+      const scope = { channel: input.channel, platform, runtimeVersion };
+      if (await hasUpdate(scope)) live.push(scope);
+    }
+    const [scope] = live;
+    if (live.length > 1) {
+      throw new Error(
+        `${platform} has an update for ${live.length} runtime versions: ${live.map((entry) => entry.runtimeVersion).join(", ")}. Give --platform ${platform} --runtime <version>. Nothing changed.`,
+      );
+    }
+    if (scope) scopes.push(scope);
+    else skipped.push(platform);
+  }
+  if (scopes.length === 0) {
+    throw new Error(
+      `No recorded store build of ${input.platforms.join(" and ")} has an update on the channel ${input.channel}. For a build with no tag, give --platform and --runtime.`,
+    );
+  }
+  return { scopes, skipped };
+}
+
 /** The update that the server gives a phone of `scope`, as a phone asks for it. Null for no update. */
 export async function probeManifest(
   serverUrl: string,
