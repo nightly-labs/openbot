@@ -146,7 +146,7 @@ interface Window {
   readonly version: string;
   readonly from: string;
   readonly to: string;
-  /** The end of the install window for arrivals: earlier when the next release came out before `to`. */
+  /** The end of the install window for arrivals: earlier when a newer release came out before `to`. */
   readonly installsTo: string;
 }
 
@@ -232,11 +232,15 @@ async function publishedReleases(): Promise<Release[]> {
   });
 }
 
-function pickReleases(
-  releases: readonly Release[],
-  wanted: string,
-  wantedPrevious: string | undefined,
-): { next: Release; previous: Release } {
+interface Pair {
+  readonly next: Release;
+  readonly previous: Release;
+  /** When the first release newer than `next` was published, if one is. */
+  readonly nextFollowedAt: string | undefined;
+  readonly previousFollowedAt: string | undefined;
+}
+
+function pickReleases(releases: readonly Release[], wanted: string, wantedPrevious: string | undefined): Pair {
   const sorted = [...releases].sort((a, b) => compareVersions(b.version, a.version));
   const next = wanted === "latest" ? sorted[0] : sorted.find((release) => release.version === wanted);
   if (!next) throw new Error(`No published GitHub Release has the version ${wanted}.`);
@@ -247,7 +251,10 @@ function pickReleases(
   if (compareVersions(previous.version, next.version) >= 0) {
     throw new Error(`--previous must be older than ${next.version}.`);
   }
-  return { next, previous };
+  // After a newer release is out, an install goes to that release, so it ends the install window.
+  const followedAt = (release: Release) =>
+    sorted.findLast((other) => compareVersions(other.version, release.version) > 0)?.publishedAt;
+  return { next, previous, nextFollowedAt: followedAt(next), previousFollowedAt: followedAt(previous) };
 }
 
 // --- SQL --------------------------------------------------------------------------------------------
@@ -310,6 +317,13 @@ FROM (
   FROM events
   WHERE name = 'update_action' AND ${environment}
     AND properties['action'] = 'install' AND properties['result'] = 'succeeded'
+    AND created_at >= ${at(windows.map((window) => window.from).sort()[0] ?? "")}
+    AND created_at < ${at(
+      windows
+        .map((window) => window.installsTo)
+        .sort()
+        .at(-1) ?? "",
+    )}
     AND version != '' AND properties['app_version'] != version
   GROUP BY profile_id, version
 ) AS installs
@@ -468,38 +482,28 @@ function compare(
   });
 }
 
-function windows(next: Release, previous: Release, hours: number): { previous: Window; next: Window } {
+function windows(pair: Pair, hours: number): { previous: Window; next: Window } {
   const span = hours * 3_600_000;
   const margin = ARRIVAL_MARGIN_MINUTES * 60_000;
-  const nextFrom = Date.parse(next.publishedAt);
-  const previousFrom = Date.parse(previous.publishedAt);
-  const iso = (time: number) => new Date(time).toISOString();
-  return {
-    next: {
-      version: next.version,
-      from: next.publishedAt,
-      to: iso(nextFrom + span),
-      installsTo: iso(nextFrom + span - margin),
-    },
-    previous: {
-      version: previous.version,
-      from: previous.publishedAt,
-      to: iso(previousFrom + span),
-      // After the new release is out, an install goes to the new release, not to the previous one.
-      installsTo: iso(Math.min(previousFrom + span, nextFrom) - margin),
-    },
+  const window = (release: Release, followedAt: string | undefined): Window => {
+    const from = Date.parse(release.publishedAt);
+    const to = from + span;
+    const installsTo = Math.min(to, followedAt === undefined ? to : Date.parse(followedAt)) - margin;
+    return {
+      version: release.version,
+      from: release.publishedAt,
+      to: new Date(to).toISOString(),
+      installsTo: new Date(Math.max(from, installsTo)).toISOString(),
+    };
   };
+  return { next: window(pair.next, pair.nextFollowedAt), previous: window(pair.previous, pair.previousFollowedAt) };
 }
 
-async function buildReport(
-  next: Release,
-  previous: Release,
-  requestedHours: number | undefined,
-  now: number,
-): Promise<Report> {
+async function buildReport(releases: Pair, requestedHours: number | undefined, now: number): Promise<Report> {
+  const { next, previous } = releases;
   const sinceRelease = (now - Date.parse(next.publishedAt)) / 3_600_000;
   const hours = Math.max(0, Math.min(sinceRelease, requestedHours ?? MAX_WINDOW_HOURS, MAX_WINDOW_HOURS));
-  const pair = windows(next, previous, hours);
+  const pair = windows(releases, hours);
   const both = [pair.previous, pair.next];
   const { user, password } = await credentials();
   const connection = await connectClickHouse();
@@ -687,12 +691,13 @@ async function main(): Promise<void> {
   const maxAge = positiveNumber(parsed.values["max-age"], "--max-age");
   try {
     const now = Date.now();
-    const { next, previous } = pickReleases(await publishedReleases(), wanted, wantedPrevious);
+    const releases = pickReleases(await publishedReleases(), wanted, wantedPrevious);
+    const { next, previous } = releases;
     if (maxAge !== undefined && now - Date.parse(next.publishedAt) > maxAge * 3_600_000) {
       process.stdout.write(`The release is older than ${maxAge} h; nothing to check.\n`);
       return;
     }
-    const report = await buildReport(next, previous, hours, now);
+    const report = await buildReport(releases, hours, now);
     const path = await writeReport(report);
     let sent = false;
     if (discord && report.result !== "worse" && parsed.values.state) {
