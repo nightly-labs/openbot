@@ -28,6 +28,8 @@ export const messages = {
   "status.agent.reportProblem":
     "Esto será un issue público en GitHub, con la versión de la app y tu sistema. Tu nombre no aparece.",
   "status.agent.sendIdea": "Esto se convierte en un issue público de GitHub. Tu nombre no se muestra.",
+  "status.agent.feedbackRecentErrors": "Errores recientes en el chat:",
+  "status.agent.feedbackSameAs": "Se añade al issue #{issue}",
   "status.agent.feedbackSent": "Enviado al equipo de OpenBot: {title}",
   "status.agent.serverInstallCommand":
     "Crear un comando de un solo uso que instala OpenBot en otro ordenador como el servidor {name} y lo conecta a tu cuenta. El agente lo ejecuta allí.",

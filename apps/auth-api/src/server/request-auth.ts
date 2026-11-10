@@ -207,6 +207,26 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
 });
 
 /**
+ * A few similar-issue searches for each account and minute. All accounts share the search quota of
+ * the one app installation, so one account must not use it all.
+ */
+export const enforceFeedbackSearchRateLimit = Effect.fn("GitHub.enforceFeedbackSearchRateLimit")(function* (
+  userId: string,
+) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({
+    try: () => limiter.limit({ key: `search:${userId}` }),
+    catch: unavailable,
+  });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many searches. Try again later.");
+  }
+});
+
+/**
  * A few feedback issues for each account and minute, and 10 each day: each one is a public issue
  * that a person reads. The daily count is the only feedback data that D1 keeps. It returns the UTC day
  * that it counted, for `uncountFeedback`.

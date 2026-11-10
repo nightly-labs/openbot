@@ -271,8 +271,14 @@ function FeedbackOffer(props: {
   onSend: () => void;
   onDismiss: () => void;
 }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const idea = () => props.report.kind === "idea";
+  // The host writes its notes, such as the recent errors, as source text paragraphs.
+  const text = () =>
+    props.report.text
+      .split("\n\n")
+      .map((part) => sourceText(part))
+      .join("\n\n");
   return (
     <section
       class="approval-card conversation-interaction-card feedback-offer"
@@ -287,7 +293,7 @@ function FeedbackOffer(props: {
       </strong>
       <blockquote class="feedback-offer-quote">
         <strong>{props.report.title}</strong>
-        <Show when={props.report.text}>{(text) => <p>{text()}</p>}</Show>
+        <Show when={text()}>{(body) => <p>{body()}</p>}</Show>
       </blockquote>
       <div class="feedback-offer-actions">
         <Button
