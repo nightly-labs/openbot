@@ -342,7 +342,9 @@ export function isBalanceDiagnostic(message: string): boolean {
 export function isImageTooSmallDiagnostic(message: string): boolean {
   return (
     /\bimage\b[^.\n]{0,80}\btoo small\b/iu.test(message) ||
-    /\b(?:height|width)\b[^.\n]{0,60}\bmust be (?:at least \d+ ?(?:px|pixels?)\b|larger than\b)/iu.test(message) ||
+    (/\bimage\b/iu.test(message) &&
+      /\b(?:height|width)\b[^.\n]{0,60}\bmust be at least \d+ ?(?:px|pixels?)\b/iu.test(message)) ||
+    /\bmust be larger than factor\b/iu.test(message) ||
     /\bimage length and width do not meet the model restrictions\b/iu.test(message)
   );
 }
