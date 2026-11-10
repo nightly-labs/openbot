@@ -614,6 +614,19 @@
   font-size: var(--openbot-text-sm);
 }
 
+/* The composer's wrap places the mention picker above the composer, in the panel. The composer has its
+   own margins, and the editor keeps the dock's height limit. */
+.agent-dock-composer-wrap.composer-wrap {
+  --composer-editor-limit: initial;
+
+  padding: 0;
+}
+
+/* As in the main chat, the picker is 12px narrower on each side than the composer. */
+.agent-dock-composer-wrap .mention-picker {
+  --mention-picker-side-inset: calc(var(--openbot-space-3) + 12px);
+}
+
 /* The app's compact composer, as the side-question and diagram chat panels use it. */
 .agent-dock-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;

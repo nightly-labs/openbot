@@ -188,6 +188,29 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision":
     "Busque nas minhas notas do Cobrain o que decidimos sobre preços.",
   "marketplace.plugin.cobrain.prompt.saveNote": "Salve uma nota no Cobrain com o que fizemos hoje e o que falta.",
+  "marketplace.plugin.honcho.tagline": "Sua memória em todas as ferramentas de IA",
+  "marketplace.plugin.honcho.description":
+    "O Honcho, da Plastic Labs, dá aos agentes uma memória de longo prazo sobre você que outras ferramentas de IA conectadas podem compartilhar. Os agentes salvam o que aprendem, e o Honcho raciocina sobre isso para criar um modelo das suas preferências, objetivos e formas de trabalhar. Os agentes fazem perguntas a ele antes de começar. Os agentes do OpenBot também têm sua própria memória; o Honcho é a memória que acompanha você em outras ferramentas. As mensagens que os agentes salvam vão para sua conta do Honcho.",
+  "marketplace.plugin.honcho.app":
+    "Salve e consulte memória de longo prazo nos seus espaços de trabalho do Honcho por um único servidor MCP.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Antes de começarmos, pergunte ao Honcho o que ele sabe sobre como gosto de trabalhar.",
+  "marketplace.plugin.honcho.prompt.save": "Salve no Honcho as decisões desta conversa.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "O que o Honcho diz sobre meu estilo de escrita? Use isso neste rascunho.",
+  "marketplace.plugin.honcho.hint.apiKey": "Crie uma chave em app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Memória que aprende com o tempo",
+  "marketplace.plugin.hindsight.description":
+    "O Hindsight, da Vectorize, dá aos agentes uma memória de longo prazo no Hindsight Cloud. Os agentes retêm fatos e eventos, recuperam-nos por significado, tempo e entidade, e refletem sobre eles para formar modelos mentais. As memórias ficam em bancos, e os agentes podem criar um banco para cada projeto ou pessoa. Os agentes do OpenBot também têm sua própria memória; o Hindsight é a memória que outras ferramentas de IA conectadas podem compartilhar. O que os agentes retêm vai para sua conta do Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app":
+    "Retenha, recupere e reflita sobre memórias nos seus bancos do Hindsight Cloud por um único servidor MCP.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Antes de começarmos, recupere do Hindsight o que sabemos sobre este projeto.",
+  "marketplace.plugin.hindsight.prompt.retain":
+    "Retenha no Hindsight as decisões e as perguntas em aberto desta conversa.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Reflita sobre minhas memórias no Hindsight: que padrões você vê no meu trabalho do último mês?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Crie uma chave na página Connect do Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Designs e protótipos",
   "marketplace.plugin.figma.description":
     "O Figma permite que agentes leiam arquivos de design, inspecionem componentes, estilos e variáveis, e entreguem especificações de produção a engenheiros. Ele se conecta ao servidor MCP no app de desktop do Figma, neste computador. O servidor só lê designs por enquanto; suporte de escrita está em andamento.",

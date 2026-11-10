@@ -181,6 +181,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "시작하기 전에 이 프로젝트의 Cobrain 컨텍스트를 불러와 줘.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "가격에 대해 우리가 뭘 결정했는지 Cobrain 노트에서 검색해 줘.",
   "marketplace.plugin.cobrain.prompt.saveNote": "오늘 한 일과 남은 일을 Cobrain에 노트로 저장해 줘.",
+  "marketplace.plugin.honcho.tagline": "모든 AI 도구에 걸친 나의 기억",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs의 Honcho는 연결한 다른 AI 도구와 공유할 수 있는, 나에 대한 장기 기억을 에이전트에게 제공합니다. 에이전트는 배운 내용을 저장하고, Honcho는 이를 바탕으로 추론하여 나의 선호, 목표, 일하는 방식에 대한 모델을 만듭니다. 에이전트는 시작하기 전에 Honcho에게 질문합니다. OpenBot 에이전트에도 자체 기억이 있습니다. Honcho는 다른 도구에서도 나를 따라오는 기억입니다. 에이전트가 저장한 메시지는 내 Honcho 계정으로 전송됩니다.",
+  "marketplace.plugin.honcho.app": "하나의 MCP 서버로 Honcho 워크스페이스에 장기 기억을 저장하고 조회합니다.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "시작하기 전에 내가 어떻게 일하는 것을 좋아하는지 Honcho가 무엇을 알고 있는지 물어봐 주세요.",
+  "marketplace.plugin.honcho.prompt.save": "이 스레드의 결정 사항을 Honcho에 저장해 주세요.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho는 내 글쓰기 스타일에 대해 뭐라고 하나요? 이 초안에 반영해 주세요.",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev에서 키를 만드세요.",
+  "marketplace.plugin.hindsight.tagline": "시간이 지나며 배우는 기억",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize의 Hindsight는 Hindsight Cloud에 있는 장기 기억을 에이전트에게 제공합니다. 에이전트는 사실과 사건을 보존하고, 의미, 시간, 엔터티로 불러오며, 이를 되돌아보며 멘털 모델을 만듭니다. 기억은 뱅크에 보관되며, 에이전트는 프로젝트나 사람마다 뱅크를 만들 수 있습니다. OpenBot 에이전트에도 자체 기억이 있습니다. Hindsight는 연결한 다른 AI 도구와 공유할 수 있는 기억입니다. 에이전트가 보존한 내용은 내 Hindsight Cloud 계정으로 전송됩니다.",
+  "marketplace.plugin.hindsight.app":
+    "하나의 MCP 서버로 Hindsight Cloud 뱅크의 기억을 보존하고, 불러오고, 되돌아봅니다.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "시작하기 전에 이 프로젝트에 대해 알고 있는 내용을 Hindsight에서 불러와 주세요.",
+  "marketplace.plugin.hindsight.prompt.retain": "이 스레드의 결정 사항과 남은 질문을 Hindsight에 보존해 주세요.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "내 Hindsight 기억을 되돌아봐 주세요. 지난 한 달 동안 내 작업에서 어떤 패턴이 보이나요?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud의 Connect 페이지에서 키를 만드세요.",
   "marketplace.plugin.figma.tagline": "디자인 및 프로토타입",
   "marketplace.plugin.figma.description":
     "Figma를 사용하면 에이전트가 디자인 파일을 읽고, 컴포넌트, 스타일, 변수를 살펴보고, 개발자에게 제작 명세를 전달할 수 있어요. 이 컴퓨터의 Figma 데스크톱 앱에 있는 MCP 서버에 연결해요. 서버는 디자인을 읽기만 할 수 있고, 쓰기 지원은 준비 중이에요.",

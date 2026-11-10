@@ -219,6 +219,23 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "حمّل سياق Cobrain لهذا المشروع قبل أن نبدأ.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "ابحث في ملاحظات Cobrain عمّا قررناه بشأن التسعير.",
   "marketplace.plugin.cobrain.prompt.saveNote": "احفظ ملاحظة في Cobrain بما أنجزناه اليوم وما تبقّى.",
+  "marketplace.plugin.honcho.tagline": "ذاكرتك عبر كل أدوات الذكاء الاصطناعي",
+  "marketplace.plugin.honcho.description":
+    "يمنح Honcho من Plastic Labs الوكلاء ذاكرة طويلة المدى عنك يمكن لأدوات الذكاء الاصطناعي الأخرى التي تربطها أن تشاركها. يحفظ الوكلاء ما يتعلمونه، ويستنتج Honcho منه نموذجًا لتفضيلاتك وأهدافك وطرق عملك. يطرح الوكلاء عليه الأسئلة قبل أن يبدؤوا. لوكلاء OpenBot ذاكرتهم الخاصة أيضًا؛ وHoncho هو الذاكرة التي تتبعك إلى الأدوات الأخرى. تذهب الرسائل التي يحفظها الوكلاء إلى حسابك في Honcho.",
+  "marketplace.plugin.honcho.app": "احفظ الذاكرة طويلة المدى واستعلم عنها في مساحات عمل Honcho عبر خادم MCP واحد.",
+  "marketplace.plugin.honcho.prompt.recall": "قبل أن نبدأ، اسأل Honcho عمّا يعرفه عن طريقتي المفضلة في العمل.",
+  "marketplace.plugin.honcho.prompt.save": "احفظ قرارات هذه المحادثة في Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences": "ماذا يقول Honcho عن أسلوبي في الكتابة؟ استخدمه في هذه المسودة.",
+  "marketplace.plugin.honcho.hint.apiKey": "أنشئ مفتاحًا في app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "ذاكرة تتعلم مع الوقت",
+  "marketplace.plugin.hindsight.description":
+    "يمنح Hindsight من Vectorize الوكلاء ذاكرة طويلة المدى في Hindsight Cloud. يحتفظ الوكلاء بالحقائق والأحداث، ويستدعونها حسب المعنى والوقت والكيان، ويتأملون فيها لتكوين نماذج ذهنية. تُحفظ الذكريات في بنوك، ويمكن للوكلاء إنشاء بنك لكل مشروع أو شخص. لوكلاء OpenBot ذاكرتهم الخاصة أيضًا؛ وHindsight هو الذاكرة التي يمكن لأدوات الذكاء الاصطناعي الأخرى التي تربطها أن تشاركها. ما يحتفظ به الوكلاء يذهب إلى حسابك في Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app": "احتفظ بالذكريات واستدعها وتأمل فيها في بنوك Hindsight Cloud عبر خادم MCP واحد.",
+  "marketplace.plugin.hindsight.prompt.recall": "قبل أن نبدأ، استدعِ من Hindsight ما نعرفه عن هذا المشروع.",
+  "marketplace.plugin.hindsight.prompt.retain": "احتفظ في Hindsight بالقرارات والأسئلة المفتوحة من هذه المحادثة.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "تأمل في ذكرياتي في Hindsight: ما الأنماط التي تراها في عملي خلال الشهر الماضي؟",
+  "marketplace.plugin.hindsight.hint.apiKey": "أنشئ مفتاحًا في صفحة Connect في Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "التصاميم والنماذج الأولية",
   "marketplace.plugin.figma.description":
     "يتيح Figma للوكلاء قراءة ملفات التصميم، وفحص المكونات والأنماط والمتغيرات، وتسليم مواصفات الإنتاج للمهندسين. يتصل بخادم MCP في تطبيق Figma المكتبي على هذا الحاسوب. يستطيع الخادم قراءة التصاميم فقط؛ ودعم الكتابة قيد التطوير.",
