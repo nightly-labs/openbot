@@ -33,6 +33,7 @@ import type {
   ConversationMessage,
   CreateAgentInput,
   McpServerConfig,
+  QueuedMessageReceipt,
   SidebarLayoutSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -211,6 +212,19 @@ export type FeedbackSendResult =
   | { readonly status: "sent"; readonly url: string; readonly number: number }
   | { readonly status: "signedOut" };
 
+/**
+ * What became of a message from another agent while its recipient's chat turn runs: `steered` into
+ * that turn, or the reason it waits for the next one. Null when no running chat turn could take it,
+ * so the message starts when the recipient is free.
+ */
+export type AgentMessageSteer =
+  | "steered"
+  | "recipient-queues"
+  | "provider-unsupported"
+  | "routine-run"
+  | "steer-failed"
+  | null;
+
 /** Sends approved feedback to the account service, which opens it as a public GitHub issue. */
 export interface AgentFeedback {
   /** False when nobody is signed in to OpenBot, so a send cannot go out with an account. */
@@ -287,9 +301,9 @@ export interface OpenBotToolRouterHooks {
   requestNewChat(agentId: string): void;
   /**
    * Takes a message from another agent into the recipient's running chat turn when the recipient's
-   * busy-message mode is "steer". Otherwise the message waits in the queue.
+   * busy-message mode is "steer". Otherwise the message waits in the queue. The result says which.
    */
-  steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
+  steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<AgentMessageSteer>;
   /** The answer of one web search for the agent, from a side turn whose only tool is web search. */
   searchWeb(agentId: string, query: string): Effect.Effect<string, ToolOperationFailed>;
   /** The CLI version of a provider, as its settings row shows it; null when it is not known. */
@@ -2629,8 +2643,11 @@ export class OpenBotToolRouter {
           idempotencyKey: toolCallIdempotencyKey(params),
         })
         .pipe(toToolOperationFailed);
+      const deliveries: SentDelivery[] = [];
       for (const delivery of receipt.deliveries) {
-        yield* this.#hooks.steerAgentMessage(delivery.recipientAgentId, delivery.id);
+        // Waits for the provider, so the sender can tell the user if the message joined the turn.
+        const steer = yield* this.#hooks.steerAgentMessage(delivery.recipientAgentId, delivery.id);
+        deliveries.push(sentDelivery(delivery, steer));
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
         this.#drain.scheduleDrain(delivery.recipientAgentId);
       }
@@ -2639,10 +2656,25 @@ export class OpenBotToolRouter {
       this.#conversation.emitConversation(snapshot);
       return {
         success: true,
-        contentItems: [{ type: "inputText", text: JSON.stringify(receipt) }],
+        contentItems: [{ type: "inputText", text: JSON.stringify({ ...receipt, deliveries }) }],
       };
     },
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,
   );
+}
+
+type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
+  outcome?: "steered" | "queued";
+  queuedBecause?: Exclude<AgentMessageSteer, "steered" | null>;
+};
+
+/**
+ * A `send_message` delivery as its sender reads it. The receipt is from before the steer, so a
+ * steered message shows as running. A queued one says why it waits while the recipient works.
+ */
+function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
+  if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
+  if (delivery.status !== "queued") return delivery;
+  return { ...delivery, outcome: "queued", ...(steer ? { queuedBecause: steer } : {}) };
 }

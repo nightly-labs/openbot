@@ -199,7 +199,12 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { type AgentFeedback, type AgentServerClaims, OpenBotToolRouter } from "./agent/openbot-tool-router";
+import {
+  type AgentFeedback,
+  type AgentMessageSteer,
+  type AgentServerClaims,
+  OpenBotToolRouter,
+} from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -1711,7 +1716,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId, context, link) => this.#emitError(code, error, agentId, context, link),
         emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
-        steerAgentMessage: (recipientAgentId, deliveryId) => this.#steerAgentMessage(recipientAgentId, deliveryId),
+        steerAgentMessage: (recipientAgentId, deliveryId) =>
+          this.#steerAgentMessage(recipientAgentId, deliveryId, false).pipe(Effect.asVoid),
         dropRefusedSession: (agentId, externalThreadId) =>
           this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
         listAgents: () => this.listAgents(),
@@ -1871,7 +1877,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         requestNewChat: (agentId) => {
           this.#requestedNewChats.add(agentId);
         },
-        steerAgentMessage: (recipientAgentId, deliveryId) => this.#steerAgentMessage(recipientAgentId, deliveryId),
+        steerAgentMessage: (recipientAgentId, deliveryId) =>
+          this.#steerAgentMessage(recipientAgentId, deliveryId, true),
         searchWeb: (agentId, query) => this.#searchWeb(agentId, query),
         providerVersion: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.version ?? null,
       },
@@ -5697,7 +5704,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             Effect.sync(() => this.#emitError("message_preview_failed", failure.cause, agent.id)),
           ),
         );
-    yield* this.#steerWhenBusy(agent, task, snapshot, delivery.delivery.id, true);
+    yield* this.#steerWhenBusy(agent, task, snapshot, delivery.delivery.id, true, false);
     // A turn that waits on a question in this chat reads no message until that question is answered,
     // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
     const waitingTurnId = snapshot.activeTurnId;
@@ -5752,6 +5759,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * Takes a message that arrives while the agent works into the running turn, when the agent's
    * busy-message mode is "steer". The message is from the user or from another agent. A provider
    * that cannot steer, or a routine run, keeps the message queued; `explain` says why on its row.
+   * With `wait`, the result says what became of the message; otherwise the steer runs in the
+   * background and the result is null.
    */
   readonly #steerWhenBusy = Effect.fn("AgentService.steerWhenBusy")(function* (
     this: AgentService,
@@ -5760,43 +5769,42 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     snapshot: ConversationSnapshot,
     deliveryId: string,
     explain: boolean,
-  ) {
+    wait: boolean,
+  ): Effect.fn.Return<AgentMessageSteer> {
     // A turn the user stopped is ending, and a message steered into it would end with it.
     const stoppedTurnId = this.#stoppedTurn(agent.id, task?.taskId ?? null);
-    const steerTurnId =
-      snapshot.activeTurnId &&
-      snapshot.activeTurnId !== stoppedTurnId &&
-      (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer"
-        ? snapshot.activeTurnId
-        : null;
-    if (!steerTurnId) return;
+    const steerTurnId = snapshot.activeTurnId !== stoppedTurnId ? snapshot.activeTurnId : null;
+    if (!steerTurnId) return null;
+    if ((agent.busyMessageMode ?? this.#busyMessageMode()) !== "steer") return "recipient-queues";
     if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
       if (explain) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
+      return "provider-unsupported";
     }
     // A routine run's own session ends with the run, so a chat message waits for the next turn.
-    else if (this.#routineRunsIn(agent, task?.threadId ?? null)) {
+    if (this.#routineRunsIn(agent, task?.threadId ?? null)) {
       if (explain) yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
+      return "routine-run";
     }
-    // Not awaited: the message is already queued, and the sender is answered without the wait for
-    // the provider.
-    else
-      yield* this.#steerSentMessage(agent, snapshot.threadId ?? agent.threadId, deliveryId, steerTurnId, explain).pipe(
-        Effect.forkIn(this.#scope),
-      );
+    const steer = this.#steerSentMessage(agent, snapshot.threadId ?? agent.threadId, deliveryId, steerTurnId, explain);
+    if (wait) return yield* steer;
+    // The message is already queued, and the sender is answered without the wait for the provider.
+    yield* steer.pipe(Effect.forkIn(this.#scope));
+    return null;
   });
 
   /**
    * A message from another agent follows the recipient's busy-message mode, as a message from the
    * user does. Only a message for the recipient's own chat can go into its running turn. The person
-   * did not send it, so a message that cannot steer waits with no reason on its row.
+   * did not send it, so a message that cannot steer waits with no reason on its row. With `wait`,
+   * the sender learns if the message joined the running turn, or why it waits (#6475).
    */
-  #steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void> {
+  #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.list().find((item) => item.id === recipientAgentId);
     // A recipient with no loaded chat runs no turn, so its page is not read for this.
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
     if (!agent || !snapshot || this.#store.isHidden(agent.id) || !this.#mailbox.steersChatTurn(deliveryId))
-      return Effect.void;
-    return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false);
+      return Effect.succeed(null);
+    return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
   }
 
   /**
@@ -5812,8 +5820,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     deliveryId: string,
     turnId: string,
     explain: boolean,
-  ) {
-    yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }).pipe(
+  ): Effect.fn.Return<AgentMessageSteer> {
+    return yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }).pipe(
+      Effect.as("steered" as const),
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
           logger.warn("A message sent to steer the running turn waits in the queue.", {
@@ -5822,9 +5831,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           });
           // When the turn ended in between, the message starts as the next turn or waits behind it
           // like any other, which is no fallback worth naming.
-          if (!explain || this.#conversation.ensureSnapshot(agent.id, threadId).activeTurnId !== turnId) return;
-          yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
-          this.#mailboxSync.emitQueue(agent.id);
+          if (this.#conversation.ensureSnapshot(agent.id, threadId).activeTurnId !== turnId) return null;
+          if (explain) {
+            yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
+            this.#mailboxSync.emitQueue(agent.id);
+          }
+          return "steer-failed" as const;
         }),
       ),
     );
