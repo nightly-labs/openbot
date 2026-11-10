@@ -17,6 +17,10 @@ export const messages = {
   "menu.quitConfirmBody": "在你再次打开 OpenBot 之前，助手和自动化任务会停止。",
   "menu.quitConfirm": "退出",
   "menu.quitHint": "按住 ⌘Q 或按两次以退出",
+  "menu.closeWorkingTitle": { other: "{count} 个智能体仍在工作" },
+  "menu.closeWorkingBody":
+    "退出 OpenBot 后，智能体会停止。请让它继续运行，以便它们完成工作。要再次显示窗口，请打开 OpenBot。",
+  "menu.closeKeepRunning": "继续运行",
   "menu.trayOpen": "打开 OpenBot",
   "menu.trayQuit": "退出 OpenBot",
   "menu.trayTooltip": "OpenBot",
