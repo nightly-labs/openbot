@@ -107,10 +107,10 @@ export const exportHistory = Effect.fn("InstanceTransfer.exportHistory")(functio
     const parts: string[] = [];
     for (let start = 0; start < messages.length; start += PART_MESSAGES) {
       const name = `${folder}/chat-${threadIndex + 1}-${parts.length + 1}.json`;
-      const data = new TextEncoder().encode(JSON.stringify(messages.slice(start, start + PART_MESSAGES)));
-      bytes += data.byteLength;
+      const part = jsonPart(messages.slice(start, start + PART_MESSAGES));
+      bytes += part.bytes;
       parts.push(name);
-      entries.push({ name, read: () => Promise.resolve(data) });
+      entries.push({ name, read: part.read });
     }
     indexThreads.push({
       main: thread.main,
@@ -305,12 +305,23 @@ export function exportChannelMessages(
   let bytes = 0;
   for (let start = 0; start < messages.length; start += PART_MESSAGES) {
     const name = `${prefix}messages-${parts.length + 1}.json`;
-    const data = new TextEncoder().encode(JSON.stringify(messages.slice(start, start + PART_MESSAGES)));
-    bytes += data.byteLength;
+    const part = jsonPart(messages.slice(start, start + PART_MESSAGES));
+    bytes += part.bytes;
     parts.push(name);
-    entries.push({ name, read: () => Promise.resolve(data) });
+    entries.push({ name, read: part.read });
   }
   return { parts, bytes };
+}
+
+/**
+ * One JSON part of the file. The size is counted now, and the bytes are made again when the archive
+ * writes the part, so the export does not keep the encoded history of every chat in memory.
+ */
+function jsonPart(value: readonly unknown[]): { bytes: number; read: HistoryEntry["read"] } {
+  return {
+    bytes: Buffer.byteLength(JSON.stringify(value)),
+    read: () => Promise.resolve(new TextEncoder().encode(JSON.stringify(value))),
+  };
 }
 
 /**

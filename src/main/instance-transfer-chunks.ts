@@ -93,12 +93,12 @@ function partLength(size: number, index: number): number {
   return Math.min(INSTANCE_TRANSFER_CHUNK_BYTES, size - index * INSTANCE_TRANSFER_CHUNK_BYTES);
 }
 
-function sha256Hex(bytes: Uint8Array): string {
+export function sha256Hex(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
 /** Reads `length` bytes at `position` into the start of `buffer`. A file that is shorter fails. */
-async function readFully(handle: FileHandle, buffer: Buffer, position: number, length: number): Promise<Buffer> {
+export async function readFully(handle: FileHandle, buffer: Buffer, position: number, length: number): Promise<Buffer> {
   let read = 0;
   while (read < length) {
     const { bytesRead } = await handle.read(buffer, read, length - read, position + read);
@@ -126,16 +126,11 @@ async function hashParts(path: string, size: number): Promise<{ sha256: string; 
   }
 }
 
-async function writeFully(path: string, bytes: Uint8Array, position: number): Promise<void> {
-  const handle = await open(path, "r+");
-  try {
-    let written = 0;
-    while (written < bytes.length) {
-      const { bytesWritten } = await handle.write(bytes, written, bytes.length - written, position + written);
-      written += bytesWritten;
-    }
-  } finally {
-    await handle.close();
+export async function writeFully(handle: FileHandle, bytes: Uint8Array, position: number): Promise<void> {
+  let written = 0;
+  while (written < bytes.length) {
+    const { bytesWritten } = await handle.write(bytes, written, bytes.length - written, position + written);
+    written += bytesWritten;
   }
 }
 
@@ -204,9 +199,14 @@ export class InstanceTransferChunks {
     // Another request can end the upload while this one reads its body.
     if (this.#uploads.get(upload.id) !== upload) return yield* closed();
     upload.writing++;
-    yield* archiveCall(() => writeFully(upload.path, bytes, input.index * INSTANCE_TRANSFER_CHUNK_BYTES)).pipe(
-      Effect.ensuring(Effect.sync(() => upload.writing--)),
-    );
+    yield* archiveCall(async () => {
+      const handle = await open(upload.path, "r+");
+      try {
+        await writeFully(handle, bytes, input.index * INSTANCE_TRANSFER_CHUNK_BYTES);
+      } finally {
+        await handle.close();
+      }
+    }).pipe(Effect.ensuring(Effect.sync(() => upload.writing--)));
     upload.received.add(input.index);
     upload.timer.refresh();
     let receivedBytes = 0;

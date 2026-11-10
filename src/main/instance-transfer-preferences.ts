@@ -133,7 +133,8 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
     warnings.push(sourceText("error.import.transferFolders", { name, number: value.folderCount }));
 });
 
-function reason(error: unknown): string {
+/** Why one step of an import did not happen, for its warning. */
+export function reason(error: unknown): string {
   const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
   return cause instanceof Error ? cause.message.slice(0, 500) : sourceText("error.import.transferStepFailed");
 }

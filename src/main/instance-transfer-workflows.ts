@@ -7,6 +7,7 @@
 import { isWorkflowGraph, type WorkflowGraph, type WorkflowNode } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import { reason } from "./instance-transfer-preferences";
 
 /** The most workflows a file carries. */
 export const TRANSFER_WORKFLOWS = 200;
@@ -102,9 +103,4 @@ function decodeWorkflow(value: unknown): TransferWorkflow | null {
   const { title, graph } = value;
   if (typeof title !== "string" || !title.trim() || title.length > 160 || !isWorkflowGraph(graph)) return null;
   return { title, graph, ...("relink" in value && value.relink === true ? { relink: true } : {}) };
-}
-
-function reason(error: unknown): string {
-  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
-  return cause instanceof Error ? cause.message.slice(0, 500) : sourceText("error.import.transferStepFailed");
 }

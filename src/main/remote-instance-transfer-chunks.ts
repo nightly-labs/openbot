@@ -21,6 +21,7 @@ import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schedule } from "effect";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
+import { readFully, sha256Hex, writeFully } from "./instance-transfer-chunks";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { AGENT_IMPORT_UPLOAD_TIMEOUT_MS, type RemoteServerManager } from "./remote-server-manager";
 import { RemoteWorkflowError } from "./remote-service-effects";
@@ -129,34 +130,11 @@ function invalidPart(): ArchiveOperationError {
   return archiveFailure(new Error(sourceText("error.import.transferPartInvalid")));
 }
 
-function sha256Hex(bytes: Uint8Array): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
-/** Reads `length` bytes at `position` into the start of `buffer`. */
-async function readFully(handle: FileHandle, buffer: Buffer, position: number, length: number): Promise<Buffer> {
-  let read = 0;
-  while (read < length) {
-    const { bytesRead } = await handle.read(buffer, read, length - read, position + read);
-    if (bytesRead === 0) throw new Error(sourceText("error.import.transferPartInvalid"));
-    read += bytesRead;
-  }
-  return buffer.subarray(0, length);
-}
-
 async function hashFile(handle: FileHandle, size: number, buffer: Buffer): Promise<string> {
   const hash = createHash("sha256");
   for (let position = 0; position < size; position += buffer.length)
     hash.update(await readFully(handle, buffer, position, Math.min(buffer.length, size - position)));
   return hash.digest("hex");
-}
-
-async function writeFully(handle: FileHandle, bytes: Uint8Array, position: number): Promise<void> {
-  let written = 0;
-  while (written < bytes.length) {
-    const { bytesWritten } = await handle.write(bytes, written, bytes.length - written, position + written);
-    written += bytesWritten;
-  }
 }
 
 /** Sends the file at `path` to the host and answers the preview of `instance-transfer-v1` stage. */

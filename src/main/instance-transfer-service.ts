@@ -842,7 +842,10 @@ export class InstanceTransferService {
         agentIds.set(agent.key, result.success.id);
       }
     }
-    // Chats after every agent and routine exists, so each link in a message finds its copy.
+    // Chats after every agent and routine exists, so each link in a message finds its copy. Their
+    // files go to the upload folder, which a restart clears, in a folder with a random name.
+    const uploads = this.options.uploadDirectory;
+    const scratch = uploads ? yield* this.#prepareUploadDirectory(uploads).pipe(Effect.as(uploads)) : tmpdir();
     for (const agent of selected) {
       const agentId = agentIds.get(agent.key);
       if (!agentId || !agent.history) continue;
@@ -856,7 +859,7 @@ export class InstanceTransferService {
           prefix: agentPrefix(agent.key),
           agentIds,
           routineIds,
-          scratch: join(tmpdir(), "openbot-transfer-history"),
+          scratch,
           readerId: actor.id,
         },
         warnings,
