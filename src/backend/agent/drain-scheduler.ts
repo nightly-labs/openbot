@@ -1315,7 +1315,7 @@ function serviceTier(
   if (!agent.fastMode) return { serviceTier: null };
   const model = models.find((candidate) => candidate.provider === provider && candidate.id === agent.model);
   if (!model) return {};
-  // As Codex does for a tier that the model does not have, Ultrafast on such a model runs at the standard tier.
-  if (agent.ultrafast) return { serviceTier: model.ultrafastServiceTier ?? null };
+  // Ultrafast on a model or account without the tier runs at Fast, the next fastest tier.
+  if (agent.ultrafast) return { serviceTier: model.ultrafastServiceTier ?? model.fastServiceTier ?? null };
   return { serviceTier: model.fastServiceTier ?? null };
 }

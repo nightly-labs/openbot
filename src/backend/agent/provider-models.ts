@@ -275,7 +275,7 @@ export function modelsAfterOpenCodeDiscoveryFailure(previous: AgentModelOption[]
  * lists only the deprecated `additionalSpeedTiers`, where Fast is `fast`. The Claude client lists
  * `fast` for a model that Claude Code can run in fast mode.
  */
-export function fastServiceTier(server: ModelListResponse["data"][number]): {
+export function serviceTierFields(server: ModelListResponse["data"][number]): {
   fastServiceTier?: string;
   ultrafastServiceTier?: string;
 } {

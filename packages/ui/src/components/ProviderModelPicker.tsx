@@ -571,15 +571,18 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const accounts = railAccounts(props.provider);
     return accounts.length ? providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID) : null;
   };
+  /** The saved speed. It can name a tier that the model does not have. */
+  const savedSpeed = (): Speed =>
+    props.fastMode !== true ? "standard" : props.ultrafast === true ? "ultrafast" : "fast";
   /**
-   * The tier that the next turn uses. A model without the chosen tier runs at the standard tier, as
-   * Codex runs a tier that the model does not have.
+   * The tier that the next turn uses. A model without a fast tier runs at the standard tier, and
+   * Ultrafast on a model without that tier runs at Fast.
    */
   const speed = (): Speed => {
     const model = selectedModel();
-    if (props.fastMode !== true || !model?.fastServiceTier) return "standard";
-    if (props.ultrafast !== true) return "fast";
-    return model.ultrafastServiceTier ? "ultrafast" : "standard";
+    const saved = savedSpeed();
+    if (saved === "standard" || !model?.fastServiceTier) return "standard";
+    return saved === "ultrafast" && model.ultrafastServiceTier ? "ultrafast" : "fast";
   };
   /** The speed in the trigger, only while the model has the tier: another model runs at standard speed. */
   const triggerSpeed = (): Speed => {
@@ -1214,7 +1217,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           sameWidth={false}
                           placement="bottom-end"
                           onChange={(option) => {
-                            if (!option || option.id === speed() || props.disabled || effortLocked()) return;
+                            if (!option || option.id === savedSpeed() || props.disabled || effortLocked()) return;
                             props.onFastModeChange?.(option.id !== "standard", option.id === "ultrafast");
                           }}
                           itemComponent={(item) => (

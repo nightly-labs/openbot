@@ -1394,7 +1394,7 @@ export function createConversationViewScope(props: ConversationProps) {
     await props.onUpdateAgent(agentId, updates);
     return true;
   }
-  // The switch shows the new value while the save runs. The saved agent then holds it.
+  // The Speed select shows the new value while the save runs. The saved agent then holds it.
   const [fastModeDraft, setFastModeDraft] = createSignal<{ agentId: string; fastMode: boolean; ultrafast: boolean }>();
   const fastMode = () => {
     const draft = fastModeDraft();
@@ -1405,9 +1405,10 @@ export function createConversationViewScope(props: ConversationProps) {
     return draft && draft.agentId === props.agent?.id ? draft.ultrafast : props.agent?.ultrafast === true;
   };
   /**
-   * The Fast switch of the model pickers, in the chat header and in the agent settings: on this
+   * The Speed select of the model pickers, in the chat header and in the agent settings: on this
    * computer, or on a joined server with `agent-fast-mode-v1`. The picker shows it only for a model
-   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`).
+   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`). A joined
+   * server lists no Ultrafast tier, so its picker offers Standard and Fast.
    */
   const fastModeChange = () =>
     props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)

@@ -800,7 +800,9 @@ export class AgentStore {
         // The new provider has its own price, and Claude fast mode needs the user's confirmation.
         next.fastMode = false;
       }
-      if (input.ultrafast !== undefined && !isBoolean(input.ultrafast)) throw new Error("Invalid fast mode value.");
+      // Ultrafast is a fast mode tier, so it comes only with a fast mode change.
+      if (input.ultrafast !== undefined && (!isBoolean(input.ultrafast) || input.fastMode === undefined))
+        throw new Error("Invalid fast mode value.");
       // Each fast mode change names the tier: a change from a client that does not know Ultrafast,
       // such as a remote client, sets Fast.
       if (input.fastMode !== undefined) {

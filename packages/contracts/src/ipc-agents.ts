@@ -493,7 +493,7 @@ export interface UpdateAgentInput {
   allowNewChat?: boolean | null;
   quickAcknowledgement?: boolean | null;
   fastMode?: boolean;
-  /** Only with `fastMode: true`. A change of `fastMode` without it turns Ultrafast off. */
+  /** Sent only with `fastMode`; an update with `ultrafast` and no `fastMode` fails. A change of `fastMode` without it turns Ultrafast off. */
   ultrafast?: boolean;
   /** `null` returns the agent to the app default. */
   busyMessageMode?: BusyMessageMode | null;
