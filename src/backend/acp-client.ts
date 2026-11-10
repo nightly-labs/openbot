@@ -2298,7 +2298,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         thread.activeTurn === turn &&
         !turn.stopped &&
         (yield* this.#discardLostTurns(thread.id, sent.failure.cause)) &&
-        this.#flavor.lostTurns?.unsent.test(failureText(sent.failure.cause))
+        this.#flavor.lostTurns?.unsent.test(failureText(sent.failure.cause)) &&
+        // The user can stop the turn while the discard runs.
+        thread.activeTurn === turn &&
+        !turn.stopped
       )
         sent = yield* send();
       let response = providerResult(sent);

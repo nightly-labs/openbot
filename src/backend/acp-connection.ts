@@ -173,11 +173,11 @@ export class AcpConnection {
     argv: readonly string[],
     timeoutMs: number,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
-    const direct = cliSpawnTarget(this.options.cli.executable, argv);
-    const target = this.options.confine ? this.options.confine(direct) : direct;
     yield* Effect.tryPromise({
-      try: (signal) =>
-        execFileAsync(target.command, target.args, {
+      try: (signal) => {
+        const direct = cliSpawnTarget(this.options.cli.executable, argv);
+        const target = this.options.confine ? this.options.confine(direct) : direct;
+        return execFileAsync(target.command, target.args, {
           signal,
           timeout: timeoutMs,
           maxBuffer: 64 * 1024,
@@ -189,7 +189,8 @@ export class AcpConnection {
           },
           windowsVerbatimArguments: target.windowsVerbatimArguments,
           windowsHide: true,
-        }),
+        });
+      },
       catch: providerFailure,
     });
   });
