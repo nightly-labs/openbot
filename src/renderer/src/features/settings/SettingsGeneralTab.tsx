@@ -38,6 +38,7 @@ import { useI18n } from "../../i18n-context";
 import { useInterfaceSizeChoice } from "../../interface-size";
 import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
+import { InterfaceFontSetting } from "./InterfaceFontSetting";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
 const quitGuardOptions = [...QUIT_GUARDS];
@@ -140,6 +141,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               </Select>
             </ItemActions>
           </Item>
+          <InterfaceFontSetting mount={props.selectMount} />
           <Item data-settings-row="settings.logoColor.title" class="settings-modal-row settings-logo-color-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>

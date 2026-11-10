@@ -783,6 +783,8 @@ export const IPC_ENDPOINTS = {
     // The zoom shortcuts and the View menu change the size in main, so main tells the window, and
     // Settings shows the new size.
     appInterfaceSizePreference: event<AppInterfaceSizePreference>()("app:interface-size-preference"),
+    // Read only. The interface font row lists fonts that are installed on this computer.
+    getInstalledFontFamilies: request<undefined, string[]>()("app:get-installed-font-families"),
     // The native Preferences menu item and its shortcut live in main, while the dialog lives in
     // the renderer, so the menu click is broadcast rather than handled: every window opens its
     // own Settings.

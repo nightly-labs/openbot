@@ -286,6 +286,14 @@ export function decodeAppInterfaceSizePreference(value: unknown): AppInterfaceSi
   return { percent: preference.percent };
 }
 
+export function decodeInstalledFontFamilies(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new Error("Invalid installed fonts.");
+  return value.map((item) => {
+    if (typeof item !== "string") throw new Error("Invalid installed fonts.");
+    return item;
+  });
+}
+
 export function decodeChatWindowTargets(value: unknown): ChatWindowTarget[] {
   if (!Array.isArray(value)) throw new Error("Invalid chat windows.");
   return value.map((item) => {
