@@ -37,6 +37,7 @@ const PRESENTATION: AgentDockPresentation = {
   display: { kind: "display", id: 69733382 },
   edge: "left",
   autoHide: true,
+  edgeStrip: false,
   offsets: [{ displayId: 69733382, offset: 0 }],
   seats: [
     { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 } },

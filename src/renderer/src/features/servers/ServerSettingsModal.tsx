@@ -69,6 +69,7 @@ import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../se
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
@@ -236,6 +237,12 @@ export interface ServerSettingsModalProps {
    * administers.
    */
   skillLearning?: ServerSkillLearningOptions | undefined;
+  /**
+   * General shows whether the agents learn from what people do in agent tabs they hold only when a
+   * caller supplies this, and only for the local server or a remote host with `browsing-memory-v1`
+   * that this member administers.
+   */
+  browsingMemory?: ServerBrowsingMemoryOptions | undefined;
   /**
    * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
    * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member

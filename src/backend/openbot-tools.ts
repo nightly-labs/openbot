@@ -52,6 +52,7 @@ import {
   ROUTINE_INSTRUCTION_RULE,
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineRunPlaceZodSchema,
   routineScheduleZodSchema,
@@ -582,7 +583,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
       runIn: routineRunPlaceZodSchema.optional(),
     },
   },
@@ -606,7 +607,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: ROUTINE_NO_UPDATE_TOOL,
     description:
-      "Only in a scheduled, script or webhook routine run whose task gives nothing to report. OpenBot collapses your text answers into the run in the chat and sends no notification. Not when you report anything: a requested reminder or message is a report, unless the notification conditions of the task say to send nothing. In a manual Test run, the user sees your answer.",
+      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update that wants no answer. OpenBot collapses your text answers in the chat and sends no notification. A requested reminder or message is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
     shape: {},
   },
   {
@@ -643,11 +644,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "remember",
     description:
-      "Stage one short, durable memory for this agent. Use memoryId to correct or consolidate an existing memory. New entries are searchable unless inclusion is essential. Essential requests that do not fit stay searchable. The change commits only if the current turn completes.",
+      "Stage one short, durable memory for this agent. Use memoryId to correct or merge a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. It commits only if the current turn completes.",
     shape: {
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
       inclusion: z.enum(["essential", "searchable"]).optional(),
+      site: z.string().max(2048).optional(),
     },
   },
   {

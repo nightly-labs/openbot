@@ -283,7 +283,7 @@ export function sectionTeammatesUpdate(
 
 /** The essential memories and the counts that an agent's prompt states, redacted and within the budget. */
 export interface MemoryContext {
-  memories: Pick<AgentMemory, "id" | "text" | "origin">[];
+  memories: Pick<AgentMemory, "id" | "text" | "origin" | "site">[];
   storedCount: number;
   limit: number;
 }
@@ -299,7 +299,12 @@ export function memoryContext(
 ): MemoryContext {
   const promptMemories: MemoryContext["memories"] = [];
   for (const memory of memories) {
-    const safe = { id: memory.id, text: redactSecrets(memory.text), origin: memory.origin };
+    const safe = {
+      id: memory.id,
+      text: redactSecrets(memory.text),
+      origin: memory.origin,
+      ...(memory.site ? { site: memory.site } : {}),
+    };
     // Redaction can expand a short secret. Keep the final block bounded as well as stored selection.
     if (essentialMemoryBytes([...promptMemories, safe]) <= AGENT_MEMORY_CONTEXT_BUDGET_BYTES) promptMemories.push(safe);
   }
@@ -329,7 +334,7 @@ export function memoryContextUpdate(delivered: MemoryContext | null, current: Me
   const before = new Map(delivered.memories.map((memory) => [memory.id, memory]));
   const changed = current.memories.filter((memory) => {
     const old = before.get(memory.id);
-    return !old || old.text !== memory.text || old.origin !== memory.origin;
+    return !old || old.text !== memory.text || old.origin !== memory.origin || old.site !== memory.site;
   });
   const kept = new Set(current.memories.map((memory) => memory.id));
   const removed = delivered.memories.filter((memory) => !kept.has(memory.id)).map((memory) => memory.id);

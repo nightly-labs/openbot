@@ -62,6 +62,8 @@ export const messages = {
   "agent.dock.writing": "{name} כותב",
   "agent.dock.empty": "אין הודעות עדיין. אפשר לכתוב ל-{name}.",
   "agent.dock.settings": "הגדרות המעגן",
+  "agent.dock.strip.show": "הצגת מעגן הסוכנים",
+  "agent.dock.strip.asks": "הצגת מעגן הסוכנים. סוכן שואל אותך משהו",
   "agent.dock.search": "חיפוש סוכנים וערוצים",
   "agent.dock.searchPlaceholder": "חיפוש",
   "agent.dock.noMatch": "אין שום דבר בשם „{query}”",

@@ -779,6 +779,16 @@ Server settings > General > Memory review sets the number of turns (10, 20 or 40
 the server, or turns these reviews off; off, no review sends anything. An owner or admin of a joined
 server can change it.
 
+Server settings > General > Learn from my browsing is off by default. When it is on, and you or a
+team member control a page of an agent's browser, OpenBot records the address of each page (the host
+and the path, without the query or the hash, and with each path part that looks like a code or an id
+replaced), its title, and the kind and the label of each control
+you click. It does not record what you type, field values, password fields, card or one-time code
+fields, secret tabs, or private sign-ins. The steps stay on this computer in
+`openbot-browsing-steps-v1.json`. The next memory review of that agent sends them, with secrets
+redacted, to the agent's own provider, as part of the review above, and then deletes them. Steps that
+no review reads are deleted after 30 days. Turning the setting off deletes all recorded steps.
+
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
 - `~/OpenBot/Shared` contains managed transfers shared between agents, and

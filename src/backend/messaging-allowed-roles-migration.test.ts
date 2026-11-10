@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
@@ -53,7 +53,9 @@ function seed(db: DatabaseSync, version: number): void {
  * Every row of every table, by table name. Migration 47 replaces the empty task table with the thread
  * table; `agent-thread-migration.test.ts` checks that move.
  */
-function contents(db: DatabaseSync): Record<string, unknown[]> {
+type Contents = Record<string, Record<string, SQLOutputValue>[]>;
+
+function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
@@ -65,12 +67,20 @@ function contents(db: DatabaseSync): Record<string, unknown[]> {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
+/** The source rows, and each agent memory has no site, as migration 60 adds it. */
+function withNoMemorySite(before: Contents): Contents {
+  return {
+    ...before,
+    projection_agent_memories: (before.projection_agent_memories ?? []).map((row) => ({ ...row, site: null })),
+  };
+}
+
 function roleTables(db: DatabaseSync) {
   return db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%messaging_allowed_roles%' ORDER BY name").all();
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 59 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 60 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -88,7 +98,7 @@ describe("messaging allowed roles migration", () => {
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({
-        ...before,
+        ...withNoMemorySite(before),
         projection_messaging_allowed_roles: [],
         browser_profiles: [],
         workflow_edges: [],
@@ -129,7 +139,7 @@ describe("messaging allowed roles migration", () => {
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
     expect(contents(db)).toEqual({
-      ...before,
+      ...withNoMemorySite(before),
       projection_messaging_allowed_roles: [],
       browser_profiles: [],
       workflow_edges: [],
@@ -159,9 +169,9 @@ describe("messaging allowed roles migration", () => {
     const db = databaseAt(43);
     seed(db, 43);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(60,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(61,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=60; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=61; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(roleTables(db)).toEqual([]);

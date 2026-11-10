@@ -100,6 +100,11 @@ export const messages = defineMessages("sitePage", {
   "sitePage.pricing.enterprise.body":
     "Larger servers, more than {count} members, or anything else you need. With enterprise support.",
   "sitePage.pricing.enterprise.contact": "Contact sales",
+  // A checkbox above the buy button. {policy} links to the privacy policy, and {terms} links to the Terms,
+  // which include the consumer right of withdrawal. The buyer ticks it before Checkout.
+  "sitePage.pricing.consent.statement": "I declare that I accept {policy}, {terms}.",
+  "sitePage.pricing.consent.policy": "policy",
+  "sitePage.pricing.consent.terms": "terms and right of withdrawal",
   // The /teams page for companies.
   "sitePage.teams.title": "OpenBot for Teams",
   "sitePage.teams.description":

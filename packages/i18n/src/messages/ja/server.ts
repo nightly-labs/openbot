@@ -343,6 +343,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "先に確認",
   "server.settings.skillLearningOff": "オフ",
   "server.settings.skillLearningLoadFailed": "スキル学習の設定を読み込めませんでした。",
+  "server.settings.browsingMemory": "自分の閲覧から学習",
+  "server.settings.browsingMemoryDescription":
+    "エージェントのブラウザーを操作すると、使ったページとボタンからエージェントがサイトの使い方を学習します。入力したテキストは保存されません。",
+  "server.settings.browsingMemoryLoadFailed": "閲覧の設定を読み込めませんでした。",
   "server.settings.remoteOnline": "ホストはオンラインです。公開設定はオーナーが管理しています。",
   "server.settings.remoteOffline": "ホストはオフラインです。公開設定はオーナーが管理しています。",
   "server.settings.reachable": "オンラインでアクセスできます。招待されたユーザーのみがサインインできます。",

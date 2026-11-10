@@ -119,6 +119,7 @@ export const messages = defineMessages("error.team", {
   "error.team.folderUnavailable": "This folder is not available on the host computer.",
   "error.team.memoryReviewUnsupported": "The memory review is not supported by this connection.",
   "error.team.skillLearningUnsupported": "Skill learning is not supported by this connection.",
+  "error.team.browsingMemoryUnsupported": "Learning from browsing is not supported by this connection.",
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
   "error.team.claudeUserSetupUnsupported": "This connection does not support the Claude Code setup switch.",
   "error.team.claudeCompactWindowUnsupported": "This connection does not support the Claude compaction size.",

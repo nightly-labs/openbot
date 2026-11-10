@@ -10,6 +10,10 @@ import type { AppTranslate } from "@openbot/i18n";
 /** The largest team that the page sells to. A larger team contacts sales. */
 const PRICING_MAX_MEMBERS = Math.max(LICENSE_MAX_USERS, ...BILLING_PLANS.map((plan) => plan.memberLimit));
 
+/** Private-use characters that mark where the two links go in the consent sentence of each language. */
+export const CONSENT_POLICY_MARKER = "\uE000";
+export const CONSENT_TERMS_MARKER = "\uE001";
+
 export function pricingPageText(t: AppTranslate) {
   return {
     title: t("sitePage.pricing.title"),
@@ -25,6 +29,14 @@ export function pricingPageText(t: AppTranslate) {
       title: t("sitePage.pricing.enterprise.title"),
       body: t("sitePage.pricing.enterprise.body", { count: PRICING_MAX_MEMBERS }),
       contact: t("sitePage.pricing.enterprise.contact"),
+    },
+    consent: {
+      statement: t("sitePage.pricing.consent.statement", {
+        policy: CONSENT_POLICY_MARKER,
+        terms: CONSENT_TERMS_MARKER,
+      }),
+      policy: t("sitePage.pricing.consent.policy"),
+      terms: t("sitePage.pricing.consent.terms"),
     },
   };
 }

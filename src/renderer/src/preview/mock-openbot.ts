@@ -58,6 +58,7 @@ import {
   type BackgroundProcess,
   type BrowserProfileSummary,
   type BrowserProxySummary,
+  type BrowsingMemoryPreference,
   type BusyMessageModePreference,
   browserProxyAddressText,
   type CentralAuthState,
@@ -83,6 +84,7 @@ import {
   DEFAULT_APP_INTERFACE_SIZE,
   DEFAULT_APP_LOGO_COLOR,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
+  DEFAULT_BROWSING_MEMORY_PREFERENCE,
   DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_CLAUDE_COMPACT_WINDOW,
   DEFAULT_CLAUDE_USER_SETUP,
@@ -112,6 +114,7 @@ import {
   type HostedSiteSummary,
   type HostStatus,
   hostAgentMemoryLimit,
+  hostBrowsingMemory,
   hostMemoryReview,
   hostSkillLearning,
   isAgentMemoryLimit,
@@ -422,6 +425,24 @@ function mockWorkspaceDirectory(path: string): WorkspaceDirectory {
   };
 }
 
+/** Fonts that most Macs have, so the preview draws each choice in its real font. */
+const STORY_INSTALLED_FONTS = [
+  "Al Bayan",
+  "Arial",
+  "Avenir Next",
+  "Baghdad",
+  "Courier New",
+  "Geeza Pro",
+  "Georgia",
+  "Helvetica Neue",
+  "Menlo",
+  "Monaco",
+  "Noto Nastaliq Urdu",
+  "Tahoma",
+  "Times New Roman",
+  "Verdana",
+];
+
 /** What each story server answers with when it is tested, so a story reads the same way twice. */
 const PREVIEW_BROWSERS: ExternalLinkBrowsers = {
   defaultBrowser: { name: "Safari", path: "/Applications/Safari.app" },
@@ -481,6 +502,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
+  let browsingMemory: BrowsingMemoryPreference = { ...DEFAULT_BROWSING_MEMORY_PREFERENCE };
   // The disk level is below the preview disk use (82%), so Storage shows a passed level.
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
@@ -513,6 +535,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     palettes: [],
     chatBackgroundLight: null,
     chatBackgroundDark: null,
+    interfaceFont: null,
+    codeFont: null,
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -1316,6 +1340,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       for (const listener of appearanceListeners) listener(clone(appearancePreference));
       return clone(appearancePreference);
     },
+    listInstalledFonts: async () => [...STORY_INSTALLED_FONTS],
     onAppAppearancePreference: (listener) => {
       appearanceListeners.add(listener);
       return () => appearanceListeners.delete(listener);
@@ -3495,6 +3520,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isSkillLearningMode(mode)) throw new Error("Skill learning mode is required.");
         skillLearning = { mode };
         return hostSkillLearning(skillLearning);
+      },
+      getBrowsingMemory: async () => hostBrowsingMemory(browsingMemory),
+      setBrowsingMemory: async (enabled) => {
+        browsingMemory = { enabled };
+        return hostBrowsingMemory(browsingMemory);
       },
       // Preview has one host, so every server shares one set of machine alerts.
       getMachineAlerts: async () => clone(machineAlerts),

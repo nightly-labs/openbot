@@ -16,6 +16,12 @@ export const messages = {
     "Zeigt den unscharfen Schreibtisch hinter dem Fenster. Websites und Menüs nutzen dann das App-Design.",
   "settings.interfaceSize.title": "Größe der Oberfläche",
   "settings.interfaceSize.description": "Die Größe von Text und Bedienelementen in OpenBot.",
+  "settings.interfaceFont.title": "Schrift der Oberfläche",
+  "settings.interfaceFont.description": "Die Schrift von Menüs, Chats und Einstellungen.",
+  "settings.interfaceFont.default": "Standard (Inter)",
+  "settings.codeFont.title": "Code-Schrift",
+  "settings.codeFont.description": "Die Schrift von Code, Terminals und Dateipfaden.",
+  "settings.codeFont.default": "Standard",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -259,6 +265,9 @@ export const messages = {
   "settings.agentDock.autoHide.title": "Ausblenden, wenn nicht benutzt",
   "settings.agentDock.autoHide.description":
     "Das Dock gleitet in den Rand. Beweg den Zeiger an den Rand, um es zu zeigen.",
+  "settings.agentDock.edgeStrip.title": "Streifen am Rand zeigen",
+  "settings.agentDock.edgeStrip.description":
+    "Ein schmaler Streifen bleibt dort, wo das Dock verschwindet. Beweg den Zeiger in seine Nähe, um das Dock zu zeigen. Wenn ein Agent dich etwas fragt, läuft eine Farbwelle über den Streifen.",
   "settings.agentDock.results.title": "Erledigte Arbeit zeigen",
   "settings.agentDock.results.description": "Ergebnisse der Agenten erscheinen kurz neben dem Dock.",
   "settings.agentDock.agents.title": "Agenten im Dock",

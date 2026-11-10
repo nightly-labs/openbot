@@ -116,6 +116,7 @@ export const messages = {
   "error.team.folderUnavailable": "התיקייה הזו אינה זמינה במחשב המארח.",
   "error.team.memoryReviewUnsupported": "סקירת הזיכרון אינה נתמכת בחיבור הזה.",
   "error.team.skillLearningUnsupported": "החיבור הזה אינו תומך בלמידת מיומנויות.",
+  "error.team.browsingMemoryUnsupported": "החיבור הזה לא תומך בלמידה מגלישה.",
   "error.team.promptCacheTtlUnsupported": "זמן מטמון ההנחיות אינו נתמך בחיבור הזה.",
   "error.team.claudeUserSetupUnsupported": "החיבור הזה לא תומך במתג ההגדרות של Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "החיבור הזה לא תומך בגודל הכיווץ של Claude.",

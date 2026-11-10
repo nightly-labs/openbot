@@ -658,6 +658,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `browsing-memory-v1` | Read and set whether the host records what a person does in an agent's browser tab that they hold, for the memory review of that agent. Protocol 9 only | `hostAdmin` |
 | `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
@@ -762,6 +763,15 @@ The snapshot gives the mode and the modes that the host permits; the host refuse
 client shows an unknown mode from a later host as its raw value. The agent service reads the value
 at each review. Server settings → General → Agents → Skill learning sets it for this computer
 (`hostAdmin.setSkillLearning`, local handler) and for a joined server.
+
+`browsing-memory-v1` reads and sets "Learn from my browsing" (`openbot-browsing-memory-v1.json`,
+`{ enabled }`, off by default) at `POST /v1/admin/host/browsing-memory` and
+`POST /v1/admin/host/browsing-memory/update` (owner or admin). While it is on, the host records the
+pages and the controls that a person uses in an agent tab that they hold, and the next memory review
+of that agent reads them (see [browser.md](browser.md)). Turning it off deletes the recorded steps.
+A connection without the capability gets `error.team.browsingMemoryUnsupported`. Server settings →
+General → Agents → Learn from my browsing sets it for this computer (`hostAdmin.setBrowsingMemory`,
+local handler) and for a joined server.
 
 The capability also carries the skill question card (see [providers.md](providers.md#skill-suggestions)).
 A skill question message (`itemType` `skill-suggestion:*`) gets `skillSuggestion: { name }` on the

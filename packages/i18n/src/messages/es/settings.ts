@@ -16,6 +16,12 @@ export const messages = {
     "Muestra el escritorio desenfocado detrás de la ventana. Los sitios y menús usan entonces el tema de la app.",
   "settings.interfaceSize.title": "Tamaño de la interfaz",
   "settings.interfaceSize.description": "El tamaño del texto y los controles en OpenBot.",
+  "settings.interfaceFont.title": "Fuente de la interfaz",
+  "settings.interfaceFont.description": "La fuente de los menús, los chats y los ajustes.",
+  "settings.interfaceFont.default": "Predeterminada (Inter)",
+  "settings.codeFont.title": "Fuente del código",
+  "settings.codeFont.description": "La fuente del código, las terminales y las rutas de archivo.",
+  "settings.codeFont.default": "Predeterminada",
   "settings.logoColor.title": "Color del logotipo",
   "settings.logoColor.description": "Se muestra en el Dock, la barra de tareas y Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -258,6 +264,9 @@ export const messages = {
   "settings.agentDock.autoHide.title": "Ocultar cuando no se usa",
   "settings.agentDock.autoHide.description":
     "El dock se desliza dentro del borde. Lleva el puntero al borde para mostrarlo.",
+  "settings.agentDock.edgeStrip.title": "Mostrar una franja en el borde",
+  "settings.agentDock.edgeStrip.description":
+    "Una franja fina queda donde se oculta el dock. Acerca el puntero para mostrar el dock. Una ola de color sube por la franja cuando un agente te pregunta algo.",
   "settings.agentDock.results.title": "Mostrar trabajo terminado",
   "settings.agentDock.results.description": "Los resultados de los agentes aparecen un momento junto al dock.",
   "settings.agentDock.agents.title": "Agentes en el dock",

@@ -242,6 +242,8 @@ export class AgentRemoval {
       }),
     );
     yield* this.closeBrowserTabs(agent);
+    // Again: until its tab closed, a tab that the user held could record a browsing step for the agent.
+    yield* this.#hooks.cancelMemoryReview(agent.id);
     // Nobody can use the sign-ins of a deleted agent again.
     const cleared = yield* Effect.result(this.#browser.clearAgentSession(agent.id));
     if (Result.isFailure(cleared))

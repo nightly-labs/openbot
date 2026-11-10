@@ -66,7 +66,7 @@ import {
   providerResetDelayMs,
 } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
-import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
+import { isNoUpdateAnswer, quietTeammateDelivery, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
   foldCodexChildItem,
@@ -1105,7 +1105,7 @@ export class TurnLifecycle {
           this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId))
         ) {
           this.#quietEmptyAnswers.add(errorTurnId);
-          logger.info("A quiet routine run ended with no answer after its no-update call.", {
+          logger.info("A quiet turn ended with no answer after its no-update call.", {
             agentId,
             turnId: errorTurnId,
             provider: source.provider,
@@ -1268,14 +1268,16 @@ export class TurnLifecycle {
   }
 
   /**
-   * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs, so
-   * its completion keeps the text answers as quiet answers; `shown` when a person waits for the answer, as in a Test
-   * run; null when no routine run started the turn. The completion decides again, because a message
-   * can join the turn after the call.
+   * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs and
+   * teammate updates, so its completion keeps the text answers as quiet answers; `shown` when a
+   * person waits for the answer, as in a Test run; null when neither a routine run nor a teammate
+   * update started the turn. The completion decides again, because a message can join the turn after
+   * the call.
    */
   requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null {
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return null;
+    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine" || quietTeammateDelivery(delivery)))
+      return null;
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
@@ -1294,8 +1296,8 @@ export class TurnLifecycle {
   }
 
   /**
-   * Only a turn that runs nothing but quiet routine runs, in the agent's own chat or in a routine's
-   * side thread: not in a channel, a messaging thread or another task.
+   * Only a turn that runs nothing but quiet routine runs and teammate updates, in the agent's own
+   * chat or in a routine's side thread: not in a channel, a messaging thread or another task.
    */
   #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
     const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
@@ -1304,7 +1306,9 @@ export class TurnLifecycle {
       (!this.#conversation.isExecutionThread(publicThreadId) ||
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
-        ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
+        ({ delivery }) =>
+          quietTeammateDelivery(delivery) ||
+          (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)),
       )
     );
   }
@@ -1571,8 +1575,9 @@ export class TurnLifecycle {
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
         dropPlaceholderAnswers(snapshot, turnId);
       }
-      // Only a turn that ran nothing but scheduled, script or webhook runs: a person who wrote in the
-      // same turn, or who started a Test run, waits for the answer. A failed run is never quiet.
+      // Only a turn that ran nothing but scheduled, script or webhook runs and teammate updates: a
+      // person who wrote in the same turn, or who started a Test run, waits for the answer. A failed
+      // run is never quiet.
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&

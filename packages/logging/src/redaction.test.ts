@@ -144,6 +144,18 @@ describe("redactText", () => {
     expect(redactText("note {not json} and more")).toBe("note {not json} and more");
   });
 
+  // An agent's reply goes through these rules before it is stored. Doubled brackets with no quoted
+  // key are a template or a link, not a record (#6437).
+  it("keeps template placeholders and links that are not records", () => {
+    expect(redactText("Dear {{name}}, see {{ a.b }} and [[Page]]")).toBe("Dear {{name}}, see {{ a.b }} and [[Page]]");
+    expect(redactText("m = [[a, b], [c, d]]")).toBe("m = [[a, b], [c, d]]");
+    expect(redactText("a chunk that ends {{na")).toBe("a chunk that ends {{na");
+    // Each placeholder is one read against the scan bound, so a template with many of them is kept.
+    const template = Array.from({ length: 16 }, (_, index) => `{{p${index}}}`).join(" ");
+    expect(redactText(template)).toBe(template);
+    expect(redactText('ERROR [{"headers":{"X-Tenant":"tenant-secret"}},]')).toBe("ERROR [redacted-unscanned]");
+  });
+
   it("redacts a serialized payload no matter how long it is", () => {
     const padding = "x".repeat(200_000);
     expect(redactText(JSON.stringify({ key: "pk_live_abcdefgh1234", padding }))).toBe(
@@ -265,9 +277,9 @@ describe("redactText", () => {
   it("bounds the work a line of open braces can cause", () => {
     const braces = "{".repeat(65_536);
     const started = performance.now();
-    // A brace followed by a brace opens what looks like a record, and the run never closes, so the
-    // whole line is dropped on the first read instead of once per brace.
-    expect(redactText(braces)).toBe("[redacted-unscanned]");
+    // No brace opens a record, because no quoted key follows, so the whole run is passed in one read
+    // instead of once per brace.
+    expect(redactText(braces)).toBe(braces);
     expect(performance.now() - started).toBeLessThan(1_000);
   });
 

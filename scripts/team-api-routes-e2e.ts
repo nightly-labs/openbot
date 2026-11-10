@@ -157,6 +157,10 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
+  BROWSING_MEMORY_CAPABILITY,
+  BROWSING_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -322,6 +326,7 @@ import { AgentNotificationLevelStore } from "../src/main/agent-notification-leve
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
+import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
 import {
   claudeCompactWindowControl,
   createClaudeCompactWindowPreferenceStore,
@@ -1688,6 +1693,9 @@ const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
+// The real browsing memory store on a temporary file, as the host keeps it.
+const browsingMemoryFile = join(root, "browsing-memory.json");
+const browsingMemory = new BrowsingMemoryPreferenceStore(browsingMemoryFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
 const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
@@ -1896,6 +1904,7 @@ try {
       }),
       memoryReview,
       skillLearning,
+      browsingMemory,
       // A stand-in for `HostService.rotateIdentityKey`; `host-key-rotation-e2e.ts` checks the real
       // signing. This checks the gate and that a refused request never reaches the host.
       hostKey: {
@@ -4572,6 +4581,76 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  // ---- Learn from my browsing (browsing-memory-v1) ----
+  {
+    const capabilities = [BROWSING_MEMORY_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises browsing-memory-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSING_MEMORY_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSING_MEMORY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const adminRead = await call("POST", BROWSING_MEMORY_ROUTES.settings, { token: adaToken, json: {}, capabilities });
+    check(
+      "an admin reads the default: learning from browsing is off",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, { enabled: false }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", BROWSING_MEMORY_ROUTES.settings, { token: adaToken, json: {} });
+    check(
+      "the browsing memory routes without the capability get 400 browsingMemoryUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.browsingMemoryUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", BROWSING_MEMORY_ROUTES.settings, { token: bobToken, json: {}, capabilities });
+    const memberSet = await call("POST", BROWSING_MEMORY_ROUTES.update, {
+      token: bobToken,
+      json: { enabled: true },
+      capabilities,
+    });
+    const invalid = await call("POST", BROWSING_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { enabled: "yes" },
+      capabilities,
+    });
+    check(
+      "a member cannot read or set browsing memory, the host refuses a value that is not a boolean, and nothing is saved",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        !browsingMemory.get().enabled &&
+        !existsSync(browsingMemoryFile),
+      [summary(memberRead), summary(memberSet), summary(invalid)],
+    );
+    const on = await call("POST", BROWSING_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { enabled: true },
+      capabilities,
+    });
+    const reloaded = new BrowsingMemoryPreferenceStore(browsingMemoryFile);
+    await runCauseEffect(reloaded.load());
+    check(
+      "an admin turns learning from browsing on; the host saves it and a restart reads it",
+      on.status === 200 &&
+        isDeepStrictEqual(on.body, { enabled: true }) &&
+        browsingMemory.get().enabled &&
+        reloaded.get().enabled,
+      summary(on),
+    );
+    const off = await call("POST", BROWSING_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { enabled: false },
+      capabilities,
+    });
+    check(
+      "an admin turns learning from browsing off again",
+      off.status === 200 && isDeepStrictEqual(off.body, { enabled: false }) && !browsingMemory.get().enabled,
+      summary(off),
     );
   }
 
