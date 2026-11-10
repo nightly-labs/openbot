@@ -808,7 +808,7 @@ export class GitHubConnectorService {
     const generation = this.#generation;
     const userToken = yield* this.accessToken();
     if (!userToken) return;
-    yield* this.#botTokens.renew(userToken);
+    if (yield* this.#botTokens.renew(userToken)) yield* this.#refused(userToken);
     // Also after a failure: a token that expired while the API was not reachable leaves the file.
     const current = yield* this.#serialize(() =>
       Effect.gen({ self: this }, function* () {
