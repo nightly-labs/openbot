@@ -22,7 +22,7 @@ import { countCrashDumps } from "./run-marker";
 
 export const START_ATTEMPTS_FILE = "openbot-start-attempts-v1.json";
 /** The failed starts in a row of one version before the recovery window shows. */
-export const START_FAILURE_LIMIT = 3;
+const START_FAILURE_LIMIT = 3;
 
 const StartFailure = Schema.Literals(["error", "exception", "crash"]);
 type StartFailure = typeof StartFailure.Type;
