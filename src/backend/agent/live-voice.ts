@@ -42,19 +42,22 @@ const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
-/** The longest answer, in UTF-8 bytes, that the relay gives to the voice as it is: about 80 English words. */
-const RELAY_VERBATIM_BYTES = 600;
-/** The longest summary, in words, that the relay gives to the voice for a longer answer. */
-const RELAY_SUMMARY_WORDS = 150;
-/** The first line of a tool result with a longer answer. The relay model does not measure the length reliably. */
-const LONG_ANSWER_MARK = "[long answer]";
 /**
  * Codex gives the voice at most about 4,000 bytes of a relay reply: about the first 2,000 bytes while
  * the relay writes them, and the remainder only when the reply is complete. From a longer reply it
  * removes the middle. The relay also needs many seconds to copy a long answer. So the relay copies
  * only a short answer, and gives a long one as a summary that reaches the voice complete and in a
  * few seconds (#6659).
+ *
+ * The longest answer, in UTF-8 bytes, that the relay copies: about 80 English words. Codex also tells
+ * the relay to be concise, so the relay sometimes shortens an answer that has no mark, and then it
+ * does not name the chat. Thus the limit is small: a marked answer always gets a summary that does.
  */
+const RELAY_VERBATIM_BYTES = 600;
+/** The longest summary of a longer answer, in words. */
+const RELAY_SUMMARY_WORDS = 150;
+/** The first line of a tool result with a longer answer. The relay model does not measure the length reliably. */
+const LONG_ANSWER_MARK = "[long answer]";
 const RELAY_INSTRUCTIONS =
   "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
   "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
@@ -63,7 +66,8 @@ const RELAY_INSTRUCTIONS =
   "Use only facts from the answer, and never add or change one. " +
   "Write plain sentences without links, lists, formatting or code. " +
   "End with one sentence that says that the full answer is in the chat. " +
-  "In every other case, reply with the tool result verbatim and nothing else.";
+  "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
+  "do not shorten it, and do not change its form.";
 /** The first message in the voice conversation. The voice model reads it as the user's. */
 const RELAY_VOICE_RULE =
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
@@ -435,8 +439,12 @@ export class LiveVoice {
   }
 }
 
-/** A long answer gets the mark that tells the relay to give a summary of it. */
+/**
+ * A long answer gets the mark that tells the relay to give a summary of it. A failure does not: the
+ * chat can have no answer for it.
+ */
 function toolResult(reply: LiveVoiceReply): DynamicToolResult {
-  const text = Buffer.byteLength(reply.text) > RELAY_VERBATIM_BYTES ? `${LONG_ANSWER_MARK}\n${reply.text}` : reply.text;
+  const long = reply.success && Buffer.byteLength(reply.text) > RELAY_VERBATIM_BYTES;
+  const text = long ? `${LONG_ANSWER_MARK}\n${reply.text}` : reply.text;
   return { contentItems: [{ type: "inputText", text }], success: reply.success };
 }
