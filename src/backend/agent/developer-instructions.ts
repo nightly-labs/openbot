@@ -187,14 +187,14 @@ function sameInstructionsFile(a: InstructionsFileText | null, b: InstructionsFil
  * The instruction file block to send with the next user turn, or `null` when the agent already has
  * it. `current` is null when there is no text to give: no file, an empty file, or a file that the CLI
  * reads by itself. `undefined` for `delivered` means that the context can hold an earlier text: a
- * resumed session, or one after a compaction. Then only a text sends a block, as for saved logins:
- * the notice that the earlier text no longer applies goes only after a block with text.
+ * resumed session, or one after a compaction. Then the block goes also with no text, as a notice
+ * that names only the earlier blocks: a CLI that reads the file by itself still gets its rules.
  */
 export function instructionsFileUpdate(
   delivered: InstructionsFileText | null | undefined,
   current: InstructionsFileText | null,
 ): string | null {
-  if (delivered === undefined ? !current : sameInstructionsFile(delivered, current)) return null;
+  if (delivered !== undefined && sameInstructionsFile(delivered, current)) return null;
   return [
     INSTRUCTIONS_FILE_BLOCK_START,
     ...(current
