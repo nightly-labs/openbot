@@ -16,6 +16,12 @@ export const messages = {
     "Показывать размытый рабочий стол за окном. Сайты и меню тогда используют тему приложения.",
   "settings.interfaceSize.title": "Размер интерфейса",
   "settings.interfaceSize.description": "Размер текста и элементов управления в OpenBot.",
+  "settings.interfaceFont.title": "Шрифт интерфейса",
+  "settings.interfaceFont.description": "Шрифт меню, чатов и настроек.",
+  "settings.interfaceFont.default": "По умолчанию (Inter)",
+  "settings.codeFont.title": "Шрифт кода",
+  "settings.codeFont.description": "Шрифт кода, терминалов и путей к файлам.",
+  "settings.codeFont.default": "По умолчанию",
   "settings.logoColor.title": "Цвет логотипа",
   "settings.logoColor.description": "Отображается в Dock, на панели задач и в Dynamic Island.",
   "settings.logoColor.buildNote":

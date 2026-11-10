@@ -16,6 +16,12 @@ export const messages = {
     "Muestra el escritorio desenfocado detrás de la ventana. Los sitios y menús usan entonces el tema de la app.",
   "settings.interfaceSize.title": "Tamaño de la interfaz",
   "settings.interfaceSize.description": "El tamaño del texto y los controles en OpenBot.",
+  "settings.interfaceFont.title": "Fuente de la interfaz",
+  "settings.interfaceFont.description": "La fuente de los menús, los chats y los ajustes.",
+  "settings.interfaceFont.default": "Predeterminada (Inter)",
+  "settings.codeFont.title": "Fuente del código",
+  "settings.codeFont.description": "La fuente del código, las terminales y las rutas de archivo.",
+  "settings.codeFont.default": "Predeterminada",
   "settings.logoColor.title": "Color del logotipo",
   "settings.logoColor.description": "Se muestra en el Dock, la barra de tareas y Dynamic Island.",
   "settings.logoColor.buildNote":

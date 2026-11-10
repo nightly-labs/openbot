@@ -16,6 +16,12 @@ export const messages = {
     "Mostra a área de trabalho desfocada atrás da janela. Sites e menus passam a usar o tema do app.",
   "settings.interfaceSize.title": "Tamanho da interface",
   "settings.interfaceSize.description": "O tamanho do texto e dos controles no OpenBot.",
+  "settings.interfaceFont.title": "Fonte da interface",
+  "settings.interfaceFont.description": "A fonte dos menus, das conversas e das configurações.",
+  "settings.interfaceFont.default": "Padrão (Inter)",
+  "settings.codeFont.title": "Fonte do código",
+  "settings.codeFont.description": "A fonte do código, dos terminais e dos caminhos de arquivo.",
+  "settings.codeFont.default": "Padrão",
   "settings.logoColor.title": "Cor do logotipo",
   "settings.logoColor.description": "Aparece no Dock, na barra de tarefas e na Dynamic Island.",
   "settings.logoColor.buildNote":

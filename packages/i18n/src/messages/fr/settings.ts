@@ -19,6 +19,12 @@ export const messages = {
     "Affiche le bureau flouté derrière la fenêtre. Les sites et les menus suivent alors le thème de l’app.",
   "settings.interfaceSize.title": "Taille de l’interface",
   "settings.interfaceSize.description": "La taille du texte et des commandes dans OpenBot.",
+  "settings.interfaceFont.title": "Police de l’interface",
+  "settings.interfaceFont.description": "La police des menus, des discussions et des réglages.",
+  "settings.interfaceFont.default": "Par défaut (Inter)",
+  "settings.codeFont.title": "Police du code",
+  "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
+  "settings.codeFont.default": "Par défaut",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":

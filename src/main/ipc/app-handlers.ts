@@ -32,6 +32,7 @@ import type { ApprovalAutomation } from "../approval-automation-store";
 import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
 import type { ExternalLinkOpener, ExternalLinkPreferenceStore } from "../external-link-opener";
 import { feedbackFacts } from "../feedback";
+import { listInstalledFonts } from "../installed-fonts";
 import type { InterfaceSizeService } from "../interface-size-service";
 import type { LanguageService } from "../language-service";
 import { aboveAppsScreenSupport } from "../linux-wayland-output";
@@ -302,6 +303,8 @@ export function appIpcHandlers({
       setAppAppearancePreference: payloadHandler(parseAppAppearancePreference, (parsed) =>
         runCauseEffect(appearance.set(parsed)),
       ),
+      // Local only: the list is the fonts of this computer, and the font choice is per computer.
+      listInstalledFonts: handler(() => runCauseEffect(listInstalledFonts())),
       getAppInterfaceSizePreference: handler(() => interfaceSize.preference),
       setAppInterfaceSizePreference: payloadHandler(parseAppInterfaceSizePreference, (parsed) =>
         runCauseEffect(interfaceSize.set(parsed)),

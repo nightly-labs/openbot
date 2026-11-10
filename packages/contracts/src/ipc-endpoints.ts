@@ -775,6 +775,9 @@ export const IPC_ENDPOINTS = {
     ),
     // Sent to every window, because each window applies the choice to its own page.
     appAppearancePreference: event<AppAppearancePreference>()("app:appearance-preference"),
+    // The font family names of this computer, for the font choices in Settings. Main reads them,
+    // so the renderer needs no font access permission.
+    listInstalledFonts: request<undefined, string[]>()("app:list-installed-fonts"),
     getAppInterfaceSizePreference: request<undefined, AppInterfaceSizePreference>()(
       "app:get-interface-size-preference",
     ),

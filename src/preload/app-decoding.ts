@@ -25,6 +25,7 @@ import {
   type AnalyticsPreference,
   type AppAppearancePreference,
   type AppBehaviorPreference,
+  type AppFontFamily,
   type AppInfo,
   type AppInterfaceSizePreference,
   type AppLanguagePreference,
@@ -67,6 +68,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAppAppearance,
+  isAppFontFamily,
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
@@ -263,6 +265,17 @@ function decodeChatBackground(value: unknown): ChatBackgroundColor | null {
   return value;
 }
 
+/** A font name becomes part of a CSS font list in the page, so only a name that can go there passes. */
+function decodeFontFamily(value: unknown): AppFontFamily | null {
+  if (value !== null && !isAppFontFamily(value)) throw new Error("Invalid font.");
+  return value;
+}
+
+export function decodeInstalledFonts(value: unknown): AppFontFamily[] {
+  if (!Array.isArray(value) || !value.every(isAppFontFamily)) throw new Error("Invalid installed fonts.");
+  return [...value];
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
@@ -277,6 +290,8 @@ export function decodeAppAppearancePreference(value: unknown): AppAppearancePref
     palettes,
     chatBackgroundLight: decodeChatBackground(preference.chatBackgroundLight),
     chatBackgroundDark: decodeChatBackground(preference.chatBackgroundDark),
+    interfaceFont: decodeFontFamily(preference.interfaceFont),
+    codeFont: decodeFontFamily(preference.codeFont),
   };
 }
 

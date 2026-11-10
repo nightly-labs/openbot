@@ -16,6 +16,12 @@ export const messages = {
     "Mostra la scrivania sfocata dietro la finestra. Siti e menu usano allora il tema dell’app.",
   "settings.interfaceSize.title": "Dimensione dell'interfaccia",
   "settings.interfaceSize.description": "La dimensione di testo e controlli in OpenBot.",
+  "settings.interfaceFont.title": "Carattere dell'interfaccia",
+  "settings.interfaceFont.description": "Il carattere di menu, chat e impostazioni.",
+  "settings.interfaceFont.default": "Predefinito (Inter)",
+  "settings.codeFont.title": "Carattere del codice",
+  "settings.codeFont.description": "Il carattere di codice, terminali e percorsi dei file.",
+  "settings.codeFont.default": "Predefinito",
   "settings.logoColor.title": "Colore del logo",
   "settings.logoColor.description": "Mostrato nel Dock, nella barra delle applicazioni e nella Dynamic Island.",
   "settings.logoColor.buildNote":

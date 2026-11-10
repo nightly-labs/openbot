@@ -67,6 +67,8 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
+      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
+      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
       { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
