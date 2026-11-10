@@ -173,9 +173,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const [quietRunIds, setQuietRunIds] = createSignal<ReadonlySet<string>>(new Set());
   const readRunIds = new Set<string>();
   createEffect(
-    () => quietRunCandidates(routineRunRows(), routineRunTurns()),
-    (candidates) => {
-      const listRuns = deps.props.listRoutineRuns;
+    () => ({
+      candidates: quietRunCandidates(routineRunRows(), routineRunTurns()),
+      listRuns: deps.props.listRoutineRuns,
+    }),
+    ({ candidates, listRuns }) => {
       if (!listRuns) return;
       for (const [routineId, runIds] of candidates) {
         const unread = runIds.filter((runId) => !readRunIds.has(runId));
