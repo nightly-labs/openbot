@@ -963,6 +963,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Claude Code 默认",
   "mobile.server.providers.promptCacheHour": "1 小时",
   "mobile.server.providers.promptCacheLoadFailed": "无法加载此服务器的提示缓存时长。",
+  "mobile.server.providers.compactWindow": "压缩聊天的大小",
+  "mobile.server.providers.compactWindowHint":
+    "当聊天达到此大小时，Claude Code 会总结较早的轮次。较低可使轮次更快、更便宜。较高会保留更多细节。窗口较小的模型会在其自身上限处压缩。",
+  "mobile.server.providers.compactWindowDefault": "Claude Code 默认",
+  "mobile.server.providers.compactWindowTokens": "{size} 个 token",
+  "mobile.server.providers.compactWindowLoadFailed": "无法加载该服务器的压缩大小。",
   "mobile.server.providers.disconnect": "断开连接",
   "mobile.server.providers.disconnectTitle": "断开 {name}？",
   "mobile.server.providers.disconnectBody":

@@ -239,9 +239,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} is gestopt voordat het proces van de agent startte.",
   "error.provider.archiveUnreadable":
     "Het runtime-archief kan niet worden gelezen of gebruikt een niet-ondersteunde indeling.",
-  "error.provider.antigravityArchivePath": "Het Gemini-archief bevat een onverwacht bestand.",
-  "error.provider.antigravityChecksum": "Checksum van de Gemini-runtime komt niet overeen.",
-  "error.provider.antigravityReleaseShape": "De Gemini-release heeft een onverwachte vorm.",
   "error.provider.antigravityMissing": "Gemini is niet gedownload. Download het in OpenBot om door te gaan.",
   "error.provider.antigravityNotStarted": "De Gemini-server is gevonden, maar de versie kan niet worden gelezen.",
   "error.provider.antigravityOverrideInvalid":
@@ -258,6 +255,8 @@ export const messages = {
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Op een Windows-host opent Gemini de Google-pagina op de host zelf. Verbind Gemini op de hostcomputer.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",
   "error.provider.cursorChecksum": "Checksum van de Cursor-runtime komt niet overeen.",
   "error.provider.cursorReleaseShape": "De Cursor-release heeft een onverwachte vorm.",

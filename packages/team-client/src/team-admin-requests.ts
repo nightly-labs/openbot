@@ -14,6 +14,7 @@ import {
   type BackgroundProcess,
   type BrowseAgentFoldersInput,
   type ChatColors,
+  type ClaudeCompactWindowSetting,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
@@ -69,6 +70,10 @@ import {
 } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import {
+  CLAUDE_COMPACT_WINDOW_ROUTES,
+  decodeClaudeCompactWindowResponse,
+} from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import type { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -957,6 +962,23 @@ export function setHostPromptCacheTtl(
   ttl: PromptCacheTtl,
 ): Effect.Effect<PromptCacheTtlSetting, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROMPT_CACHE_TTL_ROUTES.update, decodePromptCacheTtlSetting, { ttl }));
+}
+
+/** `claude-compact-window-v1`: the size at which Claude Code compacts the chats of the host's agents. */
+export function getHostClaudeCompactWindow(
+  request: TeamApiRequest,
+): Effect.Effect<ClaudeCompactWindowSetting, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CLAUDE_COMPACT_WINDOW_ROUTES.settings, decodeClaudeCompactWindowResponse, {}));
+}
+
+/** `claude-compact-window-v1`: sets the size. `null` leaves Claude Code's own size for each model. */
+export function setHostClaudeCompactWindow(
+  request: TeamApiRequest,
+  tokens: number | null,
+): Effect.Effect<ClaudeCompactWindowSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, decodeClaudeCompactWindowResponse, { tokens }),
+  );
 }
 
 /** `model-visibility-v1`: every model of one provider of the host, and the ones its model picker shows. */

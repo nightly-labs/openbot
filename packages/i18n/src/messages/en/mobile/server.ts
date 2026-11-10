@@ -1276,6 +1276,12 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.promptCacheDefault": "Claude Code default",
   "mobile.server.providers.promptCacheHour": "1 hour",
   "mobile.server.providers.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "mobile.server.providers.compactWindow": "Compact chats at",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",
+  "mobile.server.providers.compactWindowDefault": "Claude Code default",
+  "mobile.server.providers.compactWindowTokens": "{size} tokens",
+  "mobile.server.providers.compactWindowLoadFailed": "Could not load the compaction size of this server.",
   "mobile.server.providers.disconnect": "Disconnect",
   "mobile.server.providers.disconnectTitle": "Disconnect {name}?",
   "mobile.server.providers.disconnectBody":

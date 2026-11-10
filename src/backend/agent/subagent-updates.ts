@@ -311,9 +311,13 @@ export function endSubagentTurn(state: SubagentState, turnId: string, now: strin
   return changed ? update : null;
 }
 
-/** The process ended, and each subagent that still ran ended with it. */
-export function stopSubagents(state: SubagentState, now: string): SubagentChange[] {
+/**
+ * The process ended, and each subagent that still ran ended with it. `turnIds` limits this to the
+ * turns of one session, which closed: the agent then reports nothing more of its subagents.
+ */
+export function stopSubagents(state: SubagentState, now: string, turnIds?: ReadonlySet<string>): SubagentChange[] {
   return [...state.turns].flatMap(([turnId, turn]) => {
+    if (turnIds && !turnIds.has(turnId)) return [];
     turn.ended = true;
     let changed = false;
     for (const subagent of turn.subagents) changed = endSubagent(subagent, "stopped", now) || changed;

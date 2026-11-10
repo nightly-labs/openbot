@@ -315,6 +315,13 @@ export const messages = defineMessages("provider", {
   "provider.settings.claudeUserSetupServerDescription":
     "Agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on the server. Off, each turn sends a shorter prompt. Workspace files still load.",
   "provider.settings.claudeUserSetupLoadFailed": "Could not load the Claude Code setting.",
+  "provider.settings.context": "Context",
+  "provider.settings.compactWindow": "Compact chats at",
+  "provider.settings.compactWindowDescription":
+    "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",
+  "provider.settings.compactWindowDefault": "Claude Code default",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Could not load the compaction size of this server.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {
     one: "{shown} of {count} model shows in the model picker.",

@@ -1142,6 +1142,12 @@ export const messages = {
   "mobile.server.providers.promptCacheHour": "1 godzina",
   "mobile.server.providers.promptCacheLoadFailed":
     "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "mobile.server.providers.compactWindow": "Kompaktuj czaty przy",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
+  "mobile.server.providers.compactWindowDefault": "Domyślne Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} tokenów",
+  "mobile.server.providers.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
   "mobile.server.providers.disconnect": "Rozłącz",
   "mobile.server.providers.disconnectTitle": "Rozłączyć {name}?",
   "mobile.server.providers.disconnectBody":

@@ -1,0 +1,33 @@
+{
+  "slug": "qonto",
+  "name": "Qonto",
+  "tagline": "Business banking and cards",
+  "description": "Qonto lets agents read business accounts, balances, cards, and transactions, and act on Qonto data within the permissions of the signed-in user. Each user signs in to their own Qonto account through the browser.",
+  "category": "other",
+  "creatorName": "Qonto",
+  "iconUrl": "https://qonto.com/blog/assets/apple-touch-icon-4d8a168a3ba8d53fa08beaf4d665da32d9a43f49b88fa9f08d3017e23663ef53.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-balances", "text": "What is the balance of each of my Qonto accounts?" },
+    { "id": "prompt-missing-receipts", "text": "List last month's card transactions that have no receipt." },
+    { "id": "prompt-spend-categories", "text": "Summarize our spending by category this quarter." }
+  ],
+  "apps": [
+    {
+      "id": "app-qonto-mcp",
+      "name": "Qonto",
+      "description": "Accounts, cards, and transactions, over Qonto's MCP server with browser sign-in.",
+      "iconUrl": "https://qonto.com/blog/assets/apple-touch-icon-4d8a168a3ba8d53fa08beaf4d665da32d9a43f49b88fa9f08d3017e23663ef53.png",
+      "server": {
+        "name": "qonto",
+        "transport": "http",
+        "url": "https://mcp.qonto.com/mcp",
+        "auth": [{ "id": "qonto-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://qonto.com",
+  "privacyPolicyUrl": "https://legal.qonto.com/en#template-6uiwuhdde",
+  "termsUrl": "https://legal.qonto.com/en",
+  "skills": []
+}

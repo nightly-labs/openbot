@@ -241,6 +241,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "Os agentes carregam CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude no servidor. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
   "provider.settings.claudeUserSetupLoadFailed": "Não foi possível carregar a configuração do Claude Code.",
+  "provider.settings.context": "Contexto",
+  "provider.settings.compactWindow": "Compactar chats em",
+  "provider.settings.compactWindowDescription":
+    "O Claude Code resume os turnos antigos de um chat quando o chat atinge este tamanho. Menor mantém os turnos rápidos e baratos. Maior mantém mais detalhes. Um modelo com uma janela menor compacta no próprio limite.",
+  "provider.settings.compactWindowDefault": "Padrão do Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Não foi possível carregar o tamanho de compactação deste servidor.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece no seletor de modelos.",

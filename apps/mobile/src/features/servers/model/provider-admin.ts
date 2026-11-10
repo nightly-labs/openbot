@@ -9,6 +9,7 @@ import {
   type AgentStatus,
   agentProviderDescriptor,
   agentProviderName,
+  type ClaudeCompactWindowSetting,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
@@ -41,6 +42,7 @@ import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
@@ -91,6 +93,7 @@ import {
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
+  getHostClaudeCompactWindow,
   getHostModelVisibility,
   getHostPromptCacheTtl,
   getHostProviderDefault,
@@ -106,6 +109,7 @@ import {
   resetProviderUsage,
   saveCustomAgent,
   saveCustomProvider,
+  setHostClaudeCompactWindow,
   setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostProviderDefault,
@@ -361,7 +365,8 @@ export function relayPage(
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
- * `prompt-cache-ttl-v1`, `provider-sign-out-v1` and `provider-usage-reset-v1`), with the newest route set that the host serves. The
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1` and `provider-usage-reset-v1`), with the newest
+ * route set that the host serves. The
  * host checks the role on every route.
  */
 export function createProviderAdmin(request: TeamApiRequest, capabilities: readonly string[]) {
@@ -517,6 +522,17 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
           read: (): Promise<PromptCacheTtlSetting> => runTeamRequest(getHostPromptCacheTtl(request)),
           set: (ttl: PromptCacheTtl): Promise<PromptCacheTtlSetting> =>
             runTeamRequest(setHostPromptCacheTtl(request, ttl)),
+        }
+      : null,
+    /**
+     * The size at which Claude Code compacts the chats of the host's agents (`claude-compact-window-v1`),
+     * or null. `tokens: null` is Claude Code's own size for each model.
+     */
+    compactWindow: has(CLAUDE_COMPACT_WINDOW_CAPABILITY)
+      ? {
+          read: (): Promise<ClaudeCompactWindowSetting> => runTeamRequest(getHostClaudeCompactWindow(request)),
+          set: (tokens: number | null): Promise<ClaudeCompactWindowSetting> =>
+            runTeamRequest(setHostClaudeCompactWindow(request, tokens)),
         }
       : null,
     /** Signs the host's own sign-in of a provider out (`provider-sign-out-v1`), or null. Its agents wait. */

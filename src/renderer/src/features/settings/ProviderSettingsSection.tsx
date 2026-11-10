@@ -50,6 +50,7 @@ import {
   type ProviderKeyApi,
 } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import {
+  type ProviderClaudeCompactWindow,
   type ProviderClaudeUserSetup,
   type ProviderDefaultChoice,
   type ProviderModelVisibilityControl,
@@ -63,6 +64,10 @@ import { createEffect, createMemo, createSignal, createStore, Show, untrack } fr
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import type { ProviderConnectionApi } from "../../components/provider-connection-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import {
+  createProviderClaudeCompactWindow,
+  type ProviderClaudeCompactWindowSource,
+} from "./provider-claude-compact-window";
 import { createProviderClaudeUserSetup, type ProviderClaudeUserSetupSource } from "./provider-claude-user-setup";
 import { createHostDefaultProvider, type HostDefaultProviderSource } from "./provider-host-default";
 import { createProviderModelVisibility, type ProviderModelVisibilitySource } from "./provider-model-visibility";
@@ -123,6 +128,7 @@ interface ProviderSettingsSectionProps {
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   promptCache?: ProviderPromptCache | undefined;
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
+  claudeCompactWindow?: ProviderClaudeCompactWindow | undefined;
   modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
 }
 
@@ -299,6 +305,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onDetailChange={props.onDetailChange}
         promptCache={props.promptCache}
         claudeUserSetup={props.claudeUserSetup}
+        claudeCompactWindow={props.claudeCompactWindow}
         modelVisibility={props.modelVisibility}
         footer={
           <>
@@ -580,6 +587,8 @@ export function HostProviderSettingsPanel(
     promptCache?: ProviderPromptCacheSource | undefined;
     /** The Claude page's "Use my Claude Code setup" switch, for a host with `claude-user-setup-v1` that this account administers. */
     claudeUserSetup?: ProviderClaudeUserSetupSource | undefined;
+    /** The Claude page's compaction size, for a host with `claude-compact-window-v1` that this account administers. */
+    claudeCompactWindow?: ProviderClaudeCompactWindowSource | undefined;
     /** The Models section of each provider page, for a host with `model-visibility-v1` that this account administers. */
     modelVisibility?: ProviderModelVisibilitySource | undefined;
     /** The Default provider of a joined host with `provider-default-v1` that this account administers. */
@@ -597,6 +606,10 @@ export function HostProviderSettingsPanel(
   );
   const claudeUserSetup = createProviderClaudeUserSetup(
     () => props.claudeUserSetup,
+    () => props.agentStatus,
+  );
+  const claudeCompactWindow = createProviderClaudeCompactWindow(
+    () => props.claudeCompactWindow,
     () => props.agentStatus,
   );
   const keys = createProviderKeyState({
@@ -668,6 +681,7 @@ export function HostProviderSettingsPanel(
         onDetailChange={props.onDetailChange}
         promptCache={promptCache()}
         claudeUserSetup={claudeUserSetup()}
+        claudeCompactWindow={claudeCompactWindow()}
         modelVisibility={modelVisibility()}
         detectionSettings={
           <Show when={props.detectionSettings}>

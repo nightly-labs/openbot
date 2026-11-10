@@ -219,9 +219,6 @@ export const messages = {
   "error.provider.noAgentProcess": "لا توجد عملية {provider} قيد التشغيل لهذا الوكيل.",
   "error.provider.stoppedBeforeAgentProcess": "توقف {provider} قبل بدء عملية الوكيل.",
   "error.provider.archiveUnreadable": "تتعذّر قراءة أرشيف بيئة التشغيل أو أنه يستخدم تنسيقًا غير مدعوم.",
-  "error.provider.antigravityArchivePath": "يحتوي أرشيف Gemini على ملف غير متوقع.",
-  "error.provider.antigravityChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Gemini.",
-  "error.provider.antigravityReleaseShape": "إصدار Gemini بتنسيق غير متوقع.",
   "error.provider.antigravityMissing": "لم يُنزَّل Gemini. نزّله في OpenBot للمتابعة.",
   "error.provider.antigravityNotStarted": "عُثر على خادم Gemini، لكن تتعذّر قراءة إصداره.",
   "error.provider.antigravityOverrideInvalid":
@@ -237,6 +234,8 @@ export const messages = {
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "على مضيف Windows، يفتح Gemini صفحة Google على المضيف نفسه. اربط Gemini على الكمبيوتر المضيف.",
   "error.provider.cursorArchivePath": "يحتوي أرشيف Cursor على ملف غير متوقع.",
   "error.provider.cursorChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cursor.",
   "error.provider.cursorReleaseShape": "إصدار Cursor بتنسيق غير متوقع.",

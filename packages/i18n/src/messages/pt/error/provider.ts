@@ -242,9 +242,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} parou antes de o processo do agente iniciar.",
   "error.provider.archiveUnreadable":
     "O arquivo compactado do ambiente de execução não pode ser lido ou usa um formato incompatível.",
-  "error.provider.antigravityArchivePath": "O arquivo compactado do Gemini contém um arquivo inesperado.",
-  "error.provider.antigravityChecksum": "A soma de verificação do ambiente de execução do Gemini não corresponde.",
-  "error.provider.antigravityReleaseShape": "A versão do Gemini tem um formato inesperado.",
   "error.provider.antigravityMissing": "O Gemini não foi baixado. Baixe-o no OpenBot para continuar.",
   "error.provider.antigravityNotStarted": "O servidor do Gemini foi encontrado, mas não é possível ler sua versão.",
   "error.provider.antigravityOverrideInvalid":
@@ -261,6 +258,8 @@ export const messages = {
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "O Gemini perdeu a conexão com seu agente e parou. Envie uma mensagem para continuar.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Em um host Windows, o Gemini abre a página do Google no próprio host. Conecte o Gemini no computador host.",
   "error.provider.cursorArchivePath": "O arquivo compactado do Cursor contém um arquivo inesperado.",
   "error.provider.cursorChecksum": "A soma de verificação do ambiente de execução do Cursor não corresponde.",
   "error.provider.cursorReleaseShape": "A versão do Cursor tem um formato inesperado.",
