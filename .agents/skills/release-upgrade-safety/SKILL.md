@@ -39,12 +39,15 @@ the `Agent` call. In a harness that has no model choice, use a lower reasoning e
 | Tier | Claude Code | Tasks |
 | --- | --- | --- |
 | Strong | the session model | Step 1 residue, gates A, B, C and E, gate F when `electron-updater` moved, the Step 3 verdict |
-| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the Discord announcement draft |
+| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the translation wording review, the Discord announcement draft |
 | Small | `haiku` | gate H, the `whats-new/<locale>.json` translations, mechanical `git grep` and file inventories |
 
 - **Translations:** give each small-tier subagent a few locales, the English entry, and the
   [i18n.md terms](../../../docs/i18n.md#terms). Then run `bun scripts/whats-new-translations.ts <version>`
-  once. Give only the locales that fail to a medium-tier subagent.
+  once. It checks only the version, the date and the counts of notices and items, not the wording.
+  Then give all locales to one medium-tier subagent. It compares the terms, the tone, the screen
+  names and the headline endings with the i18n terms, and corrects them. Accept a translation only
+  after this review.
 - **Do not raise the tier because a gate is long.** Raise it when the task needs judgment: a hazard
   that can lose user data, or a frozen wire format.
 - **Check the evidence of each report** before you accept it, as `AGENTS.md` says. A small-tier
