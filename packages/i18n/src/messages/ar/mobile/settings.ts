@@ -91,6 +91,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "الإضاءة",
   "mobile.settings.appearance.messageColorFooter":
     "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
+  "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
   "mobile.settings.animations.title": "الحركات",
   "mobile.settings.animations.footer":
     "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",

@@ -84,6 +84,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosità",
   "mobile.settings.appearance.messageColorFooter":
     "Con Colore dell'agente, i tuoi messaggi in una chat con un agente usano il colore di quell'agente. Con Colore personalizzato, i tuoi messaggi in tutte le chat usano il colore che scegli. Il colore del testo cambia per restare leggibile.",
+  "mobile.settings.appearance.collapseRoutines": "Comprimi attività delle routine",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Gli eventi consecutivi delle routine in una chat appaiono come una riga compressa. Tocca la riga per mostrarli.",
   "mobile.settings.animations.title": "Animazioni",
   "mobile.settings.animations.footer":
     "Disattiva le animazioni per ridurre il movimento in tutta l'app. Se «Riduci movimento» è attivo nelle impostazioni del telefono, anche l'app riduce il movimento. Le animazioni qui sotto restano allora disattivate.",

@@ -32,15 +32,8 @@ export const messages = {
   "mobile.chat.routine.created": "Rotina criada",
   "mobile.chat.routine.updated": "Rotina atualizada",
   "mobile.chat.routine.deleted": "Rotina excluída",
-  "mobile.chat.routine.runGroup.count": { one: "{count} execução", other: "{count} execuções" },
-  "mobile.chat.routine.runGroup.show": {
-    one: "Mostrar {count} execução de {name}",
-    other: "Mostrar {count} execuções de {name}",
-  },
-  "mobile.chat.routine.runGroup.hide": {
-    one: "Ocultar {count} execução de {name}",
-    other: "Ocultar {count} execuções de {name}",
-  },
+  "mobile.chat.routine.group.title": "Atividade de rotinas",
+  "mobile.chat.routine.group.count": { one: "{count} evento", other: "{count} eventos" },
   "mobile.chat.contextReset": "Novo chat iniciado",
   "mobile.chat.plan.title": "Tarefas",
   "mobile.chat.plan.stopped": "Interrompido",

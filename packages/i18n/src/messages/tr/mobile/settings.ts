@@ -84,6 +84,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Açıklık",
   "mobile.settings.appearance.messageColorFooter":
     "Ajan rengi ile bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Özel renk ile tüm sohbetlerdeki mesajlarınız seçtiğiniz rengi kullanır. Metin rengi okunaklı kalması için değişir.",
+  "mobile.settings.appearance.collapseRoutines": "Rutin etkinliğini daralt",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Bir sohbetteki ardışık rutin olayları daraltılmış tek bir satır olarak görünür. Göstermek için satıra dokunun.",
   "mobile.settings.animations.title": "Animasyonlar",
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",

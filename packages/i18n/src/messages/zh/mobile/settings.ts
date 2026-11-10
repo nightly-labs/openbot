@@ -81,6 +81,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "亮度",
   "mobile.settings.appearance.messageColorFooter":
     "选择助手颜色时，助手对话中你的消息使用该助手的颜色。选择自定义颜色时，所有对话中你的消息使用你选的颜色。文字颜色会自动调整，保持清晰可读。",
+  "mobile.settings.appearance.collapseRoutines": "折叠自动化任务动态",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "聊天中连续的自动化任务事件会显示为一行折叠的条目。轻点该行即可展开。",
   "mobile.settings.animations.title": "动画",
   "mobile.settings.animations.footer":
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
