@@ -123,7 +123,7 @@ interface GlobalSearchProps {
   /** Omit to hide the Channels filter, for a client or server without channels. */
   channels?: GlobalSearchChannel[] | undefined;
   /** Omit to hide the Routines filter. */
-  routines?: GlobalSearchRoutine[];
+  routines?: GlobalSearchRoutine[] | undefined;
   routinesLoading?: boolean;
   /** Commands and settings pages. They show in All when the query matches. */
   actions?: GlobalSearchAction[];

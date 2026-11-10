@@ -3,10 +3,10 @@ import {
   type AgentModelChoice,
   type AgentStatus,
   type ClientAgentModelOption,
-  type ClientAgentSummary,
   sameAgentModelChoice,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import type { AgentProfile } from "@openbot/ui/data";
 import {
   type BackupModelSource,
   rememberedBackupModels,
@@ -21,7 +21,7 @@ import { useServers } from "../servers/servers-context";
 
 /** The fields of an agent that the question reads. */
 type UsageLimitAgent = Pick<
-  ClientAgentSummary,
+  AgentProfile,
   "id" | "name" | "provider" | "model" | "providerAccountId" | "reasoningEffort" | "backupModels"
 >;
 
