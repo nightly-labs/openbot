@@ -147,13 +147,28 @@ function refuse(reason: WorkspacePathRefused["reason"], message: string, memberM
   return Effect.fail(attachmentFailure(new WorkspacePathRefused(reason, message, memberMessage)));
 }
 
+/**
+ * Options of the local desktop. `allowOutside` opens any path, for an agent with Full access. `allowedRoots`
+ * opens the folders that the user gave a Workspace only agent (`additionalFolders`). The Team API passes
+ * neither, so a remote member reaches nothing outside the workspace.
+ */
+interface WorkspacePathAccess {
+  allowOutside?: boolean;
+  allowedRoots?: readonly string[];
+}
+
 /** Resolves a path that a message or the model wrote to a real path, with the workspace containment check. */
 const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: { allowOutside?: boolean; allowRoot?: boolean; fileHistory?: readonly string[] },
+  options: WorkspacePathAccess & { allowRoot?: boolean; fileHistory?: readonly string[] },
 ) {
   const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
+  // A folder that was moved or deleted opens nothing.
+  const allowedRoots = (yield* Effect.forEach(options.allowedRoots ?? [], (root) =>
+    attachmentCall(() => realpath(root)).pipe(Effect.orElseSucceed(() => null)),
+  )).filter((root): root is string => root !== null);
+  const inAllowedRoot = (path: string) => allowedRoots.some((root) => root === path || isWithin(root, path));
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
   // A member reads one sentence for a path that is missing and for a path outside the workspace, so
   // the answer does not tell whether a path exists on the host.
@@ -202,11 +217,11 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
   );
   const insideWorkspace =
     isWithin(workspaceRoot, resolvedPath) || (options.allowRoot === true && resolvedPath === workspaceRoot);
-  if (!insideWorkspace && !options.allowOutside) {
+  if (!insideWorkspace && !options.allowOutside && !inAllowedRoot(resolvedPath)) {
     return yield* refuse("outside", sourceText("error.backend.workspaceFileOutside"), memberMessage);
   }
   const metadata = yield* attachmentCall(() => stat(resolvedPath));
-  return { workspaceRoot, resolvedPath, insideWorkspace, metadata };
+  return { workspaceRoot, allowedRoots, inAllowedRoot, resolvedPath, insideWorkspace, metadata };
 });
 
 /**
@@ -226,7 +241,7 @@ function isMissing(error: AttachmentOperationError): boolean {
 export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: { allowOutside?: boolean; fileHistory?: readonly string[] } = {},
+  options: WorkspacePathAccess & { fileHistory?: readonly string[] } = {},
 ): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
   const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, options);
   if (!metadata.isFile()) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));
@@ -242,12 +257,13 @@ export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(
 export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirectory")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: { allowOutside?: boolean } = {},
+  options: WorkspacePathAccess = {},
 ): Effect.fn.Return<WorkspaceDirectory, AttachmentOperationError> {
-  const { workspaceRoot, resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, {
-    ...options,
-    allowRoot: true,
-  });
+  const { workspaceRoot, allowedRoots, inAllowedRoot, resolvedPath, insideWorkspace, metadata } =
+    yield* resolveWorkspacePath(agent, inputPath, {
+      ...options,
+      allowRoot: true,
+    });
   if (!metadata.isDirectory())
     return yield* refuse("not-directory", sourceText("error.backend.workspacePathNotDirectory"));
   // `workspacePathFromInput` trims, decodes `%XX` and expands `~/`. Each segment is encoded and a
@@ -271,7 +287,8 @@ export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirector
     if (!dirent.isSymbolicLink()) continue;
     // A link is followed for its kind; its target must pass the same containment check as a path.
     const target = yield* attachmentCall(() => realpath(entryPath)).pipe(Effect.orElseSucceed(() => null));
-    if (target === null || (!options.allowOutside && !isWithin(workspaceRoot, target))) continue;
+    if (target === null || (!options.allowOutside && !isWithin(workspaceRoot, target) && !inAllowedRoot(target)))
+      continue;
     const linked = yield* attachmentCall(() => stat(target)).pipe(Effect.orElseSucceed(() => null));
     if (linked?.isDirectory() || linked?.isFile())
       candidates.push({ name: dirent.name, target, kind: linked.isDirectory() ? "directory" : "file" });
@@ -303,7 +320,13 @@ export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirector
     path: pathFor(resolvedPath),
     root: agent.workspacePath,
     // A folder outside the workspace is listed only for a caller that may go outside, so its parent is too.
-    parentPath: resolvedPath === workspaceRoot || parent === resolvedPath ? null : pathFor(parent),
+    // The top of an allowed folder has no parent to go to.
+    parentPath:
+      resolvedPath === workspaceRoot ||
+      parent === resolvedPath ||
+      (!options.allowOutside && allowedRoots.includes(resolvedPath))
+        ? null
+        : pathFor(parent),
     // An encoded path can pass the limit that the routes accept again; that entry is left out.
     entries: shown.filter(
       (entry): entry is WorkspaceDirectoryEntry => entry !== null && entry.path.length <= INPUT_LIMITS.path,
