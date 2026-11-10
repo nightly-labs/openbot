@@ -654,7 +654,7 @@ list of documents, text, data, and source files.
 - `~/.claude` — login and session history managed exclusively by Claude CLI.
 - `~/.grok` — login and session history managed exclusively by Grok CLI.
 - `~/.gemini` (or `$GEMINI_HOME`) — login and session history managed exclusively by the
-  Antigravity ACP server that Gemini uses.
+  Antigravity CLI that Gemini uses.
 - `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
   process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 - `~/.cline` (or `$CLINE_DIR`) — login and session history managed exclusively by the Cline CLI.

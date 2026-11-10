@@ -300,11 +300,11 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     foldersInFullAccess: false,
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
-  // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
+  // so the plan runs through Google's Antigravity CLI. The account and the models are Gemini.
   antigravity: {
     id: "antigravity",
     displayName: "Gemini",
-    cliName: "Antigravity ACP server",
+    cliName: "Antigravity CLI",
     onboardingDescription: "Google AI Pro or Ultra plan",
     signInMessage: "Sign in with Google to use Gemini.",
     installGuideLink: null,

@@ -254,7 +254,7 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
     provider: "antigravity",
     id: "gemini-3.1-pro",
     name: "Gemini 3.1 Pro",
-    description: "Discovered from the Antigravity ACP server.",
+    description: "Discovered from the Antigravity CLI.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["low", "high"],
   },

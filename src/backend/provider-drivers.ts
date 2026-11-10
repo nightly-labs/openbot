@@ -637,6 +637,11 @@ interface ProviderModelCatalog {
   /** No models while the provider says that the user must sign in and it has no client. */
   readonly hiddenWhenSignedOut?: true;
   /**
+   * The CLI lists its models best first, so the list keeps that order and is not sorted by version.
+   * The first model is the default of a provider with no `defaultProviderModel`.
+   */
+  readonly ownOrder?: true;
+  /**
    * The CLI can list only some of its models just after it starts, and the whole list a moment later.
    * A list that lacks an agent's model is read once more before the agent leaves that model.
    */
@@ -1070,7 +1075,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     },
     // `model/list` opens a probe session and then probes the efforts of each model. On a busy
     // computer the two together pass 5 s, and the picker then had no Gemini models (#3546).
-    catalog: { slowList: true },
+    // The Antigravity CLI 1.5.5 lists the plan's Gemini models first, best first: an Ultra plan gives
+    // Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5 and GPT-OSS 120B. Sorted by
+    // version, "GPT-OSS 120B" read as version 120 and came first, so a new agent ran it.
+    catalog: { slowList: true, ownOrder: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
