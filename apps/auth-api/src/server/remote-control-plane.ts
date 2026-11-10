@@ -2266,7 +2266,10 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** The host that a Slack workspace, Discord guild or Telegram chat is linked to, or null. */
+  /**
+   * The host that a Slack workspace, Discord guild, Telegram chat or webhook route is linked to, or
+   * null. A revoked webhook route has no host: its routine was disabled, deleted or moved.
+   */
   readonly routeHost = Effect.fn("RemoteControlPlane.routeHost")(
     function* (
       this: RemoteControlPlane,
@@ -2282,9 +2285,13 @@ export class RemoteControlPlane {
             ? dependencies.database
                 .prepare("SELECT host_id FROM discord_guild_routes WHERE guild_id = ?")
                 .bind(route.guildId)
-            : dependencies.database
-                .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
-                .bind(route.botId, route.chatId);
+            : route.platform === "telegram"
+              ? dependencies.database
+                  .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
+                  .bind(route.botId, route.chatId)
+              : dependencies.database
+                  .prepare("SELECT host_id FROM webhook_routes WHERE route_id = ? AND revoked_at IS NULL")
+                  .bind(route.routeId);
       const row = yield* remoteCall(() => statement.first<{ host_id: string }>());
       return row?.host_id ?? null;
     },

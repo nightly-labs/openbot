@@ -77,9 +77,10 @@ export function OpenBotHostedServers() {
         routine runs at the right time.
       </p>
       <p>
-        If you connect Slack, the server stays awake while Slack is connected. That lets your team send requests to
-        OpenBot in Slack and get responses from its agents. Without an active connection like this, the server goes idle
-        when it’s not being used.
+        Messages and webhooks wake it too. When someone mentions OpenBot or messages it in Slack, Discord or Telegram,
+        the server starts and answers once it is back online. A webhook routine works the same way: the first delivery
+        gets a “try again later” answer and starts the server, and the sender’s next try reaches it. Most webhook
+        senders, such as Shopify and Stripe, try again on their own.
       </p>
 
       <h2>Hosted Server or Self-Hosting?</h2>
