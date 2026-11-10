@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "De 1Password-CLI is niet ingelogd. Zet de integratie aan in de 1Password-app en verbind opnieuw.",
   "error.connector.onePasswordCliFailed": "De 1Password-CLI is mislukt: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Je 1Password-account staat niet toe dat je de gedeelde kluis of een serviceaccount maakt. Vraag een eigenaar of beheerder van het account om deze toestemming, of vraag om een token van een serviceaccount en klik op “Gebruik token”.",
   "error.connector.onePasswordUnexpected": "1Password gaf een onverwacht antwoord: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password heeft het token van het serviceaccount niet geaccepteerd.",
   "error.connector.onePasswordNoVault":

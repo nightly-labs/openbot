@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI はサインインしていません。1Password アプリで連携をオンにしてから、もう一度接続してください。",
   "error.connector.onePasswordCliFailed": "1Password CLI が失敗しました: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "この 1Password アカウントには、共有保管庫やサービスアカウントを作成する権限がありません。アカウントのオーナーまたは管理者にこの権限を依頼するか、サービスアカウントのトークンを受け取って「トークンを使う」をクリックしてください。",
   "error.connector.onePasswordUnexpected": "1Password から予期しない応答がありました: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password はサービスアカウントのトークンを受け付けませんでした。",
   "error.connector.onePasswordNoVault":

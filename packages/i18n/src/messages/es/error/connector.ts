@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "La CLI de 1Password no tiene una sesión iniciada. Activa su integración en la aplicación 1Password y vuelve a conectar.",
   "error.connector.onePasswordCliFailed": "La CLI de 1Password falló: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Tu cuenta de 1Password no te permite crear la bóveda compartida ni una cuenta de servicio. Pide este permiso a un propietario o administrador de la cuenta, o pídele un token de cuenta de servicio y haz clic en «Usar token».",
   "error.connector.onePasswordUnexpected": "1Password envió una respuesta inesperada: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password no aceptó el token de cuenta de servicio.",
   "error.connector.onePasswordNoVault":

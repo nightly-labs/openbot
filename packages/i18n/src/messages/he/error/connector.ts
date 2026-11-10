@@ -28,6 +28,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "ה-CLI של 1Password לא מחובר. יש להפעיל את האינטגרציה שלו באפליקציית 1Password ולהתחבר שוב.",
   "error.connector.onePasswordCliFailed": "ה-CLI של 1Password נכשל: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "חשבון 1Password שלך לא מאפשר לך ליצור את הכספת המשותפת או חשבון שירות. יש לבקש את ההרשאה הזו מבעלים או ממנהל של החשבון, או לבקש מהם אסימון של חשבון שירות וללחוץ על ״שימוש באסימון״.",
   "error.connector.onePasswordUnexpected": "1Password שלח תשובה לא צפויה: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password לא קיבל את האסימון של חשבון השירות.",
   "error.connector.onePasswordNoVault": "חשבון השירות לא יכול לקרוא אף כספת. יש לתת לו גישה לכספת ולנסות שוב.",

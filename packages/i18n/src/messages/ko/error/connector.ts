@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI에 로그인되어 있지 않아요. 1Password 앱에서 연동을 켠 후 다시 연결해 주세요.",
   "error.connector.onePasswordCliFailed": "1Password CLI가 실패했어요: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "이 1Password 계정으로는 공유 보관함이나 서비스 계정을 만들 수 없어요. 계정 소유자나 관리자에게 이 권한을 요청하거나, 서비스 계정 토큰을 받아 ‘토큰 사용’을 클릭해 주세요.",
   "error.connector.onePasswordUnexpected": "1Password가 예상하지 못한 응답을 보냈어요: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password가 서비스 계정 토큰을 받아들이지 않았어요.",
   "error.connector.onePasswordNoVault":

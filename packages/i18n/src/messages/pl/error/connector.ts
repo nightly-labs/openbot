@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI nie jest zalogowane. Włącz jego integrację w aplikacji 1Password, a potem połącz ponownie.",
   "error.connector.onePasswordCliFailed": "Błąd 1Password CLI: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Twoje konto 1Password nie pozwala Ci utworzyć udostępnionego sejfu ani konta usługi. Poproś właściciela lub administratora konta o to uprawnienie albo o token konta usługi, a potem kliknij „Użyj tokenu”.",
   "error.connector.onePasswordUnexpected": "1Password wysłał nieoczekiwaną odpowiedź: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password nie zaakceptował tokenu konta usługi.",
   "error.connector.onePasswordNoVault":

@@ -29,6 +29,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordCliSignedOut":
     "The 1Password CLI is not signed in. Turn on its integration in the 1Password app, then connect again.",
   "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Your 1Password account does not let you create the shared vault or a service account. Ask an owner or administrator of the account for this permission, or ask them for a service account token and click “Use token”.",
   "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
   "error.connector.onePasswordNoVault":
