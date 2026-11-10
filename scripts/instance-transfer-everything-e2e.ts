@@ -348,6 +348,25 @@ try {
       { id: "local", name: "You" },
     ),
   );
+  // A database can keep channel instructions from before the 2,000-character limit (#5929).
+  const longDesk = await runCauseEffect(
+    source.agents.channels.command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId: randomUUID(),
+        draft: {
+          name: "Long desk",
+          title: "",
+          instructions: "Short.",
+          members: [{ agentId: writer.id }],
+          leadAgentId: null,
+        },
+      },
+      { id: "local", name: "You" },
+    ),
+  );
+  source.agents.channels.store.update({ ...longDesk, instructions: "x".repeat(2_500) });
   source.agents.createChannelMemory({ channelId: channel.id, text: "Headlines stay under ten words." });
   source.agents.createChannelRoutine({
     channelId: channel.id,
@@ -520,6 +539,13 @@ try {
   const channels = target.agents.channels.store.ids().map((id) => target.agents.channels.store.get(id));
   const newChannel = channels.find((item) => item.name === "Newsroom");
   pass("the channel moves", newChannel !== undefined);
+  const newLongDesk = channels.find((item) => item.name === "Long desk");
+  pass(
+    "a channel with long stored instructions moves with the first 2,000 characters and a warning",
+    newLongDesk?.instructions.length === 2_000 &&
+      exported.warnings.some((warning) => warning.startsWith("Long desk:") && warning.includes("2000")),
+    JSON.stringify({ length: newLongDesk?.instructions.length, warnings: exported.warnings }),
+  );
   assert.ok(newChannel);
   pass(
     "channel members and lead are the new agents",
@@ -557,8 +583,8 @@ try {
   const newSummary = target.agents.channels.store.list("local").find((item) => item.id === newChannel.id);
   pass(
     "the open views get the imported channel messages",
-    published.at(-1)?.channelId === newChannel.id &&
-      published.at(-1)?.revision === target.agents.channels.store.get(newChannel.id).revision,
+    published.filter((entry) => entry.channelId === newChannel.id).at(-1)?.revision ===
+      target.agents.channels.store.get(newChannel.id).revision,
     JSON.stringify(published.filter((entry) => entry.channelId === newChannel.id)),
   );
   pass(

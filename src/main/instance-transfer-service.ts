@@ -469,6 +469,13 @@ export class InstanceTransferService {
         warnings.push(sourceText("error.import.transferChannelLimit", { limit: TRANSFER_CHANNELS }));
         break;
       }
+      if (channel.instructions.length > INPUT_LIMITS.agentDescription)
+        warnings.push(
+          sourceText("error.import.transferChannelInstructionsCut", {
+            name: channel.name,
+            limit: INPUT_LIMITS.agentDescription,
+          }),
+        );
       const key = isAgentImportKey(channel.id) ? channel.id : `channel-${channels.length + 1}`;
       channelKeys.set(channel.id, key);
       let image: string | null = null;
@@ -482,7 +489,8 @@ export class InstanceTransferService {
         key,
         name: channel.name,
         title: channel.title,
-        instructions: channel.instructions,
+        // A channel can keep longer instructions from before the limit, but a new channel cannot.
+        instructions: channel.instructions.slice(0, INPUT_LIMITS.agentDescription),
         members,
         lead: channel.leadAgentId ? (keys.get(channel.leadAgentId) ?? null) : null,
         ...(channel.isolated === undefined ? {} : { isolated: channel.isolated }),

@@ -73,6 +73,8 @@ export const messages = defineMessages("error.import", {
   "error.import.transferModelMissing":
     '{name}: the model "{model}" is not available here yet, so the agent uses the default model. Choose the model again when its provider is ready.',
   "error.import.transferAgentSettingSkipped": "{name}: a setting of the agent is not applied. {reason}",
+  "error.import.transferChannelInstructionsCut":
+    "{name}: only the first {limit} characters of the channel instructions are in the file, because a new channel can have {limit}.",
   "error.import.transferSettingSkipped": "{name} is not imported. {reason}",
   "error.import.transferRoutineFlowSkipped": "The import left out a routine flow. {reason}",
   "error.import.transferCustomAgentCommand":

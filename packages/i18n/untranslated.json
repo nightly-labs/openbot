@@ -232,6 +232,22 @@
     "tr",
     "zh"
   ],
+  "error.import.transferChannelInstructionsCut": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.import.transferChannelInvalid": [
     "ar",
     "de",
