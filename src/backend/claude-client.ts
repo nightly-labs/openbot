@@ -577,6 +577,13 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
   return settings;
 });
 
+/**
+ * The model ids that a model list of any sign-in reported. A client for one generation or an agent's
+ * own process reads no list, so it sends a listed id as it is, not the default model (#6330). Ids
+ * are never removed: a list of one account must not drop the ids of another.
+ */
+const CLAUDE_LISTED_MODELS = new Set<string>();
+
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
   readonly turnContext = true;
@@ -946,6 +953,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#modelSdkValues.clear();
       for (const [id, capability] of effortCapabilities) this.#modelEffortCapabilities.set(id, capability);
       for (const [id, value] of sdkValues) this.#modelSdkValues.set(id, value);
+      for (const id of sdkValues.keys()) CLAUDE_LISTED_MODELS.add(id);
       return yield* providerSync(() => result);
     }).pipe(
       Effect.ensuring(
@@ -2561,7 +2569,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #sdkModel(model: string): string {
-    return this.#modelSdkValues.get(model) ?? normalizeClaudeModel(model);
+    return this.#modelSdkValues.get(model) ?? (CLAUDE_LISTED_MODELS.has(model) ? model : normalizeClaudeModel(model));
   }
 }
 
