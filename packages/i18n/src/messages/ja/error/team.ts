@@ -63,6 +63,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "この接続では履歴を削除できません。",
   "error.team.channelTaskCancelUnsupported": "この接続ではチャンネルのタスクを中止できません。",
   "error.team.membersCannotDeleteChannels": "メンバーはチャンネルを削除できません。",
+  "error.team.membersCannotDeleteChannelHistory": "メンバーはチャンネルの履歴を削除できません。",
   "error.team.membersCannotArchiveChannels": "メンバーはチャンネルをアーカイブできません。",
   "error.team.membersCannotRestoreChannels": "メンバーはチャンネルを復元できません。",
   "error.team.sharedDataUnsupported": "この接続では共有データを利用できません。",

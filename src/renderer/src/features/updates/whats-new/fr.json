@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Les agents apprennent seuls de nouvelles compétences après une correction ou une méthode qui a fonctionné. Choisissez Automatique, Demander d’abord ou Désactivé dans Réglages du serveur → Général.",
+          "Les identifiants du Coffre-fort peuvent garder un code de validation en deux étapes, et les agents peuvent l’utiliser pour se connecter.",
+          "Sur Windows, l’îlot dynamique et le dock des agents montrent vos agents, comme sur un Mac. Le dock des agents peut aussi contenir des canaux.",
+          "Les agents peuvent regarder des vidéos publiques en ligne, comme des liens YouTube ou TikTok.",
+          "Sélectionnez plusieurs fichiers dans la Bibliothèque pour les télécharger ou les supprimer en une fois.",
+          "Les agents peuvent envoyer pour vous un rapport de bug ou une idée de fonctionnalité à l’équipe OpenBot."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Les membres d’un canal répondent pendant qu’ils travaillent dans leur propre discussion, et une salutation ou un message peu clair va au responsable du canal.",
+          "Un nouvel agent s’ouvre avec un court message de bienvenue et trois premières tâches que vous pouvez choisir.",
+          "Connectez Composio en vous identifiant dans le navigateur. Vous ne saisissez plus d’URL ni de clé API.",
+          "Réglages s’appelle maintenant Vos réglages, et Réglages du serveur a un champ de recherche.",
+          "L’icône de l’app sur macOS a un nouvel aspect en verre."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La file d’attente d’un agent ne relance plus le même message encore et encore pendant que l’agent attend la réponse à sa propre question.",
+          "Un agent ChatGPT ne compacte plus le contexte encore et encore, et ne reste plus sans fin sur « Compactage du contexte ».",
+          "Les agents sur Cursor et quelques autres fournisseurs gardent leurs outils OpenBot après un redémarrage d’OpenBot.",
+          "Les agents peuvent utiliser un serveur MCP distant auquel vous êtes connecté, comme n8n, avec la dernière version de MCP."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],

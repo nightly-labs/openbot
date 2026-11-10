@@ -391,6 +391,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse צריך טקסט או תמונה.",
   "error.provider.museMethodUnsupported": "Muse לא תומך ב-{method}.",
   "error.provider.museTurnFailed": "הפעולה של Muse נכשלה.",
+  "error.provider.museModelUnavailable":
+    "Muse לא יכול להשתמש במודל הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל, או שלחשבון הזה אין גישה למודל. בחר מודל אחר ונסה שוב.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse לא יכול ליצור פרופיל בלי גישה לכלים חיצוניים. יש להשתמש בספק אחר כדי ליצור את הפרופיל, ואז לבחור ב-Muse עבור הסוכן.",
   "error.provider.museAuthUnverified": "האימות של Muse לא אומת. יש להתחבר במחשב המארח, או להגדיר מפתח API של Meta.",

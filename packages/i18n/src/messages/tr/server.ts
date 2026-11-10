@@ -127,6 +127,24 @@ export const messages = {
     "OpenBot sunucuyu durdurur ve ajanlarını, sohbetlerini ve dosyalarını çöp kutusuna taşır.",
   "server.local.deleting": "Sunucu siliniyor…",
   "server.local.deletedTitle": "{name} silindi",
+  "server.install.title": "Başka bir bilgisayarda yeni sunucu",
+  "server.install.description":
+    "Bu komutu size ait bir Linux bilgisayarda veya VPS'te çalıştırın. Komut OpenBot'u kurar ve sunucuyu bu hesaba ekler.",
+  "server.install.making": "Bu hesap için komut oluşturuluyor…",
+  "server.install.failed": "OpenBot komut oluşturamadı. İnternet bağlantısını kontrol edin.",
+  "server.install.copyForAgent": "Yapay zekâ ajanı için kopyala",
+  "server.install.expiresIn": "Bir kez çalışır. {time} sonra sona erer.",
+  "server.install.newCommand": "Yeni komut",
+  "server.install.waiting": "Komutun sunucunuzda çalışması bekleniyor…",
+  "server.install.starting": "{name} oturum açtı. Sunucu başlatılıyor…",
+  "server.install.connected": "{name} bağlandı.",
+  "server.install.offline": "{name} çevrimdışı.",
+  "server.install.expired": "Bu komutun süresi doldu. Yeni bir komut oluşturun.",
+  "server.install.agentPrompt":
+    'OpenBot\'u bu Linux sunucuya kur ve OpenBot hesabımda oturum aç.\nBu komutu root olarak çalıştır. Soru sormaz ve birkaç dakika sürer:\n\n{command}\n\n"OpenBot is connected to your account." satırı ve 0 çıkış koduyla biter.\nKomut 15 dakika boyunca bir kez çalışır. Hiçbir yere kaydetme.',
+  "server.install.setUpWithAgent": "Bir ajanla kur",
+  "server.install.sshAgentPrompt":
+    "Linux sunucuma SSH ile bağlan ve OpenBot'u sunucu olarak oraya kur.\n\nSSH adresi (user@host):",
   // Hesap maksimum sayıda barındırılan sunucuya sahip olduğunda gösterilir. Planlar devre dışıdır.
   "server.add.limit.title": "Bu hesap maksimum sunucu sayısına ulaştı",
   "server.add.limit.description": {

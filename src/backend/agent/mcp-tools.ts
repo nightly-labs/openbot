@@ -103,6 +103,8 @@ export interface AgentMcpServers {
   remove(mcpServerId: string): Effect.Effect<unknown, ToolOperationFailed>;
   /** A silent test: stored sign-ins only, never a browser. */
   inspect(config: McpServerConfig): Effect.Effect<McpProbeOutcome, ToolOperationFailed>;
+  /** Whether an http server that answered without a sign-in offers one. Public documents only. */
+  offersSignIn(config: McpServerConfig): Effect.Effect<boolean>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
 }
@@ -129,6 +131,7 @@ export function mcpServersFromGateway(
         Effect.mapError((cause) => new ToolOperationFailed({ cause })),
         Effect.andThen(gateway.inspect(config).pipe(toToolFailure)),
       ),
+    offersSignIn: (config) => gateway.offersSignIn(config),
     redact: (text) => gateway.redact(text),
   };
 }
@@ -225,7 +228,20 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
     case "test_mcp_server": {
       const { name } = yield* toolStep(() => namedServerSchema.parse(call.arguments));
       const config = yield* findServer(servers, name);
-      return yield* report(servers, call, config, yield* servers.inspect(config), false);
+      const outcome = yield* servers.inspect(config);
+      // A server can list its tools to anyone and want a sign-in only to run one: the test passes
+      // and those tools fail. Only a test the agent asks for reads the metadata, not each search.
+      if (outcome.error === null && (yield* servers.offersSignIn(config))) {
+        yield* call.requestSignIn(config);
+        return openBotToolResult({
+          status: "ready",
+          server: describeServer(config, servers.signIns()),
+          toolCount: outcome.toolCount,
+          tools: outcome.tools,
+          next: `The server offers a sign-in, which some tools can need. When the user's request needs such a tool: ${SIGN_IN_NEXT}`,
+        });
+      }
+      return yield* report(servers, call, config, outcome, false);
     }
     case "save_mcp_server": {
       const input = yield* toolStep(() => saveMcpServerToolSchema.parse(call.arguments));

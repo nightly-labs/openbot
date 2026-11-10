@@ -48,11 +48,13 @@ import { useChannels } from "../channels/channels-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
+import { useServerActions } from "../servers/server-actions";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
+import { serversPort } from "../servers/servers-port";
 import { useSettings } from "../settings/settings-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
@@ -87,7 +89,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const serverScope = useServerScope();
   const platform = usePlatform();
   const connectors = useConnectors();
-  const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { select: selectServer } = useServerActions();
   const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
     useServerSettings();
   const {
@@ -253,11 +256,18 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
-  /** "Delete history" of the active agent's own chat. The Team API has no route for it. */
+  /** This computer, an owner or admin, or a member with manage access to the agent. */
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
+
+  /**
+   * "Delete history" of the active agent's own chat: on this computer, or on a host that serves
+   * `chat-history-v1`, for a reader who can delete any message of the chat.
+   */
   const deleteActiveAgentHistory = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "chat-history-v1")) return undefined;
+    if (!deletesAnyAgentMessage(agent.id)) return undefined;
     return async () => {
       await turnsPort().agent.deleteHistory(agent.id, server.id);
       // A window around a search result keeps the messages that an empty snapshot does not name, so
@@ -412,7 +422,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onOwnComputer: activeServer()?.kind === "local",
     });
   };
-  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
   /** The host deletes messages only with `message-delete-v1`. This computer always can. */
   const messageDeleteSupported = () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY);
   /** Whether the reader may delete `message` in the active agent's chat or side threads. */
@@ -583,6 +592,16 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         mcpSignedIn={(mcpServerId) =>
           serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
         }
+        serverInstall={{
+          get servers() {
+            return servers();
+          },
+          get loaded() {
+            return serversLoaded();
+          },
+          retryConnection: (serverId) => serversPort().servers.retryConnection(serverId),
+          onOpenServer: selectServer,
+        }}
         onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
         agentStatus={panelAgentStatus()}
         agentsConnecting={agentListConnecting() || (remoteLoading() && activeServer()?.state === "online")}

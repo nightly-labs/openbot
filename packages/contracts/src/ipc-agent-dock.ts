@@ -31,6 +31,10 @@ export const AGENT_DOCK_LIMITS = {
   channels: 100,
   /** The bound of a channel image URL, the same as the channel contract. */
   channelImageUrl: 2048,
+  /** The parts of a dock window that take the pointer on Linux: the dock, the panel, the shelf and the edge strip. */
+  inputRects: 8,
+  /** The largest window side, in px. */
+  inputExtent: 100_000,
 } as const;
 
 /** A seat of the dock: an agent or a channel. The ids of the two kinds can be equal. */
@@ -185,11 +189,30 @@ export type AgentDockAction =
   /** Shows the agent dock settings in the main window. */
   | { type: "open-settings" };
 
+/**
+ * Why the agent dock and the Dynamic Island cannot show above other apps now. "restart": OpenBot runs on Wayland, and it can start
+ * again on XWayland. "unsupported": it cannot, with no X11 display or in a development build.
+ */
+export type AboveAppsSupport = "restart" | "unsupported";
+
+/** On: on Wayland, OpenBot starts again on XWayland, so the dock can show above other apps. */
+export interface SetAgentDockXWaylandInput {
+  enabled: boolean;
+}
+
 export interface SetAgentDockInteractiveInput {
   /** Whether the window takes the pointer. Outside the dock shapes, clicks go to the apps under it. */
   interactive: boolean;
   /** The chat composer needs key input. Main makes the panel key without activating the app. */
   keyboard?: boolean;
+}
+
+/** A part of the dock window, in window px. */
+export interface AgentDockInputRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export function isAgentDockPresentation(value: unknown): value is AgentDockPresentation {
@@ -242,6 +265,27 @@ export function isAgentDockInteractive(value: unknown): value is SetAgentDockInt
     isDynamicRecord(value) &&
     isBoolean(value.interactive) &&
     (value.keyboard === undefined || isBoolean(value.keyboard))
+  );
+}
+
+export function isAgentDockXWayland(value: unknown): value is SetAgentDockXWaylandInput {
+  return isDynamicRecord(value) && isBoolean(value.enabled);
+}
+
+/**
+ * The parts of the dock window that take the pointer and show. Linux gives no pointer events to a
+ * window that lets them through, so there the window shape follows the dock instead.
+ */
+export function isAgentDockInputRegion(value: unknown): value is AgentDockInputRect[] {
+  return isList(
+    value,
+    AGENT_DOCK_LIMITS.inputRects,
+    (rect): rect is AgentDockInputRect =>
+      isDynamicRecord(rect) &&
+      integerInRange(rect.x, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(rect.y, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(rect.width, 1, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(rect.height, 1, AGENT_DOCK_LIMITS.inputExtent),
   );
 }
 

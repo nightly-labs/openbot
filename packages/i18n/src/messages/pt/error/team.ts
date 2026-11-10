@@ -65,6 +65,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "Esta conexão não oferece suporte à exclusão do histórico.",
   "error.team.channelTaskCancelUnsupported": "Esta conexão não oferece suporte ao cancelamento de tarefas de canais.",
   "error.team.membersCannotDeleteChannels": "Membros não podem excluir canais.",
+  "error.team.membersCannotDeleteChannelHistory": "Membros não podem excluir o histórico do canal.",
   "error.team.membersCannotArchiveChannels": "Membros não podem arquivar canais.",
   "error.team.membersCannotRestoreChannels": "Membros não podem restaurar canais.",
   "error.team.sharedDataUnsupported": "Esta conexão não oferece suporte a dados compartilhados.",

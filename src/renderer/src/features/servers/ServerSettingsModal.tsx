@@ -56,6 +56,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack }
 import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
+import { hostedPlanStorageGb } from "../files/storage-usage";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
 import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
@@ -919,7 +920,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.storage}>
           {(storage) => (
             <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
-              <ServerStoragePanel serverId={props.server.id} members={props.members} {...storage()} />
+              <ServerStoragePanel
+                serverId={props.server.id}
+                storageGb={hostedPlanStorageGb(props.server)}
+                members={props.members}
+                {...storage()}
+              />
             </Tabs.Content>
           )}
         </Show>

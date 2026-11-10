@@ -174,6 +174,14 @@ export interface AgentDockVoice {
 /** A drag of the dock handle: the window that holds the dock moves with the pointer. */
 export type AgentDockDragPhase = "start" | "move" | "end";
 
+/** A part of the window that the dock covers, in window px. */
+export interface AgentDockShapeRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AgentDockProps {
   seats: readonly AgentDockSeat[];
   /** The agents that the add menu offers. */
@@ -210,6 +218,11 @@ export interface AgentDockProps {
   onShelfChange?: ((shown: boolean) => void) | undefined;
   /** The composer shows a microphone only when it is set. */
   voice?: AgentDockVoice | undefined;
+  /**
+   * For a window that takes the pointer and shows only where the dock is. Called with the parts that
+   * the dock covers when it rests, and with null when it starts to move: then the whole stage counts.
+   */
+  onShapeChange?: ((parts: readonly AgentDockShapeRect[] | null) => void) | undefined;
 }
 
 /** The seats, drafts and other records are keyed by `agentDockSeatKey`. */
@@ -239,6 +252,8 @@ const ADD_SEARCH_MIN = 9;
 /** The morph of the add list when the search changes its rows. The same move as the menu panels. */
 const ADD_MORPH_MS = 200;
 const ADD_MORPH_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+/** The room around each part of the shape: the goo, the handle stroke and a hovered seat reach past the geometry. */
+const SHAPE_MARGIN = 14;
 
 export function AgentDock(props: AgentDockProps) {
   const { t } = useText();
@@ -290,7 +305,14 @@ export function AgentDock(props: AgentDockProps) {
   const seatFades = createScrollFades();
   onCleanup(() => seatFades.stop());
 
-  const motion = createMotion(() => render());
+  let moving = false;
+  const motion = createMotion(
+    () => render(),
+    (value) => {
+      moving = value;
+      reportShape();
+    },
+  );
   const initialCount = initialSeats.length;
   const dockH = motion.spring(dockHeight(initialCount), WOBBLY);
   const addY = motion.spring(addCenterY(initialCount), WOBBLY);
@@ -460,6 +482,27 @@ export function AgentDock(props: AgentDockProps) {
 
     const r = Math.max(0, dropR.value);
     drop.style.transform = `translate(${dropX.value}px, ${dropY.value}px) translate(-50%, -50%) scale(${r / (SEAT / 2)})`;
+  }
+
+  /** The parts that the dock covers at rest: the dock and its handle, the open panel and the shelf. */
+  function reportShape() {
+    const report = props.onShapeChange;
+    if (!report) return;
+    if (moving) return report(null);
+    const parts: Element[] = [dockEdge, ...(props.onDrag ? [handleHit] : [])];
+    if (panelOpen.value > 0.001) parts.push(panelEdge);
+    if (shelf && !shelf.hidden) parts.push(shelf);
+    report(
+      parts
+        .map((element) => element.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map((rect) => ({
+          x: rect.x - SHAPE_MARGIN,
+          y: rect.y - SHAPE_MARGIN,
+          width: rect.width + SHAPE_MARGIN * 2,
+          height: rect.height + SHAPE_MARGIN * 2,
+        })),
+    );
   }
 
   /** The add menu opens away from the screen edge. */
@@ -941,9 +984,24 @@ export function AgentDock(props: AgentDockProps) {
     },
   );
 
+  /* The edge changes the place of the dock without a spring. */
+  createEffect(
+    () => props.side,
+    () => reportShape(),
+  );
+
   onSettled(() => {
     render();
-    return () => motion.stop();
+    reportShape();
+    // The shelf grows, shrinks and hides without a spring; the window can get another height.
+    const resized = new ResizeObserver(() => reportShape());
+    if (shelf) resized.observe(shelf);
+    window.addEventListener("resize", reportShape);
+    return () => {
+      motion.stop();
+      resized.disconnect();
+      window.removeEventListener("resize", reportShape);
+    };
   });
 
   return (

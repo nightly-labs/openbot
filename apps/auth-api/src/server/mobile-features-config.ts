@@ -9,11 +9,11 @@ import type { MobileFeatureConfig, MobileLatestVersions } from "@openbot/contrac
 export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
   cloudServers: {
     ios: { upTo: "1.4.7" },
-    android: { upTo: "1.4.7" },
+    android: { upTo: "1.4.8" },
   },
   browser: {
     ios: { upTo: "1.4.7" },
-    android: { upTo: "1.4.7" },
+    android: { upTo: "1.4.8" },
   },
 };
 
@@ -24,5 +24,5 @@ export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
  */
 export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
   ios: "1.4.7",
-  android: "1.4.7",
+  android: "1.4.8",
 };

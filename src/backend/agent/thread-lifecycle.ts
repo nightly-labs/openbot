@@ -46,7 +46,7 @@ import {
   toMcpShapeFailed,
   usableMcpServers,
 } from "../mcp-provider-shapes";
-import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDecoder } from "../protocol";
+import { decodeRecordResponse, decodeThreadResponse, getRecord, getString, type ResponseDecoder } from "../protocol";
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import { readCodexMcpConfig } from "./codex-mcp-config";
@@ -120,6 +120,8 @@ const RUNTIME_RELOADED_ON_RESUME: ReadonlySet<AgentProvider> = new Set(["claude"
 
 /** Per server key, the `tools` table Codex saved for it: each tool's approval. */
 type CodexToolApprovals = Array<[string, DynamicRecord]>;
+/** The start of the title that `#nameSession` gives a session in the provider's own thread list. */
+const SESSION_NAME_PREFIX = "OpenBot · ";
 
 /** The instruction file that the developer instructions name, and its text when they carry it. */
 interface InstructionsFileInPrompt {
@@ -202,6 +204,8 @@ export interface ThreadLifecycleOptions {
   vaultItems?: () => VaultContents;
   /** OpenBot runs on a server. The prompt then names the sign-in on the user's computer. */
   serverHost?: boolean;
+  /** The plan storage in GB of a hosted server, read at each start and resume of a session. */
+  hostedStorageGb?: () => number | null;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
   /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
@@ -246,6 +250,7 @@ export class ThreadLifecycle {
   readonly #passwordVaultConnected: () => boolean;
   readonly #vaultItems: () => VaultContents;
   readonly #serverHost: boolean;
+  readonly #hostedStorageGb: () => number | null;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -298,6 +303,7 @@ export class ThreadLifecycle {
     this.#passwordVaultConnected = options.passwordVaultConnected ?? (() => false);
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
     this.#serverHost = options.serverHost ?? false;
+    this.#hostedStorageGb = options.hostedStorageGb ?? (() => null);
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -873,6 +879,7 @@ export class ThreadLifecycle {
     this.#conversation.bindThread(externalThreadId, agent.id, publicThreadId);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
+    yield* this.#nameSession(client, externalThreadId, agent, null);
     if (replaced) yield* this.#archiveReplacedSession(client, replaced.externalSessionId);
     return externalThreadId;
   });
@@ -894,6 +901,33 @@ export class ThreadLifecycle {
       .archiveThread(externalThreadId)
       .pipe(
         Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
+      );
+  }, Effect.uninterruptible);
+
+  /**
+   * Gives the session a title in the provider's own thread list, such as the Codex app. Without it
+   * the row shows the first turn's OpenBot context block. A resume gives the title again when the
+   * agent's name changed, but keeps a title that the user wrote in the other app. A failure is
+   * logged, and the session goes on with its old title.
+   */
+  readonly #nameSession = Effect.fn("ThreadLifecycle.nameSession")(function* (
+    this: ThreadLifecycle,
+    client: AgentClient,
+    externalThreadId: string,
+    agent: AgentSummary,
+    currentName: string | null,
+  ) {
+    const name = `${SESSION_NAME_PREFIX}${agent.name}`;
+    if (!client.nameThread || currentName === name) return;
+    if (currentName !== null && !currentName.startsWith(SESSION_NAME_PREFIX)) return;
+    yield* client
+      .nameThread(externalThreadId, name)
+      .pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() =>
+            logger.warn("Could not name a provider session.", { provider: client.provider, error: failure.cause }),
+          ),
+        ),
       );
   }, Effect.uninterruptible);
 
@@ -1322,6 +1356,7 @@ export class ThreadLifecycle {
       passwordVault: this.#passwordVaultConnected(),
       vaultItems: this.#vaultItems(),
       serverHost: this.#serverHost,
+      hostedStorageGb: this.#hostedStorageGb(),
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),
@@ -1470,15 +1505,17 @@ export class ThreadLifecycle {
     const resumed = yield* Effect.result(
       client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed),
     );
+    let response: DynamicRecord;
     if (Result.isFailure(resumed)) {
       if (client.provider !== "codex" || !isArchivedThreadError(resumed.failure.cause)) return yield* resumed.failure;
       yield* client
         .request("thread/unarchive", { threadId: externalThreadId }, decodeRecordResponse)
         .pipe(toThreadOperationFailed);
-      yield* client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed);
-    }
+      response = yield* client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed);
+    } else response = resumed.success;
     this.#rememberTurnContext(client, externalThreadId, givenContext);
     this.#conversation.markThreadLoaded(externalThreadId, client);
+    yield* this.#nameSession(client, externalThreadId, agent, getString(getRecord(response, "thread"), "name"));
   }).bind(this);
 
   /**

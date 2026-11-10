@@ -114,6 +114,10 @@ export const messages = {
   "composer.error.changeModel": "تعذّر تغيير النموذج. حاول مرة أخرى.",
   "composer.error.changeEffort": "تعذّر تغيير مستوى الجهد. حاول مرة أخرى.",
   "composer.error.changeFastMode": "تعذّر تغيير الوضع السريع. حاول مرة أخرى.",
+  "composer.fastMode.confirmTitle": "تشغيل الوضع السريع؟",
+  "composer.fastMode.confirmDescription":
+    "يجيب Claude بشكل أسرع، لكن كل رمز يكلّف أكثر. مع اشتراك Claude، يستخدم الوضع السريع دائمًا أرصدة الاستخدام، حتى عندما يتبقى استخدام في خطتك.",
+  "composer.fastMode.confirm": "تشغيل",
   "composer.context.label": "السياق ممتلئ بنسبة {percent}",
   "composer.context.labelEstimated": "السياق ممتلئ بنسبة {percent} تقريبًا",
   "composer.context.labelCompacting": "جارٍ ضغط السياق",

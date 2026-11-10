@@ -199,7 +199,7 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { type AgentFeedback, OpenBotToolRouter } from "./agent/openbot-tool-router";
+import { type AgentFeedback, type AgentServerClaims, OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -354,6 +354,8 @@ export interface AgentServiceOptions {
   feedbackFacts?: FeedbackFacts | null;
   /** Sends approved `send_feedback` text to the account service. */
   feedback?: AgentFeedback | null;
+  /** Makes one-time claims for `create_server_install_command` with the account session. */
+  serverClaims?: AgentServerClaims | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -466,6 +468,11 @@ export interface AgentServiceOptions {
    * while memory is low, and only a fixed number of turns run at the same time.
    */
   hostMemory?: HostMemory | null;
+  /**
+   * The plan storage in GB of a hosted server, or null elsewhere and until the account server answers.
+   * The agent instructions name the limit.
+   */
+  hostedStorageGb?: () => number | null;
   /** When an idle Codex session is unloaded, and how many idle sessions one app server keeps. Tests make it short. */
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
 }
@@ -1199,6 +1206,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }),
       // Only a server has a memory reading.
       serverHost: hostMemory !== null,
+      ...(options.hostedStorageGb ? { hostedStorageGb: options.hostedStorageGb } : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",
@@ -1535,7 +1543,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
-        mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
+        mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
@@ -1670,7 +1678,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
-        mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
+        mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
@@ -1779,12 +1787,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
+      serverClaims: options.serverClaims ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
+        agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
+        providerStatuses: () => this.getStatus().providers ?? [],
         preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) =>
           this.createAgent(
@@ -3364,6 +3375,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 ...previousChoice,
                 reasoningEffort: previous.reasoningEffort,
                 ...(failingOver ? { cause: "provider-error" as const } : {}),
+                // The provider change turns fast mode off, so the return turns it on again.
+                ...(previous.fastMode ? { fastMode: true } : {}),
               }))
         : undefined;
     const usageLimitReturn =
@@ -3490,7 +3503,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       };
     };
     if (agent.usageLimitReturn && this.#usageLimitReady(agent.usageLimitReturn))
-      return { input: move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort), move: "return" };
+      return {
+        input: {
+          ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
+          ...(agent.usageLimitReturn.fastMode ? { fastMode: true } : {}),
+        },
+        move: "return",
+      };
     const limited = !this.#usageLimits.mayDrain(agentId);
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
     if (!limited && !failed) return null;
@@ -3519,6 +3538,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#usageLimitReady(choice) &&
         !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
     );
+  }
+
+  /**
+   * Whether a ready model continues work that a usage limit stopped after it started: a backup in the
+   * agent's order, or the model the agent left, once no limit holds it. The move after the turn goes
+   * back to that model first, so the work goes with it (#6022).
+   */
+  #mayContinueStoppedWork(agentId: string): boolean {
+    const returnTo = this.#store.list().find((candidate) => candidate.id === agentId)?.usageLimitReturn;
+    return Boolean(returnTo && this.#usageLimitReady(returnTo)) || this.#usageLimitBackup(agentId, true) !== undefined;
   }
 
   /**

@@ -279,6 +279,11 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-4);
 }
 
+/* Why an app does not connect here: it wraps, as cut to one line it would lose what to do. */
+.marketplace-app-reason {
+  white-space: normal;
+}
+
 .marketplace-command {
   overflow-wrap: anywhere;
   color: var(--openbot-text-primary);

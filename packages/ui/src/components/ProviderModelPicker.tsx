@@ -1100,7 +1100,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 fallback={
                                   search().trim()
                                     ? t("provider.picker.noMatches")
-                                    : t("provider.picker.noModels", { name: railName(provider, t) })
+                                    : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+                                      provider === "muse"
+                                      ? t("provider.picker.museNoModels")
+                                      : t("provider.picker.noModels", { name: railName(provider, t) })
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}

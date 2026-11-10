@@ -10,11 +10,14 @@ import {
   type AgentDockChatModel,
   type AgentDockSeat,
   type AgentDockSeatRef,
+  type AgentDockShapeRect,
   type AgentDockChannel as AgentDockUiChannel,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
+import { windowShape } from "../../window-shape";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
@@ -22,6 +25,11 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 const TUCK_DELAY_MS = 900;
 /** The width of the strip at the screen edge where the pointer brings a hidden dock back. */
 const EDGE_STRIP = 4;
+/**
+ * Linux gives no pointer moves to a window that lets the pointer through. There the window shape is
+ * the dock: the pointer goes to the apps outside it, and nothing outside it shows.
+ */
+const SHAPED_WINDOW = currentDevicePlatform() === "linux";
 
 /**
  * The agent dock in its own window at the left or right edge of the screen. The main renderer owns the
@@ -40,8 +48,10 @@ export function AgentDockSurface() {
   /* A plain copy: a signal write shows in a read only after the next flush. */
   let isTucked = false;
   const setTucked = (value: boolean) => {
+    if (isTucked === value) return;
     isTucked = value;
     setTuckedSignal(value);
+    syncShape();
   };
   let received = false;
   let chatOpen = false;
@@ -53,6 +63,9 @@ export function AgentDockSurface() {
   let autoHide = false;
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
   let sent = { interactive: false, keyboard: false };
+  /** The dock parts at rest, or null while the dock moves. */
+  let dockShape: readonly AgentDockShapeRect[] | null = null;
+  let sentShape = "";
   /** A retry of a failed draft keeps its id, so the agent or the channel gets the message once. */
   let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
 
@@ -90,6 +103,27 @@ export function AgentDockSurface() {
       updateTuck();
     },
   );
+
+  /**
+   * Linux: tells main the parts of the window that take the pointer. The whole window while the dock
+   * moves or a menu is open, so that nothing is cut off; the strip at the edge while the dock is hidden.
+   */
+  function syncShape() {
+    if (!SHAPED_WINDOW) return;
+    const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
+    const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
+    if (isTucked) {
+      const x = presentation()?.edge === "left" ? 0 : window.innerWidth - EDGE_STRIP;
+      parts.push({ x, y: 0, width: EDGE_STRIP, height: window.innerHeight });
+    }
+    const shape = windowShape(parts);
+    const key = JSON.stringify(shape);
+    if (key === sentShape) return;
+    sentShape = key;
+    void agentDockPort()
+      .agentDock.setInputRegion(shape)
+      .catch(() => undefined);
+  }
 
   /** Tells main when the window takes the pointer and the keys. Only a change is sent. */
   const sync = () => {
@@ -133,7 +167,10 @@ export function AgentDockSurface() {
     };
     const onBlur = () => setCloseRequest((value) => value + 1);
     // A menu opens and closes in a portal on the body.
-    const menus = new MutationObserver(() => sync());
+    const menus = new MutationObserver(() => {
+      sync();
+      syncShape();
+    });
     menus.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["role"] });
     document.addEventListener("mouseover", onPointer);
     document.addEventListener("mousemove", onPointer);
@@ -211,6 +248,14 @@ export function AgentDockSurface() {
           voice={voice}
           side={presentation()?.edge ?? "right"}
           tucked={tucked()}
+          onShapeChange={
+            SHAPED_WINDOW
+              ? (parts) => {
+                  dockShape = parts;
+                  syncShape();
+                }
+              : undefined
+          }
           onDrag={(phase) => {
             dragging = phase !== "end";
             updateTuck();

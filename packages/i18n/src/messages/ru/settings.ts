@@ -120,6 +120,9 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "{setting}: задать всем агентам",
   "settings.agentDefaults.agentLabel": "{setting}: {agent}",
   "settings.agentDefaults.loadFailed": "Не удалось загрузить агентов.",
+  "settings.commitCoAuthor.sectionTitle": "Коммиты Git",
+  "settings.commitCoAuthor.title": "Указывать OpenBot в коммитах",
+  "settings.commitCoAuthor.description": "Агенты добавляют OpenBot соавтором своих коммитов. Автором остаётесь вы.",
   "settings.planStart.title": "Начало работы",
   "settings.planStart.wait": "Когда я нажму «Начать»",
   "settings.planStart.after": "Через {time}",
@@ -203,8 +206,15 @@ export const messages = {
   "settings.soundTheme.play": "Воспроизвести: {name}",
   "settings.notch.title": "Поведение",
   "settings.notch.show.title": "Показывать статус в вырезе MacBook",
+  "settings.notch.show.titleTopOfScreen": "Показывать статус вверху экрана",
   "settings.notch.show.description":
     "Показывать активность агентов и всё, что требует внимания, в верхней части каждого дисплея.",
+  "settings.notch.xwayland.title": "Нужен перезапуск",
+  "settings.notch.xwayland.description":
+    "В Wayland OpenBot должен использовать XWayland, чтобы показать Dynamic Island поверх других приложений. До этого остров не показан.",
+  "settings.notch.xwayland.unsupported":
+    "В Wayland без XWayland Dynamic Island не может быть поверх других приложений.",
+  "settings.notch.xwayland.restart": "Перезапустить",
   "settings.notch.idle.title": "Показывать панель в режиме ожидания",
   "settings.notch.idle.description": "Показывать логотип OpenBot и приветствие, когда нет активного статуса.",
   "settings.notch.displays.title": "Показывать на дополнительных дисплеях",
@@ -229,6 +239,12 @@ export const messages = {
     "«Поверх других приложений» оставляет док на экране, когда OpenBot в фоне.",
   "settings.agentDock.placement.screen": "Поверх других приложений",
   "settings.agentDock.placement.window": "В окне OpenBot",
+  "settings.agentDock.xwayland.title": "Нужен перезапуск",
+  "settings.agentDock.xwayland.description":
+    "В Wayland OpenBot должен использовать XWayland, чтобы показать док поверх других приложений. До этого док показан в окне OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "В Wayland без XWayland док не может быть поверх других приложений. Он показан в окне OpenBot.",
+  "settings.agentDock.xwayland.restart": "Перезапустить",
   "settings.agentDock.display.title": "Дисплей",
   "settings.agentDock.display.description": "Если этот дисплей не подключён, док переходит на дисплей окна OpenBot.",
   "settings.agentDock.display.window": "Вместе с окном OpenBot",

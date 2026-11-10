@@ -9,6 +9,7 @@ import {
   isStripeCheckoutUrl,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
+import type { ConversationMessage } from "./ipc-conversation-messages";
 import { type LicenseOrder, parseLicenseOrder } from "./license";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 import { slugifyTeamServerName } from "./validation";
@@ -30,6 +31,12 @@ export const HOSTED_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>>
   standard: "default",
   pro: "large",
 };
+
+/**
+ * The disk of a hosted server that the system and the preinstalled tools use, in GB (measured on the
+ * running servers on 2026-11-09: 19 to 22 GB). The plan storage does not count it: it is on top of the plan.
+ */
+export const HOSTED_SERVER_BASE_IMAGE_GB = 22;
 
 export const HOSTED_SERVER_STATES = [
   /** The row exists, and the account server waits for Stripe to confirm the first payment. */
@@ -460,4 +467,81 @@ export function parseHostedServerLifecycleInput(value: unknown): HostedServerLif
     };
   }
   return { serverId: value.serverId, action: value.action };
+}
+
+/**
+ * A one-time claim that signs a new server in to the account of the user that made it. The
+ * account service answers `POST /v2/server-claims` with it. It works once, until `expiresAt`.
+ */
+export interface ServerClaim {
+  claim: string;
+  /** Milliseconds since the epoch. */
+  expiresAt: number;
+}
+
+/** The account service makes 32 random bytes in base64url. The claim goes into a shell command, so only these characters. */
+const SERVER_CLAIM_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
+export function parseServerClaim(value: unknown): ServerClaim | null {
+  if (!isDynamicRecord(value) || !isString(value.claim) || !SERVER_CLAIM_PATTERN.test(value.claim)) return null;
+  if (!isNumber(value.expiresAt) || !Number.isFinite(value.expiresAt)) return null;
+  return { claim: value.claim, expiresAt: value.expiresAt };
+}
+
+/** The install script of a self-hosted server (`scripts/install-server.sh`, docs/self-hosted-server.md). */
+export const INSTALL_SERVER_SCRIPT_URL =
+  "https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh";
+
+/** A word for a POSIX shell: in single quotes, with each single quote closed, escaped and opened again. */
+function shellWord(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * The one command that installs OpenBot on a Linux server and signs it in with the claim. With a
+ * name, the server gets that name; without one, the install script names it OpenBot.
+ *
+ * The claim goes to bash on standard input, as a line before the script. sudo logs its arguments
+ * and each variable that it passes (`ENV=`), and `ps` shows the arguments to each user.
+ */
+export function installServerCommand(claim: string, name?: string): string {
+  const named = name === undefined ? "" : ` -- --name ${shellWord(name)}`;
+  return `{ echo OPENBOT_CLAIM=${claim}; curl -fsSL ${INSTALL_SERVER_SCRIPT_URL}; } | sudo bash -s${named}`;
+}
+
+const SERVER_INSTALL_ITEM_TYPE_PREFIX = "server-install:";
+/** The item type of a chat message holds at most 128 characters. */
+const ITEM_TYPE_LIMIT = 128;
+
+/**
+ * An install command that an agent made in a chat. The chat card waits for the new server. It never
+ * holds the claim: the message stays in the chat after the claim is spent.
+ */
+export interface ServerInstallEvent {
+  /** When the command stops working, in milliseconds since the epoch. */
+  expiresAt: number;
+  /** The name that the command gives the server. Null when it does not fit the item type. */
+  name: string | null;
+}
+
+export function serverInstallItemType(event: ServerInstallEvent): string {
+  if (!Number.isSafeInteger(event.expiresAt) || event.expiresAt < 0) throw new Error("A valid expiry is required.");
+  const base = `${SERVER_INSTALL_ITEM_TYPE_PREFIX}${event.expiresAt}:`;
+  const named = event.name === null ? base : `${base}${encodeURIComponent(event.name)}`;
+  return named.length <= ITEM_TYPE_LIMIT ? named : base;
+}
+
+export function serverInstallEvent(message: ConversationMessage): ServerInstallEvent | null {
+  if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
+  if (!message.itemType?.startsWith(SERVER_INSTALL_ITEM_TYPE_PREFIX)) return null;
+  const match = /^([0-9]{1,16}):(.*)$/su.exec(message.itemType.slice(SERVER_INSTALL_ITEM_TYPE_PREFIX.length));
+  if (!match?.[1] || match[2] === undefined) return null;
+  const expiresAt = Number(match[1]);
+  if (!Number.isSafeInteger(expiresAt)) return null;
+  if (!match[2]) return { expiresAt, name: null };
+  try {
+    return { expiresAt, name: parseHostedServerName(decodeURIComponent(match[2])) };
+  } catch {
+    return null;
+  }
 }

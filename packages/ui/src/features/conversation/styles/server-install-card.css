@@ -1,0 +1,199 @@
+/* Server install card: the loader waits in the icon tile, then the new server's logo pops in. */
+
+.server-install-card[data-step="expired"] .server-install-card-status {
+  color: var(--openbot-warning);
+}
+
+.server-install-card-status-text {
+  display: inline-block;
+}
+
+.server-install-card-tile {
+  --server-install-size: var(--openbot-control-lg);
+  --server-install-radius: var(--openbot-radius-md);
+  --server-install-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  width: var(--server-install-size);
+  height: var(--server-install-size);
+  place-items: center;
+  border-radius: var(--server-install-radius);
+}
+
+.server-install-card-tile[data-step="expired"] {
+  box-sizing: border-box;
+  border: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-surface-raised);
+}
+
+.server-install-card-tile > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.server-install-card-tile[data-step] .server-install-card-face {
+  display: grid;
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  place-items: center;
+  border-radius: var(--server-install-radius);
+}
+
+.server-install-card-tile[data-step] .server-install-card-logo {
+  --server-gradient-logo-size: var(--server-install-size);
+  --server-gradient-logo-radius: var(--server-install-radius);
+  position: relative;
+  overflow: hidden;
+  animation: server-install-pop-in 520ms var(--server-install-spring) 380ms backwards;
+}
+
+.server-install-card-logo > img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+/* When the server signs in, the plush squints with its happy face, hops, and shrinks away. */
+.server-install-card-tile:is([data-step="starting"], [data-step="connected"], [data-step="offline"]) .ui-plush-eye {
+  animation: ui-plush-squint 220ms var(--openbot-ease-out) forwards;
+}
+
+.server-install-card-tile:is([data-step="starting"], [data-step="connected"], [data-step="offline"])
+  .server-install-card-loader {
+  animation: server-install-pop-out 420ms var(--openbot-ease-out) 200ms forwards;
+}
+
+/* The first animation in each list stays the same, so that the pop does not play again. */
+.server-install-card-tile[data-step="starting"] .server-install-card-logo {
+  animation:
+    server-install-pop-in 520ms var(--server-install-spring) 380ms backwards,
+    server-install-breathe 1.8s ease-in-out 900ms infinite;
+}
+
+.server-install-card-tile[data-step="connected"] .server-install-card-logo {
+  animation:
+    server-install-pop-in 520ms var(--server-install-spring) 380ms backwards,
+    server-install-settle 420ms var(--server-install-spring);
+}
+
+/* The badge: a spinner while the server starts, then a check that draws itself. */
+.server-install-card-badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  place-items: center;
+  border: 2px solid var(--openbot-bg-canvas);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+  transition:
+    background-color var(--openbot-duration-normal) var(--openbot-ease-out),
+    color var(--openbot-duration-normal) var(--openbot-ease-out);
+  animation: server-install-badge-in 360ms var(--server-install-spring) 640ms backwards;
+}
+
+.server-install-card-badge[data-step="connected"] {
+  background: var(--openbot-success);
+  color: var(--openbot-bg-canvas);
+}
+
+.server-install-card-badge > svg {
+  width: 10px;
+  height: 10px;
+}
+
+.server-install-card-check * {
+  stroke-dasharray: 20;
+  animation: server-install-draw 360ms var(--openbot-ease-out) 80ms backwards;
+}
+
+.server-install-card-status-text,
+.server-install-card-action {
+  animation: server-install-text-in var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+/* The card showed first with the server signed in: the logo is already in place. */
+.server-install-card-tile[data-revealed][data-step] .server-install-card-face,
+.server-install-card-tile[data-revealed] .server-install-card-badge,
+.server-install-card-tile[data-revealed] .server-install-card-check * {
+  animation: none;
+}
+
+.server-install-card-tile[data-revealed][data-step="starting"] .server-install-card-logo {
+  animation: server-install-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes server-install-pop-out {
+  30% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@keyframes server-install-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+@keyframes server-install-breathe {
+  50% {
+    opacity: 0.6;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes server-install-settle {
+  from {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes server-install-badge-in {
+  from {
+    transform: scale(0);
+  }
+}
+
+@keyframes server-install-draw {
+  from {
+    stroke-dashoffset: 20;
+  }
+}
+
+@keyframes server-install-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-install-card .server-install-card-tile[data-step] .server-install-card-face,
+  .server-install-card .server-install-card-badge,
+  .server-install-card .server-install-card-check *,
+  .server-install-card .server-install-card-status-text,
+  .server-install-card .server-install-card-action {
+    animation: none;
+    transition: none;
+  }
+
+  .server-install-card
+    .server-install-card-tile:is([data-step="starting"], [data-step="connected"], [data-step="offline"])
+    .server-install-card-loader {
+    opacity: 0;
+  }
+}
