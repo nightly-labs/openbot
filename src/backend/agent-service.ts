@@ -6158,7 +6158,10 @@ function failureMessages(error: unknown): string[] {
   return messages;
 }
 
-/** Where the local user may open an agent's file links: anywhere in Full access, else also its added folders. */
+/**
+ * Where the local user, or an owner or admin through the Team API, may open an agent's file links:
+ * anywhere in Full access, else in the workspace and the added folders.
+ */
 function localWorkspaceAccess(agent: AgentSummary): { allowOutside: boolean; allowedRoots: readonly string[] } {
   return { allowOutside: !workspaceAccessEnforced(agent), allowedRoots: agent.additionalFolders ?? [] };
 }
