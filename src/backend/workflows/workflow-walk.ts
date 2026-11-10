@@ -358,14 +358,16 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 /** The prompt of a condition. The model must answer one word. */
 export function conditionPrompt(rule: string, input: string): string {
   return [
-    "You judge one condition of a workflow. Read the input, then answer with one word: yes or no.",
+    "You judge one condition of a workflow. Read the input, then answer with one English word: yes or no. Answer in English also when the condition or the input uses another language.",
     `Condition: ${rule.trim() || "The input is not empty."}`,
     `--- input ---\n${input || "(empty)"}`,
   ].join("\n\n");
 }
 
-/** The answer of a condition, or null when the model did not answer yes or no. */
+/** The answer of a condition, or null when the model did not answer yes or no. "true" and "false" count too. */
 export function conditionAnswer(text: string): "yes" | "no" | null {
   const word = /^[^a-z]*([a-z]+)/iu.exec(text.trim())?.[1]?.toLowerCase();
-  return word === "yes" || word === "no" ? word : null;
+  if (word === "yes" || word === "true") return "yes";
+  if (word === "no" || word === "false") return "no";
+  return null;
 }
