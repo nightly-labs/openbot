@@ -328,6 +328,15 @@ export interface AcpHistoryPersistence {
  */
 const ACP_SESSION_IDLE_RELEASE_MS = 5 * 60_000;
 
+/**
+ * The shortest wait for the start of a session's own process (`AcpFlavor.sessionProcesses`), the
+ * long start wait of `ProviderRuntime`. The Windows Gemini server unpacks about 310 MB at each start,
+ * and a reopened session starts one after each idle release. On a busy computer that took 23 to 55 s,
+ * and the 30 s request timeout failed the turn at each attempt (#6246). The start holds back only its
+ * own session, and a process that ends fails it at once.
+ */
+const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
+
 /** An agent that reports no context size gets the instructions again after this many prompts. */
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
 
@@ -586,7 +595,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initialized: Deferred.Deferred<void, ProviderClientOperationError> | null = null;
   #scope = Scope.makeUnsafe();
   #initialization: InitializeResponse | null = null;
-  /** How long the agent's own process had to start, which each session's process gets too. */
+  /** How long the agent's own process had to start. A session's process gets at least `ACP_SESSION_PROCESS_START_TIMEOUT_MS`. */
   #startTimeoutMs: number | null = null;
   #models: AcpModel[] = [];
   #lastTurnStartedAt = 0;
@@ -1425,7 +1434,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (thread?.transport === transport) thread.needsResume = true;
     });
     this.#openingSessionProcesses.add(transport);
-    const startTimeout = this.#startTimeout(this.#startTimeoutMs ?? this.#requestTimeoutMs);
+    const startTimeout = this.#startTimeout(
+      Math.max(this.#startTimeoutMs ?? this.#requestTimeoutMs, ACP_SESSION_PROCESS_START_TIMEOUT_MS),
+    );
     yield* Effect.gen({ self: this }, function* () {
       yield* providerSync(() => {
         // A stop that started before this spawn did not see the process. In the same step, so no stop starts between.
