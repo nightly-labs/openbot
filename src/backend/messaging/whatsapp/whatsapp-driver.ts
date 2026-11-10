@@ -67,6 +67,12 @@ const IMAGE_TYPES: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+/** WhatsApp opens a document by its type, so a generic type makes a ".bin" file. Attachments store HTML as plain text. */
+const DOCUMENT_TYPES: Record<string, string> = {
+  ".htm": "text/html",
+  ".html": "text/html",
+};
+
 /** The stored values of one linked number. `whatsappStoreKey` opens its store, the others name it. */
 export interface WhatsAppCredentials {
   storeId: string;
@@ -254,7 +260,7 @@ class WhatsAppAdapter implements MessagingAdapter {
             : {
                 document: { url: file.path },
                 fileName: file.name.slice(0, 255) || "file",
-                mimetype: "application/octet-stream",
+                mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
           yield* this.#send(target, content);
           return true;
