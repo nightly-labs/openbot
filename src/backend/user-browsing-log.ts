@@ -50,12 +50,31 @@ export function stepText(text: string, limit = USER_BROWSING_TEXT_CHARACTERS): s
   return line.length > limit ? `${line.slice(0, limit - 1)}…` : line;
 }
 
-/** The host and the path of a web page, or null for any other URL. The query and the hash stay out. */
+/**
+ * A path part that looks like a code, such as the token of a reset or an invitation link, or an id:
+ * a hex or UUID value, a long mix of letters and digits that is not a hyphenated slug, or any long part.
+ */
+function isCodeSegment(segment: string): boolean {
+  if (segment.length >= 32) return true;
+  if (!/\d/u.test(segment)) return false;
+  return (
+    /^[0-9a-f-]{8,}$/iu.test(segment) || (segment.length >= 16 && /[a-z]/iu.test(segment) && !/[-.]/u.test(segment))
+  );
+}
+
+/**
+ * The host and the path of a web page, or null for any other URL. The query and the hash stay out,
+ * and each path part that looks like a code becomes ":id".
+ */
 export function stepPlace(url: string): { host: string; path: string } | null {
   try {
     const parsed = new URL(url);
     if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname) return null;
-    return { host: stepText(parsed.hostname, PATH_CHARACTERS), path: stepText(parsed.pathname, PATH_CHARACTERS) };
+    const path = parsed.pathname
+      .split("/")
+      .map((segment) => (isCodeSegment(segment) ? ":id" : segment))
+      .join("/");
+    return { host: stepText(parsed.hostname, PATH_CHARACTERS), path: stepText(path, PATH_CHARACTERS) };
   } catch {
     return null;
   }
@@ -128,7 +147,8 @@ export class UserBrowsingLog {
       const last = steps.at(-1);
       if (step.kind === "page" && last?.kind === "page" && last.host === step.host && last.path === step.path) {
         if (step.title === undefined || last.title === step.title) return false;
-        steps[steps.length - 1] = { ...last, title: step.title };
+        // A new time, so that a review that read the old title does not delete the new one.
+        steps[steps.length - 1] = { ...last, title: step.title, at: this.#now() };
       } else steps.push({ ...step, at: this.#now() });
       this.#steps.set(agentId, steps.slice(-STEPS_PER_AGENT));
       return true;

@@ -781,7 +781,8 @@ server can change it.
 
 Server settings > General > Learn from my browsing is off by default. When it is on, and you or a
 team member control a page of an agent's browser, OpenBot records the address of each page (the host
-and the path, without the query or the hash), its title, and the kind and the label of each control
+and the path, without the query or the hash, and with each path part that looks like a code or an id
+replaced), its title, and the kind and the label of each control
 you click. It does not record what you type, field values, password fields, card or one-time code
 fields, secret tabs, or private sign-ins. The steps stay on this computer in
 `openbot-browsing-steps-v1.json`. The next memory review of that agent sends them, with secrets

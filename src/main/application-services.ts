@@ -112,7 +112,7 @@ import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, redactSecrets, registerSecretValue, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { installRemoteSyncProfileSink } from "@openbot/team-client/sync-profile";
 import {
@@ -1349,7 +1349,10 @@ export async function createApplicationServices({
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
     pagePreload: join(__dirname, "../preload/browserPage.cjs"),
     siteMemories: (agentId, hostname) =>
-      siteMemoryStore.forHost(agentId, hostname).flatMap(({ id, site, text }) => (site ? [{ id, site, text }] : [])),
+      // Redacted as the other memory paths are: the snapshot goes to the agent's provider.
+      siteMemoryStore
+        .forHost(agentId, hostname)
+        .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : [])),
     userBrowsing: {
       enabled: () => browsingMemory.get().enabled,
       record: (agentId, step) => {
@@ -2151,7 +2154,12 @@ export async function createApplicationServices({
     agentMemoryLimit: () => agentMemoryLimit.get().limit,
     memoryReviewInterval: () => memoryReview.get().interval,
     skillLearning: () => skillLearning.get().mode,
-    userBrowsing,
+    userBrowsing: {
+      // Also when the delete at the switch-off failed: a review reads no step while the setting is off.
+      pending: (agentId) => (browsingMemory.get().enabled ? userBrowsing.pending(agentId) : Effect.succeed([])),
+      reviewed: (agentId, through) => userBrowsing.reviewed(agentId, through),
+      forgetAgent: (agentId) => userBrowsing.forgetAgent(agentId),
+    },
     skillLearner: () => localSkillLearner(skills),
     responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),

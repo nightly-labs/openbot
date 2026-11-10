@@ -225,7 +225,8 @@ host and keeps the fact. The browser guidance asks the agent to save such a step
 lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
 while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
-a page that loads (host, path and title, without the query or the hash) or a press on a control
+a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
+path part that looks like a code, such as a reset token, with `:id`) or a press on a control
 (`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
 with a 1 second limit). A press outside a control, on a password field, or on a field whose
 `autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
