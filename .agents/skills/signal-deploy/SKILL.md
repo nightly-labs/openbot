@@ -38,10 +38,11 @@ was older than #1520. It had no `/v1/webhooks` route and refused webhook-only in
 
 ## 1. Find the running version
 
-First read `commit` from the public health route:
+First read `commit` from the public health route of both machines:
 
 ```sh
 curl -fsS https://signal1.openbot.run/health/live
+curl -fsS https://signal2.openbot.run/health/live
 ```
 
 If `commit` is missing (a build from before this field) or `unknown` (built without
