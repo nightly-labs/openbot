@@ -1452,7 +1452,11 @@ Pi uses its native `--mode rpc` interface. It does not use an ACP wrapper. Reque
 clears queued work before abort. Session paths and the active conversation branch are preserved.
 Models come from the running CLI. A small extension uses Pi's `registerMcpServer` interface to
 register configured MCP servers and OpenBot tools. Secrets are supplied through process state,
-not copied into the extension source.
+not copied into the extension source. A Workspace only Pi runs in a sandbox that its MCP servers
+would inherit, so OpenBot starts each stdio server itself (`mcp-stdio-relay.ts`) and registers it
+in Pi as a Streamable HTTP server on 127.0.0.1, with a bearer token. Each Pi session of the server
+starts its own process, and the process stops with that session or with the thread. The Access
+setting does not limit MCP servers, as for Claude and Codex (#6191).
 
 Managed Pi archives come from official GitHub releases and use the published SHA-256 digest.
 Sign-in opens Pi in a host terminal. Close Pi after sign-in to refresh models in OpenBot.
