@@ -342,6 +342,19 @@ export class InstanceTransferService {
     /** The person whose channel messages the import gives to the person who imports. */
     exporter?: string,
   ): Effect.fn.Return<InstanceExportResult, ArchiveOperationError> {
+    return yield* (yield* this.prepareExport(input, limits, exporter)).write(path);
+  }).bind(this);
+
+  /**
+   * Reads what the export carries and checks the file limits, before the user chooses where to save
+   * it. `write` writes that export.
+   */
+  readonly prepareExport = Effect.fn("InstanceTransfer.prepareExport")(function* (
+    this: InstanceTransferService,
+    input: ExportInstanceInput,
+    limits: ArchiveLimits = ARCHIVE,
+    exporter?: string,
+  ): Effect.fn.Return<PreparedExport, ArchiveOperationError> {
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
     if (selected.some((agent) => !agent))
@@ -535,11 +548,16 @@ export class InstanceTransferService {
     };
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     entries.unshift({ name: INSTANCE_TRANSFER_MANIFEST, read: () => Promise.resolve(manifestBytes) });
-    const gone = yield* writeZipEffect(path, entries);
     return {
-      saved: true,
-      fileName: basename(path),
-      warnings: gone > 0 ? [...warnings, sourceText("error.import.transferFilesGone", { number: gone })] : warnings,
+      write: (path: string) =>
+        writeZipEffect(path, entries).pipe(
+          Effect.map((gone) => ({
+            saved: true,
+            fileName: basename(path),
+            warnings:
+              gone > 0 ? [...warnings, sourceText("error.import.transferFilesGone", { number: gone })] : warnings,
+          })),
+        ),
     };
   }).bind(this);
 
@@ -1661,6 +1679,11 @@ function transferRoutines(agent: TransferAgent): TransferAgent["routines"] {
 function isSharedData(name: string): boolean {
   const lower = name.toLowerCase();
   return [SHARED_DATA, SHARED_TRANSFERS].some((folder) => lower === folder || lower.startsWith(`${folder}/`));
+}
+
+/** An export that is read and checked, and not written yet. */
+export interface PreparedExport {
+  write(path: string): Effect.Effect<InstanceExportResult, ArchiveOperationError>;
 }
 
 interface ZipEntry {

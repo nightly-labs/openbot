@@ -91,9 +91,11 @@ export function instanceTransferIpcHandlers({
   };
 
   const exportLocal = async (input: ExportInstanceInput): Promise<InstanceExportResult> => {
+    // An export over the file limits fails here, before the user chooses where to save it.
+    const prepared = await runCauseEffect(instanceTransfer.prepareExport(input));
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
-    const result = await runCauseEffect(instanceTransfer.exportTo(path, input));
+    const result = await runCauseEffect(prepared.write(path));
     lastExport = path;
     return result;
   };
