@@ -52,6 +52,7 @@ export function createIdleRestartToast(options: { status: Accessor<UpdateStatus>
         description: view.description,
         duration: Number.POSITIVE_INFINITY,
         dismissible: false,
+        closeButton: false,
         action: {
           label: view.action,
           onClick: () => {
