@@ -972,9 +972,7 @@ export class TurnLifecycle {
         // The compaction deadline stopped this turn, not the user: it failed. A quiet routine turn that
         // failed only because it gave no answer after the no-update call completed.
         const status =
-          reported === "failed" &&
-          this.#quietEmptyAnswers.has(turnId) &&
-          this.#quietAfterNoUpdate(agentId, threadId, turnId)
+          reported === "failed" && this.#quietEmptyAnswers.has(turnId) && !this.#turnErrors.has(turnId)
             ? "completed"
             : reported === "interrupted" &&
                 this.#compactionFailures.get(turnId)?.stalled &&
@@ -1102,10 +1100,14 @@ export class TurnLifecycle {
           threadId &&
           errorTurnId &&
           this.#runningTurns.has(errorTurnId) &&
-          this.#quietAfterNoUpdate(agentId, threadId, errorTurnId)
+          this.#noUpdateTurns.has(errorTurnId) &&
+          !this.#reportedFailures.has(errorTurnId) &&
+          this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId))
         ) {
           this.#quietEmptyAnswers.add(errorTurnId);
           logger.info("A quiet routine run ended with no answer after its no-update call.", {
+            agentId,
+            turnId: errorTurnId,
             provider: source.provider,
           });
           return;
@@ -1289,15 +1291,6 @@ export class TurnLifecycle {
     if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return false;
     this.#reportedFailures.set(turnId, reason);
     return true;
-  }
-
-  /** A turn of quiet routine runs only, whose agent called the no-update tool and reported no failure. */
-  #quietAfterNoUpdate(agentId: string, threadId: string, turnId: string): boolean {
-    return (
-      this.#noUpdateTurns.has(turnId) &&
-      !this.#reportedFailures.has(turnId) &&
-      this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, turnId))
-    );
   }
 
   /**
@@ -1780,6 +1773,7 @@ export class TurnLifecycle {
     if (running) this.#keepTurnTiming(turnId, running);
     this.#runningTurns.delete(turnId);
     this.#reportedFailures.delete(turnId);
+    this.#quietEmptyAnswers.delete(turnId);
     this.#markEnded(turnId);
     this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
