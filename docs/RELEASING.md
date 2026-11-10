@@ -448,6 +448,12 @@ A store that a newer version replaced is `Skipped (Android)`, and `/changelog` s
 `bun run mobile:release` does each step from a menu and opens the pull request
 (`apps/mobile/README.md#release-menu`).
 
+A fix with no native change can go to the phones of a store version with no store review, as an
+over-the-air update: `bun run mobile:ota:publish`. Its notes get a section with a fourth number, such
+as `1.5.0.1`, from `bun run mobile:release:ota`; the store version and `app.json` do not change. The
+steps, the limits and the rollback are in
+[the mobile README](../apps/mobile/README.md#over-the-air-updates).
+
 The same step sets that version for the store in `MOBILE_LATEST_VERSIONS` and in the `upTo` of each
 feature in `apps/auth-api/src/server/mobile-features-config.ts`. The merge deploys the account
 service. An app with an older version then shows the update header on home. Set it only after the

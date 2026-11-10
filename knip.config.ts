@@ -124,6 +124,10 @@ const config: KnipConfig = {
     "apps/site-router": {
       project: ["src/**/*.ts"],
     },
+    "apps/mobile-updates": {
+      entry: ["scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/**/*.ts"],
+    },
     "apps/mobile": {
       entry: [
         "src/app/**/*.{ts,tsx}",
