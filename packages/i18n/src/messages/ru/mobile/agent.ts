@@ -336,6 +336,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Повторить загрузку моделей",
   "mobile.agent.runtime.loadingModels": "Загрузка моделей…",
   "mobile.agent.runtime.noModels": "Для этого провайдера нет доступных моделей.",
+  "mobile.agent.runtime.searchModels": "Поиск моделей",
+  "mobile.agent.runtime.noMatches": "Моделей по вашему запросу не найдено.",
   "mobile.agent.runtime.usageLimit": "Лимит использования исчерпан",
   "mobile.agent.runtime.usageLimitWindow": "Лимит ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Сброс: {time}",

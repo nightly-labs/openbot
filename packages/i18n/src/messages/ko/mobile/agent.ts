@@ -308,6 +308,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "모델 다시 시도",
   "mobile.agent.runtime.loadingModels": "모델 불러오는 중…",
   "mobile.agent.runtime.noModels": "이 제공자에서 사용할 수 있는 모델이 없어요.",
+  "mobile.agent.runtime.searchModels": "모델 검색",
+  "mobile.agent.runtime.noMatches": "검색과 일치하는 모델이 없어요.",
   "mobile.agent.runtime.usageLimit": "사용 한도에 도달했어요",
   "mobile.agent.runtime.usageLimitWindow": "{window} 한도",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 초기화",

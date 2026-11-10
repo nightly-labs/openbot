@@ -314,6 +314,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "モデルを再読み込み",
   "mobile.agent.runtime.loadingModels": "モデルを読み込んでいます…",
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
+  "mobile.agent.runtime.searchModels": "モデルを検索",
+  "mobile.agent.runtime.noMatches": "検索に一致するモデルはありません。",
   "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
   "mobile.agent.runtime.usageLimitWindow": "{window}の上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} にリセット",

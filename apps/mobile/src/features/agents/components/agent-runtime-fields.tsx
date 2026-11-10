@@ -13,9 +13,10 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Typography } from "heroui-native";
+import Check from "lucide-react-native/icons/check";
 import { useEffect, useState } from "react";
-import { Platform } from "react-native";
-import { useUniwind } from "uniwind";
+import { Keyboard, Platform } from "react-native";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
@@ -32,6 +33,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
 
 const EFFORT_LABELS = {
@@ -60,6 +62,12 @@ function pickerLabel(text: string, selected: boolean): string {
   const characters = Array.from(text);
   return characters.length > MAX_PICKER_LABEL ? `${characters.slice(0, MAX_PICKER_LABEL).join("").trimEnd()}…` : text;
 }
+
+/**
+ * A provider with this many models gets a search under the rows. A menu does not filter, and
+ * OpenRouter lists hundreds of models, so the user scrolled the whole menu to find one.
+ */
+const MODEL_SEARCH_MIN = 9;
 
 /**
  * The accounts of the host's providers, and the agents on an account after the first. Null for a
@@ -147,6 +155,29 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
+  const accent = String(useCSSVariable("--openbot-accent"));
+  const [query, setQuery] = useState("");
+  const searches = showsModel && options.length >= MODEL_SEARCH_MIN;
+  const words = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
+  // The search also reads the model id, as the backup model search does.
+  const matches =
+    searches && words.length > 0
+      ? options.filter((option) => {
+          const text = `${option.name} ${option.id}`.toLocaleLowerCase();
+          return words.every((word) => text.includes(word));
+        })
+      : null;
+  const chooseModel = (id: string) => {
+    const next = options.find((option) => option.id === id);
+    if (!next) return;
+    onChange({
+      model: next.id,
+      reasoningEffort:
+        reasoningEffort && next.supportedReasoningEfforts.includes(reasoningEffort)
+          ? reasoningEffort
+          : next.defaultReasoningEffort,
+    });
+  };
   return (
     <>
       <SettingsSection title={title} footer={spentLimit}>
@@ -241,17 +272,7 @@ export function AgentRuntimeFields({
                 enabled={enabled}
                 dark={theme === "dark"}
                 label={t("mobile.agent.runtime.model")}
-                onChange={(id) => {
-                  const next = options.find((option) => option.id === id);
-                  if (!next) return;
-                  onChange({
-                    model: next.id,
-                    reasoningEffort:
-                      reasoningEffort && next.supportedReasoningEfforts.includes(reasoningEffort)
-                        ? reasoningEffort
-                        : next.defaultReasoningEffort,
-                  });
-                }}
+                onChange={chooseModel}
               />
             }
           >
@@ -291,6 +312,45 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
       </SettingsSection>
+      {searches ? (
+        <SheetFormField
+          label={t("mobile.agent.runtime.searchModels")}
+          hideLabel
+          appearance="soft"
+          placeholder={t("mobile.agent.runtime.searchModels")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          editable={enabled}
+          value={query}
+          onChangeText={setQuery}
+        />
+      ) : null}
+      {matches?.length === 0 ? (
+        <Typography.Paragraph className="px-4 text-grouped-secondary">
+          {t("mobile.agent.runtime.noMatches")}
+        </Typography.Paragraph>
+      ) : null}
+      {matches?.length ? (
+        <SettingsSection>
+          {matches.map((option) => (
+            <SettingsRow
+              key={option.id}
+              checked={option.id === model}
+              disclosure={false}
+              disabled={!enabled}
+              trailing={option.id === model ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+              onPress={() => {
+                chooseModel(option.id);
+                setQuery("");
+                Keyboard.dismiss();
+              }}
+            >
+              <Typography.Paragraph numberOfLines={2}>{option.name}</Typography.Paragraph>
+            </SettingsRow>
+          ))}
+        </SettingsSection>
+      ) : null}
       {fastMode && showsModel && selected?.fastServiceTier ? <AgentFastModeField {...fastMode} /> : null}
       {models.isError ? (
         <Button variant="ghost" onPress={() => void models.refetch()}>
