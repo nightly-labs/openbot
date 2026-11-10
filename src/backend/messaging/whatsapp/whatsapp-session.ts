@@ -10,6 +10,7 @@ import {
   fetchLatestWaWebVersion,
   type GroupMetadata,
   generateMessageIDV2,
+  jidNormalizedUser,
   type MiscMessageGenerationOptions,
   makeCacheableSignalKeyStore,
   proto,
@@ -337,7 +338,7 @@ export class WhatsAppSession {
     return metadata;
   });
 
-  /** The JIDs that WhatsApp has an account for, of the phone numbers in digits. */
+  /** The user JIDs, without a device, that WhatsApp has an account for, of the phone numbers in digits. */
   readonly registered = Effect.fn("WhatsAppSession.registered")(function* (
     this: WhatsAppSession,
     numbers: readonly string[],
@@ -348,7 +349,7 @@ export class WhatsAppSession {
       try: () => socket.onWhatsApp(...numbers),
       catch: (cause) => new MessagingAdapterError({ cause }),
     });
-    return (found ?? []).filter((result) => result.exists).map((result) => result.jid);
+    return (found ?? []).filter((result) => result.exists).map((result) => jidNormalizedUser(result.jid));
   });
 
   readonly groups = Effect.fn("WhatsAppSession.groups")(function* (this: WhatsAppSession) {

@@ -180,20 +180,21 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     sender: WhatsAppSender,
   ) {
     const connectionId = yield* this.#connectionId(workspaceId);
+    const id = sender.kind === "contact" ? yield* this.#registeredNumber(connectionId, sender.id) : sender.id;
     if (this.#store.allowedSenders(connectionId).length >= MESSAGING_LIMITS.allowedSenders)
       return yield* failure("error.messaging.whatsappTooManySenders");
-    const id = sender.kind === "contact" ? yield* this.#registeredNumber(connectionId, sender.id) : sender.id;
     this.#store.addAllowedSender(connectionId, { ...sender, id });
   });
 
   /**
    * The form of a contact's number that WhatsApp has, so that posts reach the contact. The number as it
-   * was typed when the number is not connected, or when WhatsApp does not answer in time.
+   * was typed when it has only one form, when the number is not connected, or when WhatsApp does not
+   * answer in time.
    */
   #registeredNumber(connectionId: string, number: string): Effect.Effect<string> {
     const session = this.#handle(connectionId)?.session;
-    if (!session?.socket()) return Effect.succeed(number);
     const forms = whatsAppNumberForms(number);
+    if (!session || forms.length === 1) return Effect.succeed(number);
     return session.registered(forms).pipe(
       Effect.map((jids) => forms.find((form) => jids.includes(userJid(form))) ?? number),
       Effect.timeoutOrElse({ duration: REGISTERED_NUMBER_TIMEOUT_MS, orElse: () => Effect.succeed(number) }),
