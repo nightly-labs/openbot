@@ -43,7 +43,8 @@ const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
  */
 const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
-  if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_REJECT;
+  // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
+  if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
   let hidden = node.hidden || node.inert || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true';
   if (!hidden) {
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
