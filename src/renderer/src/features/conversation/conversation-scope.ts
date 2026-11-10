@@ -428,6 +428,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
   /** The page that fixes the account behind the shown error (#2419). */
   const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
+  /** The provider's text behind a general sentence, for the user to copy (#6410). */
+  const currentChatErrorDetails = () => currentChatErrorEntry()?.details ?? null;
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
@@ -2539,6 +2541,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatErrorReference,
     currentChatErrorRun,
     currentChatErrorLink,
+    currentChatErrorDetails,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,

@@ -177,7 +177,7 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
-import { claimErrorToast, readableAgentError } from "../agents/agent-error-text";
+import { agentErrorDetails, claimErrorToast, readableAgentError } from "../agents/agent-error-text";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
@@ -1519,7 +1519,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const serverId = server()?.id;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
-        controller.setConversationErrors((current) => ({ ...current, [key]: readableAgentError(event.message) }));
+        const message = readableAgentError(event.message);
+        controller.setConversationErrors((current) => ({ ...current, [key]: message }));
+        // The general sentence hides the cause, so the user can copy it into a report (#6410).
+        const details = agentErrorDetails(event.message);
+        controller.setConversationErrorRuns((current) => {
+          if (details) return { ...current, [key]: { message, run: null, details } };
+          if (!(key in current)) return current;
+          const { [key]: _replaced, ...next } = current;
+          return next;
+        });
         return;
       }
       const description = readableAgentError(event.message);
