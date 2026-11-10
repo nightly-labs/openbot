@@ -578,11 +578,10 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
 });
 
 /**
- * The SDK value of each model that Claude Code reported, by model id. Only the main client reads the
- * model list, so the clients for one generation and an agent's own process share its last reading:
- * with no entry, `normalizeClaudeModel` sent the default model instead of a gateway's model (#6330).
+ * The model ids of the last model list. Only the main client reads the list, so a client for one
+ * generation or an agent's own process sends a listed id as it is, not the default model (#6330).
  */
-const CLAUDE_MODEL_SDK_VALUES = new Map<string, string>();
+const CLAUDE_LISTED_MODELS = new Set<string>();
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
@@ -628,6 +627,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
+  readonly #modelSdkValues = new Map<string, string>();
   /**
    * The memories and section-mates of each thread. They go with the turns, not in the system
    * prompt, so a memory change keeps the cached prefix and restarts no query.
@@ -949,9 +949,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         };
       });
       this.#modelEffortCapabilities.clear();
-      CLAUDE_MODEL_SDK_VALUES.clear();
+      this.#modelSdkValues.clear();
       for (const [id, capability] of effortCapabilities) this.#modelEffortCapabilities.set(id, capability);
-      for (const [id, value] of sdkValues) CLAUDE_MODEL_SDK_VALUES.set(id, value);
+      for (const [id, value] of sdkValues) this.#modelSdkValues.set(id, value);
+      CLAUDE_LISTED_MODELS.clear();
+      for (const id of sdkValues.keys()) CLAUDE_LISTED_MODELS.add(id);
       return yield* providerSync(() => result);
     }).pipe(
       Effect.ensuring(
@@ -2565,7 +2567,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #sdkModel(model: string): string {
-    return CLAUDE_MODEL_SDK_VALUES.get(model) ?? normalizeClaudeModel(model);
+    return this.#modelSdkValues.get(model) ?? (CLAUDE_LISTED_MODELS.has(model) ? model : normalizeClaudeModel(model));
   }
 }
 
