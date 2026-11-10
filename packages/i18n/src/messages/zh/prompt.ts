@@ -44,8 +44,6 @@ export const messages = {
   "prompt.browser.title.cancelled": "已在 {host} 上取消该步骤",
   "prompt.browser.title.pending": "请在 {host} 上完成该步骤",
   "prompt.browser.cancelled": "已取消",
-  "prompt.browser.reload":
-    "完成登录后，先刷新浏览器页面，再选择“我已完成”。在页面刷新之前，页面检查会一直处于阻断状态。",
   "prompt.browser.continuing": "{name} 正在继续。",
   "prompt.browser.cancelledBody": "浏览器步骤已取消。",
   "prompt.browser.pendingBody": "请打开页面完成登录、验证或授权，然后让 {name} 继续。",

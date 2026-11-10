@@ -44,8 +44,6 @@ export const messages = {
   "prompt.browser.title.cancelled": "أُلغيت الخطوة على {host}",
   "prompt.browser.title.pending": "أكمل الخطوة على {host}",
   "prompt.browser.cancelled": "أُلغي",
-  "prompt.browser.reload":
-    "أكمل تسجيل الدخول، ثم أعد تحميل صفحة المتصفح قبل اختيار «انتهيت». يبقى فحص الصفحة محظورًا حتى تُعاد تحميلها.",
   "prompt.browser.continuing": "يتابع {name}.",
   "prompt.browser.cancelledBody": "أُلغيت خطوة المتصفح.",
   "prompt.browser.pendingBody": "افتح الصفحة لإكمال تسجيل الدخول أو التحقق أو الموافقة. ثم دع {name} يتابع.",

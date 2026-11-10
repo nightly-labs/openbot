@@ -44,8 +44,6 @@ export const messages = {
   "prompt.browser.title.cancelled": "השלב בוטל ב-{host}",
   "prompt.browser.title.pending": "יש להשלים את השלב ב-{host}",
   "prompt.browser.cancelled": "בוטל",
-  "prompt.browser.reload":
-    "יש להשלים את ההתחברות ואז לטעון מחדש את דף הדפדפן לפני שבוחרים ב-״סיימתי״. בדיקת הדף נשארת חסומה עד שהדף נטען מחדש.",
   "prompt.browser.continuing": "{name} ממשיך.",
   "prompt.browser.cancelledBody": "שלב הדפדפן בוטל.",
   "prompt.browser.pendingBody":
