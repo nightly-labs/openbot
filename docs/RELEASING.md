@@ -617,7 +617,8 @@ The workflow:
 8. generates SPDX SBOMs and GitHub build-provenance attestations for all three platforms;
 9. publishes one non-draft GitHub Release only after all platform jobs pass. It joins the ARM64 and
    x64 `latest-mac.yml` files with `scripts/merge-mac-update-manifests.ts`: electron-updater selects
-   the ZIP whose name contains `arm64` on Apple silicon and the other ZIP on Intel.
+   the ZIP whose name contains `arm64` on Apple silicon and the other ZIP on Intel. Then it writes the
+   first rollout percentage into the four update manifests (see [Staged rollout](#staged-rollout)).
 10. builds a Docker image (`docker/Dockerfile`) from each Linux AppImage on a runner of that
     architecture, after it checks the AppImage against its `SHA256SUMS` file. It starts each image
     with `docker/seccomp.json`, waits for `openbot status`, and stops it, which must exit with 0;
@@ -658,7 +659,8 @@ It logs in to Azure, then signs a throwaway executable once immediately and once
 the delay between login and signing in a release build. It uploads and publishes nothing. Run it once
 after a change to the Azure setup or to `electron-builder.windows-signing.yml`, before the next tag.
 
-Installed OpenBot builds check for updates shortly after launch and every four minutes. New versions
+Installed OpenBot builds check for updates shortly after launch and every four minutes. A new version
+goes to a part of the installs first (see [Staged rollout](#staged-rollout)). New versions
 download automatically while **Automatically download updates** is on, which is the default and is
 persisted per user in `openbot-update-preference-v1.json`; with the setting off, a download starts
 only on a user action. The update notice in the sidebar and Settings > Updates show the current
@@ -699,8 +701,111 @@ The release workflow stops if the macOS update ZIP, the Windows NSIS installer, 
 is larger than 700 MiB, or if the DMG is larger than 750 MiB. It also stops if update metadata has a wrong size or SHA-512, if
 a voice model is present, or if the application contains a second native Claude runtime.
 
-If a release is bad, publish a newer patch version. Do not replace an already published version with
-different binaries.
+If a release is bad, pause its rollout and publish a newer patch version (see
+[Staged rollout](#staged-rollout)). Do not replace an already published version with different
+binaries.
+
+## Staged rollout
+
+A new desktop release goes first to a part of the installed apps. electron-updater reads
+`stagingPercentage` in the update manifest (`latest.yml`, `latest-mac.yml`, `latest-linux.yml` and
+`latest-linux-arm64.yml`). Each install has a random ID in `.updaterId` in its user data folder.
+An install gets the release only when its ID is in the first `stagingPercentage` percent. The IDs
+do not change, so the same installs are first in each release, and an install that is in a 10% stage
+is also in the 50% stage. A manifest with no `stagingPercentage` goes to all installs.
+
+An install outside the stage gets the same result as an install with no new release: the sidebar
+shows nothing, and Settings > Updates shows that OpenBot is up to date, also after
+**Check for updates**. It shows no error. Each check of `UpdateService`, also the manual check,
+goes through the staging check of electron-updater. OpenBot does not replace that check.
+
+The publish job writes the percentage into the four manifests before it uploads them, with
+`scripts/update-rollout.ts`. The default is 10. To use a different first percentage, set the
+`RELEASE_STAGING_PERCENTAGE` repository variable to a whole number from 0 to 100 before you push the
+tag. 100 releases to all installs at once. The `Validate release tag` job stops the run when the
+value is not valid. The manifests are not in a `SHA256SUMS` file or in an attestation, so the
+percentage changes no checksum. The script stops when any value other than the percentage changes,
+such as the SHA-512 or the size of a file.
+
+### Release to all installs
+
+1. Push the tag. The release goes to 10% of the installs.
+2. Wait about one day. Then examine the release:
+   - Run the [release regression report](../.agents/skills/openpanel/SKILL.md#release-regression-report):
+     `gh workflow run release-regression.yml`. It posts to the private Discord channel. It compares
+     the two newest releases that each have 30 computers in the last 14 days. For some hours, a
+     10% stage can have fewer. When the report says that there is nothing to compare, or it does not
+     name the new release, wait and run it again.
+   - With the `openpanel` skill, compare `system_unclean_exit` (by `previous_app_version`) and
+     `system_startup` of the new and the previous version. The report does not show unclean exits.
+   - Read the new crash reports and feedback for the new version.
+3. When the numbers are good, release to all installs:
+
+   ```sh
+   gh workflow run release-rollout.yml --ref main -f tag=vX.Y.Z -f percentage=100
+   ```
+
+   You can go to 50 first. Add `-f dry-run=true` to see the change in the run summary and upload
+   nothing.
+
+`release-rollout.yml` downloads the four manifests, changes only `stagingPercentage`, and checks
+that each other value is the same. It uploads only these four `.yml` files, downloads them again and
+compares them. It never uploads, replaces or deletes a binary. It refuses a draft, and only a run
+from `main` uploads. At 100 it removes the field, so the manifests are the same as before the stage.
+Installs read the new percentage at their next check, which is at most four minutes later.
+
+### Pause a release
+
+```sh
+gh workflow run release-rollout.yml --ref main -f tag=vX.Y.Z -f percentage=0
+```
+
+Installs that do not have the release yet stop getting it at their next check. A pause does not
+stop these:
+
+- An install that already downloaded the release keeps it ready. It installs the release at its
+  next restart: by the user, by an idle restart that the user asked for, or by an update that the
+  admin of a joined server asked for.
+- New downloads from the website, Nix, the Docker image, and hosted and self-installed servers.
+  These do not read `stagingPercentage` (see [Servers and Docker](#servers-and-docker)).
+- The Discord announcement. It says that the release is out when the release is published.
+
+### Ship a patch over a paused release
+
+Merge the fix to `main` and publish vX.Y.(Z+1) as usual. The patch becomes the latest release and
+starts at `RELEASE_STAGING_PERCENTAGE`. The same installs are first, so the installs that got the
+paused release get the patch first, while its percentage is not less than the highest percentage
+of the paused release. electron-updater reads only the latest release, so the paused release goes
+to no other install. Do not raise the paused release again.
+
+To stop a bad release on each path at once, before the patch is ready, make the previous release
+the latest one:
+
+```sh
+gh release edit vX.Y.(Z-1) --latest --repo nightly-labs/openbot
+```
+
+electron-updater then sees an older version and offers no update. The update script of hosted and
+self-installed servers removes a staged copy of the bad release at its next check, but a server that
+boots before that check installs it. The Docker `latest` tag and the template of new hosted servers
+do not change back.
+
+### Servers and Docker
+
+Servers do not use the stage. Hosted and self-installed Linux servers update with
+`scripts/hosting/openbot-hosted-update` and `HostedUpdateAdapter`. They read `latest-linux.yml` or
+`latest-linux-arm64.yml`, check for an update 5 minutes after start and then every 6 hours, and
+install a downloaded release at the next boot or when an owner, an admin or a permitted member installs
+it in Server Settings > Updates. The `docker-publish` job moves the Docker `latest` tag when the
+release is published, and the `hosted-release` job selects the release for new hosted servers. So
+all servers get a new release in about 6 hours, and a pause does not stop them.
+
+### Notes
+
+- A re-run of the publish job writes `RELEASE_STAGING_PERCENTAGE` again. After a re-run, set the
+  percentage again with `release-rollout.yml`.
+- `gh release upload --clobber` deletes each manifest and then uploads it again. A check in that
+  short time gets no manifest. Settings > Updates can then show a check error until the next check.
 
 Before working this checklist, audit the changes since the last released tag with the
 `.agents/skills/release-upgrade-safety/` skill: it covers the upgrade and data-loss hazards an
