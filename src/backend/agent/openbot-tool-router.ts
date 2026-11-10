@@ -574,11 +574,22 @@ export class OpenBotToolRouter {
                       ...(typeof limit === "number" ? { limit } : {}),
                     })
                   : this.#history.call(scope.agentId, targetThreadId ?? scope.threadId, params.tool, params.arguments);
+            // The agent often calls a history tool without its schema, so it gets the argument error to
+            // correct the call; "unavailable" made it repeat the same call (#6027).
+            const historyFailure = (error: unknown) =>
+              Effect.sync(() => {
+                if (error instanceof z.ZodError) {
+                  const detail = error.issues
+                    .map((issue) => `${issue.path.join(".") || "arguments"}: ${issue.message}`)
+                    .join(" ");
+                  return openBotToolFailure(sourceText("error.agent.historyArgumentsInvalid", { detail }));
+                }
+                logger.warn("An OpenBot history tool failed.", { tool: params.tool, error: toLogValue(error) });
+                return openBotToolFailure(sourceText("error.agent.historyUnavailable"));
+              });
             const result = yield* history.pipe(
-              Effect.catch(() => Effect.succeed(openBotToolFailure(sourceText("error.agent.historyUnavailable")))),
-              Effect.catchDefect(() =>
-                Effect.succeed(openBotToolFailure(sourceText("error.agent.historyUnavailable"))),
-              ),
+              Effect.catch((failure) => historyFailure(failure.cause)),
+              Effect.catchDefect(historyFailure),
             );
             const currentScope = this.#conversation.historyScope(params.threadId, client);
             if (!request.signal?.aborted && client.running)
