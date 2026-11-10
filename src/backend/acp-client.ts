@@ -212,6 +212,11 @@ interface AcpTurn {
   interruptedAnswer: string | null;
   /** A failure that the server sent as answer text and then ended the turn as a success. */
   providerError: string | null;
+  /**
+   * The message for a tool that one of the agent's hooks refused because the hook did not run
+   * (`AcpFlavor.toolHookFailure`). It fails a turn that ends with no other failure.
+   */
+  hookFailure: string | null;
   /** The agent's process lost its sign-in (`AcpFlavor.signInLostChunk`), and ends after this turn. */
   signInLost: boolean;
   /**
@@ -2228,6 +2233,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       reasoned: false,
       interruptedAnswer: null,
       providerError: null,
+      hookFailure: null,
       signInLost: false,
       failureCause: null,
       accountLink: null,
@@ -2328,6 +2334,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.providerError = sdkHarness.turnFailure(detail);
           }
         }
+      }
+      // A hook that did not run explains the turn only when no other failure does.
+      if (turn.hookFailure && !turn.providerError && !turn.stopped && response.stopReason === "end_turn") {
+        turn.failureCause = "permission";
+        turn.providerError = turn.hookFailure;
       }
       const status =
         turn.stopped || response.stopReason === "cancelled"
@@ -2698,14 +2709,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         ...(update.status === "failed" && update.content ? { error: update.content } : {}),
       };
       turn.toolItems.set(update.toolCallId, item);
-      // Antigravity puts the error of a failed tool in `rawOutput`, and other agents in the content.
-      const hookFailure =
-        update.status === "failed" && turn.providerError === null
-          ? (this.#flavor.toolHookFailure?.(JSON.stringify([update.rawOutput, update.content])) ?? null)
-          : null;
-      if (hookFailure) {
-        turn.failureCause = "permission";
-        turn.providerError = hookFailure;
+      // Antigravity 1.4.5 also sends the error of a failed tool as a `rawOutput` string.
+      if (update.status === "failed" && turn.hookFailure === null && this.#flavor.toolHookFailure) {
+        const output =
+          typeof update.rawOutput === "string" ? update.rawOutput : JSON.stringify(update.rawOutput ?? null);
+        turn.hookFailure = this.#flavor.toolHookFailure(`${output}\n${JSON.stringify(update.content ?? null)}`);
       }
       this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);
       this.emit("notification", {
