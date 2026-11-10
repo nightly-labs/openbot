@@ -905,8 +905,15 @@ try {
     report.installedVersion === newVersion,
     `The new build reports version ${report.installedVersion}, not ${newVersion}.`,
   );
-  check(report.oldQuit.clean, "The previous release did not quit on the quit request.");
-  check(report.newQuit.clean, "The new build did not quit on the quit request.");
+  // A crash (no exit code) or a failed shutdown (a non-zero code) during the quit is a failure too.
+  check(
+    report.oldQuit.clean && report.oldQuit.exitCode === 0,
+    `The previous release did not quit cleanly on the quit request (exit code ${report.oldQuit.exitCode}).`,
+  );
+  check(
+    report.newQuit.clean && report.newQuit.exitCode === 0,
+    `The new build did not quit cleanly on the quit request (exit code ${report.newQuit.exitCode}).`,
+  );
   check(
     JSON.stringify(afterUpgrade) === JSON.stringify(report.seeded),
     `The new build lost seeded data: before ${JSON.stringify(report.seeded)}, after ${JSON.stringify(afterUpgrade)}.`,
