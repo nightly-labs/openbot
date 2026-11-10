@@ -210,6 +210,10 @@ Only a snapshot that reached the agent counts as shown. The host reads them from
 (`AgentMemoryStore.forHost`); nothing leaves the computer except the snapshot that goes to the
 provider, as for every other snapshot field. The Team API leaves out `site`, so the released memory
 shape stays the same. An instance transfer does not carry the site.
+The background memory review can add or update a memory with a `site` too. Its prompt asks it to keep
+how one site works, as the agent found it in the chat (where a control is, a step that worked after
+one failed), as a site memory, and a class of task as a skill. The review drops a site that is not a
+host and keeps the fact. The browser guidance asks the agent to save such a step itself.
 
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers

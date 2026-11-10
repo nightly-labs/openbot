@@ -48,6 +48,8 @@
 //  25. "ask": Save writes the skill with the background writer, not in an agent turn. Two presses
 //      save once, a later press sees the saved skill, and the next message brings no question. Save
 //      also revises a local skill. When the writer fails, Save reports false and the yes still works.
+//  26. A review adds a memory with a site, as a host. A site that is not a host is dropped, and the
+//      fact is kept. The review prompt shows the site of a memory.
 // No provider, account or network is used. `bun run test:memory-review`.
 // Writes .openbot-build/memory-review-e2e/report.json.
 import assert from "node:assert/strict";
@@ -1235,6 +1237,39 @@ try {
       "The review reads the turn with the memory save.",
     );
     return { reviews: reviews().length };
+  });
+
+  await check("a review adds a site memory, keeps a fact whose site is bad, and shows each site", async () => {
+    const browsing = await createAgent("Browsing");
+    const count = reviews().length;
+    control({
+      operations: [
+        {
+          type: "add",
+          text: "Example login: the Continue button is below the cookie banner.",
+          inclusion: "searchable",
+          site: "https://www.Example.com/login",
+        },
+        { type: "add", text: "The status page lists outages first.", inclusion: "searchable", site: "not a host" },
+      ],
+    });
+    await send(
+      browsing.id,
+      `Log in to example.com. ${calls({ tool: "remember", arguments: { text: "Docs search is in the top bar.", site: "docs.example.org" } })}`,
+    );
+    await chat(browsing.id, 3, "Browsing");
+    await reviewed(count + 1);
+    const memories = await waitFor("the memories of the review", () => {
+      const list = service.listMemories(browsing.id);
+      return list.length === 3 ? list : null;
+    });
+    const site = (text: string) => memories.find((memory) => memory.text === text)?.site;
+    assert.equal(site("Example login: the Continue button is below the cookie banner."), "example.com");
+    assert.equal(site("The status page lists outages first."), undefined, "A bad site is dropped, not the fact.");
+    assert.equal(site("Docs search is in the top bar."), "docs.example.org", "The agent's own save keeps its site.");
+    assert.ok((reviews().at(-1) ?? "").includes('"site":"docs.example.org"'), "The review shows the site.");
+    control({ operations: [] });
+    return { memories: memories.length };
   });
 
   report.passed = true;

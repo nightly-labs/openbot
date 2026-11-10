@@ -247,8 +247,8 @@ export class AgentMemories {
             operation.type === "forget"
               ? { memoryId: operation.memoryId }
               : operation.type === "update"
-                ? { memoryId: operation.memoryId, text: operation.text }
-                : { text: operation.text, inclusion: operation.inclusion },
+                ? { memoryId: operation.memoryId, text: operation.text, ...reviewSite(operation.site) }
+                : { text: operation.text, inclusion: operation.inclusion, ...reviewSite(operation.site) },
         },
         agentId,
       );
@@ -821,4 +821,10 @@ function addChanges(
 ): void {
   if (added.length === 0) return;
   changes.set(agentId, [...(changes.get(agentId) ?? []), ...added]);
+}
+
+/** The site of a review change, when it is a host: a review keeps a fact whose site it wrote badly. */
+function reviewSite(site: string | undefined): { site?: string } {
+  const normalized = site ? normalizeMemorySite(site) : null;
+  return normalized ? { site: normalized } : {};
 }
