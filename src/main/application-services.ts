@@ -1232,7 +1232,7 @@ export async function createApplicationServices({
   const store = new AgentStore(
     app.getPath("userData"),
     homedir(),
-    new OpenBotDatabase(app.getPath("userData")),
+    new OpenBotDatabase(app.getPath("userData"), { appVersion: app.getVersion() }),
     () => agentDefaults.get(),
     localServerChild?.agentRoot,
   );

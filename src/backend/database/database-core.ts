@@ -3,10 +3,14 @@ import { appendFileSync, existsSync } from "node:fs";
 import { chmod, copyFile, mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { Effect, Result } from "effect";
-import { migrateOpenBotDatabase } from "../openbot-database-schema";
+import { createOpenBotLogger } from "@openbot/logging";
+import { Cause, Effect, Result } from "effect";
+import { migrateOpenBotDatabase, pendingMigrationSourceVersion } from "../openbot-database-schema";
 import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
+import { copyDatabaseBeforeMigration, DatabaseCopyFailure, type DatabaseCopyOptions } from "./pre-migration-copy";
+
+const logger = createOpenBotLogger("openbot-database-copy");
 
 export interface OrchestrationEventInput {
   aggregateType: string;
@@ -35,6 +39,8 @@ export const LOWERCASE_FUNCTION = "openbot_lowercase";
 
 export interface DatabaseCoreOptions {
   userDataPath: string;
+  /** The copy of `openbot.db` that a start makes before a migration. */
+  copy?: DatabaseCopyOptions;
 }
 
 /**
@@ -51,11 +57,13 @@ export interface DatabaseCoreOptions {
 export class DatabaseCore {
   readonly path: string;
   readonly #legacyBackupRoot: string;
+  readonly #copy: DatabaseCopyOptions;
   #db: DatabaseSync | null = null;
 
   constructor(options: DatabaseCoreOptions) {
     this.path = join(options.userDataPath, "openbot.db");
     this.#legacyBackupRoot = join(options.userDataPath, "legacy-backup-v1");
+    this.#copy = options.copy ?? {};
   }
 
   initialize = Effect.fn("DatabaseCore.initialize")(function* (this: DatabaseCore) {
@@ -66,7 +74,7 @@ export class DatabaseCore {
     const db = yield* storedSync(() => new DatabaseSync(this.path));
     const configured = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
-        yield* storedSync(() => {
+        const sourceVersion = yield* storedSync(() => {
           db.exec("PRAGMA journal_mode = WAL");
           db.exec("PRAGMA foreign_keys = ON");
           db.exec("PRAGMA busy_timeout = 5000");
@@ -78,8 +86,10 @@ export class DatabaseCore {
             typeof value === "string" ? value.toLocaleLowerCase() : value,
           );
           this.#db = db;
-          this.#migrate(closedCleanly);
+          return pendingMigrationSourceVersion(db);
         });
+        if (sourceVersion !== null) yield* this.#copyBeforeMigration(db, sourceVersion);
+        yield* storedSync(() => this.#migrate(closedCleanly));
         yield* storedIO(() => chmod(this.path, 0o600));
       }),
     );
@@ -207,6 +217,55 @@ export class DatabaseCore {
       this.connection
         .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = ? AND aggregate_id = ? LIMIT 1")
         .get(aggregateType, aggregateId),
+    );
+  }
+
+  /**
+   * Copies the database before its first pending migration, so a user can go back to the release
+   * before it. A failed or skipped copy only logs a warning, and the migration runs as it did before
+   * copies existed: a copy is a second chance, and a start that a copy stops would lock the user out
+   * of data that is intact. The log has no path, only the copy's file name, sizes and an error code.
+   */
+  #copyBeforeMigration(db: DatabaseSync, sourceVersion: number): Effect.Effect<void> {
+    return copyDatabaseBeforeMigration({ ...this.#copy, db, databasePath: this.path, sourceVersion }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          if (result.status === "copied") {
+            logger.info(`Copied the OpenBot database before its migration from schema version ${sourceVersion}.`, {
+              fileName: result.fileName,
+              removedCopies: result.removedCopies,
+            });
+          } else if (result.status === "kept") {
+            // A migration of this version committed in part before an earlier start failed.
+            logger.info(
+              `Kept the copy from before the first migration attempt of this version. The migration continues from schema version ${sourceVersion}.`,
+              { fileName: result.fileName },
+            );
+          } else {
+            logger.warn(
+              `The disk has not enough free space for a copy of the OpenBot database. The migration from schema version ${sourceVersion} continues without a copy.`,
+              { requiredBytes: result.requiredBytes, freeBytes: result.freeBytes },
+            );
+          }
+        }),
+      ),
+      Effect.asVoid,
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          const found = Cause.findError(cause);
+          const failure = Result.isSuccess(found) ? found.success : null;
+          const detail = {
+            stage: failure instanceof DatabaseCopyFailure ? failure.stage : "unknown",
+            code: errorCode(failure ? failure.cause : Cause.squash(cause)) ?? "unknown",
+          };
+          logger.warn(
+            failure?.stage === "rotate"
+              ? "Copied the OpenBot database, but could not remove the older copies."
+              : `The copy of the OpenBot database failed. The migration from schema version ${sourceVersion} continues without a copy.`,
+            detail,
+          );
+        }),
+      ),
     );
   }
 

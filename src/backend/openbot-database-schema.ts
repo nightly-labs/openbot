@@ -1072,6 +1072,25 @@ export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrati
   if (pending.length > 0 || !options.closedCleanly) assertQuickCheck(db);
 }
 
+/**
+ * The schema version that the next `migrateOpenBotDatabase` call migrates from, or `null` when that
+ * call runs no migration: a new database gets the latest schema, and a current one has none pending.
+ * It throws the same errors as `migrateOpenBotDatabase` for a newer or a broken migration history.
+ */
+export function pendingMigrationSourceVersion(db: DatabaseSync): number | null {
+  validateMigrationRegistry();
+  if (!hasExistingSchema(db)) return null;
+  const appliedVersions = readAppliedVersions(db);
+  validateAppliedVersions(appliedVersions);
+  const currentVersion = latestAppliedVersion(appliedVersions);
+  return currentVersion < LATEST_SCHEMA_VERSION ? currentVersion : null;
+}
+
+/** The latest applied schema version, as the migration runner reads it. */
+export function readSchemaVersion(db: DatabaseSync): number {
+  return latestAppliedVersion(readAppliedVersions(db));
+}
+
 function migrateToBaselineV8(db: DatabaseSync, appliedAt: string): void {
   db.exec(BASELINE_V8_SCHEMA_SQL);
   db.prepare(

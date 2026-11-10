@@ -29,6 +29,7 @@ import {
   type MailboxProjectionChanges,
   type MailboxProjectionState,
 } from "./database/mailbox-projection";
+import type { DatabaseCopyOptions } from "./database/pre-migration-copy";
 import {
   type ProviderHistoryImportState,
   type ProviderHistorySessionInput,
@@ -83,8 +84,12 @@ export class OpenBotDatabase {
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
 
-  constructor(readonly userDataPath: string) {
-    this.#core = new DatabaseCore({ userDataPath });
+  /** `copy` names and checks the copy that a start makes before a migration. Tests replace its disk check. */
+  constructor(
+    readonly userDataPath: string,
+    copy: DatabaseCopyOptions = {},
+  ) {
+    this.#core = new DatabaseCore({ userDataPath, copy });
     this.usage = new AgentUsage(this.#core);
     this.#conversations = new ConversationQueries({ core: this.#core });
     this.#roster = new AgentRoster({ core: this.#core });
