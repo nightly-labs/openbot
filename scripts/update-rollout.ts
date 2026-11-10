@@ -101,7 +101,7 @@ export function setStagingPercentage(source: string, percentage: number): string
 /**
  * Stops unless `updated` is `original` with only the rollout percentage changed. The text other than
  * the `stagingPercentage` line must be the same, and so must the values that YAML 1.1 and YAML 1.2
- * read from it.
+ * read from it, which include each SHA-512 and size.
  */
 export function assertOnlyStagingChanged(original: string, updated: string, percentage: number): void {
   if (!isDeepStrictEqual(otherLines(original), otherLines(updated))) {
@@ -114,7 +114,6 @@ export function assertOnlyStagingChanged(original: string, updated: string, perc
       throw new Error(`The update manifest does not have the rollout percentage ${percentage}.`);
     }
     const { stagingPercentage: _after, ...rest } = after;
-    assertSameDownloads(before, rest);
     if (!isDeepStrictEqual(before, rest)) {
       throw new Error("The update manifest has changes other than stagingPercentage.");
     }
@@ -126,21 +125,6 @@ function otherLines(text: string): string[] {
     .replace(/\n$/u, "")
     .split("\n")
     .filter((line) => !STAGING_LINE.test(line));
-}
-
-/** The values that electron-updater checks each download against, by name, for a clear error. */
-function assertSameDownloads(before: UpdateManifest, after: UpdateManifest): void {
-  for (const key of ["version", "path", "sha512"] as const) {
-    if (before[key] !== after[key]) throw new Error(`The update manifest has a different ${key}.`);
-  }
-  if (before.files.length !== after.files.length) throw new Error("The update manifest has a different file list.");
-  before.files.forEach((file, index) => {
-    for (const key of ["url", "sha512", "size", "blockMapSize"] as const) {
-      if (file[key] !== after.files[index]?.[key]) {
-        throw new Error(`The update manifest has a different ${key} for ${file.url}.`);
-      }
-    }
-  });
 }
 
 /** Checks that `paths` are the four manifests of one release, each once. */
