@@ -568,8 +568,8 @@ export class AgentImportService {
         .library()
         .list()
         .pipe(Effect.mapError((error) => archiveFailure(error.cause)));
-      const taken = new Set([...planned.keys(), ...library.map((candidate) => candidate.slug)]);
-      const renamed = yield* archiveSync(() => renameSkill(skill.files, taken));
+      const names = new Map(library.map((candidate) => [candidate.slug, candidate.name]));
+      const renamed = yield* archiveSync(() => renameSkill(skill.files, planned, names));
       warnings.push(
         sourceText("error.import.skillRenamed", { name: source.name, skill: renamed.from, renamed: renamed.name }),
       );
@@ -726,8 +726,16 @@ function skillDigest(files: ReadonlyArray<readonly [string, Uint8Array]>): strin
   return hash.digest("hex");
 }
 
-/** The skill with ` 2`, ` 3`, ... after its frontmatter name, at the first number whose slug is free. */
-function renameSkill(files: ReadonlyArray<readonly [string, Uint8Array]>, taken: ReadonlySet<string>) {
+/**
+ * The skill with ` 2`, ` 3`, ... after its frontmatter name, at the first number whose slug this run
+ * does not use. A library skill can have that slug only with the same name: an earlier import of
+ * the same export saved it, so this import revises it as it revises a skill that keeps its name.
+ */
+function renameSkill(
+  files: ReadonlyArray<readonly [string, Uint8Array]>,
+  planned: ReadonlyMap<string, string>,
+  library: ReadonlyMap<string, string>,
+) {
   const index = files.findIndex(([name]) => name === "SKILL.md");
   const text = new TextDecoder("utf-8", { fatal: true }).decode(files[index]?.[1]);
   const match = text.match(SKILL_FRONTMATTER);
@@ -735,14 +743,14 @@ function renameSkill(files: ReadonlyArray<readonly [string, Uint8Array]>, taken:
   const from = String(frontmatter.get("name")).trim();
   // A slug keeps 64 characters, so a long name is cut to keep the number in its slug.
   const base = from.slice(0, 56).trimEnd();
-  for (let number = 2; number <= taken.size + 2; number++) {
+  for (let number = 2; number <= planned.size + library.size + 2; number++) {
     const name = `${base} ${number}`;
     frontmatter.set("name", name);
     const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
     const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
     // The slug comes from SKILL.md alone, so the other files are not zipped for each number.
     const { slug } = inspectArchive(zipSync({ "SKILL.md": skillFile }));
-    if (!taken.has(slug))
+    if (!planned.has(slug) && (library.get(slug) ?? name) === name)
       return {
         files: files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file)),
         slug,
