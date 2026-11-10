@@ -420,6 +420,24 @@ function mockWorkspaceDirectory(path: string): WorkspaceDirectory {
 }
 
 /** What each story server answers with when it is tested, so a story reads the same way twice. */
+/** Fonts that most Macs have, so the preview draws each choice in its real font. */
+const STORY_INSTALLED_FONTS = [
+  "Al Bayan",
+  "Arial",
+  "Avenir Next",
+  "Baghdad",
+  "Courier New",
+  "Geeza Pro",
+  "Georgia",
+  "Helvetica Neue",
+  "Menlo",
+  "Monaco",
+  "Noto Nastaliq Urdu",
+  "Tahoma",
+  "Times New Roman",
+  "Verdana",
+];
+
 const PREVIEW_BROWSERS: ExternalLinkBrowsers = {
   defaultBrowser: { name: "Safari", path: "/Applications/Safari.app" },
   browsers: [
@@ -509,6 +527,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     palettes: [],
     chatBackgroundLight: null,
     chatBackgroundDark: null,
+    interfaceFont: null,
+    codeFont: null,
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -1312,6 +1332,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       for (const listener of appearanceListeners) listener(clone(appearancePreference));
       return clone(appearancePreference);
     },
+    listInstalledFonts: async () => [...STORY_INSTALLED_FONTS],
     onAppAppearancePreference: (listener) => {
       appearanceListeners.add(listener);
       return () => appearanceListeners.delete(listener);

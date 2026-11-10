@@ -16,6 +16,12 @@ export const messages = {
     "Zeigt den unscharfen Schreibtisch hinter dem Fenster. Websites und Menüs nutzen dann das App-Design.",
   "settings.interfaceSize.title": "Größe der Oberfläche",
   "settings.interfaceSize.description": "Die Größe von Text und Bedienelementen in OpenBot.",
+  "settings.interfaceFont.title": "Schrift der Oberfläche",
+  "settings.interfaceFont.description": "Die Schrift von Menüs, Chats und Einstellungen.",
+  "settings.interfaceFont.default": "Standard (Inter)",
+  "settings.codeFont.title": "Code-Schrift",
+  "settings.codeFont.description": "Die Schrift von Code, Terminals und Dateipfaden.",
+  "settings.codeFont.default": "Standard",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
