@@ -105,18 +105,22 @@ function matchChromePageValues(): void {
   };
 
   // Chromium reaches a security key with no dialog, so a request that can use one keeps the native
-  // path. A credential with no transports can be an older security key.
+  // path: a site that asks for a security key, or a credential that a security key can hold. A
+  // credential with no transports can be an older security key.
   const securityKeyTransports = new Set(["usb", "nfc", "ble", "smart-card"]);
   const opensPasskeyDialog = (options: CredentialRequestOptions | undefined): boolean => {
     try {
       const publicKey = options?.publicKey;
       // Autofill (conditional) requests open no dialog, and an aborted request gets its native error.
       if (!publicKey || options.mediation === "conditional" || options.signal?.aborted) return false;
-      return !Array.from(publicKey.allowCredentials ?? []).some(
-        (credential) =>
-          credential.transports === undefined ||
-          Array.from(credential.transports).some((transport) => securityKeyTransports.has(transport)),
-      );
+      // TypeScript's DOM types do not have the WebAuthn Level 3 `hints` yet.
+      if ("hints" in publicKey && Array.isArray(publicKey.hints) && publicKey.hints.includes("security-key")) {
+        return false;
+      }
+      return !Array.from(publicKey.allowCredentials ?? []).some((credential) => {
+        const transports = Array.from(credential.transports ?? []);
+        return transports.length === 0 || transports.some((transport) => securityKeyTransports.has(transport));
+      });
     } catch {
       // Options that cannot be read get the native error.
       return false;
