@@ -1,6 +1,10 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
-import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
+import {
+  SIDEBAR_CHAT_ORDERS,
+  type SidebarChatOrder,
+  type SidebarView,
+} from "@openbot/ui/features/sidebar/sidebar-types";
 import { PAGE_RAIL_PINNABLE_PAGES, type PageRailPinnablePage } from "@openbot/ui/features/window/PageRail";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { z } from "zod";
@@ -17,6 +21,7 @@ import {
   RAIL_PINS_STORAGE_KEY,
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
+  SIDEBAR_CHAT_ORDER_STORAGE_KEY,
   SIDEBAR_VIEW_STORAGE_KEY,
 } from "./layout-constants";
 import { usePlatform } from "./platform";
@@ -70,6 +75,19 @@ function readRailPinChoices(): RailPinChoices {
 }
 
 /**
+ * The saved chat order of the sidebar. Without a choice, unread chats show in a group of their own.
+ * Blocked storage or an unknown value reads as no choice.
+ */
+function readSidebarChatOrder(): SidebarChatOrder {
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_CHAT_ORDER_STORAGE_KEY);
+    return SIDEBAR_CHAT_ORDERS.find((order) => order === saved) ?? "unread-group";
+  } catch {
+    return "unread-group";
+  }
+}
+
+/**
  * The width of the workspace sidebar, and the two independent reasons it can be
  * narrow: the user collapsed it, or the window is too small to keep it open.
  *
@@ -109,6 +127,7 @@ const Layout = createSimpleContext({
     const [sidebarView, setSidebarViewSignal] = createSignal<SidebarView>(
       window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY) === "routines" ? "routines" : "agents",
     );
+    const [sidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder>(readSidebarChatOrder());
     const [railPinChoices, setRailPinChoices] = createSignal<RailPinChoices>(readRailPinChoices());
     const railPinned = createMemo(() => {
       const choices = railPinChoices();
@@ -142,9 +161,11 @@ const Layout = createSimpleContext({
       return () => window.removeEventListener("resize", updateResponsiveSidebar);
     });
 
-    // Another window or browser tab can change the pins.
+    // Another window or browser tab can change the pins or the chat order.
     function readRailPinsFromStorage(event: StorageEvent): void {
       if (event.key === null || event.key === RAIL_PINS_STORAGE_KEY) setRailPinChoices(readRailPinChoices());
+      if (event.key === null || event.key === SIDEBAR_CHAT_ORDER_STORAGE_KEY)
+        setSidebarChatOrderSignal(readSidebarChatOrder());
     }
 
     onSettled(() => {
@@ -165,6 +186,15 @@ const Layout = createSimpleContext({
     function setSidebarView(view: SidebarView): void {
       setSidebarViewSignal(view);
       window.localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, view);
+    }
+
+    function setSidebarChatOrder(order: SidebarChatOrder): void {
+      setSidebarChatOrderSignal(order);
+      try {
+        window.localStorage.setItem(SIDEBAR_CHAT_ORDER_STORAGE_KEY, order);
+      } catch {
+        // Blocked or full storage keeps the choice for this window only.
+      }
     }
 
     function setRailPinned(page: PageRailPinnablePage, pinned: boolean): void {
@@ -194,6 +224,8 @@ const Layout = createSimpleContext({
       serverRailVisible,
       sidebarView,
       setSidebarView,
+      sidebarChatOrder,
+      setSidebarChatOrder,
       railPinned,
       setRailPinned,
     };
