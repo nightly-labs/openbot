@@ -362,6 +362,12 @@
  */
 .browser-dock:is([data-tucked], [data-phase="showing"]) {
   width: var(--browser-dock-open-width, min(560px, calc(100% - 2 * var(--openbot-space-4))));
+  /* The page under the hidden box gets the clicks where no overlay shrinks, as over a remote live view. */
+  pointer-events: none;
+}
+
+.browser-dock[data-tucked] > .browser-dock-tab {
+  pointer-events: auto;
 }
 
 .browser-dock-editor {
