@@ -296,6 +296,12 @@ export class McpOAuth implements McpOAuthAuthority {
    * first rather than leaving two browser tabs that race to answer.
    */
   readonly #attempts = new Map<string, () => void>();
+  /**
+   * For each server, the redirect address its last sign-in opened the browser with and got no grant
+   * back on. The next sign-in registers the other name of the same listener: a firewall can refuse
+   * a request that names `127.0.0.1` on the authorization page, where OpenBot cannot see it (#6149).
+   */
+  readonly #unanswered = new Map<string, string>();
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<void>>();
@@ -445,6 +451,8 @@ export class McpOAuth implements McpOAuthAuthority {
     const key = mcpOAuthAccountKey(url);
     if (!key) return null;
     this.#attempts.get(key)?.();
+    const unanswered = this.#unanswered.get(key);
+    this.#unanswered.delete(key);
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
     this.#waiting.set(state, (code) => {
@@ -456,8 +464,12 @@ export class McpOAuth implements McpOAuthAuthority {
     let abandoned = false;
     let cancelled = false;
     const resource = mcpOAuthServerUrl(key);
-    const provider = this.#provider(key, state, () => abandoned, open);
+    const provider = this.#provider(key, state, () => abandoned, open, unanswered);
     const abandon = () => {
+      // `receiveAuthorizationCode` removes the state when the grant arrives. An attempt that ended
+      // before it opened a page keeps the record it was given, for the next attempt.
+      const unansweredNow = provider.openedRedirectUrl ?? unanswered;
+      if (!abandoned && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
@@ -751,6 +763,7 @@ export class McpOAuth implements McpOAuthAuthority {
   #invalidate(key: string): void {
     this.#generations.set(key, (this.#generations.get(key) ?? 0) + 1);
     this.#attempts.get(key)?.();
+    this.#unanswered.delete(key);
   }
 
   /** A `state` makes the provider interactive; `null` keeps it silent. */
@@ -759,6 +772,7 @@ export class McpOAuth implements McpOAuthAuthority {
     state: string | null,
     isAbandoned: () => boolean = () => false,
     open?: McpSignInOpener,
+    unansweredRedirectUrl?: string,
   ): McpOAuthClientProvider {
     const generation = this.#generations.get(key) ?? 0;
     const storage = this.#options.storage;
@@ -797,6 +811,7 @@ export class McpOAuth implements McpOAuthAuthority {
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),
       hasUnboundCredentials: hasUnboundCredentials(stored),
+      unansweredRedirectUrl,
     });
   }
 }
@@ -816,6 +831,8 @@ interface ClientProviderOptions {
   legacyIssuer: string | undefined;
   /** Whether this provider started with credentials that have no issuer binding. */
   hasUnboundCredentials: boolean;
+  /** The address the last sign-in of this server opened the browser with and got no grant back on. */
+  unansweredRedirectUrl?: string | undefined;
 }
 
 /**
@@ -862,10 +879,26 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   constructor(options: ClientProviderOptions) {
     this.#options = options;
     this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
+    this.#retryRedirectUrl = this.#otherRedirectName(options.unansweredRedirectUrl);
   }
 
   /** The `localhost` form of this run's loopback address, for a server that refuses `127.0.0.1`. */
   readonly #localhostRedirectUrl: string | null;
+  /**
+   * The other name of this run's listener, when the last sign-in of this server opened the browser
+   * on one name and no grant came back. This attempt registers that name instead (#6149).
+   */
+  readonly #retryRedirectUrl: string | null;
+  /** The `redirect_uri` of the authorization page this attempt opened, or `null` before it opens one. */
+  #openedRedirectUrl: string | null = null;
+
+  /** The `localhost` form of this run's address for its `127.0.0.1` form, and the reverse. */
+  #otherRedirectName(redirectUrl: string | null | undefined): string | null {
+    const localhost = this.#localhostRedirectUrl;
+    if (!localhost) return null;
+    if (redirectUrl === this.#options.redirectUrl) return localhost;
+    return redirectUrl === localhost ? this.#options.redirectUrl : null;
+  }
 
   /**
    * This run's address, or its `localhost` form when the registration on file names that form. A
@@ -906,7 +939,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       client_name: "OpenBot",
       client_uri: "https://openbot.run",
       logo_uri: "https://openbot.run/icon-512x512.png",
-      redirect_uris: [this.#options.redirectUrl],
+      redirect_uris: [this.#retryRedirectUrl ?? this.#options.redirectUrl],
       application_type: "native",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -971,6 +1004,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       return this.#register();
     }
     if (!this.#options.state || this.#exchangingCode) return client;
+    // The last browser trip on the address of this registration got no grant back: register the
+    // other name of the same listener. A client metadata document lists only one address.
+    const retry = this.#retryRedirectUrl;
+    if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !client.redirect_uris.includes(retry))
+      return this.#register();
     // A registration made before its scope named `offline_access` refuses the request that adds it.
     // Only a scope from the resource's metadata is checked: with no scope to send, nothing is added.
     const discovery = this.#discoveryState;
@@ -982,6 +1020,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
     this.#redirectAddressChecked = true;
     return refreshWorthTrying ? client : this.#register();
+  }
+
+  get openedRedirectUrl(): string | null {
+    return this.#openedRedirectUrl;
   }
 
   get registrationPending(): boolean {
@@ -1002,7 +1044,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * A server that refuses the `127.0.0.1` address gets one more registration with the `localhost`
    * form of the same address, which the listener also answers. The MCP authorization specification
-   * names `localhost` redirects, and some servers accept only that name (#5584).
+   * names `localhost` redirects, and some servers accept only that name (#5584). A `localhost`
+   * registration after an unanswered sign-in (#6149) gets the `127.0.0.1` form in the same way.
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
@@ -1012,20 +1055,19 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       if (!registering) return fetch(input, init);
       const request = this.#withOfflineAccessRegistration(init);
       let response = await fetch(input, request);
-      const retry = this.#withLocalhostRedirect(request);
+      const retry = this.#withOtherRedirectName(request);
       if (retry && (await refusesRedirectAddress(response))) response = await fetch(input, retry);
       this.#registrationStatus = response.status;
       return response;
     };
   }
 
-  /** The registration body with the `localhost` address, or `null` when it does not send this run's `127.0.0.1` address. */
-  #withLocalhostRedirect(init: RequestInit): RequestInit | null {
-    const localhost = this.#localhostRedirectUrl;
-    if (!localhost || typeof init.body !== "string") return null;
+  /** The registration body with the other name of this run's address, or `null` when it sends neither name. */
+  #withOtherRedirectName(init: RequestInit): RequestInit | null {
+    if (!this.#localhostRedirectUrl || typeof init.body !== "string") return null;
     const body = registrationBodySchema.parse(JSON.parse(init.body));
-    if (body.redirect_uris?.length !== 1 || body.redirect_uris[0] !== this.#options.redirectUrl) return null;
-    return { ...init, body: JSON.stringify({ ...body, redirect_uris: [localhost] }) };
+    const other = body.redirect_uris?.length === 1 ? this.#otherRedirectName(body.redirect_uris[0]) : null;
+    return other ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [other] }) } : null;
   }
 
   /** The SDK's registration body, with the `offline_access` that `withOfflineAccess` will request. */
@@ -1229,6 +1271,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
             : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
         );
         yield* mcpCall(() => this.#options.openExternal(url.toString()));
+        this.#openedRedirectUrl = url.searchParams.get("redirect_uri");
       }),
     );
   }
