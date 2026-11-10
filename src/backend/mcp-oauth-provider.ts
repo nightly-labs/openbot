@@ -455,9 +455,7 @@ export class McpOAuth implements McpOAuthAuthority {
     this.#unanswered.delete(key);
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
-    let granted = false;
     this.#waiting.set(state, (code) => {
-      granted = true;
       Deferred.doneUnsafe(grant, Effect.succeed(code));
     });
     if (open) this.#openedElsewhere.add(state);
@@ -468,8 +466,10 @@ export class McpOAuth implements McpOAuthAuthority {
     const resource = mcpOAuthServerUrl(key);
     const provider = this.#provider(key, state, () => abandoned, open, unanswered);
     const abandon = () => {
-      const opened = provider.openedRedirectUrl;
-      if (!abandoned && !granted && opened) this.#unanswered.set(key, opened);
+      // `receiveAuthorizationCode` removes the state when the grant arrives. An attempt that ended
+      // before it opened a page keeps the record it was given, for the next attempt.
+      const unansweredNow = provider.openedRedirectUrl ?? unanswered;
+      if (!abandoned && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
@@ -890,7 +890,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    */
   readonly #retryRedirectUrl: string | null;
   /** The `redirect_uri` of the authorization page this attempt opened, or `null` before it opens one. */
-  openedRedirectUrl: string | null = null;
+  #openedRedirectUrl: string | null = null;
 
   /** The `localhost` form of this run's address for its `127.0.0.1` form, and the reverse. */
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
@@ -1020,6 +1020,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
     this.#redirectAddressChecked = true;
     return refreshWorthTrying ? client : this.#register();
+  }
+
+  get openedRedirectUrl(): string | null {
+    return this.#openedRedirectUrl;
   }
 
   get registrationPending(): boolean {
@@ -1267,7 +1271,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
             : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
         );
         yield* mcpCall(() => this.#options.openExternal(url.toString()));
-        this.openedRedirectUrl = url.searchParams.get("redirect_uri");
+        this.#openedRedirectUrl = url.searchParams.get("redirect_uri");
       }),
     );
   }
