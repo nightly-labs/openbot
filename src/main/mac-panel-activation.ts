@@ -92,3 +92,23 @@ export function hidePanelFromWindowSwitchers(window: BrowserWindow): void {
     logger.warn("Unable to hide the panel from window switchers:", toLogValue(error));
   }
 }
+
+/**
+ * Keeps a macOS panel on screen when the user hides OpenBot (Hide OpenBot, ⌘H). AppKit hides every
+ * window of a hidden application unless the window sets `canHide` to NO. Electron has no option for it.
+ */
+export function keepPanelThroughAppHide(window: BrowserWindow): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const objc = objcRuntime();
+    const nsWindow = objc.sendPointer(objc.pointerOf(window.getNativeWindowHandle()), objc.sel("window"));
+    const setCanHide = objc.sel("setCanHide:");
+    if (!nsWindow || !objc.sendRespondsTo(nsWindow, objc.sel("respondsToSelector:"), setCanHide)) {
+      logger.warn("The panel window has no setCanHide: method.");
+      return;
+    }
+    objc.sendBool(nsWindow, setCanHide, false);
+  } catch (error) {
+    logger.warn("Unable to keep the panel on screen when OpenBot hides:", toLogValue(error));
+  }
+}

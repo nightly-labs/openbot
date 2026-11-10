@@ -56,7 +56,7 @@ import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
 import { usesX11Windows } from "./linux-wayland-output";
-import { hidePanelFromWindowSwitchers, preventPanelActivation } from "./mac-panel-activation";
+import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -714,6 +714,8 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   preventPanelActivation(window);
   // While its chat composer is focused, the dock is the main window, and AltTab would list it.
   hidePanelFromWindowSwitchers(window);
+  // The dock stays on screen when the user hides OpenBot, as it does when the main window is minimized.
+  keepPanelThroughAppHide(window);
   // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
