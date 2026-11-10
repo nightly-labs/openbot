@@ -110,9 +110,18 @@ export class AgentInterruptTool {
     // drain would start the next of these messages.
     const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
     if (!turnId) {
-      // A task turn never runs the caller's message, so it is never the caller's to stop. Say so, or the
-      // caller reads "nothing ran" while `list_agents` shows the agent as working.
+      // A task or channel turn never runs the caller's message, so it is never the caller's to stop.
+      // Say so, or the caller reads "nothing ran" while `list_agents` shows the agent as working.
       const runningTasks = this.#conversation.workingTaskSnapshots(agentId).length;
+      if (this.#conversation.workingChannelSnapshots(agentId).length > 0) {
+        return openBotToolResult({
+          interruptedTurnId: null,
+          cancelledMessages,
+          ...(runningTasks > 0 ? { runningTasks } : {}),
+          runningChannelTask: true,
+          note: "This agent still works on a channel task. This tool cannot stop it. Use the task controls in the channel.",
+        });
+      }
       if (runningTasks === 0) return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
       return openBotToolResult({
         interruptedTurnId: null,
@@ -140,7 +149,9 @@ export class AgentInterruptTool {
         .unresolvedDeliveries()
         .find(
           ({ delivery }) =>
-            delivery.recipientAgentId === agentId && delivery.turnId && !this.#mailbox.taskIdForDelivery(delivery.id),
+            delivery.recipientAgentId === agentId &&
+            delivery.turnId &&
+            this.#mailbox.laneIdForDelivery(delivery.id) === null,
         )?.delivery.turnId ?? null
     );
   }

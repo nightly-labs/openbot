@@ -119,6 +119,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot이 서버를 중지하고 에이전트, 채팅, 파일을 휴지통으로 옮겨요.",
   "server.local.deleting": "서버 삭제 중…",
   "server.local.deletedTitle": "{name}을(를) 삭제했어요",
+  "server.install.title": "다른 컴퓨터의 새 서버",
+  "server.install.description":
+    "본인이 소유한 Linux 컴퓨터나 VPS에서 이 명령을 실행하세요. OpenBot을 설치하고 서버를 이 계정에 추가해요.",
+  "server.install.making": "이 계정용 명령을 만드는 중…",
+  "server.install.failed": "OpenBot이 명령을 만들지 못했어요. 인터넷 연결을 확인하세요.",
+  "server.install.copyForAgent": "AI 에이전트용으로 복사",
+  "server.install.expiresIn": "한 번만 작동해요. {time} 후에 만료돼요.",
+  "server.install.newCommand": "새 명령",
+  "server.install.waiting": "서버에서 명령이 실행되기를 기다리는 중…",
+  "server.install.starting": "{name}이(가) 로그인했어요. 서버를 시작하는 중…",
+  "server.install.connected": "{name}이(가) 연결됐어요.",
+  "server.install.offline": "{name}이(가) 오프라인이에요.",
+  "server.install.expired": "이 명령은 만료됐어요. 새 명령을 만드세요.",
+  "server.install.agentPrompt":
+    '이 Linux 서버에 OpenBot을 설치하고 내 OpenBot 계정에 로그인시켜 줘.\n이 명령을 root로 실행해. 질문은 없고 몇 분 걸려:\n\n{command}\n\n"OpenBot is connected to your account." 줄과 종료 코드 0으로 끝나.\n이 명령은 15분 동안 한 번만 작동해. 어디에도 저장하지 마.',
+  "server.install.setUpWithAgent": "에이전트로 설정",
+  "server.install.sshAgentPrompt":
+    "SSH로 내 Linux 서버에 연결하고 OpenBot을 서버로 설치해 주세요.\n\nSSH 주소 (user@host):",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "이 계정은 서버를 최대 개수까지 만들었어요",
   "server.add.limit.description": {
@@ -339,7 +357,17 @@ export const messages = {
   "server.settings.memoryReviewOff": "끄기",
   "server.settings.memoryReviewTurns": { other: "{count}턴마다" },
   "server.settings.memoryReviewLoadFailed": "메모리 검토 설정을 불러올 수 없었어요.",
-  "server.settings.rolesTitle": "역할",
+  "server.settings.skillLearning": "스킬 학습",
+  "server.settings.skillLearningDescription": "이 서버의 에이전트가 배운 내용을 스킬로 저장할지 여부입니다.",
+  "server.settings.skillLearningAutomatic": "자동",
+  "server.settings.skillLearningAsk": "먼저 묻기",
+  "server.settings.skillLearningOff": "끄기",
+  "server.settings.skillLearningLoadFailed": "스킬 학습 설정을 불러오지 못했습니다.",
+  "server.settings.browsingMemory": "내 브라우징에서 학습",
+  "server.settings.browsingMemoryDescription":
+    "에이전트의 브라우저를 조작하면 에이전트가 사용한 페이지와 버튼에서 사이트 사용법을 학습합니다. 입력한 텍스트는 저장되지 않습니다.",
+  "server.settings.browsingMemoryLoadFailed": "브라우징 설정을 불러올 수 없습니다.",
+  "server.settings.rolesTitle": "권한",
   "server.settings.rolesDescription":
     "멤버가 사용할 수 있는 에이전트를 선택하세요. 멤버는 모든 사용자와 자신의 역할 중 가장 높은 접근 권한을 받아요. 소유자와 관리자는 모든 에이전트를 사용할 수 있어요.",
   "server.settings.auditTitle": "감사 로그",
@@ -363,7 +391,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "서버 키를 변경했어요",
   "server.settings.hostKeyChanged": "마지막 변경",
   "server.settings.hostKeyChangedDescription": "{date}. 이전 키와 새 키가 모두 이 변경에 서명했어요.",
-  "server.settings.hostKeyLocalOnly": "이 컴퓨터의 서버만 여기서 키를 변경할 수 있어요.",
+  "server.settings.hostKeyOwnerOnly": "서버 키는 소유자만 변경할 수 있어요.",
   "server.settings.removeTitle": "서버 제거",
   "server.settings.removeDescription":
     "모든 멤버에 대해 계정 서비스에서 이 서버를 제거해요. 서버의 컴퓨터를 더 이상 사용할 수 없을 때 사용하세요.",
@@ -431,6 +459,7 @@ export const messages = {
   "server.roles.memberCount": { other: "멤버 {count}명" },
   "server.roles.agentList": "에이전트: {names}",
   "server.roles.agentLevel": "{agent}에 대한 {role}의 접근 권한",
+  "server.roles.changeInEveryone": "모든 사용자에서 변경",
   "server.roles.setAll": "모두 설정",
   "server.roles.setAllLabel": "모두 설정: 모든 에이전트에 대한 {role}의 접근 권한",
   "server.roles.loadFailed": "이 서버의 역할을 불러올 수 없었어요.",

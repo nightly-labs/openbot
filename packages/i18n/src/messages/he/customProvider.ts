@@ -129,6 +129,7 @@ export const messages = {
     other: "פועל · {count} מודלים",
   },
   "customProvider.detected.title": "נמצא במחשב הזה",
+  "customProvider.detected.titleServer": "נמצא בשרת",
   "customProvider.detected.scanning": "מחפש מודלים וסוכנים מקומיים.",
   "customProvider.detected.scanAgain": "סריקה חוזרת",
   "customProvider.detected.empty": "OpenBot לא מצא שרת מודלים מקומי או סוכן ACP.",
@@ -152,6 +153,8 @@ export const messages = {
   "customProvider.detection.enabled": "חיפוש מודלים וסוכנים מקומיים",
   "customProvider.detection.enabledDescription":
     "OpenBot בודק את כתובות ברירת המחדל של Ollama ושל LM Studio, ומחפש סוכני ACP מוכרים ב-PATH שלך.",
+  "customProvider.detection.enabledDescriptionServer":
+    "השרת בודק את כתובות ברירת המחדל של Ollama ושל LM Studio, ומחפש סוכני ACP מוכרים ב-PATH שלו.",
   "customProvider.detection.addresses": "כתובות נוספות של שרתי מודלים",
   "customProvider.detection.address.label": "כתובת {number}",
   "customProvider.detection.address.remove": "הסרת כתובת {number}",
@@ -171,6 +174,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "אותיות לטיניות קטנות, ספרות או מקפים. אי אפשר לשנות אותו מאוחר יותר.",
   "customProvider.acp.command": "פקודה",
   "customProvider.acp.commandHint": "התוכנית להפעלה. OpenBot מחפש אותה ב-PATH שלך.",
+  "customProvider.acp.commandHintServer": "התוכנית להפעלה. השרת מחפש אותה ב-PATH שלו.",
   "customProvider.acp.args": "ארגומנטים",
   "customProvider.acp.argsHint": "יש להפריד בין ארגומנטים ברווחים. ארגומנט שיש בו רווחים צריך להיות במרכאות.",
   "customProvider.acp.usagePrompt": "פקודת שימוש",
@@ -197,6 +201,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "הפקודה הזו רצה במחשב שלך",
   "customProvider.acp.trustDescription":
     "OpenBot מפעיל אותה עם חשבון המשתמש שלך. הסוכן יכול לקרוא ולשנות קבצים ולהריץ פקודות. יש להוסיף רק סוכן מהימן.",
+  "customProvider.acp.hostTrustTitle": "הפקודה הזו רצה בשרת",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot מפעיל אותה עם חשבון המשתמש של השרת. הסוכן יכול לקרוא ולשנות קבצים בשרת ולהריץ שם פקודות. יש להוסיף רק סוכן מהימן.",
   "customProvider.acp.submit": "הוספת סוכן",
   "customProvider.acp.editTitle": "עריכת סוכן ACP מותאם אישית",
   "customProvider.acp.submitEdit": "שמירת הסוכן",
@@ -213,6 +220,7 @@ export const messages = {
     "יש להשתמש באותיות לטיניות קטנות, ספרות או מקפים, ולהתחיל באות או בספרה. אפשר עד 40 תווים.",
   "customProvider.agents.title": "סוכנים מותאמים אישית",
   "customProvider.agents.description": "סוכני ACP ש-OpenBot מפעיל במחשב הזה.",
+  "customProvider.agents.hostDescription": "סוכני ACP ש-OpenBot מפעיל במחשב של השרת.",
   "customProvider.agents.empty": "עדיין אין סוכנים מותאמים אישית.",
   "customProvider.agents.add": "הוספת סוכן",
   "customProvider.agents.restart": "הפעלה מחדש של הסוכנים",

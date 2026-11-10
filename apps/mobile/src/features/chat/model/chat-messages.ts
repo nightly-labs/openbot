@@ -25,6 +25,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { thinkingRowId } from "./turn-thinking";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
 
@@ -59,8 +60,6 @@ export type ChatMessage =
       label: MobileTextKey;
       routineId: string;
       routineName: string;
-      /** When the host stored the marker. Not `createdAt`: a marker gets no day label. */
-      storedAt?: string;
     }
   | {
       id: string;
@@ -258,7 +257,6 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
     label: marker.label,
     routineId: marker.routineId,
     routineName: marker.routineName,
-    storedAt: message.createdAt,
   }));
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
@@ -406,7 +404,7 @@ export function projectChatMessages(
       const key = message.turnId ?? message.id;
       let thinking = thinkingByTurn.get(key);
       if (!thinking) {
-        thinking = { id: `thinking:${key}`, kind: "thinking", turnId: message.turnId, steps: [] };
+        thinking = { id: thinkingRowId(key), kind: "thinking", turnId: message.turnId, steps: [] };
         thinkingByTurn.set(key, thinking);
         result.push(thinking);
       }
@@ -470,13 +468,16 @@ export function groupExchangeMarkers<T extends ChatMessage>(messages: readonly T
   return rows;
 }
 
-/** Consecutive completed runs of one routine, drawn as one row as on desktop. */
+/** Consecutive routine markers, drawn as one closed row. */
 export interface RoutineRunGroup {
-  /** The ID of the first run, so the row stays the same while new runs join. */
+  /**
+   * The row ID that the group had when it first showed, so the row keeps its key, size and open state
+   * while markers join it: new markers at the end, and markers of an older page at the start.
+   */
   id: string;
   kind: "routine-run-group";
-  /** The name of the newest run. */
-  routineName: string;
+  /** The name of the newest marker when all markers are of one routine, else null. */
+  routineName: string | null;
   runs: RoutineMarker[];
 }
 
@@ -491,6 +492,8 @@ function rowMarkers(row: ChatRow): readonly { id: string }[] {
 }
 
 const routineRunGroups = new WeakMap<RoutineMarker, RoutineRunGroup>();
+/** The row ID that each routine marker last showed in, by marker ID. */
+const routineRowIds = new Map<string, string>();
 
 /** The rows where a routine run group must stop, so a line or a focused run keeps a row of its own. */
 export interface RoutineRunGroupStops {
@@ -503,10 +506,12 @@ export interface RoutineRunGroupStops {
 }
 
 /**
- * Joins consecutive completed runs of one routine into one row, as desktop does, so a routine that
- * runs often does not fill the chat. Any other row stops the group, and so does a run that did not
- * complete. A group also stops at a new day, at the first unread row, at the branch divider, and
- * around the run that the chat opens at.
+ * Joins consecutive routine markers into one row, so routines that run or change often do not fill
+ * the chat. Unlike desktop, markers of different routines and lifecycle markers join too. A run
+ * that is queued, running or needs attention keeps a row of its own, so live work stays visible.
+ * Any other row stops the group. A group also stops at the first unread row, at the branch divider,
+ * and around the marker that the chat opens at. A new day does not stop a group: a marker gets no
+ * day label on mobile.
  */
 export function groupRoutineRunMarkers<T extends ChatRow>(
   rows: readonly T[],
@@ -524,50 +529,71 @@ export function groupRoutineRunMarkers<T extends ChatRow>(
     if (branch >= 0) starts.add(branch + 1);
   }
   const result: (T | RoutineRunGroup)[] = [];
+  // A group never takes the ID of a marker in another row: a marker alone uses its own ID.
+  const markerIds = new Set(rows.flatMap((row) => (row.kind === "routine" ? [row.id] : [])));
+  const usedIds = new Set<string>();
   let run: (T & RoutineMarker)[] = [];
   const closeRun = () => {
     const [first] = run;
-    if (first) result.push(run.length === 1 ? first : routineRunGroup(first, run));
+    if (!first) return;
+    const id = run.length === 1 ? first.id : routineRowId(first, run, markerIds, usedIds);
+    usedIds.add(id);
+    for (const marker of run) routineRowIds.set(marker.id, id);
+    result.push(run.length === 1 ? first : routineRunGroup(id, first, run));
     run = [];
   };
   rows.forEach((row, index) => {
-    if (!completedRun(row)) {
+    if (!groupableRoutine(row)) {
       closeRun();
       result.push(row);
       return;
     }
-    const previous = run.at(-1);
-    if (
-      previous &&
-      (starts.has(index) || previous.routineId !== row.routineId || startsDay(previous.storedAt, row.storedAt))
-    )
-      closeRun();
+    if (starts.has(index)) closeRun();
     run.push(row);
   });
   closeRun();
   return result;
 }
 
-/** Whether `current` is on a later local day than `previous`. A marker with no time starts no day. */
-function startsDay(previous: string | undefined, current: string | undefined): boolean {
-  if (!previous || !current) return false;
-  const [before, after] = [new Date(previous), new Date(current)];
-  if (Number.isNaN(before.getTime()) || Number.isNaN(after.getTime())) return false;
-  return before.toDateString() !== after.toDateString();
+const LIVE_ROUTINE_EVENTS: ReadonlySet<RoutineMarkerEvent> = new Set(["queued", "running", "needs-attention"]);
+
+function groupableRoutine<T extends ChatRow>(row: T): row is T & RoutineMarker {
+  return row.kind === "routine" && !LIVE_ROUTINE_EVENTS.has(row.event);
 }
 
-function completedRun<T extends ChatRow>(row: T): row is T & RoutineMarker {
-  return row.kind === "routine" && row.event === "succeeded";
+/**
+ * The row ID of a group: the ID of a row that one of its markers showed in, so an older page that
+ * joins the top group does not give the list a new row of an unknown size. Else the ID of its first
+ * marker. A group that splits keeps the ID in its first part.
+ */
+function routineRowId(
+  first: RoutineMarker,
+  run: readonly RoutineMarker[],
+  markerIds: ReadonlySet<string>,
+  usedIds: ReadonlySet<string>,
+): string {
+  for (const marker of run) {
+    const id = routineRowIds.get(marker.id);
+    if (id === undefined || usedIds.has(id)) continue;
+    if (!markerIds.has(id) || run.some((item) => item.id === id)) return id;
+  }
+  return first.id;
 }
 
-/** Reuse the group of the same runs, so a streamed reply does not draw the group row again. */
-function routineRunGroup(first: RoutineMarker, runs: RoutineMarker[]): RoutineRunGroup {
+/** Reuse the group of the same markers, so a streamed reply does not draw the group row again. */
+function routineRunGroup(id: string, first: RoutineMarker, runs: RoutineMarker[]): RoutineRunGroup {
   const cached = routineRunGroups.get(first);
-  if (cached?.runs.length === runs.length && cached.runs.every((item, index) => item === runs[index])) return cached;
+  if (
+    cached?.id === id &&
+    cached.runs.length === runs.length &&
+    cached.runs.every((item, index) => item === runs[index])
+  )
+    return cached;
+  const newest = runs.at(-1) ?? first;
   const group: RoutineRunGroup = {
-    id: first.id,
+    id,
     kind: "routine-run-group",
-    routineName: runs.at(-1)?.routineName ?? first.routineName,
+    routineName: runs.every((item) => item.routineId === first.routineId) ? newest.routineName : null,
     runs,
   };
   routineRunGroups.set(first, group);
@@ -677,7 +703,6 @@ function projectChannelMessage(
       label: routine.label,
       routineId: routine.routineId,
       routineName: routine.routineName,
-      storedAt: entry.message.createdAt,
     };
   }
   if (entry.message.questionPrompt) {

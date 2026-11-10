@@ -16,6 +16,12 @@ export const messages = {
     "창 뒤에 흐릿한 바탕화면을 표시해요. 웹사이트와 메뉴도 앱 테마를 사용해요.",
   "settings.interfaceSize.title": "인터페이스 크기",
   "settings.interfaceSize.description": "OpenBot의 텍스트와 컨트롤 크기예요.",
+  "settings.interfaceFont.title": "인터페이스 글꼴",
+  "settings.interfaceFont.description": "메뉴, 채팅, 설정의 글꼴이에요.",
+  "settings.interfaceFont.default": "기본값 (Inter)",
+  "settings.codeFont.title": "코드 글꼴",
+  "settings.codeFont.description": "코드, 터미널, 파일 경로의 글꼴이에요.",
+  "settings.codeFont.default": "기본값",
   "settings.logoColor.title": "로고 색상",
   "settings.logoColor.description": "Dock, 작업 표시줄, Dynamic Island에 표시돼요.",
   "settings.logoColor.buildNote": "이 빌드는 자체 로고 색상을 유지해요. 선택한 색상은 릴리스 앱에 적용돼요.",
@@ -117,6 +123,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "모든 에이전트에 {setting} 설정",
   "settings.agentDefaults.agentLabel": "{agent}의 {setting}",
   "settings.agentDefaults.loadFailed": "에이전트를 읽을 수 없어요.",
+  "settings.commitCoAuthor.sectionTitle": "Git 커밋",
+  "settings.commitCoAuthor.title": "커밋에 OpenBot 표시",
+  "settings.commitCoAuthor.description":
+    "에이전트가 만든 커밋에 OpenBot을 공동 작성자로 추가해요. 커밋 작성자는 바뀌지 않아요.",
   "settings.planStart.title": "작업 시작",
   "settings.planStart.wait": "시작을 누를 때",
   "settings.planStart.after": "{time} 후",
@@ -195,7 +205,14 @@ export const messages = {
   "settings.soundTheme.play": "{name} 재생",
   "settings.notch.title": "동작",
   "settings.notch.show.title": "MacBook 노치에 상태 표시",
+  "settings.notch.show.titleTopOfScreen": "화면 상단에 상태 표시",
   "settings.notch.show.description": "각 디스플레이 상단에 에이전트 활동과 확인이 필요한 항목을 표시해요.",
+  "settings.notch.xwayland.title": "다시 시작 필요",
+  "settings.notch.xwayland.description":
+    "Wayland에서는 다른 앱 위에 Dynamic Island를 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 아일랜드는 표시되지 않습니다.",
+  "settings.notch.xwayland.unsupported":
+    "XWayland가 없는 Wayland에서는 Dynamic Island를 다른 앱 위에 표시할 수 없습니다.",
+  "settings.notch.xwayland.restart": "다시 시작",
   "settings.notch.idle.title": "대기 상태 아일랜드 표시",
   "settings.notch.idle.description": "활성 상태가 없을 때 OpenBot 로고와 인사말을 표시해요.",
   "settings.notch.displays.title": "추가 디스플레이에 표시",
@@ -220,6 +237,12 @@ export const messages = {
     "'다른 앱 위'를 선택하면 OpenBot이 백그라운드에 있어도 독이 화면에 표시됩니다.",
   "settings.agentDock.placement.screen": "다른 앱 위",
   "settings.agentDock.placement.window": "OpenBot 창 안",
+  "settings.agentDock.xwayland.title": "다시 시작 필요",
+  "settings.agentDock.xwayland.description":
+    "Wayland에서는 다른 앱 위에 독을 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 독은 OpenBot 창 안에 표시됩니다.",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland가 없는 Wayland에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
+  "settings.agentDock.xwayland.restart": "다시 시작",
   "settings.agentDock.display.title": "디스플레이",
   "settings.agentDock.display.description":
     "해당 디스플레이가 연결되어 있지 않으면 독이 OpenBot 창의 디스플레이로 이동합니다.",
@@ -234,6 +257,9 @@ export const messages = {
   "settings.agentDock.edge.left": "왼쪽",
   "settings.agentDock.autoHide.title": "사용하지 않을 때 숨기기",
   "settings.agentDock.autoHide.description": "독이 가장자리 안으로 들어갑니다. 포인터를 가장자리로 옮기면 나타납니다.",
+  "settings.agentDock.edgeStrip.title": "가장자리에 띠 표시",
+  "settings.agentDock.edgeStrip.description":
+    "독이 숨은 자리에 얇은 띠가 남습니다. 포인터를 가까이 가져가면 독이 나타납니다. 에이전트가 질문하면 띠에 색 물결이 올라갑니다.",
   "settings.agentDock.results.title": "완료된 작업 표시",
   "settings.agentDock.results.description": "에이전트가 완료한 결과가 잠시 독 옆에 표시됩니다.",
   "settings.agentDock.agents.title": "독의 에이전트",
@@ -622,6 +648,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex 라이브 음성",
   "settings.voice.speech.codexLive.description":
     "모든 에이전트와의 음성 대화는 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "모든 에이전트와의 음성 대화는 서버의 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
   "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",
@@ -642,8 +670,6 @@ export const messages = {
   "settings.transfer.old.text": "에이전트와 서버 설정을 파일로 저장해요.",
   "settings.transfer.new.title": "이 서버로 가져오기",
   "settings.transfer.new.text": "파일에서 에이전트와 서버 설정을 추가해요.",
-  "settings.transfer.notMoved":
-    "API 키, 로그인 정보, 커넥터, 앱 환경설정, 채팅 기록은 옮겨지지 않아요. 새 서버에서 다시 설정해 주세요.",
   "settings.transfer.back": "뒤로",
   "settings.transfer.loading": "에이전트를 읽는 중…",
   "settings.transfer.summary.label": "파일에 포함된 내용",

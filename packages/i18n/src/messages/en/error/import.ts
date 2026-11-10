@@ -31,17 +31,27 @@ export const messages = defineMessages("error.import", {
   "error.import.fileRenamed": "{name}: {file} already exists, so this copy is saved as {saved}.",
   "error.import.fileSkipped": "{name}: the file {file} is skipped. {reason}",
   "error.import.chooseZip": "Choose a .zip file.",
-  "error.import.zipTooLarge": "The export must be a .zip under 2 GB.",
   "error.import.unsafeFile": "The export contains an unsafe file: {name}",
-  "error.import.expandedTooLarge": "The export must expand to under 2 GB and {limit} files.",
+  "error.import.tooManyFiles": "The export must have {limit} files or fewer.",
+  "error.import.diskSpace":
+    "{name}: its files need {size} GB of free disk space, and {free} GB is free. Free up space, then import the agent again.",
   "error.import.remoteExpandedTooLarge": "The export must expand to under 500 MB and {limit} files.",
   "error.import.zipInvalid":
     "The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.",
+  "error.import.entryDamaged": "The file is damaged in the export.",
+  "error.import.foldersSkipped":
+    "{number} files in .git and node_modules folders are left out. A tool can make them again.",
   "error.import.empty": "The export is empty.",
   "error.import.remoteZipTooLarge": "To import into a joined server, the export must be a .zip under 100 MB.",
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",
+  "error.import.uploadDiskSpace":
+    "The export needs {size} GB of free disk space on the server, and {free} GB is free. Free up space on the server, then choose the export again.",
+  "error.import.remoteZipTooLargeOldHost":
+    "This server accepts an export of up to 100 MB. Update OpenBot on the server to import a larger export.",
   "error.import.skillKept":
     '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
+  "error.import.skillRenamed":
+    '{name}: the name of the skill "{skill}" is too similar to the name of another skill, so it is saved as "{renamed}".',
   // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles":
     "This folder has no Hermes profiles. Choose the Hermes folder, which holds config.yaml or SOUL.md.",
@@ -66,6 +76,9 @@ export const messages = defineMessages("error.import", {
   "error.import.transferSettingsInvalid": "The app settings in the file are invalid, so they are not imported.",
   "error.import.transferModelMissing":
     '{name}: the model "{model}" is not available here yet, so the agent uses the default model. Choose the model again when its provider is ready.',
+  "error.import.transferAgentSettingSkipped": "{name}: a setting of the agent is not applied. {reason}",
+  "error.import.transferChannelInstructionsCut":
+    "{name}: only the first {limit} characters of the channel instructions are in the file, because a new channel can have {limit}.",
   "error.import.transferSettingSkipped": "{name} is not imported. {reason}",
   "error.import.transferRoutineFlowSkipped": "The import left out a routine flow. {reason}",
   "error.import.transferCustomAgentCommand":
@@ -81,4 +94,31 @@ export const messages = defineMessages("error.import", {
     "{name}: values that can hold a secret were removed from its arguments or address. Enter them again in Settings.",
   "error.import.transferSharedKept":
     "{number} files in the Shared folder are already here, so they are kept as they are.",
+  "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
+  "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
+  "error.import.transferWorkflowInvalid": "A workflow in the file is invalid, so it is skipped.",
+  "error.import.transferRoutineWebhook":
+    "{name}: the routine “{routine}” has a new webhook address. Open it, make a new secret, and give both to the sender.",
+  "error.import.transferWorkflowWebhook":
+    "{name}: the workflow needs a new webhook address. Open it, make the address again, and give it to the sender.",
+  "error.import.transferWorkflowConnection":
+    "{name}: choose the Slack, Discord, or Telegram connection of the workflow again after you connect it here.",
+  "error.import.transferHistorySkipped": "{name}: the chat history in the file is invalid, so it is not imported.",
+  "error.import.transferChatsSkipped": {
+    one: "{name}: {count} chat is not imported.",
+    other: "{name}: {count} chats are not imported.",
+  },
+  "error.import.transferLocalScripts":
+    "{name}: “Local scripts” was on for this agent. Turn it on again in its settings if you trust the file.",
+  "error.import.transferAgentNewChats":
+    "{name}: “Agent starts new chats” was on for this agent. Turn it on again in its settings if you trust the file.",
+  "error.import.transferAlwaysAllow":
+    "{name}: you always allowed this agent on the other computer. Here it asks first until you allow it again.",
+  "error.import.transferFolders":
+    "{name}: it used {number} folders outside its workspace. Add them again in its settings, in Folders.",
+  // A transfer file that goes to or from a joined server in parts.
+  "error.import.transferPartsClosed": "The transfer with the server stopped. Try again.",
+  "error.import.transferPartInvalid": "Part of the transfer file did not arrive correctly. Try again.",
+  "error.import.transferStepFailed": "This server did not save it.",
+  "error.import.transferNoSpace": "There is not enough free disk space on the server for this transfer file.",
 });

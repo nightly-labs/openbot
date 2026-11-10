@@ -44,6 +44,8 @@ lines.on("line", (line) => {
       return { type: "audio", mimeType: block.mimeType, size: bytes.length,
         sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
     }) });
+    send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: message.params.sessionId,
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "OK" } } } });
     return reply({ stopReason: "end_turn" });
   }
   send({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Fixture does not implement " + message.method } });

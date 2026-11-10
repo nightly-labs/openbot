@@ -26,6 +26,13 @@ export const messages = {
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureRegion":
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
+  "status.agent.reportProblem": "앱 버전과 시스템 정보가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
+  "status.agent.sendIdea": "공개 GitHub 이슈가 됩니다. 이름은 표시되지 않습니다.",
+  "status.agent.feedbackSent": "OpenBot 팀에 보냄: {title}",
+  "status.agent.serverInstallCommand":
+    "다른 컴퓨터에 OpenBot을 서버 {name}(으)로 설치하고 계정에 로그인하는 일회용 명령을 만듭니다. 에이전트가 그곳에서 실행합니다.",
+  "status.agent.serverInstallCard": "서버 {name}의 설치 명령",
+  "status.agent.feedbackSending": "피드백을 OpenBot 팀에 보내는 중…",
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",
@@ -83,5 +90,6 @@ export const messages = {
   "status.agent.mcpSignInRequested": "MCP 서버 {name}에 로그인이 필요해요. 서버 설정의 MCP에서 로그인해 주세요.",
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
+  "status.agent.compactionContinues": "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겼어요. 에이전트가 계속해요.",
   "status.agent.branchTitle": "분기된 채팅",
 } as const satisfies PartialTranslation<typeof source>;

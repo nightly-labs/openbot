@@ -71,6 +71,7 @@ export const messages = {
     "채널에 시작을 확인하지 못한 배정이 있어요. 삭제하기 전에 결과를 확인하세요.",
   "error.backend.channelNotFound": "채널을 찾을 수 없어요.",
   "error.backend.channelMemberUnavailable": "채널 멤버를 사용할 수 없어요.",
+  "error.backend.channelInstructionsTooLong": "지침을 2,000자 이내로 줄이세요. 더 긴 지침은 저장되지 않아요.",
   "error.backend.channelWaitBeforeNewConversation": "이 채널의 작업이 끝날 때까지 기다린 다음 새 대화를 시작하세요.",
   "error.backend.channelWaitBeforeCompact": "이 채널의 작업이 끝날 때까지 기다린 다음 압축하세요.",
   "error.backend.channelWaitBeforeDeleteHistory": "이 채널의 작업이 끝날 때까지 기다린 다음 기록을 삭제하세요.",
@@ -199,7 +200,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "이 에이전트에는 이 ID의 루틴이 없어요.",
   "error.backend.agentWaitNoRoutine":
     "대기를 깨우는 것은 내 루틴의 실행뿐인데, 루틴이 없어요. openbot.create_routine으로 루틴을 만든 후 대기를 여세요.",
-  "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.markUnreadRemoteUnsupported":
     "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.messageDeleteUnsupported": "이 서버는 메시지 삭제를 지원하지 않아요.",
@@ -231,6 +231,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "로그인 응답이 제시간에 도착하지 않았어요.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot이 이 서버의 로그인 정보를 읽을 수 없었어요. 서버 주소를 확인한 후 다시 시도해 주세요.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
   "error.backend.mcpServerSignInForProvider":

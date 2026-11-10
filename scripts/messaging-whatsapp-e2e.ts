@@ -37,12 +37,19 @@ import { AgentStore } from "../src/backend/agent-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { type MessagingCredentials, MessagingService } from "../src/backend/messaging/messaging-service";
+import { WhatsAppRefusedError } from "../src/backend/messaging/messaging-types";
 import { WhatsAppChatState } from "../src/backend/messaging/whatsapp/whatsapp-chats";
 import { whatsAppDriver } from "../src/backend/messaging/whatsapp/whatsapp-driver";
 import { whatsAppInbound } from "../src/backend/messaging/whatsapp/whatsapp-events";
 import { WHATSAPP_TEXT_LIMIT, whatsAppChunks } from "../src/backend/messaging/whatsapp/whatsapp-render";
 import { WhatsAppRuntime } from "../src/backend/messaging/whatsapp/whatsapp-runtime";
-import { backoffDelay, closeDecision, type WhatsAppSocket } from "../src/backend/messaging/whatsapp/whatsapp-session";
+import {
+  backoffDelay,
+  closeDecision,
+  MESSAGE_ACK,
+  type WhatsAppAck,
+  type WhatsAppSocket,
+} from "../src/backend/messaging/whatsapp/whatsapp-session";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
 import { parseStartWhatsAppLinkInput, parseWhatsAppSenderInput } from "../src/main/ipc/messaging-inputs";
@@ -60,6 +67,9 @@ const OWNER_LID = "777001";
 const FRIEND = "48600100300";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
+/** A Brazilian mobile number as people type it, and the older form that its WhatsApp account keeps. */
+const BRAZIL_TYPED = "5531988887777";
+const BRAZIL_ACCOUNT = "553188887777";
 const GROUP = "120363000000000001@g.us";
 const OTHER_GROUP = "120363000000000002@g.us";
 const PAIRING_CODE: string = "ABCD1234";
@@ -119,6 +129,7 @@ interface Sent {
 class FakeSocket implements WhatsAppSocket {
   readonly #events = new EventEmitter();
   readonly #frames = new Set<() => void>();
+  readonly #acks = new Set<(node: WhatsAppAck) => void>();
   readonly #phone: FakePhone;
   readonly config: UserFacingSocketConfig;
   ended = false;
@@ -128,9 +139,10 @@ class FakeSocket implements WhatsAppSocket {
       this.#events.on(event, listener);
     },
   };
-  readonly ws = {
-    on: (_event: "frame", listener: () => void) => {
-      this.#frames.add(listener);
+  readonly ws: WhatsAppSocket["ws"] = {
+    on: (event: string, listener: (node: WhatsAppAck) => void) => {
+      if (event === MESSAGE_ACK) this.#acks.add(listener);
+      else this.#frames.add(() => listener({ attrs: {} }));
     },
   };
   readonly signalRepository = {
@@ -187,6 +199,11 @@ class FakeSocket implements WhatsAppSocket {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
     this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
+    // WhatsApp's server answers each message with an ack, after the send returns.
+    const error = this.#phone.refused.get(jid);
+    setTimeout(() => {
+      for (const ack of this.#acks) ack({ attrs: { id, ...(error ? { error } : {}) } });
+    }, 0);
     const text = "text" in content && typeof content.text === "string" ? content.text : "";
     const message: WAMessage = {
       key: { remoteJid: jid, id, fromMe: true },
@@ -225,6 +242,14 @@ class FakeSocket implements WhatsAppSocket {
     return group(jid, jid === GROUP ? "Team" : "Family");
   }
 
+  /** Each number has an account, in the form it was asked for, except the Brazilian one, which keeps its older form. */
+  async onWhatsApp(...phoneNumbers: string[]) {
+    return phoneNumbers.map((number) => ({
+      jid: `${number === BRAZIL_TYPED ? BRAZIL_ACCOUNT : number}@s.whatsapp.net`,
+      exists: true,
+    }));
+  }
+
   async updateMediaMessage(message: WAMessage): Promise<WAMessage> {
     return message;
   }
@@ -233,6 +258,8 @@ class FakeSocket implements WhatsAppSocket {
 class FakePhone {
   readonly sockets: FakeSocket[] = [];
   readonly sent: Sent[] = [];
+  /** The chats whose posts the server refuses in its ack, with the error code. */
+  readonly refused = new Map<string, string>();
   logouts = 0;
   /** WhatsApp cannot be reached: each socket closes before it shows a code. */
   offline = false;
@@ -755,6 +782,41 @@ try {
       return { chat: `${LID_FRIEND}@s.whatsapp.net` };
     });
 
+    await step(
+      "Brazilian numbers: a contact typed with the 9 gets work through the form that WhatsApp sends",
+      async () => {
+        const accountJid = `${BRAZIL_ACCOUNT}@s.whatsapp.net`;
+        // A contact saved before WhatsApp named the form: the typed number is in the settings.
+        agents.messaging.store.addAllowedSender(connectionId(agents), {
+          id: BRAZIL_TYPED,
+          kind: "contact",
+          name: "Bia",
+        });
+        const saved = message({ chat: accountJid, text: "oi, tudo bem?" });
+        phone.current().receive([saved]);
+        await until(() => received(agents, accountJid, saved.key.id ?? ""), "the message of the saved contact");
+        const values = credentials.get(connectionId(agents));
+        assert.ok(values);
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        await runCauseEffect(adapter.identify());
+        await runCauseEffect(
+          adapter.postAnswer({ platformChannelId: accountJid, replyThreadId: null }, "Resposta", null),
+        );
+        await until(() => phone.textsTo(accountJid).includes("Resposta"), "the answer to the saved contact");
+        // A contact added while the number is connected gets the form that WhatsApp has.
+        agents.messaging.store.removeAllowedSender(connectionId(agents), BRAZIL_TYPED);
+        const input = parseWhatsAppSenderInput({
+          workspaceId: OWNER,
+          sender: { id: "+55 31 9 8888-7777", kind: "contact", name: "Bia" },
+        });
+        await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+        const ids = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
+        assert.ok(ids.includes(BRAZIL_ACCOUNT), "The contact was not saved in the form that WhatsApp has.");
+        assert.ok(!ids.includes(BRAZIL_TYPED), "The contact was saved as typed.");
+        return { saved: BRAZIL_ACCOUNT };
+      },
+    );
+
     await step("burst: short messages of one person within 1.5 s become one request", async () => {
       const strangerJid = `${STRANGER}@s.whatsapp.net`;
       const first = message({ chat: strangerJid, text: "one more thing" });
@@ -836,6 +898,36 @@ try {
       );
       await until(() => phone.textsTo(contactJid).includes("To a contact"), "the post to an allowed contact, as it is");
       return { refused: true, spacer: true };
+    });
+
+    await step("adapter: a post that the server refuses in its ack fails, and is not reported as sent", async () => {
+      const values = credentials.get(connectionId(agents));
+      assert.ok(values);
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      await runCauseEffect(adapter.identify());
+      const contactJid = `${STRANGER}@s.whatsapp.net`;
+      phone.refused.set(contactJid, "463");
+      try {
+        const sentFrom = phone.sent.length;
+        const refused = await Effect.runPromise(
+          Effect.result(adapter.postAnswer({ platformChannelId: contactJid, replyThreadId: null }, "Test", null)),
+        );
+        assert.ok(
+          phone.sent.slice(sentFrom).some((sent) => sent.jid === contactJid),
+          "The post never reached the server.",
+        );
+        assert.equal(refused._tag, "Failure", "A post that the server refused counted as sent.");
+        const cause = refused._tag === "Failure" ? refused.failure.cause : null;
+        assert.ok(cause instanceof WhatsAppRefusedError, "The failure does not say that WhatsApp refused the post.");
+        assert.equal(cause.code, "whatsapp_463");
+      } finally {
+        phone.refused.delete(contactJid);
+      }
+      const accepted = await runCauseEffect(
+        adapter.postAnswer({ platformChannelId: contactJid, replyThreadId: null }, "Accepted", null),
+      );
+      assert.ok(accepted, "A post with a clean ack did not return its id.");
+      return { refusedCode: "whatsapp_463", acceptedId: accepted };
     });
 
     await step("adapter: an answer that mentions a person is a new post that notifies them", async () => {
@@ -1038,6 +1130,7 @@ try {
         [OWNER_JID]: OWNER,
         [`${STRANGER}@s.whatsapp.net`]: STRANGER,
         [`${LID_FRIEND}@s.whatsapp.net`]: LID_FRIEND,
+        [`${BRAZIL_ACCOUNT}@s.whatsapp.net`]: BRAZIL_ACCOUNT,
         [GROUP]: FRIEND,
       };
       for (const link of agents.messaging.store.links(orchestrator ?? ""))

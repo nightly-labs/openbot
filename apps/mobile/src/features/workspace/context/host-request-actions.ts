@@ -17,6 +17,7 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   decodeInstalledSkills,
+  decodeMachineMetrics,
   decodeStorageUsage,
   type HiddenAgent,
   isAgentMemory,
@@ -56,7 +57,8 @@ import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
-import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_IMPORT_CAPABILITY, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v2";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import {
   AGENT_INSTRUCTIONS_CAPABILITY,
@@ -120,6 +122,11 @@ import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import {
+  MACHINE_RESOURCES_CAPABILITY,
+  MACHINE_RESOURCES_ROUTES,
+} from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -144,6 +151,7 @@ import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/wor
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -278,8 +286,11 @@ import {
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
   stageAgentImport,
+  stageAgentImportInParts,
   stageInstanceTransfer,
   startAgentTask,
+  startLiveVoice,
+  stopLiveVoice,
   type TeamApiRequest,
   TeamRequestError,
 } from "@openbot/team-client/team-api-requests";
@@ -365,6 +376,7 @@ type HostRequestActions = Pick<
   | "uninstallAgentSkill"
   | "loadAgentStorage"
   | "loadServerStorage"
+  | "loadMachineMetrics"
   | "clearServerStorage"
   | "loadAgentAdminSettings"
   | "updateAgentAdminSettings"
@@ -386,6 +398,8 @@ type HostRequestActions = Pick<
   | "loadPlanLimits"
   | "setAgentProviderAccount"
   | "startNewChat"
+  | "startLiveVoice"
+  | "stopLiveVoice"
   | "compactContext"
   | "loadAgentSessionSettings"
   | "loadAgentFolders"
@@ -420,6 +434,7 @@ type HostRequestActions = Pick<
   | "saveVaultItem"
   | "deleteVaultItem"
   | "importVaultCsv"
+  | "checkAgentExport"
   | "stageAgentImport"
   | "applyAgentImport"
   | "discardAgentImport"
@@ -714,6 +729,7 @@ export function createHostRequestActions({
     canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
     canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
     canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
+    canUseLiveVoice: (serverId) => has(serverId, LIVE_VOICE_CAPABILITY),
     attachmentSupport: (serverId) => {
       const advertised = capabilities.get(serverId) ?? [];
       return {
@@ -771,8 +787,26 @@ export function createHostRequestActions({
     deleteVaultItem: async (id, serverId) =>
       runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, has(serverId, VAULT_V2_CAPABILITY))),
     importVaultCsv: async (csv, serverId) => runTeamRequest(importHostVaultCsv(vaultImportAdmin(serverId), csv)),
-    stageAgentImport: async (upload, serverId, onProgress) =>
-      runTeamRequest(stageAgentImport(agentImportApi(serverId, onProgress), upload)),
+    checkAgentExport: (size, serverId) => {
+      if (!has(serverId, AGENT_IMPORT_V2_CAPABILITY) && size > AGENT_IMPORT_UPLOAD_BYTES)
+        throw new Error(sourceText("error.import.remoteZipTooLargeOldHost"));
+    },
+    stageAgentImport: async (file, serverId, onProgress) => {
+      if (has(serverId, AGENT_IMPORT_V2_CAPABILITY)) {
+        // The progress of each part's upload, as a fraction of the whole export.
+        let part = { offset: 0, length: 0 };
+        const request = agentImportApi(serverId, (fraction) =>
+          onProgress?.((part.offset + fraction * part.length) / file.size),
+        );
+        const readPart = (offset: number, length: number) => {
+          part = { offset, length };
+          return file.readPart(offset, length);
+        };
+        return runTeamRequest(stageAgentImportInParts(request, { name: file.name, size: file.size, readPart }));
+      }
+      const upload = { name: file.name, mimeType: "application/zip", base64: await file.readAll() };
+      return runTeamRequest(stageAgentImport(agentImportApi(serverId, onProgress), upload));
+    },
     applyAgentImport: async (input, serverId) =>
       runTeamRequest(applyAgentImport(agentImportApi(serverId), input, phoneTimezone())),
     discardAgentImport: async (token, serverId) => runTeamRequest(discardAgentImport(agentImportApi(serverId), token)),
@@ -1118,6 +1152,10 @@ export function createHostRequestActions({
         input,
       );
     },
+    loadMachineMetrics: async (serverId) => {
+      requireCapability(capabilities, serverId, MACHINE_RESOURCES_CAPABILITY, "mobile.server.machine.unsupported");
+      return request("POST", MACHINE_RESOURCES_ROUTES.metrics, decodeMachineMetrics, {}, serverId);
+    },
     clearServerStorage: async (category, serverId) => {
       requireCapability(capabilities, serverId, STORAGE_CAPABILITY, "mobile.workspace.error.filesUnsupported");
       await request("POST", STORAGE_ROUTES.clear, ignoreResponse, { category }, serverId);
@@ -1240,6 +1278,17 @@ export function createHostRequestActions({
       requireCapability(capabilities, serverId, CONTEXT_RESET_CAPABILITY, "mobile.agent.newChat.unsupported");
       await runTeamRequest(clearAgentContext(teamApi(serverId), agentId));
     },
+    startLiveVoice: async (input, serverId) =>
+      runTeamRequest(
+        startLiveVoice(capabilityApi(serverId, LIVE_VOICE_CAPABILITY, "mobile.chat.liveVoice.gptUnsupported"), input),
+      ),
+    stopLiveVoice: async (sessionId, serverId) =>
+      runTeamRequest(
+        stopLiveVoice(
+          capabilityApi(serverId, LIVE_VOICE_CAPABILITY, "mobile.chat.liveVoice.gptUnsupported"),
+          sessionId,
+        ),
+      ),
     compactContext: async (agentId, serverId) => {
       requireCapability(capabilities, serverId, CONTEXT_COMPACT_CAPABILITY, "mobile.agent.compact.unsupported");
       await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);

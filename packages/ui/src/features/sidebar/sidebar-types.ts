@@ -34,6 +34,23 @@ export type SidebarView = "agents" | "routines";
  */
 export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
 
+/**
+ * How the list orders the chats in the sections. Pins and "Needs you" come first in each order, and
+ * none of them changes the saved `agentOrder`.
+ * - `manual`: the saved order of the layout.
+ * - `unread-group`: unread chats leave their section for an "Unread" group under "Needs you", and go
+ *   back to their place when they are read.
+ * - `unread-first`: each section shows its unread chats first, then the others, both by last
+ *   activity. Chats do not drag in this order, because the order is not manual.
+ */
+export type SidebarChatOrder = "manual" | "unread-group" | "unread-first";
+
+export const SIDEBAR_CHAT_ORDERS = [
+  "manual",
+  "unread-group",
+  "unread-first",
+] as const satisfies readonly SidebarChatOrder[];
+
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */
   view?: SidebarView | undefined;
@@ -80,6 +97,10 @@ export interface SidebarProps {
   agentMoods: Record<string, AvatarMood>;
   layout: SidebarLayoutSnapshot;
   layoutMutable?: boolean | undefined;
+  /** How the list orders the chats. The default is `manual`. */
+  chatOrder?: SidebarChatOrder | undefined;
+  /** Saves the user's choice of order. Without it, the list menu has no "Sort chats" item. */
+  onChatOrderChange?: ((order: SidebarChatOrder) => void) | undefined;
   collapsedSectionIds: string[];
   onMutateLayout: (action: SidebarLayoutAction) => Promise<void>;
   /**
@@ -115,6 +136,15 @@ export interface SidebarProps {
    * one keeps its section and its pin for a restore.
    */
   userHiddenAgents?: HiddenAgent[] | undefined;
+  /**
+   * The agents whose own chat or side threads have unread replies. Their menu offers Mark read; the
+   * menu of the other agents offers Mark unread.
+   */
+  unreadAgentIds?: ReadonlySet<string> | undefined;
+  /** Marks the chat and the side threads of an agent read. Without it, the agent menu shows no read item. */
+  onMarkAgentRead?: ((agentId: string) => void) | undefined;
+  /** Marks the newest reply of an agent unread. Without it, the agent menu shows no unread item. */
+  onMarkAgentUnread?: ((agentId: string) => void) | undefined;
   /** Hides an agent. Without it, the agent menu shows no hide item. */
   onHideAgent?: ((agentId: string) => void) | undefined;
   /** Puts a hidden agent back in its section. Without it, a hidden agent's menu shows no restore item. */
@@ -164,6 +194,7 @@ export type SidebarAgentState =
   | { kind: "waiting"; reason: SidebarWaitReason; detail: string | null }
   | { kind: "working" }
   | { kind: "responded" }
+  /** `count` is the unread replies of the agent's chat. 0: only its side threads have unread replies. */
   | { kind: "unread"; count: number }
   | { kind: "routine"; phase: SidebarRoutinePhase; count: number }
   /** The provider plan is spent, so the queue waits. `resetsAt` is in epoch seconds, `null` when unknown. */

@@ -1,3 +1,4 @@
+import { ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentMessageMarkerModel } from "@openbot/ui/data";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 
@@ -56,15 +57,47 @@ export function groupAgentMessageMarkers(
 }
 
 /**
- * Sets on the marker of each agent message that has text whether the text shows under the marker.
- * `open` holds the exchange ids of the open messages. A message with no text gets no toggle.
+ * Sets on the marker of each agent message that has text or quiet answers whether they show under
+ * the marker. `open` holds the exchange ids of the open messages, and `answers` the quiet answers by
+ * exchange id (`teammateUpdateAnswers`). A message with neither gets no toggle.
  */
-export function markOpenAgentMessages(messages: readonly AgentMessage[], open: ReadonlySet<string>): AgentMessage[] {
+export function markOpenAgentMessages(
+  messages: readonly AgentMessage[],
+  open: ReadonlySet<string>,
+  answers: ReadonlyMap<string, readonly AgentMessage[]>,
+): AgentMessage[] {
   return messages.map((message) => {
     const marker = message.actionMarker;
-    if (marker?.kind !== "agent-message" || message.body.trim() === "") return message;
+    if (marker?.kind !== "agent-message") return message;
+    if (message.body.trim() === "" && !answers.has(marker.messageId)) return message;
     return { ...message, actionMarker: { ...marker, expanded: open.has(marker.messageId) } };
   });
+}
+
+/**
+ * The quiet answers of each turn that teammate updates started, by the exchange id of the last update
+ * of the turn. An update wants no answer, so when nothing in the turn was for the user, OpenBot kept
+ * the agent's text as quiet answers (#6821). They show under the marker of the update, which starts
+ * closed, as the answers of a quiet routine run show under its run. A turn with no teammate update
+ * keeps its quiet answers in place.
+ */
+export function teammateUpdateAnswers(messages: readonly AgentMessage[]): Map<string, AgentMessage[]> {
+  const updateByTurn = new Map<string, string>();
+  for (const message of messages) {
+    const exchange = message.exchange;
+    if (message.turnId && exchange?.direction === "incoming" && exchange.expectsReply === false)
+      updateByTurn.set(message.turnId, exchange.messageId);
+  }
+  const answers = new Map<string, AgentMessage[]>();
+  if (updateByTurn.size === 0) return answers;
+  for (const message of messages) {
+    const exchangeId = message.turnId && updateByTurn.get(message.turnId);
+    if (!exchangeId || message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) continue;
+    const turnAnswers = answers.get(exchangeId) ?? [];
+    turnAnswers.push(message);
+    answers.set(exchangeId, turnAnswers);
+  }
+  return answers;
 }
 
 /** A message with attachments draws them under its marker, so it keeps a row of its own. */

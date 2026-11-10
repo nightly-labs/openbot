@@ -6,12 +6,13 @@ import {
   type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
+  DEFAULT_APP_LOGO_COLOR,
   DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
   type QuitGuard,
 } from "@openbot/contracts/ipc";
-import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, localeDirection, resolveLocale, translateFor, withHourCycle } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -123,7 +124,13 @@ import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
-import { restartOnXWaylandWithoutMonitor, takeXWaylandRestartMarker } from "./linux-wayland-output";
+import {
+  keepAboveAppsXWayland,
+  restartOnXWaylandForAboveApps,
+  restartOnXWaylandWithoutMonitor,
+  setAboveAppsXWayland,
+  takeXWaylandRestartMarker,
+} from "./linux-wayland-output";
 import { openLocalServerControl, takeLocalServerChildEnvironment } from "./local-server-child";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
@@ -149,6 +156,7 @@ import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
+import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
@@ -296,11 +304,13 @@ if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
 // XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
 // systemd watches the process, the output and the input of a headless server, so it does not restart.
+// The agent dock and the Dynamic Island above other apps also start again on XWayland, when the user chose it.
 const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
-  (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env)))
+  ((await Effect.runPromise(restartOnXWaylandForAboveApps(process.env, app.getPath("userData")))) ||
+    (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -329,8 +339,10 @@ if (hasSingleInstanceLock) {
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
   stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
-  if (startedOnXWayland)
+  if (startedOnXWayland === "monitor")
     logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
+  if (startedOnXWayland === "above-apps")
+    logger.info("The agent dock or the Dynamic Island shows above other apps, so OpenBot uses XWayland.");
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
@@ -370,6 +382,11 @@ protocol.registerSchemesAsPrivileged([
   {
     scheme: "openbot-remote-visual",
     privileges: { standard: true, secure: true },
+  },
+  // The decode window of `read_video`, in its own session. It fetches the downloaded files.
+  {
+    scheme: "openbot-video",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
   },
   {
     scheme: "openbot-avatar",
@@ -507,7 +524,10 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
-  getFormat: () => createFormat(services?.language.locale ?? "en"),
+  getFormat: () => {
+    const locale = services?.language.locale ?? "en";
+    return createFormat(locale, withHourCycle(locale, systemHourCycle()));
+  },
   // The desktop app shows the notifications of a local server, as it does for every joined server.
   desktopNotificationsEnabled: () =>
     !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),
@@ -562,6 +582,14 @@ const windows = createMainWindowController({
 });
 
 let appIconColorImage: NativeImage | undefined;
+/**
+ * A packaged release on macOS shows the icon of its bundle in the Dock. On macOS 26 that icon comes
+ * from the Icon Composer catalog, with glass and with dark, clear and tinted versions; `dock.setIcon`
+ * would replace it with one flat image until the app quits.
+ */
+const dockShowsBundleIcon = process.platform === "darwin" && app.isPackaged && appVariant === "production";
+/** Electron cannot give the Dock back to the bundle icon, so after one change each change sets an image. */
+let dockIconChanged = false;
 let backgroundTray: BackgroundTray | null = null;
 
 /**
@@ -572,6 +600,7 @@ let backgroundTray: BackgroundTray | null = null;
  */
 function applyAppIconColor(color: AppLogoColor): void {
   if (appVariant !== "production") return;
+  if (dockShowsBundleIcon && color === DEFAULT_APP_LOGO_COLOR && !dockIconChanged) return;
   const icon = nativeImage.createFromPath(
     resolveLogoColorIconPath({
       color,
@@ -583,6 +612,7 @@ function applyAppIconColor(color: AppLogoColor): void {
   );
   if (icon.isEmpty()) return;
   if (process.platform === "darwin") {
+    dockIconChanged = true;
     app.dock?.setIcon(icon);
     return;
   }
@@ -709,6 +739,8 @@ function registerIpcHandlers({
   agentDefaults,
   agentMemoryLimit,
   memoryReview,
+  skillLearning,
+  browsingMemory,
   agentAccess,
   serverAudit,
   teamStore,
@@ -716,6 +748,7 @@ function registerIpcHandlers({
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
+  claudeCompactWindow,
   modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
@@ -820,8 +853,15 @@ function registerIpcHandlers({
       resources: resourceMonitor,
       startup,
     }),
-    ...dynamicIslandIpcHandlers({ dynamicIsland }),
-    ...agentDockIpcHandlers({ agentDock }),
+    ...dynamicIslandIpcHandlers({
+      dynamicIsland,
+      setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
+      keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
+    }),
+    ...agentDockIpcHandlers({
+      agentDock,
+      setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "agent-dock", enabled),
+    }),
     ...browserDockIpcHandlers({ browserDock }),
     ...computerUseIpcHandlers({
       cuaDriver,
@@ -829,12 +869,15 @@ function registerIpcHandlers({
       permissionHelp: computerUsePermissionHelp,
     }),
     ...macAutomationIpcHandlers({ platform: process.platform }),
-    ...backgroundProcessIpcHandlers({ platform: process.platform, agents: () => service.listAgents() }),
+    ...backgroundProcessIpcHandlers({
+      platform: process.platform,
+      agents: () => service.listAgents(),
+      remoteServers,
+    }),
     ...providerIpcHandlers({
       service,
       providerRuntimes,
       credentials: providerCredentials,
-      claudeUserSetup,
       openLink,
     }),
     ...voiceIpcHandlers({
@@ -873,9 +916,13 @@ function registerIpcHandlers({
     ...hostedServerIpcHandlers({ hostedServers }),
     ...localServerIpcHandlers({ localServers }),
     ...customProviderIpcHandlers(customProviderChanges),
-    ...customAgentIpcHandlers(customAgentChanges),
+    ...customAgentIpcHandlers({ changes: customAgentChanges, remoteServers }),
     ...acpRegistryIpcHandlers(acpRegistry, remoteServers),
-    ...providerDetectionIpcHandlers({ detection: providerDetection, settings: providerDetectionSettings }),
+    ...providerDetectionIpcHandlers({
+      detection: providerDetection,
+      settings: providerDetectionSettings,
+      remoteServers,
+    }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,
@@ -921,7 +968,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
-    ...routineResultIpcHandlers({ routineResults }),
+    ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...agentAdminIpcHandlers({
@@ -940,8 +987,12 @@ function registerIpcHandlers({
       serverPersonality,
       agentMemoryLimit,
       memoryReview,
+      skillLearning,
+      browsingMemory,
       machineAlerts,
       promptCacheTtl,
+      claudeUserSetup,
+      claudeCompactWindow,
       modelVisibility,
       agentAccess,
       serverAudit,
@@ -1342,7 +1393,7 @@ if (!hasSingleInstanceLock) {
       powerMonitor.on("shutdown", () => runMarker?.osShutdown());
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon) app.dock?.setIcon(appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;

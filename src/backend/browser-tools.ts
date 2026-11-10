@@ -5,6 +5,8 @@ import {
   VAULT_TEXT_LIMIT,
   type VaultContactFields,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { TWO_STEP_KEY_LIMIT } from "@openbot/contracts/two-step-code";
 import { UI_BLOCK_LIMITS, UI_VAULT_REQUEST_KINDS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
@@ -13,6 +15,7 @@ import {
   BROWSER_FILL_FIELDS_MAX_TEXT_BYTES,
   BROWSER_FILL_FIELDS_MAX_TIMEOUT_MS,
 } from "./browser-fill-fields";
+import { repairBrowserStep, repairBrowserToolInput } from "./browser-tool-input";
 
 export const OPENBOT_BROWSER_NAMESPACE = "openbot_browser";
 
@@ -168,6 +171,8 @@ export const BROWSER_SCRIPT_MAX_STEPS = 200;
 export const BROWSER_SCRIPT_MAX_SLEEP_MS = 25_000;
 const BROWSER_SCRIPT_MAX_CHARS = 20_000;
 export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
+/** An evaluate step gives its value to the script only, so it can read a whole page, such as its text. */
+export const BROWSER_SCRIPT_EVALUATE_MAX_BYTES = 1024 * 1024;
 const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
 
 const browserStepSchema = z.discriminatedUnion("action", [
@@ -190,7 +195,7 @@ export type BrowserStep = z.infer<typeof browserStepSchema>;
 
 /** Steps from a `run_script` sandbox are untrusted values, so each one is decoded before it runs. */
 export function parseBrowserStep(value: unknown): BrowserStep {
-  const result = browserStepSchema.safeParse(value);
+  const result = browserStepSchema.safeParse(isDynamicRecord(value) ? repairBrowserStep(value) : value);
   if (!result.success) throw new Error(`Invalid browser step: ${z.prettifyError(result.error)}`);
   return result.data;
 }
@@ -281,13 +286,13 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "list_vault_items",
     description:
-      "List what the user saved in the OpenBot Vault, not a password manager. A login shows id, website and username; its password and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy, when present, names the agent that added the item.",
+      "List what the user saved in the OpenBot Vault, not a password manager. A login shows id, website, username and hasTwoStepKey; its secrets and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy, when present, names the agent that added the item.",
     shape: {},
   }),
   browserTool({
     name: "save_vault_item",
     description:
-      "Add contact info or a login to the OpenBot Vault, or change a saved item. Without id, the item is new; a login needs website, username and password, such as a pasted password, and a saved login for that site and username gets it. With an id from list_vault_items (not list_logins), a login changes its username and password, and a card only fields that are not secret. An omitted field keeps its value. Returns status, id, kind and name, never a secret. Do not repeat a password. A password needs a request of a person in your OpenBot chat.",
+      "Add contact info or a login to the OpenBot Vault, or change a saved item. Without id, the item is new; a login needs website, username and password, and a saved login for that site and username gets it. With an id from list_vault_items (not list_logins), a login changes its username, password and twoStepKey, and a card only fields that are not secret. An omitted field keeps its value. Returns status, id, kind and name. Do not repeat a secret. A password or twoStepKey needs a request of a person in your OpenBot chat.",
     shape: {
       kind: z.enum(["contact", "login", "card"]),
       id: identifier.optional().describe("The item to change. Omit it to add a contact or a login."),
@@ -296,6 +301,13 @@ const BROWSER_TOOL_DEFINITIONS = [
       website: vaultText.describe("New login: the HTTPS website."),
       username: vaultText.describe("Login: the username or email."),
       password: z.string().max(VAULT_PASSWORD_LIMIT).optional().describe("Login: the password."),
+      twoStepKey: z
+        .string()
+        .max(TWO_STEP_KEY_LIMIT)
+        .optional()
+        .describe(
+          "Login: the authenticator setup key or otpauth:// link that a site shows with its 2FA QR code. Empty removes it.",
+        ),
       nameOnCard: vaultText.describe("Card: the name on the card."),
       expMonth: z.number().int().min(1).max(12).optional().describe("Card: the expiry month."),
       expYear: z.number().int().min(2000).max(2099).optional().describe("Card: the four-digit expiry year."),
@@ -572,7 +584,7 @@ export type BrowserToolArguments<Name extends BrowserToolCall["tool"]> = Extract
 export function parseBrowserToolCall(tool: string, value: unknown): BrowserToolCall {
   const definition = BROWSER_TOOL_DEFINITIONS.find((candidate) => candidate.name === tool);
   if (!definition) throw new Error(`Unknown browser tool: ${tool}`);
-  return definition.parse(value);
+  return definition.parse(repairBrowserToolInput(tool, value).value);
 }
 
 // Upload staging parses the same arguments before it resolves and authorizes local files.

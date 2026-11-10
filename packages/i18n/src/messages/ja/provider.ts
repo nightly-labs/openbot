@@ -123,10 +123,14 @@ export const messages = {
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.museNoModels":
+    "Muse はこのアカウントにモデルを返しませんでした。このエージェントが動作している国では Muse を利用できない可能性があります。別のプロバイダーのモデルを選択してください。",
   "provider.picker.customEmpty":
     "OpenAI 互換のエンドポイントを追加してください。このコンピューター上のモデルサーバーでも、ベース URL とキーがあるサービスでも使えます。",
   "provider.picker.customPending":
     "エンドポイントのモデルはまだ読み込まれていません。プロバイダーは現在のタスクが止まったあとで読み込みます。",
+  "provider.picker.customUnlisted": "{name} はエンドポイントのモデルを表示していません。",
+  "provider.picker.editEndpoints": "エンドポイントを編集",
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.usageLimit": "使用量の上限に達しました",
   "provider.picker.usageLimitWindow": "{window}の上限",
@@ -137,7 +141,12 @@ export const messages = {
   "provider.picker.effortLabel": "エージェントの推論の強さ",
   "provider.picker.effortFixed": "{effort}（{provider} が固定）",
   "provider.picker.fast": "高速",
-  "provider.picker.fastLabel": "高速モード",
+  "provider.picker.fastText": "応答が速く、使用量が増えます",
+  "provider.picker.speed": "速度",
+  "provider.picker.standard": "標準",
+  "provider.picker.standardText": "既定の速度",
+  "provider.picker.ultrafast": "超高速",
+  "provider.picker.ultrafastText": "最速の応答、使用量が大幅に増えます",
   "provider.picker.selectEffort": "推論の強さを選択",
   "provider.picker.custom": "カスタム",
   "provider.picker.cliReady": "{cli} 準備完了",
@@ -235,7 +244,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "自分の Claude Code 設定を使う",
   "provider.settings.claudeUserSetupDescription":
     "エージェントは ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
+  "provider.settings.claudeUserSetupServerDescription":
+    "エージェントはサーバー上の ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code の設定を読み込めませんでした。",
+  "provider.settings.context": "コンテキスト",
+  "provider.settings.compactWindow": "チャットを圧縮するサイズ",
+  "provider.settings.compactWindowDescription":
+    "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
+  "provider.settings.compactWindowDefault": "Claude Code の既定",
+  "provider.settings.compactWindowTokens": "{size} トークン",
+  "provider.settings.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
   "provider.settings.models": "モデル",
   "provider.settings.modelsDescription": { other: "{count} 件中 {shown} 件のモデルがモデル選択に表示されます。" },
   "provider.settings.modelsSearch": "モデルを検索",

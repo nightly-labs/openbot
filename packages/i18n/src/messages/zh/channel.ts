@@ -9,6 +9,8 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "重新分配 {name} 被停止的任务",
   "channel.stoppedTask.reassign": "重新分配",
   "channel.stoppedTask.cancel": "取消任务",
+  "channel.stoppedTask.assignmentLoop": "{names} 互相传递这个任务的次数过多。为防止循环，任务已停止。",
+  "channel.stoppedTask.assignmentLoopMembers": "成员互相传递这个任务的次数过多。为防止循环，任务已停止。",
   "channel.conversation.noMembers": "请在频道设置中添加助手以开始工作。",
   "channel.conversation.archivedNotice": "已删除的频道，仅供预览。",
   "channel.composer.label": "发消息到频道",

@@ -4,7 +4,11 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "السجل غير متاح لهذا الطلب. اقرأ السجل الحديث مرة أخرى، أو استخدم channel_history لعمل القنوات.",
+  "error.agent.historyArgumentsInvalid":
+    "وسائط السجل غير صحيحة: {detail} صحّح الوسائط وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
   "error.agent.toolRequestInvalid": "وسائط اكتشاف الأدوات غير صالحة. استخدم المخطط المُعلَن واسم الأداة المؤهَّل الأصلي.",
+  "error.agent.toolCallArgumentsNotObject":
+    "لم تعمل الأداة. في tool_call يجب أن تكون arguments كائن JSON وليست نصًا. أرسل الاستدعاء مرة أخرى مع arguments ككائن.",
   "error.agent.approvalWhileDeleting": "لا يمكن منح الموافقة أثناء حذف الوكيل.",
   "error.agent.accessLocalOnly": "لا يمكن تغيير وصول الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.duplicateCleanupFailed": "فشل تكرار الوكيل وتعذّرت إزالة النسخة غير المكتملة.",
@@ -40,6 +44,8 @@ export const messages = {
   "error.agent.providerNotListed": "لا يتوفر أي نموذج من {provider} الآن. استدعِ list_models لعرض النماذج المتاحة.",
   "error.agent.reasoningEffortUnsupported":
     "النموذج «{model}» لا يدعم مستوى الاستدلال «{effort}». المستويات المدعومة: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "النموذج «{model}» ليس له إعداد لمستوى الاستدلال، لذلك لا يمكنك تغيير مستواه.",
   "error.agent.noStartingModelInSettings":
     "لا يتوفر نموذج لدى {provider}، ولا لدى أي مزوّد آخر مسجّل الدخول. سجّل الدخول إلى مزوّد، أو غيّر المزوّد الافتراضي في إعدادات الخادم ← المزوّدون.",
   "error.agent.noStartingModel":
@@ -66,6 +72,8 @@ export const messages = {
   "error.agent.endpointRemoved": "أُزيلت نقطة النهاية التي استخدمها هذا الوكيل. اختر نموذجًا آخر له.",
   "error.agent.turnStalled":
     "توقّف {provider} عن الاستجابة، لذا أنهى OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.compactionConnectionLost":
+    "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت، ثم أرسل رسالة للمتابعة.",
   "error.agent.selectedGone": "لم يعد الوكيل المحدد موجودًا.",
   "error.agent.profileEndpointsChanged": "تغيّرت نقاط النهاية المخصصة أثناء الإنشاء. أعد المحاولة.",
   "error.agent.profileInvalid": "أعاد المزوّد ملفًا تعريفيًا غير صالح. جرّب تعديل المطالبة.",

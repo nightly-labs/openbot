@@ -8,7 +8,6 @@ export const messages = {
   "error.voice.removeBusy": "יש להמתין לסיום תמלול הקול ואז להסיר את המודל.",
   "error.voice.removeFailed": "לא ניתן להסיר את מודל הקול. יש לנסות שוב.",
   "error.voice.runtimeUnavailable": "תמלול קול מקומי אינו זמין בפלטפורמה הזו.",
-  "error.voice.busy": "תמלול קול כבר מתבצע.",
   "error.voice.modelUnavailable": "מודל הקול אינו זמין.",
   "error.voice.transcriptionTimedOut": "תמלול הקול חרג מהזמן המותר.",
   "error.voice.prepareRequired": "תמלול קול מקומי אינו זמין. יש להריץ `bun run voice:prepare` ולהפעיל מחדש את OpenBot.",
@@ -29,7 +28,10 @@ export const messages = {
   "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
   "error.voice.live.failed": "הקול החי נעצר: {reason}",
   "error.voice.live.disconnected": "הקול החי התנתק.",
+  "error.voice.live.hostFailed":
+    "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
   "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
+  "error.voice.live.unavailable": "OpenAI לא הצליחה להפעיל קול חי. הבעיה היא בצד של OpenAI. יש לנסות שוב מאוחר יותר.",
   "error.voice.live.off": "הקול החי של Codex כבוי. אפשר להפעיל אותו בהגדרות ← קול.",
   // The user's own voice server.
   "error.voice.server.routeOff": "שרת הקול לא הוגדר לכך. יש לבדוק את הגדרות ← קול.",

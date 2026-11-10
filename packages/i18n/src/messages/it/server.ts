@@ -121,6 +121,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot arresta il server e sposta i suoi agenti, chat e file nel cestino.",
   "server.local.deleting": "Eliminazione del server…",
   "server.local.deletedTitle": "{name} eliminato",
+  "server.install.title": "Nuovo server su un altro computer",
+  "server.install.description":
+    "Esegui questo comando su un computer Linux o un VPS di tua proprietà. Installa OpenBot e aggiunge il server a questo account.",
+  "server.install.making": "Creazione di un comando per questo account…",
+  "server.install.failed": "OpenBot non è riuscito a creare un comando. Controlla la connessione a internet.",
+  "server.install.copyForAgent": "Copia per un agente IA",
+  "server.install.expiresIn": "Funziona una volta. Scade tra {time}.",
+  "server.install.newCommand": "Nuovo comando",
+  "server.install.waiting": "In attesa che il comando venga eseguito sul tuo server…",
+  "server.install.starting": "{name} ha effettuato l’accesso. Avvio del server…",
+  "server.install.connected": "{name} è connesso.",
+  "server.install.offline": "{name} è offline.",
+  "server.install.expired": "Questo comando è scaduto. Creane uno nuovo.",
+  "server.install.agentPrompt":
+    'Installa OpenBot su questo server Linux e collegalo al mio account OpenBot.\nEsegui questo comando come root. Non fa domande e richiede alcuni minuti:\n\n{command}\n\nTermina con la riga "OpenBot is connected to your account." e il codice di uscita 0.\nIl comando funziona una volta, per 15 minuti. Non salvarlo da nessuna parte.',
+  "server.install.setUpWithAgent": "Configura con un agente",
+  "server.install.sshAgentPrompt":
+    "Connettiti via SSH al mio server Linux e installa OpenBot come server.\n\nIndirizzo SSH (user@host):",
   "server.add.limit.title": "Questo account ha il numero massimo di server",
   "server.add.limit.description": {
     one: "Un account può avere {count} server a pagamento. Per aggiungerne un altro, eliminane prima uno.",
@@ -322,6 +340,16 @@ export const messages = {
   "server.settings.memoryReviewOff": "Disattivata",
   "server.settings.memoryReviewTurns": { one: "Ogni {count} turno", other: "Ogni {count} turni" },
   "server.settings.memoryReviewLoadFailed": "Impossibile caricare l'impostazione della revisione delle memorie.",
+  "server.settings.skillLearning": "Apprendimento delle skill",
+  "server.settings.skillLearningDescription": "Se gli agenti di questo server salvano ciò che imparano come skill.",
+  "server.settings.skillLearningAutomatic": "Automatico",
+  "server.settings.skillLearningAsk": "Chiedi prima",
+  "server.settings.skillLearningOff": "Disattivato",
+  "server.settings.skillLearningLoadFailed": "Impossibile caricare l’impostazione di apprendimento delle skill.",
+  "server.settings.browsingMemory": "Impara dalla mia navigazione",
+  "server.settings.browsingMemoryDescription":
+    "Quando controlli il browser di un agente, l'agente impara come funzionano i siti dalle pagine e dai pulsanti che usi. Il testo digitato non viene conservato.",
+  "server.settings.browsingMemoryLoadFailed": "Impossibile caricare l'impostazione di navigazione.",
   "server.settings.remoteOnline": "L'host è online. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.remoteOffline": "L'host è offline. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.reachable": "Raggiungibile online. Solo le persone invitate possono accedere.",
@@ -340,7 +368,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Ultima modifica",
   "server.settings.hostKeyChangedDescription":
     "{date}. La chiave precedente e la nuova chiave hanno firmato questa modifica.",
-  "server.settings.hostKeyLocalOnly": "Qui solo il server su questo computer può cambiare la sua chiave.",
+  "server.settings.hostKeyOwnerOnly": "Solo il proprietario può cambiare la chiave del server.",
   "server.settings.removeTitle": "Rimuovi il server",
   "server.settings.removeDescription":
     "Rimuovi questo server dal servizio account per tutti i membri. Usalo quando il suo computer non è più disponibile.",

@@ -164,6 +164,11 @@ export interface AgentModelOption {
    * the model has no fast mode.
    */
   fastServiceTier?: string;
+  /**
+   * The provider's id for the Ultrafast service tier of this model, such as Codex `ultrafast`. Absent
+   * when the model or the account does not have it. The released Team API model list does not carry it.
+   */
+  ultrafastServiceTier?: string;
   /** See `AgentModelListing`. The released Team API model list does not carry it; `model-visibility-v1` does. */
   listing?: AgentModelListing;
 }
@@ -189,6 +194,8 @@ function hasAgentModelOptionFields(value: DynamicRecord): boolean {
     value.supportedReasoningEfforts.every(isReasoningEffort) &&
     (value.reasoningEffortConfigurable === undefined || isBoolean(value.reasoningEffortConfigurable)) &&
     (value.fastServiceTier === undefined || isBoundedString(value.fastServiceTier, INPUT_LIMITS.serviceTier)) &&
+    (value.ultrafastServiceTier === undefined ||
+      isBoundedString(value.ultrafastServiceTier, INPUT_LIMITS.serviceTier)) &&
     (value.listing === undefined || isOneOf(AGENT_MODEL_LISTINGS, value.listing))
   );
 }

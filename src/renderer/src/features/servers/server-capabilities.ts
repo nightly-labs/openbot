@@ -50,6 +50,7 @@ export function serverSupportsCapability(
       capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
       capability === "vault-v2" ||
+      capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||
       capability === "provider-host-sign-in-v1" ||
       capability === "storage-v1" ||
@@ -73,6 +74,7 @@ export function serverSupportsCapability(
       capability === "providers-v4" ||
       capability === "providers-v5" ||
       capability === "custom-provider-harness-v1" ||
+      capability === "custom-provider-edit-v1" ||
       capability === "agent-session-settings-v1" ||
       capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
@@ -82,6 +84,8 @@ export function serverSupportsCapability(
       capability === "host-timezone-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
+      capability === "skill-learning-v1" ||
+      capability === "browsing-memory-v1" ||
       capability === "prompt-cache-ttl-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
@@ -100,6 +104,7 @@ export function serverSupportsCapability(
       capability === "webhook-sender-secret-v1" ||
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
+      capability === "instance-transfer-chunks-v1" ||
       capability === "agent-hidden-v1" ||
       capability === "agent-tasks-v1" ||
       capability === "agent-threads-v1" ||
@@ -118,7 +123,25 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
-      capability === "conversation-unread-from-v1") &&
+      capability === "chat-history-v1" ||
+      capability === "conversation-unread-from-v1" ||
+      capability === "conversation-file-search-v1" ||
+      capability === "custom-agents-v1" ||
+      capability === "host-key-rotation-v1" ||
+      capability === "routine-results-v1" ||
+      capability === "workflows-chats-v1" ||
+      capability === "workflows-channels-v1" ||
+      capability === "vault-import-v1" ||
+      capability === "agent-waits-v1" ||
+      capability === "agent-queue-task-v1" ||
+      capability === "background-processes-v1" ||
+      capability === "routines-once-v1" ||
+      capability === "routine-run-command-v1" ||
+      capability === "claude-user-setup-v1" ||
+      capability === "claude-compact-window-v1" ||
+      capability === "agent-usage-limit-v1" ||
+      capability === "hermes-import-v1" ||
+      capability === "provider-detection-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -181,6 +204,15 @@ export function relaySignInProviders(server: ServerSummary | undefined): readonl
   return server?.kind === "remote" && serverSupportsCapability(server, "sign-in-relay-v1")
     ? SIGN_IN_RELAY_PROVIDERS
     : [];
+}
+
+/**
+ * Whether Settings can change the server key: this computer's, or a joined server's when the account
+ * owns it and the host serves `host-key-rotation-v1`. The host refuses an admin or a member.
+ */
+export function serverRotatesHostKey(server: ServerSummary | undefined): server is ServerSummary {
+  if (server?.kind === "local") return true;
+  return server?.role === "owner" && serverSupportsCapability(server, "host-key-rotation-v1");
 }
 
 /** An owner or admin of a joined server. This computer is always its own administrator. */

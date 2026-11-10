@@ -16,6 +16,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import {
   type ConversationUiBlock,
   normalizeConversationUiBlock,
@@ -85,9 +86,11 @@ import {
   mcpElicitationResult,
   mcpToolCallConsent,
   promptQuestions,
+  promptQuestionsProblem,
   promptResolution,
   questionPromptText,
   uiBlockPromptResult,
+  userMessagePromptResult,
   validPromptQuestions,
   vaultPromptResult,
   vaultRequestFormSpec,
@@ -184,14 +187,18 @@ const VAULT_LOGIN_ADD_FIELDS =
 const VAULT_PASSWORD_EXTERNAL_REFUSED =
   "You cannot save a password in an external chat. Ask the user to add it in Server settings > Vault.";
 const VAULT_PASSWORD_PERSON_ONLY =
-  "Only a person's message, in your OpenBot chat or a thread they opened, can save a password. Ask the user to add it in Server settings > Vault.";
+  "Only a person's message, in your OpenBot chat or a thread they opened, can save a password or a two-step key. Ask the user to add it in Server settings > Vault.";
 /** The password of a `save_vault_item` call whose other arguments can be wrong. */
 const decodePasswordArgument = Schema.decodeUnknownOption(Schema.Struct({ password: Schema.String }));
+const VAULT_TWO_STEP_KEY_INVALID =
+  "twoStepKey is not an authenticator setup key. Give the base32 key (at least 16 characters) or the otpauth://totp/ link that the site shows with its QR code.";
+/** The two-step key of a `save_vault_item` call whose other arguments can be wrong. */
+const decodeTwoStepKeyArgument = Schema.decodeUnknownOption(Schema.Struct({ twoStepKey: Schema.String }));
 const VAULT_CARD_ADD_REFUSED =
   "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], readonly string[]> = {
   contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
-  login: ["website", "username", "password"],
+  login: ["website", "username", "password", "twoStepKey"],
   card: ["label", "nameOnCard", "expMonth", "expYear", "billingContactId"],
 };
 
@@ -220,7 +227,7 @@ function sameSite(address: string, merchant: string): boolean {
 }
 
 /** What `save_vault_item` saves: a change, or a new login, which `saveLogin` merges by site and username. */
-type VaultAgentSave = VaultAgentChange | { kind: "newLogin"; login: VaultTypedLogin };
+type VaultAgentSave = VaultAgentChange | { kind: "newLogin"; login: VaultTypedLogin; twoStepKey?: string | undefined };
 
 /** The save that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
 function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentSave | string {
@@ -230,15 +237,27 @@ function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentS
   );
   if (misplaced) return `${misplaced[0]} is not a field of a ${args.kind}. Its fields are: ${allowed.join(", ")}.`;
   if (args.kind === "login") {
+    // Checked before anything is saved, so that a new login is not kept without its key.
+    if (args.twoStepKey && normalizeTwoStepKey(args.twoStepKey) === null) return VAULT_TWO_STEP_KEY_INVALID;
     if (args.id) {
       if (args.website !== undefined)
         return "A saved login keeps its website. Omit website, or omit id to add a login.";
-      return { kind: "login", id: args.id, username: args.username, password: args.password };
+      return {
+        kind: "login",
+        id: args.id,
+        username: args.username,
+        password: args.password,
+        twoStepKey: args.twoStepKey,
+      };
     }
     if (!args.website?.trim() || !args.password?.trim()) return VAULT_LOGIN_ADD_FIELDS;
     const url = websiteUrl(args.website);
     if (url?.protocol !== "https:" || !url.hostname) return "website must be an HTTPS website, such as example.com.";
-    return { kind: "newLogin", login: { origin: url.origin, username: args.username ?? "", password: args.password } };
+    return {
+      kind: "newLogin",
+      login: { origin: url.origin, username: args.username ?? "", password: args.password },
+      twoStepKey: args.twoStepKey || undefined,
+    };
   }
   if (args.kind === "card")
     return args.id
@@ -1400,6 +1419,12 @@ export class AttentionRegistry {
     // short password is redacted only when the Vault saves it: an unsaved short value would hide unrelated text.
     const raw = decodePasswordArgument(params.arguments);
     if (Option.isSome(raw)) registerSecretValue(raw.value.password);
+    const rawKey = decodeTwoStepKeyArgument(params.arguments);
+    if (Option.isSome(rawKey) && rawKey.value.twoStepKey) {
+      registerSecretValue(rawKey.value.twoStepKey);
+      const secret = twoStepKeySecret(rawKey.value.twoStepKey);
+      if (secret) registerSecretValue(secret);
+    }
     const call = yield* attentionStep(() => parseBrowserToolCall("save_vault_item", params.arguments));
     if (call.tool !== "save_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault save request.") });
@@ -1408,6 +1433,10 @@ export class AttentionRegistry {
       // A team member, a routine, another agent or a web page must not set a saved password.
       if (!requestedByPerson()) return browserTakeoverError(VAULT_PASSWORD_PERSON_ONLY);
     }
+    // Nor a two-step key: a page could replace the key of the user's login with its own. The key comes
+    // from the site, not the chat, so an external chat can ask for it.
+    if (call.args.twoStepKey !== undefined && !requestedByPerson())
+      return browserTakeoverError(VAULT_PASSWORD_PERSON_ONLY);
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
@@ -1418,10 +1447,20 @@ export class AttentionRegistry {
       change.kind === "newLogin" ? vault.saveLogin(change.login, addedBy) : vault.save(change, addedBy),
     );
     if (Result.isFailure(saved)) return vaultFailure("save", saved.failure);
+    let keySaved = false;
+    // `saveLogin` keeps only what the secure input types, so the key of a new login is a second change.
+    if (change.kind === "newLogin" && change.twoStepKey !== undefined) {
+      const keyed = yield* Effect.result(
+        vault.save({ kind: "login", id: saved.success.id, twoStepKey: change.twoStepKey }, addedBy),
+      );
+      if (Result.isFailure(keyed)) return vaultFailure("save", keyed.failure);
+      keySaved = true;
+    }
     const { created, id, kind, name } = saved.success;
     const item = { id, kind, name };
     // A saved login for the same site and username that had this password stays as it was.
-    if ("changed" in saved.success && !saved.success.changed) return vaultResult({ status: "unchanged", ...item });
+    if ("changed" in saved.success && !saved.success.changed && !keySaved)
+      return vaultResult({ status: "unchanged", ...item });
     this.#noteVaultChange(
       agentId,
       params.threadId,
@@ -1555,13 +1594,16 @@ export class AttentionRegistry {
     const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
     const args = getRecord(request.params, "arguments");
     const questions = promptQuestions(args);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !validPromptQuestions(questions)) {
+    const problem = promptQuestionsProblem(questions);
+    if (!threadId || !turnId || !agentId || !publicThreadId || problem) {
       client.respond(request.id, {
         success: false,
         contentItems: [
           {
             type: "inputText",
-            text: "OpenBot could not create a user question.",
+            text: problem
+              ? `OpenBot could not create a user question: ${problem} Correct the arguments and retry.`
+              : "OpenBot could not create a user question.",
           },
         ],
       });
@@ -1831,6 +1873,33 @@ export class AttentionRegistry {
     }
   }
 
+  /**
+   * The user wrote in a chat while its turn waits on a question or a UI block there. The turn reads
+   * no message until that tool call returns, and a queued message starts only when the turn ends, so
+   * each would wait for the other. The questions and blocks of the turn close as skipped, with a note
+   * to follow the message. A form whose key or item is being saved finishes on its own. Approvals,
+   * MCP elicitations and browser takeovers stay: a message must not refuse an action or end a sign-in.
+   */
+  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
+        continue;
+      if (pending.saving || pending.responseKind === "mcp-elicitation") continue;
+      this.#routines.markRunningForTurn(turnId);
+      // The card shows as the user's own skip does.
+      this.#closePrompt(
+        requestId,
+        pending,
+        userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId),
+        { status: "cancelled" },
+        pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
+      );
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
   /** Expires the prompts of one lost provider client, or of all clients when none is given. */
   clearPrompts(client?: AgentClient): void {
     for (const [requestId, pending] of this.#prompts) {
@@ -1877,23 +1946,37 @@ export class AttentionRegistry {
    * that forgot the request ignores the answer.
    */
   #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
+    this.#closePrompt(
+      requestId,
+      pending,
+      pending.uiBlock
+        ? uiBlockPromptResult({ status: "expired", blockId: pending.uiBlock.blockId })
+        : expiredPromptResult(pending.responseKind),
+      { status: "expired" },
+      { status: "expired" },
+    );
+  }
+
+  /** Removes an unanswered prompt, gives a running client `result`, and stores how the card ended. */
+  #closePrompt(
+    requestId: RequestId,
+    pending: PendingPrompt,
+    result: unknown,
+    resolution: AgentPromptResolution,
+    uiBlockState: UiBlockState | undefined,
+  ): void {
     this.#prompts.delete(requestId);
     clearTimeout(pending.autoAnswer?.timer);
     this.#emitInputResolved("prompt", requestId, pending.agentId);
     if (pending.client.running) {
       try {
-        pending.client.respond(
-          pending.id,
-          pending.uiBlock
-            ? uiBlockPromptResult({ status: "expired", blockId: pending.uiBlock.blockId })
-            : expiredPromptResult(pending.responseKind),
-        );
+        pending.client.respond(pending.id, result);
       } catch (error) {
-        logger.warn("Unable to answer an expired prompt", { error: toLogValue(error) });
+        logger.warn("Unable to answer a closed prompt", { error: toLogValue(error) });
       }
     }
     try {
-      this.#resolvePersistedPrompt(pending, { status: "expired" }, { status: "expired" });
+      this.#resolvePersistedPrompt(pending, resolution, uiBlockState);
     } catch (error) {
       this.#emitError("prompt_persistence_failed", error, pending.agentId);
     }
@@ -2009,7 +2092,7 @@ export class AttentionRegistry {
         "field-kind",
         kind === "password"
           ? "the field target is not a password input."
-          : 'the field targets do not have autocomplete="one-time-code".',
+          : 'the field targets are not code fields. A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, 2fa, or verification code in its id, name, or aria-label and no backup, recovery, email, phone, or SMS word.',
       );
     const found = yield* Effect.result(
       Effect.gen(function* () {

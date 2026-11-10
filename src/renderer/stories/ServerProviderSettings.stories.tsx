@@ -164,6 +164,24 @@ const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
     models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
   },
 ];
+/**
+ * The endpoints of a joined server's host, as `custom-provider-edit-v1` lists them: each one names its
+ * harness and its header names. The model limits stay on the host.
+ */
+const STORY_HOST_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
+  {
+    id: "aperture",
+    name: "Aperture",
+    baseUrl: "https://aperture.example.com/v1",
+    hasApiKey: true,
+    headerNames: ["X-Tenant"],
+    models: [
+      { id: "qwen3-coder", name: "Qwen3 Coder" },
+      { id: "glm-4.6", name: "GLM 4.6" },
+    ],
+    harness: "pi",
+  },
+];
 const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
@@ -208,6 +226,11 @@ function ServerProvidersStory(props: {
   hermes?: ProviderRuntimeStatus | null;
   /** A joined server whose host logs Codex in with an OpenAI key: before the key, or with it. */
   hostCodexKey?: "missing" | "saved";
+  /**
+   * A joined server with saved endpoints: `edit` is a host with `custom-provider-edit-v1`, and
+   * `remove-only` is an older host, which offers Remove only.
+   */
+  hostCustomProviders?: "edit" | "remove-only";
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const hermes = props.hermes;
@@ -255,7 +278,11 @@ function ServerProvidersStory(props: {
   const codeConnection = createFakeConnection({ browser: fn(), finishAfterMs: 0 });
   const browserConnection = createFakeConnection({ browser: fn(), alternative: [] });
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
-    props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
+    props.hostCustomProviders
+      ? [...STORY_HOST_CUSTOM_PROVIDERS]
+      : props.customProviderList
+        ? [...STORY_CUSTOM_PROVIDERS]
+        : [],
   );
   const [detectionSettings, setDetectionSettings] = createSignal(props.detectionSettings);
   const [offProviders, setOffProviders] = createSignal(props.offProviders);
@@ -306,7 +333,7 @@ function ServerProvidersStory(props: {
   // compiled ternary prop cannot create its memo.
   const switchToManageProviders = props.inactive ? fn() : undefined;
   function storyServer(): ServerSummary {
-    if (props.hostCodexKey) return { ...teamServer, active: true };
+    if (props.hostCodexKey || props.hostCustomProviders) return { ...teamServer, active: true };
     return props.inactive ? { ...localServer, active: false } : localServer;
   }
 
@@ -373,7 +400,7 @@ function ServerProvidersStory(props: {
       providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
-      onUpdateCustomProvider: updateCustomProvider,
+      onUpdateCustomProvider: props.hostCustomProviders === "remove-only" ? undefined : updateCustomProvider,
       get customProviders() {
         return customProviders();
       },
@@ -436,7 +463,8 @@ function ServerProvidersStory(props: {
             onRecheckScreenRecording={fn(async () => undefined)}
             initialSection="providers"
             hostPromptCacheTtl={{}}
-            claudeUserSetup
+            claudeUserSetup={{}}
+            claudeCompactWindow={{}}
             hostModelVisibility={{}}
             onSwitchToManageProviders={switchToManageProviders}
             providers={providerOptions()}
@@ -560,6 +588,20 @@ export const HostCodexKey: Story = {
 /** The same server after the key: Codex on the host uses the OpenAI API key. */
 export const HostCodexKeySaved: Story = {
   render: () => <ServerProvidersStory hostCodexKey="saved" />,
+};
+
+/**
+ * A joined server whose host has `custom-provider-edit-v1`. Open the endpoint list: each endpoint
+ * offers Edit. The form changes the name, address, models, key and headers; the host keeps the
+ * harness and the model limits.
+ */
+export const HostCustomProviderEdit: Story = {
+  render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="edit" />,
+};
+
+/** The same server on an older host: the endpoint list offers Remove only. */
+export const HostCustomProviderRemoveOnly: Story = {
+  render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="remove-only" />,
 };
 
 export const ProviderDownloads: Story = {

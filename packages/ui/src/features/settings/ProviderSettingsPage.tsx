@@ -11,7 +11,9 @@ import {
   type AgentProviderId,
   type AgentProviderStatus,
   agentProviderName,
+  type ClaudeCompactWindowSetting,
   type CustomProviderSummary,
+  claudeCompactWindowSizes,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
@@ -110,12 +112,26 @@ export interface ProviderPromptCache {
   onChange: (ttl: PromptCacheTtl) => void;
 }
 
+/**
+ * The size at which Claude Code compacts the chats of the host's agents. `value` is null until the
+ * host answers; its `tokens` is null for Claude Code's own size.
+ */
+export interface ProviderClaudeCompactWindow {
+  value: ClaudeCompactWindowSetting | null;
+  pending: boolean;
+  /** A load or a save that failed. */
+  error: string | null;
+  onChange: (tokens: number | null) => void;
+}
+
 /** Whether Claude loads the user's own Claude Code setup. `value` is null until main answers. */
 export interface ProviderClaudeUserSetup {
   value: boolean | null;
   pending: boolean;
   /** A load or a save that failed. */
   error: string | null;
+  /** The switch of a joined server: the agents load the setup of the host's user, on the host. */
+  remote?: boolean;
   onChange: (enabled: boolean) => void;
 }
 
@@ -173,6 +189,8 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   promptCache?: ProviderPromptCache | undefined;
   /** On the Claude page. This computer only: a joined server has no route for it. */
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
+  /** On the Claude page. Only for a host with `claude-compact-window-v1` that this account administers. */
+  claudeCompactWindow?: ProviderClaudeCompactWindow | undefined;
   /**
    * The model list of one provider page. Called once when the page opens, so the control lives as
    * long as the page. Only for a host with `model-visibility-v1` that this account administers.
@@ -560,6 +578,11 @@ function ProviderPage(props: PageProps) {
         <RuntimeSection {...props} row={row} />
         <Show when={props.option.id === "claude" && props.promptCache}>
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
+        </Show>
+        <Show when={props.option.id === "claude" && props.claudeCompactWindow}>
+          {(compaction) => (
+            <CompactWindowSection compaction={compaction()} disabled={props.disabled} menuMount={props.menuMount} />
+          )}
         </Show>
         <Show when={props.option.id === "claude" && props.claudeUserSetup}>
           {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
@@ -1551,6 +1574,83 @@ function PromptCacheSection(props: {
   );
 }
 
+/* ---------------------------------------------- Context */
+
+/** A select value: `default` for Claude Code's own size, or a number of tokens as text. */
+type CompactWindowChoice = "default" | `${number}`;
+
+function compactWindowChoice(tokens: number | null): CompactWindowChoice {
+  return tokens === null ? "default" : `${tokens}`;
+}
+
+/**
+ * Claude only. The size at which Claude Code sums up the older turns of a chat. Automatic compaction
+ * stays on; the default leaves Claude Code's own size for each model. A change applies to the next
+ * Claude process. A size that another client saved and that is not a choice here still shows.
+ */
+function CompactWindowSection(props: {
+  compaction: ProviderClaudeCompactWindow;
+  disabled: boolean | undefined;
+  menuMount: HTMLElement | undefined;
+}) {
+  const { t, format } = useText();
+  const choices = (): CompactWindowChoice[] =>
+    claudeCompactWindowSizes(props.compaction.value?.tokens ?? null).map(compactWindowChoice);
+  const label = (choice: CompactWindowChoice) =>
+    choice === "default"
+      ? t("provider.settings.compactWindowDefault")
+      : t("provider.settings.compactWindowTokens", { size: format.compact(Number(choice)) });
+  return (
+    <SettingsSection title={t("provider.settings.context")}>
+      <ItemGroup class="settings-modal-card">
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle id="provider-settings-compact-window-label">{t("provider.settings.compactWindow")}</ItemTitle>
+            <Show
+              when={props.compaction.error}
+              fallback={<ItemDescription>{t("provider.settings.compactWindowDescription")}</ItemDescription>}
+            >
+              {(message) => (
+                <ItemDescription class="provider-settings-error" role="alert">
+                  {message()}
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <Show when={props.compaction.value}>
+            {(value) => (
+              <ItemActions>
+                <Select<CompactWindowChoice>
+                  options={choices()}
+                  value={compactWindowChoice(value().tokens)}
+                  disabled={Boolean(props.disabled || props.compaction.pending)}
+                  placement="bottom-end"
+                  // The select also reports the value that it shows, which is not a choice of the user.
+                  onChange={(choice) => {
+                    if (!choice || choice === compactWindowChoice(props.compaction.value?.tokens ?? null)) return;
+                    props.compaction.onChange(choice === "default" ? null : Number(choice));
+                  }}
+                  itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
+                >
+                  <SelectTrigger size="sm" aria-labelledby="provider-settings-compact-window-label">
+                    <SelectValue<CompactWindowChoice>>
+                      {(state) => {
+                        const selected = state.selectedOption();
+                        return selected ? label(selected) : "";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.menuMount} />
+                </Select>
+              </ItemActions>
+            )}
+          </Show>
+        </Item>
+      </ItemGroup>
+    </SettingsSection>
+  );
+}
+
 /* ---------------------------------------------- Claude Code setup */
 
 /**
@@ -1560,16 +1660,17 @@ function PromptCacheSection(props: {
  */
 function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disabled: boolean | undefined }) {
   const { t } = useText();
+  function claudeUserSetupDescription(): string {
+    if (props.setup.remote === true) return t("provider.settings.claudeUserSetupServerDescription");
+    return t("provider.settings.claudeUserSetupDescription");
+  }
   return (
     <SettingsSection title={t("provider.settings.claudeSetup")}>
       <ItemGroup class="settings-modal-card">
         <Item class="settings-modal-row">
           <ItemContent>
             <ItemTitle id="provider-settings-claude-setup-label">{t("provider.settings.claudeUserSetup")}</ItemTitle>
-            <Show
-              when={props.setup.error}
-              fallback={<ItemDescription>{t("provider.settings.claudeUserSetupDescription")}</ItemDescription>}
-            >
+            <Show when={props.setup.error} fallback={<ItemDescription>{claudeUserSetupDescription()}</ItemDescription>}>
               {(message) => (
                 <ItemDescription class="provider-settings-error" role="alert">
                   {message()}

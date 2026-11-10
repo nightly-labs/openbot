@@ -10,6 +10,7 @@
 import type { IncomingMessage } from "node:http";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
   agentAccessRank,
   type ConversationMessage,
@@ -39,6 +40,7 @@ import {
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -200,10 +202,11 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
 
 /**
  * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
- * into its run, so a quiet answer goes to none: it would show as a new answer to every client.
+ * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
+ * agent's setup message (`agent-welcome-v1`) is for the agent only, so it goes to none either.
  */
 function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return false;
+  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE || itemType === AGENT_WELCOME_ITEM_TYPE) return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
@@ -327,6 +330,7 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     if (sideRoute) {
       const input = sideRoute.request(path, value, {
         channelIsolation: capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+        channelPicture: capabilities.has(CHANNEL_PICTURE_CAPABILITY),
       });
       if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;

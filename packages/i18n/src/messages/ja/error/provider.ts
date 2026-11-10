@@ -232,6 +232,8 @@ export const messages = {
     "OpenCode のモデルが、回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode のモデルが、推論のあと回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
+  "error.provider.acpNoAnswer":
+    "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",
@@ -242,9 +244,6 @@ export const messages = {
   "error.provider.noAgentProcess": "{provider} には、このエージェント用に実行中のプロセスがありません。",
   "error.provider.stoppedBeforeAgentProcess": "エージェントのプロセスが開始する前に {provider} が停止しました。",
   "error.provider.archiveUnreadable": "ランタイムのアーカイブを読み取れないか、対応していない形式です。",
-  "error.provider.antigravityArchivePath": "Gemini のアーカイブに予期しないファイルがあります。",
-  "error.provider.antigravityChecksum": "Gemini ランタイムのチェックサムが一致しません。",
-  "error.provider.antigravityReleaseShape": "Gemini のリリースの形式が予期しないものです。",
   "error.provider.antigravityMissing":
     "Gemini はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
@@ -260,6 +259,10 @@ export const messages = {
     "Gemini は現在このモデルを使用できません。別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Windows ホストでは、Gemini は Google のページをホスト上で開きます。ホストのコンピューターで Gemini を接続してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
   "error.provider.cursorChecksum": "Cursor ランタイムのチェックサムが一致しません。",
   "error.provider.cursorReleaseShape": "Cursor のリリースの形式が予期しないものです。",
@@ -302,6 +305,10 @@ export const messages = {
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageTooSmall":
+    "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageTooLarge":
+    "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.museMcpStartupFault":
@@ -436,6 +443,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse にはテキストまたは画像が必要です。",
   "error.provider.museMethodUnsupported": "Muse は {method} に対応していません。",
   "error.provider.museTurnFailed": "Muse のターンに失敗しました。",
+  "error.provider.museModelUnavailable":
+    "Muse はこのモデルを使用できません。このエージェントが動作している国では Muse を利用できないか、このアカウントにモデルへのアクセス権がない可能性があります。別のモデルを選択してから、もう一度お試しください。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse は外部ツールにアクセスできないため、プロフィールを生成できません。別のプロバイダーでプロフィールを生成してから、エージェントに Muse を選択してください。",
   "error.provider.museAuthUnverified":

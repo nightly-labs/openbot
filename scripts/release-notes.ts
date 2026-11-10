@@ -2,6 +2,10 @@
 // release that ships with an empty or malformed section ships with an empty or broken page entry.
 // No package imports: `release.yml` runs this before `bun install`.
 
+import { execFileSync } from "node:child_process";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+
 const RELEASE_GROUPS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"];
 const PLACEHOLDER = /\b(TODO|TBD|FIXME|XXX)\b/;
 
@@ -80,6 +84,58 @@ export function formatStoreDates(dates: StoreDates): string {
     ...days.map(({ store, day }) => `${day} (${MOBILE_STORE_NAMES[store]})`),
     ...skipped.map((store) => `${SKIPPED} (${MOBILE_STORE_NAMES[store]})`),
   ].join(", ");
+}
+
+/**
+ * An over-the-air (OTA) update of a store version: `1.4.8.2` is the second one of `1.4.8`. It
+ * changes only the JavaScript of a build that the stores already have. Thus it is not a store
+ * version: no store reviews it, it does not change `app.json`, and it gets no Discord post.
+ * Undefined for a store version.
+ */
+export function otaVersion(version: string): { store: string; number: number } | undefined {
+  const [, store = "", number = ""] = /^(\d+\.\d+\.\d+)\.(\d+)$/.exec(version) ?? [];
+  return store === "" ? undefined : { store, number: Number(number) };
+}
+
+/**
+ * What is wrong with the OTA sections of the mobile changelog. Empty when each one is ready.
+ * An OTA section has the heading of a store version that is available, such as
+ * `## [1.4.8.1] - 2026-11-12 (Android)`, and it is directly above the section that it updates.
+ */
+export function otaSectionProblems(changelog: string): string[] {
+  const headings = changelog.split(/\r?\n/).flatMap((line) => {
+    const [, version = ""] = /^## \[([^\]]+)\]/.exec(line) ?? [];
+    return version === "" ? [] : [{ version, line }];
+  });
+  const datesOf = (version: string) => {
+    const prefix = `## [${version}] - `;
+    const line = headings.find((heading) => heading.line.startsWith(prefix))?.line;
+    return line === undefined ? undefined : parseStoreDates(line.slice(prefix.length));
+  };
+  return headings.flatMap(({ version, line }, index) => {
+    const ota = otaVersion(version);
+    if (ota === undefined) return [];
+    const problems = releaseNotesProblems(changelog, version, { storeReview: true });
+    const dates = datesOf(version) ?? {};
+    const stores = MOBILE_STORES.filter((store) => dates[store] !== undefined);
+    if (stores.length === 0 || stores.some((store) => dates[store] === SKIPPED)) {
+      problems.push(
+        `"${line}" is an OTA update, so it must have a date for each platform that gets it, and no "${IN_REVIEW}" or "${SKIPPED}".`,
+      );
+    }
+    // The first OTA update is above its store version, and each later one is above the one before it.
+    const below = ota.number > 1 ? `${ota.store}.${ota.number - 1}` : ota.store;
+    if (ota.number < 1 || headings[index + 1]?.version !== below) {
+      problems.push(`"${line}" must be directly above the "## [${below}]" section.`);
+    }
+    const storeDates = datesOf(ota.store) ?? {};
+    for (const store of stores.filter((candidate) => storeDay(storeDates, candidate) === undefined)) {
+      problems.push(
+        `${version} names ${MOBILE_STORE_NAMES[store]}, but ${ota.store} is not available on ${MOBILE_STORE_NAMES[store]}.`,
+      );
+    }
+    return problems;
+  });
 }
 
 interface ReleaseNotesOptions {
@@ -172,6 +228,25 @@ export function unreleasedItems(changelog: string): string[] {
   if (start === -1) return [];
   const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
   return lines.slice(start + 1, end === -1 ? undefined : end).filter((line) => line.startsWith("- "));
+}
+
+/** The fragments in `directory`, oldest commit first. A fragment with no commit is last. */
+export async function releaseFragments(directory: string): Promise<string[]> {
+  // Recursive, as the hook and the workflow check a fragment in a subdirectory too.
+  const names = (await readdir(directory, { recursive: true })).filter(
+    (name) => name.endsWith(".md") && name !== "README.md",
+  );
+  const added = (path: string) => {
+    const time = execFileSync("git", ["log", "--diff-filter=A", "--format=%ct", "-1", "--", path], {
+      encoding: "utf8",
+    }).trim();
+    return time === "" ? Number.POSITIVE_INFINITY : Number(time);
+  };
+  return names
+    .map((name) => join(directory, name))
+    .map((path) => ({ path, time: added(path) }))
+    .sort((a, b) => a.time - b.time || a.path.localeCompare(b.path))
+    .map(({ path }) => path);
 }
 
 /** What stops one fragment in `changelog.d` from being released. Empty when it is ready. */

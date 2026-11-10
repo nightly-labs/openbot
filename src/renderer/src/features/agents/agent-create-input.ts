@@ -13,8 +13,13 @@ export type NewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSe
  * remote host without `agent-create-model` drops the pair and starts its own default. The reasoning
  * level and the account travel only with the pair; without a level, the backend starts the model's
  * default level, and without an account, the provider's own sign-in.
+ * `welcomeSupported`: the host hides the first message (`agent-welcome-v1`), so it can be a setup message.
  */
-export function newAgentInput(draft: NewAgentDraft, createModelSupported: boolean): CreateAgentInput {
+export function newAgentInput(
+  draft: NewAgentDraft,
+  createModelSupported: boolean,
+  welcomeSupported: boolean,
+): CreateAgentInput {
   return {
     name: draft.name.trim(),
     description: draft.purpose.trim() || "General-purpose assistant",
@@ -29,6 +34,6 @@ export function newAgentInput(draft: NewAgentDraft, createModelSupported: boolea
           ...(draft.providerAccountId ? { providerAccountId: draft.providerAccountId } : {}),
         }
       : {}),
-    initialMessage: createAgentInitialMessage(draft),
+    initialMessage: createAgentInitialMessage(draft, welcomeSupported),
   };
 }

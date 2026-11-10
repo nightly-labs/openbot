@@ -1,10 +1,10 @@
 {
-  "version": "0.64.0",
+  "version": "0.66.0",
   "highlights": [
-    "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Use my Claude Code setup in Settings → Providers → Claude.",
-    "Put your agents on the new agent dock at the edge of your Mac screen, and chat with them from there.",
-    "Agents now write short updates while they work. Choose Classic in Server settings to keep the old style.",
-    "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
-    "Attach a file of any type to a chat, and send files of up to 100 MB from the web app."
+    "Agents now learn new skills by themselves after you correct them, and fix their own skills while they work.",
+    "Save two-step codes in the Vault, and let agents sign in with them.",
+    "The Dynamic Island and the agent dock now work on Windows, and the dock can hold channels.",
+    "Agents can watch public videos, such as YouTube or TikTok links, and read what is said in them.",
+    "Channel members answer while they work, and a greeting or an unclear message goes to the lead."
   ]
 }

@@ -4,8 +4,12 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Bu istek için geçmiş kullanılamıyor. Son geçmişi tekrar okuyun veya kanal çalışması için channel_history kullanın.",
+  "error.agent.historyArgumentsInvalid":
+    "Geçmiş bağımsız değişkenleri yanlış: {detail} Bağımsız değişkenleri düzeltip yeniden dene. openbot.tool_describe şemayı verir.",
   "error.agent.toolRequestInvalid":
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Araç çalışmadı. tool_call içinde arguments metin değil, bir JSON nesnesi olmalı. Çağrıyı arguments bir nesne olacak şekilde yeniden gönderin.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
@@ -48,6 +52,8 @@ export const messages = {
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    '"{model}" modelinin akıl yürütme eforu ayarı yok, bu yüzden eforunu değiştiremezsiniz.',
   "error.agent.noStartingModelInSettings":
     "{provider} için kullanılabilir model yok ve oturum açılmış diğer sağlayıcılarda da yok. Bir sağlayıcıda oturum açın veya Sunucu ayarları → Sağlayıcılar bölümünden varsayılan sağlayıcıyı değiştirin.",
   "error.agent.noStartingModel":
@@ -75,6 +81,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.compactionConnectionLost":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",

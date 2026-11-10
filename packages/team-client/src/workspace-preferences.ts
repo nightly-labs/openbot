@@ -9,6 +9,8 @@ const WorkspacePreferences = Schema.Struct({
   hiddenChannels: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
   /** The workflows that the mobile drawer shows under Workflows. An older app keeps reading the file. */
   pinnedWorkflows: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
+  /** The sidebar sections that the user closed on this phone. An older app keeps reading the file. */
+  collapsedSections: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
   /**
    * The agent and channel pins in the order of the last list that the host gave (`sidebar-pins-v1`).
    * Absent until the first read from a host that keeps the pins. An older app keeps reading the file.
@@ -58,6 +60,7 @@ export function createWorkspacePreferences(
       ...(value.pinnedChannels ? { pinnedChannels: value.pinnedChannels } : {}),
       ...(value.hiddenChannels ? { hiddenChannels: value.hiddenChannels } : {}),
       ...(value.pinnedWorkflows ? { pinnedWorkflows: value.pinnedWorkflows } : {}),
+      ...(value.collapsedSections ? { collapsedSections: value.collapsedSections } : {}),
       ...(value.pinOrder ? { pinOrder: value.pinOrder } : {}),
       ...(value.pinsPending ? { pinsPending: true } : {}),
     };

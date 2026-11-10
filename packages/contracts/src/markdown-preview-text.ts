@@ -1,4 +1,5 @@
 import { Marked, type Token, type Tokens } from "marked";
+import { attachmentReferenceAt } from "./attachment-references";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "./chat-math";
 import { chatTagReferences, expandChatTagReferences } from "./chat-tag-references";
 
@@ -26,11 +27,14 @@ const markdown = new Marked({
       },
     },
     {
-      // A mention (`@[Chief](agent:chief)`) would otherwise read as a link.
+      // A mention (`@[Chief](agent:chief)`) or a file (`@[notes.md](attachment:<id>)`) would otherwise
+      // read as `@` and a link. A file shows its name.
       name: "chatTag",
       level: "inline",
       start: (source) => source.indexOf("@["),
       tokenizer(source) {
+        const file = attachmentReferenceAt(source);
+        if (file) return { type: "chatTag", raw: file.marker, text: file.name };
         const reference = chatTagReferences(source)[0];
         if (reference?.start !== 0) return undefined;
         const raw = source.slice(0, reference.end);

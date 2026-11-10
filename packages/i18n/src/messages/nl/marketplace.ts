@@ -118,6 +118,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "Draait in de desktop-app van {name} op {address}.",
   "marketplace.app.setup.desktopConnected": "Verbonden met {address}.",
   "marketplace.app.setup.open": "Geen login of sleutel nodig.",
+  "marketplace.app.blocked.update":
+    "{host} draait een oudere OpenBot-versie die geen apps kan koppelen. Werk OpenBot op {host} bij, of vraag de eigenaar dat te doen.",
+  "marketplace.app.blocked.member":
+    "Alleen een eigenaar of beheerder van {host} kan daar apps koppelen. Vraag een van hen om {name} te koppelen, of om OpenBot op {host} bij te werken zodat leden apps kunnen koppelen.",
   "marketplace.app.connectAgain": "Opnieuw koppelen",
   "marketplace.app.automation.askOnInstall": "Bij installatie macOS om toegang vragen",
   "marketplace.app.automation.title": "Toegang tot Apple-apps",
@@ -184,6 +188,27 @@ export const messages = {
     "Zoek in mijn Cobrain-notities wat we over de prijzen hebben besloten.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Sla een notitie op in Cobrain met wat we vandaag hebben gedaan en wat er nog moet.",
+  "marketplace.plugin.honcho.tagline": "Je geheugen in al je AI-tools",
+  "marketplace.plugin.honcho.description":
+    "Honcho van Plastic Labs geeft agents een langetermijngeheugen over jou dat andere gekoppelde AI-tools kunnen delen. Agents slaan op wat ze leren, en Honcho redeneert erover om een model te maken van je voorkeuren, doelen en manier van werken. Agents stellen het vragen voordat ze beginnen. OpenBot-agents hebben ook hun eigen geheugen; Honcho is het geheugen dat je naar andere tools volgt. Berichten die agents opslaan, gaan naar je Honcho-account.",
+  "marketplace.plugin.honcho.app":
+    "Langetermijngeheugen in je Honcho-werkruimten opslaan en bevragen via één MCP-server.",
+  "marketplace.plugin.honcho.prompt.recall": "Vraag Honcho voordat we beginnen wat het weet over hoe ik graag werk.",
+  "marketplace.plugin.honcho.prompt.save": "Sla de beslissingen uit deze thread op in Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Wat zegt Honcho over mijn schrijfstijl? Gebruik het voor dit concept.",
+  "marketplace.plugin.honcho.hint.apiKey": "Maak een sleutel op app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Geheugen dat leert met de tijd",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight van Vectorize geeft agents een langetermijngeheugen in Hindsight Cloud. Agents onthouden feiten en gebeurtenissen, halen ze op naar betekenis, tijd en entiteit, en denken erover na om mentale modellen te vormen. Herinneringen staan in banken, en agents kunnen een bank maken voor elk project of elke persoon. OpenBot-agents hebben ook hun eigen geheugen; Hindsight is het geheugen dat andere gekoppelde AI-tools kunnen delen. Wat agents onthouden, gaat naar je Hindsight Cloud-account.",
+  "marketplace.plugin.hindsight.app":
+    "Herinneringen in je Hindsight Cloud-banken onthouden, ophalen en overdenken via één MCP-server.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Haal voordat we beginnen uit Hindsight op wat we over dit project weten.",
+  "marketplace.plugin.hindsight.prompt.retain": "Onthoud de beslissingen en open vragen uit deze thread in Hindsight.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Denk na over mijn herinneringen in Hindsight: welke patronen zie je in mijn werk van de afgelopen maand?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Maak een sleutel op de pagina Connect van Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Ontwerpen en prototypes",
   "marketplace.plugin.figma.description":
     "Met Figma kunnen agents ontwerpbestanden lezen, componenten, stijlen en variabelen inspecteren en productiespecificaties aan ontwikkelaars overdragen. Het koppelt met de MCP-server in de Figma-desktopapp op deze computer. De server kan alleen ontwerpen lezen; ondersteuning voor schrijven komt eraan.",
@@ -366,16 +391,24 @@ export const messages = {
     "Hoeveel contacten zitten er in het VIP-segment, en hoe is dat deze maand veranderd?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Maak een concept van een campagne voor de nieuwe collectie, maar verstuur die niet.",
-  "marketplace.plugin.composio.tagline": "Veel apps via je eigen Composio-link",
+  "marketplace.plugin.postiz.tagline": "Socialemediaplanning",
+  "marketplace.plugin.postiz.description":
+    "Met Postiz kunnen agents je socialemediakanalen tonen en berichten opstellen, inplannen en publiceren op meer dan 30 netwerken, zoals X, LinkedIn, Instagram en TikTok. Agents kunnen ook media uploaden en AI-afbeeldingen en -video's maken. Log in de browser in op je Postiz-account, of plak de API-sleutel uit Settings › Developers in Postiz. Alle cloudabonnementen van Postiz bevatten API-toegang. Agents kunnen een bericht direct publiceren, dus controleer elk bericht voordat je het goedkeurt.",
+  "marketplace.plugin.postiz.app":
+    "Kanalen, concepten, ingeplande berichten en media, via de MCP-server van Postiz met inloggen in de browser of een API-sleutel.",
+  "marketplace.plugin.postiz.prompt.channels": "Welke socialemediakanalen zijn met Postiz verbonden?",
+  "marketplace.plugin.postiz.prompt.week": "Welke berichten zijn voor volgende week ingepland?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Stel een LinkedIn-bericht op over onze nieuwe release, maar plan het niet in.",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub en meer dan 1000 andere apps",
   "marketplace.plugin.composio.description":
-    "Composio koppelt agents met Gmail, Slack, GitHub en honderden andere apps via één MCP-server. Koppel de apps die je wilt in je Composio-account en plak hier de MCP-URL en API-sleutel ervan.",
+    "Composio koppelt je agents via één MCP-server met Gmail, Slack, GitHub en meer dan 1000 andere apps. Log in met je Composio-account. Als een agent een app nodig heeft, vraagt hij je die app te koppelen.",
   "marketplace.plugin.composio.app":
-    "De apps die je toevoegt aan je Composio-MCP-server, via de link uit je Composio-account.",
+    "De apps die je koppelt in je Composio-account. Een agent vraagt je een app te koppelen wanneer hij die nodig heeft.",
   "marketplace.plugin.composio.prompt.inbox":
     "Vat mijn ongelezen e-mail samen en stel antwoorden op voor de dringende.",
   "marketplace.plugin.composio.prompt.handoff": "Plaats een samenvatting van deze pull request in ons teamkanaal.",
   "marketplace.plugin.composio.prompt.apps": "Welke apps en acties kun je via Composio gebruiken?",
-  "marketplace.plugin.composio.hint.url": "De URL van een MCP-server in je Composio-account",
   "marketplace.plugin.composio.hint.apiKey":
     "Je vindt deze in je Composio-account, onder Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres-projecten, branches en migraties",
@@ -491,7 +524,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "Zoek een dataset met weertijdreeksen en toon de kolommen.",
   "marketplace.auth.apiKey": "API-sleutel",
   "marketplace.auth.personalApiKey": "Persoonlijke API-sleutel",
-  "marketplace.auth.mcpUrl": "MCP-URL",
   "marketplace.auth.createKey": "Sleutel maken",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Probeer in {name}",

@@ -26,6 +26,14 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Przechwyć okno {name} i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureRegion":
     "Przechwyć obszar ekranu w punkcie {x}, {y} o rozmiarze {width} × {height} punktów i wyślij obraz do modelu agenta.",
+  "status.agent.reportProblem":
+    "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji i Twoim systemem. Twoje imię nie jest widoczne.",
+  "status.agent.sendIdea": "To będzie publiczne zgłoszenie na GitHubie. Twoje imię nie będzie widoczne.",
+  "status.agent.feedbackSent": "Wysłano do zespołu OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Utwórz jednorazowe polecenie, które instaluje OpenBot na innym komputerze jako serwer {name} i loguje go do Twojego konta. Agent uruchamia je tam.",
+  "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",
+  "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
   "status.agent.screenCaptureProgress": "Prośba o przechwycenie ekranu…",
@@ -78,5 +86,6 @@ export const messages = {
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
+  "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",
   "status.agent.branchTitle": "Odgałęziony czat",
 } as const satisfies PartialTranslation<typeof source>;

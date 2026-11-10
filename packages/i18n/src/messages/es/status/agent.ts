@@ -25,6 +25,14 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Capturar la ventana {name} y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureRegion":
     "Capturar el área de la pantalla en {x}, {y}, de {width} × {height} puntos, y enviar la imagen al modelo del agente.",
+  "status.agent.reportProblem":
+    "Esto será un issue público en GitHub, con la versión de la app y tu sistema. Tu nombre no aparece.",
+  "status.agent.sendIdea": "Esto se convierte en un issue público de GitHub. Tu nombre no se muestra.",
+  "status.agent.feedbackSent": "Enviado al equipo de OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Crear un comando de un solo uso que instala OpenBot en otro ordenador como el servidor {name} y lo conecta a tu cuenta. El agente lo ejecuta allí.",
+  "status.agent.serverInstallCard": "Comando de instalación para el servidor {name}",
+  "status.agent.feedbackSending": "Enviando tus comentarios al equipo de OpenBot…",
   "status.agent.workflowDelete":
     "Eliminar el flujo de trabajo {title} con sus ejecuciones y versiones. Sus pasos abiertos se detienen.",
   "status.agent.screenCaptureProgress": "Pidiendo permiso para capturar la pantalla…",
@@ -76,5 +84,7 @@ export const messages = {
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
+  "status.agent.compactionContinues":
+    "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
 } as const satisfies PartialTranslation<typeof source>;

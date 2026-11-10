@@ -170,7 +170,7 @@ count. The last request counts, also in a session from before migration 15. An u
 `last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
 is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
-session, except from Antigravity: 1.4.3 sends the tokens of one prompt, so each prompt result has its
+session, except from Antigravity: from 1.4.3 it sends the tokens of one prompt, so each prompt result has its
 own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 

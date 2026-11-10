@@ -1,10 +1,17 @@
-import { LOCAL_SERVER_ID, type RemovableRuntimes, type TeamMemberSummary } from "@openbot/contracts/ipc";
+import {
+  LOCAL_SERVER_ID,
+  type RemovableRuntimes,
+  type StorageDisk,
+  type TeamMemberSummary,
+} from "@openbot/contracts/ipc";
 import { MachineResources } from "@openbot/ui/features/files/MachineResources";
 import { StorageOverview } from "@openbot/ui/features/files/StorageOverview";
+import { BackgroundProcessesSection } from "@openbot/ui/features/settings/BackgroundProcessesSection";
 import { createEffect, createSignal, Show } from "solid-js";
 import { type FilesPort, filesPort } from "./files-port";
 import { createMachineResources } from "./machine-resources";
-import { createServerAgents, createStorageUsage } from "./storage-usage";
+import { createServerBackgroundProcesses } from "./server-background-processes";
+import { createServerAgents, createStorageUsage, planDisk } from "./storage-usage";
 
 export interface ServerStorageOptions {
   /** The computer the numbers belong to, such as "This Mac" or the server name. */
@@ -17,6 +24,11 @@ export interface ServerStorageOptions {
   members?: readonly TeamMemberSummary[];
   /** The storage calls of a client with no `window.openbot`, such as the web client. */
   calls?: FilesPort;
+  /**
+   * The joined server serves `background-processes-v1`. With `canManage`, Storage lists the programs
+   * that its agents left running. This computer lists its own in Settings > Agents.
+   */
+  backgroundProcesses?: boolean;
 }
 
 /**
@@ -24,11 +36,28 @@ export interface ServerStorageOptions {
  * stored file. The agents are read for this server, because the dialog can be open for a server
  * that is not the selected one and the selected server's agents would name the wrong rows.
  */
-export function ServerStoragePanel(props: ServerStorageOptions & { serverId: string }) {
+export function ServerStoragePanel(
+  props: ServerStorageOptions & {
+    serverId: string;
+    /** The plan storage in GB of a hosted server. The free space is then what the plan has left. */
+    storageGb?: number | null;
+  },
+) {
   const calls = () => props.calls ?? filesPort();
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), calls);
   const machine = createMachineResources(() => ({ serverId: props.serverId, canManage: props.canManage }), calls);
   const agents = createServerAgents(() => props.serverId, calls);
+  const processes = createServerBackgroundProcesses(
+    () => ({
+      serverId: props.serverId,
+      shown:
+        props.serverId !== LOCAL_SERVER_ID &&
+        props.canManage &&
+        props.backgroundProcesses === true &&
+        calls().backgroundProcesses !== undefined,
+    }),
+    calls,
+  );
 
   // Only this computer: a server removes its own old versions, and its store is not reachable here.
   const runtimes = () => {
@@ -70,6 +99,33 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
     }
   }
 
+  // A hosted server shows the free space of its plan, as the sidebar storage card does. The disk is read
+  // again after each scan; until it comes, the free space of the disk shows.
+  const [disk, setDisk] = createSignal<{ scan: unknown; disk: StorageDisk } | null>(null);
+  createEffect(
+    () => [storage.state.usage, props.storageGb, calls().storage.getDisk] as const,
+    ([scan, storageGb, getDisk]) => {
+      if (!scan || !storageGb || !getDisk) return;
+      let current = true;
+      getDisk(props.serverId)
+        .then((answer) => {
+          if (current) setDisk(answer ? { scan, disk: answer } : null);
+        })
+        .catch(() => {
+          if (current) setDisk(null);
+        });
+      return () => {
+        current = false;
+      };
+    },
+  );
+  const freeBytes = () => {
+    const scan = storage.state.usage;
+    const read = disk();
+    if (!scan) return null;
+    return props.storageGb && read?.scan === scan ? planDisk(read.disk, props.storageGb).freeBytes : scan.freeBytes;
+  };
+
   const usage = () => storage.state.usage;
 
   return (
@@ -79,7 +135,7 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
       error={storage.error()}
       scannedAt={usage()?.scannedAt ?? null}
       breakdown={usage()?.breakdown ?? []}
-      freeBytes={usage()?.freeBytes ?? null}
+      freeBytes={freeBytes()}
       agents={agents()}
       agentUsage={usage()?.agents ?? []}
       conversations={usage()?.conversations ?? []}
@@ -98,15 +154,28 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
       // Settings has no preview pane, so a preview opens the file in its app.
       onPreviewFile={(file) => void storage.fileAction(file, "open", { onShowInChat: () => undefined })}
       machine={
-        <Show when={machine.state.available}>
-          <MachineResources
-            metrics={machine.state.metrics}
-            error={machine.state.error}
-            alerts={machine.state.alerts}
-            members={props.members ?? []}
-            onChangeAlerts={machine.saveAlerts}
-          />
-        </Show>
+        <>
+          <Show when={machine.state.available}>
+            <MachineResources
+              metrics={machine.state.metrics}
+              error={machine.state.error}
+              alerts={machine.state.alerts}
+              members={props.members ?? []}
+              onChangeAlerts={machine.saveAlerts}
+            />
+          </Show>
+          <Show when={processes.state.processes}>
+            {(list) => (
+              <BackgroundProcessesSection
+                processes={list()}
+                loadFailed={processes.state.loadFailed}
+                agents={processes.state.agents}
+                stopping={processes.state.stopping}
+                onStop={processes.stop}
+              />
+            )}
+          </Show>
+        </>
       }
       onFileAction={(file, action) =>
         storage.fileAction(file, action, {

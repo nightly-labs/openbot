@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name} ajanının durdurulan görevini yeniden ata",
   "channel.stoppedTask.reassign": "Yeniden ata",
   "channel.stoppedTask.cancel": "Görevi iptal et",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Üyeler bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
   "channel.conversation.noMembers": "Çalışmayı başlatmak için kanal ayarlarından ajan ekleyin.",
   "channel.conversation.archivedNotice": "Silinmiş kanal. Yalnızca önizleme.",
   "channel.composer.label": "Kanala mesaj",

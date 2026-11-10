@@ -21,6 +21,11 @@ coverage/
 *.key
 *.p12
 *.pem
+# The update signing certificate of the mobile app is public, and each binary has it. The EAS build
+# copies the project with its own ignore logic: a file is left out when one `.gitignore` file ignores
+# it, and the exception in `apps/mobile/.gitignore` does not count for the rule above. Without this
+# line, the build has no certificate and `expo prebuild` stops.
+!apps/mobile/certs/certificate.pem
 .idea/
 # Keep shared VS Code settings while ignoring other editor state.
 **/.vscode/*

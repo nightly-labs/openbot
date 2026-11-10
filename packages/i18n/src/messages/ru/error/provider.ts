@@ -221,6 +221,8 @@ export const messages = {
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Модель OpenCode завершила ход после рассуждения, без ответа. Повторите попытку или выберите другую модель.",
+  "error.provider.acpNoAnswer":
+    "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -230,9 +232,6 @@ export const messages = {
   "error.provider.noAgentProcess": "У {provider} нет запущенного процесса для этого агента.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} остановился до запуска процесса агента.",
   "error.provider.archiveUnreadable": "Архив среды выполнения не читается или имеет неподдерживаемый формат.",
-  "error.provider.antigravityArchivePath": "В архиве Gemini неожиданный файл.",
-  "error.provider.antigravityChecksum": "Контрольная сумма среды выполнения Gemini не совпадает.",
-  "error.provider.antigravityReleaseShape": "У релиза Gemini неожиданная структура.",
   "error.provider.antigravityMissing": "Gemini не загружен. Загрузите его в OpenBot, чтобы продолжить.",
   "error.provider.antigravityNotStarted": "Сервер Gemini найден, но его версию прочитать не удаётся.",
   "error.provider.antigravityOverrideInvalid":
@@ -247,6 +246,10 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "На хосте с Windows Gemini открывает страницу Google на самом хосте. Подключите Gemini на компьютере-хосте.",
   "error.provider.cursorArchivePath": "В архиве Cursor неожиданный файл.",
   "error.provider.cursorChecksum": "Контрольная сумма среды выполнения Cursor не совпадает.",
   "error.provider.cursorReleaseShape": "У релиза Cursor неожиданная структура.",
@@ -285,6 +288,10 @@ export const messages = {
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
   "error.provider.foreignReasoning":
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
+  "error.provider.imageTooSmall":
+    "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
+  "error.provider.imageTooLarge":
+    "Модель не приняла изображение в этом чате, потому что изображение слишком большое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
   "error.provider.museMcpStartupFault":
@@ -413,6 +420,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse нужен текст или изображение.",
   "error.provider.museMethodUnsupported": "Muse не поддерживает {method}.",
   "error.provider.museTurnFailed": "Ход Muse не удался.",
+  "error.provider.museModelUnavailable":
+    "Muse не может использовать эту модель. Возможно, Muse недоступен в стране, где работает этот агент, или у этой учётной записи нет доступа к модели. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse не может создать профиль без доступа к внешним инструментам. Создайте профиль с другим провайдером, затем выберите Muse для агента.",
   "error.provider.museAuthUnverified":

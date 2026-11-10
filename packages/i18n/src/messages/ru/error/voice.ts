@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Дождитесь окончания расшифровки голоса, затем удалите модель.",
   "error.voice.removeFailed": "Не удалось удалить голосовую модель. Повторите попытку.",
   "error.voice.runtimeUnavailable": "Локальная расшифровка голоса недоступна на этой платформе.",
-  "error.voice.busy": "Расшифровка голоса уже выполняется.",
   "error.voice.modelUnavailable": "Голосовая модель недоступна.",
   "error.voice.transcriptionTimedOut": "Время расшифровки голоса истекло.",
   "error.voice.prepareRequired":
@@ -29,6 +28,10 @@ export const messages = {
   "error.voice.live.timedOut": "Живой голос Codex не запустился вовремя. Попробуйте ещё раз.",
   "error.voice.live.failed": "Живой голос остановлен: {reason}",
   "error.voice.live.disconnected": "Живой голос отключён.",
+  "error.voice.live.hostFailed":
+    "Codex на сервере не смог запустить живой голос. Попросите владельца обновить Codex на этом компьютере и войти через ChatGPT, затем попробуйте снова.",
   "error.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
+  "error.voice.live.unavailable":
+    "OpenAI не удалось запустить живой голос. Проблема на стороне OpenAI. Повторите попытку позже.",
   "error.voice.live.off": "Живой голос Codex выключен. Включите его в Настройки → Голос.",
 } as const satisfies PartialTranslation<typeof source>;

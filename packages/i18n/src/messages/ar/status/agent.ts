@@ -26,6 +26,13 @@ export const messages = {
     "التقاط منطقة الشاشة عند {x}، {y}، بحجم {width} × {height} نقطة وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.vaultCardFill":
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
+  "status.agent.reportProblem": "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك. لا يظهر اسمك.",
+  "status.agent.sendIdea": "يصبح هذا مشكلة عامة على GitHub. لا يظهر اسمك.",
+  "status.agent.feedbackSent": "أُرسل إلى فريق OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",
+  "status.agent.serverInstallCard": "أمر التثبيت للخادم {name}",
+  "status.agent.feedbackSending": "جارٍ إرسال ملاحظاتك إلى فريق OpenBot…",
   "status.agent.workflowDelete": "احذف سير العمل {title} مع عمليات تشغيله وإصداراته. تتوقف خطواته المفتوحة.",
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",
   "status.agent.linkCardFill":
@@ -115,5 +122,6 @@ export const messages = {
   "status.agent.vaultField.email": "عنوان البريد الإلكتروني",
   "status.agent.nextStepContinues": "توقف الوكيل قبل خطوته التالية. سيتابع ({current} من {limit}).",
   "status.agent.planContinues": "في الخطة خطوات مفتوحة. سيتابع الوكيل ({current} من {limit}).",
+  "status.agent.compactionContinues": "توقف الاتصال أثناء ضغط الوكيل لسياقه. يتابع الوكيل.",
   "status.agent.branchTitle": "دردشة متفرعة",
 } as const satisfies PartialTranslation<typeof source>;

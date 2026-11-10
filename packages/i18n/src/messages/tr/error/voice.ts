@@ -8,7 +8,6 @@ export const messages = {
   "error.voice.removeBusy": "Ses dökümü bitene kadar bekleyin, sonra modeli kaldırın.",
   "error.voice.removeFailed": "Ses modeli kaldırılamadı. Tekrar deneyin.",
   "error.voice.runtimeUnavailable": "Yerel ses dökümü bu platformda kullanılamıyor.",
-  "error.voice.busy": "Zaten bir ses dökümü işlemi devam ediyor.",
   "error.voice.modelUnavailable": "Ses modeli kullanılamıyor.",
   "error.voice.transcriptionTimedOut": "Ses dökümü zaman aşımına uğradı.",
   "error.voice.prepareRequired":
@@ -31,6 +30,9 @@ export const messages = {
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
   "error.voice.live.disconnected": "Canlı ses bağlantısı kesildi.",
+  "error.voice.live.hostFailed":
+    "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "error.voice.live.unavailable": "OpenAI canlı sesi başlatamadı. Sorun OpenAI tarafında. Daha sonra yeniden deneyin.",
   "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
 } as const satisfies PartialTranslation<typeof source>;

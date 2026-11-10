@@ -356,7 +356,11 @@ export class BrowserCdpEngine {
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
        * field is a password field, or every field asks for a one-time code. A text field that the page
-       * masks with `-webkit-text-security` is a password field. The fingerprint check of `enter` keeps
+       * masks with `-webkit-text-security` is a password field. A code field has
+       * `autocomplete="one-time-code"`, or is a text, tel or number input with a strong code word such as
+       * otp, 2fa or verification code in its id, name or aria-label, as older Keycloak sign-in pages have.
+       * A name that also has backup, recovery, mail, phone, sms, name or label is not one: it is another
+       * code or not a code. The fingerprint check of `enter` keeps
        * this true until the fill; the mask is read here only, because a page can change it as it fills.
        */
       fields: { password: boolean; oneTimeCode: boolean };
@@ -437,7 +441,9 @@ export class BrowserCdpEngine {
             send,
             node.backendNodeId,
             `function() {
-              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
+              const named = [this.id, this.name, this.getAttribute('aria-label') ?? ''].join(' ').replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+              const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && /totp|\\b(?:otp|2fa|mfa)+(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?factor\\b/.test(named) && !/backup|recovery|mail|phone|sms|name|label/.test(named));
+              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
           );
@@ -789,7 +795,12 @@ export class BrowserCdpEngine {
             { concurrency: "unbounded" },
           );
         let [metrics, [parsed, focus], challenge, settle] = yield* Effect.all(
-          [send("Page.getLayoutMetrics"), collect(), detectChallenge(this.#contents, send), probeSettle(send)],
+          [
+            send("Page.getLayoutMetrics"),
+            collect(),
+            detectChallenge(this.#contents, send, [...this.#targetSessions.keys()]),
+            probeSettle(send),
+          ],
           { concurrency: "unbounded" },
         );
         // A page that still shows loading placeholders, or a new page with no controls yet, would
@@ -2700,6 +2711,7 @@ export class BrowserCdpEngine {
     awaitPromise = true,
     timeoutMs = ACTION_TIMEOUT_MS,
     undefinedAsNull = false,
+    maxBytes = MAX_RESULT_BYTES,
   ): Effect.fn.Return<BrowserJsonValue, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
@@ -2730,9 +2742,11 @@ export class BrowserCdpEngine {
         if (serialized === undefined)
           return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
         const bytes = Buffer.byteLength(serialized, "utf8");
-        if (bytes > MAX_RESULT_BYTES) {
+        if (bytes > maxBytes) {
           return yield* browserFailure(
-            new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes). ${BROWSER_VALUE_TOO_LARGE}`),
+            new Error(
+              `Browser evaluation result exceeds ${Math.round(maxBytes / 1024)} KB (${bytes} bytes). ${BROWSER_VALUE_TOO_LARGE}`,
+            ),
           );
         }
         // `serialized` is the value the caller receives, so parse that rather than asserting over

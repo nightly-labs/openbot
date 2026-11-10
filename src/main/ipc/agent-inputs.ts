@@ -774,6 +774,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isBoolean(value.fastMode)) throw new Error("Invalid fast mode value.");
     result.fastMode = value.fastMode;
   }
+  if (value.ultrafast !== undefined) {
+    if (!isBoolean(value.ultrafast)) throw new Error("Invalid fast mode value.");
+    result.ultrafast = value.ultrafast;
+  }
   if (value.providerAccountId !== undefined) {
     if (value.providerAccountId !== null && !isProviderAccountId(value.providerAccountId))
       throw new Error("Invalid provider account.");

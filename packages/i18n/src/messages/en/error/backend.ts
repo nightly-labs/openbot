@@ -71,6 +71,8 @@ export const messages = defineMessages("error.backend", {
     "The channel has an unconfirmed assignment start. Check its outcome before deleting it.",
   "error.backend.channelNotFound": "Channel not found.",
   "error.backend.channelMemberUnavailable": "A channel member is unavailable.",
+  "error.backend.channelInstructionsTooLong":
+    "Shorten the instructions to 2,000 characters. Longer instructions are not saved.",
   "error.backend.channelWaitBeforeNewConversation":
     "Wait until the work in this channel stops, then start a new conversation.",
   "error.backend.channelWaitBeforeCompact": "Wait until the work in this channel stops, then compact it.",
@@ -204,7 +206,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitRoutineGone": "This agent has no routine with this id.",
   "error.backend.agentWaitNoRoutine":
     "Only a run of one of your routines wakes a wait, and you have no routine. Create one with openbot.create_routine, then open the wait.",
-  "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marking a message unread is only available for agents on this computer.",
   "error.backend.messageDeleteUnsupported": "Deleting messages is not supported by this server.",
@@ -236,6 +237,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot could not read the sign-in information of this server. Check the server address and try again.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "The sign-in server sent an answer that OpenBot cannot read. If the service gives you an API key or a token, add it to the settings of this server, then test the connection again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",

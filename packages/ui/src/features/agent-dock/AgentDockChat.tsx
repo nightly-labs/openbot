@@ -1,6 +1,7 @@
 /**
  * The chat in the agent dock's panel: a header, the recent text messages and a compact composer.
  * Tool steps, plans and other timeline items stay in the main window, which opens from the ⋯ menu.
+ * A channel seat shows the same chat, with the author's name over each message from someone else.
  */
 
 import {
@@ -17,18 +18,19 @@ import {
   X,
 } from "@openbot/ui";
 import { createMemo, For, onCleanup, Show } from "solid-js";
-import type { AvatarMood } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentMessage, ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE } from "../sidebar/sidebar-filtering";
 import type { SidebarWaitReason } from "../sidebar/sidebar-types";
+import type { AgentDockSeat } from "./AgentDock";
 
 /** The panel shows the newest messages only; the main window has the full history. */
 const VISIBLE_MESSAGES = 60;
@@ -44,7 +46,7 @@ const THUMB_HIDE_MS = 900;
 const SCROLL_INPUT_MS = 1000;
 
 export interface AgentDockChatModel {
-  /** The agent's loaded messages, oldest first. The panel shows the text ones. */
+  /** The loaded messages of the agent or channel, oldest first. The panel shows the text ones. */
   messages: readonly AgentMessage[];
   /** True while the agent works on a turn. */
   working: boolean;
@@ -80,11 +82,16 @@ export interface AgentDockChatVoice {
   onSend: () => void;
 }
 
-/** The messages that the panel shows: the text of the user and of the agent. */
+/** The messages that the panel shows: the text of the people and of the agents. */
 export function isDockMessage(message: AgentMessage): boolean {
   if (message.author !== "you" && message.author !== "agent") return false;
   if (message.kind !== undefined && message.kind !== "text" && message.kind !== "error") return false;
   return message.body.trim().length > 0;
+}
+
+/** A message of the reader. In a channel, a message of another person carries its author. */
+function isOwn(message: AgentMessage): boolean {
+  return message.author === "you" && !message.senderMember;
 }
 
 /**
@@ -94,12 +101,11 @@ export function isDockMessage(message: AgentMessage): boolean {
 function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
   const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
-  return messages.slice(start).some((message) => message.author === "you" && message.body.trim() === pending.text);
+  return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
 }
 
 export function AgentDockChat(props: {
-  agent: ComposerAgent;
-  mood: AvatarMood;
+  seat: AgentDockSeat;
   chat: AgentDockChatModel;
   draft: string;
   pending: readonly AgentDockPendingMessage[];
@@ -127,10 +133,19 @@ export function AgentDockChat(props: {
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
   const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
+  const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
+  const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
+  const name = () => (props.seat.kind === "agent" ? props.seat.agent.name : props.seat.channel.name);
   const subtitle = () => {
     if (props.chat.wait) return t(SIDEBAR_WAIT_TITLE[props.chat.wait]);
     if (props.chat.working) return t("agent.dock.working");
-    return props.agent.title;
+    return props.seat.kind === "agent" ? props.seat.agent.title : props.seat.channel.title;
+  };
+  /** The author shown over a message in a channel. The reader's own messages have no name. */
+  const author = (message: AgentMessage): string | undefined => {
+    if (!channel() || isOwn(message)) return undefined;
+    if (message.senderMember) return message.senderMember.name;
+    return props.agents.find((agent) => agent.id === message.senderAgentId)?.name;
   };
   const waitReason = () => props.chat.wait;
   const voicePhase = (): VoicePhase => props.voice?.phase ?? "idle";
@@ -231,9 +246,30 @@ export function AgentDockChat(props: {
   return (
     <div class="agent-dock-chat">
       <header class="agent-dock-chat-header">
-        <AgentAvatar agent={props.agent} motion="idle" mood={props.mood} class="agent-dock-chat-avatar" />
+        <Show
+          when={channel()}
+          fallback={
+            <Show when={agentSeat()}>
+              {(seat) => (
+                <AgentAvatar agent={seat().agent} motion="idle" mood={seat().mood} class="agent-dock-chat-avatar" />
+              )}
+            </Show>
+          }
+        >
+          {(shown) => (
+            <span class="agent-dock-chat-channel">
+              <ChannelAvatar
+                members={shown().members}
+                agents={props.agents}
+                layout="cluster"
+                icon={shown().icon}
+                imageUrl={shown().imageUrl}
+              />
+            </span>
+          )}
+        </Show>
         <div class="agent-dock-chat-title">
-          <strong>{props.agent.name}</strong>
+          <strong>{name()}</strong>
           <span>{subtitle()}</span>
         </div>
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
@@ -295,17 +331,18 @@ export function AgentDockChat(props: {
           <div class="agent-dock-messages-content" ref={(element) => sizes.observe(element)}>
             <Show
               when={messages().length > 0 || pending().length > 0}
-              fallback={<p class="agent-dock-empty">{t("agent.dock.empty", { name: props.agent.name })}</p>}
+              fallback={<p class="agent-dock-empty">{t("agent.dock.empty", { name: name() })}</p>}
             >
               <For each={messages()}>
                 {(message) => (
                   <Bubble
-                    align={message.author === "you" ? "end" : "start"}
-                    variant={message.author === "you" ? "secondary" : "muted"}
+                    align={isOwn(message) ? "end" : "start"}
+                    variant={isOwn(message) ? "secondary" : "muted"}
                     class="agent-dock-bubble"
                     data-error={message.kind === "error" ? "" : undefined}
                   >
                     <BubbleContent>
+                      <Show when={author(message)}>{(shown) => <span class="agent-dock-author">{shown()}</span>}</Show>
                       {/* Markdown with mention chips, as in the main chat. */}
                       <div class="agent-dock-markdown message-markdown">
                         <MarkdownMessageText
@@ -336,7 +373,9 @@ export function AgentDockChat(props: {
                 <BubbleContent>
                   <span class="agent-dock-typing" role="status">
                     <TypingDots class="agent-dock-typing-dots" />
-                    <span class="agent-dock-sr">{t("agent.dock.writing", { name: props.agent.name })}</span>
+                    <span class="agent-dock-sr">
+                      {channel() ? t("agent.dock.working") : t("agent.dock.writing", { name: name() })}
+                    </span>
                   </span>
                 </BubbleContent>
               </Bubble>
@@ -363,46 +402,49 @@ export function AgentDockChat(props: {
 
       <Show when={props.error}>{(error) => <p class="agent-dock-error">{error()}</p>}</Show>
 
-      <form
-        class="composer agent-dock-composer"
-        data-compact=""
-        onSubmit={(event: SubmitEvent) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <div class="composer-input-label">
-          <ComposerEditor
-            agentId={undefined}
-            agents={props.agents}
-            value={props.draft}
-            placeholder={t("composer.placeholder.message", { name: props.agent.name })}
-            ariaLabel={t("composer.placeholder.message", { name: props.agent.name })}
-            disabled={transcribing()}
-            focusRequest={props.focusRequest}
-            dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}
-            onValueChange={(value) => props.onDraftChange(value)}
-            onSubmit={submit}
-          />
-        </div>
-        <div class="composer-primary-actions">
-          <Show when={props.voice} fallback={sendButton()}>
-            {(voice) => (
-              <ComposerVoiceControls
-                phase={voice().phase}
-                levels={voice().levels}
-                elapsedSeconds={voice().elapsedSeconds}
-                modelProgress={voice().modelProgress}
-                blocked={voice().blocked}
-                onStart={() => voice().onStart()}
-                onCancel={() => voice().onCancel()}
-                onFinish={() => voice().onFinish()}
-                send={sendButton()}
-              />
-            )}
-          </Show>
-        </div>
-      </form>
+      {/* The mention picker hangs from the composer inside its `.composer-wrap`. */}
+      <div class="composer-wrap agent-dock-composer-wrap">
+        <form
+          class="composer agent-dock-composer"
+          data-compact=""
+          onSubmit={(event: SubmitEvent) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <div class="composer-input-label">
+            <ComposerEditor
+              agentId={undefined}
+              agents={props.agents}
+              value={props.draft}
+              placeholder={t("composer.placeholder.message", { name: name() })}
+              ariaLabel={t("composer.placeholder.message", { name: name() })}
+              disabled={transcribing()}
+              focusRequest={props.focusRequest}
+              dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}
+              onValueChange={(value) => props.onDraftChange(value)}
+              onSubmit={submit}
+            />
+          </div>
+          <div class="composer-primary-actions">
+            <Show when={props.voice} fallback={sendButton()}>
+              {(voice) => (
+                <ComposerVoiceControls
+                  phase={voice().phase}
+                  levels={voice().levels}
+                  elapsedSeconds={voice().elapsedSeconds}
+                  modelProgress={voice().modelProgress}
+                  blocked={voice().blocked}
+                  onStart={() => voice().onStart()}
+                  onCancel={() => voice().onCancel()}
+                  onFinish={() => voice().onFinish()}
+                  send={sendButton()}
+                />
+              )}
+            </Show>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

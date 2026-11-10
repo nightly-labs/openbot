@@ -123,6 +123,24 @@ export const messages = {
     "OpenBot detiene el servidor y mueve sus agentes, chats y archivos a la papelera.",
   "server.local.deleting": "Eliminando servidor…",
   "server.local.deletedTitle": "{name} eliminado",
+  "server.install.title": "Nuevo servidor en otro ordenador",
+  "server.install.description":
+    "Ejecuta este comando en un ordenador Linux o VPS que sea tuyo. Instala OpenBot y añade el servidor a esta cuenta.",
+  "server.install.making": "Creando un comando para esta cuenta…",
+  "server.install.failed": "OpenBot no pudo crear un comando. Comprueba la conexión a internet.",
+  "server.install.copyForAgent": "Copiar para un agente de IA",
+  "server.install.expiresIn": "Funciona una vez. Caduca en {time}.",
+  "server.install.newCommand": "Nuevo comando",
+  "server.install.waiting": "Esperando a que el comando se ejecute en tu servidor…",
+  "server.install.starting": "{name} inició sesión. Iniciando el servidor…",
+  "server.install.connected": "{name} está conectado.",
+  "server.install.offline": "{name} está sin conexión.",
+  "server.install.expired": "Este comando caducó. Crea uno nuevo.",
+  "server.install.agentPrompt":
+    'Instala OpenBot en este servidor Linux e inicia sesión en mi cuenta de OpenBot.\nEjecuta este comando como root. No hace preguntas y tarda unos minutos:\n\n{command}\n\nTermina con la línea "OpenBot is connected to your account." y el código de salida 0.\nEl comando funciona una vez, durante 15 minutos. No lo guardes en ningún sitio.',
+  "server.install.setUpWithAgent": "Configurar con un agente",
+  "server.install.sshAgentPrompt":
+    "Conéctate por SSH a mi servidor Linux e instala OpenBot en él como servidor.\n\nDirección SSH (user@host):",
   "server.add.limit.title": "Esta cuenta tiene el número máximo de servidores",
   "server.add.limit.description": {
     one: "Una cuenta puede tener {count} servidor de pago. Para añadir un servidor, elimina uno primero.",
@@ -326,6 +344,17 @@ export const messages = {
   "server.settings.memoryReviewOff": "Desactivada",
   "server.settings.memoryReviewTurns": { one: "Cada {count} turno", other: "Cada {count} turnos" },
   "server.settings.memoryReviewLoadFailed": "No se pudo cargar el ajuste de revisión de recuerdos.",
+  "server.settings.skillLearning": "Aprendizaje de habilidades",
+  "server.settings.skillLearningDescription":
+    "Si los agentes de este servidor guardan lo que aprenden como habilidades.",
+  "server.settings.skillLearningAutomatic": "Automático",
+  "server.settings.skillLearningAsk": "Preguntar antes",
+  "server.settings.skillLearningOff": "Desactivado",
+  "server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
+  "server.settings.browsingMemory": "Aprender de mi navegación",
+  "server.settings.browsingMemoryDescription":
+    "Cuando controlas el navegador de un agente, el agente aprende cómo funcionan los sitios a partir de las páginas y los botones que usas. El texto que escribes no se guarda.",
+  "server.settings.browsingMemoryLoadFailed": "No se pudo cargar el ajuste de navegación.",
   "server.settings.remoteOnline": "El host está en línea. Su propietario controla la publicación.",
   "server.settings.remoteOffline": "El host está sin conexión. Su propietario controla la publicación.",
   "server.settings.reachable": "Accesible en línea. Solo las personas invitadas pueden iniciar sesión.",
@@ -343,7 +372,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Clave del servidor cambiada",
   "server.settings.hostKeyChanged": "Último cambio",
   "server.settings.hostKeyChangedDescription": "{date}. La clave anterior y la clave nueva firmaron este cambio.",
-  "server.settings.hostKeyLocalOnly": "Aquí solo el servidor de este ordenador puede cambiar su clave.",
+  "server.settings.hostKeyOwnerOnly": "Solo el propietario puede cambiar la clave del servidor.",
   "server.settings.removeTitle": "Eliminar servidor",
   "server.settings.removeDescription":
     "Elimina este servidor del servicio de cuentas para todos los miembros. Úsalo cuando su equipo ya no esté disponible.",

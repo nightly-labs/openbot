@@ -55,7 +55,6 @@ import type {
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
-  CreateAgentInput,
   CreateRoutineInput,
   CreateWorkflowInput,
   DecideWorkflowStepInput,
@@ -84,6 +83,7 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  MachineMetrics,
   MarkAgentTaskReadInput,
   McpServerConfig,
   McpSignInState,
@@ -177,6 +177,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
@@ -186,6 +187,8 @@ import type {
   HostLocalServerList,
   MessagingConnectorPage,
 } from "@openbot/team-client/team-admin-requests";
+import type { AgentExportParts } from "@openbot/team-client/team-api-requests";
+import type { NewAgentInput } from "@/features/agents/model/agent-initial-message";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -194,6 +197,12 @@ import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
+
+/** An export file on this phone, read when it is sent. */
+export interface AgentExportFile extends AgentExportParts {
+  /** The whole file as Base64. */
+  readAll: () => Promise<string>;
+}
 
 type MobileServerKind = "local" | "remote";
 /** The message that `message-delete-v1` deletes. */
@@ -381,6 +390,13 @@ export interface MobileWorkspaceContextValue {
   toggleWorkflowPin: (workflowId: string, serverId: string) => ToggleAgentPinResult;
   /** Drops the pins of workflows that the host no longer lists. Call only with a complete list. */
   reconcileWorkflowPins: (serverId: string, workflowIds: readonly string[]) => void;
+  /** The sidebar sections of the active server that the user closed. Saved on this device. */
+  collapsedSectionIds: ReadonlySet<string>;
+  /**
+   * Opens or closes a sidebar section of a server. `sectionIds` are the sections of its layout now:
+   * the saved list drops the others.
+   */
+  toggleSectionCollapsed: (serverId: string, sectionId: string, sectionIds: readonly string[]) => void;
   conversationStore: MobileConversationStore;
   /** Activity, unread agents, and browser requests. Read them with a selector hook, not from the context. */
   liveState: LiveWorkspaceStore;
@@ -552,9 +568,14 @@ export interface MobileWorkspaceContextValue {
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
   /** The text of a CSV password export. The host adds its logins and answers only the counts. */
   importVaultCsv: (csv: string, serverId: string) => Promise<VaultHostImportResult>;
-  /** Sends a Grok Bot or Hermes export to the host, which keeps it under the preview's token. */
+  /** Throws when the host takes an export of this size only with a newer OpenBot. Nothing goes to the host. */
+  checkAgentExport: (size: number, serverId: string) => void;
+  /**
+   * Sends a Grok Bot or Hermes export to the host, which keeps it under the preview's token. A host
+   * with `agent-import-v2` gets it in parts; an older host takes up to 100 MB.
+   */
   stageAgentImport: (
-    upload: RemoteFileUpload,
+    file: AgentExportFile,
     serverId: string,
     onProgress?: (fraction: number) => void,
   ) => Promise<AgentImportPreview>;
@@ -662,7 +683,11 @@ export interface MobileWorkspaceContextValue {
   canManageProviders: (serverId: string) => boolean;
   /** The Providers admin of one host, with the newest route set that it serves. */
   providerAdmin: (serverId: string) => ProviderAdmin;
-  /** An owner or admin of an online host that serves `mcp-servers-v1`. The host checks the role again. */
+  /**
+   * An owner or admin of an online host that serves `mcp-servers-v1`, or a member when the host also
+   * serves `mcp-member-access-v1`. The host checks the role again, and refuses a member a row that
+   * another person added.
+   */
   canManageMcpServers: (serverId: string) => boolean;
   /** The MCP servers that the host gives its agents. Each change answers with the whole list. */
   listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
@@ -673,7 +698,7 @@ export interface MobileWorkspaceContextValue {
   /** Connects once with `config` on the host. Nothing is saved. */
   testMcpServer: (config: McpServerConfig, serverId: string) => Promise<McpTestResult>;
   /**
-   * An owner or admin of an online host that serves `mcp-servers-v1` and `sign-in-relay-v1`: the phone
+   * A user who manages the MCP servers of a host that serves `sign-in-relay-v1`: the phone
    * opens the browser sign-in of an MCP server, and the host keeps the grant.
    */
   canRelayMcpSignIn: (serverId: string) => boolean;
@@ -683,8 +708,11 @@ export interface MobileWorkspaceContextValue {
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
   signOutMcpServer: (mcpServerId: string, serverId: string) => Promise<McpSignInState[]>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
-  /** Creates an agent on the active server and returns its id. */
-  createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Creates an agent on the active server and returns its id. A host with `agent-welcome-v1` gets a
+   * hidden setup message, then the first task as the user's own message.
+   */
+  createAgent: (input: NewAgentInput) => Promise<string>;
   /**
    * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
    * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.
@@ -692,7 +720,8 @@ export interface MobileWorkspaceContextValue {
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
-  deleteAgent: (agentId: string) => Promise<void>;
+  /** Deletes an agent on `serverId`, or on the active server. */
+  deleteAgent: (agentId: string, serverId?: string) => Promise<void>;
   duplicateAgent: (agentId: string) => Promise<void>;
   saveAgentMemory: (agentId: string, text: string, serverId: string, memoryId?: string) => Promise<void>;
   deleteAgentMemory: (agentId: string, memoryId: string, serverId: string) => Promise<void>;
@@ -765,6 +794,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
+  canReadMachineMetrics: (serverId: string) => boolean;
+  /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
+  loadMachineMetrics: (serverId: string) => Promise<MachineMetrics>;
   /** True when the host advertises `remote-desktop`. The host decides which members it lets in. */
   canControlComputer: (serverId: string) => boolean;
   /** The connected peer's path for the remote desktop viewer, or null while the server is not connected. */
@@ -880,6 +913,11 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `live-voice-v1`: a member can talk with an agent by GPT live voice. */
+  canUseLiveVoice: (serverId: string) => boolean;
+  /** Starts GPT live voice with the WebRTC offer of the phone's peer. Only a host with `canUseLiveVoice` takes it. */
+  startLiveVoice: (input: LiveVoiceStartRequest, serverId: string) => Promise<LiveVoiceSessionResponse>;
+  stopLiveVoice: (sessionId: string, serverId: string) => Promise<void>;
   /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
   canCompactContext: (serverId: string) => boolean;
   /**
@@ -1080,6 +1118,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "canDeleteMessages"
   | "canMarkUnreadFrom"
+  | "canUseLiveVoice"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"
@@ -1112,6 +1151,7 @@ type MobileWorkspaceStateKey =
   | "pinnedAgentIds"
   | "pinnedChannelIds"
   | "pinnedWorkflowIds"
+  | "collapsedSectionIds"
   | "hiddenChannelIds"
   | "hidesAgentsOnServer"
   | "canUnhideAgent"
@@ -1120,6 +1160,7 @@ type MobileWorkspaceStateKey =
   | "canCreateLocalServers"
   | "localServerKind"
   | "canManageServerTimezone"
+  | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
   | "canReadServerAudit"

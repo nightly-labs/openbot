@@ -29,6 +29,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
+  isCustomProviderHarness,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
@@ -36,7 +37,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
-import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
+import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -332,6 +333,11 @@ export interface ProviderHooks {
    * so a change made while it starts is not in the process that arrives.
    */
   captureConfigRevision(): number;
+  /**
+   * True while a saved endpoint of `harness` waits for a process that reads it. Without the hook,
+   * the status does not say.
+   */
+  endpointsPending?(harness: CustomProviderHarness): boolean;
 }
 
 /**
@@ -455,6 +461,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
+  /** The providers whose model list is read again after it timed out. */
+  readonly #relisting = new Set<AgentProvider>();
   /** The MCP server failures shown in this run, by provider, server and kind. */
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
@@ -598,13 +606,15 @@ export class ProviderRuntime implements ProviderPort {
             const temp = provider === "antigravity" ? antigravityTemp(this.#credentials) : undefined;
             return temp && { ...temp, provider: providerLabel(provider) };
           },
-          // The sign-in process waits for a slow start, so the check after it waits as long (#3546).
-          // A cancel or a removal must not wait for that start: the accounts start it uninterruptibly.
-          authenticate: (provider, cli, accountEnvironment, afterSignIn) =>
+          // An account check waits for a slow start as the sign-in process does (#3546): the checks of
+          // all accounts start together, and on a busy computer each took longer than the request
+          // timeout (#5927). A cancel or a removal must not wait for that start: the accounts start it
+          // uninterruptibly.
+          authenticate: (provider, cli, accountEnvironment, longStart) =>
             this.#authenticateClient(provider, cli, {
               accountEnvironment,
               interruptibleStart: true,
-              ...(afterSignIn ? { startTimeoutMs: this.#longStartWaitMs(provider) } : {}),
+              ...(longStart ? { startTimeoutMs: this.#longStartWaitMs(provider) } : {}),
             }).pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause }))),
           stopClient: (client) =>
             Effect.gen({ self: this }, function* () {
@@ -708,7 +718,13 @@ export class ProviderRuntime implements ProviderPort {
                 ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const withAccounts = accounts ? { ...withSource, accounts } : withSource;
-        return this.#restartsWhenIdle.has(row.id) ? { ...withAccounts, restartPending: true } : withAccounts;
+        const endpointsPending =
+          isCustomProviderHarness(row.id) && this.#hooks.endpointsPending
+            ? { endpointsPending: this.#hooks.endpointsPending(row.id) }
+            : {};
+        return this.#restartsWhenIdle.has(row.id)
+          ? { ...withAccounts, ...endpointsPending, restartPending: true }
+          : { ...withAccounts, ...endpointsPending };
       }),
     };
   }
@@ -3294,6 +3310,7 @@ export class ProviderRuntime implements ProviderPort {
         // A new CLI gets new starts: the failures were of the one it replaces.
         this.#startFailures.delete(provider);
         this.#slowStarts.delete(provider);
+        this.#resetRestarts(provider);
       });
       // Other providers can have live turns. Replacement must not run start recovery. The start checks
       // the copy just installed: a CLI the user installed that is as new ran in its place, and its
@@ -3313,6 +3330,9 @@ export class ProviderRuntime implements ProviderPort {
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
       // The system stops each copy in the same way, so the copy stays for the start after the user's fix.
       if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
+      // OpenCode can fail a start in this way, and the start tries again in a few seconds. Removing the
+      // copy left that retry with no CLI, and the row said that OpenCode is not downloaded (#6335).
+      if (status?.message === OPENCODE_INTERNAL_FAILURE && this.#restartTimers.has(provider)) return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         // The update reason keeps catalog text only, so other text would leave only "Try again.".
         // The log keeps the start failure as the cause.
@@ -3812,6 +3832,14 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "mistral") {
+        // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
+        // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the
+        // Python log, such as `WARNING:...:Retrying model completion (attempt 1, ...): ReadError('')`
+        // for a request that it sends again by itself, one "Mistral error" toast per line (#5923).
+        stderrLogger.warn("Mistral Vibe logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
       if (isGlogBelowErrorDiagnostic(message) || isRustLogBelowErrorDiagnostic(message)) {
         stderrLogger.info("A provider logged an info or warning record.", { provider: client.provider, message });
         return;
@@ -4049,7 +4077,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
     const errorSerialAtStart = this.#errorSerial;
-    const fresh = yield* this.#modelCatalog.refresh();
+    const { fresh, timedOut } = yield* this.#modelCatalog.refresh();
     let cleared = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
@@ -4058,7 +4086,33 @@ export class ProviderRuntime implements ProviderPort {
       cleared = true;
     }
     if (cleared) this.#setStatus({});
+    // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
+    // the picker kept the built-in models until a provider started again (#6212).
+    for (const provider of timedOut) {
+      if (this.#relisting.has(provider)) continue;
+      this.#relisting.add(provider);
+      yield* this.#relistModels(provider).pipe(
+        Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider))),
+        Effect.forkIn(this.#scope),
+      );
+    }
     return fresh;
+  });
+
+  /**
+   * Reads the model list of a provider again, once, with the full request timeout. A fresh list
+   * clears the provider's last error, when the error is older than this read, and publishes the
+   * status, so the renderer reads the catalogue again.
+   */
+  readonly #relistModels = Effect.fn("ProviderRuntime.relistModels")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const errorSerialAtStart = this.#errorSerial;
+    if (!(yield* this.#modelCatalog.relist(provider))) return;
+    const lastError = this.#lastErrors.get(provider);
+    if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
+    this.#setStatus({});
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */

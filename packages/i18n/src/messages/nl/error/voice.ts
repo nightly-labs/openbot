@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Wacht tot de spraaktranscriptie klaar is en verwijder dan het model.",
   "error.voice.removeFailed": "Kan het spraakmodel niet verwijderen. Probeer het opnieuw.",
   "error.voice.runtimeUnavailable": "Lokale spraaktranscriptie is niet beschikbaar op dit platform.",
-  "error.voice.busy": "Er loopt al een spraaktranscriptie.",
   "error.voice.modelUnavailable": "Het spraakmodel is niet beschikbaar.",
   "error.voice.transcriptionTimedOut": "De spraaktranscriptie duurde te lang.",
   "error.voice.prepareRequired":
@@ -31,6 +30,10 @@ export const messages = {
   "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
+  "error.voice.live.hostFailed":
+    "Codex op de server kon live spraak niet starten. Vraag de eigenaar om Codex op die computer bij te werken en in te loggen met ChatGPT, en probeer het dan opnieuw.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "error.voice.live.unavailable":
+    "OpenAI kon live spraak niet starten. Het probleem ligt bij OpenAI. Probeer het later opnieuw.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
 } as const satisfies PartialTranslation<typeof source>;

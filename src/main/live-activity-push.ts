@@ -51,6 +51,11 @@ export interface LiveActivityPushOptions {
   randomBytes(size: number): Uint8Array;
   /** Whether the member is still a member and not disabled. A removed member gets no more updates. */
   memberActive(memberId: string): boolean;
+  /**
+   * The thread of the side thread of the agent that runs the turn, or null when the turn is of the
+   * agent's own chat. The link of a view that shows this work then opens that thread.
+   */
+  sideThreadOfTurn?(agentId: string, turnId: string): string | null;
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
@@ -347,8 +352,17 @@ export class LiveActivityPushService {
         registration.photos.get(agent.id) ?? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood),
       unreadAgents,
       actionKey: registration.keys.action,
+      threadId: this.#threadId(registration, presentation),
       redact: redactText,
     });
+  }
+
+  /** The thread that the links of the view open: the thread of its request, or the side thread that works. */
+  #threadId(registration: Registration, presentation: DynamicIslandPresentation): string | null {
+    const requestThread = registration.coordinator.requestThreadId(presentation);
+    if (requestThread) return requestThread;
+    const working = registration.coordinator.workingTurn(presentation);
+    return working ? (this.#options.sideThreadOfTurn?.(working.agentId, working.turnId) ?? null) : null;
   }
 
   #stop(registration: Registration): void {
@@ -374,11 +388,17 @@ export class LiveActivityPushService {
   }
 }
 
-/** Whether the island view shows the event that `subject` names, so a notification would repeat it. */
+/**
+ * Whether the island view shows the event that `subject` names, so a notification would repeat it.
+ * The view shows the replies and the failed turn of the agent's own chat. The end of a turn in a side
+ * thread is not one of them, so its notification goes out, also while the view shows an older reply
+ * or failure of the same agent.
+ */
 function presentationShows(
   presentation: DynamicIslandPresentation,
-  { agentId, kind }: PushNotificationSubject,
+  { agentId, kind, sideThread }: PushNotificationSubject,
 ): boolean {
+  if (sideThread) return false;
   switch (presentation.mode) {
     case "message":
       return kind === "reply" && presentation.message.agent.id === agentId;

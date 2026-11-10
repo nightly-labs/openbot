@@ -123,6 +123,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "{name} デスクトップアプリの {address} で動作します。",
   "marketplace.app.setup.desktopConnected": "{address} に接続済みです。",
   "marketplace.app.setup.open": "サインインもキーも不要です。",
+  "marketplace.app.blocked.update":
+    "{host} の OpenBot は古いバージョンのため、アプリを接続できません。{host} の OpenBot をアップデートするか、オーナーにアップデートを依頼してください。",
+  "marketplace.app.blocked.member":
+    "{host} でアプリを接続できるのはオーナーまたは管理者だけです。{name} の接続か、メンバーもアプリを接続できるよう {host} の OpenBot のアップデートを依頼してください。",
   "marketplace.app.connectAgain": "もう一度接続",
   "marketplace.app.automation.askOnInstall": "インストール時に macOS にアクセスを求める",
   "marketplace.app.automation.title": "Apple アプリへのアクセス",
@@ -192,6 +196,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
+  "marketplace.plugin.honcho.tagline": "AI ツールをまたぐあなたの記憶",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs の Honcho は、接続した他の AI ツールとも共有できる、あなたについての長期記憶をエージェントに与えます。エージェントは学んだことを保存し、Honcho はそれをもとに推論して、あなたの好み、目標、仕事の進め方のモデルを作ります。エージェントは作業を始める前に Honcho に質問します。OpenBot のエージェントにも独自の記憶があります。Honcho は他のツールでもあなたについていく記憶です。エージェントが保存したメッセージはあなたの Honcho アカウントに送られます。",
+  "marketplace.plugin.honcho.app": "1 つの MCP サーバーで、Honcho のワークスペースに長期記憶を保存して照会します。",
+  "marketplace.plugin.honcho.prompt.recall":
+    "始める前に、私の好きな仕事の進め方について Honcho が何を知っているか聞いてください。",
+  "marketplace.plugin.honcho.prompt.save": "このスレッドの決定事項を Honcho に保存してください。",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho は私の文章のスタイルについて何と言っていますか？この下書きに活かしてください。",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev でキーを作成してください。",
+  "marketplace.plugin.hindsight.tagline": "時間とともに学ぶ記憶",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize の Hindsight は、Hindsight Cloud にある長期記憶をエージェントに与えます。エージェントは事実や出来事を保持し、意味、時間、エンティティで呼び出し、それを振り返ってメンタルモデルを作ります。記憶はバンクに保管され、エージェントはプロジェクトや人ごとにバンクを作れます。OpenBot のエージェントにも独自の記憶があります。Hindsight は接続した他の AI ツールと共有できる記憶です。エージェントが保持した内容はあなたの Hindsight Cloud アカウントに送られます。",
+  "marketplace.plugin.hindsight.app":
+    "1 つの MCP サーバーで、Hindsight Cloud のバンクにある記憶を保持、呼び出し、振り返ります。",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "始める前に、このプロジェクトについて分かっていることを Hindsight から呼び出してください。",
+  "marketplace.plugin.hindsight.prompt.retain": "このスレッドの決定事項と未解決の質問を Hindsight に保持してください。",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "私の Hindsight の記憶を振り返ってください。この 1 か月の私の仕事にどんなパターンがありますか？",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud の Connect ページでキーを作成してください。",
   "marketplace.plugin.figma.tagline": "デザインとプロトタイプ",
   "marketplace.plugin.figma.description":
     "Figma を使うと、エージェントはデザインファイルを読み取り、コンポーネント、スタイル、変数を調べ、本番用の仕様をエンジニアに渡せます。このコンピューターの Figma デスクトップアプリにある MCP サーバーに接続します。サーバーはデザインの読み取りのみ可能で、書き込みには現在対応中です。",
@@ -375,15 +400,23 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
-  "marketplace.plugin.composio.tagline": "自分の Composio リンクで多数のアプリを利用",
+  "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
+  "marketplace.plugin.postiz.description":
+    "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.postiz.app":
+    "ブラウザでのサインインまたは API キーを使い、Postiz の MCP サーバー経由でチャンネル、下書き、予約投稿、メディアを扱います。",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz に接続されている SNS チャンネルはどれですか?",
+  "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿の下書きを作成して。ただし予約はしないで。",
+  "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
-    "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など数百のアプリに接続します。Composio アカウントで使いたいアプリを接続し、その MCP URL と API キーをここに貼り付けてください。",
+    "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",
   "marketplace.plugin.composio.app":
-    "Composio MCP サーバーに追加したアプリを、Composio アカウントのリンクで提供します。",
+    "Composio アカウントで接続したアプリです。エージェントは必要になったときにアプリの接続を求めます。",
   "marketplace.plugin.composio.prompt.inbox": "未読メールをまとめて、急ぎのものに返信の下書きを作成してください。",
   "marketplace.plugin.composio.prompt.handoff": "このプルリクエストの概要をチームのチャンネルに投稿してください。",
   "marketplace.plugin.composio.prompt.apps": "Composio で使えるアプリと操作はどれですか？",
-  "marketplace.plugin.composio.hint.url": "Composio アカウントにある MCP サーバーの URL",
   "marketplace.plugin.composio.hint.apiKey": "Composio アカウントの Settings > Sessions & API Key で確認できます。",
   "marketplace.plugin.neon.tagline": "Postgres のプロジェクト、ブランチ、マイグレーション",
   "marketplace.plugin.neon.description":
@@ -501,7 +534,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "気象の時系列データセットを探して、その列を見せてください。",
   "marketplace.auth.apiKey": "API キー",
   "marketplace.auth.personalApiKey": "個人用 API キー",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "キーを作成",
 
   "marketplace.skill.doc": "SKILL.md",

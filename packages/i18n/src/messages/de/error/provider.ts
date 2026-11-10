@@ -236,6 +236,8 @@ export const messages = {
     "Das OpenCode-Modell hat den Durchlauf ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Das OpenCode-Modell hat den Durchlauf nach seinem Nachdenken ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
+  "error.provider.acpNoAnswer":
+    "{provider} hat den Durchlauf ohne Antwort beendet. Sende die Nachricht erneut oder starte einen neuen Chat.",
   "error.provider.chatgptPageFailed": "OpenBot konnte die ChatGPT-Verbindungsseite nicht öffnen.",
   "error.provider.noneReady": "Kein Agentenanbieter ist bereit.",
   "error.provider.claudeTurnActive":
@@ -248,9 +250,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} wurde gestoppt, bevor der Agentenprozess gestartet wurde.",
   "error.provider.archiveUnreadable":
     "Das Laufzeitarchiv kann nicht gelesen werden oder verwendet ein nicht unterstütztes Format.",
-  "error.provider.antigravityArchivePath": "Das Gemini-Archiv enthält eine unerwartete Datei.",
-  "error.provider.antigravityChecksum": "Die Prüfsumme der Gemini-Laufzeit stimmt nicht überein.",
-  "error.provider.antigravityReleaseShape": "Die Gemini-Version hat eine unerwartete Struktur.",
   "error.provider.antigravityMissing":
     "Gemini wurde nicht heruntergeladen. Lade es in OpenBot herunter, um fortzufahren.",
   "error.provider.antigravityNotStarted":
@@ -267,6 +266,10 @@ export const messages = {
     "Gemini kann dieses Modell gerade nicht verwenden. Wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Der Gemini-Dienst von Google hat die Anfrage nicht abgeschlossen. Versuche es in ein paar Minuten erneut.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Auf einem Windows-Host öffnet Gemini die Google-Seite auf dem Host selbst. Verbinde Gemini auf dem Host-Computer.",
   "error.provider.cursorArchivePath": "Das Cursor-Archiv enthält eine unerwartete Datei.",
   "error.provider.cursorChecksum": "Die Prüfsumme der Cursor-Laufzeit stimmt nicht überein.",
   "error.provider.cursorReleaseShape": "Die Cursor-Version hat eine unerwartete Struktur.",
@@ -306,6 +309,10 @@ export const messages = {
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.imageTooSmall":
+    "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu klein ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.imageTooLarge":
+    "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu groß ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
   "error.provider.museMcpStartupFault":
@@ -442,6 +449,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse benötigt Text oder ein Bild.",
   "error.provider.museMethodUnsupported": "Muse unterstützt {method} nicht.",
   "error.provider.museTurnFailed": "Der Muse-Durchlauf ist fehlgeschlagen.",
+  "error.provider.museModelUnavailable":
+    "Muse kann dieses Modell nicht verwenden. Muse ist im Land, in dem dieser Agent läuft, möglicherweise nicht verfügbar, oder dieses Konto hat keinen Zugriff auf das Modell. Wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kann ohne Zugriff auf externe Werkzeuge kein Profil erstellen. Verwende einen anderen Anbieter, um das Profil zu erstellen, und wähle dann Muse für den Agenten.",
   "error.provider.museAuthUnverified":

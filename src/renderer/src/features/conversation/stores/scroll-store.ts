@@ -22,7 +22,7 @@ import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { formatMessageTime } from "../../../app-message-projection";
-import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
@@ -113,6 +113,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
         times.set(message.turnId, message.createdAt);
     return times;
   });
+  /*
+   * In Natural, a member's progress notes show as its own messages, as in an agent chat: a member can
+   * say "I'll check the shared folder first" and then answer. Each note waits until it is complete
+   * (`held`), so it enters as one bubble and does not grow.
+   */
   const progressRows = (thinking: AgentMessage): AgentMessage[] => {
     const channel = deps.props.channel;
     if (!channel) return narrationRows(thinking, deps.props.agent?.provider);
@@ -122,6 +127,21 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       (row) => !answeredAt || !row.createdAt || row.createdAt <= answeredAt,
     );
   };
+  /** The agents that write in the channel now. Their text that still arrives waits until it is complete. */
+  const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
+  /*
+   * Only the text of a member that works waits. A view keeps the copy of an older message that it
+   * loaded, so a copy loaded while it streamed can stay "streaming" after its task ends (#4846), and
+   * it must not stay hidden.
+   */
+  const held = (message: AgentMessage): boolean =>
+    heldWhileWritten(message) &&
+    (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
+  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+  const foldedAnswerIds = createMemo(
+    () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
+  );
   const shownMessages = createMemo(() => {
     const progressUpdates = deps.props.responseStyle === "natural";
     const channelTurnRows: AgentMessage[][] = [];
@@ -136,15 +156,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
         return [];
       }
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
-      return silentAgentAnswer(message) ? [] : [message];
+      return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
     });
     // Members of a channel work at the same time, so each update goes where its time puts it.
     const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
     // Natural shows an agent's text once it is complete, as one bubble, while the activity line
-    // names the step. A bubble that grows as the text arrives moves the chat at each line. A channel
-    // has no such activity line, so its members' text shows as it arrives.
-    const complete =
-      progressUpdates && !deps.props.channel ? shown.filter((message) => !heldWhileWritten(message)) : shown;
+    // names the step. A bubble that grows as the text arrives moves the chat at each line.
+    const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;
     const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
     return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
   });
@@ -198,7 +216,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
         ? state?.compaction?.startedAt
         : undefined;
-    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages());
+    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages(), updateAnswers());
     const boundary =
       startedAt === undefined
         ? -1
@@ -417,6 +435,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,

@@ -16,6 +16,12 @@ export const messages = {
     "Pokazuj rozmyty pulpit za oknem. Strony i menu używają wtedy motywu aplikacji.",
   "settings.interfaceSize.title": "Rozmiar interfejsu",
   "settings.interfaceSize.description": "Rozmiar tekstu i elementów sterujących w OpenBot.",
+  "settings.interfaceFont.title": "Czcionka interfejsu",
+  "settings.interfaceFont.description": "Czcionka menu, czatów i ustawień.",
+  "settings.interfaceFont.default": "Domyślna (Inter)",
+  "settings.codeFont.title": "Czcionka kodu",
+  "settings.codeFont.description": "Czcionka kodu, terminali i ścieżek plików.",
+  "settings.codeFont.default": "Domyślna",
   "settings.logoColor.title": "Kolor logo",
   "settings.logoColor.description": "Widoczny w Docku, na pasku zadań i w Dynamic Island.",
   "settings.logoColor.buildNote": "Ta kompilacja ma własny kolor logo. Wybór dotyczy wersji wydanej.",
@@ -118,6 +124,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "{setting}: ustaw dla wszystkich agentów",
   "settings.agentDefaults.agentLabel": "{setting}: {agent}",
   "settings.agentDefaults.loadFailed": "Nie udało się odczytać agentów.",
+  "settings.commitCoAuthor.sectionTitle": "Commity Git",
+  "settings.commitCoAuthor.title": "Wymieniaj OpenBot w commitach",
+  "settings.commitCoAuthor.description":
+    "Agenci dodają OpenBot jako współautora swoich commitów. Ty pozostajesz autorem.",
   "settings.planStart.title": "Rozpoczęcie pracy",
   "settings.planStart.wait": "Gdy nacisnę Start",
   "settings.planStart.after": "Po {time}",
@@ -202,7 +212,13 @@ export const messages = {
   "settings.soundTheme.play": "Odtwórz {name}",
   "settings.notch.title": "Działanie",
   "settings.notch.show.title": "Pokazuj status w wycięciu MacBooka",
+  "settings.notch.show.titleTopOfScreen": "Pokazuj status u góry ekranu",
   "settings.notch.show.description": "Pokazuj aktywność agentów i elementy wymagające uwagi u góry każdego ekranu.",
+  "settings.notch.xwayland.title": "Wymagane ponowne uruchomienie",
+  "settings.notch.xwayland.description":
+    "W Wayland OpenBot musi używać XWayland, aby pokazać Dynamic Island nad innymi aplikacjami. Do tego czasu wyspa się nie pokazuje.",
+  "settings.notch.xwayland.unsupported": "W Wayland bez XWayland Dynamic Island nie może być nad innymi aplikacjami.",
+  "settings.notch.xwayland.restart": "Uruchom ponownie",
   "settings.notch.idle.title": "Pokazuj bezczynną wyspę",
   "settings.notch.idle.description": "Pokazuj logo OpenBot i powitanie, gdy żaden status nie jest aktywny.",
   "settings.notch.displays.title": "Pokazuj na dodatkowych ekranach",
@@ -227,6 +243,12 @@ export const messages = {
     "„Nad innymi aplikacjami” zostawia dok na ekranie, gdy OpenBot działa w tle.",
   "settings.agentDock.placement.screen": "Nad innymi aplikacjami",
   "settings.agentDock.placement.window": "W oknie OpenBot",
+  "settings.agentDock.xwayland.title": "Wymagane ponowne uruchomienie",
+  "settings.agentDock.xwayland.description":
+    "W Wayland OpenBot musi używać XWayland, aby pokazać dok nad innymi aplikacjami. Do tego czasu dok jest w oknie OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "W Wayland bez XWayland dok nie może być nad innymi aplikacjami. Jest w oknie OpenBot.",
+  "settings.agentDock.xwayland.restart": "Uruchom ponownie",
   "settings.agentDock.display.title": "Ekran",
   "settings.agentDock.display.description":
     "Jeśli ten ekran nie jest podłączony, dok przechodzi na ekran okna OpenBot.",
@@ -241,6 +263,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Lewa",
   "settings.agentDock.autoHide.title": "Ukrywaj, gdy nieużywany",
   "settings.agentDock.autoHide.description": "Dok chowa się w krawędzi. Przesuń wskaźnik do krawędzi, aby go pokazać.",
+  "settings.agentDock.edgeStrip.title": "Pokazuj pasek przy krawędzi",
+  "settings.agentDock.edgeStrip.description":
+    "Cienki pasek zostaje tam, gdzie chowa się dok. Zbliż do niego wskaźnik, aby pokazać dok. Gdy agent o coś pyta, przez pasek przechodzi fala kolorów.",
   "settings.agentDock.results.title": "Pokazuj ukończoną pracę",
   "settings.agentDock.results.description": "Wyniki agentów pojawiają się na chwilę obok doku.",
   "settings.agentDock.agents.title": "Agenci w doku",
@@ -668,6 +693,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Głos na żywo Codex",
   "settings.voice.speech.codexLive.description":
     "Rozmowy głosowe z każdym agentem używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos, Twoje prośby i odpowiedzi agenta trafiają do OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Rozmowy głosowe z każdym agentem używają głosu na żywo OpenAI z logowaniem Codex serwera. Twój głos, Twoje prośby i odpowiedzi agenta trafiają do OpenAI.",
   "settings.voice.speech.speed.title": "Szybkość",
   "settings.voice.speech.voice.title": "Głos",
   "settings.voice.speech.voice.female": "Głos żeński {number}",
@@ -688,8 +715,6 @@ export const messages = {
   "settings.transfer.old.text": "Zapisz agentów i ustawienia serwera w pliku.",
   "settings.transfer.new.title": "Importuj na ten serwer",
   "settings.transfer.new.text": "Dodaj agentów i ustawienia serwera z pliku.",
-  "settings.transfer.notMoved":
-    "Klucze API, logowania, konektory, preferencje aplikacji i historia czatów nie są przenoszone. Skonfiguruj je ponownie na nowym serwerze.",
   "settings.transfer.back": "Wstecz",
   "settings.transfer.loading": "Wczytywanie twoich agentów…",
   "settings.transfer.summary.label": "Zawartość pliku",

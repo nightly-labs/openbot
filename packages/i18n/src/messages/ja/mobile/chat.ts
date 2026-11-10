@@ -32,9 +32,8 @@ export const messages = {
   "mobile.chat.routine.created": "ルーティンを作成しました",
   "mobile.chat.routine.updated": "ルーティンを更新しました",
   "mobile.chat.routine.deleted": "ルーティンを削除しました",
-  "mobile.chat.routine.runGroup.count": { other: "{count} 回の実行" },
-  "mobile.chat.routine.runGroup.show": { other: "{name} の {count} 回の実行を表示" },
-  "mobile.chat.routine.runGroup.hide": { other: "{name} の {count} 回の実行を非表示" },
+  "mobile.chat.routine.group.title": "ルーティンのアクティビティ",
+  "mobile.chat.routine.group.count": { other: "{count} 件のイベント" },
   "mobile.chat.contextReset": "新しいチャットを開始しました",
   "mobile.chat.plan.title": "タスク",
   "mobile.chat.plan.stopped": "停止",
@@ -51,6 +50,9 @@ export const messages = {
   "mobile.chat.code.copyFailed": "コードをコピーできませんでした",
   "mobile.chat.code.copied": "コードをコピーしました",
   "mobile.chat.code.copy": "コードをコピー",
+  "mobile.chat.table.copyMarkdown": "Markdown としてコピー",
+  "mobile.chat.table.copyCsv": "CSV としてコピー",
+  "mobile.chat.table.copyFailed": "表をコピーできませんでした",
   "mobile.chat.preview.htmlTitle": "HTML プレビュー",
   "mobile.chat.preview.mermaidTitle": "Mermaid 図",
   "mobile.chat.preview.htmlCode": "HTML コード",
@@ -189,6 +191,14 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs のキーに権限が不足しています。設定 > 音声 で確認してください。",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs にはネットワーク接続が必要です。",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "音声サーバーが返信を読み上げられませんでした。設定 > 音声 で確認してください。",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "このサーバーは GPT Live Voice に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
+  "mobile.chat.liveVoice.gptFailed": "GPT Live Voice を開始できませんでした。ミュートを解除して再試行してください。",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice が停止しました。ミュートを解除すると再開します。",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "設定で OpenBot にマイクの使用を許可してから、ミュートを解除して再試行してください。",
   "mobile.chat.composer.addAttachment": "添付ファイルを追加",
   "mobile.chat.composer.ask": "{name} に質問",
   "mobile.chat.composer.stopFailed": "エージェントを停止できませんでした。すでに終了している可能性があります。",

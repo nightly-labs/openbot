@@ -139,9 +139,13 @@ export const messages = {
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.museNoModels":
+    "لم يرسل Muse أي نماذج لهذا الحساب. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل. اختر نموذجًا من مزوّد آخر.",
   "provider.picker.customEmpty":
     "أضف نقطة نهاية متوافقة مع OpenAI — خادم نماذج على هذا الحاسوب، أو أي خدمة لها عنوان URL أساسي ومفتاح.",
   "provider.picker.customPending": "لم يتم تحميل نماذج نقاط النهاية بعد. يقرأها المزوّد بعد توقف مهمته الحالية.",
+  "provider.picker.customUnlisted": "لا يعرض {name} نماذج نقاط النهاية الخاصة بك.",
+  "provider.picker.editEndpoints": "تعديل نقاط النهاية",
   "provider.picker.defaultModelLabel": "{name}، الافتراضي",
   "provider.picker.usageLimit": "تم بلوغ حد الاستخدام",
   "provider.picker.usageLimitWindow": "حد {window}",
@@ -152,7 +156,12 @@ export const messages = {
   "provider.picker.effortLabel": "جهد التفكير لدى الوكيل",
   "provider.picker.effortFixed": "{effort}، يحدده {provider}",
   "provider.picker.fast": "سريع",
-  "provider.picker.fastLabel": "الوضع السريع",
+  "provider.picker.fastText": "ردود أسرع واستخدام أكبر",
+  "provider.picker.speed": "السرعة",
+  "provider.picker.standard": "عادي",
+  "provider.picker.standardText": "السرعة الافتراضية",
+  "provider.picker.ultrafast": "فائق السرعة",
+  "provider.picker.ultrafastText": "أسرع الردود واستخدام أكبر بكثير",
   "provider.picker.selectEffort": "اختيار الجهد",
   "provider.picker.custom": "مخصص",
   "provider.picker.cliReady": "{cli} جاهز",
@@ -326,7 +335,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
   "provider.settings.claudeUserSetupDescription":
     "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude على الخادم. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
   "provider.settings.claudeUserSetupLoadFailed": "تعذّر تحميل إعداد Claude Code.",
+  "provider.settings.context": "السياق",
+  "provider.settings.compactWindow": "ضغط المحادثات عند",
+  "provider.settings.compactWindowDescription":
+    "يلخّص Claude Code الأدوار الأقدم في المحادثة عندما تصل إلى هذا الحجم. القيمة الأقل تبقي الأدوار سريعة ورخيصة. القيمة الأعلى تحتفظ بتفاصيل أكثر. النموذج ذو النافذة الأصغر يضغط عند حده الخاص.",
+  "provider.settings.compactWindowDefault": "الافتراضي في Claude Code",
+  "provider.settings.compactWindowTokens": "{size} رمز",
+  "provider.settings.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",

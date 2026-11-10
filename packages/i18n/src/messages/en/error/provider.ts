@@ -219,6 +219,8 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "The OpenCode model ended the turn after its reasoning, with no answer. Try again, or choose another model.",
+  "error.provider.acpNoAnswer":
+    "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -228,9 +230,6 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAgentProcess": "{provider} has no process running for this agent.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} stopped before the agent's process started.",
   "error.provider.archiveUnreadable": "The runtime archive cannot be read or uses an unsupported format.",
-  "error.provider.antigravityArchivePath": "The Gemini archive has an unexpected file.",
-  "error.provider.antigravityChecksum": "Gemini runtime checksum mismatch.",
-  "error.provider.antigravityReleaseShape": "The Gemini release has an unexpected shape.",
   "error.provider.antigravityMissing": "Gemini is not downloaded. Download it in OpenBot to continue.",
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityOverrideInvalid":
@@ -245,6 +244,10 @@ export const messages = defineMessages("error.provider", {
     "Gemini cannot use this model now. Choose another model, then try again.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini lost the connection to its agent and stopped. Send a message to continue.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "On a Windows host, Gemini opens the Google page on the host itself. Connect Gemini on the host computer.",
   "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",
   "error.provider.cursorChecksum": "Cursor runtime checksum mismatch.",
   "error.provider.cursorReleaseShape": "The Cursor release has an unexpected shape.",
@@ -281,6 +284,10 @@ export const messages = defineMessages("error.provider", {
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageTooSmall":
+    "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageTooLarge":
+    "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
   "error.provider.museMcpStartupFault":
@@ -404,6 +411,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.museEmptyInput": "Muse needs text or an image.",
   "error.provider.museMethodUnsupported": "Muse does not support {method}.",
   "error.provider.museTurnFailed": "Muse turn failed.",
+  "error.provider.museModelUnavailable":
+    "Muse cannot use this model. Muse may not be available in the country where this agent runs, or this account has no access to the model. Choose another model, then try again.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse cannot generate a profile without access to external tools. Use another provider to generate the profile, then select Muse for the agent.",
   "error.provider.museAuthUnverified":

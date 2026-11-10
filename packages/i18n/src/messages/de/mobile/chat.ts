@@ -33,18 +33,8 @@ export const messages = {
   "mobile.chat.routine.created": "Routine erstellt",
   "mobile.chat.routine.updated": "Routine aktualisiert",
   "mobile.chat.routine.deleted": "Routine gelöscht",
-  "mobile.chat.routine.runGroup.count": {
-    one: "{count} Ausführung",
-    other: "{count} Ausführungen",
-  },
-  "mobile.chat.routine.runGroup.show": {
-    one: "{count} Ausführung von {name} anzeigen",
-    other: "{count} Ausführungen von {name} anzeigen",
-  },
-  "mobile.chat.routine.runGroup.hide": {
-    one: "{count} Ausführung von {name} ausblenden",
-    other: "{count} Ausführungen von {name} ausblenden",
-  },
+  "mobile.chat.routine.group.title": "Routine-Aktivität",
+  "mobile.chat.routine.group.count": { one: "{count} Ereignis", other: "{count} Ereignisse" },
   "mobile.chat.contextReset": "Neuer Chat gestartet",
   "mobile.chat.plan.title": "Aufgaben",
   "mobile.chat.plan.stopped": "Gestoppt",
@@ -61,6 +51,9 @@ export const messages = {
   "mobile.chat.code.copyFailed": "Code konnte nicht kopiert werden",
   "mobile.chat.code.copied": "Code kopiert",
   "mobile.chat.code.copy": "Code kopieren",
+  "mobile.chat.table.copyMarkdown": "Als Markdown kopieren",
+  "mobile.chat.table.copyCsv": "Als CSV kopieren",
+  "mobile.chat.table.copyFailed": "Tabelle konnte nicht kopiert werden",
   "mobile.chat.preview.htmlTitle": "HTML-Vorschau",
   "mobile.chat.preview.mermaidTitle": "Mermaid-Diagramm",
   "mobile.chat.preview.htmlCode": "HTML-Code",
@@ -201,6 +194,15 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Dem ElevenLabs-Schlüssel fehlt eine Berechtigung. Prüfe sie unter Einstellungen > Stimme.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs braucht eine Netzwerkverbindung.",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "Dein Sprachserver konnte die Antwort nicht vorlesen. Prüfe ihn unter Einstellungen > Sprache.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Dieser Server unterstützt GPT Live Voice nicht. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "mobile.chat.liveVoice.gptFailed":
+    "GPT Live Voice konnte nicht starten. Hebe die Stummschaltung auf, um es erneut zu versuchen.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice wurde beendet. Hebe die Stummschaltung auf, um es neu zu starten.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Erlaube OpenBot in den Einstellungen, das Mikrofon zu verwenden. Hebe dann die Stummschaltung auf.",
   "mobile.chat.composer.addAttachment": "Anhang hinzufügen",
   "mobile.chat.composer.ask": "{name} fragen",
   "mobile.chat.composer.stopFailed": "Der Agent konnte nicht gestoppt werden. Möglicherweise ist er bereits fertig.",

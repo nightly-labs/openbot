@@ -247,9 +247,79 @@
   height: var(--openbot-icon-md);
 }
 
+/* The add menu lists every agent that is not on the dock. With many agents it is taller than the dock
+ * window, so it fits the space left and only the agent rows scroll. The search field and Dock
+ * settings stay in place. The rows fade at an edge with more agents behind it (the shared
+ * .scroll-fade-* masks). */
+.agent-dock-add-menu.ui-action-menu {
+  display: flex;
+  max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
+  flex-direction: column;
+}
+
+/* A fixed width, so the menu does not change size while a search removes rows. */
+.agent-dock-add-menu-search.ui-action-menu {
+  width: 232px;
+}
+
+/* The list reaches the panel edges, so the separator before the channels does not overflow it. */
+.agent-dock-add-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin-inline: calc(var(--ui-menu-padding) * -1);
+  padding-inline: var(--ui-menu-padding);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+/* A Bloub drawing is larger than its avatar box. Without the clip, the last row overflows the list by a
+ * few pixels, so a short list scrolls and shows the bottom fade. The list already cut that part. */
+.agent-dock-add-list > [role="menuitem"] {
+  overflow-y: clip;
+}
+
+.agent-dock-add-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* Kobalte draws the separator as an hr. The menu rule styles only a direct hr, so this one uses the same line. */
+.agent-dock-add-list > hr {
+  height: 1px;
+  margin: var(--ui-menu-padding) calc(var(--ui-menu-padding) * -1);
+  border: 0;
+  background: var(--openbot-border);
+}
+
+/* The shared search select row. Its line goes from edge to edge of the menu, as the separator does. */
+.agent-dock-add-search {
+  margin: calc(var(--ui-menu-padding) * -1) calc(var(--ui-menu-padding) * -1) var(--openbot-space-1);
+}
+
+/* The field takes the focus each time the menu opens, so it shows no border or focus ring. */
+.agent-dock-add-search .agent-dock-add-search-input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.agent-dock-add-search .agent-dock-add-search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .agent-dock-menu-avatar.agent-avatar {
   width: 20px;
   height: 20px;
+}
+
+.agent-dock-menu-channel {
+  display: inline-flex;
+}
+
+.agent-dock-menu-channel .channel-avatar-cluster {
+  --channel-avatar-size: 20px;
+  --agent-avatar-outline-width: 1px;
 }
 
 /* The chat, over the liquid panel. */
@@ -293,6 +363,15 @@
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
+}
+
+.agent-dock-chat-channel {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.agent-dock-chat-channel .channel-avatar-cluster {
+  --channel-avatar-size: 34px;
 }
 
 .agent-dock-chat-title {
@@ -437,6 +516,15 @@
   color: var(--openbot-danger-text);
 }
 
+/* The author of a channel message from someone else. */
+.agent-dock-author {
+  display: block;
+  margin-block-end: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
+}
+
 .agent-dock-text {
   margin: 0;
   white-space: pre-wrap;
@@ -524,6 +612,19 @@
   margin: var(--openbot-space-2) var(--openbot-space-4) 0;
   color: var(--openbot-danger-text);
   font-size: var(--openbot-text-sm);
+}
+
+/* The composer's wrap places the mention picker above the composer, in the panel. The composer has its
+   own margins, and the editor keeps the dock's height limit. */
+.agent-dock-composer-wrap.composer-wrap {
+  --composer-editor-limit: initial;
+
+  padding: 0;
+}
+
+/* As in the main chat, the picker is 12px narrower on each side than the composer. */
+.agent-dock-composer-wrap .mention-picker {
+  --mention-picker-side-inset: calc(var(--openbot-space-3) + 12px);
 }
 
 /* The app's compact composer, as the side-question and diagram chat panels use it. */
@@ -709,4 +810,15 @@
 /* The screen edge is the frame there, so the strip of frame on the right of the dock is past the window. */
 :root[data-surface="agent-dock"] .agent-dock {
   right: -5px;
+}
+
+/* A channel draws its member cluster in the square of an agent face. It is last so that it
+ * outranks the face sizes of the rules above. */
+.agent-dock-seat-button .channel-avatar-cluster .agent-avatar,
+.agent-dock-chat-channel .channel-avatar-cluster .agent-avatar,
+.agent-dock-menu-channel .channel-avatar-cluster .agent-avatar {
+  --agent-avatar-optical-offset: calc(var(--channel-avatar-face) * -0.14);
+
+  width: var(--channel-avatar-face);
+  height: var(--channel-avatar-face);
 }

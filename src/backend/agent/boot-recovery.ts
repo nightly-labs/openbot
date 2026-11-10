@@ -19,7 +19,8 @@ import type { ThreadLifecycle } from "./thread-lifecycle";
 type UnresolvedDelivery = DeliveryContext["delivery"];
 
 export interface BootRecoveryHooks {
-  executionThreads?(): Array<{ id: string; threadId: string }>;
+  /** The channel and messaging threads. A channel thread names its channel: its turns run in their own lane. */
+  executionThreads?(): Array<{ id: string; threadId: string; channelId?: string }>;
   /** The threads of the agents' tasks. Each runs in its own lane, beside the agent's own chat. */
   taskThreads?(): Array<{ id: string; threadId: string }>;
   deliveryThreadId?(deliveryId: string): string | null;
@@ -30,6 +31,8 @@ export interface BootRecoveryHooks {
    * routine, whose record is gone. A Test, script or webhook run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /** Whether this thread is a routine's side thread, where a turn can end quiet. */
+  isRoutineThread(threadId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -101,7 +104,8 @@ export class BootRecovery {
         const agent = agents.find((item) => item.id === context.id);
         // A thread that is also the agent's own chat is in the list already.
         if (!agent || agent.threadId === context.threadId) return [];
-        this.#conversation.registerExecutionThread(agent.id, context.threadId);
+        if (context.channelId) this.#conversation.registerChannelThread(agent.id, context.threadId, context.channelId);
+        else this.#conversation.registerExecutionThread(agent.id, context.threadId);
         return [{ ...agent, threadId: context.threadId }];
       }),
       ...(this.#hooks.taskThreads?.() ?? []).flatMap((context) => {
@@ -143,11 +147,11 @@ export class BootRecovery {
     for (const id of this.#orphanedDeliveryIds) {
       if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
     }
-    // Each lane of an agent (its own chat, or one task) starts one turn at a time, so the unconfirmed
-    // deliveries of a lane are one batch. The turn names only the first of them as its client id, and
-    // the others ran in that same turn.
+    // Each lane of an agent (its own chat, one task, or one channel) starts one turn at a time, so the
+    // unconfirmed deliveries of a lane are one batch. The turn names only the first of them as its
+    // client id, and the others ran in that same turn.
     const laneOf = (delivery: { id: string; recipientAgentId: string }) =>
-      `${delivery.recipientAgentId}\u0000${this.#mailbox.taskIdForDelivery(delivery.id) ?? ""}`;
+      `${delivery.recipientAgentId}\u0000${this.#mailbox.laneIdForDelivery(delivery.id) ?? ""}`;
     const unconfirmedStarts = new Map<string, Set<string>>();
     for (const { delivery } of unresolved) {
       if (delivery.status !== "starting" || delivery.turnId) continue;
@@ -369,6 +373,8 @@ export class BootRecovery {
             findDelivery: (deliveryId) => this.#mailbox.deliveryForProviderMessage(agent.id, deliveryId),
             findMessageDelivery: (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
             quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
+            quietTeammateThread:
+              !this.#conversation.isExecutionThread(publicThreadId) || this.#hooks.isRoutineThread(publicThreadId),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(

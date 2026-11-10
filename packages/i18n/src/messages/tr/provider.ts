@@ -120,10 +120,14 @@ export const messages = {
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
   "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
+  "provider.picker.museNoModels":
+    "Muse bu hesap için model göndermedi. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir. Başka bir sağlayıcıdan model seçin.",
   "provider.picker.customEmpty":
     "OpenAI uyumlu bir uç nokta ekleyin — bu bilgisayardaki bir model sunucusu veya bir temel URL ve anahtara sahip herhangi bir hizmet.",
   "provider.picker.customPending":
     "Uç noktalarınızın modelleri henüz yüklenmedi. Sağlayıcı bunları geçerli görevi durduktan sonra okur.",
+  "provider.picker.customUnlisted": "{name}, uç noktalarınızın modellerini listelemiyor.",
+  "provider.picker.editEndpoints": "Uç noktaları düzenle",
   "provider.picker.defaultModelLabel": "{name}, varsayılan",
   "provider.picker.usageLimit": "Kullanım sınırına ulaşıldı",
   "provider.picker.usageLimitWindow": "{window} sınırı",
@@ -134,7 +138,12 @@ export const messages = {
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
   "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",
   "provider.picker.fast": "Hızlı",
-  "provider.picker.fastLabel": "Hızlı mod",
+  "provider.picker.fastText": "Daha hızlı yanıtlar, daha fazla kullanım",
+  "provider.picker.speed": "Hız",
+  "provider.picker.standard": "Standart",
+  "provider.picker.standardText": "Varsayılan hız",
+  "provider.picker.ultrafast": "Ultra hızlı",
+  "provider.picker.ultrafastText": "En hızlı yanıtlar, çok daha fazla kullanım",
   "provider.picker.selectEffort": "Efor seçin",
   "provider.picker.custom": "Özel",
   "provider.picker.cliReady": "{cli} hazır",
@@ -235,7 +244,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Kendi Claude Code kurulumumu kullan",
   "provider.settings.claudeUserSetupDescription":
     "Ajanlar CLAUDE.md dosyanızı, becerilerinizi, ajanlarınızı, kancalarınızı ve eklentilerinizi ~/.claude klasöründen yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Ajanlar sunucudaki ~/.claude konumundan CLAUDE.md, beceriler, ajanlar, hook’lar ve eklentileri yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code ayarı yüklenemedi.",
+  "provider.settings.context": "Bağlam",
+  "provider.settings.compactWindow": "Sohbetleri sıkıştırma boyutu",
+  "provider.settings.compactWindowDescription":
+    "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",
+  "provider.settings.compactWindowDefault": "Claude Code varsayılanı",
+  "provider.settings.compactWindowTokens": "{size} token",
+  "provider.settings.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
   "provider.settings.models": "Modeller",
   "provider.settings.modelsDescription": {
     one: "{count} modelden {shown} tanesi model seçicide görünür.",

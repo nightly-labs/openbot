@@ -32,6 +32,13 @@
   border-radius: inherit;
 }
 
+/* A connector's icon is a brand tile, so it fills its tile as an app icon does. */
+.integration-logo-tile > .connector-brand-tile {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
 .integration-status {
   gap: var(--openbot-space-1);
 }

@@ -92,6 +92,7 @@ export const messages = {
   "mobile.workflow.webhook.secretFailed": "Impossible de créer un secret",
   "mobile.workflow.output.notify": "Notification",
   "mobile.workflow.output.channel": "Messagerie",
+  "mobile.workflow.output.chatChannel": "Canal OpenBot",
   "mobile.workflow.output.file": "Fichier",
   "mobile.workflow.status.running": "En cours",
   "mobile.workflow.status.approval": "Vous attend",
@@ -133,6 +134,7 @@ export const messages = {
   "mobile.workflow.step.sendTo": "Envoyer à",
   "mobile.workflow.step.channelHint":
     "Un propriétaire ou un administrateur choisit la messagerie dans OpenBot sur l’ordinateur.",
+  "mobile.workflow.step.chatChannelHint": "Un propriétaire ou un admin choisit le canal dans OpenBot sur l’ordinateur.",
   "mobile.workflow.problem.noTitle": "Saisissez un nom.",
   "mobile.workflow.problem.noAgent": "Choisir un agent",
   "mobile.workflow.problem.agentGone": "L’agent n’est pas disponible. Choisir un agent",

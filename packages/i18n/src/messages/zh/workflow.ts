@@ -164,6 +164,10 @@ export const messages = {
 
   "workflow.output.title": "输出",
   "workflow.output.name": "输出",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "搜索频道",
+  "workflow.output.postsAs": "发布方式",
+  "workflow.output.postsAsNote": "备注；不会开始任务",
   "workflow.output.target.file": "文件",
   "workflow.output.target.notify": "通知",
   "workflow.output.path": "文件路径",

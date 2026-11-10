@@ -32,23 +32,12 @@ export const messages = {
   "mobile.chat.routine.created": "Utworzono rutynę",
   "mobile.chat.routine.updated": "Zaktualizowano rutynę",
   "mobile.chat.routine.deleted": "Usunięto rutynę",
-  "mobile.chat.routine.runGroup.count": {
-    one: "{count} uruchomienie",
-    few: "{count} uruchomienia",
-    many: "{count} uruchomień",
-    other: "{count} uruchomienia",
-  },
-  "mobile.chat.routine.runGroup.show": {
-    one: "Pokaż {count} uruchomienie: {name}",
-    few: "Pokaż {count} uruchomienia: {name}",
-    many: "Pokaż {count} uruchomień: {name}",
-    other: "Pokaż {count} uruchomienia: {name}",
-  },
-  "mobile.chat.routine.runGroup.hide": {
-    one: "Ukryj {count} uruchomienie: {name}",
-    few: "Ukryj {count} uruchomienia: {name}",
-    many: "Ukryj {count} uruchomień: {name}",
-    other: "Ukryj {count} uruchomienia: {name}",
+  "mobile.chat.routine.group.title": "Aktywność rutyn",
+  "mobile.chat.routine.group.count": {
+    one: "{count} zdarzenie",
+    few: "{count} zdarzenia",
+    many: "{count} zdarzeń",
+    other: "{count} zdarzenia",
   },
   "mobile.chat.contextReset": "Rozpoczęto nowy czat",
   "mobile.chat.plan.title": "Zadania",
@@ -66,6 +55,9 @@ export const messages = {
   "mobile.chat.code.copyFailed": "Nie udało się skopiować kodu",
   "mobile.chat.code.copied": "Skopiowano kod",
   "mobile.chat.code.copy": "Kopiuj kod",
+  "mobile.chat.table.copyMarkdown": "Kopiuj jako Markdown",
+  "mobile.chat.table.copyCsv": "Kopiuj jako CSV",
+  "mobile.chat.table.copyFailed": "Nie można skopiować tabeli",
   "mobile.chat.preview.htmlTitle": "Podgląd HTML",
   "mobile.chat.preview.mermaidTitle": "Diagram Mermaid",
   "mobile.chat.preview.htmlCode": "Kod HTML",
@@ -214,6 +206,15 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Kluczowi ElevenLabs brakuje uprawnienia. Sprawdź je w Ustawienia > Głos.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs wymaga połączenia z siecią.",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "Serwer głosowy nie mógł odczytać odpowiedzi. Sprawdź go w Ustawienia > Głos.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Ten serwer nie obsługuje GPT Live Voice. Zaktualizuj OpenBot na komputerze, na którym działa.",
+  "mobile.chat.liveVoice.gptFailed":
+    "Nie udało się uruchomić GPT Live Voice. Wyłącz wyciszenie, aby spróbować ponownie.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice zatrzymał się. Wyłącz wyciszenie, aby uruchomić go ponownie.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Zezwól OpenBot na użycie mikrofonu w Ustawieniach. Potem wyłącz wyciszenie, aby spróbować ponownie.",
   "mobile.chat.composer.addAttachment": "Dodaj załącznik",
   "mobile.chat.composer.ask": "Zapytaj: {name}",
   "mobile.chat.composer.stopFailed": "Nie udało się zatrzymać agenta. Mógł już skończyć.",

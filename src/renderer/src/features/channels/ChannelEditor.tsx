@@ -281,7 +281,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
     };
   }
 
-  /** The picture editor shows only where the channel picture is kept: on this computer. */
+  /** The picture editor shows only where the channel picture is kept: on this computer, or on a host with `channel-picture-v1`. */
   const pictureChannel = () => (channels.pictureSupported() ? channel() : undefined);
 
   /**

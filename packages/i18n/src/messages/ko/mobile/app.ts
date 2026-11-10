@@ -34,6 +34,7 @@ export const messages = {
   "mobile.app.route.threads": "스레드",
   "mobile.app.route.usage": "사용량",
   "mobile.app.route.marketplace": "마켓플레이스",
+  "mobile.app.route.library": "라이브러리",
   "mobile.app.quickAction.search": "검색",
   "mobile.app.update.title": "OpenBot {version} 출시",
   "mobile.app.update.readyTitle": "새 OpenBot이 준비되었습니다",

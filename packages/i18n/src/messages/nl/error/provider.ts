@@ -227,6 +227,8 @@ export const messages = {
     "Het OpenCode-model beëindigde de beurt zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Het OpenCode-model beëindigde de beurt na het redeneren, zonder antwoord. Probeer het opnieuw, of kies een ander model.",
+  "error.provider.acpNoAnswer":
+    "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
@@ -237,9 +239,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} is gestopt voordat het proces van de agent startte.",
   "error.provider.archiveUnreadable":
     "Het runtime-archief kan niet worden gelezen of gebruikt een niet-ondersteunde indeling.",
-  "error.provider.antigravityArchivePath": "Het Gemini-archief bevat een onverwacht bestand.",
-  "error.provider.antigravityChecksum": "Checksum van de Gemini-runtime komt niet overeen.",
-  "error.provider.antigravityReleaseShape": "De Gemini-release heeft een onverwachte vorm.",
   "error.provider.antigravityMissing": "Gemini is niet gedownload. Download het in OpenBot om door te gaan.",
   "error.provider.antigravityNotStarted": "De Gemini-server is gevonden, maar de versie kan niet worden gelezen.",
   "error.provider.antigravityOverrideInvalid":
@@ -254,6 +253,10 @@ export const messages = {
     "Gemini kan dit model nu niet gebruiken. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Op een Windows-host opent Gemini de Google-pagina op de host zelf. Verbind Gemini op de hostcomputer.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",
   "error.provider.cursorChecksum": "Checksum van de Cursor-runtime komt niet overeen.",
   "error.provider.cursorReleaseShape": "De Cursor-release heeft een onverwachte vorm.",
@@ -291,6 +294,10 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageTooSmall":
+    "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageTooLarge":
+    "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.museMcpStartupFault":
@@ -420,6 +427,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse heeft tekst of een afbeelding nodig.",
   "error.provider.museMethodUnsupported": "Muse ondersteunt {method} niet.",
   "error.provider.museTurnFailed": "De Muse-beurt is mislukt.",
+  "error.provider.museModelUnavailable":
+    "Muse kan dit model niet gebruiken. Muse is mogelijk niet beschikbaar in het land waar deze agent draait, of dit account heeft geen toegang tot het model. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kan geen profiel maken zonder toegang tot externe tools. Gebruik een andere aanbieder om het profiel te maken en kies daarna Muse voor de agent.",
   "error.provider.museAuthUnverified":

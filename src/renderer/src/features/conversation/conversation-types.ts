@@ -45,6 +45,7 @@ import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agen
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
 
 /**
@@ -108,6 +109,8 @@ export interface ConversationChannelSource {
   readOnly: () => boolean;
   /** The agent that wrote an agent row, with the name the channel keeps for it. */
   author: (message: AgentMessage) => ChatMessageAuthor;
+  /** A person's message that this user sent, not another member's. */
+  ownMessage: (message: AgentMessage) => boolean;
   /** The agents that work now. */
   workers: () => ChannelWorker[];
   /** The turns of the workers that run now, whose steps show under the activity line. */
@@ -154,6 +157,11 @@ export interface ConversationProps {
   onOpenMcpSignIn?: ((mcpServerId: string, trigger: HTMLElement | null) => void) | undefined;
   /** Whether the server on screen holds a sign-in for an MCP row, as Server settings last read it. */
   mcpSignedIn?: ((mcpServerId: string) => boolean) | undefined;
+  /**
+   * The server list that an install command card watches until its new server is online. Absent where
+   * this client cannot open a server; the card then stays a marker.
+   */
+  serverInstall?: ServerInstallWatch | undefined;
   platform?: import("@openbot/contracts/ipc").AppInfo["platform"] | undefined;
 
   agentStatus: AgentStatus;
@@ -285,6 +293,8 @@ export interface ConversationProps {
   usageLimitAsk?: UsageLimitAskCardProps | undefined;
   /** Whether a usage limit holds this model and account now. Absent for a joined server. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  /** Whether a provider error holds this model and account now, for the backup models page. */
+  providerFailed?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The takeover of the open thread: of a side thread while one is open, else of the agent's own chat. */
   browserTakeover: BrowserTakeoverRequest | undefined;
   /** Opens an agent. With `tabId`, the agent opens at that thread tab, not at the tab it showed last. */
@@ -398,7 +408,8 @@ export interface ConversationProps {
 }
 
 /** `messageId` is the conversation message the host stored: the delivery id of the receipt. */
-export type SendMessageResult = { messageId: string } | { error: string };
+/** `reference`: the failure's support reference, when it has one. */
+export type SendMessageResult = { messageId: string } | { error: string; reference?: string | null };
 
 export interface ComposerDraft {
   text: string;

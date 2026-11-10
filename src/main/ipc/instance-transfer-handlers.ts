@@ -1,6 +1,7 @@
 // Instance transfer for a server: this computer's own, or a joined server with `instance-transfer-v1`.
-// Main opens both file dialogs and moves the file, so the renderer never names a path, and only main
-// can reveal the saved file.
+// A joined server that also has `instance-transfer-chunks-v1` moves the file in parts, so it can be
+// larger than 100 MB. Main opens both file dialogs and moves the file, so the renderer never names a
+// path, and only main can reveal the saved file.
 
 import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -16,6 +17,7 @@ import {
   resolveRemoteInstanceTransferResult,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_REMOTE_BYTES,
@@ -28,6 +30,7 @@ import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialo
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { InstanceTransferService } from "../instance-transfer-service";
 import { decodeAgentSummaries } from "../remote-agent-decoding";
+import { downloadTransferInParts, uploadTransferInParts } from "../remote-instance-transfer-chunks";
 import { AGENT_IMPORT_UPLOAD_TIMEOUT_MS, type RemoteServerManager } from "../remote-server-manager";
 import { handler, type IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -37,7 +40,12 @@ export interface InstanceTransferIpcDependencies {
   instanceTransfer: InstanceTransferService;
   remoteServers: Pick<
     RemoteServerManager,
-    "supportsCapability" | "request" | "stageInstanceTransfer" | "downloadInstanceTransfer"
+    | "supportsCapability"
+    | "request"
+    | "stageInstanceTransfer"
+    | "downloadInstanceTransfer"
+    | "sendInstanceTransferPart"
+    | "readInstanceTransferPart"
   >;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
@@ -83,18 +91,29 @@ export function instanceTransferIpcHandlers({
   };
 
   const exportLocal = async (input: ExportInstanceInput): Promise<InstanceExportResult> => {
+    // An export over the file limits fails here, before the user chooses where to save it.
+    const prepared = await runCauseEffect(instanceTransfer.prepareExport(input));
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
-    const result = await runCauseEffect(instanceTransfer.exportTo(path, input));
+    const result = await runCauseEffect(prepared.write(path));
     lastExport = path;
     return result;
   };
+
+  const inParts = (serverId: string) => remoteServers.supportsCapability(serverId, INSTANCE_TRANSFER_CHUNKS_CAPABILITY);
 
   const exportRemote = async (input: ExportInstanceInput, serverId: string): Promise<InstanceExportResult> => {
     requireRemote(serverId);
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
-    const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, input));
+    if (inParts(serverId)) {
+      const { warnings } = await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
+      lastExport = path;
+      return { saved: true, fileName: basename(path), warnings };
+    }
+    // `instance-transfer-v1` carries no chat history.
+    const { includeHistory: _history, ...v1 } = input;
+    const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, v1));
     // The file appears only when it is complete, as a local export does.
     const part = `${path}.part`;
     try {
@@ -112,6 +131,7 @@ export function instanceTransferIpcHandlers({
     requireRemote(serverId);
     const path = await chooseFile();
     if (!path) return null;
+    if (inParts(serverId)) return runCauseEffect(uploadTransferInParts(remoteServers, serverId, path));
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > INSTANCE_TRANSFER_REMOTE_BYTES) throw new Error(sourceText("error.import.transferRemoteTooLarge"));

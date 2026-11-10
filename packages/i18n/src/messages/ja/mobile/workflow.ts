@@ -94,6 +94,7 @@ export const messages = {
   "mobile.workflow.webhook.secretFailed": "シークレットを作成できませんでした",
   "mobile.workflow.output.notify": "通知",
   "mobile.workflow.output.channel": "メッセージの送信先",
+  "mobile.workflow.output.chatChannel": "OpenBot のチャンネル",
   "mobile.workflow.output.file": "ファイル",
   "mobile.workflow.status.running": "実行中",
   "mobile.workflow.status.approval": "対応待ち",
@@ -134,6 +135,7 @@ export const messages = {
   "mobile.workflow.step.sendTo": "送信先",
   "mobile.workflow.step.channelHint":
     "メッセージの送信先は、オーナーまたは管理者がコンピューターの OpenBot で選択します。",
+  "mobile.workflow.step.chatChannelHint": "オーナーまたは管理者が、コンピュータの OpenBot でチャンネルを選びます。",
   "mobile.workflow.problem.noTitle": "名前を入力してください。",
   "mobile.workflow.problem.noAgent": "エージェントを選択",
   "mobile.workflow.problem.agentGone": "エージェントを利用できません。エージェントを選択",

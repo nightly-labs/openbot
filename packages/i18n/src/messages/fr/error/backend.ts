@@ -74,6 +74,8 @@ export const messages = {
     "Le canal a un démarrage de tâche non confirmé. Vérifiez son résultat avant de le supprimer.",
   "error.backend.channelNotFound": "Canal introuvable.",
   "error.backend.channelMemberUnavailable": "Un membre du canal est indisponible.",
+  "error.backend.channelInstructionsTooLong":
+    "Raccourcissez les instructions à 2 000 caractères. Les instructions plus longues ne sont pas enregistrées.",
   "error.backend.channelWaitBeforeNewConversation":
     "Attendez la fin du travail dans ce canal, puis démarrez une nouvelle conversation.",
   "error.backend.channelWaitBeforeCompact": "Attendez la fin du travail dans ce canal, puis compactez-le.",
@@ -220,8 +222,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Cet agent n’a pas de routine avec cet identifiant.",
   "error.backend.agentWaitNoRoutine":
     "Seule une exécution de l’une de vos routines réveille une attente, et vous n’avez aucune routine. Créez-en une avec openbot.create_routine, puis ouvrez l’attente.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Les attentes ouvertes ne sont disponibles que pour les agents de cet ordinateur.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marquer un message comme non lu n’est disponible que pour les agents de cet ordinateur.",
   "error.backend.messageDeleteUnsupported": "Ce serveur ne permet pas de supprimer des messages.",
@@ -255,6 +255,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "La réponse à la connexion n’est pas arrivée à temps.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot n’a pas pu lire les informations de connexion de ce serveur. Vérifiez l’adresse du serveur et réessayez.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Le serveur de connexion a envoyé une réponse qu’OpenBot ne peut pas lire. Si le service vous donne une clé d’API ou un jeton, ajoutez-le dans les paramètres de ce serveur, puis testez de nouveau la connexion.",
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",

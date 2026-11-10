@@ -1,4 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import {
+  DISCORD_EMBED_LIMITS,
+  DISCORD_EMBED_TEXT_LIMIT,
+  DISCORD_EMBEDS_LIMIT,
+  type DiscordEmbed,
+  discordEmbedTextLength,
+} from "@openbot/contracts/signal-protocol/discord-api";
 import { z } from "zod";
 import type { ContextEntry } from "./messaging-types";
 
@@ -19,13 +26,73 @@ const historyShape = {
   limit: z.number().int().min(1).max(HISTORY_LIMIT).optional(),
 };
 const listPlacesShape = { connection: z.string().min(1).max(INPUT_LIMITS.identifier).optional() };
+const embedUrl = z.url({ protocol: /^https?$/u }).max(DISCORD_EMBED_LIMITS.url);
+const embedText = (max: number) => z.string().trim().min(1).max(max);
+// Discord's own embed object, so Signal sends it as it is. Signal checks it again.
+const embedSchema = z
+  .strictObject({
+    title: embedText(DISCORD_EMBED_LIMITS.title).optional(),
+    description: embedText(DISCORD_EMBED_LIMITS.description).optional(),
+    url: embedUrl.optional(),
+    color: z.int().min(0).max(0xffffff).optional(),
+    timestamp: z.iso.datetime({ offset: true }).optional(),
+    author: z
+      .strictObject({
+        name: embedText(DISCORD_EMBED_LIMITS.authorName),
+        url: embedUrl.optional(),
+        icon_url: embedUrl.optional(),
+      })
+      .optional(),
+    footer: z
+      .strictObject({ text: embedText(DISCORD_EMBED_LIMITS.footerText), icon_url: embedUrl.optional() })
+      .optional(),
+    thumbnail: z.strictObject({ url: embedUrl }).optional(),
+    image: z.strictObject({ url: embedUrl }).optional(),
+    fields: z
+      .array(
+        z.strictObject({
+          name: embedText(DISCORD_EMBED_LIMITS.fieldName),
+          value: embedText(DISCORD_EMBED_LIMITS.fieldValue),
+          inline: z.boolean().optional(),
+        }),
+      )
+      .max(DISCORD_EMBED_LIMITS.fields)
+      .optional(),
+  })
+  .refine(
+    (embed) =>
+      Boolean(
+        embed.title ||
+          embed.description ||
+          embed.author ||
+          embed.footer ||
+          embed.image ||
+          embed.thumbnail ||
+          embed.fields?.length,
+      ),
+    "An embed needs a title, description, author, footer, image, thumbnail or field.",
+  );
+// An empty list is no embeds: a model can fill each optional argument.
+const embedsSchema = z
+  .array(embedSchema)
+  .max(DISCORD_EMBEDS_LIMIT)
+  .refine(
+    (embeds) => discordEmbedTextLength(embeds) <= DISCORD_EMBED_TEXT_LIMIT,
+    `The text of all embeds is longer than ${DISCORD_EMBED_TEXT_LIMIT} characters.`,
+  ) satisfies z.ZodType<DiscordEmbed[]>;
+// The tool shows an embed as any object: models know Discord's embed object, and its full schema
+// would add a kilobyte to each catalog answer. `postSchema` decodes the call with the full one.
 const postShape = {
   connection: z.string().min(1).max(INPUT_LIMITS.identifier),
   place: z.string().min(1).max(INPUT_LIMITS.identifier),
   replyTo: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
-  text: z.string().trim().min(1).max(POST_CHARACTERS),
+  text: z.string().trim().min(1).max(POST_CHARACTERS).optional(),
   files: z.array(z.string().max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
+  embeds: z.array(z.looseObject({})).optional(),
 };
+const postSchema = z
+  .strictObject({ ...postShape, embeds: embedsSchema.optional() })
+  .refine((post) => post.text !== undefined || Boolean(post.embeds?.length), "Give text, embeds, or both.");
 
 /** The tools that post on the agent's own initiative. They work in any turn, and they name the place. */
 export const MESSAGING_OUTBOUND_TOOLS = new Set(["messaging_list_places", "messaging_post"]);
@@ -61,8 +128,7 @@ export const MESSAGING_TOOL_DEFINITIONS: readonly { name: string; description: s
   },
   {
     name: "messaging_post",
-    description:
-      "Post markdown as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, sent after the text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. Everyone in the place sees the post. A Slack or Discord <@user id>, Telegram @username, or Telegram or WhatsApp @<user id> pings that person. Your final answer still goes only to the conversation you answer. Works in any turn.",
+    description: `Post markdown as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, sent after the text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. embeds: Discord only, up to ${DISCORD_EMBEDS_LIMIT} Discord embed objects; text is then optional. Everyone in the place sees the post. A Slack or Discord <@user id>, Telegram @username, or Telegram or WhatsApp @<user id> pings that person. Your final answer still goes only to the conversation you answer. Works in any turn.`,
     shape: postShape,
   },
 ];
@@ -79,8 +145,10 @@ export type MessagingOutboundToolCall =
       connection: string;
       place: string;
       replyTo: string | null;
+      /** Empty when the post has only embeds. */
       text: string;
       files: string[];
+      embeds: DiscordEmbed[];
     };
 
 /** The arguments of one outbound tool call, or the reason they are wrong. */
@@ -91,15 +159,16 @@ export function parseMessagingOutboundTool(tool: string, args: unknown): Messagi
       return parsed.success ? { tool, connection: parsed.data.connection } : invalid(parsed.error, "unknown argument.");
     }
     case "messaging_post": {
-      const parsed = z.strictObject(postShape).safeParse(args ?? {});
+      const parsed = postSchema.safeParse(args ?? {});
       return parsed.success
         ? {
             tool,
             connection: parsed.data.connection,
             place: parsed.data.place,
             replyTo: parsed.data.replyTo ?? null,
-            text: parsed.data.text,
+            text: parsed.data.text ?? "",
             files: parsed.data.files ?? [],
+            embeds: parsed.data.embeds ?? [],
           }
         : invalid(parsed.error, "unknown argument.");
     }

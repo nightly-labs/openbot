@@ -17,6 +17,8 @@ interface DetectedProviderSetupProps {
   /** The provider to add or edit. `null` keeps both forms closed. */
   provider: DetectedProvider | null;
   api: DetectedProviderApi;
+  /** The agent command runs on a joined server, not on this computer. */
+  host?: boolean | undefined;
   takenProviderIds?: readonly string[] | undefined;
   takenAgentIds?: readonly string[] | undefined;
   /** The providers that can run an endpoint, for the "Runs on" field. Without it, OpenCode runs it. */
@@ -140,6 +142,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         submitError={submitError()}
         takenAgentIds={taken(props.takenAgentIds)}
         editing={Boolean(agent()?.added)}
+        host={props.host}
         onSubmit={(value) => void save({ kind: "agent", value })}
         onCancel={props.onClose}
       />

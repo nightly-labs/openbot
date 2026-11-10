@@ -125,6 +125,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot zatrzyma serwer i przeniesie jego agentów, czaty i pliki do kosza.",
   "server.local.deleting": "Kasowanie serwera…",
   "server.local.deletedTitle": "Skasowano: {name}",
+  "server.install.title": "Nowy serwer na innym komputerze",
+  "server.install.description":
+    "Uruchom to polecenie na komputerze z Linuksem lub serwerze VPS, który należy do Ciebie. Polecenie instaluje OpenBot i dodaje serwer do tego konta.",
+  "server.install.making": "Tworzenie polecenia dla tego konta…",
+  "server.install.failed": "OpenBot nie może utworzyć polecenia. Sprawdź połączenie z internetem.",
+  "server.install.copyForAgent": "Kopiuj dla agenta AI",
+  "server.install.expiresIn": "Działa raz. Wygasa za {time}.",
+  "server.install.newCommand": "Nowe polecenie",
+  "server.install.waiting": "Czekam, aż polecenie uruchomi się na serwerze…",
+  "server.install.starting": "{name} jest zalogowany. Uruchamianie serwera…",
+  "server.install.connected": "{name} jest połączony.",
+  "server.install.offline": "{name} jest offline.",
+  "server.install.expired": "To polecenie wygasło. Utwórz nowe.",
+  "server.install.agentPrompt":
+    'Zainstaluj OpenBot na tym serwerze z Linuksem i zaloguj go do mojego konta OpenBot.\nUruchom to polecenie jako root. Nie zadaje pytań i trwa kilka minut:\n\n{command}\n\nKończy się wierszem "OpenBot is connected to your account." i kodem wyjścia 0.\nPolecenie działa raz, przez 15 minut. Nigdzie go nie zapisuj.',
+  "server.install.setUpWithAgent": "Skonfiguruj z agentem",
+  "server.install.sshAgentPrompt":
+    "Połącz się przez SSH z moim serwerem z Linuksem i zainstaluj na nim OpenBot jako serwer.\n\nAdres SSH (user@host):",
   "server.add.limit.title": "To konto ma maksymalną liczbę serwerów",
   "server.add.limit.description": {
     one: "Konto może mieć {count} płatny serwer. Aby dodać serwer, najpierw usuń jeden z istniejących.",
@@ -334,7 +352,18 @@ export const messages = {
     other: "Co {count} tury",
   },
   "server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
-  "server.settings.rolesTitle": "Role",
+  "server.settings.skillLearning": "Uczenie się umiejętności",
+  "server.settings.skillLearningDescription":
+    "Czy agenci na tym serwerze zapisują to, czego się nauczą, jako umiejętności.",
+  "server.settings.skillLearningAutomatic": "Automatycznie",
+  "server.settings.skillLearningAsk": "Najpierw zapytaj",
+  "server.settings.skillLearningOff": "Wyłączone",
+  "server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
+  "server.settings.browsingMemory": "Ucz się z mojego przeglądania",
+  "server.settings.browsingMemoryDescription":
+    "Gdy sterujesz przeglądarką agenta, agent uczy się działania stron z używanych przez Ciebie stron i przycisków. Wpisany tekst nie jest zapisywany.",
+  "server.settings.browsingMemoryLoadFailed": "Nie udało się wczytać ustawienia przeglądania.",
+  "server.settings.rolesTitle": "Uprawnienia",
   "server.settings.rolesDescription":
     "Wybierz agentów, których mogą używać członkowie. Członek dostaje najwyższy dostęp spośród roli Wszyscy i swoich ról. Właściciele i administratorzy mogą używać wszystkich agentów.",
   "server.settings.remoteOnline": "Host jest online. Publikacją zarządza jego właściciel.",
@@ -354,7 +383,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Zmieniono klucz serwera",
   "server.settings.hostKeyChanged": "Ostatnia zmiana",
   "server.settings.hostKeyChangedDescription": "{date}. Poprzedni i nowy klucz podpisały tę zmianę.",
-  "server.settings.hostKeyLocalOnly": "Tutaj klucz może zmienić tylko serwer na tym komputerze.",
+  "server.settings.hostKeyOwnerOnly": "Tylko właściciel może zmienić klucz serwera.",
   "server.settings.removeTitle": "Usuń serwer",
   "server.settings.removeDescription":
     "Usuń ten serwer z usługi kont dla wszystkich członków. Użyj tej opcji, gdy jego komputer nie jest już dostępny.",
@@ -440,6 +469,7 @@ export const messages = {
   },
   "server.roles.agentList": "Agenci: {names}",
   "server.roles.agentLevel": "Dostęp roli {role} do agenta {agent}",
+  "server.roles.changeInEveryone": "Zmień w roli Wszyscy",
   "server.roles.setAll": "Ustaw wszystkie",
   "server.roles.setAllLabel": "Ustaw wszystkie: dostęp roli {role} do wszystkich agentów",
   "server.roles.loadFailed": "Nie udało się wczytać ról tego serwera.",

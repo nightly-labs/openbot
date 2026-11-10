@@ -29,6 +29,7 @@ import type {
   RoutineConversationEvent,
   RoutineRunConversationEvent,
   SkillConversationEvent,
+  SkillSuggestionEvent,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
@@ -148,11 +149,30 @@ export type ChatActionMarkerModel =
       url: string | null;
       timestamp: string;
     }
-  | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
+  /**
+   * Where a channel request went. Consecutive receipts of one action, such as the lead giving parts
+   * of one request to three members, are one row: "Assigned to Chief, Builder and Launch". Only the
+   * timeline joins them: each stored receipt names one member. `timestamp` is the newest receipt.
+   */
+  | {
+      kind: "channel-routing";
+      action: ChannelRoutingConversationEvent["action"];
+      agentIds: string[];
+      timestamp: string;
+    }
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
+  /** A memory review asks to save a skill from the chat. The chat shows a card to save it. */
+  | (SkillSuggestionEvent & { kind: "skill-suggestion"; timestamp: string })
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
   | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
+  /**
+   * The agent got a one-time command that installs a server. The chat shows a card that waits for the
+   * server. `name` is the name that the command gives it; `expiresAt` is in milliseconds since the epoch.
+   */
+  | { kind: "server-install"; name: string | null; expiresAt: number; timestamp: string }
+  /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
+  | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */
@@ -276,6 +296,8 @@ export interface AgentProfile {
   browserProfileId?: string | undefined;
   /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
   fastMode?: boolean | undefined;
+  /** With `fastMode`, the Ultrafast tier in place of Fast. Absent for an agent on a remote host. */
+  ultrafast?: boolean | undefined;
   /** Absent means the app default. Absent for an agent on a remote host too, which does not share it. */
   busyMessageMode?: ClientAgentSummary["busyMessageMode"];
   /** Absent means the default task limit. Absent for an agent on a remote host too, which runs no tasks. */

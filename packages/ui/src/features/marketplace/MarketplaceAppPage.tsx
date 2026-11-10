@@ -366,12 +366,20 @@ function localAddress(entry: MarketplacePluginApp): string {
 function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: MarketplacePluginApp }) {
   const { t } = useText();
   const model = () => props.scope.model;
-  const setup = () => pluginAppSetup(props.entry);
   const connection = () => props.app.connections[props.entry.id] ?? NOT_HELD;
+  const setup = () => (connection().keySaved ? "key" : pluginAppSetup(props.entry));
   const host = () => model().appHostName ?? t("mcp.connect.thisComputer");
   const keyField = () => {
-    const fields = mcpFlowFields(props.entry.server.auth?.[0]);
+    const fields = mcpFlowFields(props.entry.server.auth?.find((flow) => flow.kind === "key"));
     return (fields.find((field) => !field.optional) ?? fields[0])?.label ?? "";
+  };
+  /** Why this account cannot connect the app here. The reason replaces how the app connects. */
+  const reason = () => {
+    const blocked = connection().held ? undefined : model().appsBlocked?.();
+    if (blocked?.reason === "update") return t("marketplace.app.blocked.update", { host: blocked.host });
+    if (blocked?.reason === "member")
+      return t("marketplace.app.blocked.member", { name: props.entry.name, host: blocked.host });
+    return undefined;
   };
   const description = () => {
     const name = props.entry.name;
@@ -414,7 +422,10 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
       </ItemMedia>
       <ItemContent>
         <ItemTitle>{props.entry.name}</ItemTitle>
-        <ItemDescription>{description()}</ItemDescription>
+        {/* A reason wraps: cut to one line, it would lose what to do. */}
+        <Show when={reason()} fallback={<ItemDescription>{description()}</ItemDescription>}>
+          {(text) => <ItemDescription class="marketplace-app-reason">{text()}</ItemDescription>}
+        </Show>
       </ItemContent>
       <Show when={connection().signInNeeded || action()}>
         <ItemActions>

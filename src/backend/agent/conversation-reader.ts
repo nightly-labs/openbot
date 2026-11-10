@@ -89,6 +89,7 @@ export class ConversationReader {
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
       const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
+      this.#mailboxSync.refreshQueuePositions(page.messages);
       return {
         ...page,
         readState: this.#reads.readStateForThread(memberId, agent.threadId, options),

@@ -113,6 +113,24 @@ export const messages = {
     "OpenBot stopt de server en verplaatst de agents, chats en bestanden ervan naar de prullenbak.",
   "server.local.deleting": "Server wissen…",
   "server.local.deletedTitle": "{name} gewist",
+  "server.install.title": "Nieuwe server op een andere computer",
+  "server.install.description":
+    "Voer deze opdracht uit op een Linux-computer of VPS van jezelf. De opdracht installeert OpenBot en voegt de server toe aan dit account.",
+  "server.install.making": "Opdracht voor dit account maken…",
+  "server.install.failed": "OpenBot kon geen opdracht maken. Controleer de internetverbinding.",
+  "server.install.copyForAgent": "Kopiëren voor een AI-agent",
+  "server.install.expiresIn": "Werkt één keer. Verloopt over {time}.",
+  "server.install.newCommand": "Nieuwe opdracht",
+  "server.install.waiting": "Wachten tot de opdracht op je server draait…",
+  "server.install.starting": "{name} is aangemeld. Server starten…",
+  "server.install.connected": "{name} is verbonden.",
+  "server.install.offline": "{name} is offline.",
+  "server.install.expired": "Deze opdracht is verlopen. Maak een nieuwe.",
+  "server.install.agentPrompt":
+    'Installeer OpenBot op deze Linux-server en meld hem aan bij mijn OpenBot-account.\nVoer deze opdracht uit als root. Hij stelt geen vragen en duurt een paar minuten:\n\n{command}\n\nHij eindigt met de regel "OpenBot is connected to your account." en exitcode 0.\nDe opdracht werkt één keer, 15 minuten lang. Sla hem nergens op.',
+  "server.install.setUpWithAgent": "Instellen met een agent",
+  "server.install.sshAgentPrompt":
+    "Maak via SSH verbinding met mijn Linux-server en installeer OpenBot daarop als server.\n\nSSH-adres (user@host):",
   "server.add.limit.title": "Dit account heeft het maximale aantal servers",
   "server.add.limit.description": {
     one: "Een account kan {count} betaalde server hebben. Verwijder eerst een server om er een toe te voegen.",
@@ -336,7 +354,17 @@ export const messages = {
   "server.settings.memoryReviewOff": "Uit",
   "server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
   "server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
-  "server.settings.rolesTitle": "Rollen",
+  "server.settings.skillLearning": "Vaardigheden leren",
+  "server.settings.skillLearningDescription": "Of agents op deze server wat ze leren als vaardigheden opslaan.",
+  "server.settings.skillLearningAutomatic": "Automatisch",
+  "server.settings.skillLearningAsk": "Eerst vragen",
+  "server.settings.skillLearningOff": "Uit",
+  "server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
+  "server.settings.browsingMemory": "Leren van mijn browsen",
+  "server.settings.browsingMemoryDescription":
+    "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
+  "server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
+  "server.settings.rolesTitle": "Machtigingen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",
   "server.settings.auditTitle": "Auditlog",
@@ -360,7 +388,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Laatste wijziging",
   "server.settings.hostKeyChangedDescription":
     "{date}. De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
-  "server.settings.hostKeyLocalOnly": "Alleen de server op deze computer kan hier zijn sleutel wijzigen.",
+  "server.settings.hostKeyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "server.settings.removeTitle": "Server verwijderen",
   "server.settings.removeDescription":
     "Verwijder deze server uit de accountservice voor alle leden. Gebruik dit als de computer ervan niet meer beschikbaar is.",
@@ -431,6 +459,7 @@ export const messages = {
   "server.roles.memberCount": { one: "{count} lid", other: "{count} leden" },
   "server.roles.agentList": "Agents: {names}",
   "server.roles.agentLevel": "Toegang van {role} tot {agent}",
+  "server.roles.changeInEveryone": "Wijzigen in Iedereen",
   "server.roles.setAll": "Alles instellen",
   "server.roles.setAllLabel": "Alles instellen: toegang van {role} tot alle agents",
   "server.roles.loadFailed": "Kan de rollen van deze server niet laden.",

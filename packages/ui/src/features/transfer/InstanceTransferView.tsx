@@ -40,6 +40,7 @@ export interface InstanceExportOptions {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
+  includeHistory?: boolean;
 }
 
 export interface InstanceTransferViewProps {
@@ -53,7 +54,10 @@ export interface InstanceTransferViewProps {
   exportWarnings: string[];
   exportError: string | null;
   onExport: (options: InstanceExportOptions) => void;
-  onShowExport: () => void;
+  /** The server can put the chat history in the file. */
+  historyAvailable?: boolean | undefined;
+  /** Shows the saved file in its folder. Absent in a browser, which saves to its own download folder. */
+  onShowExport?: (() => void) | undefined;
   onExportAgain: () => void;
   importPhase: InstanceImportPhase;
   preview: InstanceTransferPreview | null;
@@ -140,6 +144,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
   const [choosing, setChoosing] = createSignal(false);
   const [files, setFiles] = createSignal(true);
   const [settings, setSettings] = createSignal(true);
+  const [history, setHistory] = createSignal(true);
   const agents = () => props.summary?.agents ?? [];
   const selected = createMemo(() => agents().filter((agent) => !excluded().has(agent.id)));
   const busy = () => props.exportPhase === "exporting";
@@ -188,6 +193,16 @@ function ExportScreen(props: InstanceTransferViewProps) {
             label={t("settings.transfer.export.settings")}
             description={t("settings.transfer.export.settingsDescription")}
           />
+          <Show when={props.historyAvailable}>
+            <SwitchField
+              class="settings-modal-row"
+              checked={history()}
+              disabled={busy()}
+              onChange={setHistory}
+              label={t("settings.transfer.export.history")}
+              description={t("settings.transfer.export.historyDescription")}
+            />
+          </Show>
         </ItemGroup>
         <Button
           type="button"
@@ -232,6 +247,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
                 agentIds: selected().map((agent) => agent.id),
                 includeFiles: files(),
                 includeSettings: settings(),
+                ...(props.historyAvailable && history() ? { includeHistory: true } : {}),
               })
             }
           >
@@ -244,7 +260,12 @@ function ExportScreen(props: InstanceTransferViewProps) {
   );
 }
 
-function ExportSaved(props: { fileName: string | null; warnings: string[]; onShow: () => void; onAgain: () => void }) {
+function ExportSaved(props: {
+  fileName: string | null;
+  warnings: string[];
+  onShow: (() => void) | undefined;
+  onAgain: () => void;
+}) {
   const { t } = useText();
   return (
     <>
@@ -279,10 +300,14 @@ function ExportSaved(props: { fileName: string | null; warnings: string[]; onSho
         </li>
       </ol>
       <div class="agent-import-actions instance-transfer-start">
-        <Button type="button" variant="secondary" onClick={() => props.onShow()}>
-          <FolderOpen class="files-button-icon" aria-hidden="true" />
-          {t("settings.transfer.export.show")}
-        </Button>
+        <Show when={props.onShow}>
+          {(show) => (
+            <Button type="button" variant="secondary" onClick={() => show()()}>
+              <FolderOpen class="files-button-icon" aria-hidden="true" />
+              {t("settings.transfer.export.show")}
+            </Button>
+          )}
+        </Show>
         <Button type="button" variant="ghost" onClick={() => props.onAgain()}>
           {t("settings.transfer.export.again")}
         </Button>
@@ -590,7 +615,7 @@ function NotMoved() {
   return (
     <p class="instance-transfer-not-moved">
       <Lock class="instance-transfer-not-moved-icon" aria-hidden="true" />
-      <span>{t("settings.transfer.notMoved")}</span>
+      <span>{t("settings.transfer.notMovedSecrets")}</span>
     </p>
   );
 }

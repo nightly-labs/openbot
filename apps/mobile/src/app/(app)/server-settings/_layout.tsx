@@ -33,7 +33,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="members" options={{ title: t("mobile.app.route.members") }} />
       <Stack.Screen name="invite" options={{ title: t("mobile.server.route.invite") }} />
       <Stack.Screen name="member" options={{ title: t("mobile.server.route.member") }} />
-      <Stack.Screen name="member-roles" options={{ title: t("mobile.server.route.roles") }} />
+      <Stack.Screen name="member-roles" options={{ title: t("mobile.server.roles.title") }} />
       <Stack.Screen name="roles" options={{ title: t("mobile.server.route.roles") }} />
       {/* The page names its role in the name field. */}
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
@@ -56,6 +56,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="provider" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its provider. */}
       <Stack.Screen name="provider-models" options={{ title: t("mobile.server.route.providerModels") }} />
+      <Stack.Screen name="provider-key" options={{ title: t("mobile.server.providers.apiKey") }} />
       {/* The page names its provider, or says Add account. */}
       <Stack.Screen name="provider-sign-in" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its account. */}

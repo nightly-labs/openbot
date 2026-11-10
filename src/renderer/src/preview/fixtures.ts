@@ -184,6 +184,7 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["medium", "high", "xhigh"],
     fastServiceTier: "priority",
+    ultrafastServiceTier: "ultrafast",
   },
   {
     provider: "claude",

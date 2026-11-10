@@ -51,7 +51,20 @@ export const WORKFLOW_TRIGGER_TYPES = [
 ] as const;
 export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
 
-export const WORKFLOW_OUTPUT_TARGETS = ["notify", "channel", "file", "github", "discord", "telegram", "slack"] as const;
+/**
+ * `channel` is a place of a messaging connection, as its released name says. `chat-channel` is an
+ * OpenBot channel of this computer.
+ */
+export const WORKFLOW_OUTPUT_TARGETS = [
+  "notify",
+  "channel",
+  "file",
+  "github",
+  "discord",
+  "telegram",
+  "slack",
+  "chat-channel",
+] as const;
 export type WorkflowOutputTarget = (typeof WORKFLOW_OUTPUT_TARGETS)[number];
 
 /** A value that a node keeps: a text, a choice, a number or a switch. */
@@ -84,7 +97,8 @@ export type WorkflowFieldValue = string | number | boolean;
  *   ("trigger" for the trigger's chat), `action` (a `WorkflowTelegramAction`) and `emoji`. A chat is one
  *   connection, so a post needs no place. For `slack`: `connectionId` ("trigger" for the trigger's
  *   workspace), `action` (a `WorkflowSlackAction`), `placeId` (the channel of `post`) and `emoji` (the
- *   emoji of `react`).
+ *   emoji of `react`). For `chat-channel`: `channelId`. The result shows in the channel as a note; no
+ *   task starts.
  * - prompt: `text`.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */

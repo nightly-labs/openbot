@@ -65,6 +65,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "Esta conexión no admite la eliminación del historial.",
   "error.team.channelTaskCancelUnsupported": "Esta conexión no admite la cancelación de tareas de canales.",
   "error.team.membersCannotDeleteChannels": "Los miembros no pueden eliminar canales.",
+  "error.team.membersCannotDeleteChannelHistory": "Los miembros no pueden eliminar el historial del canal.",
   "error.team.membersCannotArchiveChannels": "Los miembros no pueden archivar canales.",
   "error.team.membersCannotRestoreChannels": "Los miembros no pueden restaurar canales.",
   "error.team.sharedDataUnsupported": "Esta conexión no admite datos compartidos.",
@@ -73,6 +74,13 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Esta conexión no admite colores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexión no admite colores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexión no puede cambiar dónde se ejecuta una rutina.",
+  "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
+  "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
+  "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",
+  "error.team.usageLimitUnsupported": "Esta conexión no puede mostrar ni cambiar los límites de uso de los agentes.",
+  "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
+  "error.team.providerDetectionUnsupported":
+    "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
@@ -86,6 +94,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "Esta conexión no permite eliminar mensajes.",
   "error.team.workspaceDirectoryUnsupported": "Esta conexión no permite mostrar carpetas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexión no permite buscar archivos.",
+  "error.team.threadMessageSearchUnsupported": "Esta conexión no permite buscar en los hilos laterales.",
   "error.team.sideQuestionUnsupported": "Esta conexión no permite preguntas aparte.",
   "error.team.liveVoiceUnsupported":
     "Este servidor no admite la voz en directo de Codex. Actualiza OpenBot en el equipo que lo ejecuta.",
@@ -112,7 +121,11 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
+  "error.team.skillLearningUnsupported": "Esta conexión no admite el aprendizaje de habilidades.",
+  "error.team.browsingMemoryUnsupported": "Esta conexión no admite aprender de la navegación.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
+  "error.team.claudeUserSetupUnsupported": "Esta conexión no admite el interruptor de configuración de Claude Code.",
+  "error.team.claudeCompactWindowUnsupported": "Esta conexión no admite el tamaño de compactación de Claude.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
   "error.team.attachmentNameRequired": "Se requiere un nombre seguro para el archivo adjunto.",
@@ -122,6 +135,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vista del navegador en directo no está disponible.",
   "error.team.browserSessionNotFound": "No se encontró la sesión de vista del navegador.",
   "error.team.mcpUnsupported": "Esta conexión no admite servidores MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Actualiza OpenBot en este dispositivo para usar más de {limit} servidores MCP en este servidor.",
   "error.team.storageUnsupported": "Esta conexión no admite almacenamiento.",
   "error.team.machineResourcesUnsupported": "Esta conexión no admite el uso de la máquina.",
   "error.team.machineAlertMemberInvalid":
@@ -161,4 +176,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "Esta dirección no es de este inicio de sesión.",
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
+  "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Esta conexión no admite ejecutar un mensaje en cola como un hilo nuevo.",
+  "error.team.backgroundProcessesUnsupported": "Esta conexión no admite procesos en segundo plano.",
+  "error.team.providerUseUnsupported": "Esta conexión no admite activar y desactivar proveedores.",
+  "error.team.providerUseInvalid": "Este proveedor no tiene un interruptor de activación.",
 } as const satisfies PartialTranslation<typeof source>;

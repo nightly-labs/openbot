@@ -26,6 +26,14 @@ export const messages = defineMessages("status.agent", {
     "Capture the screen area at {x}, {y}, {width} × {height} points and send the image to the agent's model.",
   "status.agent.vaultCardFill":
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
+  "status.agent.reportProblem":
+    "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
+  "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
+  "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
+  "status.agent.serverInstallCommand":
+    "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
+  "status.agent.serverInstallCard": "Install command for the server {name}",
+  "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":
@@ -111,5 +119,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultField.email": "Email address",
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
+  "status.agent.compactionContinues":
+    "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
+  "status.agent.importedChatTitle": "Imported chat",
 });

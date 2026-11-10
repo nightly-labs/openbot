@@ -271,6 +271,7 @@ const events = new HostEventsService({
     setEnabled: () => {},
     setAccountActive: () => {},
     refresh: () => {},
+    ensureHost: () => Effect.void,
     registerRoute: (routeId) =>
       relayUp
         ? Effect.succeed(`${RELAY_ORIGIN}/v1/webhooks/${routeId}`)

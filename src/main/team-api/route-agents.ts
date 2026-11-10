@@ -25,6 +25,7 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type CreateAgentInput, type DuplicateAgentResult, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_WELCOME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-welcome-v1";
 import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
@@ -49,7 +50,6 @@ import {
   browserTakeoverDecision,
   markerExclusionsForCapabilities,
   memberSender,
-  messageTextCut,
   pageLimit,
   pathIdentifier,
   promptAnswers,
@@ -59,12 +59,12 @@ import {
   requireAdmin,
   requireAgentLevel,
   stringField,
-  WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
 import { routeAgentConversation } from "./route-agent-conversation";
 import { routeAgentMemories } from "./route-agent-memories";
 import { routeAgentQueue } from "./route-agent-queue";
 import { routeAgentRoutines } from "./route-agent-routines";
+import { searchPageWithinFrame } from "./route-thread-message-search";
 
 export interface AgentRouteDependencies {
   // The whole service, unlike every other module here, because this one forwards it to four
@@ -172,29 +172,13 @@ export async function routeAgents(
     // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
     const agentId = url.searchParams.get("botId") ?? undefined;
     const cursor = url.searchParams.get("cursor") ?? undefined;
-    // Each result holds its whole message, so a page can be larger than one WebRTC frame. Then the
-    // page keeps the results that fit, and one result alone that is too large is cut. The text filter
-    // reads every stored message, so the search runs at most twice: the second time at the kept
-    // count, which gives the cursor of the next page.
-    let page = agents.searchConversationMessages(query, agentId, cursor, pageLimit(url));
-    let bytes = Buffer.byteLength(JSON.stringify(page));
-    if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
-      let kept = 0;
-      let size = Buffer.byteLength(JSON.stringify({ ...page, results: [] }));
-      for (const result of page.results) {
-        size += Buffer.byteLength(JSON.stringify(result)) + 1;
-        if (size > WEBRTC_FRAME_BODY_BUDGET) break;
-        kept += 1;
-      }
-      page = agents.searchConversationMessages(query, agentId, cursor, Math.max(1, kept));
-      bytes = Buffer.byteLength(JSON.stringify(page));
-    }
-    if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
-    const cut = messageTextCut(
-      page.results.map((result) => result.message),
-      bytes - WEBRTC_FRAME_BODY_BUDGET,
+    return json(
+      200,
+      searchPageWithinFrame(
+        (limit) => agents.searchConversationMessages(query, agentId, cursor, limit),
+        pageLimit(url),
+      ),
     );
-    return json(200, { ...page, results: page.results.map((result) => ({ ...result, message: cut(result.message) })) });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
@@ -238,7 +222,12 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input);
-    return json(201, await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member))));
+    // A client with `agent-welcome-v1` sends a setup message for the new agent, not a message from the member.
+    const welcome = capabilities.has(AGENT_WELCOME_CAPABILITY);
+    return json(
+      201,
+      await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member), welcome)),
+    );
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);

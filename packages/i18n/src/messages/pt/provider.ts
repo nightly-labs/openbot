@@ -114,10 +114,14 @@ export const messages = {
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "Nenhum modelo de {name} está disponível.",
+  "provider.picker.museNoModels":
+    "O Muse não enviou modelos para esta conta. O Muse pode não estar disponível no país onde este agente é executado. Escolha um modelo de outro provedor.",
   "provider.picker.customEmpty":
     "Adicione um endpoint compatível com OpenAI: um servidor de modelos neste computador ou qualquer serviço com uma URL base e uma chave.",
   "provider.picker.customPending":
     "Os modelos dos seus endpoints ainda não foram carregados. O provedor os lê após a tarefa atual parar.",
+  "provider.picker.customUnlisted": "{name} não lista os modelos dos seus endpoints.",
+  "provider.picker.editEndpoints": "Editar endpoints",
   "provider.picker.defaultModelLabel": "{name}, padrão",
   "provider.picker.usageLimit": "Limite de uso atingido",
   "provider.picker.usageLimitWindow": "Limite ({window})",
@@ -128,7 +132,12 @@ export const messages = {
   "provider.picker.effortLabel": "Esforço de raciocínio do agente",
   "provider.picker.effortFixed": "{effort}, definido por {provider}",
   "provider.picker.fast": "Rápido",
-  "provider.picker.fastLabel": "Modo rápido",
+  "provider.picker.fastText": "Respostas mais rápidas, maior uso",
+  "provider.picker.speed": "Velocidade",
+  "provider.picker.standard": "Padrão",
+  "provider.picker.standardText": "Velocidade padrão",
+  "provider.picker.ultrafast": "Ultrarrápido",
+  "provider.picker.ultrafastText": "As respostas mais rápidas, uso muito maior",
   "provider.picker.selectEffort": "Selecionar esforço",
   "provider.picker.custom": "Personalizado",
   "provider.picker.cliReady": "{cli} pronto",
@@ -229,7 +238,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Usar minha configuração do Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Os agentes carregam seu CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Os agentes carregam CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude no servidor. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
   "provider.settings.claudeUserSetupLoadFailed": "Não foi possível carregar a configuração do Claude Code.",
+  "provider.settings.context": "Contexto",
+  "provider.settings.compactWindow": "Compactar chats em",
+  "provider.settings.compactWindowDescription":
+    "O Claude Code resume os turnos antigos de um chat quando o chat atinge este tamanho. Menor mantém os turnos rápidos e baratos. Maior mantém mais detalhes. Um modelo com uma janela menor compacta no próprio limite.",
+  "provider.settings.compactWindowDefault": "Padrão do Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Não foi possível carregar o tamanho de compactação deste servidor.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece no seletor de modelos.",

@@ -17,6 +17,12 @@ export const messages = defineMessages("settings", {
     "Show the blurred desktop behind the window. Websites and menus then use the app theme.",
   "settings.interfaceSize.title": "Interface size",
   "settings.interfaceSize.description": "The size of text and controls in OpenBot.",
+  "settings.interfaceFont.title": "Interface font",
+  "settings.interfaceFont.description": "The font of menus, chats and settings.",
+  "settings.interfaceFont.default": "Default (Inter)",
+  "settings.codeFont.title": "Code font",
+  "settings.codeFont.description": "The font of code, terminals and file paths.",
+  "settings.codeFont.default": "Default",
   "settings.logoColor.title": "Logo color",
   "settings.logoColor.description": "Shown in the Dock, the taskbar and the Dynamic Island.",
   "settings.logoColor.buildNote": "This build keeps its own logo color. The choice applies to the release app.",
@@ -122,6 +128,10 @@ export const messages = defineMessages("settings", {
   "settings.agentDefaults.setAllLabel": "Set {setting} for all agents",
   "settings.agentDefaults.agentLabel": "{setting} for {agent}",
   "settings.agentDefaults.loadFailed": "The agents could not be read.",
+  "settings.commitCoAuthor.sectionTitle": "Git commits",
+  "settings.commitCoAuthor.title": "Credit OpenBot in commits",
+  "settings.commitCoAuthor.description":
+    "Agents add OpenBot as a co-author to the commits they make. You stay the author.",
   // "Start the work", under the default of "Show the plan before long tasks".
   "settings.planStart.title": "Start the work",
   "settings.planStart.wait": "When I press Start",
@@ -201,7 +211,14 @@ export const messages = defineMessages("settings", {
   "settings.soundTheme.play": "Play {name}",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
+  "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
+  "settings.notch.xwayland.title": "Restart needed",
+  "settings.notch.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the Dynamic Island above other apps. Until then, the island does not show.",
+  "settings.notch.xwayland.unsupported":
+    "On Wayland without XWayland, the Dynamic Island cannot show above other apps.",
+  "settings.notch.xwayland.restart": "Restart",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
   "settings.notch.displays.title": "Show on additional displays",
@@ -226,6 +243,12 @@ export const messages = defineMessages("settings", {
     "Above other apps keeps the dock on screen when OpenBot is in the background.",
   "settings.agentDock.placement.screen": "Above other apps",
   "settings.agentDock.placement.window": "In the OpenBot window",
+  "settings.agentDock.xwayland.title": "Restart needed",
+  "settings.agentDock.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the dock above other apps. Until then, the dock shows in the OpenBot window.",
+  "settings.agentDock.xwayland.unsupported":
+    "On Wayland without XWayland, the dock cannot show above other apps. It shows in the OpenBot window.",
+  "settings.agentDock.xwayland.restart": "Restart",
   "settings.agentDock.display.title": "Display",
   "settings.agentDock.display.description":
     "If that display is not connected, the dock goes to the display of the OpenBot window.",
@@ -240,6 +263,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.edge.left": "Left",
   "settings.agentDock.autoHide.title": "Hide when not in use",
   "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
+  "settings.agentDock.edgeStrip.title": "Show a strip at the edge",
+  "settings.agentDock.edgeStrip.description":
+    "A thin strip stays where the dock hides. Move the pointer near it to show the dock. A color wash goes up the strip when an agent asks you something.",
   "settings.agentDock.results.title": "Show finished work",
   "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
   "settings.agentDock.agents.title": "Agents on the dock",
@@ -662,7 +688,11 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.model.multilingual.description":
     "More natural, and slower. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.v3.description":
-    "The most expressive, and the slowest. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+    "Expressive, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4Turbo.description":
+    "Fast, in more than 90 languages. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4.description":
+    "The best quality, in more than 90 languages, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.xai.description":
     "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
   "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",
@@ -674,6 +704,8 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.codexLive.title": "Codex live voice",
   "settings.voice.speech.codexLive.description":
     "Voice conversations with any agent use OpenAI live voice with your Codex sign-in. Your voice, your requests and the agent's replies go to OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Voice conversations with any agent use OpenAI live voice with the Codex sign-in of the server. Your voice, your requests and the agent's replies go to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",
@@ -721,8 +753,8 @@ export const messages = defineMessages("settings", {
   "settings.transfer.old.text": "Save its agents and server settings to a file.",
   "settings.transfer.new.title": "Import into this server",
   "settings.transfer.new.text": "Add the agents and server settings from a file.",
-  "settings.transfer.notMoved":
-    "API keys, sign-ins, connectors, app preferences, and chat history are not moved. Set them up again on the new server.",
+  "settings.transfer.notMovedSecrets":
+    "API keys, sign-ins, connectors, and app preferences are not moved. Set them up again on the new server.",
   "settings.transfer.back": "Back",
   "settings.transfer.loading": "Reading your agents…",
   "settings.transfer.summary.label": "What the file contains",
@@ -738,6 +770,9 @@ export const messages = defineMessages("settings", {
   "settings.transfer.export.settings": "Include server settings",
   "settings.transfer.export.settingsDescription":
     "MCP servers, custom model providers, sidebar sections, and routine flows.",
+  "settings.transfer.export.history": "Include chat history",
+  "settings.transfer.export.historyDescription":
+    "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
   "settings.transfer.export.hideAgents": "Hide agents",
   "settings.transfer.export.agentsLabel": "Agents to export",

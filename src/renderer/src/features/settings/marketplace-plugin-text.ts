@@ -81,6 +81,30 @@ const PLUGIN_TEXT = {
       "prompt-save-note": "marketplace.plugin.cobrain.prompt.saveNote",
     },
   },
+  honcho: {
+    tagline: "marketplace.plugin.honcho.tagline",
+    description: "marketplace.plugin.honcho.description",
+    apps: {
+      "app-honcho-mcp": "marketplace.plugin.honcho.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.honcho.prompt.recall",
+      "prompt-save": "marketplace.plugin.honcho.prompt.save",
+      "prompt-preferences": "marketplace.plugin.honcho.prompt.preferences",
+    },
+  },
+  hindsight: {
+    tagline: "marketplace.plugin.hindsight.tagline",
+    description: "marketplace.plugin.hindsight.description",
+    apps: {
+      "app-hindsight-mcp": "marketplace.plugin.hindsight.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.hindsight.prompt.recall",
+      "prompt-retain": "marketplace.plugin.hindsight.prompt.retain",
+      "prompt-reflect": "marketplace.plugin.hindsight.prompt.reflect",
+    },
+  },
   figma: {
     tagline: "marketplace.plugin.figma.tagline",
     description: "marketplace.plugin.figma.description",
@@ -321,6 +345,18 @@ const PLUGIN_TEXT = {
       "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
     },
   },
+  postiz: {
+    tagline: "marketplace.plugin.postiz.tagline",
+    description: "marketplace.plugin.postiz.description",
+    apps: {
+      "app-postiz-mcp": "marketplace.plugin.postiz.app",
+    },
+    prompts: {
+      "prompt-channels": "marketplace.plugin.postiz.prompt.channels",
+      "prompt-week": "marketplace.plugin.postiz.prompt.week",
+      "prompt-draft": "marketplace.plugin.postiz.prompt.draft",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",
@@ -498,15 +534,15 @@ const PLUGIN_TEXT = {
 const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
   "API key": "marketplace.auth.apiKey",
   "Personal API key": "marketplace.auth.personalApiKey",
-  "MCP URL": "marketplace.auth.mcpUrl",
   "Get a key": "mcp.connect.getKey",
   "Create a key": "marketplace.auth.createKey",
-  "The URL of an MCP server in your Composio account": "marketplace.plugin.composio.hint.url",
   "Find it in your Composio account, in Settings > Sessions & API Key.": "marketplace.plugin.composio.hint.apiKey",
   "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.":
     "marketplace.plugin.revenuecat.hint.apiKey",
   'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".':
     "marketplace.plugin.obsidian.hint.apiKey",
+  "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
+  "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
 };
 
 const english = translateFor("en");

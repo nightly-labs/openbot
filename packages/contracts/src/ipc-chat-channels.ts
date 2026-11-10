@@ -20,6 +20,12 @@ export const CHANNEL_TASK_CANCEL_CAPABILITY = "channel-task-cancel-v1";
 export const SIGNED_OUT_CHANNEL_MEMBER_ID = "local";
 export const CHANNEL_PARALLEL_LIMIT = 2;
 export const CHANNEL_ASSIGNMENT_LIMIT = 8;
+/**
+ * The reason a run stops at `CHANNEL_ASSIGNMENT_LIMIT`. Saved tasks and every host version carry this
+ * exact English, so a screen compares it to show its own text. Do not change it.
+ */
+export const CHANNEL_ASSIGNMENT_LIMIT_ERROR =
+  "The automatic assignment limit was reached. Continue or reassign this task.";
 
 export interface ChannelMember {
   agentId: string;
@@ -77,8 +83,8 @@ export interface ChannelDraft {
    */
   isolated?: boolean;
   /**
-   * Absent keeps the stored icon, and null removes it. Only this computer keeps it: the Team API
-   * channel codecs do not carry it, so a joined server and a phone show the member faces.
+   * Absent keeps the stored icon, and null removes it. The Team API channel codecs carry it only
+   * between peers with `channel-picture-v1`; other peers show the member faces.
    */
   icon?: ChannelIcon | null;
 }
@@ -88,7 +94,11 @@ export interface Channel extends ChannelDraft {
   archived: boolean;
   revision: number;
   createdAt: string;
-  /** An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. */
+  /**
+   * An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. A
+   * joined server sends the host's URL with `channel-picture-v1`; the desktop changes it to an
+   * `openbot-remote-avatar://<server>/channel/` URL, and the web client to a data URL.
+   */
   imageUrl?: string | null;
 }
 
@@ -254,13 +264,21 @@ function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
   return rest;
 }
 
-export function isChannelDraft(value: unknown): value is ChannelDraft {
+/**
+ * `instructionsLimit` is `storedChannelInstructions` where the instructions can be the stored ones
+ * unchanged: a read, and a save, which sends the whole draft. The backend refuses a save that
+ * changes them to more than `agentDescription`.
+ */
+export function isChannelDraft(
+  value: unknown,
+  instructionsLimit: number = INPUT_LIMITS.agentDescription,
+): value is ChannelDraft {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     value.name.trim().length > 0 &&
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
-    isBoundedString(value.instructions, INPUT_LIMITS.agentDescription) &&
+    isBoundedString(value.instructions, instructionsLimit) &&
     (value.isolated === undefined || typeof value.isolated === "boolean") &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
@@ -274,7 +292,7 @@ export function isChannelDraft(value: unknown): value is ChannelDraft {
 
 const CHANNEL_ICON_NAME = /^[a-z][a-z0-9-]{0,39}$/;
 
-function isChannelIcon(value: unknown): value is ChannelIcon {
+export function isChannelIcon(value: unknown): value is ChannelIcon {
   return (
     isDynamicRecord(value) &&
     isString(value.name) &&
@@ -320,7 +338,7 @@ function sequence(value: unknown): value is number {
 export function isChannel(value: unknown): value is Channel {
   return (
     isDynamicRecord(value) &&
-    isChannelDraft(value) &&
+    isChannelDraft(value, INPUT_LIMITS.storedChannelInstructions) &&
     isIdentifier(value.id) &&
     typeof value.archived === "boolean" &&
     sequence(value.revision) &&
@@ -461,7 +479,7 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
     throw new Error("Provide a valid channel command.");
   const common = { operationId: value.operationId, channelId: value.channelId };
   const draft = normalizeChannelDraft(value.draft);
-  if (value.type === "save" && isChannelDraft(draft))
+  if (value.type === "save" && isChannelDraft(draft, INPUT_LIMITS.storedChannelInstructions))
     return {
       ...common,
       type: value.type,

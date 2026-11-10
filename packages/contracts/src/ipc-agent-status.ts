@@ -64,6 +64,13 @@ export interface AgentProviderStatus {
   /** A restart the user asked for waits for the provider's turns to end. New turns wait for it. */
   restartPending?: boolean;
   /**
+   * OpenCode and Pi: true while a saved endpoint waits for a process that reads it, as a restart
+   * waits for the provider's turns to end. False when the running process read every saved endpoint,
+   * so an endpoint it lists no model of was left out by the provider itself. A host before this field
+   * does not send it.
+   */
+  endpointsPending?: boolean;
+  /**
    * A saved API key serves the provider's turns in place of the plan sign-in, so the plan's usage
    * does not apply. Gemini: its saved key comes before the Google account. Codex: its own login is
    * an OpenAI API key. Muse: OpenBot's saved key. Local only: released Team API adapters omit it.
@@ -147,6 +154,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
+    (value.endpointsPending === undefined || typeof value.endpointsPending === "boolean") &&
     (value.apiKeyInUse === undefined || typeof value.apiKeyInUse === "boolean") &&
     (value.lastError === undefined || isNullableBoundedString(value.lastError, INPUT_LIMITS.messageText)) &&
     (value.lastErrorAt === undefined || isFiniteNumber(value.lastErrorAt)) &&
@@ -215,8 +223,10 @@ export interface AccountUsageLimit {
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
   /**
-   * OpenCode only: the weekly or monthly window that `secondary` does not hold. `secondary` is the one
-   * that stops work first, so only the usage list shows this one. The Team API does not send this field.
+   * OpenCode: the weekly or monthly window that `secondary` does not hold. `secondary` is the one that
+   * stops work first, so only the usage list shows this one. Cursor: the total of a plan split into
+   * Cursor's own models (`primary`) and the others (`secondary`), which the ring shows. No usage limit
+   * check reads this field. The Team API does not send it.
    */
   tertiary?: AccountUsageWindow;
   /**

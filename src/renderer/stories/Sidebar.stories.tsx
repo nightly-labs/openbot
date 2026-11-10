@@ -163,6 +163,7 @@ const args: Parameters<typeof Sidebar>[0] = {
   onExpand: fn(),
   onOpenSearch: fn(),
   onOpenMarketplace: fn(),
+  onChatOrderChange: fn(),
 };
 
 function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
@@ -171,6 +172,7 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   const [layout, setLayout] = createSignal(untrack(() => props.layout));
   const [collapsedSectionIds, setCollapsedSectionIds] = createSignal(untrack(() => props.collapsedSectionIds));
   const [hiddenAgents, setHiddenAgents] = createSignal(untrack(() => props.userHiddenAgents ?? []));
+  const [chatOrder, setChatOrder] = createSignal(untrack(() => props.chatOrder));
   const onHideAgent = untrack(() => props.onHideAgent);
   const onRestoreAgent = untrack(() => props.onRestoreAgent);
   return (
@@ -192,6 +194,11 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
         })
       }
       layout={layout()}
+      chatOrder={chatOrder()}
+      onChatOrderChange={(order) => {
+        setChatOrder(order);
+        props.onChatOrderChange?.(order);
+      }}
       collapsedSectionIds={collapsedSectionIds()}
       pinnedItems={pinnedItems()}
       peopleOrder={peopleOrder()}
@@ -245,6 +252,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/** "Unread in a group": the chats with unread replies leave their sections for a group under "Needs you". */
+export const UnreadGroup: Story = {
+  args: { chatOrder: "unread-group", pinnedItems: pinnedOne },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/** "Unread first in folders": each section shows its unread chats first, then the others by recency. */
+export const UnreadFirst: Story = {
+  args: { chatOrder: "unread-first", pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 

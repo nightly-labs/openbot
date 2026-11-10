@@ -6,6 +6,7 @@ import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
+import GalleryVerticalEnd from "lucide-react-native/icons/gallery-vertical-end";
 import ListChecks from "lucide-react-native/icons/list-checks";
 import Monitor from "lucide-react-native/icons/monitor";
 import Pin from "lucide-react-native/icons/pin";
@@ -618,6 +619,8 @@ function DrawerServerTools({
   const [rowWidth, setRowWidth] = useState<number>();
   // A connected host that shares its screen. The host decides which members it lets in.
   const remoteDesktop = useMobileWorkspaceSelector((current) => current.canControlComputer(serverId));
+  // An older host has no storage routes, so it has no Library, as on desktop.
+  const library = useMobileWorkspaceSelector((current) => current.canReadServerStorage(serverId));
   const routes = useMemo(
     (): Record<DrawerRoute, Href> => ({
       tasks: { pathname: "/server-tasks", params: { serverId } },
@@ -625,6 +628,7 @@ function DrawerServerTools({
       workflows: { pathname: "/server-workflows", params: { serverId } },
       marketplace: { pathname: "/server-marketplace", params: { serverId } },
       usage: { pathname: "/server-usage", params: { serverId } },
+      library: { pathname: "/server-library", params: { serverId } },
       remoteDesktop: { pathname: "/remote-desktop/[serverId]", params: { serverId } },
       members: { pathname: "/server-settings/members", params: { serverId } },
       settings: { pathname: "/server-settings", params: { serverId } },
@@ -652,6 +656,7 @@ function DrawerServerTools({
       : null,
     marketplace: { icon: Store, label: t("mobile.app.route.marketplace") },
     usage: { icon: ChartArea, label: t("mobile.app.route.usage"), value: values.usage },
+    library: library ? { icon: GalleryVerticalEnd, label: t("mobile.app.route.library") } : null,
     remoteDesktop: remoteDesktop ? { icon: Monitor, label: t("mobile.app.route.remoteDesktop") } : null,
     members: { icon: UsersRound, label: t("mobile.app.route.members"), value: values.members },
   };

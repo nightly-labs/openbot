@@ -198,6 +198,16 @@ export function WorkspaceShell(props: {
     if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
     return scope.connection.failed ? scope.connection.failure : null;
   };
+  // A remote connection can read online while the host does not answer it. Each read then failed after
+  // the same wait (#5912). The check replaces the connection only when the host does not answer.
+  const checkRemoteConnection = () => {
+    const server = activeServer();
+    if (server?.kind === "remote" && server.state === "online") void retryServerConnection(server.id);
+  };
+  const retryConversationLoad = () => {
+    checkRemoteConnection();
+    retryConversation();
+  };
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
@@ -205,8 +215,10 @@ export function WorkspaceShell(props: {
       return;
     }
     if (!server) return;
-    if (server.state === "online") scope.retry();
-    else void retryServerConnection(server.id);
+    if (server.state === "online") {
+      checkRemoteConnection();
+      scope.retry();
+    } else void retryServerConnection(server.id);
   };
   // The main window shows the toasts and prompts of the servers once.
   if (!chatWindow)
@@ -334,11 +346,17 @@ export function WorkspaceShell(props: {
                   name={activeAgent()?.name ?? ""}
                   loading={!activeConversation()?.loaded && activeConversation()?.loading === true}
                   error={activeConversation()?.loadError ?? null}
-                  onRetry={retryConversation}
+                  onRetry={retryConversationLoad}
                 />
               </Show>
               <Show when={scope.loaded() && scope.connection.panelsFailed}>
-                <ServerPanelLoadNotice busy={scope.connection.panelsLoading} onRetry={() => void scope.retryPanels()} />
+                <ServerPanelLoadNotice
+                  busy={scope.connection.panelsLoading}
+                  onRetry={() => {
+                    checkRemoteConnection();
+                    void scope.retryPanels();
+                  }}
+                />
               </Show>
             </>
           }

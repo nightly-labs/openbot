@@ -1,0 +1,150 @@
+name: Mobile OTA update
+
+# Sends a JavaScript bundle of the mobile app to the phones that have a store binary, with no store
+# review. `scripts/mobile-ota.ts` refuses a commit whose native runtime no store build has, signs the
+# manifest, and writes the bucket that the update server (`apps/mobile-updates`) reads.
+# Start it with `bun run mobile:ota:publish`, `mobile:ota:rollout` or `mobile:ota:rollback`.
+# See apps/mobile/README.md#over-the-air-updates.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: publish a new update, change its rollout, or take it back.
+        type: choice
+        options:
+          - publish
+          - rollout
+          - rollback
+        default: publish
+      platform:
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+        default: all
+      message:
+        description: "Publish only: a short description of the update."
+        type: string
+        required: false
+      rollout:
+        description: "Publish and rollout: the percentage of phones that get the update, 1 to 100."
+        type: string
+        default: "100"
+      channel:
+        description: The build profile of the binaries. Use preview to test with an internal build.
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
+      runtime:
+        description: "Rollout and rollback only, with one platform: the runtime version of the binary. Empty finds the store build that has an update."
+        type: string
+        required: false
+      to_embedded:
+        description: "Rollback only: return phones to the bundle in their binary, not to the earlier update."
+        type: boolean
+        default: false
+      dry_run:
+        description: "Publish only: run the checks and the guard, and publish nothing."
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One change of the bucket at a time.
+concurrency:
+  group: mobile-ota
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: ${{ inputs.action }} (${{ inputs.platform }}, ${{ inputs.channel }})
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/mobile-hotfix/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: release-mobile-ota
+    permissions:
+      contents: read
+    env:
+      CI: "1"
+    steps:
+      - name: Check out the commit of the update
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require update credentials
+        shell: bash
+        env:
+          MOBILE_OTA_PRIVATE_KEY: ${{ secrets.MOBILE_OTA_PRIVATE_KEY }}
+          MOBILE_OTA_R2_ACCESS_KEY_ID: ${{ secrets.MOBILE_OTA_R2_ACCESS_KEY_ID }}
+          MOBILE_OTA_R2_SECRET_ACCESS_KEY: ${{ secrets.MOBILE_OTA_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          missing=()
+          for name in MOBILE_OTA_PRIVATE_KEY MOBILE_OTA_R2_ACCESS_KEY_ID MOBILE_OTA_R2_SECRET_ACCESS_KEY CLOUDFLARE_ACCOUNT_ID EXPO_TOKEN; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing release-mobile-ota secrets or variables: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Set up Bun and Node
+        uses: ./.github/actions/setup-bun
+        with:
+          install: frozen
+
+      # The store builds run the same checks. A bundle that does not compile must not reach a phone.
+      - name: Check the mobile source
+        if: inputs.action == 'publish'
+        run: |
+          bun run mobile:lint
+          bun run mobile:typecheck
+          bun run test:desktop -- apps/mobile/src
+
+      # The public values of the production bundle, such as the analytics client, are in the EAS
+      # environment that the store builds read. `expo export` reads the file.
+      - name: Read the public values of the build environment
+        if: inputs.action == 'publish'
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CHANNEL: ${{ inputs.channel }}
+        run: bunx eas-cli@24.1.2 env:pull --environment "$CHANNEL" --path .env.local --non-interactive
+
+      - name: Run the update
+        shell: bash
+        env:
+          MOBILE_OTA_PRIVATE_KEY: ${{ secrets.MOBILE_OTA_PRIVATE_KEY }}
+          MOBILE_OTA_R2_ACCESS_KEY_ID: ${{ secrets.MOBILE_OTA_R2_ACCESS_KEY_ID }}
+          MOBILE_OTA_R2_SECRET_ACCESS_KEY: ${{ secrets.MOBILE_OTA_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          ACTION: ${{ inputs.action }}
+          PLATFORM: ${{ inputs.platform }}
+          MESSAGE: ${{ inputs.message }}
+          ROLLOUT: ${{ inputs.rollout }}
+          CHANNEL: ${{ inputs.channel }}
+          RUNTIME: ${{ inputs.runtime }}
+          TO_EMBEDDED: ${{ inputs.to_embedded }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=("$ACTION" --platform "$PLATFORM" --channel "$CHANNEL")
+          case "$ACTION" in
+            publish)
+              args+=(--message "$MESSAGE" --rollout "$ROLLOUT")
+              [[ "$DRY_RUN" == "true" ]] && args+=(--dry-run)
+              ;;
+            rollout)
+              args+=(--rollout "$ROLLOUT")
+              [[ -n "$RUNTIME" ]] && args+=(--runtime "$RUNTIME")
+              ;;
+            rollback)
+              [[ "$TO_EMBEDDED" == "true" ]] && args+=(--to-embedded)
+              [[ -n "$RUNTIME" ]] && args+=(--runtime "$RUNTIME")
+              ;;
+          esac
+          bun scripts/mobile-ota.ts "${args[@]}"

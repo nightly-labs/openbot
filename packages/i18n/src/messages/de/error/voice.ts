@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Warte, bis die Sprachtranskription endet, und entferne das Modell dann.",
   "error.voice.removeFailed": "Das Sprachmodell konnte nicht entfernt werden. Versuche es erneut.",
   "error.voice.runtimeUnavailable": "Lokale Sprachtranskription ist auf dieser Plattform nicht verfügbar.",
-  "error.voice.busy": "Eine Sprachtranskription läuft bereits.",
   "error.voice.modelUnavailable": "Das Sprachmodell ist nicht verfügbar.",
   "error.voice.transcriptionTimedOut": "Die Zeit für die Sprachtranskription ist abgelaufen.",
   "error.voice.prepareRequired":
@@ -31,6 +30,10 @@ export const messages = {
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",
   "error.voice.live.disconnected": "Live-Sprache wurde getrennt.",
+  "error.voice.live.hostFailed":
+    "Codex auf dem Server konnte Live-Sprache nicht starten. Bitte den Eigentümer, Codex auf diesem Computer zu aktualisieren und sich mit ChatGPT anzumelden. Versuche es dann noch einmal.",
   "error.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
+  "error.voice.live.unavailable":
+    "OpenAI konnte die Live-Sprache nicht starten. Das Problem liegt bei OpenAI. Versuche es später erneut.",
   "error.voice.live.off": "Codex-Live-Sprache ist aus. Schalte sie unter Einstellungen → Diktat ein.",
 } as const satisfies PartialTranslation<typeof source>;

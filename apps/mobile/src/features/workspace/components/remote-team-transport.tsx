@@ -1,9 +1,10 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -16,6 +17,7 @@ import {
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamDiagnostic,
+  type RemoteTeamEvent,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
@@ -48,8 +50,11 @@ import { currentText } from "@/shared/lib/text";
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
 
 export interface RemoteTeamTransportRef {
-  connect(hostId: string, hostPublicKey: string): Promise<void>;
+  /** `kept`: the authenticated connection from before stays, and its event stream lost no event. */
+  connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
+  /** The phone moved to another network, such as from Wi-Fi to mobile data. The peer makes a new connection. */
+  networkChanged(): void;
   request<T>(
     method: string,
     path: string,
@@ -98,13 +103,24 @@ interface RemoteTeamTransportProps {
   onMembershipChanged?: () => Promise<void>;
   /** The phone got a network again. */
   onNetworkRestored?: () => void;
-  onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => void;
+  onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
 }
 
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
   | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+
+/**
+ * The text for a refused live voice request. A 409 has the host's sentence: no Codex sign-in with
+ * ChatGPT on the host, no event connection, or a timeout. The screen translates it and removes
+ * secrets from it. A 500 of a start is a Codex failure on the host, whose reason stays in the host log.
+ */
+function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
+  if (path === LIVE_VOICE_ROUTES.start && status >= 500) return sourceText("error.voice.live.hostFailed");
+  if (path !== LIVE_VOICE_ROUTES.start && path !== LIVE_VOICE_ROUTES.stop) return null;
+  return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
+}
 
 // One object, not a new one for each render.
 const BRIDGE_DOM: DOMProps = {
@@ -221,6 +237,12 @@ export const RemoteTeamTransport = memo(
               result.error ?? currentText().t("mobile.workspace.error.connectFailed"),
               result.reference,
             );
+          return { kept: result.kept === true };
+        },
+        networkChanged: () => {
+          // The handle has the method only after the page has registered it.
+          const networkChanged = bridge.current?.networkChanged;
+          if (typeof networkChanged === "function") networkChanged(null);
         },
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
@@ -266,7 +288,10 @@ export const RemoteTeamTransport = memo(
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
-            throw referencedError(sourceText("error.remote.serverRequestFailed"), referenceFrom("http", result.status));
+            throw referencedError(
+              liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
+              referenceFrom("http", result.status),
+            );
           return decode(result.body);
         },
         openBrowserView: (options, listener) => {
@@ -401,8 +426,7 @@ export const RemoteTeamTransport = memo(
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: AgentEvent | TeamRealtimeEvent) =>
-        latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
     }));
 
     return (

@@ -1,5 +1,6 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
 import { ConversationFilesPanel } from "@openbot/ui/features/files/ConversationFilesPanel";
+import { type FilesPort, filesPort } from "./files-port";
 import { createStorageUsage } from "./storage-usage";
 
 /** Chat > Files: every file of one chat, in the side-panel slot the file preview also uses. */
@@ -12,11 +13,16 @@ export default function ChatFilesPanel(props: {
   onClose: () => void;
   onPreviewFile: (file: StoredFileRow) => void;
   onShowMessage: (messageId: string) => void;
+  /** The storage calls of a client without the desktop port. Absent, preload sends them. */
+  calls?: FilesPort | undefined;
 }) {
-  const storage = createStorageUsage(() => ({
-    serverId: props.serverId,
-    input: { scope: "conversation", conversationId: props.conversationId },
-  }));
+  const storage = createStorageUsage(
+    () => ({
+      serverId: props.serverId,
+      input: { scope: "conversation", conversationId: props.conversationId },
+    }),
+    () => props.calls ?? filesPort(),
+  );
   const usage = () => storage.state.usage;
   const showInChat = {
     onShowInChat: (row: StoredFileRow) => {

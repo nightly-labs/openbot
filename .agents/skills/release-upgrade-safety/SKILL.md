@@ -128,10 +128,11 @@ a gate can be selected without opening anything:
 - **H. Signal** — no reference file.
   always triggered: an earlier release can have left Signal behind, so a range with no `remote/`
   change does not prove that Signal is current. Signal is not deployed by CI or by the release
-  workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is missing,
-  `unknown`, or not a commit in this repository, the verdict is **needs a human**. Pass when
-  `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
-  succeeds. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
+  workflow. Read `commit` from `curl -fsS https://signal1.openbot.run/health/live` and
+  `curl -fsS https://signal2.openbot.run/health/live` (not `signal.openbot.run`, which reaches only the
+  entry machine); if a commit is missing, `unknown`, or not a commit in this repository, the verdict is
+  **needs a human**. Pass when `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
+  succeeds for both commits. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
   (`docs/RELEASING.md` preflight item 16); this is not a stop for the version bump. #1661 is the
   failure this catches: v0.33.0 clients sent webhook routes to a Signal older than #1520.
 

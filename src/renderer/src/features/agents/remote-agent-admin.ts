@@ -463,6 +463,8 @@ export async function updateRemoteAgent(
     allowNewChat,
     quickAcknowledgement,
     fastMode,
+    // `agent-fast-mode-v1` sets only Fast; a remote picker does not offer Ultrafast.
+    ultrafast: _ultrafast,
     agentId,
     ...fields
   } = input;

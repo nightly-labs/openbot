@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
   AgentColorEntry,
+  AgentContextState,
   AgentEvent,
   AgentRuntimeApproval,
   AgentStatus,
@@ -15,6 +16,7 @@ import type {
   ClientAgentSummary,
   ConversationMessage,
   ConversationPage,
+  ConversationReadState,
   HiddenAgent,
   HostedServerIssue,
   HostedServerSleep,
@@ -54,6 +56,7 @@ import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
+import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
 import {
@@ -89,6 +92,8 @@ interface WebConversation {
   error?: string | null;
   /** The older pages were released; the next latest read takes the host's page and cursor. */
   trimmed?: boolean;
+  /** The last older page did not load. The chat shows it above its messages, and a scroll up tries again. */
+  olderError?: string | null;
 }
 
 /** The messages that a conversation keeps when it is not open, as on the desktop. */
@@ -139,6 +144,10 @@ interface WebWorkspaceState {
   /** The latest progress detail of each agent's running turn. */
   progress: Record<string, { turnId: string; detail: string; running?: boolean; activity?: string }>;
   takeovers: BrowserTakeoverRequest[];
+  /** How full the context of each agent's own chat is, by agent id, from the host's runtime snapshot. */
+  contextStates: Record<string, AgentContextState>;
+  /** As `contextStates`, for each side thread, by thread id. */
+  threadContextStates: Record<string, AgentContextState>;
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
@@ -201,6 +210,11 @@ interface WebWorkspaceState {
    * and presence do not carry them. `presence` already has the member chat colours.
    */
   chatColors: ChatColors;
+  /**
+   * The read state of each agent's own chat for this member, from `conversationReads`. The sidebar
+   * shows its unread counts. An agent with no entry has no unread messages that this tab knows of.
+   */
+  reads: Record<string, ConversationReadState>;
 }
 
 export type WebRuntimeFactory = (
@@ -239,6 +253,8 @@ export function createWebWorkspace(
     prompts: [],
     progress: {},
     takeovers: [],
+    contextStates: {},
+    threadContextStates: {},
     browserTabs: [],
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
@@ -275,6 +291,7 @@ export function createWebWorkspace(
     userHiddenAgents: [],
     agentColors: [],
     chatColors: { agents: [], members: [] },
+    reads: {},
   });
   // Every progress line of the newest turns, by turn, for the steps under the activity line.
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
@@ -451,6 +468,8 @@ export function createWebWorkspace(
             };
           if (update.state !== "online") {
             draft.approvals = [];
+            draft.contextStates = {};
+            draft.threadContextStates = {};
             draft.prompts = [];
             draft.progress = {};
             draft.takeovers = [];
@@ -524,6 +543,13 @@ export function createWebWorkspace(
               draft.takeovers,
               event.snapshot.pendingBrowserTakeovers,
               attentionComplete,
+            );
+            // A host without `context-usage-v1` sends neither list, so its chats show no context meter.
+            draft.contextStates = Object.fromEntries(
+              (event.snapshot.contextStates ?? []).map((context) => [context.agentId, context]),
+            );
+            draft.threadContextStates = Object.fromEntries(
+              (event.snapshot.threadContextStates ?? []).map((context) => [context.threadId, context]),
             );
           });
         } else if (event.type === "prompt") {
@@ -648,6 +674,9 @@ export function createWebWorkspace(
         if (event.type === "chat-colors-changed") receiveChatColors({ agents: event.agents, members: event.members });
         if (event.type === "sidebar-pins-changed")
           preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
+        // A changed chat can change the unread count of any agent, and the host tells a read on another
+        // device only with an invalidation.
+        if (event.type === "conversation" || event.type === "conversation-invalidated") loadReads();
         // A read loads only the open conversation, so the events of other agents do not start one.
         const changed = changedConversation(event);
         if (changed !== undefined && changed === selectedId) void refresh();
@@ -931,6 +960,8 @@ export function createWebWorkspace(
             draft.conversations = {};
             draft.queues = {};
             draft.approvals = [];
+            draft.contextStates = {};
+            draft.threadContextStates = {};
             draft.prompts = [];
             draft.progress = {};
             setStepLines({});
@@ -941,6 +972,7 @@ export function createWebWorkspace(
             draft.sidebarLayout = defaultSidebarLayout();
             draft.userHiddenAgents = [];
             draft.agentColors = [];
+            draft.reads = {};
             draft.chatColors = { agents: [], members: [] };
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
@@ -1050,6 +1082,8 @@ export function createWebWorkspace(
       draft.queues = {};
       draft.selectedId = null;
       draft.approvals = [];
+      draft.contextStates = {};
+      draft.threadContextStates = {};
       draft.prompts = [];
       draft.progress = {};
       setStepLines({});
@@ -1060,6 +1094,7 @@ export function createWebWorkspace(
       draft.sidebarLayout = defaultSidebarLayout();
       draft.userHiddenAgents = [];
       draft.agentColors = [];
+      draft.reads = {};
       draft.chatColors = { agents: [], members: [] };
       draft.capabilities = [];
       draft.presence = null;
@@ -1176,6 +1211,8 @@ export function createWebWorkspace(
         draft.hiddenIds = [];
       }
       draft.approvals = [];
+      draft.contextStates = {};
+      draft.threadContextStates = {};
       draft.prompts = [];
       draft.takeovers = [];
       draft.browserControlState = { sessions: [] };
@@ -1186,6 +1223,7 @@ export function createWebWorkspace(
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
         draft.agentColors = [];
+        draft.reads = {};
         draft.chatColors = { agents: [], members: [] };
         draft.duplicatingAgentIds = [];
         draft.capabilities = [];
@@ -1427,6 +1465,7 @@ export function createWebWorkspace(
           if (isCurrent()) receiveChatColors(colors);
         })
         .catch(() => undefined),
+      readReads(),
     ]);
     if (isCurrent())
       setState((draft) => {
@@ -1483,19 +1522,22 @@ export function createWebWorkspace(
           ...(merge === "replace" ? {} : item.missingReferences),
           ...missingReplyOriginals(page),
         };
+        if (!older && page.readState) draft.reads[id] = page.readState;
         // A conversation that closed during this read stays trimmed: it gets no new messages until it opens.
         if (!older && draft.selectedId === id) item.trimmed = false;
         item.loading = false;
         item.error = null;
+        item.olderError = null;
       });
     } catch (error) {
       if (!disposed && current === generation && !blockAccess(error))
         setState((draft) => {
           const item = draft.conversations[id];
-          if (item) {
-            item.loading = false;
-            item.error = currentText().t("webClient.error.requestFailed");
-          }
+          if (!item) return;
+          item.loading = false;
+          // A loaded chat stays on screen: only the older page failed.
+          if (older) item.olderError = currentText().errorMessage(error, currentText().t("chat.history.olderFailed"));
+          else item.error = currentText().t("webClient.error.requestFailed");
         });
       throw error;
     } finally {
@@ -1635,6 +1677,34 @@ export function createWebWorkspace(
       }
     }
   }
+  let readsLoad: { generation: number; promise: Promise<void> } | null = null;
+  let pendingReads = false;
+  /**
+   * Reads the unread state of every agent chat. Event bursts coalesce: a call during a read schedules
+   * one more read. A failed read keeps the counts that this tab has.
+   */
+  function readReads(): Promise<void> {
+    pendingReads = true;
+    if (readsLoad?.generation === generation) return readsLoad.promise;
+    const current = generation;
+    const promise = (async () => {
+      while (pendingReads && !disposed && current === generation) {
+        pendingReads = false;
+        const value = await runtime.conversationReads().catch(() => null);
+        if (!value || disposed || current !== generation) continue;
+        setState((draft) => {
+          draft.reads = value;
+        });
+      }
+    })().finally(() => {
+      if (readsLoad?.promise === promise) readsLoad = null;
+    });
+    readsLoad = { generation: current, promise };
+    return promise;
+  }
+  function loadReads(): void {
+    void readReads();
+  }
   async function resync() {
     const current = generation;
     try {
@@ -1664,6 +1734,7 @@ export function createWebWorkspace(
       });
       receiveChatColors(chatColors);
       for (const agent of agents) loadQueue(agent.id);
+      loadReads();
       if (!selectedId && agents[0]) await select(agents[0].id);
       await refresh();
     } catch (error) {
@@ -1737,6 +1808,28 @@ export function createWebWorkspace(
         setState((draft) => {
           const value = draft.conversations[id]?.page;
           if (value?.threadId === page.threadId) value.readState = readState;
+          draft.reads[id] = readState;
+        });
+      });
+    readWrites.set(id, write);
+    return write;
+  }
+  /** Marks one agent's chat read through its newest message, loaded or not. Writes for one agent run in order. */
+  function markAgentRead(id: string) {
+    const current = generation;
+    const write = (readWrites.get(id) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        if (disposed || current !== generation) return;
+        const page = await runtime.conversation(id);
+        const latestMessageId = page.messages.at(-1)?.id;
+        if (!latestMessageId || disposed || current !== generation) return;
+        const readState = await runtime.markRead(id, latestMessageId);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[id]?.page;
+          if (value?.threadId === page.threadId) value.readState = readState;
+          draft.reads[id] = readState;
         });
       });
     readWrites.set(id, write);
@@ -1748,28 +1841,36 @@ export function createWebWorkspace(
     const current = generation;
     const reads = await runtime.conversationReads();
     if (disposed || current !== generation) return;
-    const unread = Object.entries(reads)
-      .filter(([, read]) => read.unreadCount > 0)
-      .map(([id]) => id);
-    const writes = unread.map((id) => {
-      const write = (readWrites.get(id) ?? Promise.resolve())
-        .catch(() => undefined)
-        .then(async () => {
-          if (disposed || current !== generation) return;
-          const page = await runtime.conversation(id);
-          const latestMessageId = page.messages.at(-1)?.id;
-          if (!latestMessageId || disposed || current !== generation) return;
-          const readState = await runtime.markRead(id, latestMessageId);
-          if (disposed || current !== generation) return;
-          setState((draft) => {
-            const value = draft.conversations[id]?.page;
-            if (value?.threadId === page.threadId) value.readState = readState;
-          });
+    await Promise.all(
+      Object.entries(reads)
+        .filter(([, read]) => read.unreadCount > 0)
+        .map(([id]) => markAgentRead(id)),
+    );
+  }
+  /**
+   * Marks one message of an agent's chat and the messages after it unread, with
+   * `conversation-unread-from-v1`. Writes for one agent run in order. A failure throws to the caller.
+   */
+  async function markUnreadFrom(agentId: string, messageId: string): Promise<void> {
+    const current = generation;
+    const write = (readWrites.get(agentId) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const readState = await runtime.markUnreadFrom(agentId, messageId);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[agentId]?.page;
+          if (value) value.readState = readState;
+          draft.reads[agentId] = readState;
         });
-      readWrites.set(id, write);
-      return write;
-    });
-    await Promise.all(writes);
+      });
+    readWrites.set(agentId, write);
+    await write;
+  }
+  /** Marks the newest agent reply of a chat unread, loaded or not. A failure throws to the caller. */
+  async function markLatestReplyUnread(agentId: string): Promise<void> {
+    const reply = latestIncomingConversationMessage((await runtime.conversation(agentId)).messages);
+    if (reply) await markUnreadFrom(agentId, reply.id);
   }
   /** The connected host and its connection, as the restart notices and the update dialog read them. */
   const hostViews = (): HostRestartView[] =>
@@ -1917,7 +2018,10 @@ export function createWebWorkspace(
       }
     },
     markRead,
+    markAgentRead,
     markAllRead,
+    markUnreadFrom,
+    markLatestReplyUnread,
     /**
      * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
      * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
@@ -2173,7 +2277,8 @@ export function createWebWorkspace(
     },
     older: () => {
       const id = selectedId;
-      return id ? run(() => load(id, true)) : Promise.resolve();
+      // The chat shows a failed older page itself, as on the desktop, so no toast reports it again.
+      return id ? run(() => load(id, true).catch(() => undefined)) : Promise.resolve();
     },
     setDraft(text: string) {
       const id = selectedId;

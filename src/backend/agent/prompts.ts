@@ -239,28 +239,41 @@ function elicitationFieldResult(
   return { action: "accept", content, _meta: null };
 }
 
+/**
+ * Why the questions make no card, or null when they make one. The text names the question and the
+ * limit, so the agent can correct its call: the advertised schema has no limits (#6268).
+ */
+export function promptQuestionsProblem(questions: AgentPromptQuestion[]): string | null {
+  if (questions.length === 0) return "questions must be a non-empty array of question objects, not text.";
+  if (questions.length > INPUT_LIMITS.promptQuestions)
+    return `questions has ${questions.length} items; the limit is ${INPUT_LIMITS.promptQuestions}.`;
+  const ids = new Set<string>();
+  for (const [index, question] of questions.entries()) {
+    const at = `questions[${index}]`;
+    if (question.id.length === 0 || question.id.length > INPUT_LIMITS.identifier)
+      return `${at}.id must have 1 to ${INPUT_LIMITS.identifier} characters. Leave id out to get one.`;
+    if (ids.has(question.id))
+      return `${at}.id is the id of an earlier question. Give each question a different id, or leave id out.`;
+    ids.add(question.id);
+    if (question.header.length > INPUT_LIMITS.promptHeader)
+      return `${at}.header has ${question.header.length} characters; the limit is ${INPUT_LIMITS.promptHeader}.`;
+    if (question.question.length === 0 || question.question.length > INPUT_LIMITS.promptQuestion)
+      return `${at}.question must have 1 to ${INPUT_LIMITS.promptQuestion} characters.`;
+    if (question.options === null) continue;
+    if (question.options.length > INPUT_LIMITS.promptOptions)
+      return `${at}.options has ${question.options.length} options; the limit is ${INPUT_LIMITS.promptOptions}. Keep the most likely options: the user can also type an answer.`;
+    for (const [position, option] of question.options.entries()) {
+      if (option.label.length === 0 || option.label.length > INPUT_LIMITS.promptOptionLabel)
+        return `${at}.options[${position}].label must have 1 to ${INPUT_LIMITS.promptOptionLabel} characters.`;
+      if (option.description.length > INPUT_LIMITS.promptOptionDescription)
+        return `${at}.options[${position}].description has ${option.description.length} characters; the limit is ${INPUT_LIMITS.promptOptionDescription}.`;
+    }
+  }
+  return null;
+}
+
 export function validPromptQuestions(questions: AgentPromptQuestion[]): boolean {
-  return (
-    questions.length > 0 &&
-    questions.length <= INPUT_LIMITS.promptQuestions &&
-    new Set(questions.map((question) => question.id)).size === questions.length &&
-    questions.every(
-      (question) =>
-        question.id.length > 0 &&
-        question.id.length <= INPUT_LIMITS.identifier &&
-        question.header.length <= INPUT_LIMITS.promptHeader &&
-        question.question.length > 0 &&
-        question.question.length <= INPUT_LIMITS.promptQuestion &&
-        (question.options === null ||
-          (question.options.length <= INPUT_LIMITS.promptOptions &&
-            question.options.every(
-              (option) =>
-                option.label.length > 0 &&
-                option.label.length <= INPUT_LIMITS.promptOptionLabel &&
-                option.description.length <= INPUT_LIMITS.promptOptionDescription,
-            ))),
-    )
-  );
+  return promptQuestionsProblem(questions) === null;
 }
 
 export function questionPromptText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution | null): string {
@@ -312,6 +325,24 @@ export function expiredPromptResult(
     success: false,
     contentItems: [{ type: "inputText", text: "The question expired before the user answered." }],
   };
+}
+
+/**
+ * The answer for a question or block that the user did not answer because they wrote a new message
+ * in the chat. Only the model reads it. The message reaches the agent as a steer or as the next turn.
+ */
+export function userMessagePromptResult(
+  responseKind: "dynamic-tool" | "user-input" | "ui-block",
+  blockId: string | undefined,
+): DynamicToolResult | { answers: Record<string, never> } {
+  // `request_user_input` has no field for a note: empty answers are what a skip gives.
+  if (responseKind === "user-input") return { answers: {} };
+  const value = {
+    status: "skipped",
+    ...(blockId ? { blockId } : {}),
+    next: "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.",
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
 /** What a blocking UI block (`ask_ui`) ended with. */

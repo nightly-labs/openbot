@@ -34,6 +34,9 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
+/** Words that the title of a pull request or issue contains. */
+const TITLE_PLACEHOLDER = "fix:";
+
 /** The longest text of a filter field that `workflows-v1` carries. */
 const FILTER_LIMIT = 200;
 
@@ -180,6 +183,7 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
       {settings.filters.includes("title") ? (
         <SheetFormField
           label={t("mobile.workflow.github.trigger.titleHas")}
+          placeholder={TITLE_PLACEHOLDER}
           value={settings.titleText}
           maxLength={FILTER_LIMIT}
           editable={editable}

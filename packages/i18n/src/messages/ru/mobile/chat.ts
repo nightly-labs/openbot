@@ -31,23 +31,12 @@ export const messages = {
   "mobile.chat.routine.created": "Создана регулярная задача",
   "mobile.chat.routine.updated": "Регулярная задача обновлена",
   "mobile.chat.routine.deleted": "Регулярная задача удалена",
-  "mobile.chat.routine.runGroup.count": {
-    one: "{count} запуск",
-    few: "{count} запуска",
-    many: "{count} запусков",
-    other: "{count} запуска",
-  },
-  "mobile.chat.routine.runGroup.show": {
-    one: "Показать {count} запуск: {name}",
-    few: "Показать {count} запуска: {name}",
-    many: "Показать {count} запусков: {name}",
-    other: "Показать {count} запуска: {name}",
-  },
-  "mobile.chat.routine.runGroup.hide": {
-    one: "Скрыть {count} запуск: {name}",
-    few: "Скрыть {count} запуска: {name}",
-    many: "Скрыть {count} запусков: {name}",
-    other: "Скрыть {count} запуска: {name}",
+  "mobile.chat.routine.group.title": "Активность регулярных задач",
+  "mobile.chat.routine.group.count": {
+    one: "{count} событие",
+    few: "{count} события",
+    many: "{count} событий",
+    other: "{count} события",
   },
   "mobile.chat.contextReset": "Начат новый чат",
   "mobile.chat.plan.title": "Задачи",
@@ -65,6 +54,9 @@ export const messages = {
   "mobile.chat.code.copyFailed": "Не удалось скопировать код",
   "mobile.chat.code.copied": "Код скопирован",
   "mobile.chat.code.copy": "Копировать код",
+  "mobile.chat.table.copyMarkdown": "Копировать Markdown",
+  "mobile.chat.table.copyCsv": "Копировать CSV",
+  "mobile.chat.table.copyFailed": "Не удалось скопировать таблицу",
   "mobile.chat.preview.htmlTitle": "Предпросмотр HTML",
   "mobile.chat.preview.mermaidTitle": "Диаграмма Mermaid",
   "mobile.chat.preview.htmlCode": "Код HTML",
@@ -213,6 +205,14 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "У ключа ElevenLabs нет нужного разрешения. Проверьте его в Настройки > Голос.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs нужно подключение к сети.",
+  "mobile.chat.liveVoice.voiceServerFailed":
+    "Голосовой сервер не смог прочитать ответ. Проверьте его в разделе «Настройки > Голос».",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Этот сервер не поддерживает GPT Live Voice. Обновите OpenBot на компьютере, где он работает.",
+  "mobile.chat.liveVoice.gptFailed": "Не удалось запустить GPT Live Voice. Включите микрофон, чтобы повторить.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice остановлен. Включите микрофон, чтобы запустить его снова.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Разрешите OpenBot использовать микрофон в Настройках. Затем включите микрофон, чтобы повторить.",
   "mobile.chat.composer.addAttachment": "Добавить вложение",
   "mobile.chat.composer.ask": "Спросить: {name}",
   "mobile.chat.composer.stopFailed": "Не удалось остановить агента. Возможно, он уже закончил.",

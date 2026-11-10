@@ -26,6 +26,8 @@ export const messages = {
   "error.workflow.notRetryable": "Снова можно запустить только шаг, который завершился ошибкой или был остановлен.",
   "error.workflow.noDecision": "Этот шаг не ждет решения.",
   "error.workflow.outputPlaceMissing": "Выберите место в мессенджере для этого вывода.",
+  "error.workflow.outputChannelMissing": "Выберите канал для этого вывода.",
+  "error.workflow.outputChannelFailed": "OpenBot не смог опубликовать результат в канале. Запустите шаг снова.",
   "error.workflow.discordNoMessage":
     "Этот вывод действует на сообщение Discord, которое запустило выполнение. Запустите его упоминанием в Discord или выберите «Опубликовать в канале».",
   "error.workflow.slackNoMessage":

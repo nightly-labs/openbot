@@ -49,7 +49,7 @@ interface ChatAttachmentProps {
   alignment?: "left" | "right";
   /** The sent fraction of this file, from 0 to 1, while the message that carries it is sending. */
   upload?: number;
-  /** The agent's color for the controls of a player, unless the user turned off agent colors. */
+  /** The message color for the controls of a player. Unset when the user's messages have no color. */
   tint?: AttachmentTint;
   /** The page of a visual reply, which shows in the chat as desktop shows it, at the agent's height. */
   visual?: { height?: number } | undefined;

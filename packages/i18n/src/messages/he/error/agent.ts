@@ -4,7 +4,11 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "ההיסטוריה אינה זמינה לבקשה הזו. יש לקרוא שוב את ההיסטוריה האחרונה, או להשתמש ב-channel_history לעבודה בערוץ.",
+  "error.agent.historyArgumentsInvalid":
+    "ארגומנטים שגויים להיסטוריה: {detail} תקן את הארגומנטים ונסה שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.toolRequestInvalid": "ארגומנטים לא תקינים לגילוי כלים. יש להשתמש בסכימה המוצהרת ובשם כלי מקורי מלא.",
+  "error.agent.toolCallArgumentsNotObject":
+    "הכלי לא רץ. ב-tool_call, arguments חייב להיות אובייקט JSON ולא טקסט. יש לשלוח את הקריאה שוב עם arguments כאובייקט.",
   "error.agent.approvalWhileDeleting": "אי אפשר לתת אישור בזמן שהסוכן נמחק.",
   "error.agent.accessLocalOnly": "אפשר לשנות גישה של סוכן רק במחשב שמריץ את הסוכן.",
   "error.agent.duplicateCleanupFailed": "שכפול הסוכן נכשל ולא ניתן היה להסיר את ההעתק החלקי.",
@@ -42,6 +46,7 @@ export const messages = {
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',
   "error.agent.noStartingModelInSettings":
     "אין מודל זמין ב-{provider}, וגם לאף ספק מחובר אחר אין. יש להתחבר לספק, או לשנות את ספק ברירת המחדל בהגדרות השרת ← ספקים.",
   "error.agent.noStartingModel":
@@ -68,6 +73,8 @@ export const messages = {
   "error.agent.endpointRemoved": "נקודת הקצה שהסוכן הזה השתמש בה הוסרה. יש לבחור עבורו מודל אחר.",
   "error.agent.turnStalled":
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
+  "error.agent.compactionConnectionLost":
+    "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו, ולכן המשימה נעצרה. יש לבדוק את חיבור האינטרנט ולשלוח הודעה כדי להמשיך.",
   "error.agent.selectedGone": "הסוכן שנבחר כבר לא קיים.",
   "error.agent.profileEndpointsChanged": "נקודות הקצה המותאמות השתנו בזמן היצירה. יש לנסות שוב.",
   "error.agent.profileInvalid": "הספק החזיר פרופיל לא תקין. יש לנסות לשנות את ההנחיה.",

@@ -13,6 +13,8 @@ import {
   parseHostedServerList,
   parseHostedServerStatus,
   parseHostedServerSummary,
+  parseServerClaim,
+  type ServerClaim,
 } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -125,6 +127,13 @@ export class HostedServerDesktopService {
   plans(): Effect.Effect<HostedServerCatalog, AccountServiceFailure> {
     return AccountServicePlatform.use((platform) =>
       platform.request("/v2/hosting/plans", { method: "GET" }, decodeCatalog),
+    ).pipe(Effect.provide(this.#platform));
+  }
+
+  /** A one-time claim that signs a self-hosted server in to this account. Never log it. */
+  createServerClaim(): Effect.Effect<ServerClaim, AccountServiceFailure> {
+    return AccountServicePlatform.use((platform) =>
+      platform.request("/v2/server-claims", { method: "POST" }, decodeServerClaim),
     ).pipe(Effect.provide(this.#platform));
   }
 
@@ -328,4 +337,10 @@ function decodeCatalog(value: unknown): HostedServerCatalog {
   const catalog = parseHostedServerCatalog(value);
   if (!catalog) throw new Error(sourceText("error.auth.invalidHostedServer"));
   return catalog;
+}
+
+function decodeServerClaim(value: unknown): ServerClaim {
+  const claim = parseServerClaim(value);
+  if (!claim) throw new Error(sourceText("error.auth.invalidServerClaim"));
+  return claim;
 }

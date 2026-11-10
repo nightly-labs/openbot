@@ -1,5 +1,5 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, X } from "@openbot/ui";
+import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, toast, X } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import {
   createEffect,
@@ -13,7 +13,7 @@ import {
   untrack,
 } from "solid-js";
 import { useText } from "../../text";
-import { CloseIcon, DownloadIcon } from "./ConversationIcons";
+import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon } from "./ConversationIcons";
 import { justifiedGalleryLayout } from "./image-gallery-layout";
 import {
   BACKDROP_IN,
@@ -51,6 +51,8 @@ const GALLERY_MAX_RATIO = 3;
 const SWIPE_DISTANCE = 48;
 /** A drag of a zoomed image that moves this far is not a click, so it does not close the viewer. */
 const DRAG_DISTANCE = 4;
+/** How long the copy button shows its check after a copy. */
+const COPIED_DURATION = 1500;
 
 /** The zoom of the shown image: its scale over the fitted size and its offset from the centre. */
 const FIT: Camera = { x: 0, y: 0, scale: 1 };
@@ -228,6 +230,52 @@ function zoomKeyframes(from: DOMRect, to: DOMRect, fromRadius: number, toRadius:
   ];
 }
 
+/** A web client on plain HTTP has no clipboard that takes images. */
+const canCopyImages = () => typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function";
+
+function drawPng(source: CanvasImageSource, width: number, height: number): Promise<Blob> {
+  const canvas = new OffscreenCanvas(width, height);
+  canvas.getContext("2d")?.drawImage(source, 0, 0);
+  return canvas.convertToBlob({ type: "image/png" });
+}
+
+/**
+ * The clipboard takes images as PNG. A PNG file goes as it is, and other files are drawn again. An
+ * attachment comes from another origin, and a canvas cannot read such an image, so the copy reads
+ * the file. When the file does not load or decode, the copy draws the shown image.
+ */
+async function pngImage(image: HTMLImageElement): Promise<Blob> {
+  const file = await fetch(image.currentSrc).then(
+    (response) => (response.ok ? response.blob() : undefined),
+    () => undefined,
+  );
+  if (file?.type === "image/png") return file;
+  const bitmap = file && (await createImageBitmap(file).catch(() => undefined));
+  if (!bitmap) return drawPng(image, image.naturalWidth, image.naturalHeight);
+  try {
+    return await drawPng(bitmap, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Text that the user selected in the viewer, such as the file name. Text behind the viewer does not count. */
+const selectsText = (viewer: Node) => {
+  const selection = window.getSelection();
+  return Boolean(selection?.toString()) && viewer.contains(selection?.anchorNode ?? null);
+};
+
+/** Command or Ctrl with C, also on a layout without Latin letters, such as Russian. */
+const isCopyKey = (event: KeyboardEvent) => {
+  const key = event.key.toLowerCase();
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    (key === "c" || (!/^[a-z]$/.test(key) && event.code === "KeyC"))
+  );
+};
+
 const FADE_KEYFRAMES: Keyframe[] = [
   { opacity: 0, transform: "scale(0.96)" },
   { opacity: 1, transform: "none" },
@@ -268,7 +316,15 @@ export function ImageLightbox(props: {
     const image = current();
     return image && (props.canDownload?.(image) ?? true) ? image : undefined;
   };
+  const shownImageLoaded = () => {
+    const image = current();
+    return image !== undefined && loaded[image.id] === true && failed[image.id] !== true;
+  };
   const imageElements = new Map<string, HTMLImageElement>();
+  const copyable = canCopyImages();
+  const [copied, setCopied] = createSignal<string>();
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(copiedTimer));
   const tiles = createTileMotion();
   // The thumbnails move only when the viewer grows out of one of them.
   const tilesMove = Boolean(originRect && props.thumbnail);
@@ -348,6 +404,21 @@ export function ImageLightbox(props: {
       x: point.x - ((point.x - from.x) * next) / from.scale,
       y: point.y - ((point.y - from.y) * next) / from.scale,
     };
+  };
+  /** Copies the shown image. The copy button shows the check and tells a screen reader, also for the key. */
+  const copy = () => {
+    const entry = current();
+    const image = entry ? imageElements.get(entry.id) : undefined;
+    if (!entry || !image?.isConnected || !copyable) return;
+    // The item takes the PNG as a promise, so the write keeps the press's permission while it draws.
+    navigator.clipboard.write([new ClipboardItem({ "image/png": pngImage(image) })]).then(
+      () => {
+        setCopied(entry.id);
+        clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => setCopied(undefined), COPIED_DURATION);
+      },
+      () => toast.error(t("chat.image.copyFailed")),
+    );
   };
   const zoomBy = (factor: number) => move(zoomAround(camera, { x: 0, y: 0 }, camera.scale * factor), true);
   /** A window point from the centre of the stage, where the fitted image is centred. */
@@ -604,11 +675,15 @@ export function ImageLightbox(props: {
             else if (event.target instanceof Element && !event.target.closest("button, a, .image-lightbox-image"))
               close();
           }}
-          onKeyDown={(event: KeyboardEvent) => {
+          // The native menu copies the image under the pointer, so the message's own menu does not open.
+          onContextMenu={(event: MouseEvent) => event.stopPropagation()}
+          onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
             const offset = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
             if (offset !== undefined) step(offset);
             else if (event.key === "Home") go(0, -1);
             else if (event.key === "End") go(images().length - 1, 1);
+            // Copy takes the image, unless the user selected text, such as the file name.
+            else if (isCopyKey(event) && !selectsText(event.currentTarget)) copy();
             // With Command, Ctrl or Alt, the keys are the app's own zoom shortcuts.
             else if (event.metaKey || event.ctrlKey || event.altKey) return;
             else if (event.key === "+" || event.key === "=") zoomBy(ZOOM_STEP);
@@ -652,6 +727,24 @@ export function ImageLightbox(props: {
                     <DownloadIcon />
                   </Button>
                 )}
+              </Show>
+              <Show when={copyable}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  class="image-lightbox-action image-lightbox-copy"
+                  title={t("chat.image.copy")}
+                  disabled={!shownImageLoaded()}
+                  onClick={copy}
+                >
+                  <Show when={copied() === current()?.id} fallback={<CopyIcon />}>
+                    <CheckIcon />
+                  </Show>
+                  <span class="sr-only" aria-live="polite">
+                    {copied() === current()?.id ? t("chat.image.copied") : t("chat.image.copy")}
+                  </span>
+                </Button>
               </Show>
               <Button
                 variant="ghost"

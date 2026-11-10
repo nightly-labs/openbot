@@ -14,6 +14,7 @@ import {
   decodeRecordResponse,
   isCodexLoginType,
 } from "./../protocol";
+import { ProviderSignInError, signInReason } from "../provider-client-effects";
 import { recordRestartActivity } from "../restart-activity";
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -175,7 +176,13 @@ export class CodexLoginFlow {
     clearTimeout(pending.timer);
 
     if (!completion.success) {
-      yield* this.#fail(pending, "ChatGPT connection was not completed. Try again.");
+      const reason = signInReason(completion.error);
+      yield* this.#fail(
+        pending,
+        reason
+          ? new ProviderSignInError({ message: sourceText("error.provider.acpSignInFailedReason", { reason }) })
+          : "ChatGPT connection was not completed. Try again.",
+      );
       return;
     }
 
@@ -350,14 +357,14 @@ export class CodexLoginFlow {
   readonly #fail = Effect.fn("CodexLogin.fail")(function* (
     this: CodexLoginFlow,
     pending: PendingCodexLogin,
-    message: string,
+    failure: string | ProviderSignInError,
   ) {
     if (this.#pending !== pending) return;
     clearTimeout(pending.timer);
     this.#pending = null;
     end(pending, false);
     yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
-    this.#host.setFailure(new Error(message), pending.cli.version);
+    this.#host.setFailure(typeof failure === "string" ? new Error(failure) : failure, pending.cli.version);
   }, Effect.uninterruptible);
 }
 

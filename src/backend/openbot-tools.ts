@@ -5,6 +5,7 @@ import {
   CHAT_VISUAL_MIN_HEIGHT,
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
+import { BUG_REPORT_AREAS, BUG_REPORT_SEVERITIES, FEATURE_REQUEST_TYPES } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
@@ -33,6 +34,7 @@ import {
   renameSectionToolSchema,
 } from "./agent/sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
+import { readVideoToolShape } from "./agent/video-reader";
 import { CREATE_WEBHOOK_ROUTINE_TOOL, UPDATE_WEBHOOK_ROUTINE_TOOL } from "./agent/webhook-routine-tool";
 import { START_TASK_TOOL, startTaskToolSchema } from "./agent-tasks/agent-tasks";
 import {
@@ -50,6 +52,7 @@ import {
   ROUTINE_INSTRUCTION_RULE,
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineRunPlaceZodSchema,
   routineScheduleZodSchema,
@@ -133,7 +136,6 @@ const uiActionSchema = z.strictObject({
       "The desktop and web apps ask the user again before they send this action. An app that shows only the plain question does not.",
     ),
 });
-const uiOptionSchema = z.strictObject({ id: uiBlockIdSchema, label: uiLabelSchema });
 const uiStringOptionsSchema = (max: number) => z.array(uiLabelSchema).min(1).max(max);
 const uiFormFieldBase = { id: uiBlockIdSchema, required: z.boolean().optional() };
 const uiFormTextField = (kind: "text" | "textarea") =>
@@ -218,12 +220,6 @@ export const askUiToolSchema = z.object({
       actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
     }),
     z.strictObject({
-      type: z.literal("quick_replies"),
-      title: uiTextSchema(UI_BLOCK_LIMITS.title).optional(),
-      options: z.array(uiOptionSchema).min(1).max(UI_BLOCK_LIMITS.quickReplies),
-      allowText: z.boolean().optional().describe("Show a text box for a reply in the user's own words."),
-    }),
-    z.strictObject({
       type: z.literal("choice"),
       title: uiTextSchema(UI_BLOCK_LIMITS.title),
       multiple: z.boolean().optional(),
@@ -298,6 +294,16 @@ export const saveApiKeyToolSchema = z.strictObject({
 /** `openbot.web_search`: one search turn on a ChatGPT account (`AgentService.searchWeb`). */
 export const webSearchToolSchema = z.strictObject({
   query: z.string().trim().min(1).max(1_000).describe("The whole question, with its context."),
+});
+
+/** `openbot.create_server_install_command`: a one-time command for a new server of this account. */
+export const serverInstallCommandToolSchema = z.strictObject({
+  name: z
+    .string()
+    .trim()
+    .min(INPUT_LIMITS.serverNameMin)
+    .max(INPUT_LIMITS.serverName)
+    .describe("The server name, such as the host name."),
 });
 
 export const sendToChannelToolSchema = z.strictObject({
@@ -390,6 +396,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
     shape: webSearchToolSchema.shape,
+  },
+  {
+    name: "create_server_install_command",
+    description:
+      'Make a one-time command that installs OpenBot as a server on a Linux computer or VPS, signed in to the user\'s account. Get the SSH address from the user. Run it as root over SSH; it asks nothing and ends with "OpenBot is connected to your account." It works once, for 15 minutes: never save, show or share it.',
+    shape: serverInstallCommandToolSchema.shape,
+  },
+  {
+    name: "read_video",
+    description:
+      "Watch a video link, such as Facebook, Instagram, TikTok, X or YouTube: title, author, counts, description, a timed transcript and still frames. Use it for what a video says or shows. Public videos only.",
+    shape: readVideoToolShape,
   },
   {
     name: "list_sections",
@@ -565,7 +583,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
       runIn: routineRunPlaceZodSchema.optional(),
     },
   },
@@ -589,7 +607,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: ROUTINE_NO_UPDATE_TOOL,
     description:
-      "Only in a scheduled, script or webhook routine run whose task gives nothing to report. OpenBot collapses your text answers into the run in the chat and sends no notification. Not when you report anything: a requested reminder or message is a report, unless the notification conditions of the task say to send nothing. In a manual Test run, the user sees your answer.",
+      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update that wants no answer. OpenBot collapses your text answers in the chat and sends no notification. A requested reminder or message is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
     shape: {},
   },
   {
@@ -626,11 +644,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "remember",
     description:
-      "Stage one short, durable memory for this agent. Use memoryId to correct or consolidate an existing memory. New entries are searchable unless inclusion is essential. Essential requests that do not fit stay searchable. The change commits only if the current turn completes.",
+      "Stage one short, durable memory for this agent. Use memoryId to correct or merge a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. It commits only if the current turn completes.",
     shape: {
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
       inclusion: z.enum(["essential", "searchable"]).optional(),
+      site: z.string().max(2048).optional(),
     },
   },
   {
@@ -689,7 +708,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "ask_ui",
     description: [
       "Show the user an interactive block in this conversation and wait for the answer.",
-      "Types: confirm (details, an optional preview, up to 4 buttons), quick_replies (reply chips), choice (one option, or several with multiple), form (a few text, select, segmented or date fields).",
+      "Types: confirm (details, an optional preview, up to 4 buttons), choice (one option, or several with multiple), form (a few text, select, segmented or date fields).",
       "A text field with secret: true asks for a password or a key: you get the value, OpenBot does not store it with the block, and you never repeat it. For an API key or token that a command uses, use request_api_key.",
       'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button or option id, or "submit" for choice and form; values has the option ids under "selected" or the form values by field id;',
       'actionId "_text" with "text" when the user answered in words. Or {"status":"skipped"}, or {"status":"expired"} when the turn ended first.',
@@ -733,9 +752,49 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps.`,
+    /* The description does not list the apps: the catalog has more than 200, and each agent turn would
+       carry them. An unknown name returns the list. */
+    description:
+      "Call this when the user needs an outside service, such as Notion, Slack or Linear, and you have no working tools for it. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps. An unknown name returns the list of apps.",
     shape: {
-      app: z.string().min(1).max(63).describe("An app from the list, such as notion. Use github for GitHub."),
+      app: z.string().min(1).max(63).describe("The app id, such as notion or brave-search."),
+    },
+  },
+  {
+    name: "send_feedback",
+    description:
+      "Send a bug report or a feature idea for OpenBot itself as a public GitHub issue. OpenBot adds the version, the system and your provider. The user reads the text and approves it before it is sent.",
+    shape: {
+      kind: z
+        .enum(["bug", "idea"])
+        .describe(
+          "bug: something in OpenBot does not work. idea: a feature request or another change that the user wants.",
+        ),
+      title: z.string().min(1).max(200).describe("A short summary in plain words, without a prefix."),
+      text: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe(
+          "In one to three plain sentences. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
+        ),
+      details: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe(
+          "For a bug: what the user did before it, as short numbered steps. For an idea: the problem that it solves. Leave it out when you do not know.",
+        )
+        .optional(),
+      type: z.enum(FEATURE_REQUEST_TYPES).describe("Ideas only. Your choice from the chat.").optional(),
+      area: z
+        .enum(BUG_REPORT_AREAS)
+        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
+        .optional(),
+      severity: z
+        .enum(BUG_REPORT_SEVERITIES)
+        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
+        .optional(),
     },
   },
   {

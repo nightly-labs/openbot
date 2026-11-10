@@ -1,4 +1,5 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
+import { attachmentReferenceAt } from "@openbot/contracts/attachment-references";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -64,6 +65,14 @@ interface MarkdownTokenByType {
   escape: Tokens.Escape;
   blockMath: MathToken;
   inlineMath: MathToken;
+  attachmentTag: AttachmentTagToken;
+}
+
+/** A file in the message, `@[name](attachment:<id>)`. Its name can hold `[`, which a link cannot. */
+interface AttachmentTagToken extends Tokens.Generic {
+  type: "attachmentTag";
+  text: string;
+  attachmentId: string;
 }
 
 interface MathToken extends Tokens.Generic {
@@ -92,6 +101,21 @@ const markdown = new Marked({
       tokenizer(source): MathToken | undefined {
         const math = inlineChatMath(source);
         if (math) return { type: "inlineMath", raw: math.raw, text: math.tex, display: math.display };
+      },
+    },
+    {
+      name: "attachmentTag",
+      level: "inline",
+      start: (source) => source.indexOf("@["),
+      tokenizer(source): AttachmentTagToken | undefined {
+        const reference = attachmentReferenceAt(source);
+        if (!reference) return undefined;
+        return {
+          type: "attachmentTag",
+          raw: reference.marker,
+          text: reference.name,
+          attachmentId: reference.attachmentId,
+        };
       },
     },
   ],
@@ -815,6 +839,14 @@ function MarkdownInline(props: {
               />
             );
           }
+          case "attachmentTag": {
+            if (!tokenIs(token, "attachmentTag")) return token.raw;
+            // A file that the message does not hold shows only its name, as on mobile.
+            const held = props.content.attachments?.some((attachment) => attachment.id === token.attachmentId);
+            return (
+              <RichText body={held ? token.raw : token.text} content={props.content} streamingTailAfter={after()} />
+            );
+          }
           case "checkbox":
             return null;
           default:
@@ -865,7 +897,7 @@ function textTokenEndsWithTagMarker(token: Token | undefined): boolean {
 
 function semanticChatTag(token: Token | undefined): string | null {
   if (!token || !tokenIs(token, "link")) return null;
-  const target = /^(agent|skill|quote|tab|thread)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
+  const target = /^(agent|skill|mcp|quote|tab|thread)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
   return target?.[2] ? `@${token.raw}` : null;
 }
 
@@ -1059,6 +1091,7 @@ function markdownInlinePlainText(tokens: Token[]): string {
       if (tokenIs(token, "text")) return token.tokens ? markdownInlinePlainText(token.tokens) : token.text;
       if (tokenIs(token, "codespan") || tokenIs(token, "escape") || tokenIs(token, "image")) return token.text;
       if (tokenIs(token, "inlineMath")) return token.raw;
+      if (tokenIs(token, "attachmentTag")) return token.text;
       if (token.type === "br") return "\n";
       return token.raw;
     })

@@ -90,6 +90,8 @@ export function LibraryPanel(props: { serverId: string }) {
           macWindowControls={macWindowControls()}
           onOpen={(file, origin) => void open(file, origin)}
           onAction={act}
+          onDeleteFiles={storage.deleteFiles}
+          onSaveFiles={storage.saveFiles}
         />
       </div>
       <Show when={viewing()} keyed>

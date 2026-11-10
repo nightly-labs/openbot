@@ -18,7 +18,6 @@ import {
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
   type WorkflowEdge,
-  type WorkflowFieldValue,
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowNodeKind,
@@ -32,6 +31,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import { ToolOperationFailed, toolStep } from "../agent/tool-operation";
+import { runtimeFields } from "./workflow-graph";
 import { WorkflowStoreError } from "./workflow-store";
 import type { WorkflowsHandle } from "./workflows";
 
@@ -133,48 +133,6 @@ export const WORKFLOW_CHANGE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "run_workflow",
 ]);
 
-/** The fields that a run reads, by kind (`WorkflowFields` in the contracts). Others are view state. */
-const RUNTIME_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
-  trigger: [
-    "trigger",
-    "timezone",
-    "repositories",
-    "event",
-    "filters",
-    "labels",
-    "titleText",
-    "branch",
-    "connectionId",
-    "placeId",
-    "roles",
-    "text",
-  ],
-  agent: ["agentId", "task"],
-  llm: ["provider", "model", "effort", "prompt", "system"],
-  condition: ["rule", "provider", "model", "effort"],
-  approval: ["question"],
-  output: [
-    "target",
-    "connectionId",
-    "placeId",
-    "repository",
-    "item",
-    "action",
-    "labels",
-    "labelsFrom",
-    "person",
-    "reason",
-    "title",
-    "emoji",
-  ],
-  prompt: ["text"],
-  text: ["text"],
-  note: ["text"],
-  shape: ["text"],
-  asset: [],
-  image: ["model", "prompt"],
-};
-
 /** The field that names a step in a run read, so that the agent does not read the workflow again. */
 const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
   trigger: "trigger",
@@ -220,15 +178,6 @@ class WorkflowEditRefused extends Error {}
 
 function refuse(message: string): never {
   throw new WorkflowEditRefused(message);
-}
-
-function runtimeFields(node: WorkflowNode): Record<string, WorkflowFieldValue> {
-  return Object.fromEntries(
-    RUNTIME_FIELDS[node.kind].flatMap((name) => {
-      const value = node.fields[name];
-      return value === undefined || value === "" ? [] : [[name, value]];
-    }),
-  );
 }
 
 function compactGraph(graph: WorkflowGraph, layout: boolean) {

@@ -11,6 +11,7 @@ import { browserUserControlResult } from "../src/backend/agent/prompts";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
+import type { UserBrowsingStep } from "../src/backend/user-browsing-log";
 import { RemoteEventRefresh } from "../src/main/remote-server-event-refresh";
 
 const argument = (name: string) => {
@@ -25,10 +26,22 @@ const runId = argument("run-id");
 const cases: string[] = [];
 const resultSchema = z.object({ status: z.literal("user-control-ended"), note: z.string(), next: z.string() });
 
+// The capture page: each control has a fixed place, and the page counts the presses it sees.
+const capturePage = `<!doctype html><meta charset="utf-8"><title>Capture</title>
+<style>body{margin:0}button,input,p{position:absolute;left:10px;width:200px;height:30px;margin:0}</style>
+<button style="top:10px">Proceed to checkout</button>
+<input style="top:60px" type="password" aria-label="Password" value="hunter2-fixture">
+<label style="position:absolute;top:110px;left:10px">Email <input style="position:static" value="typed-fixture@example.com"></label>
+<p style="top:160px">Plain page text</p>
+<button style="top:210px">Marker</button>
+<label style="position:absolute;top:260px;left:10px">Remember me <input style="position:static" type="checkbox" value="checkbox-value-fixture"></label>
+<script>window.presses = 0; addEventListener("mousedown", () => { window.presses += 1; }, true);</script>`;
+
 // `/slow` never answers, so only a stop ends its load.
 const server = createServer((request, response) => {
   if (request.url === "/slow") return;
   response.setHeader("Content-Type", "text/html; charset=utf-8");
+  if (request.url?.startsWith("/capture")) return response.end(capturePage);
   response.end('<!doctype html><meta charset="utf-8"><title>Fixture</title><button>Fixture button</button>');
 });
 
@@ -64,7 +77,17 @@ async function main(): Promise<void> {
       focusable: false,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
-    browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"));
+    const captured: { agentId: string; step: Omit<UserBrowsingStep, "at"> }[] = [];
+    const captureState = { enabled: true, onRecord: () => {} };
+    browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"), {
+      userBrowsing: {
+        enabled: () => captureState.enabled,
+        record: (agentId, step) => {
+          captured.push({ agentId, step });
+          captureState.onRecord();
+        },
+      },
+    });
     const host = browser;
     const params = (tool: string, args: DynamicToolCallParams["arguments"]): DynamicToolCallParams => ({
       namespace: "openbot_browser",
@@ -369,6 +392,114 @@ async function main(): Promise<void> {
       );
     }
 
+    {
+      const { tab, contents } = await open();
+      const clicks = captured.filter((item) => item.step.kind === "click");
+      const nextClick = () =>
+        new Promise<Omit<UserBrowsingStep, "at">>((resolve) => {
+          const seen = captured.length;
+          captureState.onRecord = () => {
+            const item = captured.slice(seen).find((entry) => entry.step.kind === "click");
+            if (!item) return;
+            captureState.onRecord = () => {};
+            resolve(item.step);
+          };
+        });
+      // The page counts a press after the host saw its input event, so a press the page saw and the
+      // host did not record is never recorded.
+      const press = async (y: number, x = 50) => {
+        const before = Number(await contents.executeJavaScript("window.presses"));
+        contents.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
+        contents.sendInputEvent({ type: "mouseUp", x, y, button: "left", clickCount: 1 });
+        await contents.executeJavaScript(
+          `new Promise((resolve) => { const seen = () => (window.presses > ${before} ? resolve() : requestAnimationFrame(seen)); seen(); })`,
+        );
+      };
+
+      // A press reaches only a page that is shown.
+      await runCauseEffect(host.activate(tab.id));
+      await runCauseEffect(host.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+      await runCauseEffect(host.loadUrl(tab.id, `${origin}/capture?token=QUERY-SECRET#part`));
+      await press(25);
+      assert.equal(captured.length, 0, "A tab that no person holds was recorded.");
+      recordCases("capture-skips-agent-tab");
+
+      await runCauseEffect(host.takeUserControl(tab.id, { kind: "local" }));
+      captureState.enabled = false;
+      await press(25);
+      assert.equal(captured.length, 0, "A held tab was recorded with the setting off.");
+      recordCases("capture-skips-setting-off");
+
+      captureState.enabled = true;
+      await runCauseEffect(host.loadUrl(tab.id, `${origin}/capture?token=QUERY-SECRET#part`));
+      const page = captured.find((item) => item.step.kind === "page");
+      assert.deepEqual(
+        page && { agentId: page.agentId, ...page.step },
+        { agentId: "fixture-agent", kind: "page", host: "127.0.0.1", path: "/capture", title: "Capture" },
+        "The held page was not recorded without its query.",
+      );
+      recordCases("capture-records-page-without-query");
+
+      const button = nextClick();
+      await press(25);
+      assert.deepEqual(await button, {
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/capture",
+        role: "button",
+        name: "Proceed to checkout",
+      });
+      recordCases("capture-records-control-click");
+
+      const field = nextClick();
+      await press(75);
+      await press(175);
+      // The field, right of its label text.
+      await press(125, 150);
+      assert.deepEqual(await field, {
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/capture",
+        role: "textbox",
+        name: "Email",
+      });
+      const marker = nextClick();
+      await press(225);
+      assert.equal((await marker).name, "Marker");
+      // A checkbox value is a field value: the step keeps the label.
+      const checkbox = nextClick();
+      await press(275, 150);
+      assert.deepEqual(await checkbox, {
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/capture",
+        role: "checkbox",
+        name: "Remember me",
+      });
+      assert.deepEqual(
+        captured.filter((item) => item.step.kind === "click").map((item) => item.step.name),
+        [...clicks.map((item) => item.step.name), "Proceed to checkout", "Email", "Marker", "Remember me"],
+        "A password field or page text was recorded.",
+      );
+      const stored = JSON.stringify(captured);
+      for (const secret of [
+        "QUERY-SECRET",
+        "hunter2-fixture",
+        "typed-fixture",
+        "checkbox-value-fixture",
+        "Plain page text",
+        "#part",
+      ])
+        assert(!stored.includes(secret), `A step kept ${secret}.`);
+      recordCases("capture-skips-password-and-text", "capture-keeps-field-label-not-value");
+
+      host.releaseUserControl(tab.id);
+      const count = captured.length;
+      await press(25);
+      assert.equal(captured.length, count, "A released tab was recorded.");
+      recordCases("capture-stops-after-release");
+    }
+
     const report = {
       status: "passed",
       runId,
@@ -378,7 +509,7 @@ async function main(): Promise<void> {
       electron: process.versions.electron,
       cases,
       scope:
-        "Owned hidden native process, temporary profile, and a loopback page. BrowserHost with the tool router's composition, the history state and Stop, and the remote event merge. No provider calls, no Team API transport, no secret request.",
+        "Owned hidden native process, temporary profile, and a loopback page. BrowserHost with the tool router's composition, the history state and Stop, the capture of a held tab for learning from browsing, and the remote event merge. No provider calls, no Team API transport, no secret request.",
     };
     await mkdir(dirname(reportPath), { recursive: true });
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);

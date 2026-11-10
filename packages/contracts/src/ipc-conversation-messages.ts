@@ -14,6 +14,7 @@ import {
 import { type ConversationTurnTrace, isConversationTurnTrace } from "./ipc-conversation-trace";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type ConversationSkillSuggestion, isConversationSkillSuggestion } from "./skill-suggestion-events";
 import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
@@ -244,6 +245,8 @@ export interface ConversationMessage {
   memoryChanges?: ConversationMemoryChange[] | undefined;
   /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
+  /** Set on a `skill-suggestion:*` message: the skill that the review asks to save. */
+  skillSuggestion?: ConversationSkillSuggestion | undefined;
   /**
    * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
    * beside `questionPrompt`. Absent on a message from an older host.
@@ -301,6 +304,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
+    (value.skillSuggestion === undefined || isConversationSkillSuggestion(value.skillSuggestion)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );
@@ -321,6 +325,13 @@ function isConversationDelivery(value: unknown): boolean {
  * The desktop chat shows it inside the run, which starts collapsed.
  */
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
+
+/**
+ * The item type of the setup message that a client sends to a new agent (`agent-welcome-v1`). The
+ * agent answers it with a welcome. No chat, history page, search, queue or preview shows it, and it
+ * does not go to a Team API client.
+ */
+export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
 
 /**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the

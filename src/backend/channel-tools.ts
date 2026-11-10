@@ -4,6 +4,7 @@ import { CHANNEL_REPLY_CHARACTERS, CHANNEL_REPLY_LIMIT } from "./channel-replies
 import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineScheduleZodSchema,
 } from "./routine-tool-schema";
@@ -39,7 +40,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   {
     name: "channel_assign",
     description:
-      "Assign one specific subtask to another channel member. You stay the owner: integrate the result and report to the user. End your turn while waiting for required results. Use only inside a channel task; for direct teammate work outside a channel use openbot.send_message.",
+      "Give a subtask to another member only when the person asks for that member or for help, or a part needs their role. You stay the owner: integrate the result and report. End your turn to wait for needed results. In a channel task only; else use openbot.send_message.",
     shape: handoff,
   },
   {
@@ -123,7 +124,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
       schedule: routineScheduleZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
     },
   },
   {

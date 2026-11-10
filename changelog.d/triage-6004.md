@@ -1,0 +1,3 @@
+### Fixed
+
+- In the full browser view, the message box no longer covers the middle of the web page. Before, a button or link under the message box, such as "Try another method" on a sign-in page, did not get the click. The message box is now at the bottom right (bottom left in right-to-left languages). Click the arrow in the message box to shrink it into a small tab, and click the tab to show the box again. You can do this at any time, also while the agent works. The tab shows what the agent does, and a dot shows a reply. When the agent asks a question or asks for a code, the message box comes back.

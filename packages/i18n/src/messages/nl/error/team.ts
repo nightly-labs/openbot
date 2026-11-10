@@ -65,6 +65,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "Deze verbinding ondersteunt het wissen van de geschiedenis niet.",
   "error.team.channelTaskCancelUnsupported": "Deze verbinding ondersteunt het annuleren van kanaaltaken niet.",
   "error.team.membersCannotDeleteChannels": "Leden kunnen geen kanalen verwijderen.",
+  "error.team.membersCannotDeleteChannelHistory": "Leden kunnen de kanaalgeschiedenis niet verwijderen.",
   "error.team.membersCannotArchiveChannels": "Leden kunnen geen kanalen archiveren.",
   "error.team.membersCannotRestoreChannels": "Leden kunnen geen kanalen herstellen.",
   "error.team.sharedDataUnsupported": "Deze verbinding ondersteunt geen gedeelde gegevens.",
@@ -73,6 +74,12 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Deze verbinding ondersteunt geen agentkleuren.",
   "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
   "error.team.routineRunPlaceUnsupported": "Deze verbinding kan niet wijzigen waar een routine wordt uitgevoerd.",
+  "error.team.routinesOnceUnsupported": "Deze verbinding kan geen eenmalige routines opslaan.",
+  "error.team.routineRunCommandUnsupported": "Deze verbinding kan de uitvoeropdracht van een routine niet geven.",
+  "error.team.threadQueueUnsupported": "Deze verbinding kan de wachtrij van een zijthread niet tonen.",
+  "error.team.usageLimitUnsupported": "Deze verbinding kan de gebruikslimieten van agents niet tonen of wijzigen.",
+  "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
+  "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
@@ -86,6 +93,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "Deze verbinding ondersteunt het verwijderen van berichten niet.",
   "error.team.workspaceDirectoryUnsupported": "Deze verbinding ondersteunt het tonen van mappen niet.",
   "error.team.conversationFileSearchUnsupported": "Deze verbinding ondersteunt het zoeken in bestanden niet.",
+  "error.team.threadMessageSearchUnsupported": "Deze verbinding ondersteunt het zoeken in zijthreads niet.",
   "error.team.sideQuestionUnsupported": "Deze verbinding ondersteunt geen zijvragen.",
   "error.team.liveVoiceUnsupported":
     "Deze server ondersteunt geen Codex live spraak. Werk OpenBot bij op de computer waarop de server draait.",
@@ -112,7 +120,12 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Deze verbinding ondersteunt de mappen van agents niet.",
   "error.team.folderUnavailable": "Deze map is niet beschikbaar op de hostcomputer.",
   "error.team.memoryReviewUnsupported": "Deze verbinding ondersteunt de geheugencontrole niet.",
+  "error.team.skillLearningUnsupported": "Vaardigheden leren wordt niet ondersteund door deze verbinding.",
+  "error.team.browsingMemoryUnsupported": "Leren van browsen wordt niet ondersteund door deze verbinding.",
   "error.team.promptCacheTtlUnsupported": "Deze verbinding ondersteunt de cachetijd van prompts niet.",
+  "error.team.claudeUserSetupUnsupported":
+    "Deze verbinding ondersteunt de schakelaar voor de Claude Code-instellingen niet.",
+  "error.team.claudeCompactWindowUnsupported": "Deze verbinding ondersteunt de compressiegrootte van Claude niet.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
   "error.team.agentAccessUnsupported": "Deze verbinding ondersteunt geen rollen.",
@@ -127,6 +140,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "De live browserweergave is niet beschikbaar.",
   "error.team.browserSessionNotFound": "Sessie van de browserweergave niet gevonden.",
   "error.team.mcpUnsupported": "Deze verbinding ondersteunt geen MCP-servers.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Werk OpenBot op dit apparaat bij om meer dan {limit} MCP-servers op deze server te gebruiken.",
   "error.team.storageUnsupported": "Deze verbinding ondersteunt geen opslag.",
   "error.team.machineResourcesUnsupported": "Deze verbinding ondersteunt geen machinegebruik.",
   "error.team.machineAlertMemberInvalid":
@@ -168,4 +183,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "Dit adres hoort niet bij deze inlog.",
   "error.team.signInRelayLinkUnknown": "Geen enkele agent op deze server heeft deze inloglink getoond.",
   "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
+  "error.team.agentWaitsUnsupported": "Deze verbinding ondersteunt geen open wachtpunten.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Deze verbinding ondersteunt het uitvoeren van een bericht in de wachtrij als nieuwe thread niet.",
+  "error.team.backgroundProcessesUnsupported": "Deze verbinding ondersteunt geen achtergrondprocessen.",
+  "error.team.providerUseUnsupported": "Deze verbinding ondersteunt het aan- en uitzetten van aanbieders niet.",
+  "error.team.providerUseInvalid": "Deze aanbieder heeft geen aan/uit-schakelaar.",
 } as const satisfies PartialTranslation<typeof source>;

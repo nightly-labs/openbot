@@ -33,9 +33,10 @@ export const Pending: Story = {
 };
 
 export const Narrow: Story = {
+  // The narrowest chat: a pop-out chat window at its 380px minimum width.
   decorators: [
     (Story) => (
-      <div style={{ width: "280px", "max-width": "100%" }}>
+      <div style={{ width: "340px", "max-width": "100%" }}>
         <Story />
       </div>
     ),

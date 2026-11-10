@@ -4,7 +4,11 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "该请求的历史记录不可用，请重新读取最近的历史，或在频道工作中使用 channel_history。",
+  "error.agent.historyArgumentsInvalid":
+    "历史记录参数不正确：{detail} 请更正参数后重试。openbot.tool_describe 可提供架构。",
   "error.agent.toolRequestInvalid": "工具发现参数无效。请使用声明的 schema 和原始的完整工具名。",
+  "error.agent.toolCallArgumentsNotObject":
+    "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",
@@ -39,6 +43,7 @@ export const messages = {
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
+  "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":
     "{provider} 没有可用模型，其他已登录的服务商也没有。请登录某个服务商，或在“服务器设置 → 服务商”中更改默认服务商。",
   "error.agent.noStartingModel":
@@ -62,6 +67,8 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.compactionConnectionLost":
+    "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
   "error.agent.selectedGone": "所选的助手已不存在。",
   "error.agent.profileEndpointsChanged": "生成期间自定义端点发生了变更，请重试。",
   "error.agent.profileInvalid": "服务商返回了无效的资料，请试着修改提示词。",

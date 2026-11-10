@@ -6,19 +6,23 @@
 // 2. The provider sends the browser to `/v1/auth/company/callback`. `finish` checks the ID token,
 //    finds or makes the account, and sends the browser to the app's loopback with a one-time code.
 // 3. The app gives the code and its verifier to `exchange` and gets a session like an email code gives.
+//    The phone app returns to `openbot://company-sign-in` in its browser session, and its exchange
+//    names the device, so the session is a mobile session.
 //
 // A test sign-in uses the same flow. It saves the connection only when it passes, so a connection
 // with a wrong value never takes the email codes away. SCIM from the provider turns a person off.
 
+import { MOBILE_COMPANY_SIGN_IN_RETURN } from "@openbot/contracts/company-sign-in";
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isValidHostname, normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
 import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { decodeBase64Url, deriveSecret, encodeBase64Url, hmacSha256, randomToken, sha256 } from "./crypto";
+import { mobileSessionStatements } from "./d1-auth-repository";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
-import type { AuthUser, WorkerBindings } from "./types";
+import type { AuthUser, MobileAuthDeviceIdentity, WorkerBindings } from "./types";
 
 const FLOW_TTL_MS = 10 * 60_000;
 const CODE_TTL_MS = 2 * 60_000;
@@ -453,7 +457,7 @@ export class CompanySignInService {
     webOrigin?: string,
   ): Effect.fn.Return<{ authorizationUrl: string }, CompanySignInFailure> {
     yield* this.#requireSecret();
-    yield* this.#validateReturn(input.returnTo, input.clientState, webOrigin);
+    yield* this.#validateReturn(input.returnTo, input.clientState, webOrigin, webOrigin === undefined);
     if (!TOKEN_PATTERN.test(input.clientChallenge)) return yield* invalid("The sign-in request is invalid.");
     const email = normalizeEmailAddress(input.email);
     if (!email) return yield* new CompanySignInError(400, "invalid_email", "Enter a valid email address.");
@@ -528,10 +532,13 @@ export class CompanySignInService {
     return result;
   });
 
-  /** Gives the session for a one-time code. The verifier proves the app that started the flow. */
+  /**
+   * Gives the session for a one-time code. The verifier proves the app that started the flow. With a
+   * device, the session is a mobile session that replaces the earlier session of that device.
+   */
   readonly exchange = Effect.fn("CompanySignIn.exchange")(function* (
     this: CompanySignInService,
-    input: { code: string; codeVerifier: string },
+    input: { code: string; codeVerifier: string; device?: MobileAuthDeviceIdentity },
   ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, CompanySignInFailure> {
     const failed = new CompanySignInError(
       400,
@@ -545,8 +552,9 @@ export class CompanySignInService {
     const now = this.#now();
     const session = { id: crypto.randomUUID(), token: randomToken() };
     const tokenHash = yield* hash(session.token);
-    // The session row is made only by the exchange that spent the code with the right verifier.
-    const [spent] = yield* storeCall(() =>
+    // The session row is made only by the exchange that spent the code with the right verifier. One
+    // batch: a session without its mobile row would count as a desktop session.
+    const [spent, , registered] = yield* storeCall(() =>
       this.#database.batch([
         this.#database
           .prepare(
@@ -560,9 +568,15 @@ export class CompanySignInService {
              SELECT ?, user_id, ?, ?, ?, ? FROM company_sign_in_codes WHERE code_hash = ? AND session_id = ?`,
           )
           .bind(session.id, tokenHash, PERSISTENT_SESSION_EXPIRES_AT, now, now, codeHash, session.id),
+        ...(input.device ? mobileSessionStatements(this.#database, { now, session, device: input.device }, null) : []),
       ]),
     );
     if (spent?.meta.changes !== 1) return yield* failed;
+    if (input.device) {
+      if (registered?.meta.changes !== 1) return yield* new CompanySignInOperationError({});
+      // The revocation of the earlier session is written, and the cron delivers it again.
+      yield* this.#flushSessionRevocations().pipe(Effect.catch(() => Effect.void));
+    }
     const row = yield* storeCall(() =>
       this.#database
         .prepare(
@@ -1091,9 +1105,12 @@ export class CompanySignInService {
     clientState: string,
     /** Given for a web sign-in. A test returns only to the desktop app. */
     webOrigin?: string,
+    /** True for a sign-in that an app starts. A test is not made on the phone. */
+    mobile = false,
   ) {
     const webReturn = webOrigin !== undefined && returnTo === new URL(WEB_RETURN_PATH, webOrigin).toString();
-    if ((!webReturn && !RETURN_PATTERN.test(returnTo)) || !TOKEN_PATTERN.test(clientState)) {
+    const mobileReturn = mobile && returnTo === MOBILE_COMPANY_SIGN_IN_RETURN;
+    if ((!webReturn && !mobileReturn && !RETURN_PATTERN.test(returnTo)) || !TOKEN_PATTERN.test(clientState)) {
       return yield* invalid("The sign-in request is invalid.");
     }
   });

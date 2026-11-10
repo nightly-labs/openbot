@@ -91,6 +91,7 @@ export function AgentEventBridge() {
     setUsageLimits,
     setSubagentTurns,
     setUsageLimitedModels,
+    setFailedModels,
     setWaitedUsageLimits,
     setContextStates,
     setThreadContextStates,
@@ -298,9 +299,11 @@ export function AgentEventBridge() {
           if (!platform.chatWindow && !event.quiet && !event.continues) noteSocialFollowReplyCompleted();
         }
         return;
-      case "routine-thread-turn-completed":
-        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread.
-        if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event.turn, agentList());
+      case "thread-turn-completed":
+        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread. Only a
+        // routine thread plays the sound, as before: a routine run played it in the agent's chat.
+        if (event.routine && soundLevel() === "all" && !platform.chatWindow)
+          playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
@@ -357,7 +360,7 @@ export function AgentEventBridge() {
         return;
       }
       case "runtime-snapshot":
-        void channels.refresh();
+        void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -458,6 +461,7 @@ export function AgentEventBridge() {
       Object.fromEntries(Object.entries(current).filter(([agentId]) => agentId in usageLimits)),
     );
     setUsageLimitedModels(snapshot.usageLimitedModels ?? []);
+    setFailedModels(snapshot.failedModels ?? []);
     setSubagentTurns(Object.fromEntries((snapshot.subagentTurns ?? []).map((turn) => [turn.agentId, turn.turnId])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
@@ -469,7 +473,7 @@ export function AgentEventBridge() {
     if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
-        void channels.refresh();
+        void channels.changed(event.channelId);
         return;
       }
       flush(() => handleAgentEvent(event));

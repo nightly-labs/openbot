@@ -35,6 +35,28 @@ const MAX_CANDIDATE_ITEM_TEXT = 200;
 const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
+/**
+ * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
+ * do not use the scan budget before the walk gets to what is visible. It is the hidden test of each
+ * walk that uses it: a walk gets no node with a hidden ancestor, because a shadow root or a frame is
+ * queued only from a host that the filter accepted. A skipped subtree counts as one node in the
+ * `scanned` count of the walk, so the budget still bounds the work.
+ */
+const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
+  if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
+  // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
+  if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
+  let hidden = node.hidden || node.inert || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true';
+  if (!hidden) {
+    const style = node.ownerDocument.defaultView?.getComputedStyle(node);
+    hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0';
+  }
+  if (hidden) {
+    scanned++;
+    return NodeFilter.FILTER_REJECT;
+  }
+  return NodeFilter.FILTER_ACCEPT;
+} }`;
 
 const ACTIONABLE_ROLES = new Set([
   "button",
@@ -183,18 +205,6 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         let hasVisualSurface = false;
         let hasFrame = false;
         const visibleRects = node => {
-          let element = node.parentElement;
-          while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
-            const style = getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
-            const parent = element.parentElement;
-            if (parent) element = parent;
-            else {
-              const root = element.getRootNode();
-              element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-            }
-          }
           const range = node.ownerDocument.createRange();
           range.selectNodeContents(node);
           const rects = [...range.getClientRects()];
@@ -204,7 +214,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${SKIP_HIDDEN_SUBTREES});
           let node;
           while ((node = walker.nextNode()) && scanned < maxNodes) {
             scanned++;
@@ -328,18 +338,6 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
           let chars = 0;
           let scanned = 0;
           const isVisibleText = node => {
-            let element = node.parentElement;
-            while (element) {
-              if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-              const style = getComputedStyle(element);
-              if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-              const parent = element.parentElement;
-              if (parent) element = parent;
-              else {
-                const root = element.getRootNode();
-                element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-              }
-            }
             const range = node.ownerDocument.createRange();
             range.selectNodeContents(node);
             return range.getClientRects().length > 0;
@@ -349,7 +347,7 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
             const root = roots.shift();
             if (!root || seen.has(root)) continue;
             seen.add(root);
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${SKIP_HIDDEN_SUBTREES});
             let node;
             while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES}) {
               if (performance.now() >= scanDeadline) return { matched: false, expired: true };
@@ -406,31 +404,31 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
         let scanned = 0;
         let truncated = false;
         while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
-          if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
-            truncated = true;
-            break;
-          }
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
+          // The native query finds each match in this root, also on a very large page.
+          for (const node of root.querySelectorAll(selector)) {
+            matches.push(node);
+            if (matches.length >= ${MAX_TARGET_CANDIDATES}) break;
+          }
+          if (truncated || matches.length >= ${MAX_TARGET_CANDIDATES}) continue;
+          // Only the search for shadow roots and frames, which the native query does not enter, is bounded.
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
-            const node = walker.nextNode();
-            if (!node) break;
+          let node;
+          while ((node = walker.nextNode())) {
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
               truncated = true;
               break;
             }
             scanned++;
-            if (node.matches(selector)) matches.push(node);
             if (node.localName === 'iframe' || node.localName === 'frame') {
               try { if (node.contentDocument) roots.push(node.contentDocument); } catch {}
             }
             if (node.shadowRoot) roots.push(node.shadowRoot);
           }
-          if (truncated) break;
         }
-        if (truncated && matches.length < 2) throw new Error('CSS selector uniqueness scan exceeded the safe node limit.');
+        if (truncated && matches.length === 0) throw new Error('CSS selector uniqueness scan exceeded the safe node limit.');
         return matches;
       })()`,
       contextId,
@@ -533,18 +531,6 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
         let truncated = false;
         const isCandidate = node => {
           if (node.nodeType !== 1) return false;
-          let element = node;
-          while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-            const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-            if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-            const parent = element.parentElement;
-            if (parent) element = parent;
-            else {
-              const root = element.getRootNode();
-              element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-            }
-          }
           const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
           const tag = node.localName;
           const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
@@ -560,7 +546,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           const root = roots.shift();
           if (!root || seenRoots.has(root)) continue;
           seenRoots.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
           while (matches.length < ${MAX_TARGET_CANDIDATES}) {
             const node = walker.nextNode();
             if (!node) break;
@@ -826,24 +812,11 @@ function actionableNodesExpression(limit: number): string {
     };
     const isCandidate = node => {
       if (node.nodeType !== 1) return false;
-      // The walk can visit every scanned node, so the cheap tag and role check runs before the style walk.
       const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
       const tag = node.localName;
       const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
         tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
       if (!semantic && !roles.has(explicitRole)) return false;
-      let element = node;
-      while (element) {
-        if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-        const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-        if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-        const parent = element.parentElement;
-        if (parent) element = parent;
-        else {
-          const root = element.getRootNode();
-          element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-        }
-      }
       return node.getClientRects().length > 0;
     };
     const limit = ${Math.max(0, limit)};
@@ -851,7 +824,7 @@ function actionableNodesExpression(limit: number): string {
       const root = roots.shift();
       if (!root || seenRoots.has(root)) continue;
       seenRoots.add(root);
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
       let node;
       while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
         scanned++;

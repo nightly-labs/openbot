@@ -96,6 +96,8 @@ export interface AcpConfigurationOptions {
    * the process ends, so each discovery resumes the probe session of the process, not a new one.
    */
   keepProbeSession?: () => boolean;
+  /** `AcpFlavor.probeCloseDelayMs`. */
+  probeCloseDelayMs?: number | undefined;
 }
 
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
@@ -131,7 +133,10 @@ export class AcpConfiguration {
               this.#probe = { connection, sessionId: probe.sessionId };
             })
           : Effect.forkIn(
-              providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
+              closeLater(
+                providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
+                this.options.probeCloseDelayMs,
+              ),
               this.options.scope(),
               { startImmediately: true },
             ).pipe(Effect.asVoid),
@@ -504,6 +509,11 @@ export class AcpConfiguration {
       }),
     );
   }
+}
+
+/** `close` after `delayMs`, or at once without a delay. */
+function closeLater<A, E>(close: Effect.Effect<A, E>, delayMs: number | undefined): Effect.Effect<A, E> {
+  return delayMs ? Effect.sleep(delayMs).pipe(Effect.andThen(close)) : close;
 }
 
 /** The options with the current value of one option changed, when the value has its type. */

@@ -16,6 +16,12 @@ export const messages = {
     "ウインドウの後ろにぼかしたデスクトップを表示します。Webサイトとメニューもアプリのテーマになります。",
   "settings.interfaceSize.title": "インターフェイスのサイズ",
   "settings.interfaceSize.description": "OpenBot のテキストとコントロールのサイズです。",
+  "settings.interfaceFont.title": "インターフェイスのフォント",
+  "settings.interfaceFont.description": "メニュー、チャット、設定のフォントです。",
+  "settings.interfaceFont.default": "デフォルト (Inter)",
+  "settings.codeFont.title": "コードのフォント",
+  "settings.codeFont.description": "コード、ターミナル、ファイルパスのフォントです。",
+  "settings.codeFont.default": "デフォルト",
   "settings.logoColor.title": "ロゴの色",
   "settings.logoColor.description": "Dock、タスクバー、Dynamic Island に表示されます。",
   "settings.logoColor.buildNote": "このビルドは独自のロゴの色を使います。選択はリリース版のアプリに適用されます。",
@@ -118,6 +124,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "すべてのエージェントの {setting} を設定",
   "settings.agentDefaults.agentLabel": "{agent} の {setting}",
   "settings.agentDefaults.loadFailed": "エージェントを読み込めませんでした。",
+  "settings.commitCoAuthor.sectionTitle": "Git コミット",
+  "settings.commitCoAuthor.title": "コミットに OpenBot を記載",
+  "settings.commitCoAuthor.description":
+    "エージェントが作成するコミットに OpenBot を共同作成者として追加します。作成者はあなたのままです。",
   "settings.planStart.title": "作業の開始",
   "settings.planStart.wait": "開始を押したとき",
   "settings.planStart.after": "{time}後",
@@ -196,7 +206,14 @@ export const messages = {
   "settings.soundTheme.play": "{name}を再生",
   "settings.notch.title": "動作",
   "settings.notch.show.title": "MacBook のノッチに状況を表示する",
+  "settings.notch.show.titleTopOfScreen": "画面上部に状況を表示する",
   "settings.notch.show.description": "エージェントの動作と対応が必要な項目を各ディスプレイの上部に表示します。",
+  "settings.notch.xwayland.title": "再起動が必要です",
+  "settings.notch.xwayland.description":
+    "Wayland では、ほかのアプリの上に Dynamic Island を表示するために OpenBot が XWayland を使う必要があります。それまでは、アイランドは表示されません。",
+  "settings.notch.xwayland.unsupported":
+    "XWayland のない Wayland では、Dynamic Island をほかのアプリの上に表示できません。",
+  "settings.notch.xwayland.restart": "再起動",
   "settings.notch.idle.title": "待機中のアイランドを表示する",
   "settings.notch.idle.description": "表示する状況がないときに OpenBot のロゴとあいさつを表示します。",
   "settings.notch.displays.title": "追加のディスプレイにも表示する",
@@ -221,6 +238,12 @@ export const messages = {
     "「他のアプリの上」にすると、OpenBot がバックグラウンドのときもドックが表示されます。",
   "settings.agentDock.placement.screen": "他のアプリの上",
   "settings.agentDock.placement.window": "OpenBot のウィンドウ内",
+  "settings.agentDock.xwayland.title": "再起動が必要です",
+  "settings.agentDock.xwayland.description":
+    "Wayland では、ほかのアプリの上にドックを表示するために OpenBot が XWayland を使う必要があります。それまでは、ドックは OpenBot のウィンドウ内に表示されます。",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland のない Wayland では、ドックをほかのアプリの上に表示できません。OpenBot のウィンドウ内に表示されます。",
+  "settings.agentDock.xwayland.restart": "再起動",
   "settings.agentDock.display.title": "ディスプレイ",
   "settings.agentDock.display.description":
     "そのディスプレイが接続されていない場合、ドックは OpenBot ウィンドウのディスプレイに表示されます。",
@@ -235,6 +258,9 @@ export const messages = {
   "settings.agentDock.edge.left": "左",
   "settings.agentDock.autoHide.title": "使用していないときは隠す",
   "settings.agentDock.autoHide.description": "ドックが端に隠れます。ポインタを端に移動すると表示されます。",
+  "settings.agentDock.edgeStrip.title": "端に細い帯を表示",
+  "settings.agentDock.edgeStrip.description":
+    "ドックが隠れた場所に細い帯が残ります。ポインタを近づけるとドックが表示されます。エージェントから質問があると、帯に色の波が流れます。",
   "settings.agentDock.results.title": "完了した作業を表示",
   "settings.agentDock.results.description": "エージェントの結果がドックの横に短い時間表示されます。",
   "settings.agentDock.agents.title": "ドックのエージェント",
@@ -633,6 +659,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex ライブ音声",
   "settings.voice.speech.codexLive.description":
     "どのエージェントとの音声会話も、Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
+  "settings.voice.speech.codexLive.serverDescription":
+    "どのエージェントとの音声会話も、サーバーの Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
   "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",
@@ -653,8 +681,6 @@ export const messages = {
   "settings.transfer.old.text": "エージェントとサーバー設定をファイルに保存します。",
   "settings.transfer.new.title": "このサーバーにインポート",
   "settings.transfer.new.text": "ファイルからエージェントとサーバー設定を追加します。",
-  "settings.transfer.notMoved":
-    "API キー、サインイン、コネクター、アプリの環境設定、チャット履歴は移動されません。新しいサーバーで設定し直してください。",
   "settings.transfer.back": "戻る",
   "settings.transfer.loading": "エージェントを読み込んでいます…",
   "settings.transfer.summary.label": "ファイルの内容",

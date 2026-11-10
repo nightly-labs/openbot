@@ -5,6 +5,8 @@ import { createServerTransferStore, type ServerTransferCalls } from "./server-tr
 export interface ServerTransferOptions {
   /** Signs in to a provider of this computer. Absent for a joined server, whose providers are its own. */
   onSignIn?: ((provider: AgentProviderId) => void) | undefined;
+  /** The server can put the chat history in the file. */
+  history?: boolean;
   calls?: ServerTransferCalls;
 }
 
@@ -21,7 +23,8 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
       exportWarnings={store.state.exportWarnings}
       exportError={store.state.exportError}
       onExport={(options) => store.exportFile(options)}
-      onShowExport={() => store.showExport()}
+      historyAvailable={props.history}
+      onShowExport={store.showExport}
       onExportAgain={() => store.exportAgain()}
       importPhase={store.state.importPhase}
       preview={store.state.preview}

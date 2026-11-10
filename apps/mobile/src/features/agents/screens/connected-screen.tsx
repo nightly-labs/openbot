@@ -367,8 +367,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const serverDirectoryError = useMobileWorkspaceSelector((current) => current.serverDirectoryError);
   const serverDirectoryState = useMobileWorkspaceSelector((current) => current.serverDirectoryState);
   const servers = useMobileWorkspaceSelector((current) => current.servers);
-  const [collapsedByServer, setCollapsedByServer] = useState<Record<string, ReadonlySet<string>>>({});
-  const collapsedSectionIds = collapsedByServer[activeServer.id];
+  const collapsedSectionIds = useMobileWorkspaceSelector((current) => current.collapsedSectionIds);
   const channels = useChannels(activeServer.id);
   const channelAgents = useMemo(
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
@@ -547,9 +546,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     for (const item of items) {
       if (item.kind === "waiting") sectionCollapsed = false;
       else if (item.kind === "section") {
-        const hidden = item.ancestorIds.some((ancestorId) => collapsedSectionIds?.has(ancestorId));
+        const hidden = item.ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId));
         if (hidden) ids.add(item.id);
-        sectionCollapsed = hidden || (collapsedSectionIds?.has(item.id) ?? false);
+        sectionCollapsed = hidden || collapsedSectionIds.has(item.id);
       } else if (sectionCollapsed) ids.add(item.id);
     }
     return ids;
@@ -558,11 +557,12 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // The read state changes on each message, so the counts become a string first: the map, and with it
   // `renderItem`, change only when the count of a closed folder changes.
   const unreadCounts = useUnreadCounts();
-  // The unread messages of the agents' side threads count too, as on the desktop.
+  // Loads the read marks of the agents' side threads for their badges. As on the desktop, those
+  // threads add no number to the count of a folder.
   const activeAgentIds = useMemo(() => activeAgents.map((agent) => agent.id), [activeAgents]);
-  const threadUnread = useHomeThreadState(activeServer.id, activeAgentIds);
+  useHomeThreadState(activeServer.id, activeAgentIds);
   const folderUnreadKey = useMemo(() => {
-    if (!collapsedSectionIds?.size) return "[]";
+    if (!collapsedSectionIds.size) return "[]";
     const unread = new Set(unreadAgentIds);
     const counts = new Map<string, number>();
     let folderIds: readonly string[] = [];
@@ -574,26 +574,23 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         const count =
           item.kind === "channel"
             ? item.channel.unreadCount
-            : (unread.has(item.id) ? Math.max(1, unreadCounts[item.id] ?? 1) : 0) + (threadUnread.get(item.id) ?? 0);
+            : unread.has(item.id)
+              ? Math.max(1, unreadCounts[item.id] ?? 1)
+              : 0;
         if (count > 0) for (const folderId of folderIds) counts.set(folderId, (counts.get(folderId) ?? 0) + count);
       }
     }
     return JSON.stringify([...counts]);
-  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts, threadUnread]);
+  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts]);
   const folderUnread = useMemo(() => new Map<string, number>(JSON.parse(folderUnreadKey)), [folderUnreadKey]);
   const sidebarLayout = sidebar?.layout ?? null;
   const serverId = activeServer.id;
   const toggleSection = useCallback(
     (sectionId: string) => {
       setCollapseLayout(sidebarLayout);
-      setCollapsedByServer((current) => {
-        const next = new Set(current[serverId]);
-        if (next.has(sectionId)) next.delete(sectionId);
-        else next.add(sectionId);
-        return { ...current, [serverId]: next };
-      });
+      workspace().toggleSectionCollapsed(serverId, sectionId, sidebarLayout?.order ?? []);
     },
-    [serverId, sidebarLayout],
+    [serverId, sidebarLayout, workspace],
   );
   // Rows are memoized, so a new message for one agent renders only that agent's row.
   const rowOffset = hasPins ? 1 : 0;
@@ -617,7 +614,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 empty={item.empty}
                 unread={folderUnread.get(item.id) ?? 0}
                 visibleSectionIds={visibleSectionIds}
-                collapsed={collapsedSectionIds?.has(item.id) ?? false}
+                collapsed={collapsedSectionIds.has(item.id)}
                 onToggle={toggleSection}
               />
             </SectionDropTarget>

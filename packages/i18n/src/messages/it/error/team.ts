@@ -69,6 +69,7 @@ export const messages = {
   "error.team.channelTaskCancelUnsupported":
     "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",
+  "error.team.membersCannotDeleteChannelHistory": "I membri non possono eliminare la cronologia del canale.",
   "error.team.membersCannotArchiveChannels": "I membri non possono archiviare i canali.",
   "error.team.membersCannotRestoreChannels": "I membri non possono ripristinare i canali.",
   "error.team.sharedDataUnsupported": "I dati condivisi non sono supportati da questa connessione.",
@@ -77,6 +78,15 @@ export const messages = {
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
   "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routinesOnceUnsupported": "Questa connessione non può salvare routine che vengono eseguite una volta.",
+  "error.team.routineRunCommandUnsupported":
+    "Questa connessione non può fornire il comando di esecuzione di una routine.",
+  "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.usageLimitUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
+  "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
+  "error.team.providerDetectionUnsupported":
+    "Questa connessione non può trovare i server di modelli e gli agenti del server.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
@@ -92,6 +102,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported":
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
+  "error.team.threadMessageSearchUnsupported": "Questa connessione non supporta la ricerca nei thread secondari.",
   "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
   "error.team.liveVoiceUnsupported":
     "Questo server non supporta la voce dal vivo di Codex. Aggiorna OpenBot sul computer che lo esegue.",
@@ -118,7 +129,13 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
   "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
+  "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
+  "error.team.browsingMemoryUnsupported": "Questa connessione non supporta l'apprendimento dalla navigazione.",
   "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
+  "error.team.claudeUserSetupUnsupported":
+    "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
+  "error.team.claudeCompactWindowUnsupported":
+    "Questa connessione non supporta la dimensione di compattazione di Claude.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
@@ -128,6 +145,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vista in diretta del browser non è disponibile.",
   "error.team.browserSessionNotFound": "Sessione della vista del browser non trovata.",
   "error.team.mcpUnsupported": "I server MCP non sono supportati da questa connessione.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Aggiorna OpenBot su questo dispositivo per usare più di {limit} server MCP su questo server.",
   "error.team.storageUnsupported": "L'archiviazione non è supportata da questa connessione.",
   "error.team.machineResourcesUnsupported": "L'uso della macchina non è supportato da questa connessione.",
   "error.team.machineAlertMemberInvalid":
@@ -168,4 +187,11 @@ export const messages = {
   "error.team.signInRelayMismatch": "Questo indirizzo non appartiene a questo accesso.",
   "error.team.signInRelayLinkUnknown": "Nessun agente su questo server ha mostrato questo link di accesso.",
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
+  "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",
+  "error.team.backgroundProcessesUnsupported": "Questa connessione non supporta i processi in background.",
+  "error.team.providerUseUnsupported":
+    "Questa connessione non supporta l’attivazione e la disattivazione dei provider.",
+  "error.team.providerUseInvalid": "Questo provider non ha un interruttore di attivazione.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -16,7 +16,9 @@ file when the manifest is invalid, so follow the format below exactly.
    - name, one-line role (title), and full instructions or system prompt;
    - avatar image;
    - skills: each skill folder with its `SKILL.md` and the files it uses;
-   - scheduled tasks: name, prompt, schedule, time zone, and whether it is on;
+   - scheduled tasks: name, prompt, every schedule of the task, time zone, and whether it is on;
+   - tasks that start on an event, such as a webhook, an email, or a new message: name, prompt, and
+     what starts it (see Schedules);
    - chats: read them only to write memories (step 3);
    - workspace files, only if the user agrees (step 2).
 
@@ -38,6 +40,12 @@ file when the manifest is invalid, so follow the format below exactly.
    and group chats or only some. Wait for the answer before you continue. Export every group chat,
    including one with only one other agent. Leave one out only when none of its agents are exported.
 
+   Leave out folders that a tool makes again from the other files, and do not count them in the
+   size: `node_modules`, `.git`, `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`,
+   `.next`, `.nuxt`, `dist`, `build`, `target`, `.gradle`, `.cache`, and `coverage`. Also leave out
+   `.DS_Store` files. When a folder with one of these names holds the user's own work, ask before
+   you leave it out.
+
 3. **Write memories.** From each agent's chats, write at most 50 short facts that the agent must
    keep: user preferences, names, recurring tasks, decisions, and open work. One fact per memory,
    500 characters or fewer, written as a statement ("The user reports in EUR."). Do not copy
@@ -46,10 +54,15 @@ file when the manifest is invalid, so follow the format below exactly.
 4. **Remove secrets.** Do not export `.env` files, private keys, API keys, tokens, passwords, or
    cookies, in files or in instructions. Replace a secret in instructions with
    `<ask the user for …>`. OpenBot rejects the archive if it contains a file named `.env*` or
-   `*private*key*`, a nested archive (`.zip`, `.tar`, `.gz`, `.7z`, `.rar`), or a `.git` or
-   `node_modules` folder, so leave those out.
+   `*private*key*`, or a nested archive (`.zip`, `.tar`, `.gz`, `.7z`, `.rar`), so leave those out.
 
 5. **Build the folder** (see Format) and write `openbot-import.json` last.
+
+   OpenBot puts the files of `agents/<key>/files/` in `imported/` in the agent's workspace. In
+   instructions and routine instructions, change each absolute path to a file that you export to
+   its new place: `/workspace/notes/plan.md` becomes `imported/notes/plan.md` when the file is at
+   `agents/<key>/files/notes/plan.md`. Keep a path to a file that you do not export, and tell the
+   user about it in step 7.
 
 6. **Check it** with the checklist below. Then zip the folder contents into
    `~/Downloads/.openbot-export-<YYYY-MM-DD>.zip.part`. When the zip is complete, rename it to
@@ -57,7 +70,8 @@ file when the manifest is invalid, so follow the format below exactly.
    same name in one step, so OpenBot never reads a half-written file.
 
 7. **Tell the user**, only after the rename, the path, the number of agents and group chats, and
-   anything you left out. Tell them to open OpenBot, go to **Server settings → Import**, and choose
+   anything you left out or changed: each task that starts on an event, with what starts it, and
+   each path that you kept. Tell them to open OpenBot, go to **Server settings → Import**, and choose
    the file.
 
 ## Format
@@ -155,7 +169,8 @@ Channel field rules:
 
 A channel has no folder in the archive. Up to 100 channels.
 
-The whole archive must be under 2 GB and 50,000 files or fewer.
+The whole archive must have 200,000 files or fewer. It has no size limit, but the computer that
+imports it needs free disk space for the workspace files.
 
 ### Schedules
 
@@ -175,6 +190,17 @@ Use one of these shapes. Times are 24-hour `HH:MM` in the routine's time zone. D
 When a schedule does not fit a shape, use `custom` with a cron expression. OpenBot skips a routine
 with an invalid schedule and tells the user; the rest of the agent still imports.
 
+A routine has one schedule. When a task has more than one schedule, make one routine for each
+schedule, with the same instruction, time zone, and on or off state. Add a number to each name,
+such as `Gmail check (1/3)`, and shorten the name if necessary to keep it 80 characters or fewer. Do
+not merge schedules into one, and do not leave one out.
+
+A task that starts on an event, such as a webhook, an email, or a new message, has no schedule. Do
+not put it in `routines`, and do not make up a schedule for it. For an agent, write each such task
+to `agents/<key>/files/EVENT-TASKS.md`, with its name, what starts it, and its full prompt, and set
+`files`. Do not write webhook addresses with keys, or other secrets. For a group chat, tell the user
+about each such task in step 7.
+
 ## Checklist
 
 - [ ] `openbot-import.json` is at the root of the zip, not inside a subfolder you added by mistake.
@@ -186,5 +212,9 @@ with an invalid schedule and tells the user; the rest of the agent still imports
 - [ ] Every group chat is in `channels`, unless none of its agents are exported.
 - [ ] Each channel has at least one `members` entry, each member is an agent `key` in this export, and
       `lead` is one of the members or `null`.
-- [ ] No secrets, `.env` files, keys, nested archives, `.git`, or `node_modules`.
-- [ ] Workspace files are included only if the user said yes.
+- [ ] Each schedule of each task is a routine, and no routine has a made-up schedule for a task
+      that starts on an event.
+- [ ] No secrets, `.env` files, keys, or nested archives.
+- [ ] No folders that a tool makes again, such as `node_modules`, `.git`, `.venv`, `dist`, or `build`.
+- [ ] Workspace files are included only if the user said yes. `INSTRUCTIONS.md` and
+      `EVENT-TASKS.md` are not workspace files.

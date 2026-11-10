@@ -1,0 +1,404 @@
+[
+  {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents leren zelf nieuwe vaardigheden na een correctie of een aanpak die werkte. Kies Automatisch, Eerst vragen of Uit in Serverinstellingen → Algemeen.",
+          "Logins in de Kluis kunnen een verificatiecode bewaren, en agents kunnen daarmee inloggen.",
+          "Op Windows tonen het Dynamic Island en het agentdock je agents, net als op een Mac. Het agentdock kan ook kanalen bevatten.",
+          "Agents kunnen openbare online video's bekijken, zoals YouTube- of TikTok-links.",
+          "Selecteer meerdere bestanden in de Bibliotheek om ze in één keer te downloaden of te verwijderen.",
+          "Agents kunnen voor je een bugmelding of een idee voor een functie naar het OpenBot-team sturen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kanaalleden antwoorden terwijl ze in hun eigen chat werken, en een begroeting of een onduidelijk bericht gaat naar de kanaalleider.",
+          "Een nieuwe agent opent met een kort welkom en drie eerste taken waaruit je kunt kiezen.",
+          "Verbind Composio door in de browser in te loggen. Je typt geen URL en API-sleutel meer.",
+          "Instellingen heet nu Jouw instellingen, en Serverinstellingen heeft een zoekveld.",
+          "Het app-pictogram voor macOS heeft een nieuwe glazen look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De wachtrij van een agent start niet meer steeds opnieuw hetzelfde bericht terwijl de agent op een antwoord op zijn eigen vraag wacht.",
+          "Een ChatGPT-agent comprimeert niet meer steeds opnieuw en blijft niet meer eindeloos op “Context comprimeren” staan.",
+          "Agents op Cursor en enkele andere aanbieders houden hun OpenBot-tools nadat OpenBot opnieuw is gestart.",
+          "Agents kunnen een externe MCP-server gebruiken waarop je bent ingelogd, zoals n8n, met de nieuwste MCP-versie."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "De pagina Bibliotheek in de vensterbalk toont alle afbeeldingen en bestanden uit de chats van een server.",
+          "Wis de geschiedenis van een chat of kanaal in de instellingen ervan. De configuratie, herinneringen en routines blijven.",
+          "Laat antwoorden voorlezen met ElevenLabs of xAI en dicteer met Groq, met je eigen API-sleutel in Instellingen → Spraak.",
+          "Voeg Mistral toe als aanbieder.",
+          "Open een pagina die een agent maakt als tabblad in het zijpaneel naast de chat.",
+          "Kies in Instellingen → Algemeen een chatachtergrondkleur voor het thema Licht en een andere voor het thema Donker."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents gebruiken minder tokens per verzoek bij Claude, Codex, Pi, OpenCode, Grok en Hermes.",
+          "OpenBot gebruikt minder geheugen voor browsertabbladen, inactieve agents en app-vensters.",
+          "Browsertabbladen van agents wachten op botcontroles die vanzelf slagen, en voeren korte taken in minder stappen uit.",
+          "Meldingen hebben een nieuw uiterlijk."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agents gebruiken nu ook een login die je in een wachtwoordbeheerder of de Kluis opslaat nadat hun chat is gestart.",
+          "Een server maakt weer verbinding met Signal als Signal niet antwoordt, dus apparaten zien niet langer “De host is offline.” tot een herstart.",
+          "Het Dynamic Island en het agentdock laten andere apps niet meer haperen terwijl een agent werkt.",
+          "Claude-agents met een Anthropic API-sleutel gebruiken nu het promotionele API-tegoed van die sleutel."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "Als je Claude-agents je eigen CLAUDE.md, vaardigheden of hooks gebruiken, zet dan Instellingen → Aanbieders → Claude → Mijn Claude Code-configuratie gebruiken aan."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zet je agents in het nieuwe agentdock aan de rand van het scherm op macOS. Zet het uit in Instellingen → Agentdock.",
+          "Agents schrijven nu korte updates terwijl ze werken. Kies Klassiek in Serverinstellingen → Persoonlijkheid voor de oude stijl.",
+          "Start een nieuw gesprek of comprimeer de context van een kanaal vanuit de instellingen ervan.",
+          "Leden van een server waaraan ze deelnemen, kunnen hun eigen MCP-servers toevoegen en apps zoals Trello koppelen.",
+          "Kies in Serverinstellingen → Extern bureaublad wie deze computer met extern bureaublad mag bedienen.",
+          "Gebruik OpenBot in het Hebreeuws, en koppel GitLab, Omnisend en ElevenLabs in de Marktplaats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Voeg een bestand van elk type toe aan een chat, zoals een certificaat of een VPN-profiel.",
+          "De web-app opent en verstuurt bestanden tot 100 MB.",
+          "Een bericht toont Reageren, Antwoorden en Meer als je de aanwijzer erop houdt. Zet Instellingen → Algemeen → Compacte berichtacties uit voor de volledige rij.",
+          "Op een Mac hoef je ⌘Q alleen nog ingedrukt te houden terwijl een agent werkt."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Vermeldingen in berichten op Slack, Discord, Telegram en WhatsApp sturen nu een melding naar de persoon.",
+          "Als het quotum van een aanbieder op is, zet de agent het werk voort op het eerste reservemodel dat klaarstaat.",
+          "Een chat die na elke beurt opnieuw comprimeerde, stopt automatisch comprimeren nu na 2 keer achter elkaar.",
+          "OpenBot sluit niet meer als een browseractie van een agent wacht op een pagina die navigeert.",
+          "Logins uit Proton Pass werken na een herstart van OpenBot."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kies in Instellingen → Agents wanneer de plankaart een lange taak zelf start, of laat hem pas starten als je op Starten drukt.",
+          "Kies het account van de aanbieder als je een agent maakt, als er bij die aanbieder meer dan één account is gekoppeld.",
+          "Stel in Instellingen → Agents → Lokale scripts in hoeveel verzoeken lokale scripts per uur naar elke agent mogen sturen.",
+          "De pagina Gebruik heeft een tabblad Vaardigheid dat toont hoe vaak je agents elke vaardigheid laden en wat dat kost.",
+          "Koppel Higgsfield in de Marktplaats om afbeeldingen, video's en audio te maken."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "De chatkleurkiezer heeft 11 nieuwe vaste kleuren, en code, tabellen en kaarten in een gekleurde ballon nemen die kleur over.",
+          "Kaarten waarin een agent om een antwoord vraagt, zoals een formulier voor een API-sleutel, zien eruit als de vragen van de agent.",
+          "Vraag een agent in een kanaal om een nieuw kanaal te maken of een ander kanaal te wijzigen, en hij doet dat daar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Claude blijft ingelogd na een herstart of update van OpenBot, en Claude-agents gebruiken minder van het gebruiksvenster van 5 uur.",
+          "Oudere berichten die je in een lange chat laadt, blijven geladen. De chat springt niet meer terug naar de nieuwste berichten.",
+          "Automatisch comprimeren van een chat met ChatGPT (Codex), Muse, Pi of Antigravity stopt na 2 mislukte pogingen achter elkaar, zodat de chat de limiet van je abonnement niet meer opmaakt.",
+          "GPT-spraak werkt met elke agent, ook als de agent een Codex-model gebruikt.",
+          "De browser vult opgeslagen logins uit Proton Pass in."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.62.0",
+    "date": "2026-11-05",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Geef een browserprofiel een eigen proxy in Serverinstellingen → Browserprofielen, of gebruik op een server waaraan je deelneemt je eigen computer als proxy.",
+          "Koppel Proton Pass in de Marktplaats. De browser vult de logins in uit de kluis die je met OpenBot deelt.",
+          "Typ @ in de chat van een agent om een van zijn browsertabbladen of zijthreads te taggen.",
+          "Instellingen → Spraak heeft twee extra lokale dicteermodellen: Parakeet Unified EN en Cohere Transcribe.",
+          "Een thread toont een blauwe stip als de agent erin heeft geschreven en je het nog niet hebt gelezen.",
+          "Agents kunnen bestanden naar chats in WhatsApp, Slack, Discord en Telegram sturen, en GitHub-repository's maken.",
+          "Download Hermes Agent vanuit Instellingen → Aanbieders, en verwijder een aanbieder en zijn CLI met één knop."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Routines draaien weer in de chat van de agent. Zet “Uitvoeren in een aparte thread” aan om een routine in een eigen thread te houden.",
+          "Vragen van agents staan in één ballon, één vraag tegelijk.",
+          "Als een agent om een API-sleutel vraagt, gaat de sleutel standaard naar de Kluis voor alle agents.",
+          "Pictogrammen hebben één lijndikte en worden wit als je de aanwijzer erop houdt."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot gebruikt minder energie als het open is zonder taak.",
+          "Lange chats scrollen zonder haperen en openen sneller.",
+          "OpenBot blijft bij het starten niet meer hangen op “Verbinden met OpenBot” of op het laadscherm van de server.",
+          "Routines hebben weer Computerbesturing als die voor de agent aan staat."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.61.0",
+    "date": "2026-11-04",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Verwijder een bericht in een chat: klik er met de rechtermuisknop op en kies Verwijderen. Dit werkt in chats met agents, zijtaken en kanalen.",
+          "Agents kunnen workflows maken, wijzigen en uitvoeren, en je ziet ze elke stap bouwen op de pagina Workflows.",
+          "Praat met een Codex-agent via Codex live spraak. Zet het aan in Instellingen → Spraak.",
+          "Devin en GitHub Copilot zijn nieuwe aanbieders onder Meer aanbieders.",
+          "Kies een chatkleur voor elke agent en voor jezelf. Agents hebben ook meer avatarkleuren.",
+          "Agents kunnen een API-sleutel of wachtwoord dat je in de chat plakt, opslaan in de Kluis.",
+          "Webhook-routines accepteren verzoeken volgens Standard Webhooks, zoals van Composio, Svix, Clerk en Resend.",
+          "Koppel Coinbase, Robinhood of RevenueCat via Apps in de Marktplaats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Elke routine van een agent draait in een eigen thread, zodat routines en de chat niet meer op elkaar wachten.",
+          "Agents maken meer van een taak af voordat ze stoppen, en vragen met een bevestigingskaart voordat ze iets versturen, posten, verwijderen of betalen.",
+          "De badges in de zijbalk hebben een viltlook, en een vastgezet kanaal toont het aantal ongelezen berichten."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een kanaal met een lange geschiedenis opent weer snel.",
+          "Op Linux vraagt OpenBot je niet meer na elke herstart opnieuw in te loggen als de sleutelbos de sleutel niet bewaart.",
+          "Op Windows sturen kanaalleiders berichten weer door, en kun je een server op deze computer maken.",
+          "Als een oudere versie van OpenBot gegevens opent die een nieuwere versie heeft opgeslagen, installeert die de nieuwste versie."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Praat met je agents via WhatsApp. Koppel een nummer onder Marktplaats → Apps → WhatsApp. Een apart nummer is veiliger, want WhatsApp kan nummers blokkeren die het als geautomatiseerd ziet.",
+          "Start een workflow als iemand OpenBot noemt in Slack of in een Telegram-groep, en stuur het resultaat daar terug.",
+          "Gebruik OpenBot in het Arabisch. De indeling wordt gespiegeld van rechts naar links.",
+          "Zet modellen uit in Serverinstellingen → Aanbieders. De modelkiezer toont de nieuwste modellen eerst, en oudere modellen zijn ingeklapt.",
+          "Serverinstellingen heeft een Auditlog met wijzigingen in leden, rollen en toegang van agents.",
+          "Bedrijfsaanmelding: een servereigenaar kan Microsoft Entra ID, Okta, Google Workspace of een andere OpenID Connect-aanbieder koppelen in Leden → Bedrijfsaanmelding. Mensen met een e-mailadres van het bedrijf doen dan mee zonder uitnodiging.",
+          "Geef een kanaal een afbeelding of pictogram in de kanaalinstellingen.",
+          "Een kanaal kan eigen herinneringen bewaren, en een agent kan vanuit je directe chat een taak naar een kanaal sturen.",
+          "Zijthreads hebben Antwoorden bij elk bericht.",
+          "Downloads en uploads van een server waaraan je deelneemt tonen hun voortgang, en een mislukte upload heeft de knop Opnieuw."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chatberichten gebruiken meer ruimte in een breed venster.",
+          "Elk bestand dat je vanuit een chat opent, krijgt een eigen tabblad in het zijpaneel.",
+          "Geplakte tekst van meer dan 4.000 tekens wordt een bijlage pasted-text.txt, zodat het bericht alle tekst behoudt.",
+          "OpenBot is gratis voor persoonlijk gebruik, en de eerste start zegt dat ook."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Inlogcodes bereiken gebruikers in alle regio's.",
+          "Een wit venster na een crash laadt vanzelf opnieuw.",
+          "Als Claude zijn server niet bereikt, toont de chat de nieuwe pogingen.",
+          "Een agent met reservemodellen gaat naar het volgende model als het tegoed of quotum op is voordat hij begint te schrijven."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.59.0",
+    "date": "2026-11-02",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kimi is een nieuwe aanbieder. OpenBot downloadt de Kimi Code CLI, en je logt in met je Kimi Code-account.",
+          "Gebruik Hermes Agent van Nous Research als aanbieder, met je eigen herinneringen, vaardigheden en logins.",
+          "Op een Mac heeft OpenBot een pictogram in de menubalk. Als je het venster sluit, verdwijnt het Dock-pictogram en blijven taken draaien.",
+          "Start een workflow als iemand OpenBot noemt in Discord, en stuur het resultaat terug als antwoord, bericht of reactie.",
+          "Mappen in de zijbalk kunnen mappen bevatten, tot drie niveaus diep. Sleep een chat of map naar een map.",
+          "Kies de redeneerniveaus Geen, Minimaal en Ultra als een model ze aanbiedt.",
+          "Vastgezette agents en kanalen blijven hetzelfde op elk apparaat dat verbinding maakt met een server.",
+          "Voeg SVG-afbeeldingen toe aan een chat. De agent leest de SVG-tekst.",
+          "Koppel meer dan één Notion-account, en koppel ClickUp vanuit Apps.",
+          "Een agent kan je vragen een login, kaart of adres aan de Kluis toe te voegen. Jij typt het geheim, en de agent krijgt alleen de naam."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Houd op een Mac ⌘Q ingedrukt of druk er twee keer op om af te sluiten. Eén keer per ongeluk drukken stopt je agents niet meer.",
+          "Een agent gaat vaker zelf verder als zijn plan nog open stappen heeft.",
+          "Geplakte afbeeldingen staan als miniaturen boven het berichtveld, en verstuurde afbeeldingen worden op volle grootte getoond.",
+          "Agents zonder foto tonen nu een zachte pluche bot die laat zien wat de agent doet."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Slack-vermeldingen en directe berichten bereiken OpenBot weer als een computer met de Slack-workspace uit staat.",
+          "Telefoons en andere apparaten kunnen direct verbinding maken met je servers nadat de computer uit de slaapstand komt.",
+          "Een upload in de ene chat blokkeert het versturen in andere chats niet meer.",
+          "Tekst die je uit OpenBot kopieert, wordt in andere apps geplakt zonder de kleuren van de app."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.58.0",
+    "date": "2026-11-01",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Start een workflow vanuit GitHub: een GitHub-trigger draait bij nieuwe issues, reacties, pull requests, reviews, mislukte checks of een vermelding van @openbotgit.",
+          "Wijzig GitHub vanuit een workflow: reageer, label, wijs toe, review, sluit of maak een issue als de OpenBot GitHub App.",
+          "De Marktplaats heeft 17 nieuwe OpenBot-agents, zoals QA Tester, PR Shepherd en Chief of Staff, en 15 nieuwe vaardigheden voor ze.",
+          "Gebruik toont de maandlimiet van OpenCode Go als derde balk."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een server waaraan je deelneemt, opent veel sneller. De agents en zijbalk van je vorige bezoek staan er direct terwijl de app verbinding maakt.",
+          "Op het web duurt overschakelen naar een andere server ongeveer 1 seconde, niet 2 tot 3 seconden.",
+          "Het venster opent ongeveer 3 seconden eerder als het Dynamic Island aan staat."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Je kunt een bericht in de wachtrij verplaatsen als er meer dan 32 berichten wachten.",
+          "Een Pi-beurt die 10 minuten niets verstuurt, stopt nu met een melding.",
+          "Een eigen aanbieder staat in de modelkiezer als OpenCode of Pi niet is geïnstalleerd.",
+          "Lange modelnamen in de modelkiezer lopen door op een tweede regel."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.57.0",
+    "date": "2026-10-31",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Vertak een gesprek: klik met de rechtermuisknop op het laatste agentbericht van een beurt en kies Hier aftakken. Er opent een nieuwe thread met het gesprek tot dat bericht.",
+          "De agentinstellingen hebben een pagina Instructies die het AGENTS.md-bestand van de agent toont. Als de agent zijn instructies wijzigt, toont de chat de wijziging met Ongedaan maken.",
+          "De Marktplaats staat op openbot.run. Elke agent en vaardigheid heeft een eigen pagina, en met Link kopiëren deel je die.",
+          "Een agent kan antwoorden op een melding of bevestiging van een website die zijn eigen browseractie heeft geopend.",
+          "Een gestopte of mislukte kanaaltaak heeft de knop Taak annuleren."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Herinneringen openen in het instellingenpaneel van de agent, met een korte titel voor elke herinnering en een zoekveld.",
+          "Agents sturen minder tokens per verzoek, bij elke aanbieder.",
+          "Elke routine staat op een eigen kaart met een schakelaar die hem pauzeert of hervat.",
+          "Instellingen › Meldingen toont één kaart per server, met Alles, Indien nodig en Niets als één bedieningselement."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Updates in de app installeren op trage Macs, zoals Intel-Macs.",
+          "Een inactief browsertabblad van een agent gebruikt veel minder geheugen.",
+          "Een agent op een OpenCode Go-model gaat naar zijn reservemodel bij de gebruikslimiet van Go.",
+          "Het voorbeeldpaneel van bestanden wordt bijgewerkt als de agent het geopende bestand wijzigt."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.56.0",
+    "date": "2026-10-30",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents doen veel browseracties in één stap, zoals een zoekopdracht typen, op Enter drukken en op resultaten wachten. Browsertaken zijn sneller klaar en gebruiken minder tokens.",
+          "Klik met de rechtermuisknop op een agentbericht en kies Markeer als ongelezen om het later opnieuw te lezen.",
+          "Als je nog een server hebt, kun je de server Lokaal verbergen via het menu ervan. De agents, chats en bestanden ervan blijven op je computer.",
+          "Kies in Instellingen › Meldingen het geluid dat speelt als een taak klaar is."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een aanbieder gebruikt de CLI die je zelf hebt geïnstalleerd als die dezelfde versie heeft als de kopie van OpenBot, of nieuwer is.",
+          "Je keuze voor analyse volgt je account naar je andere apparaten. Als je analyse vóór deze versie had uitgezet, blijft die op deze computer uit tot je het hier wijzigt.",
+          "Sleep aan de greep van het veld Instructies om het hoger te maken."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Cloudflare-controles slagen in de ingebouwde browser.",
+          "Elke CLI van een aanbieder gebruikt ongeveer de helft van de schijfruimte: OpenBot bewaart één versie.",
+          "Een bericht dat je naar een agent stuurt die op een gebruikslimiet zit, probeert de aanbieder direct opnieuw.",
+          "In de zijbalk komt een chat die je sleept terecht in de sectie onder de aanwijzer."
+        ]
+      }
+    ]
+  }
+]

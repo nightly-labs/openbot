@@ -22,7 +22,7 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
+import { type ReplyReading, replyVoiceFailureText, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
@@ -144,6 +144,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   const dictation = useVoiceDictation({
     enabled: input.enabled && input.online && state.open && !state.exit,
     onDraft: controller.hear,
+    endsOnPause: true,
   });
   dictationRef.current = dictation;
   const { conversation, channel, deliveries, outboxMessages } = input;
@@ -376,10 +377,10 @@ function createController({
         onDone: () => {
           if (own === generation && open) listen();
         },
-        onError: (failure) => {
+        onError: (failure, reason) => {
           if (own !== generation || !open) return;
           listen();
-          update({ error: currentText().t(REPLY_VOICE_FAILURE_TEXT[failure]) });
+          update({ error: replyVoiceFailureText(failure, reason) });
         },
       });
     }
@@ -436,6 +437,23 @@ function createController({
     current.turnId ??= current.messageId ? liveReplyTurn(conversation.messages, deliveries, current.messageId) : null;
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
+    // A streamed message that a later step marks as commentary is not part of the spoken answer.
+    // Progress updates are read on purpose, so only a message read as the answer counts.
+    if (
+      readIds.some(
+        (id) =>
+          !readUpdates?.ids.has(id) &&
+          !conversation.messages.some(
+            (message) => message.id === id && message.turnId === turnId && isAgentAnswer(message),
+          ),
+      )
+    ) {
+      stopSpeaking();
+      if (phase === "speaking") {
+        setPhase("thinking");
+        setCaption("");
+      }
+    }
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
     // Each progress update is read when it is complete, as on desktop. A stopped or failed turn ends
     // its open update part way, so only a completed one is read.

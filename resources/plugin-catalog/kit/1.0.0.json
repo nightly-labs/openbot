@@ -1,0 +1,33 @@
+{
+  "slug": "kit",
+  "name": "Kit",
+  "tagline": "Email newsletters for creators",
+  "description": "Kit lets agents read subscribers, tags, segments, sequences, and broadcasts, manage subscribers, and draft broadcasts in the signed-in Kit account. It never sends a broadcast, and it needs a paid Kit plan.",
+  "category": "productivity",
+  "creatorName": "Kit",
+  "iconUrl": "https://kit.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-growth", "text": "How many subscribers did I gain this month, and from which forms?" },
+    { "id": "prompt-broadcast-stats", "text": "Compare the open and click rates of my last five broadcasts." },
+    { "id": "prompt-draft-broadcast", "text": "Draft a broadcast that announces my new workshop." }
+  ],
+  "apps": [
+    {
+      "id": "app-kit-mcp",
+      "name": "Kit",
+      "description": "Subscribers, tags, sequences, and broadcast drafts, over Kit's MCP server with browser sign-in.",
+      "iconUrl": "https://kit.com/favicon.ico",
+      "server": {
+        "name": "kit",
+        "transport": "http",
+        "url": "https://app.kit.com/mcp",
+        "auth": [{ "id": "kit-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://kit.com",
+  "privacyPolicyUrl": "https://kit.com/privacy",
+  "termsUrl": "https://kit.com/terms",
+  "skills": []
+}

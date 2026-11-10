@@ -33,18 +33,28 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} bestaat al, dus deze kopie is opgeslagen als {saved}.",
   "error.import.fileSkipped": "{name}: het bestand {file} is overgeslagen. {reason}",
   "error.import.chooseZip": "Kies een .zip-bestand.",
-  "error.import.zipTooLarge": "De export moet een .zip van minder dan 2 GB zijn.",
   "error.import.unsafeFile": "De export bevat een onveilig bestand: {name}",
-  "error.import.expandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 2 GB en {limit} bestanden.",
+  "error.import.tooManyFiles": "De export mag maximaal {limit} bestanden bevatten.",
+  "error.import.diskSpace":
+    "{name}: de bestanden hebben {size} GB vrije schijfruimte nodig en er is {free} GB vrij. Maak ruimte vrij en importeer de agent opnieuw.",
   "error.import.remoteExpandedTooLarge": "Uitgepakt moet de export kleiner zijn dan 500 MB en {limit} bestanden.",
   "error.import.zipInvalid":
     "Het gekozen bestand is geen geldige .zip. Als Grok Bot het nog opslaat, wacht dan en kies het opnieuw.",
+  "error.import.entryDamaged": "Het bestand is beschadigd in de export.",
+  "error.import.foldersSkipped":
+    "{number} bestanden in .git- en node_modules-mappen worden weggelaten. Een tool kan ze opnieuw maken.",
   "error.import.empty": "De export is leeg.",
   "error.import.remoteZipTooLarge":
     "Om te importeren in een server waaraan je deelneemt, moet de export een .zip van minder dan 100 MB zijn.",
   "error.import.hostBusy": "De server leest andere exports. Probeer het over een paar minuten opnieuw.",
+  "error.import.uploadDiskSpace":
+    "De export heeft {size} GB vrije schijfruimte op de server nodig, en er is {free} GB vrij. Maak ruimte vrij op de server en kies de export dan opnieuw.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Deze server accepteert een export tot 100 MB. Werk OpenBot op de server bij om een grotere export te importeren.",
   "error.import.skillKept":
     "{name}: de server heeft de vaardigheid “{skill}” al, dus de agent gebruikt die vaardigheid. Vraag een beheerder om deze bij te werken.",
+  "error.import.skillRenamed":
+    "{name}: de naam van de vaardigheid “{skill}” lijkt te veel op de naam van een andere vaardigheid, dus deze wordt opgeslagen als “{renamed}”.",
   "error.import.hermesNoProfiles":
     "Deze map heeft geen Hermes-profielen. Kies de Hermes-map, met config.yaml of SOUL.md.",
   "error.import.hermesClosed": "De Hermes-profielen zijn niet meer open. Lees ze opnieuw.",

@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
 import {
@@ -26,22 +26,22 @@ import {
 } from "./acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
-import type { AcpExtensionMethod } from "./acp-sign-in";
+import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import {
   claudeModelName,
-  codexFastServiceTier,
   isOpencodeModelUnusableWithStoredKey,
   modelsAfterOpenCodeDiscoveryFailure,
+  serviceTierFields,
 } from "./agent/provider-models";
 import type { AgentClient } from "./agent-client";
-import { ANTIGRAVITY_USAGE_PROMPT, antigravityRateLimits } from "./antigravity-usage";
+import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
+import { readAntigravityQuota } from "./antigravity-usage";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
   type AgentCliInfo,
-  antigravityAnswersUsageCommand,
-  antigravityReadsGeminiHome,
+  antigravityTakesStateFolders,
   cliPathEnvironment,
   kimiLoginArgs,
   resolveAntigravityCli,
@@ -157,8 +157,9 @@ export interface ProviderAccountSupport {
   /** False for a CLI version that ignores `homeVariable`. Absent when every version reads it. */
   supports?(cli: AgentCliInfo): boolean;
   /**
-   * A usage read in a process of its own leaves a session on disk. An account with no agent process
-   * then shows its last reading, from its sign-in check, and starts no process to read usage.
+   * A usage read in a process of its own leaves a session on disk, or gives nothing new. An account
+   * with no agent process then shows its last reading, from its sign-in check, and starts no process
+   * to read usage.
    */
   readonly usageLeavesSession?: boolean;
 }
@@ -211,7 +212,7 @@ type ProviderSignIn =
 interface AcpAuthenticateSignIn {
   readonly kind: "acp-authenticate";
   readonly methodId: string;
-  readonly argv: readonly string[];
+  readonly argv: AcpArgv;
   readonly env?: Readonly<Record<string, string>>;
   readonly timeoutMs: number;
 }
@@ -242,6 +243,7 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
   const key = () => (account ? null : context.apiKey("antigravity"));
   return {
     extraEnv: () => {
+      importAntigravityToken(antigravityAppDataDir({ ...process.env, ...account }));
       const saved = key();
       return {
         ...(agentEnvironment ? context.agentEnvironment?.() : {}),
@@ -262,12 +264,38 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
 }
 
 /**
- * On macOS, Antigravity 1.4.0 and later keep the Google sign-in in the login Keychain only when a
- * test item can be written there at start. A Workspace only process cannot write the Keychain, so
- * it reads the token file in `antigravity-acp`, which does not exist, and reports no account
- * (#2988). The token file is the store on every platform, so each process shares one sign-in.
+ * On macOS, the Antigravity CLI keeps the Google sign-in in one login Keychain item, which every
+ * account would share, and a Workspace only process cannot write the Keychain (#2988). On Linux it
+ * uses the Secret Service when one runs. Under WSL it keeps the token in the file
+ * `antigravity-oauth-token` in its app data folder, so this variable gives each account a token file
+ * of its own on every platform. Antigravity 1.5 has no other switch for it. Tools that the agent runs
+ * see the variable too.
  */
-const ANTIGRAVITY_ENV = { AGY_ACP_FORCE_FILE_STORAGE: "1" };
+const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
+
+/** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */
+function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
+  return env.GEMINI_HOME?.trim() || join(homedir(), ".gemini");
+}
+
+/** The CLI's app data folder, which holds the sign-in and the sessions. 1.4 kept them there too. */
+const ANTIGRAVITY_APP_DATA = "antigravity-acp";
+
+function antigravityAppDataDir(env: Readonly<Record<string, string | undefined>>): string {
+  return join(antigravityGeminiHome(env), ANTIGRAVITY_APP_DATA);
+}
+
+/**
+ * The CLI ignores `GEMINI_HOME` and takes its folders as flags: the Gemini home as an absolute path,
+ * and the app data folder relative to the Gemini home. A relative Gemini home logs "must be an
+ * absolute path", and on Windows no relative path reaches another drive. OpenBot keeps each
+ * account's folder in `GEMINI_HOME` for itself and passes it here.
+ */
+const antigravityArgv = (env: Readonly<Record<string, string | undefined>>): readonly string[] => [
+  "acp",
+  `--gemini-dir=${antigravityGeminiHome(env)}`,
+  `--app-data-dir=${ANTIGRAVITY_APP_DATA}`,
+];
 
 /**
  * The sandbox paths of a Gemini process: in the account's `GEMINI_HOME` when it has one. The
@@ -279,16 +307,6 @@ function antigravityAccountStatePaths(context: ProviderClientContext) {
     for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return state;
 }
-
-/**
- * Antigravity 1.3.0 starts Google's browser sign-in by itself when `session/new` finds no valid
- * token, and waits there for five minutes. A client that serves turns must never open that page:
- * `BROWSER=true` stops the launch, and the prompt line tells the account check to stop waiting.
- */
-const ANTIGRAVITY_SERVING_OPTIONS = {
-  env: { BROWSER: "true", ...ANTIGRAVITY_ENV },
-  interactiveSignInPrompt: /Open the following link to authenticate the ACP server: /u,
-};
 
 const GEMINI_API_KEY_METHOD = "gemini-api-key";
 
@@ -306,17 +324,11 @@ export function antigravityTemp(context: Pick<ProviderClientContext, "providerTe
     : undefined;
 }
 
-/**
- * Google's registry starts the Linux build with an empty `--uid=`, and the other builds with no
- * argument. OpenBot starts it the same way.
- */
-const ANTIGRAVITY_ARGV: readonly string[] = process.platform === "linux" ? ["--uid="] : [];
-
 // `oauth-personal` is the Google account sign-in that a Google AI Pro or Ultra plan uses.
 const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   kind: "acp-authenticate",
   methodId: "oauth-personal",
-  argv: ANTIGRAVITY_ARGV,
+  argv: antigravityArgv,
   env: ANTIGRAVITY_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
@@ -434,9 +446,14 @@ const COPILOT_ARGV: readonly string[] = ["--acp", "--no-auto-update"];
 
 /**
  * Mistral Vibe 3.1.0 sends usage data to Mistral unless told not to (`PRIVACY.md`). Every process gets
- * the variable, the sign-in and sign-out processes too.
+ * the variable, the sign-in and sign-out processes too. Without its model catalogue, Vibe 3.1.0 lists
+ * only Mistral Medium 3.5 and the models of `config.toml`. With it, each session asks Mistral for the
+ * models of the account, and a failed request keeps that list (#5712).
  */
-const MISTRAL_ENV: Readonly<Record<string, string>> = { VIBE_ENABLE_TELEMETRY: "false" };
+const MISTRAL_ENV: Readonly<Record<string, string>> = {
+  VIBE_ENABLE_TELEMETRY: "false",
+  VIBE_EXPERIMENTAL_ENABLE_MODEL_CATALOG: "true",
+};
 
 /** `vibe-acp` serves the Agent Client Protocol on stdio, with no argument. */
 const MISTRAL_ARGV: readonly string[] = [];
@@ -549,6 +566,11 @@ export interface ProviderClientContext {
    * reason as `reportMcpDrops`: without it Claude does not load the setup, as the default is.
    */
   readonly claudeUserSetup?: () => boolean;
+  /**
+   * The size in tokens at which Claude Code compacts a chat, read at each spawn. `null` and absent
+   * leave Claude Code's own size for each model.
+   */
+  readonly claudeCompactWindow?: () => number | null;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -565,15 +587,26 @@ function withAccountEnvironment(
  * CLI's own choice. `1h` sets `ENABLE_PROMPT_CACHING_1H`, which the CLI reads last: a `promptCacheTtl`
  * in the Claude settings or `CLAUDE_CODE_PROMPT_CACHE_TTL` still wins. The CLI reads the flag before
  * its subscription rules, so subagents, an API key and a subscription on extra usage also get 1 hour.
+ *
+ * A compaction size sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. The CLI reads it before the
+ * `autoCompactWindow` of the Claude settings, and lowers it to the context window of a smaller model.
+ * The default sets nothing, so the user's own Claude settings and environment still apply. An agent's
+ * own environment values come after both, so they still win.
  */
 function claudeAgentEnvironment(
   context: ProviderClientContext,
 ): (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>> {
   const environment = withAccountEnvironment(context);
-  return (inherited) => ({
-    ...((context.promptCacheTtl?.() ?? DEFAULT_PROMPT_CACHE_TTL.ttl) === "1h" ? { ENABLE_PROMPT_CACHING_1H: "1" } : {}),
-    ...environment?.(inherited),
-  });
+  return (inherited) => {
+    const compactWindow = context.claudeCompactWindow?.() ?? null;
+    return {
+      ...((context.promptCacheTtl?.() ?? DEFAULT_PROMPT_CACHE_TTL.ttl) === "1h"
+        ? { ENABLE_PROMPT_CACHING_1H: "1" }
+        : {}),
+      ...(compactWindow === null ? {} : { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(compactWindow) }),
+      ...environment?.(inherited),
+    };
+  };
 }
 
 /**
@@ -608,10 +641,15 @@ interface ProviderModelCatalog {
    * A list that lacks an agent's model is read once more before the agent leaves that model.
    */
   readonly partialListAtStart?: true;
+  /**
+   * With `partialListAtStart`: the list is read once more after each start, also when no agent is off
+   * it, because models that come later belong in the model picker too.
+   */
+  readonly relistAfterStart?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
-  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string };
+  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
   /** False drops a model that the stored API key cannot use. Runs only while a key is stored. */
   usableWithStoredKey?(id: string, name: string): boolean;
   /**
@@ -826,7 +864,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: codexFastServiceTier },
+    catalog: { paged: true, modelFields: serviceTierFields },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new CodexAppServerClient(cli.executable, requestTimeoutMs, {
@@ -862,7 +900,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
-    catalog: { modelName: claudeModelName },
+    catalog: { modelName: claudeModelName, modelFields: serviceTierFields },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new ClaudeAgentClient(
@@ -941,8 +979,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
     // Grok 1.0.70 starts on its two built-in models when its sign-in has expired, renews the sign-in,
-    // and then fetches its catalogue. A `model/list` in between misses the newer models.
-    catalog: { partialListAtStart: true },
+    // and then fetches its catalogue. A `model/list` in between misses the newer models, so the list
+    // is read once more after each start, also when no agent is on a missing model yet (#6318).
+    catalog: { partialListAtStart: true, relistAfterStart: true },
   },
   {
     id: "opencode",
@@ -1024,8 +1063,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
-      supports: (cli) => antigravityReadsGeminiHome(cli.version),
-      // Each new Antigravity session keeps a conversation database in the account's folder.
+      supports: (cli) => antigravityTakesStateFolders(cli.version),
+      // The usage read needs an access token that has not expired, and only a running CLI refreshes it.
+      // A process started only to read usage would give no reading, so an idle account shows its last one.
       usageLeavesSession: true,
     },
     // `model/list` opens a probe session and then probes the efforts of each model. On a busy
@@ -1036,8 +1076,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "antigravity",
         flavor: ANTIGRAVITY_ACP_FLAVOR,
-        argv: ANTIGRAVITY_ARGV,
-        ...ANTIGRAVITY_SERVING_OPTIONS,
+        argv: antigravityArgv({ ...process.env, ...context.accountEnvironment }),
+        env: ANTIGRAVITY_ENV,
         discoveryCwd: () => discoveryFolder("antigravity"),
         privateTemp: antigravityTemp(context),
         ...(confinement
@@ -1051,10 +1091,18 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("antigravity"),
-        readRateLimits: (_connection, privatePrompt, model) =>
-          antigravityAnswersUsageCommand(cli.version)
-            ? privatePrompt(ANTIGRAVITY_USAGE_PROMPT).pipe(Effect.map((answer) => antigravityRateLimits(answer, model)))
-            : Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null }),
+        // A saved key has no plan quota.
+        readRateLimits: (_connection, model) =>
+          context.apiKey("antigravity") && !context.accountEnvironment
+            ? Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null })
+            : readAntigravityQuota({
+                tokenFile: join(
+                  antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
+                  ANTIGRAVITY_TOKEN_FILE,
+                ),
+                version: cli.version,
+                model,
+              }),
       }),
     // A profile-generation client asks one question and must not act: no MCP servers, and every
     // permission request is cancelled.
@@ -1062,9 +1110,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "antigravity",
         flavor: ANTIGRAVITY_ACP_FLAVOR,
-        argv: ANTIGRAVITY_ARGV,
+        argv: antigravityArgv({ ...process.env, ...context.accountEnvironment }),
+        env: ANTIGRAVITY_ENV,
         profileGeneration: true,
-        ...ANTIGRAVITY_SERVING_OPTIONS,
         discoveryCwd: () => discoveryFolder("antigravity"),
         privateTemp: antigravityTemp(context),
         ...antigravityKeyOptions(context, false),
@@ -1390,6 +1438,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       }),
     authState: (account) => ({ kind: "mistral", email: account?.email ?? null }),
     validateAccount: () => undefined,
+    // Vibe 3.1.0 adds the catalogue's models to a session only after it opens. A probe session that
+    // stays open saves the catalogue, and the next session lists it from the start (`MISTRAL_ACP_FLAVOR`).
+    catalog: { partialListAtStart: true, relistAfterStart: true },
   },
   {
     id: "hermes",
@@ -1466,7 +1517,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     signIn: { kind: "external" },
     // A custom agent can need more than 5 s to start and open a probe session in `initialize` and
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
-    catalog: { slowList: true },
+    // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
+    // the list is read once more after each start.
+    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(

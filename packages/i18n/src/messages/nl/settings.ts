@@ -16,6 +16,12 @@ export const messages = {
     "Toon het vervaagde bureaublad achter het venster. Websites en menu’s gebruiken dan het thema van de app.",
   "settings.interfaceSize.title": "Interfacegrootte",
   "settings.interfaceSize.description": "De grootte van tekst en bedieningselementen in OpenBot.",
+  "settings.interfaceFont.title": "Lettertype van de interface",
+  "settings.interfaceFont.description": "Het lettertype van menu's, chats en instellingen.",
+  "settings.interfaceFont.default": "Standaard (Inter)",
+  "settings.codeFont.title": "Lettertype voor code",
+  "settings.codeFont.description": "Het lettertype van code, terminals en bestandspaden.",
+  "settings.codeFont.default": "Standaard",
   "settings.logoColor.title": "Logokleur",
   "settings.logoColor.description": "Te zien in het Dock, de taakbalk en het Dynamic Island.",
   "settings.logoColor.buildNote": "Deze build houdt een eigen logokleur. De keuze geldt voor de release-app.",
@@ -118,6 +124,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "Stel {setting} in voor alle agents",
   "settings.agentDefaults.agentLabel": "{setting} voor {agent}",
   "settings.agentDefaults.loadFailed": "De agents konden niet worden gelezen.",
+  "settings.commitCoAuthor.sectionTitle": "Git-commits",
+  "settings.commitCoAuthor.title": "OpenBot vermelden in commits",
+  "settings.commitCoAuthor.description":
+    "Agents voegen OpenBot toe als co-auteur van hun commits. Jij blijft de auteur.",
   "settings.planStart.title": "Het werk starten",
   "settings.planStart.wait": "Als ik op Starten druk",
   "settings.planStart.after": "Na {time}",
@@ -197,8 +207,15 @@ export const messages = {
   "settings.soundTheme.play": "{name} afspelen",
   "settings.notch.title": "Gedrag",
   "settings.notch.show.title": "Toon status in de notch van de MacBook",
+  "settings.notch.show.titleTopOfScreen": "Toon status bovenaan het scherm",
   "settings.notch.show.description":
     "Toon activiteit van agents en items die aandacht nodig hebben bovenaan elk scherm.",
+  "settings.notch.xwayland.title": "Herstart nodig",
+  "settings.notch.xwayland.description":
+    "Onder Wayland moet OpenBot XWayland gebruiken om het Dynamic Island boven andere apps te tonen. Tot dan is het eiland niet te zien.",
+  "settings.notch.xwayland.unsupported":
+    "Onder Wayland zonder XWayland kan het Dynamic Island niet boven andere apps staan.",
+  "settings.notch.xwayland.restart": "Herstarten",
   "settings.notch.idle.title": "Toon inactief eiland",
   "settings.notch.idle.description": "Toon het OpenBot-logo en een begroeting wanneer er geen status actief is.",
   "settings.notch.displays.title": "Toon op extra schermen",
@@ -224,6 +241,12 @@ export const messages = {
     "‘Boven andere apps’ houdt het dock in beeld als OpenBot op de achtergrond is.",
   "settings.agentDock.placement.screen": "Boven andere apps",
   "settings.agentDock.placement.window": "In het OpenBot-venster",
+  "settings.agentDock.xwayland.title": "Herstart nodig",
+  "settings.agentDock.xwayland.description":
+    "Onder Wayland moet OpenBot XWayland gebruiken om het dock boven andere apps te tonen. Tot dan staat het dock in het OpenBot-venster.",
+  "settings.agentDock.xwayland.unsupported":
+    "Onder Wayland zonder XWayland kan het dock niet boven andere apps staan. Het staat in het OpenBot-venster.",
+  "settings.agentDock.xwayland.restart": "Herstarten",
   "settings.agentDock.display.title": "Scherm",
   "settings.agentDock.display.description":
     "Als dat scherm niet is aangesloten, gaat het dock naar het scherm van het OpenBot-venster.",
@@ -239,6 +262,9 @@ export const messages = {
   "settings.agentDock.autoHide.title": "Verbergen als het niet wordt gebruikt",
   "settings.agentDock.autoHide.description":
     "Het dock schuift in de rand. Beweeg de aanwijzer naar de rand om het te tonen.",
+  "settings.agentDock.edgeStrip.title": "Een strook aan de rand tonen",
+  "settings.agentDock.edgeStrip.description":
+    "Een smalle strook blijft waar het dock verdwijnt. Beweeg de aanwijzer ernaartoe om het dock te tonen. Een kleurgolf gaat door de strook als een agent je iets vraagt.",
   "settings.agentDock.results.title": "Klaar werk tonen",
   "settings.agentDock.results.description": "Resultaten van agents verschijnen kort naast het dock.",
   "settings.agentDock.agents.title": "Agents in het dock",
@@ -634,6 +660,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex live spraak",
   "settings.voice.speech.codexLive.description":
     "Spraakgesprekken met elke agent gebruiken live spraak van OpenAI met je Codex-aanmelding. Je stem, je verzoeken en de antwoorden van de agent gaan naar OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Spraakgesprekken met elke agent gebruiken live spraak van OpenAI met de Codex-aanmelding van de server. Je stem, je verzoeken en de antwoorden van de agent gaan naar OpenAI.",
   "settings.voice.speech.speed.title": "Snelheid",
   "settings.voice.speech.voice.title": "Stem",
   "settings.voice.speech.voice.female": "Vrouwenstem {number}",
@@ -654,8 +682,6 @@ export const messages = {
   "settings.transfer.old.text": "Bewaar de agents en serverinstellingen ervan in een bestand.",
   "settings.transfer.new.title": "Importeer in deze server",
   "settings.transfer.new.text": "Voeg de agents en serverinstellingen uit een bestand toe.",
-  "settings.transfer.notMoved":
-    "API-sleutels, aanmeldingen, connectors, app-voorkeuren en chatgeschiedenis worden niet verplaatst. Stel ze opnieuw in op de nieuwe server.",
   "settings.transfer.back": "Terug",
   "settings.transfer.loading": "Je agents lezen…",
   "settings.transfer.summary.label": "Wat het bestand bevat",

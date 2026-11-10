@@ -119,10 +119,14 @@ export const messages = {
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
   "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.museNoModels":
+    "Muse לא שלח מודלים עבור החשבון הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל. בחר מודל מספק אחר.",
   "provider.picker.customEmpty":
     "אפשר להוסיף נקודת קצה תואמת OpenAI — שרת מודלים במחשב הזה, או כל שירות עם כתובת בסיס ומפתח.",
   "provider.picker.customPending":
     "המודלים של נקודות הקצה שלך עדיין לא נטענו. הספק קורא אותם אחרי שהמשימה הנוכחית שלו נעצרת.",
+  "provider.picker.customUnlisted": "{name} לא מציג את המודלים של נקודות הקצה שלך.",
+  "provider.picker.editEndpoints": "עריכת נקודות קצה",
   "provider.picker.defaultModelLabel": "{name}, ברירת מחדל",
   "provider.picker.usageLimit": "הגעת למגבלת השימוש",
   "provider.picker.usageLimitWindow": "מגבלת {window}",
@@ -133,7 +137,12 @@ export const messages = {
   "provider.picker.effortLabel": "מאמץ החשיבה של הסוכן",
   "provider.picker.effortFixed": "{effort}, נקבע על ידי {provider}",
   "provider.picker.fast": "מהיר",
-  "provider.picker.fastLabel": "מצב מהיר",
+  "provider.picker.fastText": "תשובות מהירות יותר, שימוש מוגבר",
+  "provider.picker.speed": "מהירות",
+  "provider.picker.standard": "רגיל",
+  "provider.picker.standardText": "מהירות ברירת מחדל",
+  "provider.picker.ultrafast": "מהיר במיוחד",
+  "provider.picker.ultrafastText": "התשובות המהירות ביותר, שימוש גבוה בהרבה",
   "provider.picker.selectEffort": "בחירת מאמץ",
   "provider.picker.custom": "מותאם אישית",
   "provider.picker.cliReady": "{cli} מוכן",
@@ -290,7 +299,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":
     "הסוכנים טוענים את CLAUDE.md, הכישורים, הסוכנים, ה-hooks והתוספים שלך מ-~/.claude. כשהאפשרות כבויה, כל תור שולח הנחיה קצרה יותר. קבצי סביבת העבודה עדיין נטענים.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "הסוכנים טוענים את CLAUDE.md, המיומנויות, הסוכנים, ה-hooks והתוספים מ-~/.claude בשרת. כשהמתג כבוי, כל תור שולח הנחיה קצרה יותר. קובצי סביבת העבודה עדיין נטענים.",
   "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
+  "provider.settings.context": "הקשר",
+  "provider.settings.compactWindow": "כיווץ צ׳אטים ב־",
+  "provider.settings.compactWindowDescription":
+    "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
+  "provider.settings.compactWindowDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.compactWindowTokens": "{size} טוקנים",
+  "provider.settings.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",

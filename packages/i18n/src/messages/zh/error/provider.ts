@@ -200,6 +200,7 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
+  "error.provider.acpNoAnswer": "{provider} 结束本轮对话时没有给出回答。请重新发送消息，或开始新对话。",
   "error.provider.chatgptPageFailed": "OpenBot 无法打开 ChatGPT 连接页面。",
   "error.provider.noneReady": "没有可用的助手服务商。",
   "error.provider.claudeTurnActive": "请等待当前 Claude 对话结束，再刷新其上下文。",
@@ -209,9 +210,6 @@ export const messages = {
   "error.provider.noAgentProcess": "{provider} 没有为该助手运行进程。",
   "error.provider.stoppedBeforeAgentProcess": "{provider} 在助手进程启动前就已停止。",
   "error.provider.archiveUnreadable": "运行时压缩包无法读取，或使用了不支持的格式。",
-  "error.provider.antigravityArchivePath": "Gemini 压缩包中包含异常文件。",
-  "error.provider.antigravityChecksum": "Gemini 运行时校验和不匹配。",
-  "error.provider.antigravityReleaseShape": "Gemini 发布包的结构异常。",
   "error.provider.antigravityMissing": "Gemini 尚未下载。请在 OpenBot 中下载后继续。",
   "error.provider.antigravityNotStarted": "找到了 Gemini 服务器，但无法读取其版本。",
   "error.provider.antigravityOverrideInvalid":
@@ -224,6 +222,9 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",
   "error.provider.cursorArchivePath": "Cursor 压缩包中包含异常文件。",
   "error.provider.cursorChecksum": "Cursor 运行时校验和不匹配。",
   "error.provider.cursorReleaseShape": "Cursor 发布包的结构异常。",
@@ -260,6 +261,10 @@ export const messages = {
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
+  "error.provider.imageTooSmall":
+    "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageTooLarge":
+    "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
   "error.provider.museMcpStartupFault":
@@ -369,6 +374,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse 需要文本或图片。",
   "error.provider.museMethodUnsupported": "Muse 不支持 {method}。",
   "error.provider.museTurnFailed": "Muse 本轮对话失败。",
+  "error.provider.museModelUnavailable":
+    "Muse 无法使用此模型。Muse 可能在此智能体运行的国家或地区不可用，或者此账号无权访问该模型。请选择其他模型，然后重试。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse 在无法使用外部工具时无法生成资料。请改用其他服务商生成资料，然后为该助手选择 Muse。",
   "error.provider.museAuthUnverified": "Muse 身份验证尚未确认。请在主机电脑上连接，或设置 Meta API 密钥。",

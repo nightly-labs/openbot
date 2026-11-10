@@ -68,6 +68,7 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "לערוץ יש התחלת הקצאה שלא אושרה. יש לבדוק את תוצאתה לפני המחיקה.",
   "error.backend.channelNotFound": "הערוץ לא נמצא.",
   "error.backend.channelMemberUnavailable": "חבר בערוץ אינו זמין.",
+  "error.backend.channelInstructionsTooLong": "קצרו את ההוראות ל-2,000 תווים. הוראות ארוכות יותר לא נשמרות.",
   "error.backend.channelWaitBeforeNewConversation": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז התחילו שיחה חדשה.",
   "error.backend.channelWaitBeforeCompact": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז דחסו אותו.",
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
@@ -195,7 +196,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "לסוכן הזה אין שגרה עם המזהה הזה.",
   "error.backend.agentWaitNoRoutine":
     "רק הרצה של אחת השגרות שלך מעירה המתנה, ואין לך שגרה. יש ליצור אחת עם openbot.create_routine ואז לפתוח את ההמתנה.",
-  "error.backend.agentWaitRemoteUnsupported": "המתנות פתוחות זמינות רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.markUnreadRemoteUnsupported": "סימון הודעה כלא נקראה זמין רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.messageDeleteUnsupported": "השרת הזה אינו תומך במחיקת הודעות.",
   "error.backend.messageDeleteNotFound": "ההודעה הזו אינה בצ'אט.",
@@ -226,6 +226,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "תשובת ההתחברות לא הגיעה בזמן.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot לא הצליח לקרוא את פרטי ההתחברות של השרת הזה. יש לבדוק את כתובת השרת ולנסות שוב.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
   "error.backend.mcpServerSignInForProvider":

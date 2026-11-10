@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "음성 받아쓰기가 끝날 때까지 기다린 후 모델을 삭제해 주세요.",
   "error.voice.removeFailed": "음성 모델을 삭제할 수 없어요. 다시 시도해 주세요.",
   "error.voice.runtimeUnavailable": "이 플랫폼에서는 로컬 음성 받아쓰기를 사용할 수 없어요.",
-  "error.voice.busy": "음성 받아쓰기가 이미 진행 중이에요.",
   "error.voice.modelUnavailable": "음성 모델을 사용할 수 없어요.",
   "error.voice.transcriptionTimedOut": "음성 받아쓰기 시간이 초과되었어요.",
   "error.voice.prepareRequired":
@@ -29,6 +28,10 @@ export const messages = {
   "error.voice.live.timedOut": "Codex 라이브 음성이 제시간에 시작되지 않았어요. 다시 시도하세요.",
   "error.voice.live.failed": "라이브 음성이 중지되었어요: {reason}",
   "error.voice.live.disconnected": "라이브 음성 연결이 끊어졌어요.",
+  "error.voice.live.hostFailed":
+    "서버의 Codex가 라이브 음성을 시작하지 못했어요. 소유자에게 그 컴퓨터의 Codex를 업데이트하고 ChatGPT로 로그인해 달라고 요청한 다음 다시 시도하세요.",
   "error.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
+  "error.voice.live.unavailable":
+    "OpenAI가 라이브 음성을 시작하지 못했습니다. OpenAI 측 문제입니다. 나중에 다시 시도하세요.",
   "error.voice.live.off": "Codex 라이브 음성이 꺼져 있습니다. 설정 → 음성에서 켜세요.",
 } as const satisfies PartialTranslation<typeof source>;

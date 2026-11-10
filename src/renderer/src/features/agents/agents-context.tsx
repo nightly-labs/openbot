@@ -10,7 +10,6 @@ import type {
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import type { AgentProfile } from "@openbot/ui/data";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
-import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_STATUS } from "../../app-defaults";
@@ -310,7 +309,6 @@ const Agents = createSimpleContext({
     }
 
     async function updateAgent(agentId: string, updates: Omit<UpdateAgentInput, "agentId">): Promise<void> {
-      const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
       const properties = analyticsAgentProperties(agentId);
       const changedFields = Object.keys(updates);
@@ -342,13 +340,13 @@ const Agents = createSimpleContext({
           failure_code: "update_failed",
           ...(properties ?? {}),
         });
-        appendUiError(agentId, error, currentText().t("agent.error.settingsFailed"), serverId);
+        // Each caller shows the failure where the change was made, such as the settings panel or the
+        // usage limit card. A message in the chat as well repeats it in the wrong place.
         throw error;
       }
     }
 
     async function setAgentAvatar(agentId: string, image: AvatarImageInput | null): Promise<void> {
-      const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
       const properties = analyticsAgentProperties(agentId);
       try {
@@ -374,7 +372,7 @@ const Agents = createSimpleContext({
           failure_code: "avatar_update_failed",
           ...(properties ?? {}),
         });
-        appendUiError(agentId, error, currentText().t("agent.error.avatarFailed"), serverId);
+        // The settings panel shows the failure next to the avatar.
         throw error;
       }
     }

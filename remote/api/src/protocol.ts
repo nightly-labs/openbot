@@ -30,6 +30,8 @@ export type {
   WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
 export {
+  SIGNAL_CLIENT_RECONNECT_GRACE_MS,
+  SIGNAL_DEFAULT_RECONNECT_GRACE_MS,
   SIGNAL_MESSAGE_BYTES_LIMIT,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,

@@ -25,9 +25,14 @@ import {
   AgentStepsDisclosure,
   type AgentStepsFacts,
 } from "@openbot/ui/features/conversation/AgentSteps";
-import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import {
+  AttachmentCards,
+  type AttachmentDownloads,
+  type AttachmentMediaSource,
+} from "@openbot/ui/features/conversation/AttachmentCards";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import {
@@ -63,6 +68,7 @@ import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
+import { MAIN_THREAD_ID } from "./thread-types";
 
 const HOLD_TEXT = {
   "agent-restarting": "conversation.threads.hold.agentRestarting",
@@ -199,6 +205,11 @@ export interface AgentThreadViewProps {
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
   onOpenLink: (url: string) => void;
+  /**
+   * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
+   * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
+   */
+  onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
@@ -473,6 +484,57 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       avatarSeed: senderId,
     };
   };
+  /* The exchange ids of the agent messages whose text shows under their marker. */
+  const [openAgentMessages, setOpenAgentMessages] = createSignal<ReadonlySet<string>>(new Set());
+  const toggleAgentMessage = (messageId: string) =>
+    setOpenAgentMessages((open) => {
+      const next = new Set(open);
+      if (!next.delete(messageId)) next.add(messageId);
+      return next;
+    });
+  /** The marker of a message to or from another agent. A message with no text gets no toggle. */
+  const agentMessageMarker = (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    if (marker?.kind !== "agent-message" || !props.onSelectAgent) return undefined;
+    if (message.body.trim() === "") return marker;
+    return { ...marker, expanded: openAgentMessages().has(marker.messageId) };
+  };
+  /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
+  const agentMessageText = (messageId: string) => {
+    const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
+    return (
+      <Show when={message()}>
+        {(current) => (
+          <ChatMessageRow
+            message={{
+              id: current().id,
+              author: "agent",
+              body: current().body,
+              time: current().time,
+              ...(current().createdAt === undefined ? {} : { createdAt: current().createdAt }),
+              kind: "text",
+            }}
+            author={author(current())}
+            showAuthor
+            showTime
+            agents={props.agents}
+            skills={props.skills}
+            // The sender's name opens the thread that sent the message, or else the sender's own chat, as in the chat.
+            onSelectAgent={(agentId) =>
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent?.(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent?.(agentId)
+            }
+            onOpenTag={props.onOpenTag}
+            onOpenLink={props.onOpenLink}
+            onPreview={props.onPreview}
+            onAttachmentAction={props.onAttachmentAction}
+            macWindowControls={props.macWindowControls}
+          />
+        )}
+      </Show>
+    );
+  };
   /** The items of a message's menu: Reply, Copy, Branch on the last answer of a finished turn, and Delete. */
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
@@ -682,7 +744,31 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       />
                     )}
                   </Show>
-                  <Show when={message().kind !== "thinking"}>
+                  <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
+                    {(marker) => (
+                      <article data-chat-search-message={message().id}>
+                        <ChatActionMarker
+                          marker={marker()}
+                          agents={props.agents}
+                          onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
+                          onToggleAgentMessage={toggleAgentMessage}
+                          agentMessageText={agentMessageText}
+                        />
+                        <Show when={marker().direction === "incoming" && (message().attachments?.length ?? 0) > 0}>
+                          <div class="chat-action-attachments">
+                            <AttachmentCards
+                              attachments={message().attachments ?? []}
+                              mediaSource={props.mediaSource}
+                              downloads={props.downloads}
+                              onPreview={(attachment) => props.onPreview(attachment)}
+                              onAction={props.onAttachmentAction}
+                            />
+                          </div>
+                        </Show>
+                      </article>
+                    )}
+                  </Show>
+                  <Show when={message().kind !== "thinking" && !agentMessageMarker(message())}>
                     <Show
                       when={card()}
                       fallback={
@@ -852,6 +938,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 pending={props.pendingImages}
                 removeDisabled={sending() || voicePhase() === "transcribing"}
                 onRemove={(attachment) => remove()(attachment)}
+                macWindowControls={props.macWindowControls}
               />
             )}
           </Show>

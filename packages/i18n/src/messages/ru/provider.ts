@@ -137,10 +137,14 @@ export const messages = {
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels": "У {name} нет доступных моделей.",
+  "provider.picker.museNoModels":
+    "Muse не прислал моделей для этой учётной записи. Возможно, Muse недоступен в стране, где работает этот агент. Выберите модель другого провайдера.",
   "provider.picker.customEmpty":
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
   "provider.picker.customPending":
     "Модели ваших эндпоинтов ещё не загружены. Провайдер прочитает их, когда завершится текущая задача.",
+  "provider.picker.customUnlisted": "{name} не показывает модели ваших эндпоинтов.",
+  "provider.picker.editEndpoints": "Изменить эндпоинты",
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.usageLimit": "Лимит использования исчерпан",
   "provider.picker.usageLimitWindow": "Лимит ({window})",
@@ -151,7 +155,12 @@ export const messages = {
   "provider.picker.effortLabel": "Уровень усилий агента",
   "provider.picker.effortFixed": "{effort}, задаёт {provider}",
   "provider.picker.fast": "Быстро",
-  "provider.picker.fastLabel": "Быстрый режим",
+  "provider.picker.fastText": "Более быстрые ответы, больший расход",
+  "provider.picker.speed": "Скорость",
+  "provider.picker.standard": "Обычная",
+  "provider.picker.standardText": "Скорость по умолчанию",
+  "provider.picker.ultrafast": "Сверхбыстро",
+  "provider.picker.ultrafastText": "Самые быстрые ответы, намного больший расход",
   "provider.picker.selectEffort": "Выбрать уровень усилий",
   "provider.picker.custom": "Свой",
   "provider.picker.cliReady": "{cli} готов",
@@ -256,7 +265,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Агенты загружают ваш CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude. Если выключить, каждый ход отправляет более короткий промпт. Файлы рабочей области загружаются по-прежнему.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Агенты загружают CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude на сервере. Если выключено, каждый ход отправляет более короткий промпт. Файлы рабочей области по-прежнему загружаются.",
   "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
+  "provider.settings.context": "Контекст",
+  "provider.settings.compactWindow": "Сжимать чаты при",
+  "provider.settings.compactWindowDescription":
+    "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",
+  "provider.settings.compactWindowDefault": "По умолчанию Claude Code",
+  "provider.settings.compactWindowTokens": "{size} токенов",
+  "provider.settings.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",

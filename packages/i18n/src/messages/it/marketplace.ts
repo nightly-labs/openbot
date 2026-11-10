@@ -124,6 +124,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "Funziona nell'app desktop di {name} all'indirizzo {address}.",
   "marketplace.app.setup.desktopConnected": "Connessa a {address}.",
   "marketplace.app.setup.open": "Non servono accesso né chiave.",
+  "marketplace.app.blocked.update":
+    "{host} usa una versione precedente di OpenBot che non può collegare app. Aggiorna OpenBot su {host} o chiedi al proprietario di aggiornarlo.",
+  "marketplace.app.blocked.member":
+    "Solo un proprietario o un admin di {host} può collegare app lì. Chiedi a uno di loro di collegare {name} o di aggiornare OpenBot su {host}, così i membri potranno collegare app.",
   "marketplace.app.connectAgain": "Connetti di nuovo",
   "marketplace.app.automation.askOnInstall": "Chiedi accesso a macOS all'installazione",
   "marketplace.app.automation.title": "Accesso alle app Apple",
@@ -195,6 +199,28 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "Cerca nelle mie note Cobrain cosa abbiamo deciso sui prezzi.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Salva una nota in Cobrain con quello che abbiamo fatto oggi e quello che resta.",
+  "marketplace.plugin.honcho.tagline": "La tua memoria in tutti gli strumenti di IA",
+  "marketplace.plugin.honcho.description":
+    "Honcho di Plastic Labs dà agli agenti una memoria a lungo termine su di te che altri strumenti di IA collegati possono condividere. Gli agenti salvano ciò che imparano e Honcho ci ragiona sopra per costruire un modello delle tue preferenze, dei tuoi obiettivi e dei tuoi modi di lavorare. Gli agenti gli fanno domande prima di iniziare. Anche gli agenti OpenBot hanno la propria memoria; Honcho è la memoria che ti segue in altri strumenti. I messaggi che gli agenti salvano vanno al tuo account Honcho.",
+  "marketplace.plugin.honcho.app":
+    "Salva e interroga la memoria a lungo termine nei tuoi spazi di lavoro Honcho tramite un solo server MCP.",
+  "marketplace.plugin.honcho.prompt.recall": "Prima di iniziare, chiedi a Honcho cosa sa di come mi piace lavorare.",
+  "marketplace.plugin.honcho.prompt.save": "Salva in Honcho le decisioni di questo thread.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Cosa dice Honcho del mio stile di scrittura? Usalo per questa bozza.",
+  "marketplace.plugin.honcho.hint.apiKey": "Crea una chiave su app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Memoria che impara col tempo",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight di Vectorize dà agli agenti una memoria a lungo termine in Hindsight Cloud. Gli agenti conservano fatti ed eventi, li richiamano per significato, tempo ed entità e ci riflettono per formare modelli mentali. I ricordi stanno in banche e gli agenti possono creare una banca per ogni progetto o persona. Anche gli agenti OpenBot hanno la propria memoria; Hindsight è la memoria che altri strumenti di IA collegati possono condividere. Ciò che gli agenti conservano va al tuo account Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app":
+    "Conserva, richiama e rifletti sui ricordi nelle tue banche Hindsight Cloud tramite un solo server MCP.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Prima di iniziare, richiama da Hindsight ciò che sappiamo di questo progetto.",
+  "marketplace.plugin.hindsight.prompt.retain":
+    "Conserva in Hindsight le decisioni e le domande aperte di questo thread.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Rifletti sui miei ricordi in Hindsight: quali schemi vedi nel mio lavoro dell'ultimo mese?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Crea una chiave nella pagina Connect di Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Design e prototipi",
   "marketplace.plugin.figma.description":
     "Figma permette agli agenti di leggere i file di design, ispezionare componenti, stili e variabili e passare le specifiche di produzione agli sviluppatori. Si collega al server MCP dell'app desktop di Figma, su questo computer. Il server può solo leggere i design; il supporto alla scrittura è in sviluppo.",
@@ -376,16 +402,24 @@ export const messages = {
     "Quanti contatti ci sono nel segmento VIP e come è cambiato questo mese?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
-  "marketplace.plugin.composio.tagline": "Tante app tramite il tuo link Composio",
+  "marketplace.plugin.postiz.tagline": "Pianificazione social",
+  "marketplace.plugin.postiz.description":
+    "Postiz consente agli agenti di elencare i tuoi canali social e di scrivere, programmare e pubblicare post su oltre 30 reti, come X, LinkedIn, Instagram e TikTok. Gli agenti possono anche caricare contenuti multimediali e creare immagini e video con l'IA. Accedi al tuo account Postiz dal browser, oppure incolla la chiave API da Settings › Developers in Postiz. Tutti i piani cloud di Postiz includono l'accesso alle API. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
+  "marketplace.plugin.postiz.app":
+    "Canali, bozze, post programmati e contenuti multimediali, tramite il server MCP di Postiz con accesso dal browser o una chiave API.",
+  "marketplace.plugin.postiz.prompt.channels": "Quali canali social sono collegati a Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "Quali post sono programmati per la prossima settimana?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Scrivi una bozza di post LinkedIn sulla nostra nuova versione, ma non programmarla.",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub e oltre 1.000 altre app",
   "marketplace.plugin.composio.description":
-    "Composio collega gli agenti a Gmail, Slack, GitHub e centinaia di altre app tramite un solo server MCP. Collega le app che vuoi nel tuo account Composio, poi incolla qui il suo URL MCP e la sua chiave API.",
+    "Composio collega i tuoi agenti a Gmail, Slack, GitHub e oltre 1.000 altre app tramite un solo server MCP. Accedi con il tuo account Composio. Quando un agente ha bisogno di un'app, ti chiede di collegarla.",
   "marketplace.plugin.composio.app":
-    "Le app che aggiungi al tuo server MCP Composio, tramite il link del tuo account Composio.",
+    "Le app che colleghi nel tuo account Composio. Un agente ti chiede di collegare un'app quando ne ha bisogno.",
   "marketplace.plugin.composio.prompt.inbox": "Riassumi le mie email non lette e prepara le risposte a quelle urgenti.",
   "marketplace.plugin.composio.prompt.handoff":
     "Pubblica nel canale del nostro team un riassunto di questa pull request.",
   "marketplace.plugin.composio.prompt.apps": "Quali app e azioni puoi usare tramite Composio?",
-  "marketplace.plugin.composio.hint.url": "L'URL di un server MCP nel tuo account Composio",
   "marketplace.plugin.composio.hint.apiKey": "La trovi nel tuo account Composio, in Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Progetti, branch e migrazioni Postgres",
   "marketplace.plugin.neon.description":
@@ -502,7 +536,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "Trova un dataset di serie temporali meteo e mostrane le colonne.",
   "marketplace.auth.apiKey": "Chiave API",
   "marketplace.auth.personalApiKey": "Chiave API personale",
-  "marketplace.auth.mcpUrl": "URL MCP",
   "marketplace.auth.createKey": "Crea una chiave",
 
   "marketplace.skill.doc": "SKILL.md",

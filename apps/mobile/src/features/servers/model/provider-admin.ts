@@ -9,6 +9,7 @@ import {
   type AgentStatus,
   agentProviderDescriptor,
   agentProviderName,
+  type ClaudeCompactWindowSetting,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
@@ -40,6 +41,9 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
@@ -89,6 +93,7 @@ import {
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
+  getHostClaudeCompactWindow,
   getHostModelVisibility,
   getHostPromptCacheTtl,
   getHostProviderDefault,
@@ -104,6 +109,7 @@ import {
   resetProviderUsage,
   saveCustomAgent,
   saveCustomProvider,
+  setHostClaudeCompactWindow,
   setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostProviderDefault,
@@ -176,11 +182,27 @@ function runtimeProviders(capabilities: readonly string[]): readonly Downloadabl
 }
 
 /**
- * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`, and
- * Inception, DeepSeek and OpenRouter from `providers-v8`.
+ * The other way in that the provider page offers, as the desktop ⋯ menu of a joined server does: the
+ * relayed page, when Connect is the host's code route.
+ */
+function providerSignInAlternative(provider: AgentProviderId, capabilities: readonly string[]): "relay" | null {
+  return providerSignInMethod(provider, capabilities) === "code" &&
+    capabilities.includes(SIGN_IN_RELAY_CAPABILITY) &&
+    isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)
+    ? "relay"
+    : null;
+}
+
+/**
+ * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`,
+ * Inception, DeepSeek and OpenRouter from `providers-v8`, and Claude and ChatGPT when the host reads
+ * their key (`claude-api-key-v1`, `codex-api-key-v1`). An older host stores such a key and never
+ * reads it.
  */
 function providerHasApiKey(provider: AgentProviderId, capabilities: readonly string[]): boolean {
   if (provider === "opencode") return true;
+  if (provider === "claude") return capabilities.includes(CLAUDE_API_KEY_CAPABILITY);
+  if (provider === "codex") return capabilities.includes(CODEX_API_KEY_CAPABILITY);
   if (isKeyOnlyProvider(provider)) return capabilities.includes(PROVIDERS_V8_CAPABILITY);
   return capabilities.includes(PROVIDERS_V5_CAPABILITY) && (provider === "muse" || provider === "antigravity");
 }
@@ -219,6 +241,8 @@ export interface ProviderRow {
   /** Installed, idle, and the host has a different version. */
   updatable: boolean;
   signIn: ProviderSignInMethod | null;
+  /** A second sign-in that differs from `signIn`, or null. */
+  alternativeSignIn: "relay" | null;
   apiKey: boolean;
 }
 
@@ -264,6 +288,7 @@ export function providerRows(
             availableVersion !== runtime.version,
         ),
         signIn: providerSignInMethod(provider, capabilities),
+        alternativeSignIn: providerSignInAlternative(provider, capabilities),
         apiKey: providerHasApiKey(provider, capabilities),
       };
     });
@@ -340,7 +365,8 @@ export function relayPage(
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
- * `prompt-cache-ttl-v1`, `provider-sign-out-v1` and `provider-usage-reset-v1`), with the newest route set that the host serves. The
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1` and `provider-usage-reset-v1`), with the newest
+ * route set that the host serves. The
  * host checks the role on every route.
  */
 export function createProviderAdmin(request: TeamApiRequest, capabilities: readonly string[]) {
@@ -496,6 +522,17 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
           read: (): Promise<PromptCacheTtlSetting> => runTeamRequest(getHostPromptCacheTtl(request)),
           set: (ttl: PromptCacheTtl): Promise<PromptCacheTtlSetting> =>
             runTeamRequest(setHostPromptCacheTtl(request, ttl)),
+        }
+      : null,
+    /**
+     * The size at which Claude Code compacts the chats of the host's agents (`claude-compact-window-v1`),
+     * or null. `tokens: null` is Claude Code's own size for each model.
+     */
+    compactWindow: has(CLAUDE_COMPACT_WINDOW_CAPABILITY)
+      ? {
+          read: (): Promise<ClaudeCompactWindowSetting> => runTeamRequest(getHostClaudeCompactWindow(request)),
+          set: (tokens: number | null): Promise<ClaudeCompactWindowSetting> =>
+            runTeamRequest(setHostClaudeCompactWindow(request, tokens)),
         }
       : null,
     /** Signs the host's own sign-in of a provider out (`provider-sign-out-v1`), or null. Its agents wait. */

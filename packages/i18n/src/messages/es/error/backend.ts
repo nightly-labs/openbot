@@ -73,6 +73,8 @@ export const messages = {
     "El canal tiene un inicio de tarea sin confirmar. Comprueba el resultado antes de eliminarlo.",
   "error.backend.channelNotFound": "No se encontró el canal.",
   "error.backend.channelMemberUnavailable": "Un miembro del canal no está disponible.",
+  "error.backend.channelInstructionsTooLong":
+    "Acorta las instrucciones a 2000 caracteres. Las instrucciones más largas no se guardan.",
   "error.backend.channelWaitBeforeNewConversation":
     "Espera a que termine el trabajo en este canal y luego inicia una nueva conversación.",
   "error.backend.channelWaitBeforeCompact": "Espera a que termine el trabajo en este canal y luego compáctalo.",
@@ -214,8 +216,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Este agente no tiene ninguna rutina con este id.",
   "error.backend.agentWaitNoRoutine":
     "Solo una ejecución de una de tus rutinas despierta una espera, y no tienes ninguna rutina. Crea una con openbot.create_routine y luego abre la espera.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Las esperas abiertas solo están disponibles para agentes en este equipo.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marcar un mensaje como no leído solo está disponible para agentes en este equipo.",
   "error.backend.messageDeleteUnsupported": "Este servidor no permite eliminar mensajes.",
@@ -250,6 +250,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "La respuesta del inicio de sesión no llegó a tiempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot no pudo leer la información de inicio de sesión de este servidor. Revisa la dirección del servidor y vuelve a intentarlo.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "El servidor de inicio de sesión envió una respuesta que OpenBot no puede leer. Si el servicio te da una clave de API o un token, añádelo en la configuración de este servidor y vuelve a probar la conexión.",
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",

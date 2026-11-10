@@ -148,6 +148,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "פועל באפליקציית שולחן העבודה של {name} בכתובת {address}.",
   "marketplace.app.setup.desktopConnected": "מחובר אל {address}.",
   "marketplace.app.setup.open": "אין צורך בהתחברות או במפתח.",
+  "marketplace.app.blocked.update":
+    "ב-{host} פועלת גרסה ישנה של OpenBot שלא יכולה לחבר אפליקציות. עדכנו את OpenBot ב-{host}, או בקשו מהבעלים לעדכן אותה.",
+  "marketplace.app.blocked.member":
+    "רק בעלים או מנהל של {host} יכולים לחבר שם אפליקציות. בקשו מאחד מהם לחבר את {name}, או לעדכן את OpenBot ב-{host} כדי שחברים יוכלו לחבר אפליקציות.",
   "marketplace.app.connectAgain": "חיבור מחדש",
   "marketplace.app.automation.askOnInstall": "בקשת גישה מ-macOS בהתקנה",
   "marketplace.app.automation.title": "גישה לאפליקציות של Apple",
@@ -207,6 +211,23 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "טען את ההקשר של Cobrain לפרויקט הזה לפני שנתחיל.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "חפש בהערות Cobrain שלי מה החלטנו לגבי התמחור.",
   "marketplace.plugin.cobrain.prompt.saveNote": "שמור ב-Cobrain הערה עם מה שעשינו היום ומה נשאר.",
+  "marketplace.plugin.honcho.tagline": "הזיכרון שלך בכל כלי ה-AI",
+  "marketplace.plugin.honcho.description":
+    "Honcho של Plastic Labs נותן לסוכנים זיכרון לטווח ארוך עליך, שכלי AI אחרים שחיברת יכולים לשתף. הסוכנים שומרים את מה שהם לומדים, ו-Honcho מסיק ממנו מודל של ההעדפות, המטרות ודרכי העבודה שלך. הסוכנים שואלים אותו שאלות לפני שהם מתחילים. לסוכני OpenBot יש גם זיכרון משלהם; Honcho הוא הזיכרון שעובר איתך לכלים אחרים. הודעות שהסוכנים שומרים נשלחות לחשבון Honcho שלך.",
+  "marketplace.plugin.honcho.app": "שמירה ושאילתות של זיכרון לטווח ארוך בסביבות העבודה שלך ב-Honcho דרך שרת MCP אחד.",
+  "marketplace.plugin.honcho.prompt.recall": "לפני שנתחיל, שאל את Honcho מה הוא יודע על הדרך שבה אני אוהב לעבוד.",
+  "marketplace.plugin.honcho.prompt.save": "שמור ב-Honcho את ההחלטות מהשרשור הזה.",
+  "marketplace.plugin.honcho.prompt.preferences": "מה Honcho אומר על סגנון הכתיבה שלי? השתמש בזה בטיוטה הזו.",
+  "marketplace.plugin.honcho.hint.apiKey": "צור מפתח ב-app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "זיכרון שלומד עם הזמן",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight של Vectorize נותן לסוכנים זיכרון לטווח ארוך ב-Hindsight Cloud. הסוכנים שומרים עובדות ואירועים, מאחזרים אותם לפי משמעות, זמן וישות, ומהרהרים בהם כדי ליצור מודלים מנטליים. הזיכרונות נשמרים בבנקים, והסוכנים יכולים ליצור בנק לכל פרויקט או אדם. לסוכני OpenBot יש גם זיכרון משלהם; Hindsight הוא הזיכרון שכלי AI אחרים שחיברת יכולים לשתף. מה שהסוכנים שומרים נשלח לחשבון Hindsight Cloud שלך.",
+  "marketplace.plugin.hindsight.app": "שמירה, אחזור והרהור בזיכרונות בבנקים שלך ב-Hindsight Cloud דרך שרת MCP אחד.",
+  "marketplace.plugin.hindsight.prompt.recall": "לפני שנתחיל, אחזר מ-Hindsight מה אנחנו יודעים על הפרויקט הזה.",
+  "marketplace.plugin.hindsight.prompt.retain": "שמור ב-Hindsight את ההחלטות והשאלות הפתוחות מהשרשור הזה.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "הרהר בזיכרונות שלי ב-Hindsight: אילו דפוסים אתה רואה בעבודה שלי בחודש האחרון?",
+  "marketplace.plugin.hindsight.hint.apiKey": "צור מפתח בדף Connect של Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "עיצובים ואבות טיפוס",
   "marketplace.plugin.figma.description":
     "Figma מאפשר לסוכנים לקרוא קובצי עיצוב, לבדוק רכיבים, סגנונות ומשתנים ולמסור מפרטי ייצור למהנדסים. הוא מתחבר לשרת MCP באפליקציית Figma לשולחן העבודה, במחשב הזה. השרת יכול לקרוא עיצובים בלבד; תמיכה בכתיבה בפיתוח.",
@@ -361,14 +382,22 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "איך הקמפיינים של השבוע שעבר הצליחו בהשוואה לשבוע שלפניו?",
   "marketplace.plugin.omnisend.prompt.segment": "כמה אנשי קשר יש בפלח VIP, ואיך זה השתנה החודש?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "נסח קמפיין לקולקציה החדשה, אבל אל תשלח אותו.",
-  "marketplace.plugin.composio.tagline": "אפליקציות רבות דרך הקישור שלך ל-Composio",
+  "marketplace.plugin.postiz.tagline": "תזמון פוסטים ברשתות חברתיות",
+  "marketplace.plugin.postiz.description":
+    "Postiz מאפשר לסוכנים להציג את ערוצי הרשתות החברתיות שלך, ולכתוב טיוטות, לתזמן ולפרסם פוסטים ביותר מ-30 רשתות, כמו X,‏ LinkedIn,‏ Instagram ו-TikTok. סוכנים יכולים גם להעלות מדיה וליצור תמונות וסרטונים בבינה מלאכותית. התחבר לחשבון Postiz שלך בדפדפן, או הדבק את מפתח ה-API מ-Settings › Developers ב-Postiz. כל תוכניות הענן של Postiz כוללות גישה ל-API. סוכנים יכולים לפרסם פוסט מיד, לכן בדוק כל פוסט לפני שתאשר אותו.",
+  "marketplace.plugin.postiz.app":
+    "ערוצים, טיוטות, פוסטים מתוזמנים ומדיה, דרך שרת ה-MCP של Postiz עם התחברות בדפדפן או מפתח API.",
+  "marketplace.plugin.postiz.prompt.channels": "אילו ערוצי רשתות חברתיות מחוברים ל-Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "אילו פוסטים מתוזמנים לשבוע הבא?",
+  "marketplace.plugin.postiz.prompt.draft": "כתוב טיוטת פוסט ל-LinkedIn על הגרסה החדשה שלנו, אבל אל תתזמן אותו.",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ועוד יותר מ-1,000 אפליקציות",
   "marketplace.plugin.composio.description":
-    "Composio מחבר סוכנים ל-Gmail, Slack, GitHub ולמאות אפליקציות אחרות דרך שרת MCP אחד. יש לחבר את האפליקציות הרצויות בחשבון Composio שלך, ואז להדביק כאן את כתובת ה-MCP שלו ואת מפתח ה-API.",
-  "marketplace.plugin.composio.app": "האפליקציות שאתה מוסיף לשרת MCP שלך ב-Composio, דרך הקישור מחשבון Composio שלך.",
+    "Composio מחבר את הסוכנים שלך ל-Gmail, Slack, GitHub ולעוד יותר מ-1,000 אפליקציות אחרות דרך שרת MCP אחד. יש להתחבר עם חשבון Composio שלך. כשסוכן צריך אפליקציה, הוא מבקש ממך לחבר אותה.",
+  "marketplace.plugin.composio.app":
+    "האפליקציות שחיברת בחשבון Composio שלך. סוכן מבקש ממך לחבר אפליקציה כשהוא צריך אותה.",
   "marketplace.plugin.composio.prompt.inbox": "סכם את האימיילים שלא נקראו וצור טיוטות תשובה לדחופים.",
   "marketplace.plugin.composio.prompt.handoff": "פרסם סיכום של בקשת המשיכה הזו בערוץ הצוות שלנו.",
   "marketplace.plugin.composio.prompt.apps": "באילו אפליקציות ופעולות אתה יכול להשתמש דרך Composio?",
-  "marketplace.plugin.composio.hint.url": "כתובת שרת MCP בחשבון Composio שלך",
   "marketplace.plugin.composio.hint.apiKey": "אפשר למצוא אותו בחשבון Composio שלך, ב-Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "פרויקטי Postgres, ענפים ומיגרציות",
   "marketplace.plugin.neon.description":
@@ -469,7 +498,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "מצא מערך נתונים של סדרות זמן של מזג אוויר והצג את העמודות שלו.",
   "marketplace.auth.apiKey": "מפתח API",
   "marketplace.auth.personalApiKey": "מפתח API אישי",
-  "marketplace.auth.mcpUrl": "כתובת MCP",
   "marketplace.auth.createKey": "יצירת מפתח",
 
   "marketplace.skill.doc": "SKILL.md",

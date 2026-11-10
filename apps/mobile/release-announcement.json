@@ -1,10 +1,10 @@
 {
-  "version": "1.4.7",
+  "version": "1.4.8",
   "highlights": [
-    "Delete a message, mark it as unread, or send its text to a channel: touch and hold the message.",
-    "Link WhatsApp numbers and change Telegram and Slack triggers and outputs from your phone. The server needs the latest OpenBot.",
-    "Use the app in Arabic, with a right-to-left layout. Each chat paragraph shows in the direction of its text.",
-    "Connect Coinbase, Robinhood, RevenueCat, TickTick, Proton Pass and Higgsfield from the Apps marketplace.",
-    "The app reconnects faster when you come back to it, uses less memory while a reply streams, and closes less often."
+    "Control your computer from the phone: open the server menu and tap Control computer to see its screen and use it like a trackpad.",
+    "Type @ in a chat to tag one of the agent's browser tabs or side threads. The host needs OpenBot 0.62.0 or later.",
+    "A new Library in the server drawer shows every picture and file from the chats of a server.",
+    "Talk with an agent by GPT live voice, or dictate on the phone with Parakeet Unified or Qwen3-ASR in 30 languages.",
+    "Sign in with your company account, and connect GitLab, Omnisend and ElevenLabs from the Apps marketplace."
   ]
 }

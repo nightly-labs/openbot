@@ -28,6 +28,7 @@ import {
   reasoningText,
   type ThreadItem,
 } from "../protocol";
+import { isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
 import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
@@ -36,7 +37,11 @@ export function isNonActionableCodexWarning(message: string): boolean {
     message.startsWith("Skill descriptions were shortened to fit") ||
     // Codex sends this when it changes transport, and the same turn continues over HTTPS
     // (`codex-rs/core/src/responses_retry.rs`). A final failure comes as an `error` (#2559).
-    message.startsWith("Falling back from WebSockets to HTTPS transport.")
+    message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
+    // Codex sends this on each thread start when the user turned on a feature such as
+    // `async_compaction` in `config.toml` (`codex-rs/features/src/lib.rs`). The turn continues, and
+    // the text has the config path, so the banner replaced it with "could not continue".
+    message.startsWith("Under-development features enabled:")
   );
 }
 
@@ -137,6 +142,10 @@ function isMissingClaudeSession(provider: AgentProvider, message: string): boole
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
+  if (isImageTooSmallDiagnostic(message))
+    return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
+  if (isImageTooLargeDiagnostic(message))
+    return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
@@ -503,6 +512,8 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
+  // Its name has `send`, a word of the agent words below.
+  if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");
   const skill = getString(item, "name") === "Skill" ? getString(item, "skill") : null;
   if (skill) return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillUsing", { name: skill });
   if (descriptor.includes("capture_screen")) {

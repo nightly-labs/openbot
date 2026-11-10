@@ -144,6 +144,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "{name} masaüstü uygulamasında {address} adresinde çalışır.",
   "marketplace.app.setup.desktopConnected": "{address} adresine bağlı.",
   "marketplace.app.setup.open": "Oturum açma veya anahtar gerekmez.",
+  "marketplace.app.blocked.update":
+    "{host} uygulama bağlayamayan eski bir OpenBot sürümü çalıştırıyor. {host} üzerindeki OpenBot'u güncelleyin veya sahibinden güncellemesini isteyin.",
+  "marketplace.app.blocked.member":
+    "{host} üzerinde yalnızca bir sahip veya yönetici uygulama bağlayabilir. Onlardan {name} uygulamasını bağlamalarını ya da üyelerin uygulama bağlayabilmesi için {host} üzerindeki OpenBot'u güncellemelerini isteyin.",
   "marketplace.app.connectAgain": "Tekrar bağlan",
   "marketplace.app.automation.askOnInstall": "Yüklerken macOS'ten erişim iste",
   "marketplace.app.automation.title": "Apple uygulamalarına erişim",
@@ -216,6 +220,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision":
     "Fiyatlandırma hakkında ne karar verdiğimizi Cobrain notlarımda ara.",
   "marketplace.plugin.cobrain.prompt.saveNote": "Bugün ne yaptığımızı ve neyin kaldığını Cobrain'e not olarak kaydet.",
+  "marketplace.plugin.honcho.tagline": "Tüm yapay zekâ araçlarında hafızanız",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs'in Honcho'su, ajanlara sizinle ilgili, bağladığınız diğer yapay zekâ araçlarının da paylaşabileceği uzun süreli bir hafıza verir. Ajanlar öğrendiklerini kaydeder, Honcho da bunlar üzerinde akıl yürüterek tercihlerinizin, hedeflerinizin ve çalışma biçimlerinizin bir modelini oluşturur. Ajanlar başlamadan önce ona sorular sorar. OpenBot ajanlarının kendi hafızası da vardır; Honcho sizi diğer araçlara da izleyen hafızadır. Ajanların kaydettiği mesajlar Honcho hesabınıza gider.",
+  "marketplace.plugin.honcho.app":
+    "Tek bir MCP sunucusu üzerinden Honcho çalışma alanlarınızda uzun süreli hafızayı kaydedin ve sorgulayın.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Başlamadan önce Honcho'ya nasıl çalışmayı sevdiğim hakkında ne bildiğini sor.",
+  "marketplace.plugin.honcho.prompt.save": "Bu konudaki kararları Honcho'ya kaydet.",
+  "marketplace.plugin.honcho.prompt.preferences": "Honcho yazım tarzım hakkında ne diyor? Bu taslakta bunu kullan.",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev adresinde bir anahtar oluşturun.",
+  "marketplace.plugin.hindsight.tagline": "Zamanla öğrenen hafıza",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize'ın Hindsight'ı, ajanlara Hindsight Cloud'da uzun süreli bir hafıza verir. Ajanlar olguları ve olayları saklar, onları anlam, zaman ve varlığa göre hatırlar ve zihinsel modeller oluşturmak için üzerlerinde düşünür. Anılar bankalarda tutulur ve ajanlar her proje ya da kişi için bir banka oluşturabilir. OpenBot ajanlarının kendi hafızası da vardır; Hindsight, bağladığınız diğer yapay zekâ araçlarının paylaşabileceği hafızadır. Ajanların sakladıkları Hindsight Cloud hesabınıza gider.",
+  "marketplace.plugin.hindsight.app":
+    "Tek bir MCP sunucusu üzerinden Hindsight Cloud bankalarınızdaki anıları saklayın, hatırlayın ve üzerinde düşünün.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Başlamadan önce Hindsight'tan bu proje hakkında bildiklerimizi hatırla.",
+  "marketplace.plugin.hindsight.prompt.retain": "Bu konudaki kararları ve açık soruları Hindsight'ta sakla.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Hindsight'taki anılarım üzerinde düşün: son bir aydaki çalışmamda hangi örüntüleri görüyorsun?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud'un Connect sayfasında bir anahtar oluşturun.",
   "marketplace.plugin.figma.tagline": "Tasarımlar ve prototipler",
   "marketplace.plugin.figma.description":
     "Figma, ajanların tasarım dosyalarını okumasına, bileşenleri, stilleri ve değişkenleri incelemesine ve üretim şartnamelerini mühendislere teslim etmesine olanak tanır. Bu bilgisayardaki Figma masaüstü uygulamasındaki MCP sunucusuna bağlanır. Sunucu yalnızca tasarımları okuyabilir; yazma desteği üzerinde çalışılıyor.",
@@ -388,16 +413,24 @@ export const messages = {
     "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
-  "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
+  "marketplace.plugin.postiz.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.postiz.description":
+    "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz hesabınıza tarayıcıdan giriş yapın veya Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları API erişimi içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin.",
+  "marketplace.plugin.postiz.app":
+    "Kanallar, taslaklar, planlanmış gönderiler ve medya; tarayıcıdan giriş veya API anahtarıyla Postiz'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz'e hangi sosyal medya kanalları bağlı?",
+  "marketplace.plugin.postiz.prompt.week": "Gelecek hafta için hangi gönderiler planlandı?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
-    "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",
+    "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",
   "marketplace.plugin.composio.app":
-    "Composio MCP sunucunuza eklediğiniz uygulamalar, Composio hesabınızdaki bağlantı üzerinden.",
+    "Composio hesabınızda bağladığınız uygulamalar. Bir ajan, ihtiyaç duyduğunda bir uygulamayı bağlamanızı ister.",
   "marketplace.plugin.composio.prompt.inbox":
     "Okunmamış e-postalarımı özetle ve acil olanlara yanıt taslakları hazırla.",
   "marketplace.plugin.composio.prompt.handoff": "Bu çekme isteğinin özetini ekip kanalımıza gönder.",
   "marketplace.plugin.composio.prompt.apps": "Composio üzerinden hangi uygulamaları ve eylemleri kullanabilirsin?",
-  "marketplace.plugin.composio.hint.url": "Composio hesabınızdaki bir MCP sunucusunun URL'si",
   "marketplace.plugin.composio.hint.apiKey":
     "Composio hesabınızda, Settings > Sessions & API Key altında bulabilirsiniz.",
   "marketplace.plugin.neon.tagline": "Postgres projeleri, dalları ve geçişleri",
@@ -512,7 +545,6 @@ export const messages = {
     "Hava durumu zaman serilerinden oluşan bir veri kümesi bul ve sütunlarını göster.",
   "marketplace.auth.apiKey": "API anahtarı",
   "marketplace.auth.personalApiKey": "Kişisel API anahtarı",
-  "marketplace.auth.mcpUrl": "MCP URL'si",
   "marketplace.auth.createKey": "Anahtar oluştur",
 
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".

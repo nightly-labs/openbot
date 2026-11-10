@@ -27,6 +27,7 @@ import {
   decodeCustomAgentUsage,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
+  decodeInstalledFonts,
   decodeMobileConnectedDevices,
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
@@ -164,6 +165,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       softwareRendering: true,
     } satisfies AppInfo,
   ],
+  [
+    "app info on a Mac set to a 24-hour clock",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "darwin",
+      variant: "production",
+      hourCycle: "h23",
+    } satisfies AppInfo,
+  ],
   ["sent message stats", decodeSentMessageStats, { firstSentAt: "2026-11-01T09:30:00.000Z", sentCount: 12 }],
   ["sent message stats before the first message", decodeSentMessageStats, { firstSentAt: null, sentCount: 0 }],
   [
@@ -191,6 +203,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       palettes: [],
       chatBackgroundLight: null,
       chatBackgroundDark: null,
+      interfaceFont: null,
+      codeFont: null,
     } satisfies AppAppearancePreference,
   ],
   [
@@ -203,6 +217,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       palettes: [omarchyPalette],
       chatBackgroundLight: null,
       chatBackgroundDark: null,
+      interfaceFont: null,
+      codeFont: null,
     },
   ],
   [
@@ -215,8 +231,25 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       palettes: [],
       chatBackgroundLight: "#f1f2ff",
       chatBackgroundDark: "#162232",
+      interfaceFont: null,
+      codeFont: null,
     } satisfies AppAppearancePreference,
   ],
+  [
+    "appearance preference with an interface font and a code font",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+      interfaceFont: "Noto Sans Arabic",
+      codeFont: "JetBrains Mono",
+    } satisfies AppAppearancePreference,
+  ],
+  ["installed fonts", decodeInstalledFonts, ["Al Bayan", "DejaVu Sans", "Noto Kufi Arabic"]],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
   [
     "signed out after a keyring change",
@@ -349,6 +382,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", softwareRendering: "yes" },
   ],
+  [
+    "app info with an unknown hour cycle",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", hourCycle: "h24" },
+  ],
   // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
   [
@@ -421,6 +459,34 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeAppAppearancePreference,
     { appearance: "dark", transparentWindow: false, palette: null, palettes: [] },
   ],
+  [
+    "appearance preference with no font",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+    },
+  ],
+  [
+    "a font name that ends the CSS string",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+      interfaceFont: 'Arial"; background: url(x)',
+      codeFont: null,
+    },
+  ],
+  ["an installed font with a semicolon", decodeInstalledFonts, ["Arial", "Menlo; color: red"]],
+  ["installed fonts that are not a list", decodeInstalledFonts, "Arial"],
   [
     "a chat background that is not a hex color",
     decodeAppAppearancePreference,

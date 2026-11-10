@@ -113,6 +113,22 @@ export class MailboxSync {
     sortConversationMessages(snapshot.messages);
   }
 
+  /**
+   * Puts the current queue positions on the stored messages of a page. A move of the queue alone is
+   * not saved, so a stored row can keep an older position.
+   */
+  refreshQueuePositions(messages: readonly ConversationMessage[]): void {
+    const queued = (delivery: { status: string } | undefined) => delivery?.status === "queued";
+    if (!messages.some((message) => queued(message.delivery) || message.exchange?.deliveries.some(queued))) return;
+    const positions = this.#mailbox.queuedPositions();
+    for (const message of messages) {
+      if (message.delivery && queued(message.delivery))
+        message.delivery.position = positions.get(message.delivery.id) ?? message.delivery.position;
+      for (const delivery of message.exchange?.deliveries ?? [])
+        if (queued(delivery)) delivery.position = positions.get(delivery.id) ?? delivery.position;
+    }
+  }
+
   reconcilePersistedMailboxMessages(agent: AgentSummary): void {
     if (!agent.threadId) return;
     const page = this.#database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);

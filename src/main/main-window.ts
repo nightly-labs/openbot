@@ -55,7 +55,8 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { hidePanelFromWindowSwitchers, preventPanelActivation } from "./mac-panel-activation";
+import { usesX11Windows } from "./linux-wayland-output";
+import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -574,13 +575,15 @@ function attachAppInput(
       window.webContents.inspectElement(params.x, params.y);
       return;
     }
-    // A chat message opens its own menu, but leaves selected text and links to this one
-    // (`keepNativeMenu` in `ChatMessageRow`). The native edit menu covers editing, spelling and
-    // link copying; anything else keeps no menu.
+    // A chat message opens its own menu, but leaves selected text, links and images to this one
+    // (`keepNativeMenu` in `ChatMessageRow`). The native menu covers editing, spelling, and link and
+    // image copying; anything else keeps no menu.
     const items = chatContextMenuItems({
       selectionText: params.selectionText,
       isEditable: params.isEditable,
       linkURL: params.linkURL,
+      mediaType: params.mediaType,
+      hasImageContents: params.hasImageContents,
       misspelledWord: params.misspelledWord,
       dictionarySuggestions: params.dictionarySuggestions,
       editFlags: params.editFlags,
@@ -596,6 +599,13 @@ function attachAppInput(
           return {
             label: t("menu.copyLink"),
             click: () => clipboard.writeText(params.linkURL),
+          };
+        if (item.kind === "copy-image")
+          return {
+            label: t("menu.copyImage"),
+            click: () => {
+              if (!window.isDestroyed()) window.webContents.copyImageAt(params.x, params.y);
+            },
           };
         if (item.kind === "spelling")
           return {
@@ -622,13 +632,16 @@ function attachAppInput(
 }
 
 export function createDynamicIslandWindow(bounds: Rectangle, _display: Display): BrowserWindow {
+  // X11: as for the agent dock, a window that is not focusable when it is made never takes keys. The
+  // controller makes it not focusable after it is made, and focusable again for the inline reply.
+  const x11 = process.platform === "linux";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
-    focusable: false,
+    focusable: x11,
     hiddenInMissionControl: true,
     resizable: false,
     movable: false,
@@ -638,7 +651,8 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
     enableLargerThanScreen: true,
     hasShadow: false,
     skipTaskbar: true,
-    type: "panel",
+    // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
+    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -664,15 +678,18 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
   return window;
 }
 
-/** The agent dock at the right edge of the screen: a transparent panel above the other apps. */
+/** The agent dock at an edge of the screen: a transparent panel (a tool window on Windows) above the other apps. */
 export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
+  // X11: a window that is not focusable when it is made has no window manager, so it never takes keys.
+  // A dock window that is focusable at first stays on top on each desktop and takes keys for the chat.
+  const x11 = process.platform === "linux";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
-    focusable: false,
+    focusable: x11,
     hiddenInMissionControl: true,
     resizable: false,
     movable: false,
@@ -681,7 +698,8 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
     fullscreenable: false,
     hasShadow: false,
     skipTaskbar: true,
-    type: "panel",
+    // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
+    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -696,6 +714,8 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   preventPanelActivation(window);
   // While its chat composer is focused, the dock is the main window, and AltTab would list it.
   hidePanelFromWindowSwitchers(window);
+  // The dock stays on screen when the user hides OpenBot, as it does when the main window is minimized.
+  keepPanelThroughAppHide(window);
   // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -947,7 +967,7 @@ export function hideWindowsForQuit(): void {
 
 export function showMainWindow(window: BrowserWindow): void {
   if (windowsKeptHidden) return;
-  presentMainWindow(window, process.platform, () => app.show());
+  presentMainWindow(window, process.platform, () => app.show(), process.platform === "linux" && !usesX11Windows());
 }
 
 export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
@@ -957,13 +977,16 @@ export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
 }
 
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
-  const displayMode = display.internal ? "notch" : "island";
+  // Linux has no notch: the island floats below the top panel of the desktop. A Windows built-in
+  // display gets the notch shape at the top edge, as on a Mac.
+  const notchDisplay = process.platform !== "linux";
+  const displayMode = notchDisplay && display.internal ? "notch" : "island";
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "dynamic-island");
   url.searchParams.set("display", displayMode);
   url.searchParams.set("variant", variant);
-  const notch = dynamicIslandNotchSizeForDisplay(display);
+  const notch = dynamicIslandNotchSizeForDisplay(display, process.platform);
   if (notch) {
     url.searchParams.set("notch-width", String(notch.width));
     url.searchParams.set("notch-height", String(notch.height));

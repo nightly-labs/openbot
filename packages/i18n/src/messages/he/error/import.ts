@@ -29,15 +29,24 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} כבר קיים, ולכן העותק הזה נשמר בשם {saved}.",
   "error.import.fileSkipped": "{name}: הקובץ {file} מדולג. {reason}",
   "error.import.chooseZip": "יש לבחור קובץ .zip.",
-  "error.import.zipTooLarge": "הייצוא חייב להיות קובץ .zip קטן מ-2 GB.",
   "error.import.unsafeFile": "הייצוא מכיל קובץ לא בטוח: {name}",
-  "error.import.expandedTooLarge": "הייצוא חייב להתרחב לפחות מ-2 GB ומ-{limit} קבצים.",
+  "error.import.tooManyFiles": "הייצוא חייב לכלול {limit} קבצים לכל היותר.",
+  "error.import.diskSpace":
+    "{name}: הקבצים שלו דורשים {size} GB של שטח פנוי בדיסק, ו-{free} GB פנויים. יש לפנות מקום ולייבא את הסוכן שוב.",
   "error.import.remoteExpandedTooLarge": "הייצוא חייב להתרחב לפחות מ-500 MB ומ-{limit} קבצים.",
   "error.import.zipInvalid": "הקובץ שנבחר אינו .zip תקין. אם Grok Bot עדיין שומר אותו, יש להמתין ולבחור אותו שוב.",
+  "error.import.entryDamaged": "הקובץ פגום בייצוא.",
+  "error.import.foldersSkipped": "{number} קבצים בתיקיות .git ו-node_modules לא נכללים. כלי יכול ליצור אותם מחדש.",
   "error.import.empty": "הייצוא ריק.",
   "error.import.remoteZipTooLarge": "כדי לייבא לשרת שהצטרפת אליו, הייצוא חייב להיות קובץ .zip קטן מ-100 MB.",
   "error.import.hostBusy": "השרת קורא ייצואים אחרים. יש לנסות שוב בעוד כמה דקות.",
+  "error.import.uploadDiskSpace":
+    "הייצוא צריך {size} GB של מקום פנוי בדיסק של השרת, ויש {free} GB פנויים. יש לפנות מקום בשרת, ואז לבחור שוב את הייצוא.",
+  "error.import.remoteZipTooLargeOldHost":
+    "השרת הזה מקבל ייצוא של עד 100 MB. יש לעדכן את OpenBot בשרת כדי לייבא ייצוא גדול יותר.",
   "error.import.skillKept": '{name}: בשרת כבר יש את המיומנות "{skill}", ולכן הסוכן משתמש בה. יש לבקש ממנהל לעדכן אותה.',
+  "error.import.skillRenamed":
+    '{name}: השם של המיומנות "{skill}" דומה מדי לשם של מיומנות אחרת, ולכן היא נשמרת בשם "{renamed}".',
   "error.import.hermesNoProfiles":
     "בתיקייה הזו אין פרופילי Hermes. יש לבחור את תיקיית Hermes, שמכילה את config.yaml או את SOUL.md.",
   "error.import.hermesClosed": "פרופילי Hermes אינם פתוחים עוד. יש לקרוא אותם שוב.",

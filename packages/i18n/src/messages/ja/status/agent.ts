@@ -27,6 +27,14 @@ export const messages = {
   "status.agent.screenCaptureWindow": "ウィンドウ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureRegion":
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
+  "status.agent.reportProblem":
+    "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
+  "status.agent.serverInstallCommand":
+    "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
+  "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
+  "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
@@ -74,5 +82,7 @@ export const messages = {
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
+  "status.agent.compactionContinues":
+    "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
 } as const satisfies PartialTranslation<typeof source>;

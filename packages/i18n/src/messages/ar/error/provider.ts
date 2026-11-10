@@ -209,6 +209,7 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
+  "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
@@ -218,9 +219,6 @@ export const messages = {
   "error.provider.noAgentProcess": "لا توجد عملية {provider} قيد التشغيل لهذا الوكيل.",
   "error.provider.stoppedBeforeAgentProcess": "توقف {provider} قبل بدء عملية الوكيل.",
   "error.provider.archiveUnreadable": "تتعذّر قراءة أرشيف بيئة التشغيل أو أنه يستخدم تنسيقًا غير مدعوم.",
-  "error.provider.antigravityArchivePath": "يحتوي أرشيف Gemini على ملف غير متوقع.",
-  "error.provider.antigravityChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Gemini.",
-  "error.provider.antigravityReleaseShape": "إصدار Gemini بتنسيق غير متوقع.",
   "error.provider.antigravityMissing": "لم يُنزَّل Gemini. نزّله في OpenBot للمتابعة.",
   "error.provider.antigravityNotStarted": "عُثر على خادم Gemini، لكن تتعذّر قراءة إصداره.",
   "error.provider.antigravityOverrideInvalid":
@@ -235,6 +233,9 @@ export const messages = {
     "لا يستطيع Gemini استخدام هذا النموذج الآن. اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
+  "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "على مضيف Windows، يفتح Gemini صفحة Google على المضيف نفسه. اربط Gemini على الكمبيوتر المضيف.",
   "error.provider.cursorArchivePath": "يحتوي أرشيف Cursor على ملف غير متوقع.",
   "error.provider.cursorChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cursor.",
   "error.provider.cursorReleaseShape": "إصدار Cursor بتنسيق غير متوقع.",
@@ -272,6 +273,10 @@ export const messages = {
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.imageTooSmall":
+    "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.imageTooLarge":
+    "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة كبيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.opencodeSessionRejected":
     "رفض OpenCode الطلب ولم يذكر السبب. قد يحدث هذا في دردشة طويلة أو بعد تغيير النموذج. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا مختلفًا أو مستوى جهد أقل.",
   "error.provider.museMcpStartupFault":
@@ -391,6 +396,8 @@ export const messages = {
   "error.provider.museEmptyInput": "يحتاج Muse إلى نص أو صورة.",
   "error.provider.museMethodUnsupported": "لا يدعم Muse {method}.",
   "error.provider.museTurnFailed": "فشل دور Muse.",
+  "error.provider.museModelUnavailable":
+    "لا يمكن لـ Muse استخدام هذا النموذج. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل، أو قد لا يملك هذا الحساب إذنًا بالوصول إلى النموذج. اختر نموذجًا آخر، ثم حاول مرة أخرى.\n{detail}",
   "error.provider.museProfileUnsupported":
     "لا يستطيع Muse إنشاء ملف تعريف بدون الوصول إلى أدوات خارجية. استخدم مزوّدًا آخر لإنشاء ملف التعريف، ثم اختر Muse للوكيل.",
   "error.provider.museAuthUnverified": "لم يتم التحقق من مصادقة Muse. اتصل على الحاسوب المضيف، أو عيّن مفتاح Meta API.",

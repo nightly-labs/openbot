@@ -73,6 +73,8 @@ export const messages = {
     "Kanał ma niepotwierdzone rozpoczęcie przydziału. Sprawdź jego wynik przed usunięciem.",
   "error.backend.channelNotFound": "Nie znaleziono kanału.",
   "error.backend.channelMemberUnavailable": "Członek kanału jest niedostępny.",
+  "error.backend.channelInstructionsTooLong":
+    "Skróć instrukcje do 2000 znaków. Dłuższe instrukcje nie zostaną zapisane.",
   "error.backend.channelWaitBeforeNewConversation":
     "Poczekaj, aż praca w tym kanale się zakończy, a potem rozpocznij nową rozmowę.",
   "error.backend.channelWaitBeforeCompact": "Poczekaj, aż praca w tym kanale się zakończy, a potem go skompaktuj.",
@@ -209,7 +211,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Ten agent nie ma rutyny o tym identyfikatorze.",
   "error.backend.agentWaitNoRoutine":
     "Oczekiwanie budzi tylko uruchomienie jednej z twoich rutyn, a nie masz żadnej rutyny. Utwórz ją za pomocą openbot.create_routine, a potem otwórz oczekiwanie.",
-  "error.backend.agentWaitRemoteUnsupported": "Otwarte oczekiwania są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.markUnreadRemoteUnsupported":
     "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
   "error.backend.messageDeleteUnsupported": "Ten serwer nie obsługuje usuwania wiadomości.",
@@ -242,6 +243,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "Odpowiedź logowania nie dotarła na czas.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot nie mógł odczytać informacji o logowaniu tego serwera. Sprawdź adres serwera i spróbuj ponownie.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Serwer logowania wysłał odpowiedź, której OpenBot nie może odczytać. Jeśli usługa daje Ci klucz API lub token, dodaj go w ustawieniach tego serwera, a potem ponownie przetestuj połączenie.",
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",

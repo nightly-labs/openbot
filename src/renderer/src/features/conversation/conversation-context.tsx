@@ -1124,33 +1124,51 @@ const Conversation = createSimpleContext({
       });
     }
 
-    /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
+    /**
+     * Marks an agent's chat read through its newest message, which may not be loaded yet, and its side
+     * threads read. The sidebar badge also counts the side threads, such as a routine's thread.
+     */
+    async function markAgentChatRead(agentId: string, serverId = activeServerId()): Promise<void> {
+      const reportFailure = (error: unknown) =>
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+      const readOwnChat = async () => {
+        const page = await conversationPort().agent.readConversationPage(
+          { agentId, anchor: { type: "latest" }, limit: 1 },
+          serverId,
+        );
+        const latestMessageId = page.messages.at(-1)?.id;
+        if (latestMessageId) await markAgentMessagesRead(agentId, latestMessageId, serverId);
+      };
+      await Promise.all([
+        (unreadReplies()[agentId] ?? 0) > 0 ? readOwnChat().catch(reportFailure) : undefined,
+        (agentTasks.unreadTotals()[agentId] ?? 0) > 0
+          ? agentTasks.markAllTasksRead(agentId).catch(reportFailure)
+          : undefined,
+      ]);
+    }
+
+    /** Marks each unread agent chat read, as `markAgentChatRead` does. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
       // Only listed agents: a read of an id the host no longer knows creates that agent again.
-      const agentIds = agentList().map((agent) => agent.id);
-      const unread = agentIds.filter((agentId) => (unreadReplies()[agentId] ?? 0) > 0);
-      // The sidebar count includes the open side threads, such as a routine's thread.
-      const threadsUnread = agentIds.filter((agentId) => (agentTasks.unreadTotals()[agentId] ?? 0) > 0);
-      await Promise.all([
-        ...unread.map(async (agentId) => {
-          try {
-            const page = await conversationPort().agent.readConversationPage(
-              { agentId, anchor: { type: "latest" }, limit: 1 },
-              serverId,
-            );
-            const latestMessageId = page.messages.at(-1)?.id;
-            if (latestMessageId) await markAgentMessagesRead(agentId, latestMessageId, serverId);
-          } catch (error) {
-            appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
-          }
-        }),
-        ...threadsUnread.map((agentId) =>
-          agentTasks
-            .markAllTasksRead(agentId)
-            .catch((error) => appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId)),
-        ),
-      ]);
+      await Promise.all(agentList().map((agent) => markAgentChatRead(agent.id, serverId)));
+    }
+
+    /**
+     * Marks the newest agent reply of a chat unread, from the sidebar. The reply may not be loaded yet,
+     * so this reads the latest page. The chat stays unread until the user opens it again.
+     */
+    async function markAgentChatUnread(agentId: string, serverId = activeServerId()): Promise<void> {
+      try {
+        const page = await conversationPort().agent.readConversationPage(
+          { agentId, anchor: { type: "latest" }, limit: LATEST_PAGE_SIZE },
+          serverId,
+        );
+        const latestReply = latestIncomingConversationMessage(page.messages);
+        if (latestReply) await markAgentMessagesUnread(agentId, latestReply.id, serverId);
+      } catch (error) {
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+      }
     }
 
     function presentPromptResolution(agentId: string, turnId: string, requestId: string | number): void {
@@ -1218,6 +1236,8 @@ const Conversation = createSimpleContext({
       markAgentMessagesRead,
       markAgentMessagesUnread,
       deleteAgentMessage,
+      markAgentChatRead,
+      markAgentChatUnread,
       markAllAgentMessagesRead,
       presentPromptResolution,
       // See `AppProviders`: a chat window sends no typing state.

@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openbot-mobile-updates",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-18",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "updates.openbot.run",
+      "custom_domain": true
+    }
+  ],
+  // A request has the last fatal error text of the app in a header. Invocation logs record request
+  // headers, so they stay off. The Worker logs only its own storage errors.
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "invocation_logs": false
+    }
+  },
+  "r2_buckets": [
+    {
+      "binding": "UPDATES",
+      "bucket_name": "openbot-mobile-updates",
+      "preview_bucket_name": "openbot-mobile-updates-test"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { QueueDelivery, QueueHold, QueueSteerFallback } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -23,6 +24,8 @@ interface QueuePanelProps {
   onSteer?: ((deliveryId: string) => void) | undefined;
   /** The agent's provider cannot steer, so the row action is Send now. */
   sendsNow?: boolean | undefined;
+  /** A routine run holds this chat's turn. A message cannot steer it, so its row names the routine. */
+  routineRuns?: boolean | undefined;
   /** Starts a separate task with a queued message. Absent where the host keeps no tasks. */
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
@@ -365,10 +368,12 @@ export function QueuePanel(props: QueuePanelProps) {
   function messagePreview(delivery: QueueDelivery): string {
     const agentNames = new Map((props.agents ?? []).map((agent) => [agent.id, agent.name]));
     const skillNames = new Map((props.skills ?? []).map((skill) => [skill.skillId, skill.name]));
-    const text = expandChatTagReferences(delivery.text.trim(), (reference) => {
-      if (reference.kind === "quote") return `“${reference.name}”`;
-      return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
-    });
+    const text = expandAttachmentReferences(
+      expandChatTagReferences(delivery.text.trim(), (reference) => {
+        if (reference.kind === "quote") return `“${reference.name}”`;
+        return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
+      }),
+    );
     return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || t("queue.attachment");
   }
 
@@ -501,12 +506,20 @@ export function QueuePanel(props: QueuePanelProps) {
                         <span class="agent-queue-editing-badge">{t("queue.item.editing")}</span>
                       </Show>
                       <Show when={!editing && delivery.status === "queued" && delivery.steerFallback}>
-                        {(fallback) => (
-                          <span class="agent-queue-editing-badge" title={t(STEER_FALLBACK_REASON[fallback()])}>
-                            {t("queue.item.notSteered")}
-                            <span class="sr-only"> {t(STEER_FALLBACK_REASON[fallback()])}</span>
-                          </span>
-                        )}
+                        {(fallback) => {
+                          const reason = () =>
+                            t(
+                              fallback() === "steer-failed" && props.routineRuns
+                                ? "queue.item.steerFallback.routineRun"
+                                : STEER_FALLBACK_REASON[fallback()],
+                            );
+                          return (
+                            <span class="agent-queue-editing-badge" title={reason()}>
+                              {t("queue.item.notSteered")}
+                              <span class="sr-only"> {reason()}</span>
+                            </span>
+                          );
+                        }}
                       </Show>
                       <Show when={props.onSteer}>
                         {(steer) => (

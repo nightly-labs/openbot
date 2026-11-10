@@ -29,16 +29,24 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} موجود بالفعل، لذا تُحفظ هذه النسخة باسم {saved}.",
   "error.import.fileSkipped": "{name}: يُتخطى الملف {file}. {reason}",
   "error.import.chooseZip": "اختر ملف .zip.",
-  "error.import.zipTooLarge": "يجب أن يكون التصدير ملف .zip بحجم أقل من 2 GB.",
   "error.import.unsafeFile": "يحتوي التصدير على ملف غير آمن: {name}",
-  "error.import.expandedTooLarge": "يجب أن يكون حجم التصدير بعد فك الضغط أقل من 2 GB وأقل من {limit} ملف.",
+  "error.import.tooManyFiles": "يجب ألا يزيد عدد ملفات التصدير على {limit} ملف.",
+  "error.import.diskSpace":
+    "{name}: تحتاج ملفاته إلى {size} GB من المساحة الحرة على القرص، والمساحة الحرة {free} GB. حرّر مساحة، ثم استورد الوكيل مرة أخرى.",
   "error.import.remoteExpandedTooLarge": "يجب أن يكون حجم التصدير بعد فك الضغط أقل من 500 MB وأقل من {limit} ملف.",
   "error.import.zipInvalid": "الملف المحدد ليس ملف .zip صالحًا. إذا كان Grok Bot لا يزال يحفظه، فانتظر واختره مرة أخرى.",
+  "error.import.entryDamaged": "الملف تالف في التصدير.",
+  "error.import.foldersSkipped": "تُرك {number} ملف في مجلدات .git وnode_modules. يمكن لأداة إنشاؤها مرة أخرى.",
   "error.import.empty": "التصدير فارغ.",
   "error.import.remoteZipTooLarge": "للاستيراد إلى خادم منضم إليه، يجب أن يكون التصدير ملف .zip بحجم أقل من 100 MB.",
   "error.import.hostBusy": "يقرأ الخادم عمليات تصدير أخرى. حاول مرة أخرى بعد بضع دقائق.",
+  "error.import.uploadDiskSpace":
+    "يحتاج التصدير إلى {size} GB من المساحة الفارغة على قرص الخادم، والمتاح {free} GB. أفرغ مساحة على الخادم، ثم اختر التصدير مرة أخرى.",
+  "error.import.remoteZipTooLargeOldHost":
+    "يقبل هذا الخادم تصديرًا حتى 100 MB. حدّث OpenBot على الخادم لاستيراد تصدير أكبر.",
   "error.import.skillKept":
     "{name}: لدى الخادم المهارة «{skill}» بالفعل، لذا يستخدم الوكيل تلك المهارة. اطلب من مسؤول تحديثها.",
+  "error.import.skillRenamed": "{name}: اسم المهارة «{skill}» قريب جدًا من اسم مهارة أخرى، لذا حُفظت باسم «{renamed}».",
   "error.import.hermesNoProfiles":
     "لا يحتوي هذا المجلد على ملفات تعريف Hermes. اختر مجلد Hermes الذي يحتوي على config.yaml أو SOUL.md.",
   "error.import.hermesClosed": "لم تعد ملفات تعريف Hermes مفتوحة. اقرأها مرة أخرى.",

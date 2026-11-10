@@ -50,6 +50,14 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
+/** The source rows, and each agent memory has no site, as migration 60 adds it. */
+function withNoMemorySite(before: Contents): Contents {
+  return {
+    ...before,
+    projection_agent_memories: (before.projection_agent_memories ?? []).map((row) => ({ ...row, site: null })),
+  };
+}
+
 /** Migration 57 gives each agent routine the chat as the place where it runs. */
 function withChatRunPlace(tables: Contents): Contents {
   const routines = tables.projection_agent_routines;
@@ -73,7 +81,7 @@ describe("agent wait migration", () => {
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({
-        ...withChatRunPlace(before),
+        ...withNoMemorySite(withChatRunPlace(before)),
         agent_waits: [],
         projection_messaging_memories: [],
         routine_result_deliveries: [],
@@ -100,8 +108,9 @@ describe("agent wait migration", () => {
         browser_proxies: [],
         browser_profile_proxies: [],
         agent_usage_skill_loads: [],
+        projection_messaging_pings: [],
       });
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 58 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 60 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -121,7 +130,7 @@ describe("agent wait migration", () => {
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
     expect(contents(db)).toEqual({
-      ...withChatRunPlace(before),
+      ...withNoMemorySite(withChatRunPlace(before)),
       agent_waits: [],
       projection_messaging_memories: [],
       routine_result_deliveries: [],
@@ -148,15 +157,16 @@ describe("agent wait migration", () => {
       browser_proxies: [],
       browser_profile_proxies: [],
       agent_usage_skill_loads: [],
+      projection_messaging_pings: [],
     });
   });
 
   it("rejects newer and incomplete migration histories before it creates the table", () => {
     const db = databaseAtWithSeed(33);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(59,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(61,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=59; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=61; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(waitTables(db)).toEqual([]);

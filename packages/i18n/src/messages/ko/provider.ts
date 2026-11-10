@@ -121,10 +121,14 @@ export const messages = {
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
   "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",
+  "provider.picker.museNoModels":
+    "Muse가 이 계정에 모델을 보내지 않았어요. 이 에이전트가 실행되는 국가에서는 Muse를 사용할 수 없을 수 있어요. 다른 제공자의 모델을 선택하세요.",
   "provider.picker.customEmpty":
     "OpenAI 호환 엔드포인트를 추가하세요. 이 컴퓨터의 모델 서버나 기본 URL과 키가 있는 서비스면 돼요.",
   "provider.picker.customPending":
     "엔드포인트의 모델을 아직 불러오지 않았어요. 제공자는 현재 작업이 끝난 후 모델을 읽어요.",
+  "provider.picker.customUnlisted": "{name}에 엔드포인트의 모델이 표시되지 않아요.",
+  "provider.picker.editEndpoints": "엔드포인트 편집",
   "provider.picker.defaultModelLabel": "{name}, 기본",
   "provider.picker.usageLimit": "사용 한도에 도달했어요",
   "provider.picker.usageLimitWindow": "{window} 한도",
@@ -135,7 +139,12 @@ export const messages = {
   "provider.picker.effortLabel": "에이전트 추론 강도",
   "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
   "provider.picker.fast": "빠르게",
-  "provider.picker.fastLabel": "빠른 모드",
+  "provider.picker.fastText": "더 빠른 응답, 사용량 증가",
+  "provider.picker.speed": "속도",
+  "provider.picker.standard": "표준",
+  "provider.picker.standardText": "기본 속도",
+  "provider.picker.ultrafast": "초고속",
+  "provider.picker.ultrafastText": "가장 빠른 응답, 사용량 크게 증가",
   "provider.picker.selectEffort": "강도 선택",
   "provider.picker.custom": "사용자 지정",
   "provider.picker.cliReady": "{cli} 준비됨",
@@ -273,7 +282,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "내 Claude Code 설정 사용",
   "provider.settings.claudeUserSetupDescription":
     "에이전트가 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러옵니다. 끄면 각 턴에서 더 짧은 프롬프트를 보냅니다. 작업 공간 파일은 계속 불러옵니다.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "에이전트가 서버의 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러와요. 끄면 각 턴에서 더 짧은 프롬프트를 보내요. 워크스페이스 파일은 계속 불러와요.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code 설정을 불러오지 못했습니다.",
+  "provider.settings.context": "컨텍스트",
+  "provider.settings.compactWindow": "채팅 압축 크기",
+  "provider.settings.compactWindowDescription":
+    "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
+  "provider.settings.compactWindowDefault": "Claude Code 기본값",
+  "provider.settings.compactWindowTokens": "토큰 {size}",
+  "provider.settings.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
   "provider.settings.models": "모델",
   "provider.settings.modelsDescription": { other: "모델 {count}개 중 {shown}개가 모델 선택에 보여요." },
   "provider.settings.modelsSearch": "모델 검색",

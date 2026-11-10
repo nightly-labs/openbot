@@ -210,6 +210,7 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
+  "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
   "error.provider.chatgptPageFailed": "OpenBot לא הצליח לפתוח את דף החיבור של ChatGPT.",
   "error.provider.noneReady": "אין ספק סוכנים מוכן.",
   "error.provider.claudeTurnActive": "יש להמתין לפעולה הפעילה של Claude לפני רענון ההקשר שלו.",
@@ -219,9 +220,6 @@ export const messages = {
   "error.provider.noAgentProcess": "ל-{provider} אין תהליך שרץ עבור הסוכן הזה.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} נעצר לפני שהתהליך של הסוכן התחיל.",
   "error.provider.archiveUnreadable": "לא ניתן לקרוא את ארכיון סביבת ההרצה או שהוא בפורמט שאינו נתמך.",
-  "error.provider.antigravityArchivePath": "בארכיון של Gemini יש קובץ לא צפוי.",
-  "error.provider.antigravityChecksum": "סכום הביקורת של סביבת ההרצה של Gemini אינו תואם.",
-  "error.provider.antigravityReleaseShape": "לגרסה של Gemini יש מבנה לא צפוי.",
   "error.provider.antigravityMissing": "Gemini לא הורד. יש להוריד אותו ב-OpenBot כדי להמשיך.",
   "error.provider.antigravityNotStarted": "שרת Gemini נמצא, אך לא ניתן לקרוא את הגרסה שלו.",
   "error.provider.antigravityOverrideInvalid":
@@ -236,6 +234,9 @@ export const messages = {
     "Gemini לא יכול להשתמש במודל הזה כרגע. יש לבחור מודל אחר ואז לנסות שוב.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
+  "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "במארח Windows, ‏Gemini פותח את דף Google במארח עצמו. יש לחבר את Gemini במחשב המארח.",
   "error.provider.cursorArchivePath": "בארכיון של Cursor יש קובץ לא צפוי.",
   "error.provider.cursorChecksum": "סכום הביקורת של סביבת ההרצה של Cursor אינו תואם.",
   "error.provider.cursorReleaseShape": "לגרסה של Cursor יש מבנה לא צפוי.",
@@ -272,6 +273,10 @@ export const messages = {
     "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
   "error.provider.foreignReasoning":
     "{provider} לא קיבל את החשיבה הקודמת בצ'אט הזה, כי חשבון או מפתח API אחר קיבל אותה. OpenBot התחיל סשן חדש של {provider} עם היסטוריית הצ'אט. יש לנסות שוב.",
+  "error.provider.imageTooSmall":
+    "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageTooLarge":
+    "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.museMcpStartupFault":
@@ -390,6 +395,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse צריך טקסט או תמונה.",
   "error.provider.museMethodUnsupported": "Muse לא תומך ב-{method}.",
   "error.provider.museTurnFailed": "הפעולה של Muse נכשלה.",
+  "error.provider.museModelUnavailable":
+    "Muse לא יכול להשתמש במודל הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל, או שלחשבון הזה אין גישה למודל. בחר מודל אחר ונסה שוב.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse לא יכול ליצור פרופיל בלי גישה לכלים חיצוניים. יש להשתמש בספק אחר כדי ליצור את הפרופיל, ואז לבחור ב-Muse עבור הסוכן.",
   "error.provider.museAuthUnverified": "האימות של Muse לא אומת. יש להתחבר במחשב המארח, או להגדיר מפתח API של Meta.",

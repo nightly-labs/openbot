@@ -6,11 +6,11 @@ import {
   type AccessibilityActionInfo,
   type LayoutChangeEvent,
   type ScrollViewProps,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
@@ -92,8 +92,9 @@ const ROW_PADDING_X = 32;
 export function SettingsRow({
   children,
   supportingText,
+  value,
   onPress,
-  trailing,
+  trailing: trailingControl,
   disabled = false,
   leading,
   disclosure = true,
@@ -105,6 +106,8 @@ export function SettingsRow({
   onAccessibilityAction,
 }: PropsWithChildren<{
   supportingText?: string;
+  /** A short value, such as a count, before the disclosure chevron. */
+  value?: string;
   onPress?: () => void;
   trailing?: ReactNode;
   disabled?: boolean;
@@ -126,7 +129,17 @@ export function SettingsRow({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
-  const { fontScale } = useWindowDimensions();
+  const chevron =
+    onPress && disclosure ? <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} /> : null;
+  const trailing = value ? (
+    <View className="flex-row items-center gap-2">
+      <Typography.Paragraph className="text-grouped-secondary">{value}</Typography.Paragraph>
+      {chevron}
+    </View>
+  ) : (
+    trailingControl
+  );
+  const fontScale = useFontScale();
   const measures = Boolean(trailing) && fontScale >= STACKED_FONT_SCALE;
   const [rowWidth, setRowWidth] = useState(0);
   const [trailingWidth, setTrailingWidth] = useState(0);
@@ -134,14 +147,7 @@ export function SettingsRow({
   const onRowLayout = measures
     ? (event: LayoutChangeEvent) => setRowWidth(Math.round(event.nativeEvent.layout.width))
     : undefined;
-  const measuredTrailing = (
-    <View
-      className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 shrink"}
-      onLayout={(event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width))}
-    >
-      {trailing}
-    </View>
-  );
+  const trailingContent = trailing || chevron;
   const title = (
     <>
       {children}
@@ -152,21 +158,24 @@ export function SettingsRow({
       ) : null}
     </>
   );
+  // The title and the value keep one place in the tree in all layouts; only the styles change. If
+  // the value moved to another parent, React would mount a new native control, which is narrow
+  // until it measures its contents. The row would then change its layout again at each mount and
+  // flicker.
   const content = (
     <>
       {leading}
-      <View className="min-w-0 flex-1 gap-1">
-        {title}
-        {stacked ? measuredTrailing : null}
+      <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
+        <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
+        {trailingContent ? (
+          <View
+            className={stacked ? "max-w-full self-start overflow-hidden" : measures ? "min-w-0 shrink" : undefined}
+            onLayout={measures ? (event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width)) : undefined}
+          >
+            {trailingContent}
+          </View>
+        ) : null}
       </View>
-      {stacked
-        ? null
-        : measures
-          ? measuredTrailing
-          : trailing ||
-            (onPress && disclosure ? (
-              <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
-            ) : null)}
     </>
   );
   return onPress ? (

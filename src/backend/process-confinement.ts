@@ -117,16 +117,17 @@ export function openCodeDataDirectory(env: NodeJS.ProcessEnv = process.env, home
 }
 
 /**
- * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under
- * the Gemini home, and hook scratch files in `artifacts`. The shared `config` folder, with the
- * global hooks, skills and MCP servers, is not in the list, so it stays read-only. `settings.json`
- * selects the sign-in and `trusted_workspaces.json` trusts folders for every other process.
+ * The Antigravity CLI keeps its sign-in, sessions and harness files in `antigravity-acp` under the
+ * Gemini home (`--app-data-dir`), hook scratch files in `artifacts`, and the state of each project in
+ * `config/projects`. The rest of the shared `config` folder, with the global hooks, skills, plugins
+ * and MCP servers, is not in the list, so it stays read-only. `settings.json` selects the sign-in and
+ * `trusted_workspaces.json` trusts folders for every other process.
  */
 export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const geminiHome = env.GEMINI_HOME?.trim() || join(home, ".gemini");
   const acp = join(geminiHome, "antigravity-acp");
   return {
-    writable: [acp, join(geminiHome, "artifacts")],
+    writable: [acp, join(geminiHome, "artifacts"), join(geminiHome, "config", "projects")],
     protected: [join(acp, "settings.json"), join(acp, "trusted_workspaces.json")],
   };
 }
@@ -352,8 +353,9 @@ export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home 
  * Mistral Vibe 3.1.0 writes its session logs, history, caches, locks and the folders that it trusts
  * in its home folder. Its settings and MCP servers (`config.toml`), the saved API key (`.env`), the
  * trusted folders, hooks, instructions, tools, skills, agents, prompts and plugins are in that folder
- * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache is a
- * settings layer, so it stays read-only too. On macOS the CLI reads the API key of a sign-in from the
+ * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache and
+ * the model catalogue cache are settings layers, so they stay read-only too: the provider's shared
+ * process saves the catalogue, and a confined process reads it. Vibe 3.1.0 only logs a failed save. On macOS the CLI reads the API key of a sign-in from the
  * login Keychain with `security` (`keychainLockFiles`).
  */
 export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
@@ -378,6 +380,7 @@ export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = h
       "projects.toml",
       "local_projects.toml",
       "managed_config_cache.json",
+      "model_catalog_cache.json",
       "connector_bootstrap_cache.json",
     ].map((name) => join(vibeHome, name)),
   };

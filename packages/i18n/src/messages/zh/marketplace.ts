@@ -129,6 +129,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "在 {name} 桌面应用中运行，地址为 {address}。",
   "marketplace.app.setup.desktopConnected": "已连接到 {address}。",
   "marketplace.app.setup.open": "无需登录或密钥。",
+  "marketplace.app.blocked.update":
+    "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
+  "marketplace.app.blocked.member":
+    "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -187,6 +191,22 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "开始之前，请先加载我在 Cobrain 中的这个项目的上下文。",
   "marketplace.plugin.cobrain.prompt.searchDecision": "在我的 Cobrain 笔记中搜索我们关于定价的决定。",
   "marketplace.plugin.cobrain.prompt.saveNote": "在 Cobrain 中保存一条笔记，记下我们今天做了什么、还剩什么。",
+  "marketplace.plugin.honcho.tagline": "跨 AI 工具的个人记忆",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs 的 Honcho 为智能体提供关于你的长期记忆，你连接的其他 AI 工具也可以共享。智能体保存所学内容，Honcho 据此推理，构建你的偏好、目标和工作方式的模型。智能体在开始前会向它提问。OpenBot 智能体也有自己的记忆；Honcho 是跟随你到其他工具的记忆。智能体保存的消息会发送到你的 Honcho 账户。",
+  "marketplace.plugin.honcho.app": "通过一个 MCP 服务器，在 Honcho 工作区中保存和查询长期记忆。",
+  "marketplace.plugin.honcho.prompt.recall": "开始之前，问问 Honcho 它对我喜欢的工作方式了解多少。",
+  "marketplace.plugin.honcho.prompt.save": "把这个对话中的决定保存到 Honcho。",
+  "marketplace.plugin.honcho.prompt.preferences": "Honcho 对我的写作风格怎么说？把它用在这份草稿里。",
+  "marketplace.plugin.honcho.hint.apiKey": "在 app.honcho.dev 创建密钥。",
+  "marketplace.plugin.hindsight.tagline": "随时间学习的记忆",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize 的 Hindsight 为智能体提供 Hindsight Cloud 中的长期记忆。智能体保留事实和事件，按含义、时间和实体回忆它们，并对其进行反思以形成心智模型。记忆保存在记忆库中，智能体可以为每个项目或每个人创建一个记忆库。OpenBot 智能体也有自己的记忆；Hindsight 是你连接的其他 AI 工具可以共享的记忆。智能体保留的内容会发送到你的 Hindsight Cloud 账户。",
+  "marketplace.plugin.hindsight.app": "通过一个 MCP 服务器，在 Hindsight Cloud 记忆库中保留、回忆和反思记忆。",
+  "marketplace.plugin.hindsight.prompt.recall": "开始之前，从 Hindsight 中回忆我们对这个项目的了解。",
+  "marketplace.plugin.hindsight.prompt.retain": "把这个对话中的决定和未解决的问题保留到 Hindsight。",
+  "marketplace.plugin.hindsight.prompt.reflect": "反思我在 Hindsight 中的记忆：你在我上个月的工作中看到了哪些规律？",
+  "marketplace.plugin.hindsight.hint.apiKey": "在 Hindsight Cloud 的 Connect 页面创建密钥。",
   "marketplace.plugin.figma.tagline": "设计与原型",
   "marketplace.plugin.figma.description":
     "Figma 让助手读取设计文件、检查组件、样式与变量，并把生产规格交给工程师。它连接这台电脑上 Figma 桌面应用里的 MCP 服务器。该服务器目前只能读取设计，写入支持仍在开发中。",
@@ -338,16 +358,23 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
-  "marketplace.plugin.composio.tagline": "通过你自己的 Composio 链接连接大量应用",
+  "marketplace.plugin.postiz.tagline": "社交媒体排程",
+  "marketplace.plugin.postiz.description":
+    "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
+  "marketplace.plugin.postiz.app":
+    "通过 Postiz 的 MCP 服务器，用浏览器登录或 API 密钥处理频道、草稿、已排程的帖子和媒体。",
+  "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
+  "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
+  "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
-    "Composio 通过一个 MCP 服务器把助手连接到 Gmail、Slack、GitHub 以及数百个其他应用。在你的 Composio 账号中连接想要的应用，然后把它的 MCP URL 和 API 密钥粘贴到这里。",
-  "marketplace.plugin.composio.app": "通过你 Composio 账号中的链接，使用你添加到 Composio MCP 服务器的应用。",
+    "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",
+  "marketplace.plugin.composio.app": "你在 Composio 账号中连接的应用。助手需要某个应用时，会请你连接它。",
   "marketplace.plugin.composio.prompt.inbox": "总结我的未读邮件，并为紧急的几封起草回复。",
   "marketplace.plugin.composio.prompt.handoff": "把这个拉取请求的摘要发到我们的团队频道。",
   "marketplace.plugin.composio.prompt.apps": "通过 Composio 你能使用哪些应用和操作？",
 
   // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
-  "marketplace.plugin.composio.hint.url": "你的 Composio 账号中某个 MCP 服务器的链接",
   "marketplace.plugin.composio.hint.apiKey": "可在你的 Composio 账号的 Settings > Sessions & API Key 中找到。",
   "marketplace.plugin.neon.tagline": "Postgres 项目、分支与迁移",
   "marketplace.plugin.neon.description":
@@ -443,7 +470,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "找一个天气时间序列数据集，并显示它的列。",
   "marketplace.auth.apiKey": "API 密钥",
   "marketplace.auth.personalApiKey": "个人 API 密钥",
-  "marketplace.auth.mcpUrl": "MCP 链接",
   "marketplace.auth.createKey": "创建密钥",
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",

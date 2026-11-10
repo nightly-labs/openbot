@@ -12,6 +12,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Exit, Fiber, Option, Schema, Scope } from "effect";
+import { shownFailureDetail } from "./acp-flavor";
 import { secretElicitationField } from "./agent/prompts";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type AgentProvider, type DiagnosticOrigin, RequestTimeoutError } from "./agent-client";
@@ -907,13 +908,17 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       const history = yield* this.#history(thread.id);
       for (const item of history) this.#publish(thread, item);
       if (terminal.terminal === "failed") {
+        const message = this.#redact(
+          terminal.error?.message ?? terminal.reason ?? sourceText("error.provider.museTurnFailed"),
+        );
         this.#emit("error", {
           threadId: thread.id,
           turnId: terminal.turnId,
           error: {
-            message: this.#redact(
-              terminal.error?.message ?? terminal.reason ?? sourceText("error.provider.museTurnFailed"),
-            ),
+            // Meta refuses a model this way also where Muse is not offered (#5983).
+            message: /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu.test(message)
+              ? sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) })
+              : message,
           },
           willRetry: false,
         });

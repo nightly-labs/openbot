@@ -137,10 +137,14 @@ export const messages = {
   "provider.picker.olderModels": "Starsze modele",
   "provider.picker.olderModelsList": "Starsze modele {name}",
   "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
+  "provider.picker.museNoModels":
+    "Muse nie wysłał żadnych modeli dla tego konta. Muse może być niedostępny w kraju, w którym działa ten agent. Wybierz model innego dostawcy.",
   "provider.picker.customEmpty":
     "Dodaj endpoint zgodny z OpenAI – serwer modeli na tym komputerze lub dowolną usługę z bazowym adresem URL i kluczem.",
   "provider.picker.customPending":
     "Modele Twoich endpointów nie są jeszcze wczytane. Dostawca odczyta je po zakończeniu bieżącego zadania.",
+  "provider.picker.customUnlisted": "{name} nie pokazuje modeli Twoich endpointów.",
+  "provider.picker.editEndpoints": "Edytuj endpointy",
   "provider.picker.defaultModelLabel": "{name}, domyślny",
   "provider.picker.usageLimit": "Osiągnięto limit użycia",
   "provider.picker.usageLimitWindow": "Limit ({window})",
@@ -151,7 +155,12 @@ export const messages = {
   "provider.picker.effortLabel": "Wysiłek rozumowania agenta",
   "provider.picker.effortFixed": "{effort}, ustawia {provider}",
   "provider.picker.fast": "Szybki",
-  "provider.picker.fastLabel": "Tryb szybki",
+  "provider.picker.fastText": "Szybsze odpowiedzi, większe zużycie",
+  "provider.picker.speed": "Szybkość",
+  "provider.picker.standard": "Standardowy",
+  "provider.picker.standardText": "Domyślna szybkość",
+  "provider.picker.ultrafast": "Ultraszybki",
+  "provider.picker.ultrafastText": "Najszybsze odpowiedzi, dużo większe zużycie",
   "provider.picker.selectEffort": "Wybierz wysiłek",
   "provider.picker.custom": "Własny",
   "provider.picker.cliReady": "{cli} gotowy",
@@ -258,7 +267,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Używaj mojej konfiguracji Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Agenci wczytują Twój CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agenci wczytują CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude na serwerze. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
   "provider.settings.claudeUserSetupLoadFailed": "Nie udało się wczytać ustawienia Claude Code.",
+  "provider.settings.context": "Kontekst",
+  "provider.settings.compactWindow": "Kompaktuj czaty przy",
+  "provider.settings.compactWindowDescription":
+    "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
+  "provider.settings.compactWindowDefault": "Domyślne Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokenów",
+  "provider.settings.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {
     one: "{shown} z {count} modelu jest w wyborze modelu.",

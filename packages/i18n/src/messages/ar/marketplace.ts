@@ -155,6 +155,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "يعمل في تطبيق {name} المكتبي على {address}.",
   "marketplace.app.setup.desktopConnected": "متصل بـ {address}.",
   "marketplace.app.setup.open": "لا يلزم تسجيل دخول أو مفتاح.",
+  "marketplace.app.blocked.update":
+    "يشغّل {host} إصدارًا أقدم من OpenBot لا يمكنه ربط التطبيقات. حدّث OpenBot على {host}، أو اطلب من مالكه تحديثه.",
+  "marketplace.app.blocked.member":
+    "يمكن لمالك {host} أو لمشرف فيه فقط ربط التطبيقات هناك. اطلب من أحدهم ربط {name}، أو تحديث OpenBot على {host} ليتمكن الأعضاء من ربط التطبيقات.",
   "marketplace.app.connectAgain": "الربط مرة أخرى",
   "marketplace.app.automation.askOnInstall": "طلب الوصول من macOS عند التثبيت",
   "marketplace.app.automation.title": "الوصول إلى تطبيقات Apple",
@@ -215,6 +219,23 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "حمّل سياق Cobrain لهذا المشروع قبل أن نبدأ.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "ابحث في ملاحظات Cobrain عمّا قررناه بشأن التسعير.",
   "marketplace.plugin.cobrain.prompt.saveNote": "احفظ ملاحظة في Cobrain بما أنجزناه اليوم وما تبقّى.",
+  "marketplace.plugin.honcho.tagline": "ذاكرتك عبر كل أدوات الذكاء الاصطناعي",
+  "marketplace.plugin.honcho.description":
+    "يمنح Honcho من Plastic Labs الوكلاء ذاكرة طويلة المدى عنك يمكن لأدوات الذكاء الاصطناعي الأخرى التي تربطها أن تشاركها. يحفظ الوكلاء ما يتعلمونه، ويستنتج Honcho منه نموذجًا لتفضيلاتك وأهدافك وطرق عملك. يطرح الوكلاء عليه الأسئلة قبل أن يبدؤوا. لوكلاء OpenBot ذاكرتهم الخاصة أيضًا؛ وHoncho هو الذاكرة التي تتبعك إلى الأدوات الأخرى. تذهب الرسائل التي يحفظها الوكلاء إلى حسابك في Honcho.",
+  "marketplace.plugin.honcho.app": "احفظ الذاكرة طويلة المدى واستعلم عنها في مساحات عمل Honcho عبر خادم MCP واحد.",
+  "marketplace.plugin.honcho.prompt.recall": "قبل أن نبدأ، اسأل Honcho عمّا يعرفه عن طريقتي المفضلة في العمل.",
+  "marketplace.plugin.honcho.prompt.save": "احفظ قرارات هذه المحادثة في Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences": "ماذا يقول Honcho عن أسلوبي في الكتابة؟ استخدمه في هذه المسودة.",
+  "marketplace.plugin.honcho.hint.apiKey": "أنشئ مفتاحًا في app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "ذاكرة تتعلم مع الوقت",
+  "marketplace.plugin.hindsight.description":
+    "يمنح Hindsight من Vectorize الوكلاء ذاكرة طويلة المدى في Hindsight Cloud. يحتفظ الوكلاء بالحقائق والأحداث، ويستدعونها حسب المعنى والوقت والكيان، ويتأملون فيها لتكوين نماذج ذهنية. تُحفظ الذكريات في بنوك، ويمكن للوكلاء إنشاء بنك لكل مشروع أو شخص. لوكلاء OpenBot ذاكرتهم الخاصة أيضًا؛ وHindsight هو الذاكرة التي يمكن لأدوات الذكاء الاصطناعي الأخرى التي تربطها أن تشاركها. ما يحتفظ به الوكلاء يذهب إلى حسابك في Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app": "احتفظ بالذكريات واستدعها وتأمل فيها في بنوك Hindsight Cloud عبر خادم MCP واحد.",
+  "marketplace.plugin.hindsight.prompt.recall": "قبل أن نبدأ، استدعِ من Hindsight ما نعرفه عن هذا المشروع.",
+  "marketplace.plugin.hindsight.prompt.retain": "احتفظ في Hindsight بالقرارات والأسئلة المفتوحة من هذه المحادثة.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "تأمل في ذكرياتي في Hindsight: ما الأنماط التي تراها في عملي خلال الشهر الماضي؟",
+  "marketplace.plugin.hindsight.hint.apiKey": "أنشئ مفتاحًا في صفحة Connect في Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "التصاميم والنماذج الأولية",
   "marketplace.plugin.figma.description":
     "يتيح Figma للوكلاء قراءة ملفات التصميم، وفحص المكونات والأنماط والمتغيرات، وتسليم مواصفات الإنتاج للمهندسين. يتصل بخادم MCP في تطبيق Figma المكتبي على هذا الحاسوب. يستطيع الخادم قراءة التصاميم فقط؛ ودعم الكتابة قيد التطوير.",
@@ -376,15 +397,22 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
   "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
-  "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
+  "marketplace.plugin.postiz.tagline": "جدولة منشورات التواصل الاجتماعي",
+  "marketplace.plugin.postiz.description":
+    "يتيح Postiz للوكلاء عرض قنواتك على وسائل التواصل الاجتماعي، وكتابة المسودات وجدولة المنشورات ونشرها على أكثر من 30 شبكة، مثل X وLinkedIn وInstagram وTikTok. ويمكن للوكلاء أيضًا رفع الوسائط وإنشاء صور ومقاطع فيديو بالذكاء الاصطناعي. سجّل الدخول إلى حسابك في Postiz عبر المتصفح، أو الصق مفتاح API من Settings › Developers في Postiz. كل خطط Postiz السحابية تتضمن الوصول إلى API. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.postiz.app":
+    "القنوات والمسودات والمنشورات المجدولة والوسائط، عبر خادم MCP من Postiz بتسجيل الدخول في المتصفح أو بمفتاح API.",
+  "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
+  "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
+  "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
-    "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",
+    "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",
   "marketplace.plugin.composio.app":
-    "التطبيقات التي تضيفها إلى خادم Composio MCP، عبر الرابط من حساب Composio الخاص بك.",
+    "التطبيقات التي تربطها في حساب Composio. يطلب منك الوكيل ربط تطبيق عندما يحتاج إليه.",
   "marketplace.plugin.composio.prompt.inbox": "لخّص بريدي غير المقروء وصُغ ردودًا على الرسائل العاجلة.",
   "marketplace.plugin.composio.prompt.handoff": "انشر ملخص طلب السحب هذا في قناة فريقنا.",
   "marketplace.plugin.composio.prompt.apps": "ما التطبيقات والإجراءات التي يمكنك استخدامها عبر Composio؟",
-  "marketplace.plugin.composio.hint.url": "عنوان URL لخادم MCP في حساب Composio الخاص بك",
   "marketplace.plugin.composio.hint.apiKey": "تجده في حساب Composio، ضمن Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "مشاريع Postgres والفروع وعمليات الترحيل",
   "marketplace.plugin.neon.description":
@@ -493,7 +521,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "ابحث عن مجموعة بيانات لسلاسل زمنية للطقس واعرض أعمدتها.",
   "marketplace.auth.apiKey": "مفتاح API",
   "marketplace.auth.personalApiKey": "مفتاح API شخصي",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "إنشاء مفتاح",
 
   "marketplace.skill.doc": "SKILL.md",

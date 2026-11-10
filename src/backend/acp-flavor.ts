@@ -1,6 +1,7 @@
 import { win32 } from "node:path";
 import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
@@ -26,6 +27,12 @@ export interface AcpFlavor {
    */
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
   /**
+   * Whether ACP's `authRequired` error (`-32000`) to a new session means that the saved sign-in
+   * stopped working. The client then reports the sign-out, as at its start. Absent: the error is the
+   * session's failure only.
+   */
+  authRequiredSignsOut?: boolean;
+  /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null.
@@ -44,13 +51,28 @@ export interface AcpFlavor {
    * decision to the protocol's rules. It is a fixed code; it never carries the error's text.
    */
   failureCause?(error: unknown): CauseCode | null;
-  /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
-  emptyAnswerFailure?(reasoned: boolean): string;
+  /**
+   * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
+   * Absent: such a turn succeeds.
+   */
+  emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
+  /**
+   * The failure text of a prompt that the agent failed because the model gave no answer. The turn
+   * then ends as a turn with no answer does, not with the agent's own error text.
+   */
+  emptyAnswerError?: RegExp;
   /**
    * What to do when `session/load` or `session/resume` fails: wait once for a process that still
    * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
    */
   restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
+  /**
+   * A turn that the agent lost, after which it refuses each request of the session until the turn is
+   * discarded. `refusal` matches the text of that refusal, and `unsent` the refusal of a prompt that
+   * the agent did not take. `discard` gives the arguments of the agent's command that discards the
+   * lost turns of a session. OpenBot never sends a prompt again that the agent took.
+   */
+  lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   /** A failed model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
@@ -73,6 +95,8 @@ export interface AcpFlavor {
    * discovery then resumes one probe session for each process rather than opening another.
    */
   closeKeepsSession?: true;
+  /** How long a model discovery session stays open after discovery read it. Absent: it closes at once. */
+  probeCloseDelayMs?: number;
   /**
    * Each session gets a process of its own, and an idle session is closed by ending that process.
    * For an agent with `closeKeepsSession`.
@@ -97,6 +121,8 @@ export interface AcpFlavor {
     quota(text: string): string | null;
     /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
+    /** A failure text after which the agent no longer has the session, so the next prompt opens it again. */
+    sessionLost?: RegExp;
   };
   /** A stop finishes the turn locally, and the next prompt opens the session again first. */
   cancelLocallyThenResume?: true;
@@ -123,6 +149,13 @@ export interface AcpFlavor {
   unsentBackgroundTurns?: true;
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
+  /**
+   * The agent can send an answer again after it streamed it, as one chunk with the same `messageId`,
+   * and that chunk replaces the streamed text. ACP adds such a chunk to the message. At the end of
+   * the turn, a last chunk that holds all of the text before it in its message replaces that text,
+   * when two or more chunks of the message came before it.
+   */
+  resendsAnswer?: true;
   /**
    * OpenCode sends the work of its subagents as `opencode/session/child_update` notifications when
    * the client asks for them, and they show in the subagent card, not in the parent's steps.
@@ -190,6 +223,22 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
  */
 export const GROK_ACP_FLAVOR: AcpFlavor = {
   promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
+  // Grok CLI 1.0.77 fails the prompt when the model sends only its reasoning: `Internal error:
+  // "empty response from model (reasoning_only)"` (#6073).
+  emptyAnswerError: /\bempty response from model\b/u,
+};
+
+/**
+ * Hermes Agent 0.22 marks a turn as lost when its gateway restarts during the turn. It then refuses
+ * each prompt, model change and MCP server change of that session with `unknown_execution` until the
+ * turn is discarded. An open of the session with new MCP tokens changes its MCP servers, so the open
+ * failed too, and the agent stopped answering (#6026). `sessions discard` is the Hermes command for
+ * scripts. The prompt that the gateway lost fails with the same code, and says that Hermes keeps it.
+ */
+const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
+  refusal: /\bunknown_execution\b/u,
+  unsent: /\(nothing was submitted\)/u,
+  discard: (sessionId) => ["sessions", "discard", sessionId, "--yes"],
 };
 
 /**
@@ -200,6 +249,11 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
  */
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  lostTurns: HERMES_LOST_TURNS,
+  // Hermes Agent 0.23.0 streams the answer, and then sends all of it again when a plugin rewrote it
+  // (`transform_llm_output`). The rewrite has the streamed message's ID, so the answer showed two
+  // times in one message (#6433).
+  resendsAnswer: true,
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
 };
@@ -277,6 +331,9 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   // `config.toml`. In a confined process that file is protected, and the save fails with "Invalid
   // params" and "Layer 'user-toml': cannot write config file at <path>".
   configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
+  // Vibe 3.1.0 asks Mistral for the account's model catalogue when a session opens, and waits up to
+  // 5 s for it. A close stops that request, and then nothing saves the catalogue for later sessions.
+  probeCloseDelayMs: 5_000,
 };
 
 /**
@@ -289,16 +346,33 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
     : null;
 }
 
+/**
+ * A custom agent can end a turn as done and send nothing for it, for example when its context is full.
+ * The chat then showed nothing at all (#5110). A turn that sent any update, such as a thought, a plan
+ * or a compaction, shows it, so it still succeeds.
+ */
+function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
+  return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
+}
+
 /** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
-const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAnswerFailure: customEmptyAnswerFailure };
 
 /**
  * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
  * ID, and an agent can reuse omp's error text.
  */
-const CUSTOM_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+const CUSTOM_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: ompSessionNotFound,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+};
 
-const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = { omp: OMP_ACP_FLAVOR };
+const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
+  omp: OMP_ACP_FLAVOR,
+  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its lost turns are
+  // discarded, and its answer sent again replaces the streamed one, as for the Hermes provider.
+  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS, resendsAnswer: true },
+};
 
 /**
  * The flavor of a custom agent, from the exact name of its command: `omp`, `/usr/local/bin/omp`

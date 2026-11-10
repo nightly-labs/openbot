@@ -207,62 +207,84 @@
   color: var(--openbot-danger-text);
 }
 
-/* The chat card that asks for a Vault item: one row, with the outcome below it. */
-.vault-request.conversation-interaction-card {
-  display: grid;
-  width: 100%;
+/* The chat card that asks for a Vault item. The frame is a UiBlockCard (ui-blocks.css). */
+.vault-request {
   max-width: 520px;
-  gap: var(--openbot-space-3);
 }
 
-.vault-request-row {
+.vault-request-logo {
   display: flex;
-  min-width: 0;
+  flex: none;
+}
+
+/* Two-step codes: the live code of a login and the setup steps of its key. */
+
+.vault-two-step-digits {
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-lg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--openbot-text-primary);
+}
+
+.vault-two-step-timer.ui-radial-progress {
+  width: var(--openbot-icon-md);
+}
+
+.vault-two-step-code {
+  display: inline-flex;
   align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.vault-two-step-code[data-size="lg"] {
+  gap: var(--openbot-space-3);
+  justify-content: center;
+  padding: var(--openbot-space-4) 0;
+}
+
+.vault-two-step-code[data-size="lg"] .vault-two-step-digits {
+  font-size: var(--openbot-text-3xl);
+}
+
+.vault-two-step-code[data-size="lg"] .vault-two-step-timer.ui-radial-progress {
+  width: var(--openbot-icon-lg, 20px);
+}
+
+/* The code in a list row sits above the row's hit area, as the ⋯ menu does. */
+.vault-two-step-row-code {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  height: auto;
+  border-radius: var(--openbot-radius-sm);
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  color: inherit;
+}
+
+.vault-two-step-setup {
+  display: grid;
   gap: var(--openbot-space-3);
 }
 
-.vault-request-text {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: var(--openbot-space-0-5);
-}
-
-.vault-request-title {
-  overflow: hidden;
-  margin: 0;
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-md);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-request-detail {
-  overflow: hidden;
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-request:is([data-status="expired"], [data-status="closed"]) .vault-request-title {
-  color: var(--openbot-text-muted);
-}
-
-.vault-request-done {
-  display: inline-flex;
-  flex: none;
+.vault-two-step-or {
+  display: flex;
   align-items: center;
-  gap: var(--openbot-space-1-5);
+  gap: var(--openbot-space-3);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
 }
 
-.vault-request-done svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
+.vault-two-step-or::before,
+.vault-two-step-or::after {
+  flex: 1;
+  height: 1px;
+  background: var(--openbot-border);
+  content: "";
+}
+
+.vault-two-step-check {
+  text-align: center;
 }

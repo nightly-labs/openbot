@@ -29,6 +29,10 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import {
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -54,6 +58,7 @@ import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -73,7 +78,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
-import type { PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
@@ -82,17 +87,23 @@ import {
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
   decodeProviderUsageResetsFromHost,
+  decodeProviderUseFromHost,
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { type SignInRelayClient, signInRelayRemote } from "../sign-in-relay-client";
 import { parseProviderId, parseSetup } from "./app-inputs";
-import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-provider-inputs";
+import {
+  parseDeleteCustomProvider,
+  parseSaveCustomProvider,
+  parseUpdateCustomProvider,
+} from "./custom-provider-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import {
   parseConnectProviderAccountInput,
   parseDownloadableProviderId,
   parseProviderApiKeyInput,
+  parseProviderUseInput,
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
@@ -126,7 +137,7 @@ interface ProviderAdminIpcDependencies {
     ProviderRuntimeManager,
     "getStatus" | "download" | "cancel" | "checkForUpdates" | "ensureKeyProviderCli"
   >;
-  customProviders: PeerCustomProviderChanges;
+  customProviders: PeerCustomProviderChanges & Pick<CustomProviderChanges, "update">;
   remoteServers: ProviderAdminRemoteServers;
   /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
@@ -244,6 +255,16 @@ export function providerAdminIpcHandlers({
   }
 
   /**
+   * The on/off switch of a joined server's host's built-in providers, which only a host with
+   * `provider-use-v1` serves. This computer's own switch is `providers.setProviderOn`.
+   */
+  function providerUse(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_USE_CAPABILITY))
+      throw new Error(sourceText("error.team.providerUseUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeProviderUseFromHost, { method: "POST", body }));
+  }
+
+  /**
    * The usage reset credits of a joined server's host's accounts, which only a host with
    * `provider-usage-reset-v1` spends. This computer's own go through `providers`.
    */
@@ -304,8 +325,12 @@ export function providerAdminIpcHandlers({
     if (running) await Effect.runPromise(Fiber.interrupt(running.fiber));
   }
 
-  /** `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does not. */
+  /**
+   * `custom-provider-edit-v1` also names the header names of each endpoint, so an edit keeps them;
+   * `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does neither.
+   */
   function customRoutes(serverId: string) {
+    if (remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY)) return CUSTOM_PROVIDER_EDIT_ROUTES;
     return remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CAPABILITY)
       ? CUSTOM_PROVIDER_HARNESS_ROUTES
       : PROVIDERS_ADMIN_ROUTES;
@@ -386,6 +411,14 @@ export function providerAdminIpcHandlers({
             provider: input.preferredProvider,
             model: input.preferredModel,
           }),
+      }),
+      providerUse: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.list, {}),
+      }),
+      setProviderUse: scopedHandler(parseProviderUseInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (input, serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.set, input),
       }),
       usageResets: usageResetRequest(
         parseProviderId,
@@ -504,6 +537,28 @@ export function providerAdminIpcHandlers({
         local: (input) => runCauseEffect(customProviders.save(input)),
         remote: (input, serverId) =>
           remote(serverId, customRoutes(serverId).customSave, input, decodeCustomProviderResult),
+      }),
+      updateCustomProvider: scopedHandler(parseUpdateCustomProvider, {
+        local: (input) => runCauseEffect(customProviders.update(input)),
+        remote: (input, serverId) => {
+          // A host without `custom-provider-edit-v1` has no edit route.
+          if (!remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY))
+            throw new Error(sourceText("error.provider.localOnly"));
+          // The host keeps the harness and the model settings; the wire has neither.
+          return remote(
+            serverId,
+            CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate,
+            {
+              id: input.id,
+              name: input.name,
+              baseUrl: input.baseUrl,
+              models: input.models.map(({ id, name }) => ({ id, name })),
+              ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+              ...(input.headers !== undefined ? { headers: input.headers } : {}),
+            },
+            decodeCustomProviderResult,
+          );
+        },
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
         local: ({ id }) => runCauseEffect(customProviders.remove(id)),

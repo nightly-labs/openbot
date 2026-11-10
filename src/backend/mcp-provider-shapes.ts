@@ -466,7 +466,11 @@ export type ClaudeMcpServer =
   | { type: "stdio"; command: string; args: string[]; env: Record<string, string>; cwd?: string }
   | { type: "http"; url: string; headers: Record<string, string> };
 
-export function claudeMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<Record<string, ClaudeMcpServer>> {
+/** `userAgent` goes on each http entry whose row has no `User-Agent` of its own. */
+export function claudeMcpServers(
+  servers: readonly UsableMcpServer[],
+  userAgent?: string,
+): McpHandoff<Record<string, ClaudeMcpServer>> {
   const record: Record<string, ClaudeMcpServer> = {};
   const dropped: McpServerDrop[] = [];
   for (const server of servers) {
@@ -484,9 +488,14 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): McpHandof
             env: mcpLaunchEnvironment(server),
             ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
           }
-        : { type: "http", url: server.url, headers: mcpHandoffHeaders(server) };
+        : { type: "http", url: server.url, headers: withUserAgent(mcpHandoffHeaders(server), userAgent) };
   }
   return { servers: record, dropped };
+}
+
+function withUserAgent(headers: Record<string, string>, userAgent: string | undefined): Record<string, string> {
+  if (!userAgent || Object.keys(headers).some((key) => key.toLowerCase() === "user-agent")) return headers;
+  return { ...headers, "User-Agent": userAgent };
 }
 
 /**
@@ -569,8 +578,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * and gave a Codex agent no tools. Two names that become the same key keep the first; the second is
  * reported as a drop.
  *
- * **A key Codex's own files use with the other transport travels as `openbot_<key>`.** See
- * `codexMcpServerKey`.
+ * **A key Codex's own files already use travels as `openbot_<key>`.** See `codexMcpServerKey`.
  */
 export type CodexMcpServer =
   | {
@@ -642,18 +650,23 @@ export function providerMcpServerName(name: string): string {
 
 /**
  * The key one server travels under to Codex. Codex merges a thread entry with the entry of the same
- * key in its own files. A stdio `command` and an http `url` under one key stop Codex from loading
- * its configuration at all, and the chat cannot start. The server then travels as `openbot_<key>`,
- * and the user's own entry stays as written, turned off. A clash with the same transport keeps the
- * key.
+ * key in its own files, field by field, and a thread entry cannot remove a field. A stdio `command`
+ * and an http `url` under one key stop Codex from loading its configuration at all, and the chat
+ * cannot start (#2851). With the same transport, the user's `enabled_tools` and other fields stay on
+ * OpenBot's server: an `enabled_tools` list from another server hid all of its tools (#5786). So a
+ * key that Codex's own files use travels as `openbot_<key>`, and the user's own entry stays as
+ * written, turned off. OpenBot's placeholders are not the user's entries and keep the key. When
+ * `openbot_<key>` is reserved or the user's too, a server with the same transport keeps the key, as
+ * before: merged, it can still start, and renamed, it would be left out.
  *
  * Computer Use keeps its key: its tool consent and its instructions are found by that name.
  */
 export function codexMcpServerKey(config: McpServerConfig, own: CodexOwnTransports = {}): string {
   const name = providerMcpServerName(config.name);
-  return config.id !== COMPUTER_USE_MCP_SERVER_ID && Object.hasOwn(own, name) && own[name] !== config.transport
-    ? `openbot_${name}`
-    : name;
+  if (config.id === COMPUTER_USE_MCP_SERVER_ID || !Object.hasOwn(own, name)) return name;
+  const renamed = `openbot_${name}`;
+  const renamedTaken = Object.hasOwn(own, renamed) || isReservedMcpServerName(renamed);
+  return renamedTaken && own[name] === config.transport ? name : renamed;
 }
 
 /** Whether a key from `codexMcpServerKey` is taken by another server, or a renamed key by OpenBot's own tools. */

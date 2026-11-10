@@ -20,6 +20,7 @@ export const messages = defineMessages("queue", {
   "queue.item.steerFallback.providerUnsupported":
     "This provider cannot steer a running turn, so the message waits in the queue.",
   "queue.item.steerFallback.steerFailed": "Steering did not succeed, so the message waits in the queue.",
+  "queue.item.steerFallback.routineRun": "A routine is running now, so the message waits in the queue.",
   "queue.item.runAsTask": "Run in new thread",
   "queue.item.runAsTaskLabel": "Run queued message {position} in a new thread",
   "queue.item.deleteLabel": "Delete queued message {position}",

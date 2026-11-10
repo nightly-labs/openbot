@@ -27,6 +27,14 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Das Fenster {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureRegion":
     "Den Bildschirmbereich bei {x}, {y}, {width} × {height} Punkten aufnehmen und das Bild an das Modell des Agenten senden.",
+  "status.agent.reportProblem":
+    "Daraus wird ein öffentliches GitHub-Issue mit der App-Version und deinem System. Dein Name wird nicht angezeigt.",
+  "status.agent.sendIdea": "Daraus wird ein öffentliches GitHub-Issue. Dein Name wird nicht angezeigt.",
+  "status.agent.feedbackSent": "An das OpenBot-Team gesendet: {title}",
+  "status.agent.serverInstallCommand":
+    "Einen einmaligen Befehl erstellen, der OpenBot auf einem anderen Computer als Server {name} installiert und bei deinem Konto anmeldet. Der Agent führt ihn dort aus.",
+  "status.agent.serverInstallCard": "Installationsbefehl für den Server {name}",
+  "status.agent.feedbackSending": "Dein Feedback wird an das OpenBot-Team gesendet…",
   "status.agent.workflowDelete":
     "Den Workflow {title} mit seinen Ausführungen und Versionen löschen. Seine offenen Schritte werden beendet.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
@@ -79,5 +87,7 @@ export const messages = {
   "status.agent.nextStepContinues":
     "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
+  "status.agent.compactionContinues":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
 } as const satisfies PartialTranslation<typeof source>;

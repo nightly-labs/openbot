@@ -9,6 +9,7 @@ import {
   type AgentProviderRef,
   type AgentStatus,
   type ClientAgentModelOption,
+  type MessagingPlatform,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
   type WorkflowNodeKind,
@@ -46,6 +47,10 @@ export interface WorkflowPlace {
   placeId: string;
   /** The name of the place, as the user knows it, such as "#general". */
   label: string;
+  /** The app, the connection and the place name alone, so a list can group the places by connection. */
+  platform: MessagingPlatform;
+  connection: string;
+  name: string;
 }
 
 /** A Discord server that a Discord trigger listens to or that a Discord output acts on. */
@@ -70,6 +75,12 @@ export interface WorkflowSlackWorkspace {
   connectionId: string;
   name: string;
   channels: readonly { id: string; name: string }[];
+}
+
+/** An OpenBot channel that an output posts its result to. */
+export interface WorkflowChannel {
+  id: string;
+  name: string;
 }
 
 /** A model that an image step can draw with. */
@@ -98,6 +109,8 @@ export interface WorkflowCatalogs {
   telegram?: readonly WorkflowTelegramChat[] | undefined;
   /** The Slack workspaces of the host. Only the host that runs the workflow has them. */
   slack?: readonly WorkflowSlackWorkspace[] | undefined;
+  /** The open OpenBot channels of the host. Only this computer gives them. */
+  channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];

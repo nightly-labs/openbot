@@ -331,3 +331,31 @@ export function providerResetDelayMs(message: string): number | null {
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
 }
+
+/**
+ * Whether a model endpoint refused an image in the request because a side is too short. The image
+ * stays in the provider session, which sends it on each turn, so each turn fails the same way until
+ * a new session (#6188). xAI writes "Image dimensions 6x8 are too small. Both width and height must
+ * be at least 8 pixels.", vLLM's Qwen vision models "height:22 or width:1568 must be larger than
+ * factor:28", and DashScope "The image length and width do not meet the model restrictions".
+ */
+export function isImageTooSmallDiagnostic(message: string): boolean {
+  return (
+    /\bimage\b[^.\n]{0,80}\btoo small\b/iu.test(message) ||
+    (/\bimage\b/iu.test(message) &&
+      /\b(?:height|width)\b[^.\n]{0,60}\bmust be at least \d+ ?(?:px|pixels?)\b/iu.test(message)) ||
+    /\bmust be larger than factor\b/iu.test(message) ||
+    /\bimage length and width do not meet the model restrictions\b/iu.test(message)
+  );
+}
+
+/**
+ * Whether a model endpoint refused an image in the request because it is too large. As for a too
+ * small image, the provider session keeps the image and sends it on each turn, so each turn fails
+ * the same way until a new session (#6429). A model behind OpenCode writes "Inline image exceeds
+ * maximum dimensions of 1024px on its longest side.", and Anthropic "At least one of the image
+ * dimensions exceed max allowed size for many-image requests: 2000 pixels".
+ */
+export function isImageTooLargeDiagnostic(message: string): boolean {
+  return /\bimage\b[^.\n]{0,80}\bexceeds? (?:the )?max(?:imum)? (?:allowed size|dimensions?)\b/iu.test(message);
+}

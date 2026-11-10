@@ -132,9 +132,13 @@ export const messages = {
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
   "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.museNoModels":
+    "Muse 没有为此账号返回任何模型。Muse 可能在此智能体运行的国家或地区不可用。请选择其他提供商的模型。",
   "provider.picker.customEmpty":
     "添加一个兼容 OpenAI 的端点 —— 可以是这台电脑上的模型服务，也可以是任何提供 base URL 和密钥的服务。",
   "provider.picker.customPending": "端点的模型尚未加载。当前任务结束后服务商会读取这些模型。",
+  "provider.picker.customUnlisted": "{name} 未列出你的端点的模型。",
+  "provider.picker.editEndpoints": "编辑端点",
   "provider.picker.defaultModelLabel": "{name}，默认",
   "provider.picker.usageLimit": "已达用量上限",
   "provider.picker.usageLimitWindow": "{window}上限",
@@ -145,7 +149,12 @@ export const messages = {
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
   "provider.picker.fast": "快速",
-  "provider.picker.fastLabel": "快速模式",
+  "provider.picker.fastText": "响应更快，用量更多",
+  "provider.picker.speed": "速度",
+  "provider.picker.standard": "标准",
+  "provider.picker.standardText": "默认速度",
+  "provider.picker.ultrafast": "极速",
+  "provider.picker.ultrafastText": "最快的响应，用量高得多",
   "provider.picker.selectEffort": "选择强度",
   "provider.picker.custom": "自定义",
   "provider.picker.cliReady": "{cli} 已就绪",
@@ -279,7 +288,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":
     "智能体会从 ~/.claude 加载你的 CLAUDE.md、技能、智能体、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
+  "provider.settings.claudeUserSetupServerDescription":
+    "代理会从服务器上的 ~/.claude 加载 CLAUDE.md、技能、代理、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
   "provider.settings.claudeUserSetupLoadFailed": "无法加载 Claude Code 设置。",
+  "provider.settings.context": "上下文",
+  "provider.settings.compactWindow": "压缩聊天的大小",
+  "provider.settings.compactWindowDescription":
+    "当聊天达到此大小时，Claude Code 会总结较早的轮次。较低可使轮次更快、更便宜。较高会保留更多细节。窗口较小的模型会在其自身上限处压缩。",
+  "provider.settings.compactWindowDefault": "Claude Code 默认",
+  "provider.settings.compactWindowTokens": "{size} 个 token",
+  "provider.settings.compactWindowLoadFailed": "无法加载该服务器的压缩大小。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {
     one: "{count} 个模型中有 {shown} 个显示在模型选择器中。",

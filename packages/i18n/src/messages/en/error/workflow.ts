@@ -24,6 +24,8 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.notRetryable": "Only a step that failed or stopped can run again.",
   "error.workflow.noDecision": "This step does not wait for a decision.",
   "error.workflow.outputPlaceMissing": "Choose a messaging place for this output.",
+  "error.workflow.outputChannelMissing": "Choose a channel for this output.",
+  "error.workflow.outputChannelFailed": "OpenBot could not post the result in the channel. Run the step again.",
   "error.workflow.discordNoMessage":
     "This output acts on the Discord message that started the run. Start the run from a Discord mention, or choose Post in channel.",
   "error.workflow.slackNoMessage":

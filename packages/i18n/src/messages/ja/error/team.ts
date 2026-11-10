@@ -63,6 +63,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "この接続では履歴を削除できません。",
   "error.team.channelTaskCancelUnsupported": "この接続ではチャンネルのタスクを中止できません。",
   "error.team.membersCannotDeleteChannels": "メンバーはチャンネルを削除できません。",
+  "error.team.membersCannotDeleteChannelHistory": "メンバーはチャンネルの履歴を削除できません。",
   "error.team.membersCannotArchiveChannels": "メンバーはチャンネルをアーカイブできません。",
   "error.team.membersCannotRestoreChannels": "メンバーはチャンネルを復元できません。",
   "error.team.sharedDataUnsupported": "この接続では共有データを利用できません。",
@@ -71,6 +72,12 @@ export const messages = {
   "error.team.agentColorsUnsupported": "この接続ではエージェントの色を使用できません。",
   "error.team.chatColorsUnsupported": "この接続ではチャットの色を使用できません。",
   "error.team.routineRunPlaceUnsupported": "この接続ではルーティンの実行場所を変更できません。",
+  "error.team.routinesOnceUnsupported": "この接続では 1 回のみ実行するルーティンを保存できません。",
+  "error.team.routineRunCommandUnsupported": "この接続ではルーティンの実行コマンドを取得できません。",
+  "error.team.threadQueueUnsupported": "この接続ではサイドスレッドのキューを表示できません。",
+  "error.team.usageLimitUnsupported": "この接続ではエージェントの使用量の上限を表示または変更できません。",
+  "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
+  "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
@@ -84,6 +91,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "この接続はメッセージの削除に対応していません。",
   "error.team.workspaceDirectoryUnsupported": "この接続ではフォルダーを表示できません。",
   "error.team.conversationFileSearchUnsupported": "この接続ではファイルを検索できません。",
+  "error.team.threadMessageSearchUnsupported": "この接続ではサイドスレッドを検索できません。",
   "error.team.sideQuestionUnsupported": "この接続ではサイド質問を使えません。",
   "error.team.liveVoiceUnsupported":
     "このサーバーは Codex ライブ音声に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
@@ -110,7 +118,11 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "この接続はエージェントのフォルダーに対応していません。",
   "error.team.folderUnavailable": "このフォルダーはホストのコンピューターで使用できません。",
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
+  "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
+  "error.team.browsingMemoryUnsupported": "この接続は閲覧からの学習に対応していません。",
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
+  "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
+  "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",
@@ -120,6 +132,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "ライブブラウザービューを利用できません。",
   "error.team.browserSessionNotFound": "ブラウザービューのセッションが見つかりません。",
   "error.team.mcpUnsupported": "この接続では MCP サーバーを利用できません。",
+  "error.team.mcpServerListNeedsUpdate":
+    "このサーバーで {limit} 個を超える MCP サーバーを使うには、このデバイスの OpenBot を更新してください。",
   "error.team.storageUnsupported": "この接続ではストレージを利用できません。",
   "error.team.machineResourcesUnsupported": "この接続ではマシンの使用状況を利用できません。",
   "error.team.machineAlertMemberInvalid":
@@ -160,4 +174,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "このアドレスはこのサインインのものではありません。",
   "error.team.signInRelayLinkUnknown": "このサーバーのエージェントはこのサインインリンクを表示していません。",
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
+  "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
+  "error.team.queuedMessageThreadUnsupported":
+    "この接続では、キュー内のメッセージを新しいスレッドとして実行できません。",
+  "error.team.backgroundProcessesUnsupported": "この接続ではバックグラウンドプロセスを使用できません。",
+  "error.team.providerUseUnsupported": "この接続ではプロバイダーのオン・オフを切り替えられません。",
+  "error.team.providerUseInvalid": "このプロバイダーにはオン・オフの切り替えがありません。",
 } as const satisfies PartialTranslation<typeof source>;

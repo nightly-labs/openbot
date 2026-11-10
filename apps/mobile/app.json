@@ -3,7 +3,7 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.4.7",
+    "version": "1.4.9",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
@@ -35,12 +35,14 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ]
     },
     "plugins": [
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
+      "./plugins/with-update-channel",
       "expo-router",
       "expo-video",
       [
@@ -116,7 +118,8 @@
           "android": {
             "usesCleartextTraffic": true,
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-dontwarn org.webrtc.Dav1dDecoder$Natives"
           }
         }
       ],
@@ -131,12 +134,13 @@
               "supportsText": true,
               "supportsWebUrlWithMaxCount": 1,
               "supportsImageWithMaxCount": 10,
+              "supportsMovieWithMaxCount": 10,
               "supportsFileWithMaxCount": 10
             }
           },
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": ["text/*", "image/*", "application/*"],
+            "singleShareMimeTypes": ["*/*"],
             "multipleShareMimeTypes": ["*/*"]
           }
         }
@@ -206,6 +210,13 @@
         }
       ],
       [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow OpenBot to use your camera to scan QR codes.",
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages."
+        }
+      ],
+      [
         "expo-widgets",
         {
           "bundleIdentifier": "run.openbot.mobile.ExpoWidgetsTarget",
@@ -238,7 +249,12 @@
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/eeec730f-c8f4-42c0-a750-64df8af14940"
+      "url": "https://updates.openbot.run/manifest",
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
     }
   }
 }

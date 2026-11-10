@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Attendi la fine della trascrizione vocale, poi rimuovi il modello.",
   "error.voice.removeFailed": "Impossibile rimuovere il modello vocale. Riprova.",
   "error.voice.runtimeUnavailable": "La trascrizione vocale locale non è disponibile su questa piattaforma.",
-  "error.voice.busy": "Una trascrizione vocale è già in corso.",
   "error.voice.modelUnavailable": "Il modello vocale non è disponibile.",
   "error.voice.transcriptionTimedOut": "La trascrizione vocale è scaduta.",
   "error.voice.prepareRequired":
@@ -30,6 +29,10 @@ export const messages = {
   "error.voice.live.timedOut": "La voce dal vivo di Codex non si è avviata in tempo. Riprova.",
   "error.voice.live.failed": "La voce dal vivo si è interrotta: {reason}",
   "error.voice.live.disconnected": "La voce dal vivo si è disconnessa.",
+  "error.voice.live.hostFailed":
+    "Codex sul server non è riuscito ad avviare la voce dal vivo. Chiedi al proprietario di aggiornare Codex su quel computer e di accedere con ChatGPT, poi riprova.",
   "error.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",
+  "error.voice.live.unavailable":
+    "OpenAI non è riuscita ad avviare la voce dal vivo. Il problema è di OpenAI. Riprova più tardi.",
   "error.voice.live.off": "La voce dal vivo di Codex è disattivata. Attivala in Impostazioni → Voce.",
 } as const satisfies PartialTranslation<typeof source>;

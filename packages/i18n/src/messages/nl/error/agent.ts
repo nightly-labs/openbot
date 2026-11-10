@@ -4,8 +4,12 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "De geschiedenis is niet beschikbaar voor dit verzoek. Lees de recente geschiedenis opnieuw, of gebruik channel_history voor werk in een kanaal.",
+  "error.agent.historyArgumentsInvalid":
+    "Onjuiste geschiedenisargumenten: {detail} Corrigeer de argumenten en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.toolRequestInvalid":
     "Ongeldige argumenten voor het zoeken naar tools. Gebruik het opgegeven schema en een oorspronkelijke, volledige toolnaam.",
+  "error.agent.toolCallArgumentsNotObject":
+    "De tool is niet uitgevoerd. In tool_call moet arguments een JSON-object zijn, geen tekst. Stuur de aanroep opnieuw met arguments als object.",
   "error.agent.approvalWhileDeleting": "Je kunt geen toestemming geven terwijl de agent wordt verwijderd.",
   "error.agent.accessLocalOnly": "Toegang van de agent kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.duplicateCleanupFailed":
@@ -51,6 +55,8 @@ export const messages = {
     "Er is nu geen model van {provider} beschikbaar. Roep list_models aan om de beschikbare modellen te zien.",
   "error.agent.reasoningEffortUnsupported":
     "Model “{model}” ondersteunt redeneerniveau “{effort}” niet. Ondersteunde niveaus: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Model “{model}” heeft geen instelling voor het redeneerniveau, dus je kunt het niveau niet wijzigen.",
   "error.agent.noStartingModelInSettings":
     "{provider} heeft geen model beschikbaar, en geen andere aanbieder waarbij je bent ingelogd heeft er een. Log in bij een aanbieder, of wijzig de standaardaanbieder in Serverinstellingen → Aanbieders.",
   "error.agent.noStartingModel":
@@ -84,6 +90,8 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.compactionConnectionLost":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding en stuur dan een bericht om verder te gaan.",
   "error.agent.selectedGone": "De gekozen agent bestaat niet meer.",
   "error.agent.profileEndpointsChanged":
     "De aangepaste endpoints zijn gewijzigd tijdens het maken. Probeer het opnieuw.",

@@ -15,8 +15,12 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
-/** The transfer calls of one server. Main routes them to this computer or to a joined host. */
-export type ServerTransferCalls = OpenBotDesktopApi["instanceTransfer"];
+/**
+ * The transfer calls of one server. On the desktop, main routes them to this computer or to a joined
+ * host. In the browser client they go to the connected host, and a download has no folder to show.
+ */
+export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport"> &
+  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport">>;
 
 interface ServerTransferState {
   screen: InstanceTransferScreen;
@@ -108,9 +112,13 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       });
   }
 
-  function showExport(): void {
-    void calls.showExport().catch(report);
-  }
+  // Absent when the calls have no folder to show.
+  const show = calls.showExport;
+  const showExport = show
+    ? (): void => {
+        void show().catch(report);
+      }
+    : undefined;
 
   function exportAgain(): void {
     setState((draft) => {

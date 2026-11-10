@@ -119,11 +119,13 @@ export function syncEventQueries(
   }
   if (event.type === "status") {
     // The host sends a status event after a change to its providers, the models that its picker
-    // shows or the prompt cache time, such as one on the desktop app. Open provider pages read again.
+    // shows, the prompt cache time or the Claude compaction size, such as one on the desktop app.
+    // Open provider pages read again.
     for (const queryKey of [
       queryKeys.providerStatus(scope, serverId),
       queryKeys.providerModels(scope, serverId),
       queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCompactWindow(scope, serverId),
       queryKeys.agentModels(scope, serverId),
     ])
       void queryClient.invalidateQueries({ queryKey });
