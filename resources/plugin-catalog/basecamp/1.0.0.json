@@ -1,0 +1,33 @@
+{
+  "slug": "basecamp",
+  "name": "Basecamp",
+  "tagline": "Projects, to-dos, and messages",
+  "description": "Basecamp lets agents read projects and message threads, add to-dos, and post updates with the access the signed-in user already has. Each user signs in to their own Basecamp account through the browser.",
+  "category": "productivity",
+  "creatorName": "37signals",
+  "iconUrl": "https://basecamp.com/assets/images/general/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-catch-up", "text": "Catch me up on the website redesign project this week." },
+    { "id": "prompt-overdue", "text": "Which to-dos assigned to me are overdue?" },
+    { "id": "prompt-add-todo", "text": "Add a to-do to review the launch checklist by Thursday." }
+  ],
+  "apps": [
+    {
+      "id": "app-basecamp-mcp",
+      "name": "Basecamp",
+      "description": "Project, to-do, and message tools, over Basecamp's MCP server with browser sign-in.",
+      "iconUrl": "https://basecamp.com/assets/images/general/apple-touch-icon.png",
+      "server": {
+        "name": "basecamp",
+        "transport": "http",
+        "url": "https://mcp.basecamp.com/mcp",
+        "auth": [{ "id": "basecamp-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://basecamp.com",
+  "privacyPolicyUrl": "https://basecamp.com/about/policies/privacy",
+  "termsUrl": "https://basecamp.com/about/policies/terms",
+  "skills": []
+}

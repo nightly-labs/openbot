@@ -20,6 +20,12 @@
   border-radius: inherit;
 }
 
+.marketplace-suggestion .marketplace-suggestion-icon > .connector-brand-tile {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
 /* The name and the tagline keep one line each, so the card stays short. */
 .marketplace-suggestion .ui-block-title,
 .marketplace-suggestion .ui-block-subtitle {

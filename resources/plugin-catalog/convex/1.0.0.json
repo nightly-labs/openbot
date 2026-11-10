@@ -1,0 +1,31 @@
+{
+  "slug": "convex",
+  "name": "Convex",
+  "tagline": "Convex app setup guidance",
+  "description": "Convex gives agents the Convex runbook for starting a new app or adding Convex to an existing project, plus guidance on indexes, pagination, and scaling. These guidance tools need no account and no key.",
+  "category": "coding",
+  "creatorName": "Convex",
+  "iconUrl": "https://www.convex.dev/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-new-app", "text": "Start a new Convex app for a shared to-do list with sign-in." },
+    { "id": "prompt-add-convex", "text": "Add Convex as the backend of this existing React project." },
+    {
+      "id": "prompt-scaling",
+      "text": "How should I index and paginate a messages table that grows to millions of rows?"
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-convex-mcp",
+      "name": "Convex",
+      "description": "Convex app setup and scaling guidance, over the Convex MCP server with no sign-in.",
+      "iconUrl": "https://www.convex.dev/favicon.ico",
+      "server": { "name": "convex", "transport": "http", "url": "https://mcp.convex.dev/mcp" }
+    }
+  ],
+  "websiteUrl": "https://www.convex.dev",
+  "privacyPolicyUrl": "https://www.convex.dev/legal/privacy",
+  "termsUrl": "https://www.convex.dev/legal/tos",
+  "skills": []
+}

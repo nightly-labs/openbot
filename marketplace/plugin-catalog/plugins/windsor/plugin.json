@@ -1,0 +1,33 @@
+{
+  "slug": "windsor",
+  "name": "Windsor.ai",
+  "tagline": "Marketing data from many sources",
+  "description": "Windsor.ai lets agents query marketing and analytics data from the sources connected to the user's Windsor.ai account, such as Google Ads, Meta Ads, GA4, and HubSpot. Each user signs in to their own Windsor.ai account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Windsor.ai",
+  "iconUrl": "https://windsor.ai/wp-content/uploads/2020/02/favicon-310-300x300.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-ad-spend", "text": "Compare ad spend and conversions across Google Ads and Meta Ads last month." },
+    { "id": "prompt-campaigns", "text": "Which campaigns had the highest cost per acquisition this quarter?" },
+    { "id": "prompt-traffic", "text": "Summarize GA4 sessions by channel for the last 30 days." }
+  ],
+  "apps": [
+    {
+      "id": "app-windsor-mcp",
+      "name": "Windsor.ai",
+      "description": "Marketing and analytics data queries, over Windsor.ai's MCP server with browser sign-in.",
+      "iconUrl": "https://windsor.ai/wp-content/uploads/2020/02/favicon-310-300x300.png",
+      "server": {
+        "name": "windsor",
+        "transport": "http",
+        "url": "https://mcp.windsor.ai",
+        "auth": [{ "id": "windsor-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://windsor.ai",
+  "privacyPolicyUrl": "https://windsor.ai/privacy-statement/",
+  "termsUrl": "https://windsor.ai/terms-of-service/"
+}

@@ -6,7 +6,7 @@ import { createEffect, For, Match, onCleanup, onSettled, Show, Switch } from "so
 import { MarketplaceAgentPage } from "./MarketplaceAgentPage";
 import { AgentGroupPage } from "./MarketplaceAgents";
 import { MarketplaceAppPage } from "./MarketplaceAppPage";
-import { createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
+import { AppGroupPage, createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
 import { MarketplaceNav } from "./MarketplaceNav";
 import { MarketplaceLocalSkillPage, MarketplaceSkillPage } from "./MarketplaceSkillPage";
 import { SkillGroupPage } from "./MarketplaceSkills";
@@ -39,6 +39,7 @@ function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: str
     case "skill":
       return view.listing.name;
     case "agentGroup":
+    case "appGroup":
       return t(CATEGORY_LABELS[view.category]);
     case "app":
       return scope.model.apps().find((app) => app.id === view.id)?.name ?? fallback;
@@ -209,6 +210,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 </Match>
                 <Match when={view.kind === "skill" && view.listing} keyed>
                   {(listing) => <MarketplaceSkillPage scope={scope} listing={listing} />}
+                </Match>
+                <Match when={view.kind === "appGroup" && view.category} keyed>
+                  {(category) => <AppGroupPage scope={scope} category={category} />}
                 </Match>
                 <Match when={view.kind === "app" && view.id} keyed>
                   {(id) => <MarketplaceAppPage scope={scope} id={id} />}

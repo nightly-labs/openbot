@@ -1,0 +1,33 @@
+{
+  "slug": "ramp",
+  "name": "Ramp",
+  "tagline": "Spend, cards, and bills",
+  "description": "Ramp lets agents work with spend data such as transactions, cards, and bills as the signed-in user, within that user's permissions. At sign-in the user chooses full or read-only access.",
+  "category": "other",
+  "creatorName": "Ramp",
+  "iconUrl": "https://ramp.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-missing-receipts", "text": "Which of my card transactions this month are missing receipts?" },
+    { "id": "prompt-department-spend", "text": "Summarize company card spend by department for last quarter." },
+    { "id": "prompt-bills", "text": "Which bills are due in the next two weeks?" }
+  ],
+  "apps": [
+    {
+      "id": "app-ramp-mcp",
+      "name": "Ramp",
+      "description": "Transactions, cards, and bills, over Ramp's MCP server with browser sign-in.",
+      "iconUrl": "https://ramp.com/apple-touch-icon.png",
+      "server": {
+        "name": "ramp",
+        "transport": "http",
+        "url": "https://mcp.ramp.com/mcp",
+        "auth": [{ "id": "ramp-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://ramp.com",
+  "privacyPolicyUrl": "https://ramp.com/legal/privacy-policy",
+  "termsUrl": "https://ramp.com/legal/platform-agreement",
+  "skills": []
+}

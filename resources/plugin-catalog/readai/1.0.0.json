@@ -1,0 +1,33 @@
+{
+  "slug": "readai",
+  "name": "Read AI",
+  "tagline": "Meeting reports and transcripts",
+  "description": "Read AI lets agents search and read the meeting reports, summaries, transcripts, and action items of the signed-in user. Each user signs in to their own Read AI account through the browser.",
+  "category": "productivity",
+  "creatorName": "Read AI",
+  "iconUrl": "https://cdn.prod.website-files.com/614e5e239ea0f25fe5b6a797/615f71de842b191ea061fda6_ReadLogomark_256x256.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-yesterday", "text": "Summarize my meetings from yesterday." },
+    { "id": "prompt-action-items", "text": "What action items were assigned to me this week?" },
+    { "id": "prompt-decision", "text": "What did we decide about the launch date in the last product sync?" }
+  ],
+  "apps": [
+    {
+      "id": "app-readai-mcp",
+      "name": "Read AI",
+      "description": "Meeting reports, transcripts, and action items, over Read AI's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/614e5e239ea0f25fe5b6a797/615f71de842b191ea061fda6_ReadLogomark_256x256.png",
+      "server": {
+        "name": "readai",
+        "transport": "http",
+        "url": "https://api.read.ai/mcp",
+        "auth": [{ "id": "readai-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.read.ai",
+  "privacyPolicyUrl": "https://www.read.ai/privacy-policy",
+  "termsUrl": "https://www.read.ai/termsofservice",
+  "skills": []
+}

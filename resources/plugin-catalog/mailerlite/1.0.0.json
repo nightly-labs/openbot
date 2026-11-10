@@ -1,0 +1,33 @@
+{
+  "slug": "mailerlite",
+  "name": "MailerLite",
+  "tagline": "Email marketing",
+  "description": "MailerLite lets agents read subscribers, groups, campaigns, and automations, and draft campaigns in the signed-in MailerLite account. Each user signs in to their own MailerLite account through the browser.",
+  "category": "productivity",
+  "creatorName": "MailerLite",
+  "iconUrl": "https://avatars.githubusercontent.com/u/1104512?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-campaign-stats", "text": "Compare the open and click rates of my last five campaigns." },
+    { "id": "prompt-groups", "text": "How many active subscribers are in each group?" },
+    { "id": "prompt-draft-campaign", "text": "Draft a newsletter about our new features, but do not send it." }
+  ],
+  "apps": [
+    {
+      "id": "app-mailerlite-mcp",
+      "name": "MailerLite",
+      "description": "Subscribers, groups, campaigns, and automations, over MailerLite's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/1104512?s=256&v=4",
+      "server": {
+        "name": "mailerlite",
+        "transport": "http",
+        "url": "https://mcp.mailerlite.com/mcp",
+        "auth": [{ "id": "mailerlite-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.mailerlite.com",
+  "privacyPolicyUrl": "https://www.mailerlite.com/legal/privacy-policy",
+  "termsUrl": "https://www.mailerlite.com/legal/terms-of-service",
+  "skills": []
+}
