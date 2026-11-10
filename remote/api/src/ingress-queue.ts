@@ -178,8 +178,8 @@ export class IngressQueue {
    * A generic webhook for a route that no socket holds. It keeps nothing. A hosted server that sleeps
    * starts, at most once in `webhookWakeMilliseconds` for each host. A server that is `starting` is asked
    * to start again in the same interval: a failed resume keeps it `starting`, and a webhook has no queued
-   * event that `#wakeAgain` retries for. `allowLookup` is asked before a
-   * request to the account service, so that route IDs that Signal does not know cannot flood it.
+   * event that `#wakeAgain` retries for. `allowLookup` is asked before a lookup that is not cached and
+   * before each wake request, so that unknown route IDs and failed wakes cannot flood the account service.
    * True when the host starts.
    */
   readonly wakeOnly = Effect.fn("IngressQueue.wakeOnly")(function* (
@@ -195,6 +195,8 @@ export class IngressQueue {
     const now = this.#now();
     const last = this.#webhookWakes.get(known.hostId);
     if (last !== undefined && now - last < this.#limits.webhookWakeMilliseconds) return false;
+    // Each wake request is also a lookup, so wakes that fail cannot call the account service without limit.
+    if (!allowLookup()) return false;
     this.#webhookWakes.delete(known.hostId);
     dropOldest(this.#webhookWakes, MAXIMUM_ROUTES);
     this.#webhookWakes.set(known.hostId, now);
