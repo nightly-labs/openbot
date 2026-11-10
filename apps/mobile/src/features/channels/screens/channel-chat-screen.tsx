@@ -60,9 +60,10 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     return serverApprovals.filter((approval) => workers.has(approval.agentId));
   }, [serverApprovals, archived, threadIds, page?.tasks]);
   const serverBrowserRequests = useBrowserRequests(serverId);
-  // A member that asks in this channel waits for the person, and its row says what for.
-  const activities = useMemo(() => {
-    if (!online || archived) return [];
+  // A member that asks in this channel waits for the person, and its row says what for. The steps
+  // rows read this work also while the server is offline, so a running turn does not show as finished.
+  const memberWork = useMemo(() => {
+    if (archived) return [];
     const working = channelTaskActivities(page?.tasks ?? [], page?.messages ?? [], channel?.leadAgentId ?? null);
     const waits = new Map<string, MobileAgentWaitReason>();
     for (const approval of approvals) waits.set(approval.agentId, "approval");
@@ -91,16 +92,8 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       if (!next.some((activity) => activity.agentId === agentId))
         next.push(waiting({ agentId, turnId: null, phase: "working", detail: null }, reason));
     return next;
-  }, [
-    online,
-    archived,
-    channel?.leadAgentId,
-    page?.tasks,
-    page?.messages,
-    approvals,
-    serverBrowserRequests,
-    threadIds,
-  ]);
+  }, [archived, channel?.leadAgentId, page?.tasks, page?.messages, approvals, serverBrowserRequests, threadIds]);
+  const activities = useMemo(() => (online ? memberWork : []), [online, memberWork]);
   // A finished turn of a member with no answer, such as a stopped one, shows its steps in its own row.
   // A member's running turn shows them in its activity row. An activity with no turn is the member's latest turn.
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
@@ -112,13 +105,13 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     lastTurnSummaries.current = unansweredChannelTurnSummaries(
       entries,
       (turnId, agentId) =>
-        activities.some(
+        memberWork.some(
           (activity) => activity.agentId === agentId && (activity.turnId ?? latestTurns.get(agentId)) === turnId,
         ),
       lastTurnSummaries.current,
     );
     return lastTurnSummaries.current;
-  }, [page?.messages, activities]);
+  }, [page?.messages, memberWork]);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
