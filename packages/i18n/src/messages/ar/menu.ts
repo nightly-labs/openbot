@@ -9,6 +9,7 @@ export const messages = {
   "menu.zoomIn": "تكبير",
   "menu.zoomOut": "تصغير",
   "menu.copyLink": "نسخ الرابط",
+  "menu.copyImage": "نسخ الصورة",
   "menu.quit": "إنهاء OpenBot",
   "menu.quitConfirmTitle": "هل تريد إنهاء OpenBot؟",
   "menu.quitConfirmBody": "يتوقف الوكلاء والمهام الدورية حتى تفتح OpenBot مرة أخرى.",
