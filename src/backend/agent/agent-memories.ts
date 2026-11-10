@@ -13,6 +13,7 @@ import type {
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
+import { z } from "zod";
 import {
   type AgentMemoryListPage,
   type AgentMemorySearchResult,
@@ -24,7 +25,7 @@ import { normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MemoryReviewOperation } from "./memory-review-prompt";
-import { listMemoriesInput, searchMemoriesInput, setMemoryInclusionInput } from "./memory-tool-inputs";
+import { listMemoriesInput, searchMemoriesArguments, setMemoryInclusionInput } from "./memory-tool-inputs";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 
 type PendingMemoryMutation =
@@ -275,8 +276,15 @@ export class AgentMemories {
     redact: (value: string) => string,
   ): OpenBotToolResponse | null {
     if (params.tool === "search_memories") {
-      const parsed = searchMemoriesInput.safeParse(params.arguments);
-      if (!parsed.success) return openBotToolFailure(sourceText("error.backend.memorySearchQuery"));
+      const parsed = searchMemoriesArguments.safeParse(params.arguments);
+      // A query error keeps its own text. Another error names its field: an error about the words
+      // made the agent change a valid query and send the same bad field again (#6438).
+      if (!parsed.success)
+        return openBotToolFailure(
+          parsed.error.issues.every(({ path }) => path[0] === "query")
+            ? sourceText("error.backend.memorySearchQuery")
+            : `${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`,
+        );
       const result = memoryRecallResult(
         this.#memories.search(senderAgentId, parsed.data.query, parsed.data.limit),
         redact,
