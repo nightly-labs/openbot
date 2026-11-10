@@ -79,8 +79,8 @@ export function OpenBotHostedServers() {
       <p>
         Messages and webhooks wake it too. When someone mentions OpenBot or messages it in Slack, Discord or Telegram,
         the server starts and answers once it is back online. A webhook routine works the same way: the first delivery
-        gets a “try again later” answer and starts the server, and the sender’s next try reaches it. Most webhook
-        senders, such as Shopify and Stripe, try again on their own.
+        gets a “try again later” answer and starts the server, which takes a few minutes. A later try reaches it. Most
+        webhook senders, such as Shopify and Stripe, try again on their own for hours.
       </p>
 
       <h2>Hosted Server or Self-Hosting?</h2>

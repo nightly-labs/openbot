@@ -782,7 +782,11 @@ and the sender sends again (`docs/webhooks.md`). Because Signal cannot check the
 apply. A webhook starts a host at most once in 30 minutes, so requests to a known route URL keep a
 server awake for at most about half of the time (the idle stop is after 15 minutes). And a route that
 Signal has no recent answer for asks the account service at most 60 times a minute from one address
-(1/10 of `REMOTE_MAX_MESSAGES_PER_MINUTE`), so unknown route IDs cannot flood D1. An account service
+(1/10 of `REMOTE_MAX_MESSAGES_PER_MINUTE`), and 600 times a minute from all addresses together (the
+full limit), so unknown route IDs cannot flood D1. A start that fails does not count against the 30
+minutes. A route of a host ID that another owner registered again does not start it. A server that
+went back to sleep less than 30 minutes after a webhook started it waits for the end of the 30
+minutes; senders that retry for hours, such as Shopify and Stripe, still deliver. An account service
 without the `webhook` route answers 400, and Signal then starts nothing, as before.
 
 ## Tested on boat

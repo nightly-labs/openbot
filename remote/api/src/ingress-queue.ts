@@ -196,7 +196,10 @@ export class IngressQueue {
     this.#webhookWakes.delete(known.hostId);
     dropOldest(this.#webhookWakes, MAXIMUM_ROUTES);
     this.#webhookWakes.set(known.hostId, now);
-    return (yield* this.#check(route, routeKey, true)).state === "starting";
+    const started = (yield* this.#check(route, routeKey, true)).state === "starting";
+    // A wake that failed does not count: the sender's next try asks again.
+    if (!started && this.#webhookWakes.get(known.hostId) === now) this.#webhookWakes.delete(known.hostId);
+    return started;
   }, Effect.uninterruptible);
 
   /** The account service revoked this route: the next event asks it again. */

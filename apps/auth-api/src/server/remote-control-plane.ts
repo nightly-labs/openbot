@@ -2290,7 +2290,12 @@ export class RemoteControlPlane {
                   .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
                   .bind(route.botId, route.chatId)
               : dependencies.database
-                  .prepare("SELECT host_id FROM webhook_routes WHERE route_id = ? AND revoked_at IS NULL")
+                  // As in validateWebhookRoute: a host ID that a new owner registered again is not the route's host.
+                  .prepare(
+                    `SELECT route.host_id FROM webhook_routes route
+                     JOIN remote_hosts host ON host.host_id = route.host_id AND host.owner_user_id = route.account_id
+                     WHERE route.route_id = ? AND route.revoked_at IS NULL`,
+                  )
                   .bind(route.routeId);
       const row = yield* remoteCall(() => statement.first<{ host_id: string }>());
       return row?.host_id ?? null;

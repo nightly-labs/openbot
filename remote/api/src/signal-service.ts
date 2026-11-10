@@ -340,6 +340,8 @@ const SLACK_TEAM_RATE_FACTOR = 2;
  * check the sender, so new routes from one address ask at most 1/10 of the message limit a minute.
  */
 const WEBHOOK_WAKE_RATE_FACTOR = 1 / 10;
+/** All addresses together ask at most the message limit a minute, so many addresses cannot flood it either. */
+const WEBHOOK_WAKE_TOTAL_RATE_FACTOR = 1;
 // A host can answer a callback query that Signal delivered to it in this time. Telegram allows less.
 const TELEGRAM_CALLBACK_TTL_MILLISECONDS = 15 * 60_000;
 const MAXIMUM_TELEGRAM_CALLBACKS = 100_000;
@@ -757,9 +759,13 @@ export class SignalService {
   wakeWebhookRoute(routeId: string, address: string): void {
     if (!this.#queue.enabled) return;
     this.#fork(
-      this.#queue.wakeOnly({ platform: "webhook", routeId }, queueRouteKey("webhook", routeId), () =>
-        this.#acceptRateKey(`webhook-wake:${address}`, Date.now(), WEBHOOK_WAKE_RATE_FACTOR),
-      ),
+      this.#queue.wakeOnly({ platform: "webhook", routeId }, queueRouteKey("webhook", routeId), () => {
+        const now = Date.now();
+        return (
+          this.#acceptRateKey(`webhook-wake:${address}`, now, WEBHOOK_WAKE_RATE_FACTOR) &&
+          this.#acceptRateKey("webhook-wake", now, WEBHOOK_WAKE_TOTAL_RATE_FACTOR)
+        );
+      }),
     );
   }
 

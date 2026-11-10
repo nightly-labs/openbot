@@ -307,7 +307,7 @@ export function createRemoteApiApp(
           request.headers.get("x-forwarded-for"),
           config.trustProxy,
         );
-        // A hosted server that sleeps starts, and the sender's next try reaches it.
+        // A hosted server that sleeps starts, and a later try of the sender reaches it.
         if (!signal.holdsWebhookRoute(routeId)) {
           signal.wakeWebhookRoute(routeId, address);
           return answer(503);

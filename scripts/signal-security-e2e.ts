@@ -224,7 +224,10 @@ const SLEEPING_WEBHOOK_ROUTES: Record<string, string> = {
   "route-sleeping-a1": "host-sleeping-a",
   "route-sleeping-a2": "host-sleeping-a",
   "route-sleeping-b": "host-sleeping-b",
+  "route-sleeping-c": "host-sleeping-c",
 };
+// The first start of this route fails, as when the account service has an error.
+let failNextWebhookWake = "route-sleeping-c";
 const webhookWakes: Array<{ routeId: string; wake: boolean }> = [];
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolveBody, reject) => {
@@ -271,6 +274,10 @@ function startControlPlane(port: number): Promise<Server> {
       if (payload.route?.platform === "webhook") {
         webhookWakes.push({ routeId: payload.route.routeId, wake: payload.wake });
         const hostId = SLEEPING_WEBHOOK_ROUTES[payload.route.routeId];
+        if (payload.wake && payload.route.routeId === failNextWebhookWake) {
+          failNextWebhookWake = "";
+          return answer(500);
+        }
         if (hostId) return answer(200, { hostId, state: payload.wake ? "starting" : "sleeping" });
       }
       return answer(200, { hostId: null, state: "not_hosted" });
@@ -840,6 +847,11 @@ try {
     // A route of another host starts that host. Its wake comes after the lookup of route-sleeping-a2.
     statuses.push((await post("route-sleeping-b")).status);
     await waitUntil(() => calls("route-sleeping-b", true) === 1, "wake of route-sleeping-b");
+    // A start that failed does not count against the interval: the next try asks again.
+    statuses.push((await post("route-sleeping-c")).status);
+    await waitUntil(() => calls("route-sleeping-c", true) === 1, "failed wake of route-sleeping-c");
+    statuses.push((await post("route-sleeping-c")).status);
+    await waitUntil(() => calls("route-sleeping-c", true) === 2, "second wake of route-sleeping-c");
     // A route that no host has is looked up and starts nothing.
     statuses.push((await post("route-nobody-has")).status);
     await waitUntil(() => calls("route-nobody-has", false) === 1, "lookup of route-nobody-has");
@@ -852,7 +864,7 @@ try {
     expect(calls("route-nobody-has", true) === 0, "a route with no host asked for a wake");
     const delivered = ingress.frames.filter((frame) => frame.includes('"wake-route-'));
     expect(delivered.length === 0, "Signal passed a webhook for a sleeping host to another socket.");
-    return `503 x${statuses.length}; host-sleeping-a woke once for two routes; host-sleeping-b woke; unknown route woke nothing`;
+    return `503 x${statuses.length}; host-sleeping-a woke once for two routes; host-sleeping-b woke; host-sleeping-c woke again after a failed start; unknown route woke nothing`;
   });
 
   // Standard Webhooks (Composio, Svix): Signal relays the `webhook-*` or `svix-*` headers only to a
