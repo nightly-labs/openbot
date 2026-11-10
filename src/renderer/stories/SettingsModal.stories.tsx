@@ -359,13 +359,13 @@ export const VoiceCodexSignIn: Story = {
 };
 
 /** The install guide for each phone, the sign-in code and the connected phones. */
+export const MobileConnect: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="mobile-connect" />,
+};
+
 /** The agent dock above the other apps, with the switches for hiding it in the screen edge. */
 export const AgentDock: Story = {
   render: () => <SettingsModalStory initialOpen agentDock initialTab="agent-dock" />,
-};
-
-export const MobileConnect: Story = {
-  render: () => <SettingsModalStory initialOpen initialTab="mobile-connect" />,
 };
 
 /** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */
