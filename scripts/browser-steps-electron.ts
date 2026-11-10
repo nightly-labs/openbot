@@ -370,6 +370,20 @@ async function main(): Promise<void> {
     ]);
     recordCases("script-accepts-guessed-wait-forms", "script-targets-take-nth");
 
+    // "present" after a selector waits for the element, not for the selector as page text.
+    const presence = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: `
+        await evaluate("void setTimeout(() => document.body.append(Object.assign(document.createElement('div'), { id: 'late-results', textContent: 'Loaded' })), 200)");
+        await waitFor("#late-results", "present", { timeoutMs: 3000 });
+        await waitFor("item-3-1", "appears", { timeoutMs: 3000 });
+        return await evaluate(() => Boolean(document.querySelector("#late-results")));
+      `,
+    });
+    assert.equal(presence.outcome.value, true, presence.outcome.error);
+    recordCases("script-waits-for-present-selector");
+
     // The sandbox has no page globals: the error says where they are.
     const pageGlobal = await runScript({
       tabId: list.tab.id,

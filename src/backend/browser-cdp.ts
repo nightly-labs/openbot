@@ -2968,14 +2968,17 @@ export class BrowserCdpEngine {
           return yield* browserFailure(new Error(summary));
         }
         // A match that cannot be described, such as one removed after the scan, is left out of the list.
-        const candidates = yield* Effect.forEach(matches.slice(0, MAX_TARGET_CANDIDATES), (match) =>
+        // The other candidates keep their numbers, so that nth still selects the candidate it names.
+        const described = yield* Effect.forEach(matches.slice(0, MAX_TARGET_CANDIDATES), (match) =>
           describedMatch(send, match.objectId, match, "").pipe(Effect.catch(() => Effect.succeed(undefined))),
         ).pipe(Effect.ensuring(releaseMatches()));
+        const kept = described.flatMap((candidate, index) => (candidate ? [{ candidate, index }] : []));
         return yield* this.#ambiguousTarget(
           send,
           summary,
-          candidates.filter((candidate) => candidate !== undefined),
+          kept.map(({ candidate }) => candidate),
           deadline,
+          kept.map(({ index }) => index),
         );
       }
       const match = matches[0];
@@ -3091,6 +3094,8 @@ export class BrowserCdpEngine {
     summary: string,
     candidates: readonly SemanticMatch[],
     deadline?: number,
+    /** The nth index of each candidate, when it is not its position in `candidates`. */
+    positions?: readonly number[],
   ): Effect.fn.Return<never, BrowserOperationError> {
     const key = (candidate: SemanticMatch) => `${candidate.targetId ?? "main"}:${candidate.backendNodeId}`;
     const texts = new Map<string, TargetCandidateText>();
@@ -3114,7 +3119,7 @@ export class BrowserCdpEngine {
       const text = texts.get(key(candidate));
       const label = labels[index] ?? "";
       const ref = revision === undefined ? undefined : `${revision}:${key(candidate)}`;
-      const tokens = [`${index + 1}.`];
+      const tokens = [`${(positions?.[index] ?? index) + 1}.`];
       if (ref !== undefined && this.#targets.has(ref)) tokens.push(`ref=${ref}`);
       else missingRef = true;
       if (candidate.role) tokens.push(candidate.role);

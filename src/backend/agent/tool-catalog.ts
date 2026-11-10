@@ -224,7 +224,8 @@ function bridgedName(input: unknown): string | null {
  * Claude loads its own deferred tools with a search and then calls them directly. After a search here,
  * it called openbot.list_workflows as mcp__openbot__list_workflows, and each refused name cost a model step.
  */
-const CALL_NOTE = "These are not direct tools: run each with openbot.tool_call {name, arguments}.";
+const CALL_NOTE =
+  "Run each with openbot.tool_call {name, arguments}, or directly when you also have it as a direct tool.";
 
 /**
  * Search matches whole words, so a query that names a web service, such as "gmail" or "read mail",
@@ -370,7 +371,8 @@ function withoutTrailingClosers(text: string): string[] {
 
 /** The object in `arguments` text, also after a repair, or null when the text holds no object. */
 function decodeArgumentsText(text: string): DynamicRecord | null {
-  for (const candidate of [text, repairJsonText(text), ...withoutTrailingClosers(text)]) {
+  const trimmed = withoutTrailingClosers(text);
+  for (const candidate of [text, repairJsonText(text), ...trimmed, ...trimmed.map(repairJsonText)]) {
     try {
       const value = JSON.parse(candidate);
       return isRecord(value) ? value : null;

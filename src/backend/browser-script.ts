@@ -74,7 +74,11 @@ const __with = (step, options) => {
 // waitFor("text", "Hello") and waitFor("selector", "#done"): the forms that models write by mistake.
 const __waitFields = { text: "text", url: "url", state: "state", selector: "target", css: "target" };
 // waitFor("Results", "load"): a second word that only says to wait on the page.
-const __waitWords = new Set(["page", "load", "domcontentloaded", "networkidle", "present", "exists", "appear", "appears"]);
+const __waitWords = new Set(["page", "load", "domcontentloaded", "networkidle"]);
+// waitFor("#results", "present") waits for the element; waitFor("Results", "appears") for the text.
+// A bare word, such as "table", can be either, so only a selector with #, ., [, : or > is an element.
+const __presenceWords = new Set(["present", "exists", "appear", "appears"]);
+const __selectorLike = (value) => /^(?:[#.[*]|[a-z][\\w-]*(?:[#.[:]|\\s*[>~+]))/.test(value);
 // css("li").nth(2) and css("li").first(), as Playwright writes them. The methods are not enumerable,
 // so the target that a step sends has only its fields.
 const __target = (target) => {
@@ -147,6 +151,8 @@ globalThis.waitFor = (condition, options, more) => {
           " return !element || element.getClientRects().length === 0 || getComputedStyle(element).visibility === 'hidden'; }",
         more,
       );
+    if (__waitFields[condition] === undefined && __presenceWords.has(options.toLowerCase()))
+      return waitFor(__selectorLike(condition) ? { target: css(condition) } : condition, more);
     if (__waitFields[condition] === undefined && __waitWords.has(options.toLowerCase())) return waitFor(condition, more);
     // waitFor("Hello", "text"): the value first, the field second.
     const [name, value] = __waitFields[condition] === undefined ? [options, condition] : [condition, options];
