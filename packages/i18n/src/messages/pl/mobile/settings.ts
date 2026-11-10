@@ -89,6 +89,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Jasność",
   "mobile.settings.appearance.messageColorFooter":
     "Z kolorem agenta Twoje wiadomości w czacie z agentem mają kolor tego agenta. Z własnym kolorem Twoje wiadomości we wszystkich czatach mają wybrany kolor. Kolor tekstu zmienia się, aby tekst był czytelny.",
+  "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
   "mobile.settings.animations.title": "Animacje",
   "mobile.settings.animations.footer":
     "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",

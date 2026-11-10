@@ -9,7 +9,7 @@ import { useUniwind } from "uniwind";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { MessageColorPicker } from "@/features/settings/components/message-color-picker";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import {
   type MessageColorMode,
@@ -17,6 +17,10 @@ import {
   saveMessageColor,
   useMessageColor,
 } from "@/features/settings/model/message-color";
+import {
+  saveRoutineCollapsePreference,
+  useRoutineCollapsePreference,
+} from "@/features/settings/model/routine-collapse";
 import { saveTextSize, useTextSize } from "@/features/settings/model/text-size";
 import { PauseSlider } from "@/features/voice/components/pause-slider";
 import { haptics } from "@/shared/lib/haptics";
@@ -142,7 +146,34 @@ export function AppearanceSettingsScreen() {
           />
         ) : null}
       </SettingsSection>
+      <RoutineCollapseSection dark={theme === "dark"} />
     </SettingsContent>
+  );
+}
+
+/** Whether the rows of consecutive routine markers in a chat start closed. */
+function RoutineCollapseSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const preference = useRoutineCollapsePreference();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <SettingsSection footer={error ?? t("mobile.settings.appearance.collapseRoutinesFooter")}>
+      <SettingsRow>
+        <SettingsSwitch
+          value={preference.enabled}
+          disabled={!preference.ready || preference.saving}
+          label={t("mobile.settings.appearance.collapseRoutines")}
+          dark={dark}
+          onValueChange={(enabled) => {
+            setError(null);
+            void saveRoutineCollapsePreference(enabled).catch(() => {
+              setError(t("mobile.settings.saveFailed"));
+              void haptics.notification("error");
+            });
+          }}
+        />
+      </SettingsRow>
+    </SettingsSection>
   );
 }
 

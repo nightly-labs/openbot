@@ -84,6 +84,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Lichtheid",
   "mobile.settings.appearance.messageColorFooter":
     "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
+  "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
   "mobile.settings.animations.title": "Animaties",
   "mobile.settings.animations.footer":
     "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
