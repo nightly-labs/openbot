@@ -55,6 +55,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
+import { usesX11Windows } from "./linux-wayland-output";
 import { hidePanelFromWindowSwitchers, preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
@@ -955,7 +956,7 @@ export function hideWindowsForQuit(): void {
 
 export function showMainWindow(window: BrowserWindow): void {
   if (windowsKeptHidden) return;
-  presentMainWindow(window, process.platform, () => app.show());
+  presentMainWindow(window, process.platform, () => app.show(), process.platform === "linux" && !usesX11Windows());
 }
 
 export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
