@@ -183,7 +183,13 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${title}, ${t("mobile.chat.routine.group.count", { count })}`}
+        accessibilityLabel={[
+          title,
+          lead?.event === "failed" ? t(lead.label) : null,
+          t("mobile.chat.routine.group.count", { count }),
+        ]
+          .filter(Boolean)
+          .join(", ")}
         hitSlop={8}
         onPress={() => {
           void haptics.selection();
