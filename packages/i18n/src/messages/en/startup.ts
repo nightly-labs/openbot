@@ -20,4 +20,22 @@ export const messages = defineMessages("startup", {
   "startup.newerDataDownload": "Download OpenBot",
   "startup.newerDataGuide": "Open guide",
   "startup.newerDataQuit": "Quit",
+  // The recovery window: one version did not finish its start several times in a row. It shows before
+  // the next start, from the main process, with no renderer.
+  "startup.recoveryWindowTitle": "OpenBot recovery",
+  "startup.recoveryTitle": "OpenBot did not open",
+  "startup.recoveryBody": {
+    one: "OpenBot {version} stopped before it opened, {count} time in a row. Your local data was not reset or overwritten.",
+    other:
+      "OpenBot {version} stopped before it opened, {count} times in a row. Your local data was not reset or overwritten.",
+  },
+  "startup.recoveryHint":
+    "Try again, or install the last version that opened. To get help, export the diagnostics and send the file with your report.",
+  "startup.recoveryRetry": "Try again",
+  "startup.recoveryPreviousVersion": "Download previous version",
+  "startup.recoveryExportDiagnostics": "Export diagnostics",
+  "startup.recoveryOpenDataFolder": "Open data folder",
+  "startup.recoveryQuit": "Quit",
+  "startup.recoveryDiagnosticsSaved": "The diagnostics file is saved.",
+  "startup.recoveryActionFailed": "OpenBot could not do this action.",
 });

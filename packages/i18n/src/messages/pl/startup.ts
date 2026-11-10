@@ -18,4 +18,22 @@ export const messages = {
   "startup.newerDataDownload": "Pobierz OpenBot",
   "startup.newerDataGuide": "Otwórz przewodnik",
   "startup.newerDataQuit": "Zakończ",
+  "startup.recoveryWindowTitle": "Odzyskiwanie OpenBot",
+  "startup.recoveryTitle": "OpenBot się nie otworzył",
+  "startup.recoveryBody": {
+    one: "OpenBot {version} zatrzymał się przed otwarciem {count} raz z rzędu. Twoje lokalne dane nie zostały zresetowane ani nadpisane.",
+    few: "OpenBot {version} zatrzymał się przed otwarciem {count} razy z rzędu. Twoje lokalne dane nie zostały zresetowane ani nadpisane.",
+    many: "OpenBot {version} zatrzymał się przed otwarciem {count} razy z rzędu. Twoje lokalne dane nie zostały zresetowane ani nadpisane.",
+    other:
+      "OpenBot {version} zatrzymał się przed otwarciem {count} razy z rzędu. Twoje lokalne dane nie zostały zresetowane ani nadpisane.",
+  },
+  "startup.recoveryHint":
+    "Spróbuj ponownie albo zainstaluj ostatnią wersję, która się otwierała. Aby uzyskać pomoc, wyeksportuj diagnostykę i wyślij plik ze zgłoszeniem.",
+  "startup.recoveryRetry": "Spróbuj ponownie",
+  "startup.recoveryPreviousVersion": "Pobierz poprzednią wersję",
+  "startup.recoveryExportDiagnostics": "Eksportuj diagnostykę",
+  "startup.recoveryOpenDataFolder": "Otwórz folder danych",
+  "startup.recoveryQuit": "Zakończ",
+  "startup.recoveryDiagnosticsSaved": "Plik diagnostyki został zapisany.",
+  "startup.recoveryActionFailed": "OpenBot nie mógł wykonać tej czynności.",
 } as const satisfies PartialTranslation<typeof source>;
