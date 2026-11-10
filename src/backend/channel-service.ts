@@ -1629,6 +1629,8 @@ export class ChannelService {
             // can quote the request, so the log gives only its size and the fields it had.
             logger.warn("A routing answer was unreadable, so the lead takes the request.", {
               channelId,
+              provider: lead.provider,
+              model: lead.model,
               reason: error.message,
               characters: response.length,
               fields: keys ? keys.slice(0, 8).map((key) => key.slice(0, 40)) : [],
