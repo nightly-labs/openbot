@@ -144,6 +144,12 @@ export interface AcpFlavor {
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
   /**
+   * The agent can send an answer again after it streamed it, as one chunk with the same `messageId`,
+   * and that chunk replaces the streamed text. ACP adds such a chunk to the message. At the end of
+   * the turn, a last chunk that holds all of the text before it in its message replaces that text.
+   */
+  resendsAnswer?: true;
+  /**
    * OpenCode sends the work of its subagents as `opencode/session/child_update` notifications when
    * the client asks for them, and they show in the subagent card, not in the parent's steps.
    */
@@ -237,6 +243,10 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
   lostTurns: HERMES_LOST_TURNS,
+  // Hermes Agent 0.23.0 streams the answer, and then sends all of it again when a plugin rewrote it
+  // (`transform_llm_output`). The rewrite has the streamed message's ID, so the answer showed two
+  // times in one message (#6433).
+  resendsAnswer: true,
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
 };
@@ -352,9 +362,9 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
-  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules, and its lost turns are
-  // discarded as for the Hermes provider.
-  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS },
+  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its lost turns are
+  // discarded, and its answer sent again replaces the streamed one, as for the Hermes provider.
+  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS, resendsAnswer: true },
 };
 
 /**
