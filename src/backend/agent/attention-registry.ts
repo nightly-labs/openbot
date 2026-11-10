@@ -15,7 +15,7 @@ import type {
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import {
   type ConversationUiBlock,
@@ -55,6 +55,7 @@ import {
   type AppServerRequest,
   type DynamicToolCallParams,
   type DynamicToolResult,
+  getArray,
   getRecord,
   getString,
   type RequestId,
@@ -434,6 +435,11 @@ export interface AttentionRegistryOptions {
    */
   workspaceSandboxed?(agentId: string): boolean;
   /**
+   * Whether the agent's own confined process may write all these files. Its provider asks for a file
+   * outside its session folder, such as an added folder, and the sandbox already allows that write.
+   */
+  confinedWritesAllowed?(agentId: string, paths: readonly string[]): boolean;
+  /**
    * Whether this thread answers an external chat conversation (Slack, Discord, Telegram, WhatsApp). Nobody there can answer a
    * question card, and the turn would wait for one with no limit while every other conversation of
    * the agent waits behind it.
@@ -492,6 +498,7 @@ export class AttentionRegistry {
   readonly #routines: RoutineAttention;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #workspaceSandboxed: (agentId: string) => boolean;
+  readonly #confinedWritesAllowed: (agentId: string, paths: readonly string[]) => boolean;
   readonly #messagingThread: (threadId: string) => boolean;
   readonly #messagingRequestTurn: (agentId: string, turnId: string) => boolean;
   readonly #emit: (event: AgentEvent) => void;
@@ -514,6 +521,7 @@ export class AttentionRegistry {
     this.#routines = options.routines;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#workspaceSandboxed = options.workspaceSandboxed ?? (() => false);
+    this.#confinedWritesAllowed = options.confinedWritesAllowed ?? (() => false);
     this.#messagingThread = options.messagingThread ?? (() => false);
     this.#messagingRequestTurn = options.messagingRequestTurn ?? (() => false);
     this.#emit = options.emit;
@@ -936,15 +944,23 @@ export class AttentionRegistry {
    * The response shape is the one `respondToApproval` uses for an accepted request.
    */
   #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
-    if (!this.#answersForAgent(approval.agentId)) return false;
+    if (!this.#answersForAgent(approval.agentId) && !this.#confinedWrite(request, approval)) return false;
     client.respond(request.id, approvalReply(request.method, request.params, "accept", ""));
     return true;
   }
 
+  /** A file change that the agent's confined process may already write (#6176). */
+  #confinedWrite(request: AppServerRequest, approval: AgentApproval): boolean {
+    if (approval.kind !== "file-change") return false;
+    const paths = getArray(request.params, "filePaths").filter(isString);
+    return this.#confinedWritesAllowed(approval.agentId, paths);
+  }
+
   /**
    * The one rule for every approval OpenBot could answer itself: the agent has Full access. A
-   * Workspace only agent asks to go outside the limit the user chose, so its approvals always reach
-   * the user, and an agent at Ask first has no standing grant.
+   * Workspace only agent asks to go outside the limit the user chose, so its approvals reach the user,
+   * except a file change that its confined process may already write (`#confinedWrite`). An agent at
+   * Ask first has no standing grant.
    */
   #answersForAgent(agentId: string): boolean {
     return !this.#workspaceSandboxed(agentId) && shouldAutoApprove(this.#approvalAutomation, { agentId });

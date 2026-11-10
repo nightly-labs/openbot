@@ -238,6 +238,7 @@ import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/u
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
+import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
@@ -1080,6 +1081,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       workspaceSandboxed: (agentId) => {
         const agent = store.list().find((candidate) => candidate.id === agentId);
         return agent !== undefined && workspaceAccessEnforced(agent);
+      },
+      confinedWritesAllowed: (agentId, paths) => {
+        const agent = store.list().find((candidate) => candidate.id === agentId);
+        return (
+          agent !== undefined &&
+          agentProviderDescriptor(providerForAgent(agent)).workspaceEnforcement === "confined-process" &&
+          confinedWritesAllowed(agent, store.sharedRoot, paths)
+        );
       },
       messagingThread: (threadId) => this.messaging.store.linkForThread(threadId) !== null,
       messagingRequestTurn: (agentId, turnId) => this.#mailbox.answersMessagingRequest(agentId, turnId),
