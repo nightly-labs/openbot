@@ -50,10 +50,11 @@
 }
 
 /* The consent checkbox above the buy button. The site does not load the app's primitives, so the checkbox rules
-   of `primitives.css` are repeated here. */
+   of `primitives.css` are repeated here. The column is wide enough for the English sentence on one line; a longer
+   language wraps to two lines. */
 .pricing-page .pricing-consent-action {
   display: flex;
-  max-width: 340px;
+  max-width: 420px;
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
