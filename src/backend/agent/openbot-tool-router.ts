@@ -35,6 +35,7 @@ import type {
   ConversationMessage,
   CreateAgentInput,
   McpServerConfig,
+  QueuedMessageReceipt,
   SidebarLayoutSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -219,6 +220,19 @@ export type FeedbackSendResult =
     }
   | { readonly status: "signedOut" };
 
+/**
+ * What became of a message from another agent while its recipient's chat turn runs: `steered` into
+ * that turn, or the reason it waits for the next one. Null when no running chat turn could take it,
+ * so the message starts when the recipient is free.
+ */
+export type AgentMessageSteer =
+  | "steered"
+  | "recipient-queues"
+  | "provider-unsupported"
+  | "routine-run"
+  | "steer-failed"
+  | null;
+
 /** Sends approved feedback to the account service, which opens it as a public GitHub issue. */
 export interface AgentFeedback {
   /** False when nobody is signed in to OpenBot, so a send cannot go out with an account. */
@@ -308,9 +322,9 @@ export interface OpenBotToolRouterHooks {
   requestNewChat(agentId: string): void;
   /**
    * Takes a message from another agent into the recipient's running chat turn when the recipient's
-   * busy-message mode is "steer". Otherwise the message waits in the queue.
+   * busy-message mode is "steer". Otherwise the message waits in the queue. The result says which.
    */
-  steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
+  steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<AgentMessageSteer>;
   /** The answer of one web search for the agent, from a side turn whose only tool is web search. */
   searchWeb(agentId: string, query: string): Effect.Effect<string, ToolOperationFailed>;
   /** The CLI version of a provider, as its settings row shows it; null when it is not known. */
@@ -2744,20 +2758,52 @@ export class OpenBotToolRouter {
           idempotencyKey: toolCallIdempotencyKey(params),
         })
         .pipe(toToolOperationFailed);
-      for (const delivery of receipt.deliveries) {
-        yield* this.#hooks.steerAgentMessage(delivery.recipientAgentId, delivery.id);
-        this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-        this.#drain.scheduleDrain(delivery.recipientAgentId);
-      }
+      // Waits for each provider, so the sender can tell the user if the message joined the turn. The
+      // recipients are steered together, so one slow provider does not hold the others.
+      const deliveries = yield* Effect.forEach(
+        receipt.deliveries,
+        (delivery) =>
+          this.#hooks.steerAgentMessage(delivery.recipientAgentId, delivery.id).pipe(
+            Effect.map((steer) => {
+              this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+              this.#drain.scheduleDrain(delivery.recipientAgentId);
+              return sentDelivery(delivery, steer);
+            }),
+          ),
+        { concurrency: "unbounded" },
+      );
       const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.emitConversation(snapshot);
       return {
         success: true,
-        contentItems: [{ type: "inputText", text: JSON.stringify(receipt) }],
+        contentItems: [{ type: "inputText", text: JSON.stringify({ ...receipt, deliveries }) }],
       };
     },
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,
   );
+}
+
+type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
+  outcome?: "steered" | "queued";
+  queuedBecause?: Exclude<AgentMessageSteer, "steered" | null>;
+  note?: string;
+};
+
+/** The one reason that the user can change, named as the agent settings show it. */
+const RECIPIENT_QUEUES_NOTE =
+  "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
+
+/**
+ * A `send_message` delivery as its sender reads it. The receipt is from before the steer, so a
+ * steered message shows as running. A queued one says why it waits while the recipient works. The
+ * result explains itself, so the tool description stays in the context budget.
+ */
+function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
+  if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
+  if (delivery.status !== "queued") return delivery;
+  if (steer === "recipient-queues")
+    return { ...delivery, outcome: "queued", queuedBecause: steer, note: RECIPIENT_QUEUES_NOTE };
+  return { ...delivery, outcome: "queued", ...(steer ? { queuedBecause: steer } : {}) };
 }
