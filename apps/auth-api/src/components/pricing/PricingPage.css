@@ -41,7 +41,10 @@
   min-width: 240px;
 }
 
-.pricing-page .pricing-cta[data-disabled] {
+/* Off until the buyer ticks the consent box. The hover colour of the site's primary button stays off too. */
+.pricing-page .pricing-cta[data-disabled],
+.pricing-page .pricing-cta[data-disabled]:hover {
+  background: var(--openbot-surface-light);
   cursor: not-allowed;
   opacity: 0.45;
 }

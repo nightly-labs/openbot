@@ -36,6 +36,9 @@ const LICENSE_RARITY_STEPS: Record<LicenseTier | "none", number> = { none: 0, st
 const FIRST_SERVER: BillingPlanId = "standard";
 const FIRST_LICENSE: LicenseTier = "team";
 
+/** Splits the consent sentence at the markers and keeps them, so each marker becomes its link. */
+const CONSENT_MARKERS = new RegExp(`(${CONSENT_POLICY_MARKER}|${CONSENT_TERMS_MARKER})`);
+
 /**
  * The consent sentence with its two links. The markers in the sentence of each language show where the links go.
  * The links open in a new tab, so the order stays as the buyer set it.
@@ -64,7 +67,7 @@ function Consent(props: {
     }
     return piece;
   };
-  const pieces = () => props.text.statement.split(/(\uE000|\uE001)/).filter((piece) => piece !== "");
+  const pieces = () => props.text.statement.split(CONSENT_MARKERS).filter((piece) => piece !== "");
   return (
     <div class="pricing-consent">
       <Checkbox
@@ -73,7 +76,7 @@ function Consent(props: {
         checked={props.checked}
         onChange={(event) => props.onChange(event.currentTarget.checked)}
       />
-      <label for={props.id} class="pricing-consent-label">
+      <label id={`${props.id}-label`} for={props.id} class="pricing-consent-label">
         {pieces().map(part)}
       </label>
     </div>
@@ -116,10 +119,7 @@ function OrderAction(props: {
           icon="arrow-right"
           class="pricing-cta"
           disabled={blocked()}
-          aria-describedby={id}
-          onClick={(event: MouseEvent) => {
-            if (blocked()) event.preventDefault();
-          }}
+          aria-describedby={`${id}-label`}
         >
           {label()}
         </ButtonLink>
