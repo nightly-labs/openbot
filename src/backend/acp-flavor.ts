@@ -55,7 +55,10 @@ export interface AcpFlavor {
    * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
    * Absent: such a turn succeeds.
    */
-  emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
+  emptyAnswerFailure?(
+    turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
+    label: string,
+  ): string | null;
   /**
    * The failure text of a prompt that the agent failed because the model gave no answer. The turn
    * then ends as a turn with no answer does, not with the agent's own error text.
@@ -226,6 +229,10 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 fails the prompt when the model sends only its reasoning: `Internal error:
   // "empty response from model (reasoning_only)"` (#6073).
   emptyAnswerError: /\bempty response from model\b/u,
+  // Grok CLI 1.0.77 accepts an answer of only spaces and line breaks, and ends the prompt as done.
+  // The chat then showed no answer and no error (#6529). A plan or a compaction shows in the chat.
+  emptyAnswerFailure: ({ showedPlanOrCompaction }, label) =>
+    showedPlanOrCompaction ? null : sourceText("error.provider.acpNoAnswer", { provider: label }),
 };
 
 /**

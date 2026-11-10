@@ -205,6 +205,8 @@ interface AcpTurn {
   receivedOutput: boolean;
   /** The model sent reasoning text. An empty OpenCode turn then names reasoning without an answer. */
   reasoned: boolean;
+  /** The turn showed a plan or a compaction, which can be the whole answer of a turn with no text. */
+  showedPlanOrCompaction: boolean;
   /**
    * The partial reply and the harness error that cut it. It becomes the answer when no text comes
    * after the error, because then the harness did not retry.
@@ -902,7 +904,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    */
   #compacted(thread: AcpThread): void {
     // A compaction is the whole answer of a `/compact` turn.
-    if (thread.activeTurn) thread.activeTurn.answered = true;
+    if (thread.activeTurn) {
+      thread.activeTurn.answered = true;
+      thread.activeTurn.showedPlanOrCompaction = true;
+    }
     thread.instructionsSent = null;
     this.#turnContext.resend(thread.id);
     this.emit("notification", {
@@ -2235,6 +2240,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       thoughtStarted: false,
       receivedOutput: false,
       reasoned: false,
+      showedPlanOrCompaction: false,
       interruptedAnswer: null,
       providerError: null,
       signInLost: false,
@@ -2774,6 +2780,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (update.sessionUpdate === "plan") {
+      turn.showedPlanOrCompaction = true;
       this.emit("notification", {
         method: PLAN_UPDATED_METHOD,
         params: { threadId: thread.id, turnId: turn.id, explanation: null, plan: acpPlanSteps(update.entries) },
