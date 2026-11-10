@@ -35,7 +35,7 @@ export interface ServersPort {
   browser: Pick<OpenBotDesktopApi["browser"], "setVisible">;
   hostAdmin: Pick<
     OpenBotDesktopApi["hostAdmin"],
-    "cancelUpdate" | "getUpdateStatus" | "startUpdate" | "updateIdentity"
+    "cancelUpdate" | "getUpdateStatus" | "rotateHostKey" | "startUpdate" | "updateIdentity"
   >;
   hostedServers: Pick<OpenBotDesktopApi["hostedServers"], "list" | "restart" | "wake">;
   localServers: OpenBotDesktopApi["localServers"];

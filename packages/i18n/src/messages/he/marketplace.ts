@@ -211,6 +211,23 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "טען את ההקשר של Cobrain לפרויקט הזה לפני שנתחיל.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "חפש בהערות Cobrain שלי מה החלטנו לגבי התמחור.",
   "marketplace.plugin.cobrain.prompt.saveNote": "שמור ב-Cobrain הערה עם מה שעשינו היום ומה נשאר.",
+  "marketplace.plugin.honcho.tagline": "הזיכרון שלך בכל כלי ה-AI",
+  "marketplace.plugin.honcho.description":
+    "Honcho של Plastic Labs נותן לסוכנים זיכרון לטווח ארוך עליך, שכלי AI אחרים שחיברת יכולים לשתף. הסוכנים שומרים את מה שהם לומדים, ו-Honcho מסיק ממנו מודל של ההעדפות, המטרות ודרכי העבודה שלך. הסוכנים שואלים אותו שאלות לפני שהם מתחילים. לסוכני OpenBot יש גם זיכרון משלהם; Honcho הוא הזיכרון שעובר איתך לכלים אחרים. הודעות שהסוכנים שומרים נשלחות לחשבון Honcho שלך.",
+  "marketplace.plugin.honcho.app": "שמירה ושאילתות של זיכרון לטווח ארוך בסביבות העבודה שלך ב-Honcho דרך שרת MCP אחד.",
+  "marketplace.plugin.honcho.prompt.recall": "לפני שנתחיל, שאל את Honcho מה הוא יודע על הדרך שבה אני אוהב לעבוד.",
+  "marketplace.plugin.honcho.prompt.save": "שמור ב-Honcho את ההחלטות מהשרשור הזה.",
+  "marketplace.plugin.honcho.prompt.preferences": "מה Honcho אומר על סגנון הכתיבה שלי? השתמש בזה בטיוטה הזו.",
+  "marketplace.plugin.honcho.hint.apiKey": "צור מפתח ב-app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "זיכרון שלומד עם הזמן",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight של Vectorize נותן לסוכנים זיכרון לטווח ארוך ב-Hindsight Cloud. הסוכנים שומרים עובדות ואירועים, מאחזרים אותם לפי משמעות, זמן וישות, ומהרהרים בהם כדי ליצור מודלים מנטליים. הזיכרונות נשמרים בבנקים, והסוכנים יכולים ליצור בנק לכל פרויקט או אדם. לסוכני OpenBot יש גם זיכרון משלהם; Hindsight הוא הזיכרון שכלי AI אחרים שחיברת יכולים לשתף. מה שהסוכנים שומרים נשלח לחשבון Hindsight Cloud שלך.",
+  "marketplace.plugin.hindsight.app": "שמירה, אחזור והרהור בזיכרונות בבנקים שלך ב-Hindsight Cloud דרך שרת MCP אחד.",
+  "marketplace.plugin.hindsight.prompt.recall": "לפני שנתחיל, אחזר מ-Hindsight מה אנחנו יודעים על הפרויקט הזה.",
+  "marketplace.plugin.hindsight.prompt.retain": "שמור ב-Hindsight את ההחלטות והשאלות הפתוחות מהשרשור הזה.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "הרהר בזיכרונות שלי ב-Hindsight: אילו דפוסים אתה רואה בעבודה שלי בחודש האחרון?",
+  "marketplace.plugin.hindsight.hint.apiKey": "צור מפתח בדף Connect של Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "עיצובים ואבות טיפוס",
   "marketplace.plugin.figma.description":
     "Figma מאפשר לסוכנים לקרוא קובצי עיצוב, לבדוק רכיבים, סגנונות ומשתנים ולמסור מפרטי ייצור למהנדסים. הוא מתחבר לשרת MCP באפליקציית Figma לשולחן העבודה, במחשב הזה. השרת יכול לקרוא עיצובים בלבד; תמיכה בכתיבה בפיתוח.",

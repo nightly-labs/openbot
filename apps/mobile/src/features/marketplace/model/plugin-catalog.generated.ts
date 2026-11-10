@@ -411,6 +411,111 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "honcho",
+    name: "Honcho",
+    tagline: "Your memory across AI tools",
+    description:
+      "Honcho by Plastic Labs gives agents a long-term memory of you that other AI tools you connect can share. Agents save what they learn, and Honcho reasons over it to build a model of your preferences, goals and ways of working. Agents ask it questions before they start. OpenBot agents keep their own memory too; Honcho is the memory that follows you to other tools. Messages that agents save go to your Honcho account.",
+    category: "productivity",
+    creatorName: "Plastic Labs",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-recall", text: "Ask Honcho what it knows about how I like to work before we start." },
+      { id: "prompt-save", text: "Save the decisions from this thread to Honcho." },
+      { id: "prompt-preferences", text: "What does Honcho say about my writing style? Use it for this draft." },
+    ],
+    websiteUrl: "https://honcho.dev",
+    privacyPolicyUrl: "https://app.honcho.dev/privacy",
+    termsUrl: "https://app.honcho.dev/tos",
+    featured: false,
+    apps: [
+      {
+        id: "app-honcho-mcp",
+        name: "Honcho",
+        description: "Save and query long-term memory in your Honcho workspaces over one MCP server.",
+        server: {
+          name: "honcho",
+          transport: "http",
+          url: "https://mcp.honcho.dev",
+          auth: [
+            { id: "honcho-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "honcho-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "hch-…",
+                  hint: "Create a key at app.honcho.dev.",
+                },
+              ],
+              docsUrl: "https://honcho.dev/docs/v3/guides/integrations/mcp",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    slug: "hindsight",
+    name: "Hindsight",
+    tagline: "Memory that learns over time",
+    description:
+      "Hindsight by Vectorize gives agents a long-term memory in Hindsight Cloud. Agents retain facts and events, recall them by meaning, time and entity, and reflect on them to form mental models. Memories are kept in banks, and agents can make a bank for each project or person. OpenBot agents keep their own memory too; Hindsight is the memory that other AI tools you connect can share. What agents retain goes to your Hindsight Cloud account.",
+    category: "productivity",
+    creatorName: "Vectorize",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-recall", text: "Recall from Hindsight what we know about this project before we start." },
+      { id: "prompt-retain", text: "Retain the decisions and open questions from this thread in Hindsight." },
+      {
+        id: "prompt-reflect",
+        text: "Reflect on my Hindsight memories: what patterns do you see in my last month of work?",
+      },
+    ],
+    websiteUrl: "https://hindsight.vectorize.io",
+    privacyPolicyUrl: "https://vectorize.io/privacy",
+    termsUrl: "https://vectorize.io/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-hindsight-mcp",
+        name: "Hindsight",
+        description: "Retain, recall and reflect on memories in your Hindsight Cloud banks over one MCP server.",
+        server: {
+          name: "hindsight",
+          transport: "http",
+          url: "https://api.hindsight.vectorize.io/mcp",
+          auth: [
+            { id: "hindsight-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "hindsight-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "hsk_…",
+                  hint: "Create a key on the Connect page of Hindsight Cloud.",
+                },
+              ],
+              docsUrl: "https://ui.hindsight.vectorize.io/connect",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "figma",
     name: "Figma",
     tagline: "Designs and prototypes",

@@ -210,7 +210,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "У этого агента нет регулярной задачи с таким id.",
   "error.backend.agentWaitNoRoutine":
     "Ожидание пробуждает только запуск одной из ваших регулярных задач, а у вас их нет. Создайте регулярную задачу с помощью openbot.create_routine, затем откройте ожидание.",
-  "error.backend.agentWaitRemoteUnsupported": "Открытые ожидания доступны только для агентов на этом компьютере.",
   "error.backend.markUnreadRemoteUnsupported":
     "Отметить сообщение непрочитанным можно только для агентов на этом компьютере.",
   "error.backend.messageDeleteUnsupported": "Этот сервер не поддерживает удаление сообщений.",

@@ -194,7 +194,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "ليس لدى هذا الوكيل مهمة دورية بهذا المعرّف.",
   "error.backend.agentWaitNoRoutine":
     "لا يوقظ الانتظار إلا تشغيل إحدى مهامك الدورية، وليس لديك أي مهمة دورية. أنشئ واحدة باستخدام openbot.create_routine، ثم افتح الانتظار.",
-  "error.backend.agentWaitRemoteUnsupported": "الانتظارات المفتوحة متاحة فقط للوكلاء على هذا الحاسوب.",
   "error.backend.markUnreadRemoteUnsupported": "تمييز رسالة كغير مقروءة متاح فقط للوكلاء على هذا الحاسوب.",
   "error.backend.messageDeleteUnsupported": "لا يدعم هذا الخادم حذف الرسائل.",
   "error.backend.messageDeleteNotFound": "هذه الرسالة ليست في المحادثة.",

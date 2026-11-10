@@ -196,7 +196,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "לסוכן הזה אין שגרה עם המזהה הזה.",
   "error.backend.agentWaitNoRoutine":
     "רק הרצה של אחת השגרות שלך מעירה המתנה, ואין לך שגרה. יש ליצור אחת עם openbot.create_routine ואז לפתוח את ההמתנה.",
-  "error.backend.agentWaitRemoteUnsupported": "המתנות פתוחות זמינות רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.markUnreadRemoteUnsupported": "סימון הודעה כלא נקראה זמין רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.messageDeleteUnsupported": "השרת הזה אינו תומך במחיקת הודעות.",
   "error.backend.messageDeleteNotFound": "ההודעה הזו אינה בצ'אט.",

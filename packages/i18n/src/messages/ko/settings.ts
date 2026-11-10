@@ -639,6 +639,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex 라이브 음성",
   "settings.voice.speech.codexLive.description":
     "모든 에이전트와의 음성 대화는 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "모든 에이전트와의 음성 대화는 서버의 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
   "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",

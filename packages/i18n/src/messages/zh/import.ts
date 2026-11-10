@@ -33,8 +33,13 @@ export const messages = {
   "import.guide.hermesTitle": "把助手从 Hermes Agent 迁移过来",
   "import.guide.hermesLede":
     "每个 Hermes 配置文件会变成一个助手。你可以读取这台电脑上的配置文件，也可以让 Hermes 中的导出技能把它们打包成一个 .zip 文件。",
+  "import.guide.hermesLedeServer":
+    "每个 Hermes 配置文件会变成一个助手。你可以读取服务器上的配置文件，也可以让 Hermes 中的导出技能把它们打包成一个 .zip 文件。",
+  "import.guide.hermesLedeExport":
+    "每个 Hermes 配置文件会变成一个助手。Hermes 中的导出技能会把它们打包成一个 .zip 文件。",
   "import.guide.hermesSetupLabel": "如何带入配置文件",
   "import.guide.setupFolder": "读取这台电脑",
+  "import.guide.setupServer": "读取服务器",
   "import.guide.setupCommand": "用命令安装",
   "import.guide.hermesStepFolder": "读取 Hermes 文件夹",
   "import.guide.hermesStep1": "把导出技能添加到 Hermes",
@@ -86,7 +91,10 @@ export const messages = {
   "import.result.warnings": "部分内容没有迁移",
   "import.source.title": "你的助手现在在哪里？",
   "import.source.lede": "OpenBot 会把它们复制到这台电脑。在改动任何内容之前，你可以先看到每个项目。",
+  "import.source.ledeServer": "OpenBot 会把它们复制到服务器。在改动任何内容之前，你可以先看到每个项目。",
   "import.source.hermesNote": "读取这台电脑上的 Hermes 文件夹，或从 Hermes 导出 .zip 文件。",
+  "import.source.hermesNoteServer": "读取服务器上的 Hermes 文件夹，或从 Hermes 导出 .zip 文件。",
+  "import.source.hermesNoteExport": "从 Hermes 导出 .zip 文件。",
   "import.source.grokNote": "在云端。那里的导出助手会生成 .zip 文件。",
   "import.source.transfer": "另一台 OpenBot 电脑",
   "import.source.transferNote": "用“迁移”可以一并移动助手和设置。",
@@ -94,6 +102,9 @@ export const messages = {
   "import.hermes.readFailed": "无法读取 Hermes 文件夹",
   "import.hermes.notFound": "这台电脑上没有 Hermes 配置文件",
   "import.hermes.notFoundNote": "如果 Hermes 使用其他文件夹，例如由 HERMES_HOME 指定的文件夹，请选择该文件夹。",
+  "import.hermes.notFoundServer": "这台服务器上没有 Hermes 配置文件",
+  "import.hermes.notFoundServerNote":
+    "OpenBot 读取服务器上的 Hermes 文件夹。要从这台电脑导入 Hermes，请从 Hermes 导出 .zip 文件。",
   "import.hermes.chooseFolder": "选择 Hermes 文件夹",
   "import.hermes.chooseAnother": "选择其他文件夹",
   "import.hermes.title": "来自 Hermes Agent 的助手",

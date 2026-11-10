@@ -16,6 +16,7 @@
     "./routine-calendar-dates": "./src/routine-calendar-dates.ts",
     "./routine-schedule": "./src/routine-schedule.ts",
     "./routine-schedule-draft": "./src/routine-schedule-draft.ts",
+    "./routines-once": "./src/routines-once.ts",
     "./runtime-attention": "./src/runtime-attention.ts",
     "./agent-notifications": "./src/agent-notifications.ts",
     "./channel-notifications": "./src/channel-notifications.ts",

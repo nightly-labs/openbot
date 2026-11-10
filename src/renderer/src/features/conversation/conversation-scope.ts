@@ -35,6 +35,7 @@ import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
+import { codexLiveAccess } from "../speech/codex-live-access";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -2436,10 +2437,15 @@ export function createConversationViewScope(props: ConversationProps) {
     attachmentPicker = element;
   };
   /**
-   * A voice conversation hears and speaks on this computer, so it needs its speech models. A remote
-   * server gets the text only.
+   * A transcribed voice conversation hears and speaks on this computer with its speech models, so a
+   * browser cannot run it, and dictation stays on this computer for the same reason. Codex live voice
+   * runs in the Codex of the host and sends the audio from this page to OpenAI, so a browser has it
+   * when the host serves it, the user turned it on, and the host's Codex has a ChatGPT sign-in.
    */
-  const voiceConversationAvailable = () => !channel && !props.runtime;
+  const voiceConversationAvailable = () =>
+    !channel &&
+    (!props.runtime ||
+      (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn"));
   // A transcribed conversation sends its turns through this view, so it ends with the view.
   onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */

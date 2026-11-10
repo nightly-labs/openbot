@@ -267,6 +267,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Używaj mojej konfiguracji Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Agenci wczytują Twój CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agenci wczytują CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude na serwerze. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
   "provider.settings.claudeUserSetupLoadFailed": "Nie udało się wczytać ustawienia Claude Code.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {

@@ -17,15 +17,18 @@ import {
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onSettled, untrack } from "solid-js";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { conversationPort } from "./features/conversation/conversation-port";
+import { hostCustomAgentsApi } from "./features/custom-agents/custom-agents-port";
+import { createCustomAgentsStore } from "./features/custom-agents/stores/custom-agents-store";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { hostCustomProvidersApi } from "./features/custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "./features/custom-providers/stores/custom-providers-store";
@@ -109,6 +112,22 @@ const Providers = createSimpleContext({
     const hostCustomProviders = createCustomProvidersStore(() => {
       const serverId = providerAdminServerId();
       return serverId ? hostCustomProvidersApi(providerAdmin, serverId) : undefined;
+    });
+    /**
+     * The joined server whose custom ACP agents this window manages: the account administers it and
+     * the host serves `custom-agents-v1`. The agents of this computer are in `useCustomAgents`.
+     */
+    const customAgentsServerId = createMemo(() => remoteAdminServer(activeServer(), "custom-agents-v1")?.id);
+    const hostCustomAgents = createCustomAgentsStore(() => {
+      const serverId = customAgentsServerId();
+      return serverId ? hostCustomAgentsApi(serverId) : undefined;
+    });
+    createEffect(customAgentsServerId, (serverId) => {
+      // Each server has its own list, so a switch empties it and drops the previous server's answers.
+      hostCustomAgents.resetCustomAgents();
+      // As for this computer's list: a failure leaves it empty, and the Settings registry lists again
+      // after an install.
+      if (serverId) void hostCustomAgents.refreshCustomAgents().catch(() => undefined);
     });
     const localCustomProviders = useCustomProviders();
     /**
@@ -281,11 +300,50 @@ const Providers = createSimpleContext({
     }
 
     /**
-     * Restarts a provider of this computer after its turns end. A joined host has no such action:
-     * its provider API has no restart, so the caller offers none there.
+     * The joined server whose host's provider switch this window uses (`provider-use-v1`). The released
+     * status routes leave out `off`, so the host's off providers come from this route.
+     */
+    const providerUseServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_USE_CAPABILITY)?.id);
+    /** The off providers of that host, with the server they are of, so another server's list is not shown. */
+    const [hostProviderUse, setHostProviderUse] = createSignal<{ serverId: string; off: AgentProviderId[] }>();
+    /** Changes on each read and switch, so an older answer does not replace a newer list. */
+    let providerUseVersion = 0;
+    /**
+     * Reads the off providers of the host again. Another admin can change them, so the Providers
+     * section reads them each time it is shown. A failure keeps the last list.
+     */
+    function refreshHostProviderUse(): void {
+      const serverId = providerUseServerId();
+      if (!serverId) return;
+      const version = ++providerUseVersion;
+      void providersPort()
+        .providerAdmin.providerUse(serverId)
+        .then((off) => {
+          if (version === providerUseVersion) setHostProviderUse({ serverId, off });
+        })
+        .catch(() => undefined);
+    }
+    // A failure shows each provider as on until the next read.
+    createEffect(providerUseServerId, () => untrack(refreshHostProviderUse));
+    /** The off providers of the active joined server's host, or undefined for this computer and an older host. */
+    function hostOffProviders(): AgentProviderId[] | undefined {
+      const serverId = providerUseServerId();
+      const use = hostProviderUse();
+      return serverId && use?.serverId === serverId ? use.off : undefined;
+    }
+
+    /**
+     * Turns a provider off or on, on this computer or on a joined server's host with `provider-use-v1`.
+     * A provider of this computer restarts after its turns end.
      */
     async function setProviderOn(provider: AgentProviderId, on: boolean): Promise<void> {
       const server = activeServer();
+      if (server && server.kind !== "local" && server.id === providerUseServerId()) {
+        const version = ++providerUseVersion;
+        const off = await providersPort().providerAdmin.setProviderUse({ provider, on }, server.id);
+        if (version === providerUseVersion) setHostProviderUse({ serverId: server.id, off });
+        return;
+      }
       if (server?.kind !== "local") return;
       const status = await providersPort().setProviderOn({ provider, on });
       if (activeServer()?.id === server.id) flush(() => applyAgentStatus(status));
@@ -525,8 +583,13 @@ const Providers = createSimpleContext({
     return {
       ...runtimes,
       providerAdminServerId,
+      providerUseServerId,
+      hostOffProviders,
+      refreshHostProviderUse,
       providerKeys,
       hostCustomProviders,
+      customAgentsServerId,
+      hostCustomAgents,
       activeCustomProviders,
       refreshingProviders,
       applyAgentStatus,

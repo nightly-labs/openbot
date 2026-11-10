@@ -4,27 +4,50 @@ import {
   decodeHostVaultState,
   type VaultSaveInput,
 } from "@openbot/contracts/ipc";
+import { VAULT_IMPORT_CSV_LIMIT } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { runTeamEffect } from "@openbot/team-client";
+import { importHostVaultCsv } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import { remoteVaultCalls, type VaultCalls } from "../vault/vault-port";
+import { chooseFiles } from "./web-channels-runtime";
 import type { WebWorkspace } from "./web-client-context";
 
 /**
  * The Vault of the connected host (`vault-v3`, `vault-v2` without two-step keys, or `vault-v1` without
  * API keys), for its owner or admin. The browser has no main process, so a copy shows the secret to this page and puts it on the
- * clipboard here. There is no CSV import: the file is on this computer, not on the host.
+ * clipboard here. `importable` is true while the host serves `vault-import-v1`: the browser's file
+ * chooser picks the CSV export, and its text goes to the host.
  */
 export function webVaultCalls(
   request: () => TeamApiRequest,
   onHostEvent: WebWorkspace["onHostEvent"],
   version: 1 | 2 | 3,
+  importable = false,
 ): VaultCalls {
   const routes = version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
   const post = <T>(path: string, decode: (value: unknown) => T, body: Parameters<TeamApiRequest>[3] = {}) =>
     request()("POST", path, decode, body);
   const reveal: VaultCalls["reveal"] = (secret) => post(routes.reveal, decodeHostVaultSecret, { ...secret });
+  /** The answer has only the counts, so the list is read again, as on the desktop. A closed chooser gives null. */
+  const importCsv = async () => {
+    // The host is checked before the chooser opens, and nothing is awaited before it.
+    const send = request();
+    const [file] = await chooseFiles({ multiple: false, accept: ".csv,text/csv" });
+    if (!file) return null;
+    // Each character takes at least one byte, so a larger file cannot fit.
+    if (file.size > VAULT_IMPORT_CSV_LIMIT * 4) throw new Error(currentText().t("error.vault.csvTooLarge"));
+    const csv = await file.text();
+    if (csv.length > VAULT_IMPORT_CSV_LIMIT) throw new Error(currentText().t("error.vault.csvTooLarge"));
+    const { imported, skipped } = await runTeamEffect(
+      importHostVaultCsv(send, csv).pipe(Effect.mapError((error) => error.cause)),
+    );
+    return { imported, skipped, state: await send("POST", routes.list, decodeHostVaultState, {}) };
+  };
   return remoteVaultCalls(
     {
       list: () => post(routes.list, decodeHostVaultState),
@@ -41,6 +64,7 @@ export function webVaultCalls(
         ]),
       reset: () => post(routes.reset, decodeHostVaultState),
       codes: async () => (version === 3 ? post(VAULT_V3_ROUTES.codes, decodeHostVaultCodes) : { codes: [] }),
+      ...(importable ? { importCsv } : {}),
     },
     (read) =>
       onHostEvent((event) => {

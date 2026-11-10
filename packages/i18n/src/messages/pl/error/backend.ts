@@ -211,7 +211,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Ten agent nie ma rutyny o tym identyfikatorze.",
   "error.backend.agentWaitNoRoutine":
     "Oczekiwanie budzi tylko uruchomienie jednej z twoich rutyn, a nie masz żadnej rutyny. Utwórz ją za pomocą openbot.create_routine, a potem otwórz oczekiwanie.",
-  "error.backend.agentWaitRemoteUnsupported": "Otwarte oczekiwania są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.markUnreadRemoteUnsupported":
     "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
   "error.backend.messageDeleteUnsupported": "Ten serwer nie obsługuje usuwania wiadomości.",

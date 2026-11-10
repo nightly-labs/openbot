@@ -305,6 +305,8 @@ export interface UsageLimitAskCardProps {
   resetsAt: number | null;
   /** The models that can take the message now, the first one preselected. */
   options: readonly BackupModelOption[];
+  /** Whether the reader can save the choice in the backup models. Absent means yes. */
+  rememberable?: boolean;
   /** Moves the agent. `remember` saves the choice first in the order and switches without asking next time. */
   onSend: (option: BackupModelOption, remember: boolean) => Promise<void>;
   onWait: () => void;
@@ -336,7 +338,7 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
     setFailure(null);
     setSending(true);
     try {
-      await props.onSend(option, remember());
+      await props.onSend(option, props.rememberable !== false && remember());
     } catch (error) {
       setFailure({ message: errorMessage(error, t("chat.usageLimit.failed")), reference: errorReference(error) });
     } finally {
@@ -401,15 +403,17 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
         </>
       }
     >
-      <label class="usage-limit-ask-remember" for={rememberId}>
-        <Checkbox
-          id={rememberId}
-          checked={remember()}
-          disabled={sending()}
-          onChange={(event) => setRemember(event.currentTarget.checked)}
-        />
-        {t("chat.usageLimit.remember")}
-      </label>
+      <Show when={props.rememberable !== false}>
+        <label class="usage-limit-ask-remember" for={rememberId}>
+          <Checkbox
+            id={rememberId}
+            checked={remember()}
+            disabled={sending()}
+            onChange={(event) => setRemember(event.currentTarget.checked)}
+          />
+          {t("chat.usageLimit.remember")}
+        </label>
+      </Show>
       <Show when={failure()}>
         {(details) => (
           <p class="usage-limit-ask-error" role="alert">

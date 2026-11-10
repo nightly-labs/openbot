@@ -218,7 +218,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Este agente não tem nenhuma rotina com este id.",
   "error.backend.agentWaitNoRoutine":
     "Somente uma execução de uma das suas rotinas desperta uma espera, e você não tem nenhuma rotina. Crie uma com openbot.create_routine e depois abra a espera.",
-  "error.backend.agentWaitRemoteUnsupported": "As esperas abertas só estão disponíveis para agentes neste computador.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marcar uma mensagem como não lida só está disponível para agentes neste computador.",
   "error.backend.messageDeleteUnsupported": "Este servidor não permite excluir mensagens.",

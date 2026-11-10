@@ -128,6 +128,7 @@ export const messages = {
   "customProvider.probe.checking": "Verificando",
   "customProvider.probe.running": { one: "Em execução · {count} modelo", other: "Em execução · {count} modelos" },
   "customProvider.detected.title": "Encontrados neste computador",
+  "customProvider.detected.titleServer": "Encontrados no servidor",
   "customProvider.detected.scanning": "Buscando modelos e agentes locais.",
   "customProvider.detected.scanAgain": "Buscar novamente",
   "customProvider.detected.empty": "O OpenBot não encontrou nenhum servidor de modelos local ou agente ACP.",
@@ -150,6 +151,8 @@ export const messages = {
   "customProvider.detection.enabled": "Buscar modelos e agentes locais",
   "customProvider.detection.enabledDescription":
     "O OpenBot verifica os endereços padrão do Ollama e do LM Studio e busca agentes ACP conhecidos no seu PATH.",
+  "customProvider.detection.enabledDescriptionServer":
+    "O servidor verifica os endereços padrão do Ollama e do LM Studio e busca agentes ACP conhecidos no PATH dele.",
   "customProvider.detection.addresses": "Outros endereços de servidores de modelos",
   "customProvider.detection.address.label": "Endereço {number}",
   "customProvider.detection.address.remove": "Remover endereço {number}",
@@ -169,6 +172,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Letras minúsculas, números ou hífens. Você não pode alterá-lo depois.",
   "customProvider.acp.command": "Comando",
   "customProvider.acp.commandHint": "O programa que será iniciado. O OpenBot o busca no seu PATH.",
+  "customProvider.acp.commandHintServer": "O programa a iniciar. O servidor o procura no próprio PATH.",
   "customProvider.acp.args": "Argumentos",
   "customProvider.acp.argsHint":
     "Separe os argumentos com espaços. Coloque entre aspas um argumento que contenha espaços.",
@@ -195,6 +199,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Este comando é executado no seu computador",
   "customProvider.acp.trustDescription":
     "O OpenBot o inicia com sua conta de usuário. O agente pode ler e alterar arquivos e executar comandos. Adicione somente um agente em que você confia.",
+  "customProvider.acp.hostTrustTitle": "Este comando é executado no servidor",
+  "customProvider.acp.hostTrustDescription":
+    "O OpenBot o inicia com a conta de usuário do servidor. O agente pode ler e alterar arquivos no servidor e executar comandos nele. Adicione somente um agente em que você confia.",
   "customProvider.acp.submit": "Adicionar agente",
   "customProvider.acp.editTitle": "Editar um agente ACP personalizado",
   "customProvider.acp.submitEdit": "Salvar agente",
@@ -211,6 +218,7 @@ export const messages = {
     "Use letras minúsculas, números ou hífens, começando com uma letra ou um número. Use no máximo 40 caracteres.",
   "customProvider.agents.title": "Agentes personalizados",
   "customProvider.agents.description": "Agentes ACP que o OpenBot inicia neste computador.",
+  "customProvider.agents.hostDescription": "Agentes ACP que o OpenBot inicia no computador do servidor.",
   "customProvider.agents.empty": "Nenhum agente personalizado ainda.",
   "customProvider.agents.add": "Adicionar agente",
   "customProvider.agents.restart": "Reiniciar agentes",

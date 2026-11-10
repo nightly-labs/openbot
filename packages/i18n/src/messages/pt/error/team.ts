@@ -74,6 +74,13 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexão não oferece suporte a cores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexão não pode alterar onde uma rotina é executada.",
+  "error.team.routinesOnceUnsupported": "Esta conexão não pode salvar rotinas que são executadas uma vez.",
+  "error.team.routineRunCommandUnsupported": "Esta conexão não pode fornecer o comando de execução de uma rotina.",
+  "error.team.threadQueueUnsupported": "Esta conexão não pode mostrar a fila de uma thread paralela.",
+  "error.team.usageLimitUnsupported": "Esta conexão não pode mostrar nem alterar os limites de uso dos agentes.",
+  "error.team.hermesImportUnsupported": "Esta conexão não pode importar perfis do Hermes do servidor.",
+  "error.team.providerDetectionUnsupported":
+    "Esta conexão não pode encontrar os servidores de modelos e os agentes do servidor.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
@@ -87,6 +94,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "Esta conexão não permite excluir mensagens.",
   "error.team.workspaceDirectoryUnsupported": "Esta conexão não oferece suporte à exibição de pastas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexão não oferece suporte à pesquisa de arquivos.",
+  "error.team.threadMessageSearchUnsupported": "Esta conexão não oferece suporte à pesquisa em threads paralelas.",
   "error.team.sideQuestionUnsupported": "Esta conexão não oferece suporte a perguntas à parte.",
   "error.team.liveVoiceUnsupported":
     "Este servidor não oferece suporte à voz ao vivo do Codex. Atualize o OpenBot no computador que o executa.",
@@ -116,6 +124,7 @@ export const messages = {
   "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
   "error.team.skillLearningUnsupported": "Esta conexão não oferece suporte ao aprendizado de habilidades.",
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
+  "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
@@ -167,4 +176,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "Este endereço não é deste login.",
   "error.team.signInRelayLinkUnknown": "Nenhum agente deste servidor mostrou este link de login.",
   "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
+  "error.team.agentWaitsUnsupported": "Esta conexão não suporta esperas abertas.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Esta conexão não suporta executar uma mensagem na fila como um novo tópico.",
+  "error.team.backgroundProcessesUnsupported": "Esta conexão não suporta processos em segundo plano.",
+  "error.team.providerUseUnsupported": "Esta conexão não suporta ativar e desativar provedores.",
+  "error.team.providerUseInvalid": "Este provedor não tem um interruptor de ativação.",
 } as const satisfies PartialTranslation<typeof source>;

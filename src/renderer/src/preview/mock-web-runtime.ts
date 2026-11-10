@@ -76,6 +76,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     conversationAround: (agentId, messageId) =>
       agent.readConversationPage({ agentId, limit: 50, anchor: { type: "around", messageId } }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
+    markUnreadFrom: (agentId, fromMessageId) => agent.markConversationUnread({ agentId, fromMessageId }),
     conversationReads: () => agent.listConversationReads(),
     deleteMessage: (input) =>
       input.kind === "agent"

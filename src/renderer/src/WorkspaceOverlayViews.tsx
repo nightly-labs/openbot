@@ -1,5 +1,6 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
@@ -240,7 +241,15 @@ export function ServerSettingsOverlay(
         {...modal}
         mcpServers={serverCanManageMcp(props.server) ? props.mcpServers : undefined}
         storage={
-          serverHasStorage(props.server) ? { ...props.storage, canManage: canManageStorage(props.server) } : undefined
+          serverHasStorage(props.server)
+            ? {
+                ...props.storage,
+                canManage: canManageStorage(props.server),
+                backgroundProcesses:
+                  props.server.kind === "remote" &&
+                  serverSupportsCapability(props.server, BACKGROUND_PROCESSES_CAPABILITY),
+              }
+            : undefined
         }
         hostUpdate={
           remoteUpdateServer(props.server)

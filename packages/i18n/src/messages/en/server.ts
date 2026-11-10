@@ -463,7 +463,7 @@ export const messages = defineMessages("server", {
   "server.settings.hostKeyChanged": "Last change",
   // {date} is the date and time of the change.
   "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
-  "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
+  "server.settings.hostKeyOwnerOnly": "Only the owner can change the server key.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":
     "Remove this server from the account service for all members. Use this when its computer is no longer available.",

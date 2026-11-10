@@ -220,6 +220,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision":
     "Fiyatlandırma hakkında ne karar verdiğimizi Cobrain notlarımda ara.",
   "marketplace.plugin.cobrain.prompt.saveNote": "Bugün ne yaptığımızı ve neyin kaldığını Cobrain'e not olarak kaydet.",
+  "marketplace.plugin.honcho.tagline": "Tüm yapay zekâ araçlarında hafızanız",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs'in Honcho'su, ajanlara sizinle ilgili, bağladığınız diğer yapay zekâ araçlarının da paylaşabileceği uzun süreli bir hafıza verir. Ajanlar öğrendiklerini kaydeder, Honcho da bunlar üzerinde akıl yürüterek tercihlerinizin, hedeflerinizin ve çalışma biçimlerinizin bir modelini oluşturur. Ajanlar başlamadan önce ona sorular sorar. OpenBot ajanlarının kendi hafızası da vardır; Honcho sizi diğer araçlara da izleyen hafızadır. Ajanların kaydettiği mesajlar Honcho hesabınıza gider.",
+  "marketplace.plugin.honcho.app":
+    "Tek bir MCP sunucusu üzerinden Honcho çalışma alanlarınızda uzun süreli hafızayı kaydedin ve sorgulayın.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Başlamadan önce Honcho'ya nasıl çalışmayı sevdiğim hakkında ne bildiğini sor.",
+  "marketplace.plugin.honcho.prompt.save": "Bu konudaki kararları Honcho'ya kaydet.",
+  "marketplace.plugin.honcho.prompt.preferences": "Honcho yazım tarzım hakkında ne diyor? Bu taslakta bunu kullan.",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev adresinde bir anahtar oluşturun.",
+  "marketplace.plugin.hindsight.tagline": "Zamanla öğrenen hafıza",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize'ın Hindsight'ı, ajanlara Hindsight Cloud'da uzun süreli bir hafıza verir. Ajanlar olguları ve olayları saklar, onları anlam, zaman ve varlığa göre hatırlar ve zihinsel modeller oluşturmak için üzerlerinde düşünür. Anılar bankalarda tutulur ve ajanlar her proje ya da kişi için bir banka oluşturabilir. OpenBot ajanlarının kendi hafızası da vardır; Hindsight, bağladığınız diğer yapay zekâ araçlarının paylaşabileceği hafızadır. Ajanların sakladıkları Hindsight Cloud hesabınıza gider.",
+  "marketplace.plugin.hindsight.app":
+    "Tek bir MCP sunucusu üzerinden Hindsight Cloud bankalarınızdaki anıları saklayın, hatırlayın ve üzerinde düşünün.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Başlamadan önce Hindsight'tan bu proje hakkında bildiklerimizi hatırla.",
+  "marketplace.plugin.hindsight.prompt.retain": "Bu konudaki kararları ve açık soruları Hindsight'ta sakla.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Hindsight'taki anılarım üzerinde düşün: son bir aydaki çalışmamda hangi örüntüleri görüyorsun?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud'un Connect sayfasında bir anahtar oluşturun.",
   "marketplace.plugin.figma.tagline": "Tasarımlar ve prototipler",
   "marketplace.plugin.figma.description":
     "Figma, ajanların tasarım dosyalarını okumasına, bileşenleri, stilleri ve değişkenleri incelemesine ve üretim şartnamelerini mühendislere teslim etmesine olanak tanır. Bu bilgisayardaki Figma masaüstü uygulamasındaki MCP sunucusuna bağlanır. Sunucu yalnızca tasarımları okuyabilir; yazma desteği üzerinde çalışılıyor.",

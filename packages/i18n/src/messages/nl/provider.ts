@@ -282,6 +282,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
   "provider.settings.claudeUserSetupDescription":
     "Agents laden je CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agents laden CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude op de server. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Kan de Claude Code-instelling niet laden.",
   "provider.settings.models": "Modellen",
   "provider.settings.modelsDescription": {

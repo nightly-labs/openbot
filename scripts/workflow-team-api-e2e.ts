@@ -8,7 +8,9 @@
 // retry, hide a
 // workflow of a local-only provider, refuse a workflow too large for one frame, and tell the member's
 // event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
-// protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The codec carries kinds and statuses that this app does not know, and
+// protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The host
+// advertises `workflows-channels-v1` to a protocol 9 peer, and only an owner or admin adds an output
+// into an OpenBot channel. The codec carries kinds and statuses that this app does not know, and
 // the client shows a workflow with such a node read-only; a member reads the graph of an old version.
 // Agent steps answer through stand-ins, so no provider CLI starts and no model turn is sent.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -31,6 +33,7 @@ import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/tea
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
   WORKFLOW_STEP_TEXT_LIMIT,
@@ -779,6 +782,40 @@ try {
     const nodes = JSON.stringify(record(saved.graph, "graph").nodes);
     assert.ok(nodes.includes("telegram-chat") && nodes.includes("C-slack"), nodes);
     return { denied, owner: 200, capability: WORKFLOWS_CHATS_CAPABILITY };
+  });
+
+  await step("channels: workflows-channels-v1 goes to protocol 9; only an owner adds a channel output", async () => {
+    const capabilities = async (protocol: number) =>
+      list(
+        record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+        "capabilities",
+      );
+    assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_CHANNELS_CAPABILITY));
+    assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_CHANNELS_CAPABILITY));
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
+    const posting = withOutput(agentGraph(open), {
+      id: "chat-channel-output",
+      kind: "output",
+      at: at(600),
+      fields: { target: "chat-channel", channelId: "channel-e2e" },
+    });
+    const denied = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      member,
+      { workflowId: ids.open, baseRevision: before, graph: posting },
+      403,
+      "error.team.adminRequired",
+    );
+    const owner = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: posting,
+    });
+    assert.equal(owner.ok, true);
+    const saved = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: ids.open });
+    const nodes = JSON.stringify(record(saved.graph, "graph").nodes);
+    assert.ok(nodes.includes("chat-channel") && nodes.includes("channel-e2e"), nodes);
+    return { denied, owner: 200, capability: WORKFLOWS_CHANNELS_CAPABILITY };
   });
 
   await step("restore: a version that names the closed agent answers as missing", async () => {
