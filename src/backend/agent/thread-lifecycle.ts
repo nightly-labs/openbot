@@ -206,6 +206,8 @@ export interface ThreadLifecycleOptions {
   serverHost?: boolean;
   /** The plan storage in GB of a hosted server, read at each start and resume of a session. */
   hostedStorageGb?: () => number | null;
+  /** OpenBot draws the Computer Use agent cursor. False on a host whose agents have a display of their own. */
+  agentCursorDrawn?: boolean;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
   /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
@@ -253,6 +255,7 @@ export class ThreadLifecycle {
   readonly #vaultItems: () => VaultContents;
   readonly #serverHost: boolean;
   readonly #hostedStorageGb: () => number | null;
+  readonly #agentCursorDrawn: boolean;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -307,6 +310,7 @@ export class ThreadLifecycle {
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
     this.#serverHost = options.serverHost ?? false;
     this.#hostedStorageGb = options.hostedStorageGb ?? (() => null);
+    this.#agentCursorDrawn = options.agentCursorDrawn ?? false;
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -1381,6 +1385,7 @@ export class ThreadLifecycle {
       vaultItems: this.#vaultItems(),
       serverHost: this.#serverHost,
       hostedStorageGb: this.#hostedStorageGb(),
+      agentCursorDrawn: this.#agentCursorDrawn,
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),

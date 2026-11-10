@@ -2080,6 +2080,7 @@ export async function createApplicationServices({
         }),
     hostMemory,
     hostedStorageGb: () => hostedStorageGb,
+    agentCursorDrawn: drawsComputerUseHighlight,
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
