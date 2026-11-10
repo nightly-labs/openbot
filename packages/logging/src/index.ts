@@ -282,8 +282,12 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
         index = end;
         continue;
       }
-      result += value.slice(index, start + 1);
-      index = start + 1;
+      // No quote follows the opening brackets, so none of them opens a record. They are passed at once,
+      // so `{{name}}` costs one scan against the bound and not two.
+      let next = start + 1;
+      while (value[next] === "{" || value[next] === "[") next += 1;
+      result += value.slice(index, next);
+      index = next;
       continue;
     }
     result += value.slice(index, start) + parsed;
