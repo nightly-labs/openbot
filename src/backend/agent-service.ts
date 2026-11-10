@@ -1308,19 +1308,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ? { ...model, defaultReasoningEffort: selected.reasoningEffort }
               : model;
           const client = this.#providers.createProfileClient(selected.provider, selected.providerAccountId);
+          // A routing turn uses the one try that a person's message gave the lead, before it starts, so the
+          // other lanes stay held. The member that it picks gets its own. A summary is not that turn.
+          if (!background) this.#usageLimits.tryStarted(selected.id);
           return yield* this.#profileClients
             .run(client, (cancelled) => generateTextWithoutTools(client, turnModel, prompt, cancelled))
             .pipe(
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
               // error of the `turn/start` request. It holds the model that ran it the way a refused member turn
               // does, and the channel keeps the task queued for the reset.
-              // A routing turn uses the one try that a person's message gave the lead, refused or not:
-              // the member that it picks gets its own. A summary is not that turn.
-              Effect.ensuring(
-                Effect.sync(() => {
-                  if (!background) this.#usageLimits.tryStarted(selected.id);
-                }),
-              ),
               Effect.tapError((failure) => {
                 const resetsAt =
                   failure instanceof GenerationUsageLimitError
