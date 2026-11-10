@@ -458,6 +458,35 @@ async function main(): Promise<void> {
     assert(stuckCheckAgain.ms < 3_000, `A check that stayed waited again: ${stuckCheckAgain.ms} ms.`);
     measurements.stuckChallengeSecondSnapshotMs = stuckCheckAgain.ms;
     recordCases("snapshot-waits-for-check-once-per-document");
+    const offerSchema = z.object({
+      challenge: z.object({ target: z.object({ kind: z.literal("point"), x: z.number(), y: z.number() }) }),
+    });
+    const offer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/checkbox-captcha` });
+    assert.equal(offer.page.challenge?.status, "click-once", "A checkbox check did not offer its click.");
+    await call("click", { tabId: settleTab.id, target: offerSchema.parse(offer.raw).challenge.target });
+    const passed = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    // The check passed before or while the read waited.
+    assert(
+      passed.page.challenge === undefined || passed.page.challenge.status === "cleared",
+      `The clicked checkbox did not pass the check: ${passed.page.challenge?.status}`,
+    );
+    measurements.checkboxPassedSnapshotMs = passed.ms;
+    recordCases("challenge-offers-one-click", "challenge-click-passes");
+    const stuckOffer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-checkbox-captcha` });
+    assert.equal(stuckOffer.page.challenge?.status, "click-once");
+    await call("click", { tabId: settleTab.id, target: offerSchema.parse(stuckOffer.raw).challenge.target });
+    const stuckClick = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(
+      stuckClick.page.challenge?.status,
+      "needs-user",
+      "A check that stayed after its click did not ask for a person.",
+    );
+    assert(stuckClick.ms < 10_000, `The read after the click waited too long: ${stuckClick.ms} ms.`);
+    const stuckClickAgain = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(stuckClickAgain.page.challenge?.status, "needs-user", "A document offered its click twice.");
+    assert(stuckClickAgain.ms < 3_000, `A check that stayed after its click waited again: ${stuckClickAgain.ms} ms.`);
+    measurements.stuckCheckboxSecondSnapshotMs = stuckClickAgain.ms;
+    recordCases("challenge-click-once-per-document");
 
     phase("modal");
     const modal = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/modal` });
@@ -609,6 +638,13 @@ const PAGES: Record<string, string> = {
     <p>Please complete the security check to continue.</p>
     <iframe src="/hcaptcha.com/checkbox" style="width:300px;height:80px"></iframe>`,
   "/hcaptcha.com/checkbox": `<!doctype html><meta charset="utf-8"><label><input type="checkbox">I am human</label>`,
+  "/checkbox-captcha": checkboxCaptchaPage(true),
+  "/stuck-checkbox-captcha": checkboxCaptchaPage(false),
+  // A click anywhere in the widget tells the page; the fixture page decides whether the check passes.
+  "/challenges.cloudflare.com/turnstile": `<!doctype html><meta charset="utf-8">
+    <body style="margin:0"><label style="display:block;height:65px;padding-left:16px">
+    <input type="checkbox" style="margin-top:20px">Verify you are human</label>
+    <script>document.addEventListener("click", () => parent.postMessage("turnstile-click", "*"));</script></body>`,
   "/article": `<!doctype html><meta charset="utf-8"><title>Article</title><h1>Article</h1>
     <p>${"This article explains how a captcha asks you to verify you are human. ".repeat(40)}</p>`,
   "/modal": `<!doctype html><meta charset="utf-8"><title>Modal</title>
@@ -616,6 +652,19 @@ const PAGES: Record<string, string> = {
     <dialog><p>Confirm</p><button type="button">Inside</button></dialog>
     <script>document.querySelector("dialog").showModal();</script>`,
 };
+
+function checkboxCaptchaPage(passes: boolean): string {
+  return `<!doctype html><meta charset="utf-8"><title>Security check</title>
+    <p>Verify you are human to continue.</p>
+    <form><div><iframe src="/challenges.cloudflare.com/turnstile" style="width:300px;height:65px;border:0"></iframe>
+    <input type="hidden" name="cf-turnstile-response" value=""></div></form>
+    <script>
+      addEventListener("message", (event) => {
+        if (${passes} && event.data === "turnstile-click")
+          document.querySelector("[name=cf-turnstile-response]").value = "fixture-token";
+      });
+    </script>`;
+}
 
 function formPage(): string {
   return `<!doctype html><meta charset="utf-8"><title>Form</title>

@@ -394,7 +394,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation such as 3-D Secure, or when secure password/code handoff or card fill is unavailable.",
+      "Ask the user to take over a tab for unclear OAuth account selection, a CAPTCHA that the snapshot challenge does not offer to click, passkeys, payment confirmation such as 3-D Secure, or when secure password/code handoff or card fill is unavailable.",
     shape: {
       tabId,
       reason: z

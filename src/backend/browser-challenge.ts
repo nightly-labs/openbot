@@ -10,6 +10,9 @@ export const CHALLENGE_WAIT_MS = 15_000;
 /** How often the snapshot reads the page again while it waits. */
 export const CHALLENGE_POLL_MS = 1_000;
 
+/** How long the read after a checkbox offer waits for the check to pass. */
+export const CHALLENGE_CLICK_WAIT_MS = 6_000;
+
 /** The check reads the DOM only. A slow page must not hold the snapshot. */
 const CHECK_TIMEOUT_MS = 1_000;
 
@@ -21,6 +24,10 @@ export interface DetectedChallenge {
   vendor: string;
   kind: "non-interactive" | "interactive" | "block";
   signal: string;
+  /** The viewport point of a checkbox widget that one click can pass, such as Turnstile. */
+  checkbox: { x: number; y: number } | null;
+  /** An image puzzle shows. Only a person solves it. */
+  puzzle: boolean;
 }
 
 /**
@@ -45,7 +52,43 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
       const source = element.src || "";
       return pattern.test(source) && !/size=invisible/.test(source) && visible(element);
     });
-  const found = (vendor, kind, signal) => ({ vendor, kind, signal });
+  // A widget whose response field has a token passed: the page can submit its form.
+  const filled = (selector) => [...document.querySelectorAll(selector)].some((element) => (element.value || "").length > 0);
+  const turnstilePassed = filled("input[name='cf-turnstile-response']");
+  const recaptchaPassed = filled("textarea[name='g-recaptcha-response']");
+  const hcaptchaPassed = filled("textarea[name='h-captcha-response']");
+  // An image puzzle needs a person. A click on its checkbox does nothing more.
+  const puzzle = [...document.querySelectorAll("iframe")].some((element) => {
+    if (!/\/recaptcha\/(api2|enterprise)\/bframe|hcaptcha\.com.*frame=challenge/.test(element.src || "")) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 100 && rect.height > 100 && getComputedStyle(element).visibility !== "hidden";
+  });
+  // The checkbox of a Turnstile, reCAPTCHA or hCaptcha widget of the normal size, which is 28 px from
+  // the widget's left edge and in its middle. Turnstile can put its frame in a closed shadow root, so
+  // the parent of its response field gives the widget too. A widget outside the viewport gives none.
+  const checkbox = (() => {
+    if (puzzle) return null;
+    const widgets = [...document.querySelectorAll("iframe")].filter((element) => {
+      const source = element.src || "";
+      return (
+        (!turnstilePassed && /challenges\.cloudflare\.com/.test(source)) ||
+        (!recaptchaPassed && /\/recaptcha\/(api2|enterprise)\/anchor/.test(source) && !/size=invisible/.test(source)) ||
+        (!hcaptchaPassed && /hcaptcha\.com.*frame=checkbox/.test(source))
+      );
+    });
+    if (!turnstilePassed)
+      for (const field of document.querySelectorAll("input[name='cf-turnstile-response']"))
+        if (field.parentElement) widgets.push(field.parentElement);
+    for (const widget of widgets) {
+      const rect = widget.getBoundingClientRect();
+      if (rect.width < 200 || rect.width > 420 || rect.height < 50 || rect.height > 100) continue;
+      if (rect.left < 0 || rect.top < 0 || rect.right > innerWidth || rect.bottom > innerHeight) continue;
+      return { x: Math.round(rect.left + 28), y: Math.round(rect.top + rect.height / 2) };
+    }
+    return null;
+  })();
+  const found = (vendor, kind, signal) =>
+    kind === "block" ? { vendor, kind, signal, checkbox: null, puzzle } : { vendor, kind, signal, checkbox, puzzle };
 
   if ((has("#cf-error-details") || has(".cf-error-code")) && /blocked|error 10(0[0-9]|20)|access denied/i.test(text))
     return found("cloudflare", "block", "cloudflare-error-page");
@@ -71,13 +114,16 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   if (has("html:has(head > script[src*='.awswaf.com/'][src$='/challenge.js']) > body > #challenge-container"))
     return found("aws-waf", "non-interactive", "aws-waf-challenge");
   if (!short) return null;
-  if (frame(/challenges\.cloudflare\.com/)) return found("turnstile", "interactive", "turnstile-frame");
-  if (frame(/hcaptcha\.com/)) return found("hcaptcha", "interactive", "hcaptcha-frame");
-  if (frame(/\/recaptcha\/(api2|enterprise)\/|recaptcha\.net/)) return found("recaptcha", "interactive", "recaptcha-frame");
+  if (!turnstilePassed && frame(/challenges\.cloudflare\.com/)) return found("turnstile", "interactive", "turnstile-frame");
+  if (!hcaptchaPassed && frame(/hcaptcha\.com/)) return found("hcaptcha", "interactive", "hcaptcha-frame");
+  if (!recaptchaPassed && frame(/\/recaptcha\/(api2|enterprise)\/|recaptcha\.net/))
+    return found("recaptcha", "interactive", "recaptcha-frame");
   if (/you have been blocked|your request (has been|was) blocked|request blocked/i.test(text) || /^(access denied|403 forbidden)/i.test(title))
     return found("generic", "block", "block-text");
   if (/checking (if the site connection is secure|your browser)|verifying you are human|please wait while we (verify|check)/i.test(text))
     return found("generic", "non-interactive", "wait-text");
+  // The page keeps its text after its widget passed.
+  if (turnstilePassed || recaptchaPassed || hcaptchaPassed) return null;
   if (/verify (that )?you are (a )?human|are you a robot|press (and|&) hold|complete the security check|unusual traffic from your (computer|network)/i.test(text))
     return found("generic", "interactive", "captcha-text");
   return null;
@@ -87,11 +133,23 @@ function challengeKind(value: unknown): DetectedChallenge["kind"] | null {
   return value === "non-interactive" || value === "interactive" || value === "block" ? value : null;
 }
 
+function readCheckbox(value: unknown): DetectedChallenge["checkbox"] {
+  if (!isDynamicRecord(value)) return null;
+  const { x, y } = value;
+  return typeof x === "number" && typeof y === "number" && x >= 0 && y >= 0 ? { x, y } : null;
+}
+
 function readChallenge(value: unknown): DetectedChallenge | null {
   if (!isDynamicRecord(value)) return null;
   const kind = challengeKind(value.kind);
   if (!kind || !isString(value.vendor) || !isString(value.signal)) return null;
-  return { vendor: value.vendor, kind, signal: value.signal };
+  return {
+    vendor: value.vendor,
+    kind,
+    signal: value.signal,
+    checkbox: readCheckbox(value.checkbox),
+    puzzle: value.puzzle === true,
+  };
 }
 
 /**
@@ -119,7 +177,7 @@ export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (
 });
 
 const NEEDS_USER_NEXT =
-  "A person must pass this security check. Do not reload, retry, or try to solve it. Call request_takeover so the user solves it; in a routine run, report it.";
+  "A person must pass this security check. Do not reload, click, or try to solve it. Call request_takeover so the user solves it; in a routine run, report it.";
 
 /** The line that the model reads in the snapshot. */
 export function describeChallenge(
@@ -128,6 +186,8 @@ export function describeChallenge(
   waitedMs: number,
   /** The check passes by itself, and its wait has time left for the next read. */
   checking = false,
+  /** The checkbox that the agent may click once. Only the first read of a document offers it. */
+  clickOnce: DetectedChallenge["checkbox"] = null,
 ): BrowserChallenge | undefined {
   if (detected?.kind === "block")
     return {
@@ -142,6 +202,14 @@ export function describeChallenge(
       status: "checking",
       waitedMs,
       next: "The security check is still running. Do not reload or click it; call snapshot, which waits for it.",
+    };
+  if (detected && clickOnce)
+    return {
+      vendor: detected.vendor,
+      status: "click-once",
+      waitedMs,
+      target: { kind: "point", x: clickOnce.x, y: clickOnce.y },
+      next: "This check can pass with one click on its checkbox. Call click with target, then call snapshot, which waits for the check. Click it only once, and do not reload or solve a puzzle. If the check stays, call request_takeover so the user solves it; in a routine run, report it.",
     };
   if (detected) return { vendor: detected.vendor, status: "needs-user", waitedMs, next: NEEDS_USER_NEXT };
   if (clearedVendor)

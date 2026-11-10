@@ -95,10 +95,13 @@ export interface BrowserChallenge {
   vendor: string;
   /**
    * `checking`: a check that passes by itself is still running after this read's time ran out.
+   * `click-once`: the agent may click `target`, the checkbox of the check, one time.
    * `needs-user`: a person must pass it. `blocked`: the site refuses this browser.
    */
-  status: "cleared" | "checking" | "needs-user" | "blocked";
+  status: "cleared" | "checking" | "click-once" | "needs-user" | "blocked";
   waitedMs: number;
+  /** The checkbox to click, with `click-once` only. */
+  target?: { kind: "point"; x: number; y: number } | undefined;
   /** What the agent does next. */
   next: string;
 }

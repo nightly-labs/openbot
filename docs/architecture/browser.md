@@ -174,10 +174,23 @@ seconds, and stops at once when the tab closes, a person takes control, or the t
 All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
 leaves the rest for the next read and reports `checking`, whose `next` asks for a snapshot. A
 check that stays after the full wait reads as `needs-user` at once.
-The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `needs-user` or `blocked`), the
-vendor, the wait, and `next`, the step that the agent takes. A check that needs a person asks for
-`request_takeover` (in a routine run, a report). A block asks for a report. Each `next` also tells
-the agent not to solve, reload, or retry the check, so the guidance needs no separate rule. The idea and the vendor
+The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `click-once`,
+`needs-user` or `blocked`), the vendor, the wait, and `next`, the step that the agent takes. A check
+that needs a person asks for `request_takeover` (in a routine run, a report). A block asks for a
+report. Each `next` also tells the agent not to solve, reload, or retry the check, so the guidance
+needs no separate rule.
+
+Many checks of the Turnstile, reCAPTCHA and hCaptcha widgets pass with one click on their checkbox.
+The script finds the widget of the normal size in the viewport (its frame, or for Turnstile, whose
+frame can be in a closed shadow root, the parent of its response field) and gives the checkbox
+point, 28 px from the left edge and in the middle. The first read of a document that needs a person
+then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
+ordinary `click` tool, so ownership, user control and the cursor stay the same. The next read of
+that document waits up to 6 seconds for the check to pass; a visible image puzzle or a block ends the
+wait at once, because only a person solves a puzzle. Later reads of the document ask for a person
+and do not offer the click again. A widget whose response field has a token passed: neither its
+frame nor the generic phrases count then, because the page keeps its text. The host never solves a
+puzzle and sends no page data to a solver service. The idea and the vendor
 list come from anomalyco/browse; the code is our own.
 
 `bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
@@ -627,4 +640,5 @@ opener group until a main-frame navigation, which also clears history. Otherwise
 URL with GET to replace the document without replaying a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
-unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
+passkeys, and payment confirmation use takeover.
