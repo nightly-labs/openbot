@@ -859,14 +859,15 @@ export class OpenBotToolRouter {
     const parsed = requestApiKeyToolSchema.safeParse(params.arguments);
     if (!parsed.success)
       return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
-    // A key that the Vault has is used as it is: a copy for this agent would not follow a change in the Vault.
-    const keys = yield* apiKeys.list(agentId).pipe(Effect.catch(() => Effect.succeed<SavedApiKey[]>([])));
-    const vaultKey = keys.find((key) => key.name === parsed.data.name && key.source === "vault");
-    if (vaultKey) return openBotToolResult({ status: "saved", ...vaultKey });
-    if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId)))
+    if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId))) {
+      // An external chat cannot show the form, so a key that the Vault has is used as it is.
+      const keys = yield* apiKeys.list(agentId).pipe(Effect.catch(() => Effect.succeed<SavedApiKey[]>([])));
+      const vaultKey = keys.find((key) => key.name === parsed.data.name && key.source === "vault");
+      if (vaultKey) return openBotToolResult({ status: "saved", ...vaultKey });
       return openBotToolFailure(
         "request_api_key does not work in an external chat. Ask the user to give you the key in OpenBot.",
       );
+    }
     // With a Vault, the user can save the key for every agent, so another agent does not ask again.
     const vault = this.#vaultItems?.ready() === true;
     const spec = apiKeyFormSpec({ ...parsed.data, vault });
