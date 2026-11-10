@@ -152,11 +152,16 @@ export const messages = {
   "chat.marker.instructionsUndo": "元に戻す",
   "chat.marker.instructionsUndone": "元に戻しました",
   "chat.usageLimit.title": "{provider} の使用量の上限に達しました",
+  "chat.usageLimit.modelTitle": "{model} の使用量の上限に達しました",
   "chat.usageLimit.onHold": "メッセージを保留中",
   "chat.usageLimit.bodyReset":
     "メッセージはまだ開始されていません。今すぐ別のモデルに送信するか、{reset} までお待ちください。",
   "chat.usageLimit.body":
     "メッセージはまだ開始されていません。今すぐ別のモデルに送信するか、上限が解除されるまでお待ちください。",
+  "chat.usageLimit.channelBodyReset":
+    "{name} はまだこの作業を開始していません。今すぐ {name} を別のモデルに切り替えるか、{reset} までお待ちください。",
+  "chat.usageLimit.channelBody":
+    "{name} はまだこの作業を開始していません。今すぐ {name} を別のモデルに切り替えるか、上限が解除されるまでお待ちください。",
   "chat.usageLimit.sendTo": "送信先",
   "chat.usageLimit.remember": "次回から確認せずに切り替える",
   "chat.usageLimit.wait": "リセットを待つ",

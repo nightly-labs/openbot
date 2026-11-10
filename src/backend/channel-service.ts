@@ -80,8 +80,13 @@ export interface ChannelHooks {
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
   busy(agentId: string): boolean;
-  /** Whether a spent provider plan holds this agent, so a routing turn on its model would be refused. */
+  /**
+   * Whether a spent provider plan holds this agent, so a routing turn on its model would be refused.
+   * An agent that may try one turn, after `retry`, is not held.
+   */
   usageLimited?(agentId: string): boolean;
+  /** A person wrote to this agent while a spent plan may hold it, so it may start one turn. */
+  retry?(agentId: string): void;
   /**
    * Whether a task that a spent plan holds is dropped, because its routine has no use for a late
    * result. It settles the routine run before the task is cancelled.
@@ -992,7 +997,7 @@ export class ChannelService {
             operationId,
           ),
         );
-        return { current, continued, affected, resumed, message, result };
+        return { current, continued, affected, resumed, message, result, tasks: [task, ...others] };
       }).pipe(
         Effect.onExit((exit) =>
           committed
@@ -1003,7 +1008,12 @@ export class ChannelService {
             : Effect.void,
         ),
       );
-      const { current, continued, affected, resumed, message, result } = stored;
+      const { current, continued, affected, resumed, message, result, tasks } = stored;
+      // A person wrote, so the lead and each member that the message reaches may start one turn while a
+      // spent plan holds them, as in their own chat: the person can have bought more usage, and no
+      // reading shows that before the reset.
+      for (const agentId of new Set([current.leadAgentId, ...tasks.map((item) => item.ownerAgentId)]))
+        if (agentId) this.hooks.retry?.(agentId);
       this.publish(current.id);
       yield* this.interruptTasks(
         current.id,

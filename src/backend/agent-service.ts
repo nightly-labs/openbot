@@ -1314,11 +1314,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
               // error of the `turn/start` request. It holds the model that ran it the way a refused member turn
               // does, and the channel keeps the task queued for the reset.
+              // A refused routing turn uses the one try that a person's message gave the member.
               Effect.tapError((failure) =>
                 failure instanceof GenerationUsageLimitError
-                  ? this.#usageLimits.reached(selected.id, failure.resetsAt, selected.model)
+                  ? Effect.andThen(
+                      Effect.sync(() => this.#usageLimits.tryStarted(selected.id)),
+                      this.#usageLimits.reached(selected.id, failure.resetsAt, selected.model),
+                    )
                   : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
-                    ? this.#usageLimits.reached(selected.id, null, selected.model)
+                    ? Effect.andThen(
+                        Effect.sync(() => this.#usageLimits.tryStarted(selected.id)),
+                        this.#usageLimits.reached(selected.id, null, selected.model),
+                      )
                     : Effect.void,
               ),
             );
@@ -1345,14 +1352,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // no turn ID yet, and it makes such an agent busy: otherwise the assignment waits as
       // "starting" for that turn (#4761).
       busy: (agentId) =>
-        !this.#usageLimits.mayDrain(agentId) ||
+        this.#channelHeld(agentId) ||
         this.#mailbox.channelLanes(agentId).length > 0 ||
         this.#conversation.workingChannelSnapshots(agentId).length > 0 ||
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
             this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
-      usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
+      usageLimited: (agentId) => this.#channelHeld(agentId),
+      retry: (agentId) => this.#usageLimits.retry(agentId),
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
       steer: (agentId, threadId, turnId, messageId, text) =>
@@ -3521,6 +3529,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#mailbox.nextQueued(agentId) && !taskWork() && !this.channels.ownsWaitingWork(agentId)) return null;
     const next = this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId));
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
+  }
+
+  /** Whether a spent plan holds this agent's channel work: it is held, and no person's message gave it a try. */
+  #channelHeld(agentId: string): boolean {
+    return !this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId);
   }
 
   /**

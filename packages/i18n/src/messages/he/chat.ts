@@ -152,9 +152,14 @@ export const messages = {
   "chat.marker.instructionsUndo": "ביטול",
   "chat.marker.instructionsUndone": "בוטל",
   "chat.usageLimit.title": "הגעת למגבלת השימוש של {provider}",
+  "chat.usageLimit.modelTitle": "הגעת למגבלת השימוש של {model}",
   "chat.usageLimit.onHold": "ההודעה בהמתנה",
   "chat.usageLimit.bodyReset": "ההודעה שלך עדיין לא התחילה. אפשר לשלוח אותה עכשיו למודל אחר, או להמתין עד {reset}.",
   "chat.usageLimit.body": "ההודעה שלך עדיין לא התחילה. אפשר לשלוח אותה עכשיו למודל אחר, או להמתין עד שהמגבלה תסתיים.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} עדיין לא התחיל את העבודה הזו. אפשר להעביר את {name} עכשיו למודל אחר, או להמתין עד {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} עדיין לא התחיל את העבודה הזו. אפשר להעביר את {name} עכשיו למודל אחר, או להמתין עד שהמגבלה תסתיים.",
   "chat.usageLimit.sendTo": "שליחה אל",
   "chat.usageLimit.remember": "בפעם הבאה, לעבור בלי לשאול",
   "chat.usageLimit.wait": "המתנה לאיפוס",

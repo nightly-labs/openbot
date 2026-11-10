@@ -155,11 +155,16 @@ export const messages = {
   "chat.marker.instructionsUndo": "Rückgängig",
   "chat.marker.instructionsUndone": "Rückgängig gemacht",
   "chat.usageLimit.title": "Nutzungslimit von {provider} erreicht",
+  "chat.usageLimit.modelTitle": "Nutzungslimit von {model} erreicht",
   "chat.usageLimit.onHold": "Nachricht wartet",
   "chat.usageLimit.bodyReset":
     "Die Arbeit an deiner Nachricht hat noch nicht begonnen. Sende sie jetzt an ein anderes Modell oder warte bis {reset}.",
   "chat.usageLimit.body":
     "Die Arbeit an deiner Nachricht hat noch nicht begonnen. Sende sie jetzt an ein anderes Modell oder warte, bis das Limit endet.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} hat mit dieser Arbeit noch nicht begonnen. Wechsle {name} jetzt zu einem anderen Modell oder warte bis {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} hat mit dieser Arbeit noch nicht begonnen. Wechsle {name} jetzt zu einem anderen Modell oder warte, bis das Limit endet.",
   "chat.usageLimit.sendTo": "Senden an",
   "chat.usageLimit.remember": "Nächstes Mal ohne Nachfrage wechseln",
   "chat.usageLimit.wait": "Auf das Zurücksetzen warten",

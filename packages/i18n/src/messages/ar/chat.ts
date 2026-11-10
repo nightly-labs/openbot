@@ -250,9 +250,14 @@ export const messages = {
   "chat.marker.instructionsUndo": "تراجع",
   "chat.marker.instructionsUndone": "تم التراجع",
   "chat.usageLimit.title": "تم بلوغ حد الاستخدام لدى {provider}",
+  "chat.usageLimit.modelTitle": "تم بلوغ حد الاستخدام لـ {model}",
   "chat.usageLimit.onHold": "الرسالة معلّقة",
   "chat.usageLimit.bodyReset": "لم تبدأ رسالتك بعد. أرسلها إلى نموذج آخر الآن، أو انتظر حتى {reset}.",
   "chat.usageLimit.body": "لم تبدأ رسالتك بعد. أرسلها إلى نموذج آخر الآن، أو انتظر حتى ينتهي الحد.",
+  "chat.usageLimit.channelBodyReset":
+    "لم يبدأ {name} هذا العمل بعد. انقل {name} إلى نموذج آخر الآن، أو انتظر حتى {reset}.",
+  "chat.usageLimit.channelBody":
+    "لم يبدأ {name} هذا العمل بعد. انقل {name} إلى نموذج آخر الآن، أو انتظر حتى ينتهي الحد.",
   "chat.usageLimit.sendTo": "إرسال إلى",
   "chat.usageLimit.remember": "في المرة القادمة، بدّل دون سؤال",
   "chat.usageLimit.wait": "انتظار إعادة التعيين",

@@ -1594,6 +1594,7 @@ export function ConversationTimeline() {
                                     state={pendingState()}
                                     updateRequired={Boolean(providerUpdateRequired())}
                                     error={pendingSend()?.error ?? null}
+                                    errorReference={pendingSend()?.errorReference ?? null}
                                     retrySafe={pendingRetrySafe()}
                                     canEdit={!composerHasContent() && !editingDeliveryId()}
                                     onRetry={() => {

@@ -155,9 +155,14 @@ export const messages = {
   "chat.marker.instructionsUndo": "Deshacer",
   "chat.marker.instructionsUndone": "Deshecho",
   "chat.usageLimit.title": "Límite de uso de {provider} alcanzado",
+  "chat.usageLimit.modelTitle": "Límite de uso de {model} alcanzado",
   "chat.usageLimit.onHold": "Mensaje en espera",
   "chat.usageLimit.bodyReset": "Tu mensaje no ha empezado. Envíalo ahora a otro modelo o espera hasta {reset}.",
   "chat.usageLimit.body": "Tu mensaje no ha empezado. Envíalo ahora a otro modelo o espera a que termine el límite.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} no ha empezado este trabajo. Pasa {name} a otro modelo ahora o espera hasta {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} no ha empezado este trabajo. Pasa {name} a otro modelo ahora o espera a que termine el límite.",
   "chat.usageLimit.sendTo": "Enviar a",
   "chat.usageLimit.remember": "La próxima vez, cambiar sin preguntar",
   "chat.usageLimit.wait": "Esperar al reinicio",

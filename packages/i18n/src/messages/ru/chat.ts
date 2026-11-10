@@ -212,11 +212,16 @@ export const messages = {
   "chat.marker.instructionsUndo": "Отменить",
   "chat.marker.instructionsUndone": "Отменено",
   "chat.usageLimit.title": "Лимит использования {provider} исчерпан",
+  "chat.usageLimit.modelTitle": "Лимит использования {model} исчерпан",
   "chat.usageLimit.onHold": "Сообщение отложено",
   "chat.usageLimit.bodyReset":
     "Ваше сообщение ещё не запущено. Отправьте его другой модели сейчас или подождите до {reset}.",
   "chat.usageLimit.body":
     "Ваше сообщение ещё не запущено. Отправьте его другой модели сейчас или подождите, пока лимит сбросится.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} ещё не начал эту работу. Переключите {name} на другую модель сейчас или подождите до {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} ещё не начал эту работу. Переключите {name} на другую модель сейчас или подождите, пока лимит сбросится.",
   "chat.usageLimit.sendTo": "Отправить в",
   "chat.usageLimit.remember": "В следующий раз переключать без вопросов",
   "chat.usageLimit.wait": "Дождаться сброса",

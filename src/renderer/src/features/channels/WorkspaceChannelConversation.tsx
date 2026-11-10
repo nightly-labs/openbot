@@ -10,6 +10,7 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
+import { useUsageLimitAsk } from "../conversation/usage-limit-ask";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
   remoteRoutineRecovery,
@@ -44,6 +45,7 @@ export function WorkspaceChannelConversation(props: { account: () => CentralAuth
 }
 
 function DesktopChannelConversation(props: { channelId: string; account: () => CentralAuthUser }) {
+  const channels = useChannels();
   const platform = usePlatform();
   const scope = useServerScope();
   const connectors = useConnectors();
@@ -54,7 +56,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const { serverSettingsOpen } = useServerSettings();
   const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userHiddenAgentIds } = useAgents();
-  const { approvals, pendingPrompts } = useTurns();
+  const { approvals, pendingPrompts, usageLimits } = useTurns();
   const {
     browserTabs,
     activeBrowserTabId,
@@ -93,6 +95,25 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     approvals,
     takeovers,
     hiddenAgentIds: userHiddenAgentIds,
+  });
+  // A usage limit that holds the member whose turn a queued request waits for, the lead while no member
+  // owns it, asks where that member's work goes, as the agent's own chat does. Before, the channel only
+  // went quiet.
+  const usageLimitAskFor = useUsageLimitAsk();
+  const usageLimitAsk = createMemo(() => {
+    const page = channels.state.page;
+    if (page?.channel.id !== props.channelId || page.channel.archived) return undefined;
+    const limits = usageLimits();
+    const heldId = page.tasks
+      .filter((task) => task.state === "queued")
+      .map((task) => task.ownerAgentId ?? page.channel.leadAgentId)
+      .find((agentId) => agentId !== null && agentId in limits);
+    return heldId
+      ? usageLimitAskFor(
+          agentList().find((agent) => agent.id === heldId),
+          true,
+        )
+      : undefined;
   });
   // A named function, not a ternary in the prop: the compiler makes a memo for a ternary, and the
   // composer reads this prop in an effect, where Solid cannot make a memo.
@@ -135,6 +156,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       prompt={view.prompt()}
       promptUiBlock={view.promptUiBlock()}
       approval={view.approval()}
+      usageLimitAsk={usageLimitAsk()}
       browserTakeover={view.browserTakeover()}
       activeTurnId={view.activeTurnId()}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}
