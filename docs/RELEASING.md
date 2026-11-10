@@ -490,6 +490,8 @@ you add a release to the English file, add its translation to each of these file
 and date, the same notices, groups and item order, and one item for each English item. Write the
 first sentence of each item as its headline, as in English; Chinese and Japanese end it with `。`.
 Use the tone, the terms, and the screen names of the app catalogs in [i18n.md](i18n.md#terms).
+An agent gives these translations to small-model subagents, as the
+[release-upgrade-safety skill](../.agents/skills/release-upgrade-safety/SKILL.md#subagents-and-models) says.
 `bun scripts/whats-new-translations.ts <version>` checks the files; `release:preflight` and the
 tag workflow run it and stop a release that has no translation. A release that a file does not
 have shows in English, so an older release that was never translated keeps its English text.
