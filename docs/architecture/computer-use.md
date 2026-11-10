@@ -69,7 +69,10 @@ OpenBot draws the agent cursor in its own per-display overlays for every display
 runtime starts `serve` with `--no-overlay`. The driver's overlay covers only the main display and
 cannot follow a display connected after startup. Keeping cursor ownership in OpenBot lets the
 highlight controller add, resize, and remove display overlays without restarting the daemon or
-changing provider sessions.
+changing provider sessions. The tap removes the driver's own cursor tools (`set_agent_cursor_*`
+and `get_agent_cursor_state`) from the tool list: with `--no-overlay` they change nothing on the
+screen, and on macOS they refuse. `move_cursor` stays, because OpenBot draws its cursor at the
+point of that call.
 
 ### Agent display on a server
 

@@ -51,10 +51,24 @@ const BASE64_TEXT = /^[A-Za-z0-9+/]+={0,2}$/u;
  * JSON - is `null`.
  */
 export function rewriteCallAnswer(line: string): string | null {
-  // A rewritten answer is parsed and serialized again, which would round an integer that JavaScript
-  // cannot hold exactly. No field the driver sends is that large today, but an answer that has one
-  // is passed on unchanged rather than changed in a way nobody asked for. Only parsed numbers
-  // count: digits inside a string, such as a window title, are kept as they are.
+  const parsed = parseAnswerLine(line);
+  if (!parsed) return null;
+  if (parsed.ok === false) return refusalWithMessage(parsed);
+  if (parsed.ok !== true) return null;
+  const copied = withStructuredText(parsed.result);
+  const result = withErrorReason(copied ?? parsed.result) ?? copied;
+  return result ? JSON.stringify({ ...parsed, result }) : null;
+}
+
+/**
+ * One daemon answer line as an object, or `null` when it cannot be changed without loss.
+ *
+ * A rewritten answer is parsed and serialized again, which would round an integer that JavaScript
+ * cannot hold exactly. No field the driver sends is that large today, but an answer that has one
+ * is passed on unchanged rather than changed in a way nobody asked for. Only parsed numbers
+ * count: digits inside a string, such as a window title, are kept as they are.
+ */
+export function parseAnswerLine(line: string): DynamicRecord | null {
   let unsafeInteger = false;
   let parsed: unknown;
   try {
@@ -65,12 +79,7 @@ export function rewriteCallAnswer(line: string): string | null {
   } catch {
     return null;
   }
-  if (unsafeInteger || !isDynamicRecord(parsed)) return null;
-  if (parsed.ok === false) return refusalWithMessage(parsed);
-  if (parsed.ok !== true) return null;
-  const copied = withStructuredText(parsed.result);
-  const result = withErrorReason(copied ?? parsed.result) ?? copied;
-  return result ? JSON.stringify({ ...parsed, result }) : null;
+  return !unsafeInteger && isDynamicRecord(parsed) ? parsed : null;
 }
 
 /**
