@@ -770,6 +770,14 @@ The macOS ZIP must be smaller than 800,000,000 bytes and smaller than the offici
 Do not publish when either size gate fails, the `0.1.21` canary update crashes, or Windows starts NSIS
 during shutdown or sign-out.
 
+Each build job also runs `scripts/release-upgrade-e2e.ts` before `publish`. It installs the previous
+public release, starts it on a new profile, makes two agents with an answered chat, two memories, a
+channel and a custom agent, and quits it. It then installs the new build over it as an update does,
+starts it on the same profile, and checks the version, the schema version, every migration, table and
+column, `PRAGMA integrity_check`, the foreign keys, and that the seeded data is still there. A failure
+stops the release before `publish`. The report is `.openbot-build/release-upgrade-e2e/report.json`,
+with counts only. The script does not use the real `electron-updater` download: its header says why.
+
 The unsigned local macOS package is a development artifact. It does not prove Gatekeeper,
 notarization, or auto-update readiness. Those are proven only by the signed release workflow's
 `codesign`, `spctl`, and `stapler` checks.

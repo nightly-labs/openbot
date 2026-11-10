@@ -460,6 +460,13 @@ jobs:
             exit 1
           fi
 
+      # The signed ZIP of this build must start on the data of the previous public release, as an
+      # update does. A failure stops the publish job.
+      - name: Upgrade from the previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-upgrade-e2e.ts macos
+
       - name: Test native tenant setup
         if: matrix.arch == 'arm64'
         run: |
@@ -559,7 +566,7 @@ jobs:
     name: Build ${{ github.event_name == 'push' && 'signed' || 'unsigned' }} Windows x64 release
     needs: validate
     runs-on: windows-2025
-    timeout-minutes: 35
+    timeout-minutes: 45
     # This job reads no secrets. The environment limits a tag build to tags, and the Azure federated
     # credential trusts only this environment, so a dry run has no environment and stays unsigned.
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
@@ -687,6 +694,13 @@ jobs:
           Select-String -Path dist/latest.yml -SimpleMatch ".exe"
           bun run verify:update-artifacts windows
 
+      # The installer must update an install of the previous public release and start on its data,
+      # as an update does. A failure stops the publish job.
+      - name: Upgrade from the previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-upgrade-e2e.ts windows
+
       - name: Generate checksums
         shell: pwsh
         run: |
@@ -742,7 +756,7 @@ jobs:
             runner: ubuntu-24.04-arm
             suffix: linux-arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
+    timeout-minutes: 45
     # These jobs read no secrets. The environment limits a tag build to tags; a dry run has none.
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
@@ -853,6 +867,20 @@ jobs:
           fi
           kill "$runtime" 2>/dev/null || true
           wait "$runtime" || true
+
+      # The AppImage must replace the previous public release and start on its data, as an update
+      # does. It runs from /opt/OpenBot, where the shipped AppArmor profile permits the sandbox, as on
+      # a user's computer. A failure stops the publish job.
+      - name: Upgrade from the previous release
+        run: |
+          set -euo pipefail
+          sudo install -m 0644 build/linux/openbot.apparmor /etc/apparmor.d/openbot
+          sudo apparmor_parser -r /etc/apparmor.d/openbot
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /opt/OpenBot
+          xvfb-run -a bun scripts/release-upgrade-e2e.ts "$SUFFIX"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUFFIX: ${{ matrix.suffix }}
 
       - name: Generate checksums
         run: |
