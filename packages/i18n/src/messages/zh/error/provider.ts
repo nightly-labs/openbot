@@ -225,6 +225,8 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravityHookFailed":
+    "工具钩子“{name}”没有运行，因此 Gemini 无法使用其工具。此钩子由这台电脑上的另一个应用添加。请在该应用中关闭 Gemini 或 Antigravity 连接，或更新该应用，然后再次发送消息。",
   "error.provider.cursorArchivePath": "Cursor 压缩包中包含异常文件。",
   "error.provider.cursorChecksum": "Cursor 运行时校验和不匹配。",
   "error.provider.cursorReleaseShape": "Cursor 发布包的结构异常。",

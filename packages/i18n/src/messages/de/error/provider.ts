@@ -269,6 +269,8 @@ export const messages = {
     "Gemini kann dieses Modell gerade nicht verwenden. Wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Der Gemini-Dienst von Google hat die Anfrage nicht abgeschlossen. Versuche es in ein paar Minuten erneut.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    "Gemini konnte seine Tools nicht nutzen, weil der Tool-Hook „{name}“ nicht ausgeführt wurde. Eine andere App auf diesem Computer hat diesen Hook hinzugefügt. Schalte in dieser App die Verbindung zu Gemini oder Antigravity aus oder aktualisiere die App. Sende deine Nachricht dann erneut.",
   "error.provider.cursorArchivePath": "Das Cursor-Archiv enthält eine unerwartete Datei.",
   "error.provider.cursorChecksum": "Die Prüfsumme der Cursor-Laufzeit stimmt nicht überein.",
   "error.provider.cursorReleaseShape": "Die Cursor-Version hat eine unerwartete Struktur.",

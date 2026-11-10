@@ -236,6 +236,8 @@ export const messages = {
     "لا يستطيع Gemini استخدام هذا النموذج الآن. اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    'لم يتمكن Gemini من استخدام أدواته لأن خطاف الأدوات "{name}" لم يعمل. أضاف تطبيق آخر على هذا الكمبيوتر هذا الخطاف. أوقف اتصال Gemini أو Antigravity في ذلك التطبيق، أو حدّث ذلك التطبيق. ثم أرسل رسالتك مرة أخرى.',
   "error.provider.cursorArchivePath": "يحتوي أرشيف Cursor على ملف غير متوقع.",
   "error.provider.cursorChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cursor.",
   "error.provider.cursorReleaseShape": "إصدار Cursor بتنسيق غير متوقع.",

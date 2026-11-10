@@ -258,6 +258,8 @@ export const messages = {
     "Gemini non può usare questo modello al momento. Scegli un altro modello, poi riprova.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Il servizio Gemini di Google non ha completato la richiesta. Riprova tra qualche minuto.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    'Gemini non ha potuto usare i suoi strumenti perché l’hook degli strumenti "{name}" non è stato eseguito. Un’altra app su questo computer ha aggiunto questo hook. Disattiva la connessione a Gemini o Antigravity in quell’app, oppure aggiorna l’app. Poi invia di nuovo il messaggio.',
   "error.provider.cursorArchivePath": "L'archivio di Cursor contiene un file inatteso.",
   "error.provider.cursorChecksum": "Checksum del runtime di Cursor non corrispondente.",
   "error.provider.cursorReleaseShape": "La release di Cursor ha una struttura inattesa.",

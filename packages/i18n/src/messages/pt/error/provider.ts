@@ -259,6 +259,8 @@ export const messages = {
     "O Gemini não pode usar este modelo agora. Escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    'O Gemini não conseguiu usar as ferramentas porque o hook de ferramentas "{name}" não foi executado. Outro app neste computador adicionou esse hook. Desative a conexão com o Gemini ou o Antigravity nesse app, ou atualize o app. Depois, envie sua mensagem de novo.',
   "error.provider.cursorArchivePath": "O arquivo compactado do Cursor contém um arquivo inesperado.",
   "error.provider.cursorChecksum": "A soma de verificação do ambiente de execução do Cursor não corresponde.",
   "error.provider.cursorReleaseShape": "A versão do Cursor tem um formato inesperado.",

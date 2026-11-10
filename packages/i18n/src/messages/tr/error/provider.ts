@@ -258,6 +258,8 @@ export const messages = {
     "Gemini şu anda bu modeli kullanamıyor. Başka bir model seçin, sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google'ın Gemini hizmeti isteği tamamlamadı. Birkaç dakika sonra yeniden deneyin.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    'Araç kancası "{name}" çalışmadığı için Gemini araçlarını kullanamadı. Bu kancayı bu bilgisayardaki başka bir uygulama ekledi. O uygulamada Gemini veya Antigravity bağlantısını kapatın ya da uygulamayı güncelleyin. Ardından mesajınızı yeniden gönderin.',
   "error.provider.cursorArchivePath": "Cursor arşivi beklenmeyen bir dosya içeriyor.",
   "error.provider.cursorChecksum": "Cursor çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
   "error.provider.cursorReleaseShape": "Cursor sürümü beklenmeyen bir yapıya sahip.",

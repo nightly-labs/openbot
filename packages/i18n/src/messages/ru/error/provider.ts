@@ -249,6 +249,8 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    "Gemini не смог использовать инструменты, потому что хук инструментов «{name}» не запустился. Этот хук добавило другое приложение на этом компьютере. Отключите в нём подключение к Gemini или Antigravity либо обновите это приложение. Затем отправьте сообщение ещё раз.",
   "error.provider.cursorArchivePath": "В архиве Cursor неожиданный файл.",
   "error.provider.cursorChecksum": "Контрольная сумма среды выполнения Cursor не совпадает.",
   "error.provider.cursorReleaseShape": "У релиза Cursor неожиданная структура.",

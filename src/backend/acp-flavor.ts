@@ -171,6 +171,12 @@ export interface AcpFlavor {
    * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
    */
   planUsedUpChunk?: RegExp;
+  /**
+   * The message for a tool that failed because one of the agent's own hooks did not run. OpenBot
+   * fails the turn with it: the same hook refuses each later tool too, and the raw error does not
+   * tell the user what to fix.
+   */
+  toolHookFailure?: (text: string) => string | null;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
   /**

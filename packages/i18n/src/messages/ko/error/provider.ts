@@ -252,6 +252,8 @@ export const messages = {
     "Gemini가 지금은 이 모델을 사용할 수 없어요. 다른 모델을 선택한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    '도구 훅 "{name}"이(가) 실행되지 않아 Gemini가 도구를 사용할 수 없었습니다. 이 컴퓨터의 다른 앱이 이 훅을 추가했습니다. 해당 앱에서 Gemini 또는 Antigravity 연결을 끄거나 앱을 업데이트하세요. 그런 다음 메시지를 다시 보내세요.',
   "error.provider.cursorArchivePath": "Cursor 아카이브에 예상하지 못한 파일이 있어요.",
   "error.provider.cursorChecksum": "Cursor 런타임 체크섬이 일치하지 않아요.",
   "error.provider.cursorReleaseShape": "Cursor 릴리스의 형식이 예상과 달라요.",

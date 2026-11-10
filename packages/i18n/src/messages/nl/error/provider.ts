@@ -256,6 +256,8 @@ export const messages = {
     "Gemini kan dit model nu niet gebruiken. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    "Gemini kon zijn tools niet gebruiken, omdat de tool-hook ‘{name}’ niet is uitgevoerd. Een andere app op deze computer heeft deze hook toegevoegd. Zet in die app de koppeling met Gemini of Antigravity uit, of werk die app bij. Stuur je bericht daarna opnieuw.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",
   "error.provider.cursorChecksum": "Checksum van de Cursor-runtime komt niet overeen.",
   "error.provider.cursorReleaseShape": "De Cursor-release heeft een onverwachte vorm.",

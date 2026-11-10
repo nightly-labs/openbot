@@ -251,6 +251,8 @@ export const messages = {
     "Gemini nie może teraz użyć tego modelu. Wybierz inny model i spróbuj ponownie.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Usługa Gemini od Google nie ukończyła żądania. Spróbuj ponownie za kilka minut.\n{detail}",
+  "error.provider.antigravityHookFailed":
+    "Gemini nie mógł użyć swoich narzędzi, ponieważ hook narzędzi „{name}” się nie uruchomił. Ten hook dodała inna aplikacja na tym komputerze. Wyłącz w tej aplikacji połączenie z Gemini lub Antigravity albo ją zaktualizuj. Potem wyślij wiadomość ponownie.",
   "error.provider.cursorArchivePath": "Archiwum Cursor zawiera nieoczekiwany plik.",
   "error.provider.cursorChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cursor.",
   "error.provider.cursorReleaseShape": "Wydanie Cursor ma nieoczekiwaną strukturę.",

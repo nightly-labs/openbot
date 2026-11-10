@@ -2698,6 +2698,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         ...(update.status === "failed" && update.content ? { error: update.content } : {}),
       };
       turn.toolItems.set(update.toolCallId, item);
+      // Antigravity puts the error of a failed tool in `rawOutput`, and other agents in the content.
+      const hookFailure =
+        update.status === "failed" && turn.providerError === null
+          ? (this.#flavor.toolHookFailure?.(JSON.stringify([update.rawOutput, update.content])) ?? null)
+          : null;
+      if (hookFailure) {
+        turn.failureCause = "permission";
+        turn.providerError = hookFailure;
+      }
       this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);
       this.emit("notification", {
         method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",

@@ -262,6 +262,8 @@ export const messages = {
     "Gemini は現在このモデルを使用できません。別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
+  "error.provider.antigravityHookFailed":
+    "ツールフック「{name}」が実行されなかったため、Gemini はツールを使えませんでした。このフックは、このコンピュータ上の別のアプリが追加したものです。そのアプリで Gemini または Antigravity との連携をオフにするか、そのアプリをアップデートしてください。その後、メッセージをもう一度送信してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
   "error.provider.cursorChecksum": "Cursor ランタイムのチェックサムが一致しません。",
   "error.provider.cursorReleaseShape": "Cursor のリリースの形式が予期しないものです。",

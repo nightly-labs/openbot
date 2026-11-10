@@ -59,6 +59,19 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
 }
 
 /**
+ * A hook in the global hooks file that did not run. Antigravity 1.4.5 (`acp_server/hooks.py`) then
+ * refuses the tool: for a missing command, a non-zero exit, output that is not JSON, and also for a
+ * hook `timeout` of 0, which it reads as no time at all. Another app on the computer usually wrote
+ * the hook, such as Munder Difflin's `munder-hive` (#6189).
+ */
+const GEMINI_HOOK_FAILURE = /\bExternal hook '?([^'\n]+?)'? failed to execute\b/u;
+
+function geminiHookFailure(text: string): string | null {
+  const name = GEMINI_HOOK_FAILURE.exec(text)?.[1];
+  return name ? sourceText("error.provider.antigravityHookFailed", { name }) : null;
+}
+
+/**
  * The kind of a Gemini request failure, first match wins. Gemini reports usage only for a Google
  * sign-in on 1.4.1 or later, so a limit often has no usage notice to explain it, and the raw Google
  * status left the user unsure whether waiting or another model helps (#1676). The patterns follow
@@ -124,6 +137,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Antigravity 1.4.5 ends a turn whose quota is spent with the stop reason `refusal`
   // (`_to_acp_stop_reason` of QUOTA_EXHAUSTED).
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
+  toolHookFailure: geminiHookFailure,
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,
