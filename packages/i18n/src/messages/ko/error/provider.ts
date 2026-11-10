@@ -253,7 +253,7 @@ export const messages = {
   "error.provider.antigravityServiceFailure":
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
-    "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 다시 보내 주세요.",
+    "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
   "error.provider.cursorArchivePath": "Cursor 아카이브에 예상하지 못한 파일이 있어요.",
   "error.provider.cursorChecksum": "Cursor 런타임 체크섬이 일치하지 않아요.",
   "error.provider.cursorReleaseShape": "Cursor 릴리스의 형식이 예상과 달라요.",

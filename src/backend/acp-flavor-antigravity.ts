@@ -11,8 +11,9 @@ const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for sessio
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 /**
  * Antigravity 1.4.5 `_send_connection_lost_message`: the connection to its harness closed, and a new
- * harness did not start. It ends the turn as a success and forgets the session, so the next prompt
- * gets "Session not found" and OpenBot opens the saved session again (#6321).
+ * harness did not start. It ends the turn as a success and forgets the session, which stays on disk.
+ * The turn fails, and `sessionLost` makes OpenBot open the saved session again for the next prompt
+ * (#6321).
  */
 const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could not be re-established: /u;
 /**
