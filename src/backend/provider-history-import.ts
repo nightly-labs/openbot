@@ -69,6 +69,11 @@ export interface ProviderHistoryImportInput {
    * of a deleted routine, whose record is gone. A Test run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /**
+   * Whether a teammate's update in this thread can have ended quiet: the agent's own chat or a
+   * routine's side thread, as at the turn completion. Left out, it cannot.
+   */
+  quietTeammateThread?: boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -304,7 +309,7 @@ function routineTurnAnswers(
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
           routine =
             delivery !== undefined &&
-            (quietTeammateDelivery(delivery) ||
+            ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)));
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
