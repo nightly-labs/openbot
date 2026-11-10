@@ -2144,14 +2144,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const sidebarUnreadAgentIds = createMemo(
     () => new Set(Object.entries(workspace.state.reads).flatMap(([id, read]) => (read.unreadCount > 0 ? [id] : []))),
   );
+  /** An explicit read also ends the unread hold, as on the desktop, so new replies in the open chat read again. */
   const markSidebarAgentRead = () =>
     workspace.state.status === "online"
-      ? (agentId: string) =>
+      ? (agentId: string) => {
+          if (heldUnreadAgentId() === agentId) setHeldUnreadAgentId(null);
           void workspace.markAgentRead(agentId).catch(() =>
             actionToast.error(t("chat.unread.markReadFailed"), {
               report: { operation: "other", source: "action", cause_code: "unknown" },
             }),
-          )
+          );
+        }
       : undefined;
   /** With `conversation-unread-from-v1`: marks the newest agent reply of a chat unread from the sidebar. */
   const markSidebarAgentUnread = () =>
