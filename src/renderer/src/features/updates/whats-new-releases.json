@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Fast mode is off for each Claude agent after this update. If you used it, turn it on again in the model picker."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Add a server on your own Linux computer or VPS with one command, or ask an agent to install it there over SSH.",
+          "Server settings → Transfer can now move the chat history, the channels and the workflows to the new server.",
+          "On Linux, the Dynamic Island and the agent dock stay above other windows, as on a Mac.",
+          "Turn on Fast mode for a Claude agent, or choose Ultrafast for a Codex agent, in the model picker.",
+          "Agents keep what they learn about a site as a memory of that site, and do not repeat steps that failed.",
+          "The Apps catalog has 207 new apps, such as monday.com, Miro, Dropbox and Zapier. You connect them with a browser sign-in."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chats with unread replies show first, in an Unread group. To change the order, select Sort chats in the menu of the chat list.",
+          "On a joined server, such as a VPS, the desktop app and the browser app now have most of the features of this computer.",
+          "Agents add OpenBot as a co-author to their git commits. You stay the author. Turn it off in Your settings → Agents.",
+          "Agents finish browser tasks with fewer steps and about 18% fewer tokens.",
+          "Gemini now runs on the Antigravity CLI. Your Google sign-in stays."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A Claude agent that you stop now stops in about 10 seconds, and its queued messages start.",
+          "On Windows, agents can use the browser while the OpenBot window is minimized or in the tray.",
+          "On macOS, Restart to update no longer closes OpenBot when it runs from its disk image. It tells you to move OpenBot to Applications.",
+          "In a voice conversation, a cough or a key press no longer stops the agent's reply."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],

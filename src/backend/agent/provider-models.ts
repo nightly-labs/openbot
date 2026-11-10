@@ -62,9 +62,13 @@ export const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentMode
   ["opencode", opencodeModelRank],
 ]);
 
-/** The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`. */
+/**
+ * The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`.
+ * A parameter count is not a version: `GPT-OSS 120B` has none, and `Llama 3.3 70B` is `[3, 3]`.
+ * Before, 120B read as version 120 and put GPT-OSS ahead of every GPT-5 model.
+ */
 function modelVersion(name: string): number[] | null {
-  const match = /\d+(?:\.\d+)*/u.exec(name);
+  const match = /(?<![\d.])\d+(?:\.\d+)*(?![\d.]|[bkmt]\b)/iu.exec(name);
   return match ? match[0].split(".").map(Number) : null;
 }
 
@@ -81,6 +85,67 @@ export function compareModelVersions(left: AgentModelOption, right: AgentModelOp
     if (difference) return difference;
   }
   return 0;
+}
+
+/** Id parts that name an effort, a mode or a release channel of a model, not another model. */
+const MODEL_VARIANT_PARTS = new Set([
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "thinking",
+  "latest",
+  "preview",
+]);
+
+/**
+ * The model family of an id, without its versions, dates and variants, or `null` for an id with no
+ * name part. `claude-opus-4-6-thinking` and `claude-opus-5-5` are both `claude-opus`, and
+ * `gemini-3.8-flash-high` is `gemini-flash`. A context window in brackets stays, so
+ * `claude-opus-4-7[1m]` is `claude-opus[1m]`.
+ */
+function modelFamily(id: string): string | null {
+  const [, base = "", window = ""] = /^(.*?)(\[[^\]]*\])?$/u.exec(id.trim().toLowerCase()) ?? [];
+  const parts = base
+    .split(/[-_/]/u)
+    .filter((part) => /[a-z]/u.test(part) && !MODEL_VARIANT_PARTS.has(part) && !/^v?\d[\d.]*$/u.test(part));
+  return parts.length > 0 ? `${parts.join("-")}${window}` : null;
+}
+
+/**
+ * The model an agent moves to when the provider no longer lists its saved model: the newest listed
+ * model of the same family, such as Claude Opus 5.5 for Claude Opus 4.6. `null` when no listed model
+ * is of that family.
+ */
+export function newestOfFamily(models: readonly AgentModelOption[], modelId: string): AgentModelOption | null {
+  const family = modelFamily(modelId);
+  if (!family) return null;
+  const variant = modelVariant(modelId);
+  const sameVariant = (model: AgentModelOption) => Number(modelVariant(model.id) !== variant);
+  return (
+    models
+      .filter((model) => modelFamily(model.id) === family)
+      .map((model) => ({ model, version: { ...model, name: model.name.slice(model.name.lastIndexOf("/") + 1) } }))
+      // Between two models of one version, the one with the same variant wins, so an agent on
+      // `claude-opus-4-6-thinking` keeps thinking on `claude-opus-5-5-thinking`. Only the name after
+      // its last `/` gives the version: OpenCode puts the provider name first, such as `Lab 2/Llama 3.3`.
+      .sort(
+        (left, right) =>
+          compareModelVersions(left.version, right.version) || sameVariant(left.model) - sameVariant(right.model),
+      )[0]?.model ?? null
+  );
+}
+
+/** The variant parts of a model id, such as `high-thinking` for `claude-opus-4-6-thinking-high`. */
+function modelVariant(id: string): string {
+  return id
+    .toLowerCase()
+    .split(/[-_/]/u)
+    .filter((part) => MODEL_VARIANT_PARTS.has(part))
+    .sort()
+    .join("-");
 }
 
 /**

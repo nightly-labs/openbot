@@ -1170,12 +1170,19 @@ Network traffic can also occur when:
   tokens for those repositories. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
-- the user approves a bug report or a feature idea that an agent wrote. OpenBot shows the title and
+- the user approves a bug report or a feature idea that an agent wrote. Before the card, OpenBot
+  sends the title to the central account service (`api.openbot.run`) with the account session, and the
+  service gives the open issues of the OpenBot GitHub App with similar titles, from GitHub search. The service does not store or log the title. The
+  agent can then add the report to one of them as a comment. OpenBot shows the title and
   the agent's text first (what happened and the steps, or what the user wants and why). It then sends the text to the central account
-  service (`api.openbot.run`) with the account session: that text, the agent's choice of the form's
-  area and severity, or of the request type, when it gives them, the OpenBot version, the operating
-  system and processor architecture, and the agent's provider and CLI version. OpenBot removes known
-  secrets from the text before it shows it. The service opens it as a public issue in the
+  service with the account session: that text, the agent's choice of the form's
+  area and severity, or of the request type, when it gives them, where the user saw the problem when
+  the agent gives it, the OpenBot version, the operating system and processor architecture, whether
+  the agent runs in the desktop app, on a server or on a hosted server, and the agent's provider, CLI
+  version, model and reasoning effort. It also sends up to 5 error lines of the chat from the last
+  hour: the errors of failed tools other than shell commands, and of OpenBot tools. The card shows the
+  errors. OpenBot removes known secrets from the text and the errors before it shows them. The service opens it as a public
+  issue, or a comment on the issue that the agent chose, in the
   `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
   the account. The service does not store or log the text. For the limit of a few issues each minute and
   10 each day, it counts the issues of each account; D1 keeps the account ID, the UTC day and the

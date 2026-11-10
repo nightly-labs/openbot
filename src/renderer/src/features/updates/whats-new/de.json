@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Der Schnellmodus ist nach diesem Update für jeden Claude-Agenten aus. Wenn du ihn genutzt hast, schalte ihn in der Modellauswahl wieder ein."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Füge mit einem Befehl einen Server auf deinem eigenen Linux-Computer oder VPS hinzu, oder bitte einen Agenten, ihn dort über SSH zu installieren.",
+          "Servereinstellungen → Übertragung kann jetzt den Chatverlauf, die Kanäle und die Workflows auf den neuen Server übertragen.",
+          "Unter Linux bleiben Dynamic Island und das Agenten-Dock über anderen Fenstern, wie auf dem Mac.",
+          "Schalte in der Modellauswahl den Schnellmodus für einen Claude-Agenten ein, oder wähle Ultraschnell für einen Codex-Agenten.",
+          "Agenten behalten, was sie über eine Website lernen, als Erinnerung an diese Website und wiederholen keine Schritte, die fehlgeschlagen sind.",
+          "Der Apps-Katalog hat 207 neue Apps, zum Beispiel monday.com, Miro, Dropbox und Zapier. Du verbindest sie mit einer Anmeldung im Browser."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chats mit ungelesenen Antworten stehen oben, in der Gruppe Ungelesen. Um die Reihenfolge zu ändern, wähle Chats sortieren im Menü der Chatliste.",
+          "Auf einem beigetretenen Server, zum Beispiel einem VPS, haben die Desktop-App und die Browser-App jetzt die meisten Funktionen dieses Computers.",
+          "Agenten tragen OpenBot als Co-Autor in ihre Git-Commits ein. Du bleibst der Autor. Schalte es unter Deine Einstellungen → Agenten aus.",
+          "Agenten erledigen Browser-Aufgaben in weniger Schritten und mit etwa 18 % weniger Tokens.",
+          "Gemini läuft jetzt mit der Antigravity CLI. Deine Google-Anmeldung bleibt erhalten."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Claude-Agent, den du stoppst, hält jetzt in etwa 10 Sekunden an, und seine Nachrichten in der Warteschlange starten.",
+          "Unter Windows können Agenten den Browser nutzen, während das OpenBot-Fenster minimiert oder im Infobereich ist.",
+          "Unter macOS schließt „Neustart für Update“ OpenBot nicht mehr, wenn OpenBot von seinem Disk-Image läuft. Du wirst aufgefordert, OpenBot in den Ordner Programme zu verschieben.",
+          "In einer Sprachunterhaltung stoppt ein Husten oder ein Tastendruck die Antwort des Agenten nicht mehr."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],
