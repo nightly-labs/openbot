@@ -276,7 +276,7 @@ const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 /** An export of up to 100 MB goes up and is read in one request, and apply creates many agents. */
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 /** One part of 8 MiB of a transfer file, at 64 KB/s with time to spare. A part that fails is sent again. */
-export const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
+const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 // How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
 // host that is not back by then is offline, as any other host. A hosted server restarts its whole
 // machine and restores its disk; one took 18 minutes.

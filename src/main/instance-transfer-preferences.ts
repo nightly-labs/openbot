@@ -19,7 +19,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 
 /** What the file keeps. Each field is optional, and the import checks each one on its own. */
-export interface TransferPreferences {
+interface TransferPreferences {
   access?: string;
   computerUse?: boolean;
   allowAutomation?: boolean;
