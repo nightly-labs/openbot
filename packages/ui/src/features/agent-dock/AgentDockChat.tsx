@@ -402,46 +402,49 @@ export function AgentDockChat(props: {
 
       <Show when={props.error}>{(error) => <p class="agent-dock-error">{error()}</p>}</Show>
 
-      <form
-        class="composer agent-dock-composer"
-        data-compact=""
-        onSubmit={(event: SubmitEvent) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <div class="composer-input-label">
-          <ComposerEditor
-            agentId={undefined}
-            agents={props.agents}
-            value={props.draft}
-            placeholder={t("composer.placeholder.message", { name: name() })}
-            ariaLabel={t("composer.placeholder.message", { name: name() })}
-            disabled={transcribing()}
-            focusRequest={props.focusRequest}
-            dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}
-            onValueChange={(value) => props.onDraftChange(value)}
-            onSubmit={submit}
-          />
-        </div>
-        <div class="composer-primary-actions">
-          <Show when={props.voice} fallback={sendButton()}>
-            {(voice) => (
-              <ComposerVoiceControls
-                phase={voice().phase}
-                levels={voice().levels}
-                elapsedSeconds={voice().elapsedSeconds}
-                modelProgress={voice().modelProgress}
-                blocked={voice().blocked}
-                onStart={() => voice().onStart()}
-                onCancel={() => voice().onCancel()}
-                onFinish={() => voice().onFinish()}
-                send={sendButton()}
-              />
-            )}
-          </Show>
-        </div>
-      </form>
+      {/* The mention picker hangs from the composer inside its `.composer-wrap`. */}
+      <div class="composer-wrap agent-dock-composer-wrap">
+        <form
+          class="composer agent-dock-composer"
+          data-compact=""
+          onSubmit={(event: SubmitEvent) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <div class="composer-input-label">
+            <ComposerEditor
+              agentId={undefined}
+              agents={props.agents}
+              value={props.draft}
+              placeholder={t("composer.placeholder.message", { name: name() })}
+              ariaLabel={t("composer.placeholder.message", { name: name() })}
+              disabled={transcribing()}
+              focusRequest={props.focusRequest}
+              dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}
+              onValueChange={(value) => props.onDraftChange(value)}
+              onSubmit={submit}
+            />
+          </div>
+          <div class="composer-primary-actions">
+            <Show when={props.voice} fallback={sendButton()}>
+              {(voice) => (
+                <ComposerVoiceControls
+                  phase={voice().phase}
+                  levels={voice().levels}
+                  elapsedSeconds={voice().elapsedSeconds}
+                  modelProgress={voice().modelProgress}
+                  blocked={voice().blocked}
+                  onStart={() => voice().onStart()}
+                  onCancel={() => voice().onCancel()}
+                  onFinish={() => voice().onFinish()}
+                  send={sendButton()}
+                />
+              )}
+            </Show>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
