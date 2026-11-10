@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Po tej aktualizacji Tryb szybki jest wyłączony dla każdego agenta Claude. Aby dalej z niego korzystać, włącz go ponownie w wyborze modelu."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Dodaj serwer na własnym komputerze z systemem Linux lub na VPS jednym poleceniem albo poproś agenta, aby zainstalował go tam przez SSH.",
+          "W Ustawienia serwera → Przeniesienie możesz teraz przenieść historię czatów, kanały i przepływy pracy na nowy serwer.",
+          "W systemie Linux Dynamic Island i dok agentów zostają nad innymi oknami, tak jak na Macu.",
+          "Włącz Tryb szybki dla agenta Claude lub wybierz Ultraszybki dla agenta Codex w wyborze modelu.",
+          "Agenci zapisują to, czego dowiedzą się o stronie, jako wspomnienie tej strony i nie powtarzają kroków, które się nie udały.",
+          "Katalog Aplikacje ma 207 nowych aplikacji, takich jak monday.com, Miro, Dropbox i Zapier. Łączysz je, logując się w przeglądarce."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Czaty z nieprzeczytanymi odpowiedziami pokazują się na początku, w grupie Nieprzeczytane. Aby zmienić kolejność, wybierz Sortuj czaty w menu listy czatów.",
+          "Na serwerze, do którego należysz, na przykład na VPS, aplikacja desktopowa i aplikacja w przeglądarce mają teraz większość funkcji tego komputera.",
+          "Agenci dodają OpenBot jako współautora swoich commitów git. Ty pozostajesz autorem. Wyłącz to w Twoje ustawienia → Agenci.",
+          "Agenci kończą zadania w przeglądarce w mniejszej liczbie kroków i z około 18% mniejszym zużyciem tokenów.",
+          "Gemini działa teraz na Antigravity CLI. Twoje logowanie Google zostaje."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agent Claude, którego zatrzymasz, zatrzymuje się teraz w około 10 sekund, a wiadomości z jego kolejki się uruchamiają.",
+          "W systemie Windows agenci mogą używać przeglądarki, gdy okno OpenBot jest zminimalizowane lub w zasobniku systemowym.",
+          "W macOS „Uruchom ponownie” nie zamyka już OpenBot, gdy działa on z obrazu dysku. Zamiast tego prosi o przeniesienie OpenBot do folderu Aplikacje.",
+          "W rozmowie głosowej kaszlnięcie lub naciśnięcie klawisza nie przerywa już odpowiedzi agenta."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],

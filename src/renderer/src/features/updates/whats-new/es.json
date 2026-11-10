@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "El modo rápido está desactivado en cada agente de Claude después de esta actualización. Si lo usabas, vuelve a activarlo en el selector de modelos."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Añade un servidor en tu propio equipo Linux o VPS con un solo comando, o pide a un agente que lo instale allí por SSH.",
+          "Ajustes del servidor → Transferir ahora puede mover el historial de chats, los canales y los flujos de trabajo al nuevo servidor.",
+          "En Linux, la Dynamic Island y el dock de agentes se quedan encima de las demás ventanas, como en un Mac.",
+          "Activa el modo rápido en un agente de Claude, o elige Ultrarrápido en un agente de Codex, en el selector de modelos.",
+          "Los agentes guardan lo que aprenden sobre un sitio como un recuerdo de ese sitio, y no repiten los pasos que fallaron.",
+          "El catálogo de Apps tiene 207 apps nuevas, como monday.com, Miro, Dropbox y Zapier. Las conectas iniciando sesión en el navegador."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Los chats con respuestas sin leer se muestran primero, en un grupo No leídos. Para cambiar el orden, selecciona Ordenar chats en el menú de la lista de chats.",
+          "En un servidor al que te uniste, como un VPS, la app de escritorio y la app del navegador ahora tienen la mayoría de las funciones de este equipo.",
+          "Los agentes añaden a OpenBot como coautor en sus commits de git. Tú sigues siendo el autor. Desactívalo en Tus ajustes → Agentes.",
+          "Los agentes terminan las tareas del navegador con menos pasos y alrededor de un 18 % menos de tokens.",
+          "Gemini ahora funciona con Antigravity CLI. Tu inicio de sesión de Google se mantiene."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un agente de Claude que detienes ahora se detiene en unos 10 segundos, y sus mensajes en cola empiezan.",
+          "En Windows, los agentes pueden usar el navegador mientras la ventana de OpenBot está minimizada o en la bandeja del sistema.",
+          "En macOS, Reiniciar para actualizar ya no cierra OpenBot cuando se ejecuta desde su imagen de disco. Te pide que muevas OpenBot a Aplicaciones.",
+          "En una conversación de voz, una tos o una pulsación de tecla ya no detiene la respuesta del agente."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],

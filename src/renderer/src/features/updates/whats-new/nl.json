@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Na deze update staat de Snelle modus uit voor elke Claude-agent. Gebruikte je die, zet hem dan weer aan in de modelkiezer."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Voeg met één opdracht een server toe op je eigen Linux-computer of VPS, of vraag een agent om hem daar via SSH te installeren.",
+          "Serverinstellingen → Overdracht kan nu de chatgeschiedenis, de kanalen en de workflows naar de nieuwe server verplaatsen.",
+          "Op Linux blijven het Dynamic Island en het agentdock boven andere vensters, net als op een Mac.",
+          "Zet in de modelkiezer de Snelle modus aan voor een Claude-agent, of kies Ultrasnel voor een Codex-agent.",
+          "Agents bewaren wat ze over een site leren als herinnering bij die site, en herhalen geen stappen die mislukten.",
+          "De catalogus Apps heeft 207 nieuwe apps, zoals monday.com, Miro, Dropbox en Zapier. Je verbindt ze door in de browser in te loggen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chats met ongelezen antwoorden staan bovenaan, in een groep Ongelezen. Kies Chats sorteren in het menu van de chatlijst om de volgorde te wijzigen.",
+          "Op een server waarvan je lid bent, zoals een VPS, hebben de desktop-app en de browser-app nu de meeste functies van deze computer.",
+          "Agents voegen OpenBot toe als co-auteur van hun git-commits. Jij blijft de auteur. Zet het uit in Jouw instellingen → Agents.",
+          "Agents voeren browsertaken uit in minder stappen en met ongeveer 18% minder tokens.",
+          "Gemini draait nu op de Antigravity CLI. Je Google-login blijft."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een Claude-agent die je stopt, stopt nu binnen ongeveer 10 seconden, en de berichten in zijn wachtrij starten.",
+          "Op Windows kunnen agents de browser gebruiken terwijl het OpenBot-venster geminimaliseerd is of in het systeemvak staat.",
+          "Op macOS sluit “Herstarten om bij te werken” OpenBot niet meer af wanneer het vanaf de schijfkopie draait. Het vraagt je om OpenBot naar de map Apps te verplaatsen.",
+          "In een spraakgesprek stopt een kuch of een toetsaanslag het antwoord van de agent niet meer."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],
