@@ -35,6 +35,18 @@ const MAX_CANDIDATE_ITEM_TEXT = 200;
 const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
+/**
+ * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
+ * do not use the scan budget before the walk gets to what is visible. Each walk that uses it gives
+ * nothing from a hidden element or its descendants, with the same tests as here.
+ */
+const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
+  if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
+  if (node.hidden || node.inert || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true') return NodeFilter.FILTER_REJECT;
+  const style = node.ownerDocument.defaultView?.getComputedStyle(node);
+  if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return NodeFilter.FILTER_REJECT;
+  return NodeFilter.FILTER_ACCEPT;
+} }`;
 
 const ACTIONABLE_ROLES = new Set([
   "button",
@@ -204,7 +216,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${SKIP_HIDDEN_SUBTREES});
           let node;
           while ((node = walker.nextNode()) && scanned < maxNodes) {
             scanned++;
@@ -349,7 +361,7 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
             const root = roots.shift();
             if (!root || seen.has(root)) continue;
             seen.add(root);
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${SKIP_HIDDEN_SUBTREES});
             let node;
             while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES}) {
               if (performance.now() >= scanDeadline) return { matched: false, expired: true };
@@ -406,31 +418,31 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
         let scanned = 0;
         let truncated = false;
         while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
-          if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
-            truncated = true;
-            break;
-          }
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
+          // The native query finds each match in this root, also on a very large page.
+          for (const node of root.querySelectorAll(selector)) {
+            matches.push(node);
+            if (matches.length >= ${MAX_TARGET_CANDIDATES}) break;
+          }
+          if (truncated) continue;
+          // Only the search for shadow roots and frames, which the native query does not enter, is bounded.
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
-            const node = walker.nextNode();
-            if (!node) break;
+          let node;
+          while ((node = walker.nextNode())) {
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
               truncated = true;
               break;
             }
             scanned++;
-            if (node.matches(selector)) matches.push(node);
             if (node.localName === 'iframe' || node.localName === 'frame') {
               try { if (node.contentDocument) roots.push(node.contentDocument); } catch {}
             }
             if (node.shadowRoot) roots.push(node.shadowRoot);
           }
-          if (truncated) break;
         }
-        if (truncated && matches.length < 2) throw new Error('CSS selector uniqueness scan exceeded the safe node limit.');
+        if (truncated && matches.length === 0) throw new Error('CSS selector uniqueness scan exceeded the safe node limit.');
         return matches;
       })()`,
       contextId,
@@ -560,7 +572,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           const root = roots.shift();
           if (!root || seenRoots.has(root)) continue;
           seenRoots.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
           while (matches.length < ${MAX_TARGET_CANDIDATES}) {
             const node = walker.nextNode();
             if (!node) break;
@@ -851,7 +863,7 @@ function actionableNodesExpression(limit: number): string {
       const root = roots.shift();
       if (!root || seenRoots.has(root)) continue;
       seenRoots.add(root);
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
       let node;
       while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
         scanned++;
