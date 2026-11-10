@@ -43,6 +43,10 @@ export class WebhookRelay implements HostWebhookRelay {
     return this.#options.ingress.webhookReady();
   }
 
+  ensureHost(): Effect.Effect<void> {
+    return this.#options.ensureHost();
+  }
+
   setEnabled(enabled: boolean): void {
     if (enabled && !this.#release) this.#release = this.#options.ingress.acquireWebhooks();
     else if (!enabled && this.#release) {
@@ -95,7 +99,6 @@ export class WebhookRelay implements HostWebhookRelay {
   }).bind(this);
 
   readonly #host = Effect.fn("WebhookRelay.host")(function* (this: WebhookRelay) {
-    yield* this.#options.ensureHost();
     const hostId = this.#options.hostId();
     if (!hostId)
       return yield* new HostEventsFailure({ cause: new Error(sourceText("error.backend.webhookRouteUnavailable")) });
