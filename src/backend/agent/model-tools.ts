@@ -41,11 +41,28 @@ export type ProviderAccountRows = (provider: AgentProvider) => ProviderAccountSt
 interface ProviderModels {
   provider: AgentProvider;
   defaultModel: string;
-  models: (Pick<AgentModelOption, "id" | "name"> &
-    Partial<Pick<AgentModelOption, "defaultReasoningEffort" | "supportedReasoningEfforts">>)[];
+  models: ToolModel[];
   /** The number of models of the provider that the list leaves out. */
   omittedModels?: number;
-  accounts?: Pick<ProviderAccountStatus, "id" | "label" | "state">[];
+  accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
+}
+
+type ToolModel = Pick<AgentModelOption, "id" | "name"> &
+  Partial<Pick<AgentModelOption, "defaultReasoningEffort" | "supportedReasoningEfforts">>;
+
+function toolModel(model: AgentModelOption): ToolModel {
+  return {
+    id: model.id,
+    name: model.name,
+    // A model with no effort setting holds only a `medium` placeholder that never reaches the
+    // provider, and an agent read it as a choice (#5215).
+    ...(model.reasoningEffortConfigurable === false
+      ? {}
+      : {
+          defaultReasoningEffort: model.defaultReasoningEffort,
+          supportedReasoningEfforts: model.supportedReasoningEfforts,
+        }),
+  };
 }
 
 /** A provider row of the settings page, as `list_models` reads it. */
@@ -92,8 +109,8 @@ function matchesQuery(model: AgentModelOption, words: readonly string[]): boolea
  * The `list_models` payload: each provider that lists a model, in `AGENT_PROVIDERS` order. The models
  * are the ones the model picker shows, so the ones `create_agent` accepts. With no query, a provider
  * shows its default model, the models in use, and its first models; `omittedModels` counts the rest.
- * A query searches all models. An account has its id and the name the user gave it, never its email,
- * its credentials or its folder. A provider that is on but lists no model until the user signs in,
+ * A query searches all models. An account has its id, the name the user gave it and the models that
+ * only it serves, never its email, its credentials or its folder. A provider that is on but lists no model until the user signs in,
  * updates or repairs it is in `unavailableProviders`, with the text of its settings row and where
  * that row is: without it, the agent could not tell the user why the provider is missing (#6053).
  */
@@ -130,26 +147,22 @@ export function listModelsPayload(
         {
           provider: id,
           defaultModel: fallback.id,
-          models: listed.map((model) => ({
-            id: model.id,
-            name: model.name,
-            // A model with no effort setting holds only a `medium` placeholder that never reaches the
-            // provider, and an agent read it as a choice (#5215).
-            ...(model.reasoningEffortConfigurable === false
-              ? {}
-              : {
-                  defaultReasoningEffort: model.defaultReasoningEffort,
-                  supportedReasoningEfforts: model.supportedReasoningEfforts,
-                }),
-          })),
+          models: listed.map(toolModel),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
           ...(rows
             ? {
-                accounts: rows.map((account) => ({
-                  id: account.id,
-                  label: account.label,
-                  state: account.state,
-                })),
+                accounts: rows.map((account) => {
+                  // The models that only this account serves, as the model picker shows them (#6109).
+                  const extra = (account.models ?? []).filter(
+                    (model) => words.length === 0 || matchesQuery(model, words),
+                  );
+                  return {
+                    id: account.id,
+                    label: account.label,
+                    state: account.state,
+                    ...(extra.length > 0 ? { models: extra.map(toolModel) } : {}),
+                  };
+                }),
               }
             : {}),
         },
@@ -192,20 +205,20 @@ export function agentAccountSetup(agent: AgentSummary) {
 
 /**
  * The backup models that an `update_profile` request names, checked against the models and accounts
- * of this computer, the ones the settings page offers. As the settings page writes it, the stored
+ * of this computer, the ones the settings page offers. `modelsOf` gives the models of one account,
+ * with the ones that only that account serves. As the settings page writes it, the stored
  * order omits the provider's own sign-in and the agent's own model, has each choice once, and an
  * order that asks first with no model is null.
  */
 export function requestedBackupModels(
   request: AgentBackupModels | null,
-  models: AgentModelOption[],
+  modelsOf: (choice: Pick<AgentModelChoice, "provider" | "providerAccountId">) => AgentModelOption[],
   accounts: ProviderAccountRows,
   own: AgentModelChoice,
 ): AgentBackupModels | null {
   if (request === null) return null;
   const order: AgentModelChoice[] = [];
   for (const { provider, model, providerAccountId } of request.order) {
-    requestedToolModel({ provider, model }, models);
     const accountId = providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const rows = accounts(provider);
     if (rows ? !rows.some((account) => account.id === accountId) : accountId !== DEFAULT_PROVIDER_ACCOUNT_ID) {
@@ -213,6 +226,7 @@ export function requestedBackupModels(
         sourceText("error.provider.accountNotFound", { provider: providerLabel(provider) }),
       );
     }
+    requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
     const choice: AgentModelChoice = {
       provider,
       model,

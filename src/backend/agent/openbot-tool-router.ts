@@ -250,6 +250,8 @@ function captureFailure(failure: ScreenCaptureFailed) {
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
   listModels(): AgentModelOption[];
+  /** The models that an agent on this provider and account can run: `listModels`, then the ones only that account serves. */
+  agentModels(choice: Pick<AgentModelChoice, "provider" | "providerAccountId">): AgentModelOption[];
   /** The accounts of a signed-in provider, as the settings page lists them. */
   providerAccounts: ProviderAccountRows;
   /** The provider rows of the settings page. */
@@ -2349,26 +2351,39 @@ export class OpenBotToolRouter {
       if (widensAgentSettings(target, access, computerUse)) {
         return openBotToolFailure(sourceText("error.agent.onlyUserWidensSettings"));
       }
+      // The account the agent has after this call. A provider change without an account moves the
+      // agent to the new provider's own sign-in.
+      const accountFor = (ownProvider: AgentProvider) =>
+        providerAccountId !== undefined
+          ? (providerAccountId ?? undefined)
+          : ownProvider === target.provider
+            ? target.providerAccountId
+            : undefined;
       // Checked before anything is written, so a model the provider does not list leaves the name
-      // and every other field of the same call unchanged.
-      const runtime = requestedRuntime(target, runtimeRequest, this.#hooks.listModels());
-      // The model and account the agent has after this call. A provider change without an account
-      // moves the agent to the new provider's own sign-in.
+      // and every other field of the same call unchanged. A model that only the agent's account
+      // serves is valid, as in the model picker (#6109).
+      const requestedProvider = provider ?? target.provider;
+      const runtime = requestedRuntime(
+        target,
+        runtimeRequest,
+        this.#hooks.agentModels({ provider: requestedProvider, providerAccountId: accountFor(requestedProvider) }),
+      );
+      // The model and account the agent has after this call.
       const ownProvider = runtime.provider ?? target.provider;
       const own: AgentModelChoice = {
         provider: ownProvider,
         model: runtime.model ?? target.model,
-        providerAccountId:
-          providerAccountId !== undefined
-            ? (providerAccountId ?? undefined)
-            : ownProvider === target.provider
-              ? target.providerAccountId
-              : undefined,
+        providerAccountId: accountFor(ownProvider),
       };
       const backups =
         backupModels === undefined
           ? undefined
-          : requestedBackupModels(backupModels, this.#hooks.listModels(), this.#hooks.providerAccounts, own);
+          : requestedBackupModels(
+              backupModels,
+              (choice) => this.#hooks.agentModels(choice),
+              this.#hooks.providerAccounts,
+              own,
+            );
       const image =
         avatarPath === undefined
           ? undefined
