@@ -1,0 +1,33 @@
+{
+  "slug": "artie",
+  "name": "Artie",
+  "tagline": "Real-time data pipelines",
+  "description": "Artie lets agents create, check, and manage the real-time database replication pipelines of the signed-in account. Each user signs in to their own Artie account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Artie",
+  "iconUrl": "https://www.artie.com/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-status", "text": "Which of my pipelines have errors or lag right now?" },
+    { "id": "prompt-tables", "text": "List the tables that the Postgres pipeline replicates to Snowflake." },
+    { "id": "prompt-new-pipeline", "text": "Help me set up a pipeline from our MySQL database to BigQuery." }
+  ],
+  "apps": [
+    {
+      "id": "app-artie-mcp",
+      "name": "Artie",
+      "description": "Pipeline setup, status, and management, over Artie's MCP server with browser sign-in.",
+      "iconUrl": "https://www.artie.com/apple-icon.png",
+      "server": {
+        "name": "artie",
+        "transport": "http",
+        "url": "https://mcp.artie.com/mcp",
+        "auth": [{ "id": "artie-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.artie.com",
+  "privacyPolicyUrl": "https://www.artie.com/privacy",
+  "termsUrl": "https://www.artie.com/docs/legal/terms-of-service",
+  "skills": []
+}

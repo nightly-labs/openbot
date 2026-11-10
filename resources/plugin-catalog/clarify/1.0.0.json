@@ -1,0 +1,33 @@
+{
+  "slug": "clarify",
+  "name": "Clarify",
+  "tagline": "Industrial data and signals",
+  "description": "Clarify lets agents read signals, time series and events from the industrial data of the signed-in Clarify organization. Each user signs in to their own Clarify account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Searis",
+  "iconUrl": "https://cdn.prod.website-files.com/6aa46e94abf07cb2df2e9aef/6ac0ffbae88ea428fe23ff0f_512.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-trend", "text": "How did the temperature signals at this site change over the last 24 hours?" },
+    { "id": "prompt-anomalies", "text": "Which signals moved outside their normal range this week?" },
+    { "id": "prompt-find", "text": "Find the signals that measure pump pressure." }
+  ],
+  "apps": [
+    {
+      "id": "app-clarify-mcp",
+      "name": "Clarify",
+      "description": "Industrial signals, time series, and events, over Clarify's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6aa46e94abf07cb2df2e9aef/6ac0ffbae88ea428fe23ff0f_512.png",
+      "server": {
+        "name": "clarify",
+        "transport": "http",
+        "url": "https://mcp.clarify.io/mcp",
+        "auth": [{ "id": "clarify-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.clarify.io",
+  "privacyPolicyUrl": "https://www.clarify.io/legals/privacy-policy-2021-06-30",
+  "termsUrl": "https://www.clarify.io/legals/terms-of-service-280421",
+  "skills": []
+}

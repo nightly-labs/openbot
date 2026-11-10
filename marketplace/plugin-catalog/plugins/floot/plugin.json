@@ -1,0 +1,33 @@
+{
+  "slug": "floot",
+  "name": "Floot",
+  "tagline": "Build and edit web apps",
+  "description": "Floot lets agents create, edit, run, and publish Floot apps in the signed-in Floot account. Each user signs in to their own Floot account through the browser.",
+  "category": "coding",
+  "creatorName": "Floot",
+  "iconUrl": "https://floot.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-new-app", "text": "Build a Floot app that tracks my team's weekly goals." },
+    { "id": "prompt-list-apps", "text": "List my Floot apps and when each was last changed." },
+    { "id": "prompt-edit-app", "text": "Add a dark mode toggle to my habit tracker app." }
+  ],
+  "apps": [
+    {
+      "id": "app-floot-mcp",
+      "name": "Floot",
+      "description": "App creation, edits, runs, and publishing, over Floot's MCP server with browser sign-in.",
+      "iconUrl": "https://floot.com/favicon.ico",
+      "server": {
+        "name": "floot",
+        "transport": "http",
+        "url": "https://mcp.floot.com/mcp",
+        "auth": [{ "id": "floot-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://floot.com",
+  "privacyPolicyUrl": "https://floot.com/privacy",
+  "termsUrl": "https://floot.com/terms"
+}
