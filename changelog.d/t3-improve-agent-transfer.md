@@ -12,4 +12,4 @@
 ### Fixed
 
 - A transfer with workspace files copied the files of chat messages from the Shared folder without their messages. These files now move only with the chat history.
-- Moved chats and channels no longer show their old messages as unread.
+- Moved chats and channels no longer show their old messages as unread. A moved agent shows its last message in the sidebar.

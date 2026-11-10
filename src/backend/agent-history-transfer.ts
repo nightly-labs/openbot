@@ -26,6 +26,8 @@ export interface HistoryThread {
   /** The routine whose runs the side thread takes, as an id of the computer that made it. */
   routineId: string | null;
   messages: ConversationMessage[];
+  /** The main chat only: the last message that the sidebar shows for the agent. */
+  preview?: string;
 }
 
 /** A file of a message, on the computer that imports, by the attachment id in the message. */

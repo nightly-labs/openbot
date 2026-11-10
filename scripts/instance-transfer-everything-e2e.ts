@@ -579,6 +579,13 @@ try {
     JSON.stringify({ source: texts(sourceMain.messages), target: texts(page.messages) }),
   );
   pass("the imported chat is not unread", page.readState?.unreadCount === 0, JSON.stringify(page.readState ?? null));
+  const sourcePreview = source.agents.listAgents().find((agent) => agent.id === writer.id)?.preview;
+  const targetPreview = target.agents.listAgents().find((agent) => agent.id === newWriter.id)?.preview;
+  pass(
+    "the sidebar shows the same last message",
+    Boolean(sourcePreview) && targetPreview === sourcePreview,
+    JSON.stringify({ source: sourcePreview, target: targetPreview }),
+  );
   const imported = page.messages.find((message) => message.attachments?.length);
   const attachment = imported?.attachments?.[0];
   assert.ok(attachment, "The imported message has no file.");

@@ -243,7 +243,7 @@ import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import {
   AgentHistoryTransfer,
-  type AgentHistoryTransferFailed,
+  AgentHistoryTransferFailed,
   HISTORY_IMPORTED_EVENT,
   type HistoryThread,
   type ImportHistoryThreadInput,
@@ -6032,7 +6032,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The agent's chats for an instance transfer: its own chat, then each side thread. */
   readTransferHistory(agentId: string): HistoryThread[] {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    return agent ? this.#history.readThreads(agentId, agent.threadId) : [];
+    if (!agent) return [];
+    return this.#history
+      .readThreads(agentId, agent.threadId)
+      .map((thread) => (thread.main && agent.preview ? { ...thread, preview: agent.preview } : thread));
   }
 
   /** The stored file of a message's attachment, or null when it is gone. */
@@ -6052,6 +6055,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const { threadId, lastMessageId } = yield* this.#history.importThread(input);
     if (lastMessageId) this.#reader.markThreadRead(readerId, threadId, lastMessageId);
     if (!input.thread.main) this.#tasks.changed(input.agentId);
+    else if (input.thread.preview) {
+      // The sidebar shows the last message that the other computer showed.
+      yield* this.#store
+        .updatePreview(input.agentId, input.thread.preview)
+        .pipe(Effect.mapError((failure) => new AgentHistoryTransferFailed({ cause: failure.cause })));
+      this.#emit({ type: "agents-changed", agents: this.listAgents() });
+    }
     this.#emit({
       type: "conversation-invalidated",
       agentId: input.agentId,

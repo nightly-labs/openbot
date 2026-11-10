@@ -63,6 +63,7 @@ interface IndexThread {
   archived: boolean;
   routineKey: string | null;
   parts: string[];
+  preview?: string;
 }
 
 interface IndexFile {
@@ -119,6 +120,7 @@ export const exportHistory = Effect.fn("InstanceTransfer.exportHistory")(functio
       archived: thread.archived,
       routineKey: thread.routineId,
       parts,
+      ...(thread.preview ? { preview: thread.preview } : {}),
     });
   }
   const index = `${folder}/index.json`;
@@ -237,6 +239,7 @@ function decodeIndexValue(value: unknown, folder: string): { threads: IndexThrea
         archived: item.archived === true,
         routineKey: typeof item.routineKey === "string" ? item.routineKey : null,
         parts: item.parts,
+        ...(item.main === true && typeof item.preview === "string" ? { preview: item.preview } : {}),
       },
     ];
   });
