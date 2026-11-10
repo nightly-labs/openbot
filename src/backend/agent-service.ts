@@ -5060,7 +5060,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The end of a request that live voice gave to the agent: the answer of the delivery's last turn,
-   * or why it has none. The text goes to the voice model, which says it in the user's language.
+   * or why it has none. The text goes to the relay of the voice, which shortens a long answer, and
+   * then to the voice model, which says it in the user's language.
    */
   #liveVoiceReply(agentId: string, deliveryId: string): LiveVoiceReply | null {
     const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
