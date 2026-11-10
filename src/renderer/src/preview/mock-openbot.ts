@@ -419,7 +419,6 @@ function mockWorkspaceDirectory(path: string): WorkspaceDirectory {
   };
 }
 
-/** What each story server answers with when it is tested, so a story reads the same way twice. */
 /** Fonts that most Macs have, so the preview draws each choice in its real font. */
 const STORY_INSTALLED_FONTS = [
   "Al Bayan",
@@ -438,6 +437,7 @@ const STORY_INSTALLED_FONTS = [
   "Verdana",
 ];
 
+/** What each story server answers with when it is tested, so a story reads the same way twice. */
 const PREVIEW_BROWSERS: ExternalLinkBrowsers = {
   defaultBrowser: { name: "Safari", path: "/Applications/Safari.app" },
   browsers: [

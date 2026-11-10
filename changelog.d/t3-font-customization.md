@@ -5,5 +5,5 @@
 
 ### Fixed
 
-- On Linux, Arabic text now uses Noto Sans Arabic when it is installed. Before, the system often
-  drew Arabic in a font that was hard to read.
+- On Linux, Arabic text in the app and on openbot.run now uses Noto Sans Arabic when it is
+  installed. Before, the system often drew Arabic in a font that was hard to read.
