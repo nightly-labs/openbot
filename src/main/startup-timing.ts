@@ -42,9 +42,40 @@ export const SERVICE_STEPS = [
   "host-update",
 ] as const;
 type ServiceStep = (typeof SERVICE_STEPS)[number];
+/** `service_pre_store_ms` for `pre-store`: the time of one step. */
+type ServiceStepProperty = `service_${Snake<ServiceStep>}_ms`;
+type Snake<T extends string> = T extends `${infer Head}-${infer Tail}` ? `${Head}_${Snake<Tail>}` : T;
 
-/** Milliseconds after the main process started, at two significant digits. */
-export interface StartupProperties {
+// The template type cannot follow a runtime `replaceAll`, so this list maps each name once.
+const SERVICE_STEP_PROPERTIES = {
+  "pre-store": "service_pre_store_ms",
+  store: "service_store_ms",
+  skills: "service_skills_ms",
+  browser: "service_browser_ms",
+  preferences: "service_preferences_ms",
+  "provider-detection": "service_provider_detection_ms",
+  "mcp-sign-in-file": "service_mcp_sign_in_file_ms",
+  connectors: "service_connectors_ms",
+  "computer-use": "service_computer_use_ms",
+  routines: "service_routines_ms",
+  messaging: "service_messaging_ms",
+  team: "service_team_ms",
+  hosted: "service_hosted_ms",
+  "remote-desktop": "service_remote_desktop_ms",
+  "plugin-catalog": "service_plugin_catalog_ms",
+  "remote-servers": "service_remote_servers_ms",
+  updates: "service_updates_ms",
+  "host-update": "service_host_update_ms",
+} as const satisfies { readonly [Step in ServiceStep]: `service_${Snake<Step>}_ms` };
+
+/** The property names of the step times, in step order. */
+export const SERVICE_STEP_PROPERTY_NAMES = SERVICE_STEPS.map((step) => SERVICE_STEP_PROPERTIES[step]);
+
+/**
+ * Milliseconds after the main process started, at two significant digits. A
+ * `service_<step>_ms` value is the length of that step instead.
+ */
+export interface StartupProperties extends Partial<Record<ServiceStepProperty, number>> {
   start_kind: StartKind;
   host_kind: "desktop" | "server";
   when_ready_ms?: number;
@@ -87,21 +118,20 @@ function markMs(name: string): number | undefined {
 }
 
 /**
- * The longest step between the `openbot:services.*` marks. The first step starts at
+ * The length of each step between the `openbot:services.*` marks. The first step starts at
  * `services.start`, the top of `createApplicationServices`, so it does not include the window.
+ * A step with no mark has no length, and the next step starts at the last mark before it.
  */
-function slowestServiceStep(): { step: ServiceStep; ms: number } | null {
+function serviceStepTimes(): { step: ServiceStep; ms: number }[] {
   let previous = markMs("services.start") ?? markMs("when-ready");
-  let slowest: { step: ServiceStep; ms: number } | null = null;
+  const times: { step: ServiceStep; ms: number }[] = [];
   for (const step of SERVICE_STEPS) {
     const end = markMs(`services.${step}`);
     if (end === undefined) continue;
-    if (previous !== undefined && (slowest === null || end - previous > slowest.ms)) {
-      slowest = { step, ms: Math.max(0, end - previous) };
-    }
+    if (previous !== undefined) times.push({ step, ms: Math.max(0, end - previous) });
     previous = end;
   }
-  return slowest;
+  return times;
 }
 
 /**
@@ -179,7 +209,11 @@ export class StartupTiming {
       ["workspace_ready_ms", this.#workspaceReadyMs ?? undefined],
     ];
     for (const [key, value] of values) if (value !== undefined) properties[key] = quantize(value);
-    const slowest = slowestServiceStep();
+    let slowest: { step: ServiceStep; ms: number } | null = null;
+    for (const time of serviceStepTimes()) {
+      properties[SERVICE_STEP_PROPERTIES[time.step]] = quantize(time.ms);
+      if (slowest === null || time.ms > slowest.ms) slowest = time;
+    }
     if (slowest) {
       properties.slowest_service_step = slowest.step;
       properties.slowest_service_step_ms = quantize(slowest.ms);

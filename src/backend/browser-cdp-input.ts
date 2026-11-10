@@ -1,6 +1,82 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type { SendCommand } from "./browser-cdp-values";
-import { browserFailure, browserSync } from "./browser-effects";
+import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
+
+export interface PointerPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** A path longer than this starts this far from the target, so it crosses few other elements. */
+const MAX_POINTER_PATH = 160;
+const POINTER_PATH_STEPS = 3;
+// Longer than a frame of a throttled tab, and short against the wait of a tab with no frames.
+const POINTER_PATH_MOVE_WAIT = "100 millis";
+
+/**
+ * Moves the pointer to `to` in a few events along a slight curve, as a hand does, instead of in
+ * one jump. The path starts at `from` when it is near, otherwise a short distance away. The events
+ * have no delay between them.
+ *
+ * Chromium acknowledges a pointer move on the page's next frame. A tab with no frames, such as a
+ * hidden tab of a window that does not draw, acknowledges a move only after a second or more. When
+ * a path move is not acknowledged in time, the rest of the path is skipped, so the pointer goes to
+ * `to` with no more wait than one move.
+ */
+export const dispatchPointerMove = Effect.fn("Browser.dispatchPointerMove")(function* (
+  send: SendCommand,
+  from: PointerPoint | undefined,
+  to: PointerPoint,
+  modifiers: number,
+  sessionId?: string,
+) {
+  const path = pointerPath(from, to);
+  const target = path.pop() ?? to;
+  for (const point of path) {
+    const acknowledged = yield* send(
+      "Input.dispatchMouseEvent",
+      { type: "mouseMoved", ...point, modifiers },
+      sessionId,
+    ).pipe(Effect.timeoutOption(POINTER_PATH_MOVE_WAIT));
+    if (Option.isNone(acknowledged)) break;
+  }
+  yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", ...target, modifiers }, sessionId);
+});
+
+function pointerPath(from: PointerPoint | undefined, to: PointerPoint): PointerPoint[] {
+  let dx = from ? from.x - to.x : 0;
+  let dy = from ? from.y - to.y : 0;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 2) {
+    const angle = Math.random() * 2 * Math.PI;
+    const length = 24 + Math.random() * 24;
+    dx = Math.cos(angle) * length;
+    dy = Math.sin(angle) * length;
+  } else if (distance > MAX_POINTER_PATH) {
+    dx *= MAX_POINTER_PATH / distance;
+    dy *= MAX_POINTER_PATH / distance;
+  }
+  // A bend at right angles to the line, up to a tenth of its length.
+  const bend = (Math.random() - 0.5) * 0.2;
+  const points: PointerPoint[] = [];
+  for (let step = 0; step < POINTER_PATH_STEPS; step += 1) {
+    const rest = 1 - step / POINTER_PATH_STEPS;
+    // Fast at the start and slow near the target.
+    const along = rest * rest;
+    const curve = Math.sin(Math.PI * rest) * bend;
+    points.push({
+      x: Math.max(0, Math.round((to.x + dx * along - dy * curve) * 100) / 100),
+      y: Math.max(0, Math.round((to.y + dy * along + dx * curve) * 100) / 100),
+    });
+  }
+  points.push(to);
+  return points;
+}
+
+/** A press holds the button for 30 to 60 ms, as a quick human click does. A press with no hold is a bot signal. */
+function pressHold() {
+  return Effect.sleep(30 + Math.floor(Math.random() * 30));
+}
 
 export const dispatchMouseClick = Effect.fn("Browser.dispatchMouseClick")(function* (
   send: SendCommand,
@@ -9,8 +85,9 @@ export const dispatchMouseClick = Effect.fn("Browser.dispatchMouseClick")(functi
   totalClicks: number,
   modifiers: number,
   sessionId?: string,
+  from?: PointerPoint,
 ) {
-  yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
+  yield* dispatchPointerMove(send, from, coordinates, modifiers, sessionId);
   for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
     let released = false;
     yield* Effect.gen(function* () {
@@ -19,6 +96,7 @@ export const dispatchMouseClick = Effect.fn("Browser.dispatchMouseClick")(functi
         { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
         sessionId,
       );
+      yield* pressHold();
       yield* send(
         "Input.dispatchMouseEvent",
         { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
@@ -127,33 +205,170 @@ function normalizeModifier(value: string) {
   return null;
 }
 
+// The keys of a US layout: each character with its unshifted and shifted twin, `code` and key code.
+const US_SYMBOL_KEYS: readonly (readonly [string, string, string, number])[] = [
+  ["`", "~", "Backquote", 192],
+  ["-", "_", "Minus", 189],
+  ["=", "+", "Equal", 187],
+  ["[", "{", "BracketLeft", 219],
+  ["]", "}", "BracketRight", 221],
+  ["\\", "|", "Backslash", 220],
+  [";", ":", "Semicolon", 186],
+  ["'", '"', "Quote", 222],
+  [",", "<", "Comma", 188],
+  [".", ">", "Period", 190],
+  ["/", "?", "Slash", 191],
+  ["1", "!", "Digit1", 49],
+  ["2", "@", "Digit2", 50],
+  ["3", "#", "Digit3", 51],
+  ["4", "$", "Digit4", 52],
+  ["5", "%", "Digit5", 53],
+  ["6", "^", "Digit6", 54],
+  ["7", "&", "Digit7", 55],
+  ["8", "*", "Digit8", 56],
+  ["9", "(", "Digit9", 57],
+  ["0", ")", "Digit0", 48],
+];
+
+interface UsKey {
+  readonly code: string;
+  readonly keyCode: number;
+  readonly shift: boolean;
+}
+
+const US_KEYS: ReadonlyMap<string, UsKey> = new Map<string, UsKey>([
+  [" ", { code: "Space", keyCode: 32, shift: false }],
+  ...[..."abcdefghijklmnopqrstuvwxyz"].flatMap((letter): Array<[string, UsKey]> => {
+    const upper = letter.toUpperCase();
+    const key = { code: `Key${upper}`, keyCode: upper.charCodeAt(0) };
+    return [
+      [letter, { ...key, shift: false }],
+      [upper, { ...key, shift: true }],
+    ];
+  }),
+  ...US_SYMBOL_KEYS.flatMap(
+    ([plain, shifted, code, keyCode]): Array<[string, UsKey]> => [
+      [plain, { code, keyCode, shift: false }],
+      [shifted, { code, keyCode, shift: true }],
+    ],
+  ),
+]);
+
+/**
+ * Text up to this length is typed as key events, one key per character, as a person types it. A
+ * page that counts key events before it accepts a value then accepts it. Longer text, and each
+ * character that has no key on a US layout, is inserted as text: it is faster, and key events
+ * would give no more. Empty text is inserted too: it deletes the selection, as a replace needs.
+ */
+const MAX_KEYED_TEXT = 128;
+
+/**
+ * Code editors such as CodeMirror and Monaco add a closing bracket, quote or tag, or an indent,
+ * when a person types one of these characters. Text that has one is inserted in one piece, so the
+ * field gets the exact text.
+ */
+const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;
+
+interface TextChecks {
+  /**
+   * Tells whether the first key event reached the page. Chromium can drop key events for a tab that
+   * it accepts inserted text for, as for a hidden tab under Xvfb, and drops them with no error. The
+   * rest of the text is then inserted, as it was before keys.
+   */
+  readonly keyArrived?: Effect.Effect<boolean, BrowserOperationError>;
+  /**
+   * Saves the field text for `keyArrived` again. It runs when text was inserted before the first
+   * key, so that the inserted text does not read as a key that arrived.
+   */
+  readonly saveText?: Effect.Effect<void, BrowserOperationError>;
+  /**
+   * Runs before each key or insert after the first one, with the count of characters that the page
+   * already has. It fails when a key handler moved focus or the deadline passed, so that the error
+   * can tell the caller that part of the text is in the field. Focus that moves after the last
+   * character, as in a one-time code box, is not a failure.
+   */
+  readonly beforeNext?: (typed: number, total: number) => Effect.Effect<void, BrowserOperationError>;
+}
+
+export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
+  send: SendCommand,
+  text: string,
+  sessionId?: string,
+  checks: TextChecks = {},
+) {
+  if (text.length === 0 || text.length > MAX_KEYED_TEXT || EDITOR_COMPLETED_TEXT.test(text)) {
+    yield* send("Input.insertText", { text }, sessionId);
+    return;
+  }
+  const characters = [...text];
+  let typed = 0;
+  const beforePiece = Effect.suspend(() =>
+    typed > 0 && checks.beforeNext ? checks.beforeNext(typed, characters.length) : Effect.void,
+  );
+  const insert = (piece: string) =>
+    beforePiece.pipe(
+      Effect.andThen(send("Input.insertText", { text: piece }, sessionId)),
+      Effect.andThen(
+        Effect.sync(() => {
+          typed += [...piece].length;
+        }),
+      ),
+    );
+  let pending = "";
+  let keyed = false;
+  for (const [index, character] of characters.entries()) {
+    if (!US_KEYS.has(character)) {
+      pending += character;
+      continue;
+    }
+    if (pending) yield* insert(pending);
+    pending = "";
+    yield* beforePiece;
+    // The characters before the first key have no US key, so they were inserted.
+    if (!keyed && index > 0 && checks.saveText) yield* checks.saveText;
+    yield* dispatchTextKey(send, character, sessionId);
+    typed += 1;
+    if (!keyed && checks.keyArrived && !(yield* checks.keyArrived)) {
+      yield* insert(characters.slice(index).join(""));
+      return;
+    }
+    keyed = true;
+  }
+  if (pending) yield* insert(pending);
+});
+
 export const dispatchTextKey = Effect.fn("Browser.dispatchTextKey")(function* (
   send: SendCommand,
   character: string,
   sessionId?: string,
 ) {
-  const upper = character.toUpperCase();
-  const code = /^[a-z]$/i.test(character) ? `Key${upper}` : "Unidentified";
+  // A character that has no US key keeps the key event that Chromium gives an unknown key.
+  const usKey = US_KEYS.get(character);
+  const key = {
+    key: character,
+    code: usKey?.code ?? "Unidentified",
+    ...(usKey ? { windowsVirtualKeyCode: usKey.keyCode, modifiers: usKey.shift ? SHIFT_MODIFIER : 0 } : {}),
+  };
   let released = false;
   yield* Effect.gen(function* () {
     yield* send(
       "Input.dispatchKeyEvent",
-      { type: "rawKeyDown", key: character, code, text: character, unmodifiedText: character },
+      { type: "rawKeyDown", ...key, text: character, unmodifiedText: character },
       sessionId,
     );
     yield* send(
       "Input.dispatchKeyEvent",
-      { type: "char", key: character, code, text: character, unmodifiedText: character },
+      { type: "char", ...key, text: character, unmodifiedText: character },
       sessionId,
     );
-    yield* send("Input.dispatchKeyEvent", { type: "keyUp", key: character, code }, sessionId);
+    yield* send("Input.dispatchKeyEvent", { type: "keyUp", ...key }, sessionId);
     released = true;
   }).pipe(
     Effect.ensuring(
       Effect.suspend(() =>
         released
           ? Effect.void
-          : send("Input.dispatchKeyEvent", { type: "keyUp", key: character, code }, sessionId).pipe(Effect.ignore),
+          : send("Input.dispatchKeyEvent", { type: "keyUp", ...key }, sessionId).pipe(Effect.ignore),
       ),
     ),
   );

@@ -13,7 +13,7 @@ import type {
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
 import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
-import { type Logger, toLogValue } from "@openbot/logging";
+import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
@@ -21,7 +21,7 @@ import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
-import { inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
+import { hasCredentialHeader, inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
   type McpEndpoint,
   type McpEndpointRefusal,
@@ -511,6 +511,16 @@ export class McpGateway {
   }
 
   /**
+   * Whether an http row that answered without a sign-in offers one. A key the user pasted into a
+   * header is theirs to manage: a sign-in would not replace it.
+   */
+  offersSignIn(config: McpServerConfig): Effect.Effect<boolean> {
+    const oauth = this.#oauth;
+    if (!oauth || config.transport !== "http" || hasCredentialHeader(config)) return Effect.succeed(false);
+    return oauth.offersSignIn(config.url);
+  }
+
+  /**
    * What the providers are given at spawn. They connect for themselves; a test is not used.
    *
    * The Computer Use entry is appended here rather than stored, because it exists only while the
@@ -569,7 +579,16 @@ export class McpGateway {
    * `redactText`, which covers the patterns shared across the app.
    */
   redact(text: string): string {
-    return redactMcpValues(text, [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()]);
+    return redactMcpValues(text, this.#secretValues());
+  }
+
+  /** `redact` for text that the agent reads back, such as its memories and history: emails stay. */
+  redactForAgent(text: string): string {
+    return redactMcpValues(text, this.#secretValues(), redactSecrets);
+  }
+
+  #secretValues(): string[] {
+    return [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()];
   }
 }
 

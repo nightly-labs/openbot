@@ -19,6 +19,7 @@ import {
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
+  LEGACY_RESPONSE_STYLE,
   type ServerConnectionState,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
@@ -35,21 +36,31 @@ import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
-import { AGENT_HIDDEN_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -68,8 +79,10 @@ import {
   getHostAuditLog,
   getHostMemoryReview,
   getHostModelVisibility,
+  getHostPersonality,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
+  getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
   getStorageUsage,
@@ -78,7 +91,9 @@ import {
   setHostAgentMemoryLimit,
   setHostMemoryReview,
   setHostModelVisibility,
+  setHostPersonality,
   setHostPromptCacheTtl,
+  setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
   startHostUpdate,
@@ -198,6 +213,7 @@ import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
+import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import {
@@ -207,6 +223,7 @@ import {
   serverRoleCanAdminister,
 } from "../servers/server-capabilities";
 import { createServerConnectionToast } from "../servers/server-connection-toast";
+import { type HostPersonalityCalls, loadServerPersonality, serverResponseStyle } from "../servers/server-personality";
 import {
   offerServerUpdate,
   ServerUpdateDialogHost,
@@ -221,7 +238,14 @@ import { isReaderAuthor } from "../team/reader-identity";
 import type { ServerVaultOptions } from "../vault/ServerVaultPanel";
 import { createVaultStore } from "../vault/stores/vault-store";
 import { RailHelpMenu } from "../window/RailHelpMenu";
-import { ServerSettingsPageTitle, SettingsPageFrame } from "../window/SettingsPageFrame";
+import {
+  openFirstSettingsSection,
+  PersonalSettingsLink,
+  ServerSettingsLink,
+  ServerSettingsPageTitle,
+  SettingsPageFrame,
+  SettingsSearchField,
+} from "../window/SettingsPageFrame";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -249,6 +273,7 @@ import { createWebNotificationRouting } from "./web-notification-routing";
 import { createWebNotificationSettings } from "./web-notification-settings";
 import { requestWebNotificationPermission } from "./web-notifications";
 import { webOnePasswordConnectorPort } from "./web-onepassword-connector";
+import { webPasswordManagersPort } from "./web-password-managers";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { webRoutineFlowsHost } from "./web-routine-flows";
 import { webScheduleSource } from "./web-schedule";
@@ -549,6 +574,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         remoteDesktopAvailable: false,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+        ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
         compatibility: {
           localAppVersion: "web",
           hostAppVersion: incompatibility?.hostAppVersion ?? null,
@@ -842,6 +868,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookTestsEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROFILES_CAPABILITY),
     webhookSenderSecretEnabled,
+    () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
+    () => workspace.state.capabilities.includes(ROUTINE_RUN_PLACE_CAPABILITY),
+    () => workspace.state.capabilities.includes(SKILL_LEARNING_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1000,6 +1029,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   /** The elements of the settings page that the settings panel shows in. The page sets them. */
   const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
+  /** The search of the server settings page, which filters its section list. It clears when the page closes. */
+  const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
+  /** Each Enter in that search adds one. The server settings then open the first match. */
+  const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
   /** Where the panel of a settings page shows, or nothing while that page is not on screen. */
   function settingsPlacement(kind: SettingsKind): SettingsPagePlacement | undefined {
     const mounts = settingsMounts();
@@ -1022,6 +1055,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const githubPort = webGitHubConnectorPort(() => hostRequest());
   const onePasswordPort = webOnePasswordConnectorPort(() => hostRequest());
   const bitwardenPort = webBitwardenConnectorPort(() => hostRequest());
+  const passwordManagersPort = webPasswordManagersPort(() => hostRequest());
   const webMessaging = webHostMessaging(hostRequest, () =>
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
@@ -1038,6 +1072,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         github: () => githubPort,
         onePassword: () => onePasswordPort,
         bitwarden: () => bitwardenPort,
+        passwordManagers: () => passwordManagersPort,
         messaging: hostMessagingApi(
           () => connectorTarget()?.id,
           () => webMessaging.api,
@@ -1220,6 +1255,29 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setTimezone: async (timezone, serverId) =>
       runTeamEffect(setHostTimezone(hostRequest(serverId), timezone).pipe(Effect.mapError((error) => error.cause))),
   };
+  const hostPersonalityCalls: HostPersonalityCalls = {
+    // A host before host-personality-v1 uses the classic prompt.
+    getPersonality: async (serverId) =>
+      workspace.state.capabilities.includes(HOST_PERSONALITY_CAPABILITY)
+        ? runTeamEffect(getHostPersonality(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)))
+        : { responseStyle: LEGACY_RESPONSE_STYLE },
+    setPersonality: async (personality, serverId) =>
+      runTeamEffect(
+        setHostPersonality(hostRequest(serverId), personality).pipe(Effect.mapError((error) => error.cause)),
+      ),
+  };
+  // The server's response style decides whether progress updates show as messages. The host
+  // advertises its capabilities when it answers, so the read waits for that.
+  createEffect(
+    () => (workspace.state.status === "online" ? server()?.id : undefined),
+    (serverId) => {
+      if (serverId) loadServerPersonality(serverId, hostPersonalityCalls);
+    },
+  );
+  const responseStyle = () => {
+    const serverId = server()?.id;
+    return serverId ? serverResponseStyle(serverId) : undefined;
+  };
   const hostMemoryLimitCalls: HostMemoryLimitCalls = {
     getAgentMemoryLimit: async (serverId) =>
       runTeamEffect(getHostAgentMemoryLimit(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1233,6 +1291,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostMemoryReview(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setMemoryReview: async (interval, serverId) =>
       runTeamEffect(setHostMemoryReview(hostRequest(serverId), interval).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostSkillLearningCalls: HostSkillLearningCalls = {
+    getSkillLearning: async (serverId) =>
+      runTeamEffect(getHostSkillLearning(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setSkillLearning: async (mode, serverId) =>
+      runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
   };
   const hostPromptCacheTtlCalls: HostPromptCacheTtlCalls = {
     getPromptCacheTtl: async (serverId) =>
@@ -1407,9 +1471,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     supported: channelsSupported,
     deletionSupported: () => canAdministerServer(workspace.state.host?.role),
     taskCancelSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
+    isolationSupported: () => workspace.state.capabilities.includes(CHANNEL_ISOLATION_CAPABILITY),
     messageDeletionSupported: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => canAdministerServer(workspace.state.host?.role),
     pictureSupported: () => false,
+    contextActionsSupported: () => false,
     beforeOpen: () => {
       setCreating(false);
       // Not `showAgents`: the list restores the saved channel after a host connects, and that must
@@ -1430,7 +1496,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+      if (event.type === "channels-changed") void channels.changed(event.channelId);
+      else if (event.type === "runtime-snapshot") void channels.resync();
     }),
   );
   // The user changed their levels on another device: the matrix and the notifications follow at once.
@@ -1550,17 +1617,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return store ? { store, listAgents: async () => workspace.profiles() } : undefined;
   });
   // The Vault section, for an owner or admin of a host with `vault-v1`. The store follows the host id.
-  // With `vault-v2` it also keeps API keys.
+  // With `vault-v2` it also keeps API keys, and with `vault-v3` two-step keys.
   const vaultHostId = createMemo(() => {
     const current = server();
     return serverCanAdminister(current, VAULT_CAPABILITY) ? current?.id : undefined;
   });
   // A host that updates or rolls back keeps its id, so the store follows this capability too.
-  const vaultV2 = createMemo(() => serverCanAdminister(server(), VAULT_V2_CAPABILITY));
+  const vaultVersion = createMemo((): 1 | 2 | 3 => {
+    const current = server();
+    if (serverCanAdminister(current, VAULT_V3_CAPABILITY)) return 3;
+    return serverCanAdminister(current, VAULT_V2_CAPABILITY) ? 2 : 1;
+  });
   const vaultSettings = createMemo((): ServerVaultOptions | undefined => {
     if (vaultHostId() === undefined) return undefined;
-    const v2 = vaultV2();
-    return { store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, v2)), apiKeys: v2 };
+    const version = vaultVersion();
+    return {
+      store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, version)),
+      apiKeys: version > 1,
+      twoStep: version === 3,
+    };
   });
   const openBrowserProfileSettings = (trigger: HTMLElement) => {
     const current = server();
@@ -1576,7 +1651,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   async function createCanvasAgent(draft: NewAgentDraft): Promise<{ id: string }> {
     const created = await workspace.runtime.createAgent(
-      newAgentInput(draft, workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)),
+      newAgentInput(
+        draft,
+        workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+        workspace.state.capabilities.includes(AGENT_WELCOME_CAPABILITY),
+      ),
     );
     await workspace.refresh();
     return created;
@@ -2102,9 +2181,44 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               <Show when={server()}>{(target) => <ServerSettingsPageTitle server={target()} />}</Show>
                             )
                           }
-                          onMounts={setSettingsMounts}
-                          onEscape={showAgents}
-                        />
+                          footer={
+                            kind === "personal" ? (
+                              <Show when={server()}>
+                                {(target) => (
+                                  <ServerSettingsLink
+                                    server={target()}
+                                    onOpen={() => void openServerSettings(target().id, null)}
+                                  />
+                                )}
+                              </Show>
+                            ) : (
+                              <PersonalSettingsLink account={account()} onOpen={openAccountSettings} />
+                            )
+                          }
+                          onMounts={(mounts) => {
+                            setSettingsMounts(mounts);
+                            if (!mounts) setServerSettingsQuery("");
+                          }}
+                          // Escape clears the search, or else closes the page.
+                          onEscape={() => {
+                            if (kind === "server" && serverSettingsQuery()) setServerSettingsQuery("");
+                            else showAgents();
+                          }}
+                        >
+                          <Show when={kind === "server"}>
+                            <SettingsSearchField
+                              value={serverSettingsQuery()}
+                              onInput={setServerSettingsQuery}
+                              onEnter={() =>
+                                openFirstSettingsSection(
+                                  settingsMounts()?.nav,
+                                  () => setOpenFirstServerSectionRequest((request) => request + 1),
+                                  serverSettingsQuery,
+                                )
+                              }
+                            />
+                          </Show>
+                        </SettingsPageFrame>
                       )}
                     </Show>
                   }
@@ -2368,6 +2482,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       <ServerSettingsOverlay
                         open={serverSettings.state.open && settingsPlacement("server") !== undefined}
                         page={settingsPlacement("server")}
+                        sectionQuery={serverSettingsQuery()}
+                        openFirstSectionRequest={openFirstServerSectionRequest()}
+                        onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
                         platform="darwin"
@@ -2384,6 +2501,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onSetPublished={unavailable}
                         onCreateInvite={serverSettings.createInvite}
                         license={licenseCalls}
+                        // Company sign-in setup waits for a loopback listener, so only the desktop app has it.
+                        onDownloadDesktopApp={() => void window.open("/download", "_blank", "noopener")}
                         onContactUs={() => window.location.assign(HOSTED_SERVER_CONTACT_URL)}
                         onUpdateMember={serverSettings.updateMember}
                         onRemoveMember={serverSettings.removeMember}
@@ -2465,8 +2584,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         providers={providerSettings()}
                         hostUpdate={{ calls: hostUpdateCalls }}
                         hostTimezone={{ calls: hostTimezoneCalls }}
+                        hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
+                        skillLearning={{ calls: hostSkillLearningCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}
@@ -2850,6 +2971,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       ? workspace.state.progress[workspace.state.selectedId]?.detail
                       : undefined
                   }
+                  activityRunning={
+                    workspace.state.selectedId
+                      ? workspace.state.progress[workspace.state.selectedId]?.running
+                      : undefined
+                  }
+                  activityKind={
+                    workspace.state.selectedId
+                      ? workspace.state.progress[workspace.state.selectedId]?.activity
+                      : undefined
+                  }
                   turnStepLines={workspace.stepLines()}
                   skillsMarketplaceOpen={marketplaceOpen()}
                   mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
@@ -2866,6 +2997,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   workspaceCovered={pageCovered() || hostOffline()}
                   browserControlState={workspace.state.browserControlState}
                   server={server()}
+                  responseStyle={responseStyle()}
                   presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}
                   currentUserEmail={props.accountEmail ?? ""}
                   isOwnSender={isOwnAgentChatSender}

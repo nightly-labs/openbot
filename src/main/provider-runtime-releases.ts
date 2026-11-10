@@ -21,9 +21,9 @@ import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runti
  * users with the next OpenBot release. Providers ship faster than that, so the update offer now
  * follows upstream. The lock still names the version a first install uses when no source answers.
  *
- * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi, Kimi and Copilot, the
- * Meta and Cognition manifests for Muse and Devin, and npm's `dist.integrity` for Claude, OpenCode
- * and Cline. x.ai publishes no hash for Grok, so a Grok release is trusted on TLS alone, and so are
+ * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi, Kimi, Copilot
+ * and Mistral, the Meta and Cognition manifests for Muse and Devin, and npm's `dist.integrity` for
+ * Claude, OpenCode and Cline. x.ai publishes no hash for Grok, so a Grok release is trusted on TLS alone, and so are
  * Antigravity and Cursor from the ACP registry. Bun is a tool runtime rather than a provider, and
  * stays on the lock.
  */
@@ -70,23 +70,25 @@ const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
 
 /**
  * The spec of the asset `assetName` in the latest release of the GitHub repository `repo`, with the
- * asset's `digest` and size. The tag is `v` and the version.
+ * asset's `digest` and size. The tag is `v` and the version, and an asset name can contain the version.
  */
 const latestGitHubAsset = Effect.fn("ProviderRelease.github")(function* (
   fetch: Fetch,
   repo: string,
-  assetName: string,
+  assetNameOf: (version: string) => string,
   pinned: RuntimeSpec,
 ) {
   const release = yield* fetchJsonEffect(fetch, `https://api.github.com/repos/${repo}/releases/latest`, {
     Accept: "application/vnd.github+json",
   });
   const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
+  const assetName = version ? assetNameOf(version) : null;
   const asset = Array.isArray(release.assets)
     ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
     : null;
   if (
     !version ||
+    !assetName ||
     !isDynamicRecord(asset) ||
     !isString(asset.digest) ||
     !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
@@ -113,15 +115,23 @@ const LATEST_RELEASES: Record<
     latestGitHubAsset(
       fetch,
       "earendil-works/pi",
-      `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      () => `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
       providerRuntimeDescriptor("pi").spec(target, lock),
     ),
   copilot: ({ target, lock, fetch }) =>
     latestGitHubAsset(
       fetch,
       "github/copilot-cli",
-      `copilot-${target}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      () => `copilot-${target}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
       providerRuntimeDescriptor("copilot").spec(target, lock),
+    ),
+  // Mistral Vibe names each ACP server asset with its version, such as `vibe-acp-darwin-aarch64-3.1.0.tar.gz`.
+  mistral: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "mistralai/mistral-vibe",
+      (version) => `vibe-acp-${ACP_REGISTRY_TARGETS[target]}-${version}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("mistral").spec(target, lock),
     ),
   muse: Effect.fn("ProviderRelease.muse")(function* ({ target, lock, fetch }: LatestReleaseContext) {
     const pinned = providerRuntimeDescriptor("muse").spec(target, lock);

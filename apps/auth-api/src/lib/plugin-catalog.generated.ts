@@ -91,6 +91,18 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548",
     },
     {
+      slug: "higgsfield",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271",
+    },
+    {
+      slug: "elevenlabs",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "89647f4be8ae4d078a7c42cf3a2ccd1046c15454d2af9e60057b03208996fd77",
+    },
+    {
       slug: "apple-apps",
       version: "1.1.0",
       featured: false,
@@ -101,6 +113,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1",
+    },
+    {
+      slug: "gitlab",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "bc2e946ad9f54d21a16c8fe618ed2ad7734fe4a023dec71d341193f15ed8a23c",
     },
     {
       slug: "vercel",
@@ -205,10 +223,16 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24",
     },
     {
-      slug: "composio",
-      version: "1.1.0",
+      slug: "omnisend",
+      version: "1.0.0",
       featured: false,
-      detailSha256: "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f",
+      detailSha256: "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80",
+    },
+    {
+      slug: "composio",
+      version: "1.2.0",
+      featured: false,
+      detailSha256: "26cdd485b5cf08c7ccc54d1bb110e27990cbb02544209c1816151a89c8f4c7b3",
     },
     {
       slug: "clickup",
@@ -246,7 +270,7 @@ export interface PluginCatalogApp {
 }
 
 export type PluginCatalogServer =
-  | { name: string; transport: "http"; url: string; auth?: unknown }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
 
 export interface PluginCatalogDetail {
@@ -708,6 +732,76 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://paper.design/legal/tos",
     skills: [],
   },
+  higgsfield: {
+    slug: "higgsfield",
+    name: "Higgsfield",
+    tagline: "AI images, videos and audio",
+    description:
+      "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+    category: "design",
+    creatorName: "Higgsfield",
+    iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-credits", text: "How many Higgsfield credits do I have?" },
+      { id: "prompt-product-shot", text: "Make a Higgsfield product photo of a ceramic mug on a wooden table." },
+      { id: "prompt-clip", text: "Make a 5-second Higgsfield video of waves at sunset." },
+    ],
+    apps: [
+      {
+        id: "app-higgsfield-mcp",
+        name: "Higgsfield",
+        description:
+          "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+        iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+        server: {
+          name: "higgsfield",
+          transport: "http",
+          url: "https://mcp.higgsfield.ai/mcp",
+          auth: [{ id: "higgsfield-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://higgsfield.ai",
+    privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
+    termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
+    skills: [],
+  },
+  elevenlabs: {
+    slug: "elevenlabs",
+    name: "ElevenLabs",
+    tagline: "Speech, voices and voice agents",
+    description:
+      "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+    category: "design",
+    creatorName: "ElevenLabs",
+    iconUrl: "https://elevenlabs.io/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+      { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+      { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+    ],
+    apps: [
+      {
+        id: "app-elevenlabs-mcp",
+        name: "ElevenLabs",
+        description:
+          "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+        iconUrl: "https://elevenlabs.io/favicon.ico",
+        server: {
+          name: "elevenlabs",
+          transport: "http",
+          url: "https://api.elevenlabs.io/v1/mcp",
+          auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://elevenlabs.io",
+    privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+    termsUrl: "https://elevenlabs.io/terms-of-use",
+    skills: [],
+  },
   "apple-apps": {
     slug: "apple-apps",
     name: "Apple apps",
@@ -775,6 +869,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://sentry.io",
     privacyPolicyUrl: "https://sentry.io/privacy/",
     termsUrl: "https://sentry.io/terms/",
+    skills: [],
+  },
+  gitlab: {
+    slug: "gitlab",
+    name: "GitLab",
+    tagline: "Issues, merge requests and pipelines",
+    description:
+      "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+    category: "coding",
+    creatorName: "GitLab",
+    iconUrl: "https://gitlab.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-review-queue", text: "Which merge requests wait for my review?" },
+      { id: "prompt-failed-pipeline", text: "Why did the last pipeline on the default branch fail?" },
+      { id: "prompt-new-issue", text: "File an issue for the crash in the sync queue with reproduction steps." },
+    ],
+    apps: [
+      {
+        id: "app-gitlab-mcp",
+        name: "GitLab",
+        description:
+          "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+        iconUrl: "https://gitlab.com/favicon.ico",
+        server: {
+          name: "gitlab",
+          transport: "http",
+          url: "https://gitlab.com/api/v4/mcp",
+          auth: [{ id: "gitlab-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://about.gitlab.com",
+    privacyPolicyUrl: "https://about.gitlab.com/privacy/",
+    termsUrl: "https://about.gitlab.com/terms/",
     skills: [],
   },
   vercel: {
@@ -1466,16 +1595,51 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://resend.com/legal/terms",
     skills: [],
   },
+  omnisend: {
+    slug: "omnisend",
+    name: "Omnisend",
+    tagline: "Email and SMS marketing",
+    description:
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    category: "automation",
+    creatorName: "Omnisend",
+    iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+      { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+      { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+    ],
+    apps: [
+      {
+        id: "app-omnisend-mcp",
+        name: "Omnisend",
+        description:
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+        iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+        server: {
+          name: "omnisend",
+          transport: "http",
+          url: "https://mcp.omnisend.com/mcp",
+          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.omnisend.com",
+    privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+    termsUrl: "https://www.omnisend.com/terms/",
+    skills: [],
+  },
   composio: {
     slug: "composio",
     name: "Composio",
-    tagline: "Many apps through your own Composio link",
+    tagline: "Gmail, Slack, GitHub and 1,000+ more apps",
     description:
-      "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",
+      "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
     category: "automation",
     creatorName: "Composio",
     iconUrl: "https://composio.dev/favicon.ico",
-    version: "1.1.0",
+    version: "1.2.0",
     prompts: [
       { id: "prompt-inbox", text: "Summarize my unread email and draft replies to the urgent ones." },
       { id: "prompt-handoff", text: "Post a summary of this pull request to our team channel." },
@@ -1485,25 +1649,21 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       {
         id: "app-composio-mcp",
         name: "Composio",
-        description: "The apps you add to your Composio MCP server, over the link from your Composio account.",
+        description:
+          "The apps you connect in your Composio account. An agent asks you to connect an app when it needs it.",
         iconUrl: "https://composio.dev/favicon.ico",
         server: {
           name: "composio",
           transport: "http",
-          url: "https://composio.dev/",
+          url: "https://connect.composio.dev/mcp",
+          earlierUrls: ["https://composio.dev/"],
           auth: [
+            { id: "composio-oauth", kind: "link", label: "Sign in" },
             {
-              id: "composio-link",
+              id: "composio-key",
               kind: "key",
-              label: "MCP link",
+              label: "API key",
               fields: [
-                {
-                  id: "url",
-                  label: "MCP URL",
-                  url: true,
-                  placeholder: "https://connect.composio.dev/mcp",
-                  hint: "The URL of an MCP server in your Composio account",
-                },
                 {
                   id: "api-key",
                   label: "API key",
@@ -1512,8 +1672,6 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
                   hint: "Find it in your Composio account, in Settings > Sessions & API Key.",
                 },
               ],
-              docsUrl: "https://docs.composio.dev/kb/guide/consumer-project-boundaries-and-auth-selection",
-              docsLabel: "Get a key",
             },
           ],
         },

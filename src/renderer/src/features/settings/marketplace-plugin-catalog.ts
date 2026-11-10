@@ -547,6 +547,88 @@ const PAPER: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/paper",
 };
 
+const HIGGSFIELD: MarketplacePluginDetail = {
+  id: "plugin-higgsfield",
+  slug: "higgsfield",
+  name: "Higgsfield",
+  tagline: "AI images, videos and audio",
+  description:
+    "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+  category: "design",
+  creatorName: "Higgsfield",
+  iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-credits", text: "How many Higgsfield credits do I have?" },
+    { id: "prompt-product-shot", text: "Make a Higgsfield product photo of a ceramic mug on a wooden table." },
+    { id: "prompt-clip", text: "Make a 5-second Higgsfield video of waves at sunset." },
+  ],
+  apps: [
+    {
+      id: "app-higgsfield-mcp",
+      name: "Higgsfield",
+      description:
+        "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+      iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+      server: {
+        name: "higgsfield",
+        transport: "http",
+        url: "https://mcp.higgsfield.ai/mcp",
+        auth: [{ id: "higgsfield-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://higgsfield.ai",
+  privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
+  termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/higgsfield",
+};
+
+const ELEVENLABS: MarketplacePluginDetail = {
+  id: "plugin-elevenlabs",
+  slug: "elevenlabs",
+  name: "ElevenLabs",
+  tagline: "Speech, voices and voice agents",
+  description:
+    "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+  category: "design",
+  creatorName: "ElevenLabs",
+  iconUrl: "https://elevenlabs.io/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+    { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+    { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+  ],
+  apps: [
+    {
+      id: "app-elevenlabs-mcp",
+      name: "ElevenLabs",
+      description:
+        "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+      iconUrl: "https://elevenlabs.io/favicon.ico",
+      server: {
+        name: "elevenlabs",
+        transport: "http",
+        url: "https://api.elevenlabs.io/v1/mcp",
+        auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://elevenlabs.io",
+  privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+  termsUrl: "https://elevenlabs.io/terms-of-use",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/elevenlabs",
+};
+
 const APPLE_APPS: MarketplacePluginDetail = {
   id: "plugin-apple-apps",
   slug: "apple-apps",
@@ -625,6 +707,47 @@ const SENTRY: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/sentry",
+};
+
+const GITLAB: MarketplacePluginDetail = {
+  id: "plugin-gitlab",
+  slug: "gitlab",
+  name: "GitLab",
+  tagline: "Issues, merge requests and pipelines",
+  description:
+    "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+  category: "coding",
+  creatorName: "GitLab",
+  iconUrl: "https://gitlab.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-review-queue", text: "Which merge requests wait for my review?" },
+    { id: "prompt-failed-pipeline", text: "Why did the last pipeline on the default branch fail?" },
+    { id: "prompt-new-issue", text: "File an issue for the crash in the sync queue with reproduction steps." },
+  ],
+  apps: [
+    {
+      id: "app-gitlab-mcp",
+      name: "GitLab",
+      description:
+        "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+      iconUrl: "https://gitlab.com/favicon.ico",
+      server: {
+        name: "gitlab",
+        transport: "http",
+        url: "https://gitlab.com/api/v4/mcp",
+        auth: [{ id: "gitlab-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://about.gitlab.com",
+  privacyPolicyUrl: "https://about.gitlab.com/privacy/",
+  termsUrl: "https://about.gitlab.com/terms/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/gitlab",
 };
 
 const VERCEL: MarketplacePluginDetail = {
@@ -1409,17 +1532,58 @@ const RESEND: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/resend",
 };
 
+const OMNISEND: MarketplacePluginDetail = {
+  id: "plugin-omnisend",
+  slug: "omnisend",
+  name: "Omnisend",
+  tagline: "Email and SMS marketing",
+  description:
+    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+  category: "automation",
+  creatorName: "Omnisend",
+  iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+    { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+    { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+  ],
+  apps: [
+    {
+      id: "app-omnisend-mcp",
+      name: "Omnisend",
+      description:
+        "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+      iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+      server: {
+        name: "omnisend",
+        transport: "http",
+        url: "https://mcp.omnisend.com/mcp",
+        auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.omnisend.com",
+  privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+  termsUrl: "https://www.omnisend.com/terms/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/omnisend",
+};
+
 const COMPOSIO: MarketplacePluginDetail = {
   id: "plugin-composio",
   slug: "composio",
   name: "Composio",
-  tagline: "Many apps through your own Composio link",
+  tagline: "Gmail, Slack, GitHub and 1,000+ more apps",
   description:
-    "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",
+    "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
   category: "automation",
   creatorName: "Composio",
   iconUrl: "https://composio.dev/favicon.ico",
-  version: "1.1.0",
+  version: "1.2.0",
   prompts: [
     { id: "prompt-inbox", text: "Summarize my unread email and draft replies to the urgent ones." },
     { id: "prompt-handoff", text: "Post a summary of this pull request to our team channel." },
@@ -1429,25 +1593,21 @@ const COMPOSIO: MarketplacePluginDetail = {
     {
       id: "app-composio-mcp",
       name: "Composio",
-      description: "The apps you add to your Composio MCP server, over the link from your Composio account.",
+      description:
+        "The apps you connect in your Composio account. An agent asks you to connect an app when it needs it.",
       iconUrl: "https://composio.dev/favicon.ico",
       server: {
         name: "composio",
         transport: "http",
-        url: "https://composio.dev/",
+        url: "https://connect.composio.dev/mcp",
+        earlierUrls: ["https://composio.dev/"],
         auth: [
+          { id: "composio-oauth", kind: "link", label: "Sign in" },
           {
-            id: "composio-link",
+            id: "composio-key",
             kind: "key",
-            label: "MCP link",
+            label: "API key",
             fields: [
-              {
-                id: "url",
-                label: "MCP URL",
-                url: true,
-                placeholder: "https://connect.composio.dev/mcp",
-                hint: "The URL of an MCP server in your Composio account",
-              },
               {
                 id: "api-key",
                 label: "API key",
@@ -1456,8 +1616,6 @@ const COMPOSIO: MarketplacePluginDetail = {
                 hint: "Find it in your Composio account, in Settings > Sessions & API Key.",
               },
             ],
-            docsUrl: "https://docs.composio.dev/kb/guide/consumer-project-boundaries-and-auth-selection",
-            docsLabel: "Get a key",
           },
         ],
       },
@@ -1607,8 +1765,11 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   COBRAIN,
   FIGMA,
   PAPER,
+  HIGGSFIELD,
+  ELEVENLABS,
   APPLE_APPS,
   SENTRY,
+  GITLAB,
   VERCEL,
   CLOUDFLARE,
   SUPABASE,
@@ -1626,6 +1787,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIRECRAWL,
   BRAVE_SEARCH,
   RESEND,
+  OMNISEND,
   COMPOSIO,
   CLICKUP,
   COINBASE,

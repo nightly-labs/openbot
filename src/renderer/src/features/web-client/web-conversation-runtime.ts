@@ -1,12 +1,15 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentEvent,
-  AskSideQuestionInput,
-  AttachmentImportEvent,
-  AttachmentSummary,
-  TeamRealtimeEvent,
+import {
+  type AgentEvent,
+  type AskSideQuestionInput,
+  type AttachmentImportEvent,
+  type AttachmentSummary,
+  decodeSaveSkillSuggestionResult,
+  type SaveSkillSuggestionInput,
+  type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -47,6 +50,7 @@ function webHostAdmin(
   routineRecoveryEnabled?: () => boolean,
   webhookTestsEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -54,6 +58,7 @@ function webHostAdmin(
     () => routineRecoveryEnabled?.() === true,
     () => webhookTestsEnabled?.() === true,
     () => webhookSenderSecretEnabled?.() === true,
+    () => routineRunPlaceEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -125,6 +130,9 @@ export function createWebConversationRuntime(
   webhookTestsEnabled?: () => boolean,
   browserProfilesEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  browserProxiesEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
+  skillLearningEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
@@ -259,7 +267,9 @@ export function createWebConversationRuntime(
   });
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
-  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
+  const browserProfiles = adminRequest
+    ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
+    : undefined;
   const listLevels = remote.listAgentNotificationLevels;
   return {
     agent: {
@@ -370,6 +380,15 @@ export function createWebConversationRuntime(
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
         });
     },
+    // A member who can chat with the agent can press Save; the host checks the level.
+    get saveSkillSuggestion() {
+      if (!adminRequest || skillLearningEnabled?.() !== true) return undefined;
+      return async (input: SaveSkillSuggestionInput) =>
+        adminRequest()("POST", SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
+        });
+    },
     // Any member keeps an own level for each agent. The panel asks only a host with the capability.
     agentNotificationLevels: listLevels ? { list: () => listLevels(hostId()) } : undefined,
     // Any member reads the tab labels; the panels offer the other calls to an owner or admin only.
@@ -386,7 +405,10 @@ export function createWebConversationRuntime(
     // `request()` names the connected host at call time, so a host switch reaches the new host.
     routines: adminRequest
       ? {
-          ...teamAgentRoutinesApi((...args) => adminRequest()(...args)),
+          ...teamAgentRoutinesApi(
+            (...args) => adminRequest()(...args),
+            () => routineRunPlaceEnabled?.() === true,
+          ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
               if (event.type === "routines-changed") listener(event);
@@ -402,6 +424,7 @@ export function createWebConversationRuntime(
           routineRecoveryEnabled,
           webhookTestsEnabled,
           webhookSenderSecretEnabled,
+          routineRunPlaceEnabled,
         )
       : undefined,
   };

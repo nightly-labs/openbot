@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "غير متصل",
   "mcp.connect.close": "إغلاق ربط {name}",
   "mcp.connect.getKey": "الحصول على مفتاح",
+  "mcp.connect.useKey": "استخدام مفتاح API بدلًا من ذلك",
+  "mcp.connect.useSignIn": "تسجيل الدخول بدلًا من ذلك",
   "mcp.connect.keyDescription": "الصق بيانات اعتماد من حسابك في {name}. يتصل OpenBot بها ويحتفظ بها على {host}.",
   "mcp.connect.thisComputer": "هذا الحاسوب",
   "mcp.connect.noCredentialDescription":
@@ -153,12 +155,10 @@ export const messages = {
   "mcp.panel.removeApp": "إزالة التطبيق",
   "mcp.panel.appSaved": "تم حفظ التطبيق. سجّل الدخول لاستخدامه.",
   "mcp.panel.appRemoved": "تمت إزالة التطبيق.",
-  "mcp.signIn.relayDescription":
-    "تحقق من أن صفحة تسجيل الدخول على {page}، ثم افتحها في متصفحك. عند الانتهاء، يرسل OpenBot تسجيل الدخول إلى {host}.",
+  "mcp.signIn.relayDescription": "سجّل الدخول على {page} في متصفحك. عند الانتهاء، يرسل OpenBot تسجيل الدخول إلى {host}.",
   "mcp.signIn.relayOpenDescription":
-    "افتح صفحة تسجيل الدخول الخاصة بـ {page} في متصفحك. عند الانتهاء، الصق هنا العنوان الذي يعرضه المتصفح. ثم يرسل OpenBot تسجيل الدخول إلى {host}.",
-  "mcp.signIn.relayDeviceDescription":
-    "تحقق من أن صفحة تسجيل الدخول على {page}، ثم افتحها في متصفحك وأكمل هناك. يرى {host} تسجيل الدخول بنفسه.",
+    "سجّل الدخول على {page} في متصفحك. عند الانتهاء، الصق هنا العنوان الذي يعرضه المتصفح. ثم يرسل OpenBot تسجيل الدخول إلى {host}.",
+  "mcp.signIn.relayDeviceDescription": "سجّل الدخول على {page} في متصفحك وأكمل هناك. يرى {host} تسجيل الدخول بنفسه.",
   "mcp.signIn.relayOpen": "فتح صفحة تسجيل الدخول",
   "mcp.signIn.relayPasteHint": "إذا لم يعد المتصفح إلى OpenBot، فانسخ العنوان الذي يعرضه والصقه هنا.",
   "mcp.signIn.relayPasteRequired":

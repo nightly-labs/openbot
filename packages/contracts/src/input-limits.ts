@@ -1,5 +1,8 @@
 export const INPUT_LIMITS = {
   identifier: 128,
+  // A saved login id from `list_logins`. The longest is a Proton Pass id:
+  // `proton:` + share id (256) + `:` + item id (256).
+  vaultLoginId: 520,
   email: 254,
   accountName: 120,
   profileNameMin: 3,
@@ -110,7 +113,7 @@ export const INPUT_LIMITS = {
   // MCP server configuration. `identifier` covers the id and `path` covers the working directory.
   // The two value bounds are equal today and kept apart on purpose: an environment value and an
   // HTTP header are different things, and only one of them has a protocol that bounds it.
-  mcpServers: 32,
+  mcpServers: 100,
   mcpServerName: 80,
   mcpCommand: 4_096,
   mcpArgs: 64,

@@ -131,6 +131,33 @@ export const messages = defineMessages("server", {
     "OpenBot stops the server and moves its agents, chats and files to the trash.",
   "server.local.deleting": "Deleting server…",
   "server.local.deletedTitle": "Deleted {name}",
+  // A server that the user installs on a Linux computer or VPS of their own with one command.
+  "server.install.title": "New server on another computer",
+  "server.install.description":
+    "Run this command on a Linux computer or VPS that you own. It installs OpenBot and adds the server to this account.",
+  "server.install.making": "Making a command for this account…",
+  "server.install.failed": "OpenBot could not make a command. Check the internet connection.",
+  // Copies the command with the instructions that an AI agent needs.
+  "server.install.copyForAgent": "Copy for an AI agent",
+  // {time} is minutes and seconds, such as 14:52.
+  "server.install.expiresIn": "Works once. Expires in {time}.",
+  "server.install.newCommand": "New command",
+  "server.install.waiting": "Waiting for the command to run on your server…",
+  // {name} is the new server.
+  "server.install.starting": "{name} signed in. Starting the server…",
+  "server.install.connected": "{name} is connected.",
+  // {name} is a server that signed in earlier with the command. The app is not connected to it now.
+  "server.install.offline": "{name} is offline.",
+  "server.install.expired": "This command expired. Make a new one.",
+  // The text that "Copy for an AI agent" copies. The last line of the command output stays in English.
+  "server.install.agentPrompt":
+    'Install OpenBot on this Linux server and sign it in to my OpenBot account.\nRun this command as root. It asks no questions and takes a few minutes:\n\n{command}\n\nIt ends with the line "OpenBot is connected to your account." and exit code 0.\nThe command works once, for 15 minutes. Do not save it anywhere.',
+  // Puts an SSH task into the composer of the open chat.
+  "server.install.setUpWithAgent": "Set up with an agent",
+  // The task that "Set up with an agent" puts into the composer. The user adds the SSH address at the end.
+  // The agent gets the command from OpenBot, after the user approves it.
+  "server.install.sshAgentPrompt":
+    "Connect over SSH to my Linux server and install OpenBot on it as a server.\n\nSSH address (user@host):",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -352,6 +379,7 @@ export const messages = defineMessages("server", {
   "server.companySignIn.testedStatus": "Tested for {domains}. Turn it on to use it.",
   "server.companySignIn.setUp": "Set up",
   "server.companySignIn.edit": "Edit",
+  "server.companySignIn.desktopOnly": "Set up single sign-on in the OpenBot desktop app.",
   "server.companySignIn.loadFailed": "OpenBot couldn’t load company sign-in.",
   "server.companySignIn.scim": "User sync (SCIM)",
   "server.companySignIn.scimOff": "Off",
@@ -404,7 +432,13 @@ export const messages = defineMessages("server", {
   "server.settings.memoryReviewOff": "Off",
   "server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
   "server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
-  "server.settings.rolesTitle": "Roles",
+  "server.settings.skillLearning": "Skill learning",
+  "server.settings.skillLearningDescription": "Whether agents on this server save what they learn as skills.",
+  "server.settings.skillLearningAutomatic": "Automatic",
+  "server.settings.skillLearningAsk": "Ask first",
+  "server.settings.skillLearningOff": "Off",
+  "server.settings.skillLearningLoadFailed": "Could not load the skill learning setting.",
+  "server.settings.rolesTitle": "Permissions",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
   "server.settings.auditTitle": "Audit log",
@@ -499,6 +533,7 @@ export const messages = defineMessages("server", {
   "server.roles.memberCount": { one: "{count} member", other: "{count} members" },
   "server.roles.agentList": "Agents: {names}",
   "server.roles.agentLevel": "Access of {role} to {agent}",
+  "server.roles.changeInEveryone": "Change in Everyone",
   "server.roles.setAll": "Set all",
   "server.roles.setAllLabel": "Set all: access of {role} to all agents",
   "server.roles.loadFailed": "Could not load the roles of this server.",
@@ -576,8 +611,8 @@ export const messages = defineMessages("server", {
   "server.invite.revokeTitle": "Revoke this invitation?",
   "server.invite.revokeDescription": "The invitation stops working. People who joined with it stay members.",
   "server.desktop.accessTitle": "Remote desktop access",
-  "server.desktop.gatewayDescription":
-    "Every active server member can control this host. There is no separate remote desktop password.",
+  "server.desktop.gatewayPolicyDescription":
+    "There is no separate remote desktop password. The settings below choose who can control this computer.",
   "server.desktop.componentInstalled": "Host component installed",
   "server.desktop.componentNotInstalled": "Host component not installed",
   "server.desktop.sessions": "Unattended: {unattended} · Active sessions: {active}/{max}",
@@ -590,12 +625,27 @@ export const messages = defineMessages("server", {
   "server.desktop.hostOfflineDescription": "Reconnect to the host before you open its desktop.",
   "server.desktop.hostUpdateDescription": "Update OpenBot on the host to use remote control.",
   "server.desktop.serviceAvailable": "Service available",
-  "server.desktop.serviceAvailableDescription": "WebRTC control is available for all active members.",
+  "server.desktop.serviceAvailablePolicyDescription":
+    "This computer can share its screen. Its owner chooses which roles can control it.",
   "server.desktop.serviceNotReady": "Service not ready",
   "server.desktop.serviceNotReadyDescription":
     "Start Remote Control to check the host components and permissions. The host will report any setup error.",
   "server.desktop.remoteControl": "Remote control",
   "server.desktop.startHint": "Start Remote Control from the monitor button in the server header.",
+  "server.desktop.accessLabel": "Who can control this computer",
+  "server.desktop.accessDescription": "The members who can open the desktop of this computer from another device.",
+  "server.desktop.accessOwner": "Only the owner",
+  "server.desktop.accessAdmins": "Owner and admins",
+  "server.desktop.accessMembers": "All members",
+  "server.desktop.askLabel": "Ask on this computer",
+  "server.desktop.askDescription":
+    "Each session waits until a person at this computer allows it. With no answer in 30 seconds, OpenBot refuses it.",
+  "server.desktop.activeTitle": "Active remote desktop sessions: {active}",
+  "server.desktop.activeDescription": "Ends each session now. Members can ask again.",
+  "server.desktop.stopAll": "Stop all remote control",
+  "server.desktop.policyLoadFailed": "Could not load the remote control settings.",
+  "server.desktop.policySaveFailed": "Could not save the remote control settings.",
+  "server.desktop.stopFailed": "Could not stop remote control.",
   "server.settings.providersTitle": "Providers",
   "server.settings.providersDescription": "Manage the AI providers of the computer that runs this server.",
   "server.settings.providersSwitchNote": "Switch to {name} to manage its AI providers.",
@@ -723,4 +773,12 @@ export const messages = defineMessages("server", {
   "server.restartNotice.restartingTitle": "{name} is restarting to install an update",
   "server.restartNotice.restartingDescription": "OpenBot connects again automatically when {name} is back.",
   "server.restartNotice.backTitle": "{name} is back online",
+  "server.settings.personalityTitle": "Personality",
+  "server.settings.personalityDescription": "Choose how the agents on this server talk to you.",
+  "server.settings.responseStyle": "Response style",
+  "server.settings.responseStyleDescription":
+    "Natural: agents send short updates while they work, and the chat shows them. Classic: agents answer once, when they are done.",
+  "server.settings.responseStyleNatural": "Natural",
+  "server.settings.responseStyleClassic": "Classic",
+  "server.settings.personalityLoadFailed": "Could not load the server personality.",
 });

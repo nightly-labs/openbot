@@ -29,6 +29,14 @@ export const messages = {
     "Acquisizione della finestra {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureRegion":
     "Acquisizione dell'area dello schermo a {x}, {y}, {width} × {height} punti e invio dell'immagine al modello dell'agente.",
+  "status.agent.reportProblem":
+    "Diventerà una issue pubblica su GitHub, con la versione dell'app e il tuo sistema. Il tuo nome non viene mostrato.",
+  "status.agent.sendIdea": "Diventa una issue pubblica su GitHub. Il tuo nome non viene mostrato.",
+  "status.agent.feedbackSent": "Inviato al team di OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Crea un comando monouso che installa OpenBot su un altro computer come server {name} e lo collega al tuo account. L'agente lo esegue lì.",
+  "status.agent.serverInstallCard": "Comando di installazione per il server {name}",
+  "status.agent.feedbackSending": "Invio del tuo feedback al team di OpenBot…",
   "status.agent.workflowDelete":
     "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",
@@ -60,12 +68,28 @@ export const messages = {
   "status.agent.changesReviewing": "Analisi delle modifiche effettuate…",
   "status.agent.agentCoordinating": "Coordinamento con un altro agente…",
   "status.agent.agentResponseReviewing": "Analisi della risposta dell’altro agente…",
+  "status.agent.commandRunningUnnamed": "Esecuzione di un comando…",
   "status.agent.toolStepWorking": "Elaborazione del prossimo passaggio assistito dallo strumento…",
+  "status.agent.webSearching": "Ricerca sul web di «{query}»…",
+  "status.agent.urlFetching": "Apertura di {host}…",
+  "status.agent.fileReading": "Lettura di {name}…",
+  "status.agent.filesReading": "Lettura dei file…",
+  "status.agent.filesListing": "Esame di {path}…",
+  "status.agent.filesLooking": "Esame dei file…",
+  "status.agent.textSearching": "Ricerca di «{query}»…",
+  "status.agent.filesSearchingText": "Ricerca nei file…",
+  "status.agent.folderSizesMeasuring": "Misurazione delle dimensioni delle cartelle…",
+  "status.agent.diskSpaceChecking": "Controllo dello spazio libero su disco…",
+  "status.agent.processesChecking": "Controllo dei processi in esecuzione…",
+  "status.agent.gitChecking": "Controllo del repository Git…",
+  "status.agent.commandRunning": "Esecuzione di {program}…",
   "status.agent.memoryChanges": "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate.",
   "status.agent.memoryChangesWithConflicts":
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
+  "status.agent.compactionContinues":
+    "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
   "status.agent.branchTitle": "Chat ramificata",
 } as const satisfies PartialTranslation<typeof source>;

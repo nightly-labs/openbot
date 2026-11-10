@@ -45,7 +45,7 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 - Do not replace native headers, tab bars, toolbars, or search bars with `GlassView`. `expo-glass-effect` is for deliberate custom content surfaces, not for rebuilding system chrome.
 - Preserve platform safe-area and scroll-edge behavior. Ordinary screens normally use automatic content inset adjustment. Native sheets use the shared `SheetScrollView` header handling described below; do not add a second automatic inset or screen-local spacer.
 - The home list is the fallback exception for a full screen: iOS 27 shows no native scroll edge effect under its header. Its native header is transparent on iOS and Android, the native top edge is hidden, and the screen draws the canvas `SheetScrollEdgeEffect` of the chat header under the native buttons
-(on iOS; Android draws the solid Material bar of the big header). Android pads the list by the header height, because it has no content inset.
+(on iOS; Android draws the bar header blur of the big header, and the solid Material bar before Android 12). Android pads the list by the header height, because it has no content inset.
 - Avoid forcing opaque colors or bespoke backgrounds onto native chrome unless the product requirement explicitly calls for it. Let the operating system adapt materials to the platform version, appearance, accessibility settings, and scroll state.
 - Treat older iOS versions and Android as first-class fallbacks. The interface must remain complete and readable when Liquid Glass is unavailable or reduced transparency is enabled.
 - Use platform-native icons in native navigation (`sf` on iOS and the corresponding Material icon on Android). Use the existing application icon convention for HeroUI content.
@@ -61,18 +61,21 @@ large title does not work under the custom scroll edge effect on iOS 27, and And
   34 pt bold title. On iOS a pull past the top grows it a little, as the native title does.
 - `LargeTitleBar` draws the scroll edge effect and the 17 pt small title. The small title fades in,
   4 pt up, in 200 ms when the text of the big title reaches the bottom of the bar.
-- Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the surface
-  solid under the bar and a 32 dp fade below it, as the top fade of the design,
+- Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the bar header
+  blur described below (the surface solid under the bar and a 32 dp fade below it before Android 12),
   a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp glass circle on full screens, the plain icon in sheets.
-- Android has no Liquid Glass, and its blur does not work over a scroll view. The search field and the
-  bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
+- Android has no Liquid Glass. The search field and the bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
   opaque), a hairline edge, a soft shadow and the top light of `ChromeGlassSheen`. The home search
   field has a real blur on Android 12 and later: the home content is in a `BlurTargetView`, and the
   field draws a `BlurView` of it (radius 24) under the lighter `--openbot-bg-chrome-blur` fill. While
   the results are open, the field shows the solid glass over the blur, because the results are not in
   the target. iOS without Liquid Glass keeps the solid capsule.
-  Stacks set `androidBackOptions` in `screenOptions`, so the back button of every inner page, in
-  sheets too, is the same round button and not the native arrow.
+- Android 12 and later blur the content under the bar with `AndroidHeaderBlur`
+  (`src/shared/components/android-header-blur.tsx`): the scroll content is in an `AndroidBlurTarget`
+  on the surface color. The bar draws the usual Expo progressive blur: a `BlurView` of the target
+  (intensity 40) with the surface color at 80% over it, in a `MaskedView` whose eased gradient fades it out below the bar. A sheet bar reaches 28 dp
+  below the bar and is full over its top 45%; a full screen bar reaches 32 dp below and is full over
+  its top 68%, because its title sits lower. It needs no native change. `LargeTitleBar` takes the target as `blurTarget`.
 - `LargeTitleScrollView` puts grouped content under a big header on the sheet surface.
 
 The native header stays, transparent, with an empty title. It keeps the native Liquid Glass buttons on
@@ -295,10 +298,18 @@ covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
-Android sheets draw no edge blur. Below the opaque native header, or at the top of a sheet with no
-header, the content fades into a 32 dp masked `bg-sheet` layer. The fade follows the same rule as the
-iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat, home list
-and drawer edges keep their canvas effect.
+On Android 12 and later, a `SheetScrollView` under a native header replaces that header with
+`AndroidBlurHeader`, a custom Material 3 small top app bar (64 dp) over `AndroidHeaderBlur`. It sets
+the `header` option in a layout effect, and puts the native header back when it unmounts. The custom
+header draws the page's `headerLeft`, title and `headerRight`, so `androidBackOptions`,
+`AndroidHeaderButton` and `SheetSaveAction` keep working. The stack measures it, and the content
+clears exactly that height. A sheet header (`sheetHeaderInsetOptions`, see `isSheetHeader`) does not
+reach the status bar; a full screen adds it. A page without `SheetScrollView`, such as a scanner or a
+PIN page, keeps the opaque native header. A page that puts a `Stack.SearchBar` in the header (the
+audit log) sets `androidNativeHeader`, because the custom header cannot draw it. Before Android 12, and at the top of a sheet with no header, the
+content fades into a 32 dp masked `bg-sheet` layer below the opaque header.
+The fade follows the same rule as the iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat and drawer
+edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.

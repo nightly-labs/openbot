@@ -1,8 +1,9 @@
 // The cards, contact info and API keys of the Vault, as agents use them. The main process implements
 // this port with the encrypted Vault file. Agents read logins through the `PasswordVault` port instead
 // (`list_logins` / `submit_secret`). Agents can add and change contacts, change the fields of a card
-// that are not secret, and delete items. An agent can save a password or an API key that it has, such
-// as one the user pasted in the chat; it never reads one back. A card number gets in only from the
+// that are not secret, and delete items. An agent can save a password, a two-step key or an API key that
+// it has, such as one the user pasted in the chat or one a site showed in its two-step setup; it never
+// reads one back. A card number gets in only from the
 // form of `request_vault_item`, which the user fills in.
 
 import type {
@@ -15,11 +16,13 @@ import type {
 import type { Effect } from "effect";
 import type { PasswordVaultError } from "./password-vault";
 
-/** What an agent may see of a login: never the password or the notes. */
+/** What an agent may see of a login: never the password, the two-step key or the notes. */
 interface VaultLoginForAgent extends VaultItemOrigin {
   id: string;
   website: string;
   username: string;
+  /** Whether `submit_secret` with `method=authenticator` can enter a code for this login. */
+  hasTwoStepKey: boolean;
 }
 
 /** What an agent may see of a card. The number and the security code are never in it. */
@@ -57,7 +60,14 @@ export interface VaultCardSecret {
  */
 export type VaultAgentChange =
   | { kind: "contact"; id?: string | undefined; fields: { [Key in keyof VaultContactFields]?: string | undefined } }
-  | { kind: "login"; id: string; username?: string | undefined; password?: string | undefined }
+  | {
+      kind: "login";
+      id: string;
+      username?: string | undefined;
+      password?: string | undefined;
+      /** A TOTP setup key or `otpauth://totp/` link. "" removes the saved key. */
+      twoStepKey?: string | undefined;
+    }
   | {
       kind: "card";
       id: string;

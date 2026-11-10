@@ -14,6 +14,7 @@ import { Toaster, toast } from "@openbot/ui";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -27,6 +28,7 @@ import { createFakeConnection } from "./provider-connection-fixture";
 import { SettingsPageStory } from "./settings-page-story";
 
 const localServer = localStoryServer();
+const teamServer = STORY_SERVERS.find((candidate) => candidate.kind === "remote") ?? localServer;
 
 const providerAgentStatus: AgentStatus = {
   phase: "blocked",
@@ -55,6 +57,7 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
   devin: { phase: "not-downloaded", progress: null, message: null, version: null },
   copilot: { phase: "not-downloaded", progress: null, message: null, version: null },
+  mistral: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -123,6 +126,27 @@ const codeSignInAgentStatus: AgentStatus = {
       : provider,
   ),
 };
+/**
+ * Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. The host status
+ * does not carry the key, so only the key route says it is saved.
+ */
+const hostCodexKeyAgentStatus: AgentStatus = {
+  ...codeSignInAgentStatus,
+  providers: (codeSignInAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex" ? { ...provider, state: "available", message: null } : provider,
+  ),
+};
+/** The key routes of a joined server's host that logs Codex in with a pasted OpenAI key. */
+function hostCodexKeys(codex: "missing" | "saved"): ProviderKeyApi {
+  return {
+    readsCodexKey: true,
+    onHost: true,
+    getProviderApiKeyState: async (provider) => ({ provider, status: provider === "codex" ? codex : "missing" }),
+    setProviderApiKey: fn(async () => undefined),
+    clearProviderApiKey: fn(async () => undefined),
+    openExternal: fn(async () => undefined),
+  };
+}
 /** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
@@ -140,6 +164,24 @@ const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
     models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
   },
 ];
+/**
+ * The endpoints of a joined server's host, as `custom-provider-edit-v1` lists them: each one names its
+ * harness and its header names. The model limits stay on the host.
+ */
+const STORY_HOST_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
+  {
+    id: "aperture",
+    name: "Aperture",
+    baseUrl: "https://aperture.example.com/v1",
+    hasApiKey: true,
+    headerNames: ["X-Tenant"],
+    models: [
+      { id: "qwen3-coder", name: "Qwen3 Coder" },
+      { id: "glm-4.6", name: "GLM 4.6" },
+    ],
+    harness: "pi",
+  },
+];
 const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
@@ -153,6 +195,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   devin: { phase: "ready", progress: 100, message: null, version: "3000.11.234" },
   copilot: { phase: "ready", progress: 100, message: null, version: "1.0.105" },
+  mistral: { phase: "ready", progress: 100, message: null, version: "3.1.0" },
 };
 
 /** The Providers section of Server settings, with the providers of this computer. */
@@ -181,6 +224,13 @@ function ServerProvidersStory(props: {
    * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
    */
   hermes?: ProviderRuntimeStatus | null;
+  /** A joined server whose host logs Codex in with an OpenAI key: before the key, or with it. */
+  hostCodexKey?: "missing" | "saved";
+  /**
+   * A joined server with saved endpoints: `edit` is a host with `custom-provider-edit-v1`, and
+   * `remove-only` is an older host, which offers Remove only.
+   */
+  hostCustomProviders?: "edit" | "remove-only";
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const hermes = props.hermes;
@@ -228,7 +278,11 @@ function ServerProvidersStory(props: {
   const codeConnection = createFakeConnection({ browser: fn(), finishAfterMs: 0 });
   const browserConnection = createFakeConnection({ browser: fn(), alternative: [] });
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
-    props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
+    props.hostCustomProviders
+      ? [...STORY_HOST_CUSTOM_PROVIDERS]
+      : props.customProviderList
+        ? [...STORY_CUSTOM_PROVIDERS]
+        : [],
   );
   const [detectionSettings, setDetectionSettings] = createSignal(props.detectionSettings);
   const [offProviders, setOffProviders] = createSignal(props.offProviders);
@@ -279,6 +333,7 @@ function ServerProvidersStory(props: {
   // compiled ternary prop cannot create its memo.
   const switchToManageProviders = props.inactive ? fn() : undefined;
   function storyServer(): ServerSummary {
+    if (props.hostCodexKey || props.hostCustomProviders) return { ...teamServer, active: true };
     return props.inactive ? { ...localServer, active: false } : localServer;
   }
 
@@ -302,6 +357,7 @@ function ServerProvidersStory(props: {
       },
       get agentStatus() {
         if (hermesAgentStatus) return hermesAgentStatus;
+        if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
           : props.codeSignIn
@@ -341,9 +397,10 @@ function ServerProvidersStory(props: {
           ? fn()
           : undefined,
       accountActions: usageResetAccounts,
+      providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
-      onUpdateCustomProvider: updateCustomProvider,
+      onUpdateCustomProvider: props.hostCustomProviders === "remove-only" ? undefined : updateCustomProvider,
       get customProviders() {
         return customProviders();
       },
@@ -406,6 +463,7 @@ function ServerProvidersStory(props: {
             onRecheckScreenRecording={fn(async () => undefined)}
             initialSection="providers"
             hostPromptCacheTtl={{}}
+            claudeUserSetup
             hostModelVisibility={{}}
             onSwitchToManageProviders={switchToManageProviders}
             providers={providerOptions()}
@@ -519,6 +577,30 @@ export const CustomProviderList: Story = {
  */
 export const CodeSignIn: Story = {
   render: () => <ServerProvidersStory codeSignIn />,
+};
+
+/** A joined server with `codex-api-key-v1`: the signed-out Codex row offers API key next to Connect. */
+export const HostCodexKey: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="missing" />,
+};
+
+/** The same server after the key: Codex on the host uses the OpenAI API key. */
+export const HostCodexKeySaved: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="saved" />,
+};
+
+/**
+ * A joined server whose host has `custom-provider-edit-v1`. Open the endpoint list: each endpoint
+ * offers Edit. The form changes the name, address, models, key and headers; the host keeps the
+ * harness and the model limits.
+ */
+export const HostCustomProviderEdit: Story = {
+  render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="edit" />,
+};
+
+/** The same server on an older host: the endpoint list offers Remove only. */
+export const HostCustomProviderRemoveOnly: Story = {
+  render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="remove-only" />,
 };
 
 export const ProviderDownloads: Story = {

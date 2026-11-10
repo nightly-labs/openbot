@@ -1,14 +1,18 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { access, writeFile } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
-import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
+import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
+import { waitForSuccessfulProcess } from "./agent/provider-status";
+import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -29,7 +33,7 @@ import {
 import { mcpSecretValues, redactMcpRecord, redactMcpValues } from "./mcp-redaction";
 import type { CustomProviderSource } from "./opencode-config";
 import { PendingServerRequests } from "./pending-server-requests";
-import { createPiCustomEndpointExtension } from "./pi-custom-endpoints";
+import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
@@ -62,6 +66,9 @@ import type {
   ProviderHistoryRequest,
   ReadProviderHistory,
 } from "./provider-history";
+import { stopProcessTree } from "./windows-process-tree";
+
+const logger = createOpenBotLogger("provider-runtime");
 
 /**
  * How long a turn may send nothing, with no tool call or compaction open and no question to the
@@ -71,6 +78,32 @@ import type {
  */
 const PI_TURN_STALL_MS = 10 * 60_000;
 
+/**
+ * How long a thread with no turn keeps its `pi` process, its MCP bridge session and its extension
+ * folder. Pi opens the same session file again, so an idle thread costs only a slower first message.
+ * Without it, every Pi thread kept its process until the whole provider was idle for 10 minutes.
+ */
+const PI_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
+
+/** How many idle threads keep their `pi` process before the timeout. The longest idle goes first. */
+const PI_IDLE_THREAD_LIMIT = 1;
+
+/**
+ * How long `pi update --models` may take before the model list is read without it. It took 0.7 s in
+ * Pi 1.5.0, and the catalog waits 5 s for each `model/list` request.
+ */
+const PI_CATALOG_REFRESH_TIMEOUT_MS = 4_000;
+
+/**
+ * The variable from which `pi update --models` reads each key-only provider's key. Pi has no built-in
+ * Inception provider, so there is no catalog to refresh for it.
+ */
+const PI_CATALOG_KEY_VARIABLES: Record<KeyOnlyProviderId, string | null> = {
+  inception: null,
+  deepseek: "DEEPSEEK_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+};
+
 const PiSessionUsage = Schema.Struct({
   tokens: Schema.Struct({
     input: Schema.Number,
@@ -79,6 +112,12 @@ const PiSessionUsage = Schema.Struct({
     cacheWrite: Schema.Number,
   }),
 });
+
+/**
+ * The session cost of `get_session_stats`, in USD, at the rates of Pi's model list. Pi sends it with
+ * its tokens; a version that does not leaves the turns unpriced.
+ */
+const PiSessionCost = Schema.Struct({ cost: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)) });
 
 /**
  * The context fill of `get_session_stats`. Pi omits it with no model or window, and its `tokens` is
@@ -153,6 +192,10 @@ interface PiThread {
    * instructions and access. A thread that a history read opened after a restart has none of them.
    */
   configured: boolean;
+  /** Closes the thread when it stays with no turn. See `PI_THREAD_IDLE_RELEASE_MS`. */
+  idleRelease: ReturnType<typeof setTimeout> | null;
+  /** When its last turn ended, so the longest idle thread goes first. `0` before its first turn. */
+  idleSince: number;
 }
 interface ClientEvents {
   notification: [AppServerNotification];
@@ -164,6 +207,14 @@ interface ClientEvents {
 /** Owns Pi's native sessions. The database owns OpenBot history and agent identity. */
 export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "request";
+  /** Pi names the phase of its text only at `message_end`, where text before a tool call becomes a step. */
+  readonly provisionalAnswers = true;
+  /**
+   * The memories and section-mates go with the prompts, so the system prompt that a reopened
+   * session gets stays the same, and a live session gets a memory change too.
+   */
+  readonly turnContext = true;
+  readonly #turnContext = new TurnContext();
   readonly provider: "pi" | KeyOnlyProviderId;
   readonly #bridge = new LocalMcpBridge();
   readonly #requests = new PendingServerRequests((request) => this.emit("request", request));
@@ -235,6 +286,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   readonly #close = Effect.fn("PiAgentClient.closeThread")(function* (this: PiAgentClient, thread: PiThread) {
     thread.closed = true;
+    this.#disarmIdle(thread);
     // The key extension folder is removed also when a step before it fails.
     yield* Effect.gen(function* () {
       yield* thread.rpc.stop();
@@ -247,26 +299,61 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     const thread = this.#threads.get(id);
     if (!thread) {
       this.#released.delete(id);
+      this.#turnContext.forget(id);
       return;
     }
     if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
     yield* this.#close(thread);
     this.#threads.delete(id);
     this.#released.delete(id);
+    this.#turnContext.forget(id);
   });
 
   readonly releaseIdleThreads = Effect.fn("PiAgentClient.releaseIdleThreads")(function* (this: PiAgentClient) {
-    for (const [id, thread] of this.#threads) {
-      // A held gate is a turn that starts, before it sets `turn`, or a compaction. Out of the map
-      // before it closes, so a turn that starts during the close opens the thread again.
-      yield* Effect.gen({ self: this }, function* () {
-        if (thread.turn) return;
-        if (thread.configured) this.#released.set(id, thread.params);
-        this.#threads.delete(id);
-        yield* this.#close(thread);
-      }).pipe(thread.gate.withPermitsIfAvailable(1));
-    }
+    for (const thread of [...this.#threads.values()]) yield* this.#releaseIdle(thread);
   });
+
+  /**
+   * Closes a thread with no turn. Its next turn opens the session again with the saved settings.
+   * A thread whose gate is held tries again after the timeout.
+   */
+  readonly #releaseIdle = Effect.fn("PiAgentClient.releaseIdle")(function* (this: PiAgentClient, thread: PiThread) {
+    // A held gate is a turn that starts, before it sets `turn`, or a compaction. Out of the map
+    // before it closes, so a turn that starts during the close opens the thread again.
+    const done = yield* Effect.gen({ self: this }, function* () {
+      if (thread.turn || this.#threads.get(thread.id) !== thread) return;
+      if (thread.configured) this.#released.set(thread.id, thread.params);
+      this.#threads.delete(thread.id);
+      yield* this.#close(thread);
+    }).pipe(thread.gate.withPermitsIfAvailable(1));
+    if (Option.isNone(done) && !thread.turn && this.#threads.get(thread.id) === thread) this.#armIdle(thread);
+  });
+
+  /** Marks a thread whose turn ended as idle, and closes the longest idle threads over the limit. */
+  readonly #markIdle = Effect.fn("PiAgentClient.markIdle")(function* (this: PiAgentClient, thread: PiThread) {
+    if (thread.turn || this.#threads.get(thread.id) !== thread) return;
+    thread.idleSince = Date.now();
+    this.#armIdle(thread);
+    const idle = [...this.#threads.values()]
+      .filter((candidate) => candidate.turn === null && candidate.idleSince > 0)
+      .sort((left, right) => left.idleSince - right.idleSince);
+    for (const candidate of idle.slice(0, Math.max(0, idle.length - PI_IDLE_THREAD_LIMIT)))
+      yield* this.#releaseIdle(candidate);
+  });
+
+  #armIdle(thread: PiThread): void {
+    this.#disarmIdle(thread);
+    thread.idleRelease = setTimeout(() => {
+      thread.idleRelease = null;
+      this.#background(this.#releaseIdle(thread));
+    }, PI_THREAD_IDLE_RELEASE_MS);
+    thread.idleRelease.unref?.();
+  }
+
+  #disarmIdle(thread: PiThread): void {
+    if (thread.idleRelease) clearTimeout(thread.idleRelease);
+    thread.idleRelease = null;
+  }
 
   readonly request = Effect.fn("PiAgentClient.request")(function* <T>(
     this: PiAgentClient,
@@ -293,11 +380,15 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         break;
       }
       case "model/list":
+        yield* this.#refreshCatalog();
         response = { data: yield* this.#models(timeoutMs) };
         break;
       case "thread/start":
       case "thread/resume": {
         const thread = yield* this.#opening.withPermit(this.#open(params, method === "thread/resume", true));
+        // A resume with no thread id opens a new session, which holds no context.
+        const resumed = method === "thread/resume" && getString(params, "threadId") === thread.id;
+        this.#turnContext.set(thread.id, params, resumed);
         response = { thread: { id: thread.id } };
         break;
       }
@@ -430,6 +521,58 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     );
   });
 
+  /**
+   * Pi lists the model catalog that it bundled at its release, or the one it saved from its last
+   * refresh. An RPC process starts that refresh in the background and saves it only when it ends,
+   * but `#models` stops Pi after about 200 ms. A model that OpenRouter added after the Pi release,
+   * such as the stealth model `stealth/crouton-alpha`, did not show in the picker (#4926). This runs
+   * Pi's own command, which saves the refresh before the list is read.
+   *
+   * It runs without confinement: it is OpenBot's own command, with no model and no tools, and it
+   * writes only Pi's catalog cache. Its output is ignored, so the key cannot get into a log. It never
+   * fails: with no network, or with an old Pi, the list is the one that Pi has.
+   */
+  readonly #refreshCatalog = Effect.fn("PiAgentClient.refreshCatalog")(function* (this: PiAgentClient) {
+    const keyProvider = this.options.keyProvider;
+    const environment: Record<string, string> = {};
+    if (keyProvider) {
+      const variable = PI_CATALOG_KEY_VARIABLES[keyProvider.id];
+      const key = keyProvider.apiKey();
+      if (!variable || !key) return;
+      environment[variable] = key;
+    }
+    const target = cliSpawnTarget(this.cli.executable, ["update", "--models"]);
+    const env = { ...process.env, ...cliPathEnvironment(this.cli), ...this.options.extraEnv?.(), ...environment };
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const child = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            spawn(target.command, target.args, {
+              // Not a workspace: Pi would read its project settings.
+              cwd: homedir(),
+              env,
+              stdio: "ignore",
+              shell: false,
+              windowsHide: process.platform === "win32",
+              windowsVerbatimArguments: target.windowsVerbatimArguments,
+            }),
+          ),
+          (child) => stopProcessTree(child).pipe(Effect.ignore),
+        );
+        yield* waitForSuccessfulProcess(child, PI_CATALOG_REFRESH_TIMEOUT_MS, "Pi model catalog refresh");
+      }),
+    ).pipe(
+      Effect.catchCause((cause) =>
+        Effect.sync(() =>
+          logger.warn("Pi could not refresh its model catalog.", {
+            provider: this.provider,
+            error: this.#redact(String(Cause.squash(cause))),
+          }),
+        ),
+      ),
+    );
+  });
+
   /** The extension that gives a key-only provider its key, or that registers the custom endpoints of `pi`. */
   readonly #keyExtension = Effect.fn("PiAgentClient.keyExtension")(function* (this: PiAgentClient) {
     const keyProvider = this.options.keyProvider;
@@ -482,17 +625,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         );
         if (!replaced) return live;
       }
-      if (!isAbsolute(requestedId)) return yield* providerFailure(new MissingPiSessionError());
-      // Only a file that is gone retires the session. Another failure, such as no permission, can pass.
-      yield* providerCall(() => access(requestedId)).pipe(
-        Effect.mapError(({ cause }) =>
-          providerFailure(
-            isMissingFileError(cause)
-              ? new MissingPiSessionError()
-              : new Error(sourceText("error.provider.piSessionMissing")),
-          ),
-        ),
-      );
+      yield* requireSessionFile(requestedId);
     }
     const cwd = yield* providerSync(() => requiredString(params, "cwd"));
     let thread: PiThread | null = null;
@@ -546,7 +679,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           : ["--extension", extension.path]),
       );
       const instructions = getString(params, "developerInstructions");
-      if (instructions) args.push("--append-system-prompt", instructions);
+      if (instructions) {
+        // Pi reads the instructions from a file. The path keeps the launch line short: a `.cmd`
+        // wrapper starts through cmd.exe, which stops at 8191 characters (#3738).
+        const path = join(dirname(extension.path), "instructions.md");
+        yield* providerCall(() => writeFile(path, instructions, { mode: 0o600 }));
+        args.push("--append-system-prompt", path);
+      }
       if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
       const environment = { ...extension?.environment, ...keyExtension?.environment };
       yield* providerSync(() => this.#spawn(rpc, cwd, args, environment));
@@ -592,10 +731,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         closed: false,
         gate: Semaphore.makeUnsafe(1),
         configured,
+        idleRelease: null,
+        idleSince: 0,
       };
       yield* this.#configure(thread, params);
       this.#threads.set(id, thread);
       this.#released.delete(id);
+      // A thread that a read opened, or whose first turn never comes, closes after the timeout too.
+      this.#armIdle(thread);
       retained = true;
       return thread;
     }).pipe(
@@ -658,6 +801,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
     yield* this.#configure(thread, params);
     const prompt = yield* piPrompt(params);
+    // Pi takes one message, so the blocks go before the user's text; history readers remove them.
+    const context = this.#turnContext.take(thread.id, prompt.message.startsWith("/"));
+    const message = context.length > 0 ? [...context, prompt.message].join("\n\n") : prompt.message;
     const turn: PiTurn = {
       id: getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID(),
       startedAt: Date.now() / 1_000,
@@ -675,10 +821,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     };
     this.#addUserMessage(turn, prompt.message);
     thread.turn = turn;
+    this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
     yield* Effect.forkIn(
-      thread.rpc.request({ type: "prompt", ...prompt }, this.options.requestTimeoutMs).pipe(
+      thread.rpc.request({ type: "prompt", ...prompt, message }, this.options.requestTimeoutMs).pipe(
         Effect.flatMap((response) =>
           response.disposition === "handled" && thread.turn === turn ? this.#finish(thread, "completed") : Effect.void,
         ),
@@ -776,10 +923,15 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
     // Usage contains only validated numeric counters. Generic secret-name matching masks `*Tokens`.
+    // A turn notice holds only OpenBot's own `{ turn: { id, status } }`. A short saved secret could
+    // mask its `turn` key or its status, and the turn would then not end (#5390).
     const safe =
-      method === "openbot/usage" || method === "thread/tokenUsage/updated"
+      method === "openbot/usage" ||
+      method === "thread/tokenUsage/updated" ||
+      method === "turn/started" ||
+      method === "turn/completed"
         ? params
-        : redactMcpRecord(params, this.#secretValues());
+        : withOwnIds(redactMcpRecord(params, this.#secretValues()), params);
     this.emit("notification", {
       method,
       params: {
@@ -805,6 +957,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       this.#background(this.#ui(thread, record));
       return;
     }
+    // The summary can leave the blocks out, so the next prompt sends them in full.
+    if (record.type === "compaction_end") this.#turnContext.resend(thread.id);
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.lastActivityAt = Date.now();
@@ -865,7 +1019,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         ...(done ? { contentItems: [{ type: "inputText", text: piText(getRecord(record, "result")?.content) }] } : {}),
       };
       turn.items.set(id, item);
-      this.#notify(done ? "item/completed" : "item/started", thread, { item });
+      this.#notify(done ? "item/completed" : "item/started", thread, {
+        item,
+        filePaths: piToolFilePaths(item.tool, item.arguments, thread.cwd),
+      });
     }
   }
 
@@ -879,6 +1036,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.finishing = true;
+    // Pi may not have kept the prompt of a failed turn, with its blocks.
+    if (status === "failed") this.#turnContext.resend(thread.id);
     if (failure)
       this.#notify("error", thread, {
         error: { message: this.#redact(failure) },
@@ -898,9 +1057,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
               estimated: true,
             },
           });
-        return providerSync(() => Schema.decodeUnknownSync(PiSessionUsage)(stats));
+        // A bad cost must not drop the totals either.
+        const cost = Schema.decodeUnknownOption(PiSessionCost)(stats);
+        return providerSync(() => ({
+          ...Schema.decodeUnknownSync(PiSessionUsage)(stats),
+          cost: Option.isSome(cost) ? cost.value.cost : null,
+        }));
       }),
-      Effect.map(({ tokens }) =>
+      Effect.map(({ tokens, cost }) =>
         this.#notify("openbot/usage", thread, {
           usage: {
             inputTokens: tokens.input + tokens.cacheRead + tokens.cacheWrite,
@@ -908,6 +1072,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             cachedReadTokens: tokens.cacheRead,
             cachedWriteTokens: tokens.cacheWrite,
           },
+          ...(cost === null ? {} : { cost }),
         }),
       ),
       // A crashed host cannot answer telemetry; it must not block durable completion.
@@ -929,6 +1094,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     // Before the notice, so a session that closes when its turn ends is not busy.
     if (thread.turn === turn) thread.turn = null;
     this.#notify("turn/completed", thread, { turn: { id: turn.id, status } });
+    // In the background: a failed close of another idle thread must not fail or delay this turn.
+    this.#background(this.#markIdle(thread));
   });
 
   readonly #ui = Effect.fn("PiAgentClient.userInput")(function* (
@@ -1009,16 +1176,15 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       yield* stored.read(request, consume);
       return;
     }
-    const thread = yield* this.#thread(request.threadId, {
-      cwd: request.cwd ?? this.options.discoveryCwd?.() ?? process.cwd(),
-    });
-    const response = yield* thread.rpc.request({ type: "get_messages" });
-    const messages = getArray(response, "messages");
+    const messages = yield* this.#readMessages(
+      request.threadId,
+      request.cwd ?? this.options.discoveryCwd?.() ?? process.cwd(),
+    );
     // get_messages follows the active branch. get_entries also contains abandoned branches.
     for (let index = messages.length - 1; index >= 0; index--) {
       const message = messages[index];
       const fragment: ProviderHistoryFragment = {
-        turnId: `${thread.id}:history:${index}`,
+        turnId: `${request.threadId}:history:${index}`,
         recordsOnly: true,
         status: "completed",
         ...(isRecord(message) && typeof message.timestamp === "number" ? { startedAt: message.timestamp / 1_000 } : {}),
@@ -1029,13 +1195,109 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     }
   });
 
+  /**
+   * The messages of a session. A session that no thread has open is read on a process with no
+   * tools, extensions or MCP servers, which ends after the read. An open thread started every MCP
+   * server and Computer Use, and kept them for `PI_THREAD_IDLE_RELEASE_MS`. The history import at
+   * startup opened one for each Pi agent, and the computer stopped responding (#6012).
+   */
+  readonly #readMessages = Effect.fn("PiAgentClient.readMessages")(function* (
+    this: PiAgentClient,
+    sessionFile: string,
+    cwd: string,
+  ) {
+    const fromThread = (thread: PiThread) =>
+      thread.rpc.request({ type: "get_messages" }).pipe(Effect.map((response) => getArray(response, "messages")));
+    const live = this.#threads.get(sessionFile);
+    if (live) return yield* fromThread(live);
+    // The permit keeps a thread from opening this session while the short process has it open.
+    return yield* this.#opening.withPermit(
+      Effect.suspend(() => {
+        // A thread can open the session while this read waits for the permit.
+        const opened = this.#threads.get(sessionFile);
+        return opened ? fromThread(opened) : this.#readOnShortProcess(sessionFile, cwd);
+      }),
+    );
+  });
+
+  readonly #readOnShortProcess = Effect.fn("PiAgentClient.readOnShortProcess")(function* (
+    this: PiAgentClient,
+    sessionFile: string,
+    cwd: string,
+  ) {
+    yield* requireSessionFile(sessionFile);
+    if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
+    // A thread registers these secrets when it writes its key extension. This read has no extension,
+    // but the history can still contain the key.
+    const keyProvider = this.options.keyProvider;
+    const key = keyProvider?.apiKey();
+    if (key) this.#secrets.add(key);
+    if (!keyProvider)
+      for (const secret of piCustomEndpointSecrets(this.options.customEndpoints?.() ?? [])) this.#secrets.add(secret);
+    const rpc = new PiRpc(this.#redact, this.provider);
+    // What Pi writes after the read, while OpenBot stops it, is not an error for the user.
+    let stopping = false;
+    rpc.on("diagnostic", (text) => this.emit("diagnostic", text, { duringStop: stopping }));
+    return yield* Effect.acquireUseRelease(
+      providerSync(() => {
+        this.#spawn(rpc, cwd, ["--no-tools", "--no-extensions", "--no-mcp"], {});
+        // `stop` ends the processes in this set before it waits for the read.
+        this.#starting.add(rpc);
+      }),
+      () =>
+        Effect.gen(function* () {
+          const loaded = yield* rpc.request({ type: "switch_session", sessionPath: sessionFile });
+          if (loaded.cancelled === true)
+            return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
+          return getArray(yield* rpc.request({ type: "get_messages" }), "messages");
+        }),
+      () =>
+        Effect.sync(() => {
+          stopping = true;
+        }).pipe(
+          Effect.andThen(rpc.stop()),
+          Effect.ensuring(Effect.sync(() => this.#starting.delete(rpc))),
+          Effect.orDie,
+        ),
+    );
+  });
+
   #safeItems(items: ThreadItem[]): ThreadItem[] {
     const values = this.#secretValues();
     return items.flatMap((item) => {
-      const value = redactMcpRecord(item, values);
+      const value = withOwnIds(redactMcpRecord(item, values), item);
       return isRecord(value) && isString(value.type) ? [{ ...value, type: value.type }] : [];
     });
   }
+}
+
+/**
+ * Puts back the ids of the items of a turn after the secret masking. The masking hides the whole
+ * token around a saved value, and a short saved password can occur in a UUID (#5390). OpenBot and
+ * Pi make these ids; they hold no text from the model or a tool.
+ */
+function withOwnIds(safe: LogValue, original: DynamicRecord | ThreadItem): LogValue {
+  if (!isRecord(safe)) return safe;
+  const restored = { ...safe };
+  if (isString(original.id)) restored.id = original.id;
+  if (isString(original.itemId)) restored.itemId = original.itemId;
+  const itemId = getString(getRecord(original, "item"), "id");
+  if (itemId !== undefined && isRecord(restored.item)) restored.item = { ...restored.item, id: itemId };
+  return restored;
+}
+
+/** Only a file that is gone retires the session. Another failure, such as no permission, can pass. */
+function requireSessionFile(sessionFile: string): Effect.Effect<void, ProviderClientOperationError> {
+  if (!isAbsolute(sessionFile)) return Effect.fail(providerFailure(new MissingPiSessionError()));
+  return providerCall(() => access(sessionFile)).pipe(
+    Effect.mapError(({ cause }) =>
+      providerFailure(
+        isMissingFileError(cause)
+          ? new MissingPiSessionError()
+          : new Error(sourceText("error.provider.piSessionMissing")),
+      ),
+    ),
+  );
 }
 
 function isNamespace(value: unknown): value is DynamicToolNamespace {
@@ -1080,4 +1342,17 @@ function piFailureCause(message: string | null): CauseCode {
     classifyFailure(message),
   );
   return cause === "unknown" && PI_PROVIDER_STOP.test(message) ? "provider_unavailable" : cause;
+}
+
+/**
+ * The absolute path of a file that a Pi `read`, `write` or `edit` call names, for the thread's file
+ * history. Pi resolves the path as these tools do: without a leading `@`, from `~`, or from the cwd.
+ */
+function piToolFilePaths(tool: unknown, args: unknown, cwd: string): string[] | undefined {
+  if (tool !== "read" && tool !== "write" && tool !== "edit") return undefined;
+  const path = isRecord(args) && typeof args.path === "string" ? args.path.replace(/^@/u, "") : "";
+  if (!path) return undefined;
+  const home = path.startsWith("~/") || (process.platform === "win32" && path.startsWith("~\\"));
+  if (path === "~" || home) return [resolve(homedir(), path.slice(2))];
+  return [resolve(cwd, path)];
 }

@@ -543,6 +543,7 @@ try {
     saved: { id: "item-1", name: "Travel card", brand: "visa", last4: "4242" },
   };
   const vaultPage = page([{ ...formMessage, id: "vault-1", uiBlock: { ...formMessage.uiBlock, vault } }]);
+  const apiKeyPage = page([{ ...formMessage, id: "api-key-1", uiBlock: { ...formMessage.uiBlock, apiKey: true } }]);
 
   await step("ui-block-vault-v1: a protocol 9 capability only", () => {
     assert.ok(TEAM_CURRENT_CAPABILITIES.includes(TEAM_UI_BLOCK_VAULT_CAPABILITY));
@@ -586,6 +587,16 @@ try {
     addUiBlockVaultRequests(read.event, event);
     assert.deepEqual(read.event.page.messages[0]?.uiBlock?.vault, vault);
     return { bytes: encoded.length };
+  });
+
+  await step("ui-blocks-v1: the API key marker of the host stays off the wire", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, apiKeyPage, { uiBlocks: true });
+    assert.ok(hasUiBlock(encoded) && !encoded.includes('"apiKey"'));
+    const event = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: apiKeyPage },
+      { uiBlocks: true },
+    );
+    assert.ok(event && hasUiBlock(event) && !event.includes('"apiKey"'));
   });
 
   await step("ui-block-vault-v1: a body without a Vault request keeps its bytes", () => {

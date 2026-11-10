@@ -12,6 +12,7 @@ import { Effect } from "effect";
 
 import { join } from "node:path";
 import {
+  type AgentSummary,
   type AppVariant,
   type CentralAuthState,
   type ChatWindowTarget,
@@ -20,6 +21,7 @@ import {
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type MacPermissionId,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
 import {
@@ -53,7 +55,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { preventPanelActivation } from "./mac-panel-activation";
+import { hidePanelFromWindowSwitchers, preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -61,13 +63,13 @@ import {
   resolveMainWindowBounds,
   writeMainWindowBounds,
 } from "./main-window-state";
-import { createQuitShortcut, type QuitShortcut } from "./quit-shortcut";
+import { createQuitShortcut, isQuitGuarded, type QuitShortcut } from "./quit-shortcut";
 import type { RemoteServerManager } from "./remote-server-manager";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
-import { followAppearance, followWindowGlass, windowBackgroundColor } from "./window-appearance";
+import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
 import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
@@ -163,6 +165,10 @@ export interface MainWindowContext {
   reportError: (message: string, error: unknown) => void;
   /** Quits after `Cmd + Q` was held or pressed twice in a window. See `createQuitShortcut`. */
   quitFromShortcut: () => void;
+  /** The agents that a quit stops, here and on the servers on this computer. See `createQuitShortcut`. */
+  workingAgents: () => AgentSummary[];
+  /** A function, not a value: the user can change the choice while the window is open. */
+  quitGuard: () => QuitGuard;
 }
 
 export interface MainWindowController {
@@ -201,13 +207,17 @@ export function createMainWindowController({
   onMainWindowCreated,
   reportError,
   quitFromShortcut,
+  workingAgents,
+  quitGuard,
 }: MainWindowContext): MainWindowController {
   const quitShortcut =
     process.platform === "darwin"
       ? createQuitShortcut({
           quit: quitFromShortcut,
           isQuitting,
-          showHint: (window, visible) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, visible),
+          workingAgents,
+          guard: quitGuard,
+          showHint: (window, agents) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, agents),
         })
       : null;
   const { restoreMainWindowBounds, currentMainWindowBounds, rememberMainWindowBounds, flushMainWindowBounds } =
@@ -233,7 +243,7 @@ export function createMainWindowController({
       minWidth: 960,
       minHeight: 640,
       show: false,
-      backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
+      ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title:
         developmentProfile === "test-client"
           ? getTranslate()("window.localClientTitle")
@@ -383,7 +393,7 @@ export function createMainWindowController({
       minWidth: 380,
       minHeight: 480,
       show: false,
-      backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
+      ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       // The page sets the chat name as its title when it loads.
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
@@ -612,13 +622,16 @@ function attachAppInput(
 }
 
 export function createDynamicIslandWindow(bounds: Rectangle, _display: Display): BrowserWindow {
+  // X11: as for the agent dock, a window that is not focusable when it is made never takes keys. The
+  // controller makes it not focusable after it is made, and focusable again for the inline reply.
+  const x11 = process.platform === "linux";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
-    focusable: false,
+    focusable: x11,
     hiddenInMissionControl: true,
     resizable: false,
     movable: false,
@@ -628,7 +641,8 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
     enableLargerThanScreen: true,
     hasShadow: false,
     skipTaskbar: true,
-    type: "panel",
+    // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
+    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -642,8 +656,55 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
   // The island is the topmost window on every Space. Without this, macOS can give it activation
   // when the user switches to an application that has no window there.
   preventPanelActivation(window);
+  // While its text field is focused, the island is the main window, and AltTab would list it.
+  hidePanelFromWindowSwitchers(window);
   // Chromium shares zoom per origin. The main window zoom would shrink this fixed-size window's
   // viewport and move the shared avatar out of the expanded panel.
+  window.webContents.setZoomMode("isolated");
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
+  });
+  return window;
+}
+
+/** The agent dock at an edge of the screen: a transparent panel (a tool window on Windows) above the other apps. */
+export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
+  // X11: a window that is not focusable when it is made has no window manager, so it never takes keys.
+  // A dock window that is focusable at first stays on top on each desktop and takes keys for the chat.
+  const x11 = process.platform === "linux";
+  const window = new BrowserWindow({
+    ...bounds,
+    show: false,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    focusable: x11,
+    hiddenInMissionControl: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
+    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      devTools: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  // The chat composer makes the panel key. It must not activate the app and bring the main window up.
+  preventPanelActivation(window);
+  // While its chat composer is focused, the dock is the main window, and AltTab would list it.
+  hidePanelFromWindowSwitchers(window);
+  // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, targetUrl) => {
@@ -897,14 +958,23 @@ export function showMainWindow(window: BrowserWindow): void {
   presentMainWindow(window, process.platform, () => app.show());
 }
 
+export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
+  const url = helperRendererUrl(process.env.ELECTRON_RENDERER_URL);
+  url.searchParams.set("surface", "agent-dock");
+  return window.loadURL(url.toString());
+}
+
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
-  const displayMode = display.internal ? "notch" : "island";
+  // Linux has no notch: the island floats below the top panel of the desktop. A Windows built-in
+  // display gets the notch shape at the top edge, as on a Mac.
+  const notchDisplay = process.platform !== "linux";
+  const displayMode = notchDisplay && display.internal ? "notch" : "island";
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "dynamic-island");
   url.searchParams.set("display", displayMode);
   url.searchParams.set("variant", variant);
-  const notch = dynamicIslandNotchSizeForDisplay(display);
+  const notch = dynamicIslandNotchSizeForDisplay(display, process.platform);
   if (notch) {
     url.searchParams.set("notch-width", String(notch.width));
     url.searchParams.set("notch-height", String(notch.height));
@@ -945,15 +1015,22 @@ let quitConfirmationOpen = false;
  * routines (#4149). In a focused OpenBot page the keys never get here: `createQuitShortcut` quits
  * when they are held or pressed twice. The item gets the keys only with no OpenBot page focused, such
  * as with the window closed or a sign-in window focused. No page can show the hint there, so OpenBot
- * asks. A click on
- * the item, the Dock, a system logout and an update still quit at once.
+ * asks when the user's quit guard applies. A click on the item, the Dock, a system logout and an
+ * update still quit at once.
  */
-function macQuitItem(translate: AppTranslate, quit: (source: MenuQuitSource) => void): MenuItemConstructorOptions {
+function macQuitItem(
+  translate: AppTranslate,
+  guarded: () => boolean,
+  quit: (source: MenuQuitSource) => void,
+): MenuItemConstructorOptions {
   return {
     label: translate("menu.quit"),
     accelerator: "Command+Q",
     click: (_item, _window, event) => {
       if (!event.triggeredByAccelerator) return quit("menu");
+      // The keys quit at once when the user turned the guard off, or when no agent works and the user
+      // guards only the quits that stop agents.
+      if (!guarded()) return quit("shortcut");
       // A second press while the question is open does not open another one, and a quit that has
       // started hid every window and needs no question.
       if (quitConfirmationOpen || windowsKeptHidden) return;
@@ -997,6 +1074,8 @@ export function configureApplicationMenu(
   interfaceSize: InterfaceSizeService,
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
+  workingAgents: () => AgentSummary[],
+  quitGuard: () => QuitGuard,
   quit: (source: MenuQuitSource) => void,
 ): void {
   Menu.setApplicationMenu(
@@ -1041,7 +1120,16 @@ export function configureApplicationMenu(
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          process.platform === "darwin" ? macQuitItem(translate, quit) : { role: "quit" },
+          process.platform === "darwin"
+            ? macQuitItem(
+                translate,
+                () => {
+                  const choice = quitGuard();
+                  return isQuitGuarded(choice, choice === "working" ? workingAgents() : []);
+                },
+                quit,
+              )
+            : { role: "quit" },
         ],
       },
       { role: "editMenu" },

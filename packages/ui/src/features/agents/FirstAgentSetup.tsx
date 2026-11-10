@@ -2,6 +2,7 @@ import type { ExpressionId } from "@norbert_bodziony/bloub";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AccountUsage,
   AgentModelId,
   AgentProviderId,
   AgentReasoningEffort,
@@ -42,6 +43,8 @@ export interface FirstAgentDraft {
   model: AgentModelId;
   /** The reasoning level the user chose. Absent, the agent starts on the model's default level. */
   reasoningEffort?: AgentReasoningEffort | undefined;
+  /** The account of `provider` the agent starts on. Absent, the provider's own sign-in. */
+  providerAccountId?: string | undefined;
 }
 
 /**
@@ -67,6 +70,10 @@ export interface FirstAgentSetupProps {
   /** The live catalog behind the model picker. Absent, the form keeps no model choice. */
   modelOptions?: ClientAgentModelOption[] | undefined;
   agentStatus?: AgentStatus | undefined;
+  /** Lets the model picker choose an account of a provider with more than one. */
+  accountChoice?: boolean | undefined;
+  /** The plan readings that mark the spent models of each account in the picker. */
+  accountUsage?: AccountUsage | null | undefined;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
@@ -264,10 +271,25 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       props.onCancel();
     };
     const list = suggestionList;
-    if (list) observer.observe(list);
+    // A vertical mouse wheel scrolls the row. At the end of the row, the wheel scrolls the page again.
+    const scrollOnWheel = (event: WheelEvent) => {
+      if (!list || props.submitting || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const rightToLeft = getComputedStyle(list).direction === "rtl";
+      const position = rightToLeft ? -list.scrollLeft : list.scrollLeft;
+      const maximumScroll = list.scrollWidth - list.clientWidth;
+      if (event.deltaY > 0 ? position >= maximumScroll - 1 : position <= 1) return;
+      event.preventDefault();
+      stopSuggestionMomentum();
+      list.scrollLeft += rightToLeft ? -event.deltaY : event.deltaY;
+    };
+    if (list) {
+      observer.observe(list);
+      list.addEventListener("wheel", scrollOnWheel, { passive: false });
+    }
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       observer.disconnect();
+      list?.removeEventListener("wheel", scrollOnWheel);
       document.removeEventListener("keydown", closeOnEscape);
       stopSuggestionMomentum();
     };
@@ -346,6 +368,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       provider: props.value.provider,
       model: props.value.model,
       reasoningEffort: props.value.reasoningEffort,
+      providerAccountId: props.value.providerAccountId,
     });
   }
 
@@ -355,17 +378,21 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   const reasoningEffort = () =>
     props.value.reasoningEffort ?? modelOption(props.value.provider, props.value.model)?.defaultReasoningEffort;
 
-  /** A new model keeps the chosen level when it supports it, and else starts on its own default. */
+  /**
+   * A new model keeps the chosen level when it supports it, and else starts on its own default. The
+   * picker sends an account only for a provider with more than one; any other choice is the own sign-in.
+   */
   function selectModel(
     model: AgentModelId,
     provider: AgentProviderId,
-    _accountId?: string | null,
+    accountId?: string | null,
     effort?: AgentReasoningEffort,
   ): void {
     const kept = effort ?? props.value.reasoningEffort;
     updateDraft({
       model,
       provider,
+      providerAccountId: props.accountChoice ? (accountId ?? undefined) : undefined,
       reasoningEffort:
         kept && modelOption(provider, model)?.supportedReasoningEfforts.includes(kept) ? kept : undefined,
     });
@@ -527,6 +554,9 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       value={props.value.model}
                       modelOptions={options()}
                       agentStatus={status()}
+                      accountChoice={props.accountChoice === true}
+                      providerAccountId={props.value.providerAccountId}
+                      accountUsage={props.accountUsage}
                       runtimeStatuses={props.runtimeStatuses}
                       customProviders={props.customProviders}
                       customAgents={props.customAgents}

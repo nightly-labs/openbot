@@ -203,6 +203,11 @@
   justify-content: space-between;
 }
 
+/* The switch label starts where the labels of the fields above it start. */
+.agent-routine-run-in {
+  padding-inline-start: var(--openbot-space-2);
+}
+
 .agent-routine-active-toggle > span {
   display: grid;
   gap: 2px;
@@ -1324,7 +1329,7 @@
 }
 
 .agent-skills-modal .ui-switch-thumb[data-checked] {
-  background: var(--openbot-text-primary);
+  background: var(--openbot-text-on-accent);
 }
 
 .agent-local-library,

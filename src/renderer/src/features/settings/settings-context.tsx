@@ -13,6 +13,11 @@ import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from
 import { actionToast } from "../../action-toast";
 import { readShowAgentSteps, setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
 import { desktopAnalytics } from "../../analytics";
+import {
+  readCompactMessageActions,
+  setCompactMessageActions,
+  useCompactMessageActions,
+} from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
@@ -27,6 +32,19 @@ const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
 
 function sameExternalLinkTarget(left: ExternalLinkTarget, right: ExternalLinkTarget): boolean {
   return left.kind === right.kind && (left.kind !== "app" || right.kind !== "app" || left.path === right.path);
+}
+
+/** Compares two settings values field by field. The values hold only JSON data. */
+function samePlainValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  const leftEntries = Object.entries(left);
+  const rightEntries = new Map(Object.entries(right));
+  return (
+    leftEntries.length === rightEntries.size &&
+    leftEntries.every(([key, value]) => rightEntries.has(key) && samePlainValue(value, rightEntries.get(key)))
+  );
 }
 
 /** Tells the user why a switch went back to its previous value. */
@@ -114,14 +132,21 @@ const Settings = createSimpleContext({
       nonce: number;
     } | null>(null);
     let hostedServerDeleteNonce = 0;
-    const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
-      ...DEFAULT_GENERAL_SETTINGS,
-      taskSound: readTaskSound(),
-      sendShortcut: readSendShortcutMode(),
-      showAgentSteps: readShowAgentSteps(),
-      soundFeedback: isActionSoundEnabled(),
-      soundTheme: readActionSoundTheme(),
-    });
+    // A write of equal values keeps the current object. A new object rebuilds the options of each
+    // Select on the page, and a Select reports its value again for new options. Without this, a
+    // Select that saves the value it reports freezes the window (#5708).
+    const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(
+      {
+        ...DEFAULT_GENERAL_SETTINGS,
+        taskSound: readTaskSound(),
+        sendShortcut: readSendShortcutMode(),
+        showAgentSteps: readShowAgentSteps(),
+        compactMessageActions: readCompactMessageActions(),
+        soundFeedback: isActionSoundEnabled(),
+        soundTheme: readActionSoundTheme(),
+      },
+      { equals: samePlainValue },
+    );
     // The mode also changes outside this dialog: another window, or the web Preferences tab on
     // the same page. The shared signal carries those changes into the displayed settings value.
     // Two-arg form: compute tracks the signal, apply writes the store outside tracking.
@@ -138,6 +163,15 @@ const Settings = createSimpleContext({
       (show) => {
         setGeneralSettings((current) =>
           current.showAgentSteps === show ? current : { ...current, showAgentSteps: show },
+        );
+      },
+    );
+    const compactMessageActions = useCompactMessageActions();
+    createEffect(
+      () => compactMessageActions(),
+      (compact) => {
+        setGeneralSettings((current) =>
+          current.compactMessageActions === compact ? current : { ...current, compactMessageActions: compact },
         );
       },
     );
@@ -161,6 +195,7 @@ const Settings = createSimpleContext({
     let keepRunningInBackgroundChanged = false;
     let keepAwakeChanged = false;
     let keepAwakeOnBatteryChanged = false;
+    let quitGuardChanged = false;
 
     createEffect(
       () => ({
@@ -229,6 +264,9 @@ const Settings = createSimpleContext({
       }
       if (previous.showAgentSteps !== value.showAgentSteps) {
         setShowAgentSteps(value.showAgentSteps);
+      }
+      if (previous.compactMessageActions !== value.compactMessageActions) {
+        setCompactMessageActions(value.compactMessageActions);
       }
       if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
         setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");
@@ -302,7 +340,12 @@ const Settings = createSimpleContext({
           (preference) => preference.mode,
         );
       }
-      if (AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key])) {
+      if (
+        AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key]) ||
+        previous.agentDefaults.planStartAfterMs !== value.agentDefaults.planStartAfterMs ||
+        previous.agentDefaults.automationRunsPerHour !== value.agentDefaults.automationRunsPerHour ||
+        previous.agentDefaults.commitCoAuthor !== value.agentDefaults.commitCoAuthor
+      ) {
         agentDefaultsChanged = true;
         persistField("agentDefaults", settingsPort().setAgentDefaults({ ...value.agentDefaults }), (saved) => saved);
       }
@@ -340,6 +383,14 @@ const Settings = createSimpleContext({
           "keepAwakeOnBattery",
           settingsPort().setAppBehaviorPreference({ keepAwakeOnBattery: value.keepAwakeOnBattery }),
           (preference) => preference.keepAwakeOnBattery,
+        );
+      }
+      if (value.quitGuard !== null && previous.quitGuard !== value.quitGuard) {
+        quitGuardChanged = true;
+        persistField(
+          "quitGuard",
+          settingsPort().setAppBehaviorPreference({ quitGuard: value.quitGuard }),
+          (preference) => preference.quitGuard,
         );
       }
       if (!sameExternalLinkTarget(previous.externalLinkTarget, value.externalLinkTarget)) {
@@ -570,6 +621,7 @@ const Settings = createSimpleContext({
               keepAwakeOnBattery: keepAwakeOnBatteryChanged
                 ? current.keepAwakeOnBattery
                 : preference.keepAwakeOnBattery,
+              quitGuard: quitGuardChanged ? current.quitGuard : preference.quitGuard,
             }));
           }),
         settingsPort()

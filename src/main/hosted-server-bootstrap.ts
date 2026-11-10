@@ -11,6 +11,8 @@
  * built, at the same position as `applyDevelopmentRemoteAccount`.
  */
 
+import { existsSync } from "node:fs";
+import { BILLING_PLANS } from "@openbot/contracts/billing";
 import { parseHostedServerList } from "@openbot/contracts/hosted-servers";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
@@ -41,6 +43,24 @@ export function takeHostedServerEnvironment(
   const hostId = environment.OPENBOT_HOSTED_HOST_ID?.trim().toLowerCase() ?? "";
   if (!HOST_ID_PATTERN.test(hostId)) return null;
   return { hostId, claim };
+}
+
+/** The markers of the host's snapshot restore. `openbot-hosted-update` reads the same two. */
+const RESTORE_ACTIVE = "/var/lib/ascii-lazy/active";
+const RESTORE_DONE = "/var/lib/ascii-lazy/hydration-done";
+
+/**
+ * Answers whether the host still restores this server's disk after a wake. A restore that ended does
+ * not start again in the same boot, and each wake is a new boot, so the end is kept and not read again.
+ * A missing `active` marker is read again, because the host can write it after the first probe.
+ */
+export function hostedDiskRestoreProbe(): () => boolean {
+  let done = false;
+  return () => {
+    if (done) return false;
+    done = existsSync(RESTORE_DONE);
+    return !done && existsSync(RESTORE_ACTIVE);
+  };
 }
 
 export interface HostedServerAccountOptions {
@@ -100,7 +120,8 @@ export const applyHostedServerAccount = Effect.fn("HostedServer.applyAccount")(f
   if (!identity.enabledOnLaunch) yield* teamStore.setEnabledOnLaunch(identity.serverId, true);
 });
 
-const hostedServerName = Effect.fn("HostedServer.name")(function* (
+/** The record of this server in the hosted server list of its owner, or null when the list has none. */
+const hostedServerRecord = Effect.fn("HostedServer.record")(function* (
   centralAuth: Pick<CentralAuthManager, "requestAuthorized">,
   hostId: string,
 ) {
@@ -111,10 +132,30 @@ const hostedServerName = Effect.fn("HostedServer.name")(function* (
       return parsed;
     })
     .pipe(toRemoteWorkflowError);
-  const server = list.servers.find((entry) => entry.serverId === hostId);
+  return list.servers.find((entry) => entry.serverId === hostId) ?? null;
+});
+
+const hostedServerName = Effect.fn("HostedServer.name")(function* (
+  centralAuth: Pick<CentralAuthManager, "requestAuthorized">,
+  hostId: string,
+) {
+  const server = yield* hostedServerRecord(centralAuth, hostId);
   if (!server)
     return yield* new RemoteWorkflowError({
       cause: new Error("The account server has no record of this hosted server."),
     });
   return server.name;
+});
+
+/**
+ * The plan storage of this hosted server in GB, for the agent instructions. Null when the list has no
+ * record of the server. A plan change applies at the next start of the server, so one read at the
+ * start is enough.
+ */
+export const hostedServerStorageGb = Effect.fn("HostedServer.storageGb")(function* (
+  centralAuth: Pick<CentralAuthManager, "requestAuthorized">,
+  hostId: string,
+) {
+  const server = yield* hostedServerRecord(centralAuth, hostId);
+  return server ? (BILLING_PLANS.find((plan) => plan.id === server.plan)?.storageGb ?? null) : null;
 });

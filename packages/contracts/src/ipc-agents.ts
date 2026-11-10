@@ -51,17 +51,76 @@ export function agentComputerUseEnabled(agent: { computerUse?: boolean | undefin
 /** The agent settings that have an account default. An agent with no value of its own follows it. */
 export const AGENT_DEFAULT_KEYS = ["allowAutomation", "allowNewChat", "quickAcknowledgement"] as const;
 export type AgentDefaultKey = (typeof AGENT_DEFAULT_KEYS)[number];
-export type AgentDefaults = Record<AgentDefaultKey, boolean>;
+export type AgentDefaults = Record<AgentDefaultKey, boolean> & {
+  /**
+   * How long the plan card waits before it starts the work by itself, for all agents. `null` waits
+   * until a person presses Start.
+   */
+  planStartAfterMs: number | null;
+  /**
+   * How many messages and routine runs local scripts can send each agent in one hour. It stops a
+   * script that loops from spending the user's provider quota.
+   */
+  automationRunsPerHour: number;
+  /** Agents end each git commit message that they write with `OPENBOT_COMMIT_TRAILER`, for all agents. */
+  commitCoAuthor: boolean;
+};
 
-/** Off, which is what every agent had before the defaults existed. */
+/**
+ * The trailer that names OpenBot as a co-author of a commit. The address is the GitHub noreply address
+ * of the `openbotgit[bot]` account (user id 335604065), so GitHub links the co-author to the OpenBot app.
+ */
+export const OPENBOT_COMMIT_TRAILER = "Co-authored-by: OpenBot <335604065+openbotgit[bot]@users.noreply.github.com>";
+
+/** The plan card start time that every agent had before the setting existed. */
+export const DEFAULT_PLAN_START_AFTER_MS = 10_000;
+export const MIN_PLAN_START_AFTER_MS = 5_000;
+/** The longest `setTimeout` delay. A longer one runs at once. */
+export const MAX_PLAN_START_AFTER_MS = 2_147_483_647;
+
+/** The local script limit that every agent had before the setting existed. */
+export const DEFAULT_AUTOMATION_RUNS_PER_HOUR = 30;
+export const MIN_AUTOMATION_RUNS_PER_HOUR = 1;
+export const MAX_AUTOMATION_RUNS_PER_HOUR = 10_000;
+
+/** Off, which is what every agent had before the defaults existed. The commit co-author is on. */
 export const DEFAULT_AGENT_DEFAULTS: AgentDefaults = {
   allowAutomation: false,
   allowNewChat: false,
   quickAcknowledgement: false,
+  planStartAfterMs: DEFAULT_PLAN_START_AFTER_MS,
+  automationRunsPerHour: DEFAULT_AUTOMATION_RUNS_PER_HOUR,
+  commitCoAuthor: true,
 };
 
+export function isAutomationRunsPerHour(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= MIN_AUTOMATION_RUNS_PER_HOUR &&
+    value <= MAX_AUTOMATION_RUNS_PER_HOUR
+  );
+}
+
+export function isPlanStartAfterMs(value: unknown): value is number | null {
+  return (
+    value === null ||
+    (typeof value === "number" &&
+      Number.isSafeInteger(value) &&
+      value % 1_000 === 0 &&
+      value >= MIN_PLAN_START_AFTER_MS &&
+      value <= MAX_PLAN_START_AFTER_MS)
+  );
+}
+
 export function isAgentDefaults(value: unknown): value is AgentDefaults {
-  return isDynamicRecord(value) && AGENT_DEFAULT_KEYS.every((key) => isBoolean(value[key]));
+  return (
+    isDynamicRecord(value) &&
+    AGENT_DEFAULT_KEYS.every((key) => isBoolean(value[key])) &&
+    isPlanStartAfterMs(value.planStartAfterMs) &&
+    isAutomationRunsPerHour(value.automationRunsPerHour) &&
+    isBoolean(value.commitCoAuthor)
+  );
 }
 
 export function agentAutomationAllowed(
@@ -132,6 +191,8 @@ export interface AgentUsageLimitReturn extends AgentModelChoice {
    * value, from a newer build, reads as a usage limit, so the agent still goes back.
    */
   cause?: string | undefined;
+  /** True when fast mode was on at the model the agent left. The return turns it on again. */
+  fastMode?: boolean | undefined;
 }
 
 export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimitReturn {
@@ -139,7 +200,8 @@ export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimi
     isDynamicRecord(value) &&
     isAgentModelChoice(value) &&
     isReasoningEffort(value.reasoningEffort) &&
-    (value.cause === undefined || isString(value.cause))
+    (value.cause === undefined || isString(value.cause)) &&
+    (value.fastMode === undefined || isBoolean(value.fastMode))
   );
 }
 
@@ -263,8 +325,8 @@ export interface AgentSummary {
    */
   browserProfileId?: string;
   /**
-   * Whether the agent asks Codex for the fast service tier of its model. Local-only, like `access`.
-   * Absent means that OpenBot leaves the tier to Codex.
+   * Whether the agent asks its provider (Codex or Claude) for the fast service tier of its model. Local-only, like `access`.
+   * Absent means that OpenBot leaves the tier to the provider. A provider change turns it off.
    */
   fastMode?: boolean;
   /**
@@ -399,6 +461,11 @@ export interface CreateAgentInput {
   provider?: AgentProviderId;
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
+  /**
+   * The provider account the agent starts on. It applies only with `provider` and `model`. Absent
+   * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
+   */
+  providerAccountId?: string;
 }
 
 export interface UpdateAgentInput {

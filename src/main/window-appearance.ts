@@ -17,6 +17,8 @@ let current: AppAppearancePreference = {
   transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
   palette: null,
   palettes: [],
+  chatBackgroundLight: null,
+  chatBackgroundDark: null,
 };
 const listeners = new Set<() => void>();
 
@@ -55,6 +57,26 @@ export function followAppearance(window: BrowserWindow, darkColor: string): void
   follow(window, update);
 }
 
+/** Sets the saved transparent window choice before the first window is built, so it is built with the blur. */
+export function setInitialWindowGlass(transparentWindow: boolean): void {
+  current = { ...current, transparentWindow };
+}
+
+/**
+ * The constructor options of a window that `followWindowGlass` follows. Electron makes a macOS window
+ * translucent only when it is built with vibrancy. A window that gets its vibrancy later stays opaque
+ * to the compositor, which then draws the translucent page over what it drew before: on macOS 26 and
+ * later the previous chat shows through and the window flickers. A window built with vibrancy and no
+ * background color gets a clear background from Electron.
+ */
+export function glassWindowOptions(
+  darkColor: string,
+): { vibrancy: typeof GLASS_VIBRANCY } | { backgroundColor: string } {
+  return current.transparentWindow
+    ? { vibrancy: GLASS_VIBRANCY }
+    : { backgroundColor: windowBackgroundColor(darkColor) };
+}
+
 /**
  * Keeps the main window opaque or transparent, as the preference says, until the window closes. A
  * transparent window shows the macOS blur; the page then paints a translucent tint over it. The
@@ -62,8 +84,9 @@ export function followAppearance(window: BrowserWindow, darkColor: string): void
  * live blur. Main applies the saved preference before the window shows.
  */
 export function followWindowGlass(window: BrowserWindow, darkColor: string): void {
-  // The window is built opaque. A window opened again while the preference is on takes the blur here.
-  let glass = false;
+  // The window is built with `glassWindowOptions`, so it has the blur when the preference is on. A
+  // window built opaque takes the blur here when the preference turns on later.
+  let glass = current.transparentWindow;
   const update = () => {
     if (window.isDestroyed()) return;
     if (current.transparentWindow !== glass) {

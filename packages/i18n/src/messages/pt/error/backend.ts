@@ -65,6 +65,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "O modelo do líder do canal está indisponível.",
   "error.backend.contextCompactionIneffective":
     "A compactação não reduz este chat: após duas compactações, ele ainda usa {percent}% da janela de contexto do modelo, por isso o OpenBot para de compactá-lo. Ferramentas e instruções usam a maior parte da janela. Desative os servidores MCP ou o uso do computador de que este agente não precisa, ou escolha um modelo com uma janela maior. Depois, inicie um novo chat.",
+  "error.backend.contextCompactionStopped":
+    'Duas compactações seguidas deste chat falharam, então o OpenBot para de compactá-lo automaticamente. Cada tentativa envia o chat inteiro ao modelo e consome o limite do seu plano. Selecione "Compactar agora" para tentar de novo ou inicie um novo chat.',
   "error.backend.providerRetrying":
     "O provedor falhou nesta solicitação {attempts} vezes e tenta novamente. Se o agente não continuar, pare o turno.",
   "error.backend.providerRetryingLargeContext":
@@ -75,6 +77,13 @@ export const messages = {
     "O canal tem uma tarefa atribuída cujo início não foi confirmado. Verifique o resultado antes de excluí-lo.",
   "error.backend.channelNotFound": "Canal não encontrado.",
   "error.backend.channelMemberUnavailable": "Um membro do canal está indisponível.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Aguarde o trabalho neste canal terminar e depois inicie uma nova conversa.",
+  "error.backend.channelWaitBeforeCompact": "Aguarde o trabalho neste canal terminar e depois compacte-o.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Aguarde o trabalho neste canal terminar e depois exclua o histórico.",
+  "error.backend.channelCompactUnavailable":
+    "Nenhum membro deste canal pode compactar o contexto agora. Um membro precisa responder no canal primeiro, e o provedor dele precisa suportar compactação.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",
@@ -244,6 +253,10 @@ export const messages = {
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra as configurações de MCP e escolha Entrar.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} não conseguiu iniciar o servidor MCP {name}. Abra as configurações de MCP e escolha Testar conexão para ver a causa.",
   "error.backend.mcpOAuthProxyUnavailable":
     "O OpenBot não conseguiu iniciar a conexão local de login para este servidor. Reinicie o OpenBot e tente novamente.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -315,6 +328,19 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Já existe um perfil de navegador com este nome.",
   "error.backend.browserSessionInUse": "Uma aba ainda usa esta sessão do navegador. Tente novamente.",
   "error.backend.browserProfileLimit": "Você pode ter até {limit} perfis de navegador.",
+  "error.backend.browserProxyNotFound": "Este proxy não existe mais.",
+  "error.backend.browserProxyAddressInvalid":
+    "Digite um endereço de proxy, como socks5://host:1080 ou http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Você pode ter até {limit} proxies.",
+  "error.backend.browserProxyTaken": "Já existe um proxy com este endereço.",
+  "error.backend.browserProxyChanged":
+    "Este proxy mudou depois que você o abriu. Verifique-o novamente e tente de novo.",
+  "error.backend.browserProxyUnreachable": "O proxy {name} não responde, por isso a página não abriu.",
+  "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
+  "error.backend.browserProxyComputerUnreachable":
+    "O computador que este perfil usa não responde, por isso a página não abriu.",
+  "error.backend.browserCertificateUntrusted":
+    "O certificado de segurança deste site não é confiável, por isso a página não abriu.",
   "error.backend.browserLowMemory":
     "Este servidor está com pouca memória, por isso o navegador não pode abrir outra aba. Feche uma aba ou aguarde os outros agentes terminarem.",
   "error.backend.browserOpenFailed": "Não foi possível abrir {url}: {reason}",

@@ -1070,6 +1070,22 @@ export class D1AuthRepository implements AuthRepository {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly createServerClaimForUser = Effect.fn("D1AuthRepository.createServerClaimForUser")(
+    function* (
+      this: D1AuthRepository,
+      input: { claimHash: string; userId: string; createdAt: number; expiresAt: number },
+    ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
+      const database = yield* AuthDatabase;
+      yield* storeCall(() =>
+        database
+          .prepare("INSERT INTO server_claims(claim_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
+          .bind(input.claimHash, input.userId, input.createdAt, input.expiresAt)
+          .run(),
+      );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly redeemServerClaim = Effect.fn("D1AuthRepository.redeemServerClaim")(
     function* (
       this: D1AuthRepository,
@@ -1165,7 +1181,7 @@ export class D1AuthRepository implements AuthRepository {
 }
 
 /** Registers the new mobile session and replaces the earlier session of the same device. */
-function mobileSessionStatements(
+export function mobileSessionStatements(
   database: D1Database,
   input: { now: number; session: { id: string }; device: MobileAuthDeviceIdentity },
   linkHostId: string | null,

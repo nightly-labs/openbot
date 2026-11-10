@@ -57,6 +57,7 @@ export const messages = {
     "Bu ajanın görevleri çalışıyor. Sağlayıcıyı değiştirmeden önce bitmelerini bekleyin veya onları durdurun.",
   "error.agent.waitBeforeClearContext": "Yeni bir sohbet başlatmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.waitBeforeCompactContext": "Bağlamı sıkıştırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
+  "error.agent.waitBeforeDeleteHistory": "Geçmişi silmeden önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.compactContextUnavailable": "Bu ajan bağlamını şu anda sıkıştıramaz.",
   "error.agent.unknown": "Bilinmeyen ajan: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -74,6 +75,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.compactionConnectionLost":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",
@@ -104,6 +107,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Bu ayarı yalnızca ajanı çalıştıran bilgisayar değiştirebilir.",
   "error.agent.sideQuestionBusy": "Çok fazla yan soru çalışıyor. Kısa bir süre sonra tekrar deneyin.",
   "error.agent.sideQuestionFailed": "Ajan yan soruyu yanıtlayamadı. Tekrar deneyin.",
+  "error.agent.webSearchSignIn": "Web araması için bir ChatGPT hesabıyla Codex'te oturum açmanız gerekir.",
+  "error.agent.webSearchBusy": "Çalışan çok fazla arama ve yan soru var. Biraz sonra yeniden deneyin.",
+  "error.agent.webSearchFailed": "Web araması tamamlanmadı. Yeniden deneyin.",
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",

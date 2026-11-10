@@ -121,6 +121,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot arresta il server e sposta i suoi agenti, chat e file nel cestino.",
   "server.local.deleting": "Eliminazione del server…",
   "server.local.deletedTitle": "{name} eliminato",
+  "server.install.title": "Nuovo server su un altro computer",
+  "server.install.description":
+    "Esegui questo comando su un computer Linux o un VPS di tua proprietà. Installa OpenBot e aggiunge il server a questo account.",
+  "server.install.making": "Creazione di un comando per questo account…",
+  "server.install.failed": "OpenBot non è riuscito a creare un comando. Controlla la connessione a internet.",
+  "server.install.copyForAgent": "Copia per un agente IA",
+  "server.install.expiresIn": "Funziona una volta. Scade tra {time}.",
+  "server.install.newCommand": "Nuovo comando",
+  "server.install.waiting": "In attesa che il comando venga eseguito sul tuo server…",
+  "server.install.starting": "{name} ha effettuato l’accesso. Avvio del server…",
+  "server.install.connected": "{name} è connesso.",
+  "server.install.offline": "{name} è offline.",
+  "server.install.expired": "Questo comando è scaduto. Creane uno nuovo.",
+  "server.install.agentPrompt":
+    'Installa OpenBot su questo server Linux e collegalo al mio account OpenBot.\nEsegui questo comando come root. Non fa domande e richiede alcuni minuti:\n\n{command}\n\nTermina con la riga "OpenBot is connected to your account." e il codice di uscita 0.\nIl comando funziona una volta, per 15 minuti. Non salvarlo da nessuna parte.',
+  "server.install.setUpWithAgent": "Configura con un agente",
+  "server.install.sshAgentPrompt":
+    "Connettiti via SSH al mio server Linux e installa OpenBot come server.\n\nIndirizzo SSH (user@host):",
   "server.add.limit.title": "Questo account ha il numero massimo di server",
   "server.add.limit.description": {
     one: "Un account può avere {count} server a pagamento. Per aggiungerne un altro, eliminane prima uno.",
@@ -300,6 +318,7 @@ export const messages = {
   "server.settings.addLogo": "Aggiungi il logo del server",
   "server.settings.removeLogo": "Rimuovi il logo del server",
   "server.settings.access": "Accesso",
+  "server.companySignIn.desktopOnly": "Configura il single sign-on nell’app desktop di OpenBot.",
   "server.settings.publish": "Pubblica questo server",
   "server.settings.published": "Il server è pubblicato",
   "server.settings.setUpDesktopTitle": "Configura il desktop remoto",
@@ -321,6 +340,12 @@ export const messages = {
   "server.settings.memoryReviewOff": "Disattivata",
   "server.settings.memoryReviewTurns": { one: "Ogni {count} turno", other: "Ogni {count} turni" },
   "server.settings.memoryReviewLoadFailed": "Impossibile caricare l'impostazione della revisione delle memorie.",
+  "server.settings.skillLearning": "Apprendimento delle skill",
+  "server.settings.skillLearningDescription": "Se gli agenti di questo server salvano ciò che imparano come skill.",
+  "server.settings.skillLearningAutomatic": "Automatico",
+  "server.settings.skillLearningAsk": "Chiedi prima",
+  "server.settings.skillLearningOff": "Disattivato",
+  "server.settings.skillLearningLoadFailed": "Impossibile caricare l’impostazione di apprendimento delle skill.",
   "server.settings.remoteOnline": "L'host è online. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.remoteOffline": "L'host è offline. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.reachable": "Raggiungibile online. Solo le persone invitate possono accedere.",
@@ -442,8 +467,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "L'invito smette di funzionare. Le persone che si sono unite con esso restano membri.",
   "server.desktop.accessTitle": "Accesso al desktop remoto",
-  "server.desktop.gatewayDescription":
-    "Ogni membro attivo del server può controllare questo host. Non c'è una password separata per il desktop remoto.",
+  "server.desktop.gatewayPolicyDescription":
+    "Non c'è una password separata per il desktop remoto. Le impostazioni qui sotto scelgono chi può controllare questo computer.",
   "server.desktop.componentInstalled": "Componente dell'host installato",
   "server.desktop.componentNotInstalled": "Componente dell'host non installato",
   "server.desktop.sessions": "Non presidiato: {unattended} · Sessioni attive: {active}/{max}",
@@ -456,12 +481,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Riconnettiti all'host prima di aprire il suo desktop.",
   "server.desktop.hostUpdateDescription": "Aggiorna OpenBot sull'host per usare il controllo remoto.",
   "server.desktop.serviceAvailable": "Servizio disponibile",
-  "server.desktop.serviceAvailableDescription": "Il controllo WebRTC è disponibile per tutti i membri attivi.",
   "server.desktop.serviceNotReady": "Servizio non pronto",
   "server.desktop.serviceNotReadyDescription":
     "Avvia il controllo remoto per verificare i componenti e le autorizzazioni dell'host. L'host segnalerà eventuali errori di configurazione.",
   "server.desktop.remoteControl": "Controllo remoto",
   "server.desktop.startHint": "Avvia il controllo remoto dal pulsante del monitor nell'intestazione del server.",
+  "server.desktop.accessLabel": "Chi può controllare questo computer",
+  "server.desktop.accessDescription":
+    "I membri che possono aprire il desktop di questo computer da un altro dispositivo.",
+  "server.desktop.accessOwner": "Solo il proprietario",
+  "server.desktop.accessAdmins": "Proprietario e amministratori",
+  "server.desktop.accessMembers": "Tutti i membri",
+  "server.desktop.askLabel": "Chiedi su questo computer",
+  "server.desktop.askDescription":
+    "Ogni sessione attende che una persona a questo computer la consenta. Senza risposta entro 30 secondi, OpenBot la rifiuta.",
+  "server.desktop.activeTitle": "Sessioni di desktop remoto attive: {active}",
+  "server.desktop.activeDescription": "Termina subito ogni sessione. I membri possono chiedere di nuovo.",
+  "server.desktop.stopAll": "Interrompi tutto il controllo remoto",
+  "server.desktop.policyLoadFailed": "Impossibile caricare le impostazioni del controllo remoto.",
+  "server.desktop.policySaveFailed": "Impossibile salvare le impostazioni del controllo remoto.",
+  "server.desktop.stopFailed": "Impossibile interrompere il controllo remoto.",
   "server.settings.providersTitle": "Provider",
   "server.settings.providersDescription": "Gestisci i provider di IA del computer che esegue questo server.",
   "server.settings.providersSwitchNote": "Passa a {name} per gestire i suoi provider di IA.",
@@ -585,4 +624,12 @@ export const messages = {
   "server.restartNotice.restartingDescription":
     "OpenBot si riconnette automaticamente quando {name} torna disponibile.",
   "server.restartNotice.backTitle": "{name} è di nuovo online",
+  "server.settings.personalityTitle": "Personalità",
+  "server.settings.personalityDescription": "Scegli come ti parlano gli agenti di questo server.",
+  "server.settings.responseStyle": "Stile di risposta",
+  "server.settings.responseStyleDescription":
+    "Naturale: gli agenti inviano brevi aggiornamenti mentre lavorano e la chat li mostra. Classico: gli agenti rispondono una sola volta, alla fine.",
+  "server.settings.responseStyleNatural": "Naturale",
+  "server.settings.responseStyleClassic": "Classico",
+  "server.settings.personalityLoadFailed": "Impossibile caricare la personalità del server.",
 } as const satisfies PartialTranslation<typeof source>;

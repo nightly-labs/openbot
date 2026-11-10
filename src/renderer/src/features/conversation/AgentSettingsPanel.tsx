@@ -3,6 +3,9 @@ import {
   agentAutomationAllowed,
   agentNotificationLevelMap,
   assignedSkillCount,
+  type BrowserProfileSummary,
+  type BrowserProxyComputer,
+  type BrowserProxySummary,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
   type ServerNotificationLevel,
@@ -10,6 +13,8 @@ import {
 import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { BrowserProfileSelectProfile } from "@openbot/ui/features/browser/BrowserProfileSelect";
+import { browserProfileProxyNames } from "@openbot/ui/features/browser/BrowserProxies";
 import {
   type AgentInstructionsCalls,
   AgentInstructionsView,
@@ -66,7 +71,7 @@ interface AgentSettingsPanelProps
   instructionsRequest?: { agentId: string } | null | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
-  onOpenRoutineRun?: ((messageId: string) => void) | undefined;
+  onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
   /** Opens the side thread where a routine runs. Resolves false when the routine has no thread. */
   onOpenRoutineThread?: ((routineId: string) => Promise<boolean>) | undefined;
   skillsMode?: AgentSkillsMode | undefined;
@@ -83,6 +88,8 @@ interface AgentSettingsPanelProps
   eventRoutines?: EventRoutinesApi | undefined;
   /** The released schedule API of a client without the desktop port. Absent, preload sends it. */
   routines?: AgentRoutinesApi | undefined;
+  /** A joined host that advertises `routine-run-place-v1` keeps where each routine runs. */
+  routineRunPlace?: boolean | undefined;
   onCreateSkill?: (() => void) | undefined;
   onTrySkill?: ((skill: SkillDetail) => void) | undefined;
   /** Reads a file in the agent workspace, on the computer that runs the agent. */
@@ -103,6 +110,19 @@ interface AgentSettingsPanelProps
 }
 
 export type { AgentSkillsMode };
+
+/** Each named profile with the name of its proxy, as the server settings show it. */
+function profilesWithProxies(
+  state: {
+    profiles: readonly BrowserProfileSummary[] | undefined;
+    proxies: readonly BrowserProxySummary[] | undefined;
+    computers: readonly BrowserProxyComputer[] | undefined;
+  },
+  t: ReturnType<typeof useText>["t"],
+): BrowserProfileSelectProfile[] | undefined {
+  const names = browserProfileProxyNames(state.proxies ?? [], state.computers ?? [], t);
+  return state.profiles?.map((profile) => ({ ...profile, proxy: names.get(profile.id) }));
+}
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
@@ -182,7 +202,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     const current = hostChoice();
     if (!store || !manage || (!props.localHost && !current)) return undefined;
     return {
-      profiles: store.state.profiles,
+      profiles: profilesWithProxies(store.state, t),
       current,
       onChange: async (agentId, profile) => {
         const saved = await store.assign(agentId, profile);
@@ -200,6 +220,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       // Set only for the host on this computer, the one place the policy is kept.
       props.localHost === true,
       props.routines,
+      props.localHost === true || props.routineRunPlace === true,
     ),
   );
   const routinesPort = createMemo(() => {
@@ -435,6 +456,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
+      onUnshownSaveError={(message) =>
+        actionToast.error(message, {
+          id: "agent-settings-save-failed",
+          report: { operation: "settings", source: "action", cause_code: "unknown" },
+        })
+      }
       detailOpen={draft.routines.open || draft.files.open || draft.memories.open || draft.instructions.open}
       links={
         <>

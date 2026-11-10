@@ -5,6 +5,7 @@ import {
   DISCORD_UPLOAD_BYTES_LIMIT,
   type DiscordApiRequest,
   type DiscordButton,
+  type DiscordEmbed,
   type DiscordHistoryMessage,
   decodeDiscordChannels,
   decodeDiscordHistory,
@@ -75,7 +76,7 @@ const BUTTON_STYLES = { primary: "primary", danger: "danger" } as const;
 
 /**
  * The Discord side of one guild's connection. Every call goes through Signal, which holds the bot
- * token and refuses a call outside this host's guilds. Signal sends no post that can ping anyone. It
+ * token and refuses a call outside this host's guilds. Only a new text post can ping, and only a user. It
  * never logs message text or a response body.
  */
 class DiscordAdapter implements MessagingAdapter {
@@ -124,6 +125,8 @@ class DiscordAdapter implements MessagingAdapter {
         content: clip(body.text),
         replyTo: target.replyThreadId,
         buttons: buttons(body),
+        // Only with embeds: an older Signal refuses the key.
+        ...(body.embeds?.length ? { embeds: body.embeds } : {}),
       },
       decodeDiscordMessageId,
     );
@@ -219,6 +222,22 @@ class DiscordAdapter implements MessagingAdapter {
         firstId = yield* this.post(target, { text: first });
       }
     } else firstId = yield* this.post(target, { text: first });
+    for (const chunk of rest) yield* this.post(target, { text: chunk });
+    return firstId;
+  });
+
+  /**
+   * The text in as many posts as it needs, with the embeds on the first one: when Signal or Discord
+   * refuses the embeds, nothing is posted. Returns the id of the first post.
+   */
+  readonly postEmbeds = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    markdown: string,
+    embeds: DiscordEmbed[],
+  ) {
+    const [first = "", ...rest] = markdown ? chunkMarkdown(markdown, CHUNK_CHARACTERS) : [];
+    const firstId = yield* this.post(target, { text: first, embeds });
     for (const chunk of rest) yield* this.post(target, { text: chunk });
     return firstId;
   });
@@ -490,7 +509,7 @@ class DiscordAdapter implements MessagingAdapter {
     return this.#call({ op: "listRoles", guildId: this.#guildId }, decodeDiscordRoles);
   }
 
-  /** Signal posts with no mention allowed, so a mention shows the person and pings nobody. */
+  /** A new text post pings the person; an edit or a private reply shows the person and pings nobody. */
   mention(userId: string): string {
     return /^[0-9]+$/.test(userId) ? `<@${userId}>` : userId;
   }

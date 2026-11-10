@@ -9,17 +9,17 @@ import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import ChartColumn from "lucide-react-native/icons/chart-column";
+import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CircleX from "lucide-react-native/icons/circle-x";
 import EyeOff from "lucide-react-native/icons/eye-off";
+import ListChecks from "lucide-react-native/icons/list-checks";
 import ListRestart from "lucide-react-native/icons/list-restart";
 import Plus from "lucide-react-native/icons/plus";
 import Search from "lucide-react-native/icons/search";
 import Settings from "lucide-react-native/icons/settings";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
-import SquareCheck from "lucide-react-native/icons/square-check";
 import UsersRound from "lucide-react-native/icons/users-round";
 import {
   type ComponentProps,
@@ -629,14 +629,35 @@ export function HomeSearchBar({
   // clears it first.
   const touched = useRef(false);
   // A quick action of the app icon opens the search with the keyboard. The field registers it, so a
-  // request that comes while the list loads waits until the field and its input are mounted.
+  // request that comes while the list loads waits until the field and its input are mounted. A request
+  // that closes the screens over home comes before home shows again, and a hidden field takes no
+  // focus, so the field waits for home to have focus.
+  const navigation = useNavigation();
   useEffect(() => {
-    setHomeSearchOpener(() => {
+    let removeFocusListener: (() => void) | null = null;
+    const focusField = () => {
       touched.current = false;
       input.current?.focus();
+    };
+    setHomeSearchOpener(() => {
+      removeFocusListener?.();
+      removeFocusListener = null;
+      if (navigation.isFocused()) {
+        focusField();
+        return;
+      }
+      const remove = navigation.addListener("focus", () => {
+        remove();
+        removeFocusListener = null;
+        focusField();
+      });
+      removeFocusListener = remove;
     });
-    return () => setHomeSearchOpener(null);
-  }, [input]);
+    return () => {
+      removeFocusListener?.();
+      setHomeSearchOpener(null);
+    };
+  }, [input, navigation]);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reduced = useReducedMotion();
@@ -1059,7 +1080,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
             {
               id: "tasks",
               label: t("mobile.app.route.threads"),
-              icon: SquareCheck,
+              icon: ListChecks,
               href: { pathname: "/server-tasks", params: { serverId } } as const,
             },
           ]
@@ -1068,14 +1089,14 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
         ? [
             {
               id: "routines",
-              label: t("mobile.app.route.routines"),
+              label: t("mobile.app.route.schedule"),
               icon: CalendarClock,
               href: { pathname: "/server-routines", params: { serverId } } as const,
             },
             {
               id: "usage",
               label: t("mobile.app.route.usage"),
-              icon: ChartColumn,
+              icon: ChartArea,
               href: { pathname: "/server-usage", params: { serverId } } as const,
             },
             {
@@ -1194,7 +1215,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
         </View>
         <View className="flex-row items-start gap-2">
           <View className="pt-0.5">
-            <SquareCheck color={muted} size={16} strokeWidth={1.8} />
+            <ListChecks color={muted} size={16} strokeWidth={1.8} />
           </View>
           <Typography.Paragraph className="min-w-0 flex-1 text-muted" style={typeScale.caption}>
             {t("mobile.search.thread.how", { name: agent.name })}{" "}

@@ -4,6 +4,7 @@ import {
   CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelCommand,
   type ChannelMessage,
+  type ChannelTask,
   canAdministerServer,
   isReleasedRoutineSchedule,
   parseChannelCommand,
@@ -27,7 +28,14 @@ import {
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAgentLevel, requireReleasedSchedule, stringField } from "./request-helpers";
+import {
+  messageTextCut,
+  readJson,
+  requireAgentLevel,
+  requireReleasedSchedule,
+  stringField,
+  WEBRTC_FRAME_BODY_BUDGET,
+} from "./request-helpers";
 
 /**
  * The settings half of a channel is served from `AgentService`, the same object the IPC handlers
@@ -77,8 +85,27 @@ export async function routeChannels(
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
     requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
-    const page = channels.store.page(input.channelId, input.beforeSequence);
-    return json(200, { ...page, messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)) });
+    // Long messages, such as a member's thinking, make a page of fewer messages, so it fits one WebRTC
+    // frame. The client reads the rest as older pages. A page larger than the frame cannot reach a
+    // remote client.
+    for (let limit = 100; ; limit = Math.floor(limit / 2)) {
+      const page = channels.store.page(input.channelId, input.beforeSequence, limit);
+      let body = { ...page, messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)) };
+      let bytes = Buffer.byteLength(JSON.stringify(body));
+      if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
+        body = { ...body, tasks: pageTasks(body.tasks, body.messages) };
+        bytes = Buffer.byteLength(JSON.stringify(body));
+      }
+      if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, body);
+      if (limit === 1) {
+        // One message alone is too large: cut its text, so the channel opens and the older pages load.
+        const cut = messageTextCut(
+          body.messages.map((item) => item.message),
+          bytes - WEBRTC_FRAME_BODY_BUDGET,
+        );
+        return json(200, { ...body, messages: body.messages.map((item) => ({ ...item, message: cut(item.message) })) });
+      }
+    }
   }
   if (remove) {
     if (!capabilities.has(CHANNEL_DELETE_CAPABILITY))
@@ -90,7 +117,9 @@ export async function routeChannels(
     return empty(204);
   }
   if (settings) return routeChannelSettings(context, agents, channels, channelHiddenAgentIds);
-  const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
+  // `readJson` has already run the body through the channel wire codec, with the `isolated` of a peer
+  // that advertises channel-isolation-v1. A second pass through channels-v1 would drop it.
+  const input = parseChannelCommand(await readJson(request));
   requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
   if (input.type === "archive" && !canAdministerServer(member.role))
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
@@ -119,10 +148,28 @@ function seesChannel(members: readonly { agentId: string }[], hiddenAgentIds: Re
 }
 
 /** A channel that the list leaves out answers as a channel that does not exist. */
-function requireVisibleChannel(channels: ChannelService, channelId: string, hiddenAgentIds: ReadonlySet<string>): void {
+export function requireVisibleChannel(
+  channels: Pick<ChannelService, "store">,
+  channelId: string,
+  hiddenAgentIds: ReadonlySet<string>,
+): void {
   if (hiddenAgentIds.size === 0 || !channels.store.exists(channelId)) return;
   if (!seesChannel(channels.store.get(channelId).members, hiddenAgentIds))
     throw new HttpError(404, sourceText("error.backend.channelNotFound"));
+}
+
+/**
+ * The tasks that a page shows: every task of a run with open work (Stop, the stopped-task cards and
+ * the awaiting replies read them), and the tasks of the messages on the page. A channel keeps every
+ * task it ever had, one for each member of each request, so in a large channel the tasks alone
+ * passed one WebRTC frame and the channel did not open on a remote client (#6045).
+ */
+function pageTasks(tasks: readonly ChannelTask[], messages: readonly ChannelMessage[]): ChannelTask[] {
+  const openRuns = new Set(
+    tasks.flatMap((task) => (task.state === "completed" || task.state === "cancelled" ? [] : [task.rootTaskId])),
+  );
+  const shown = new Set(messages.map((item) => item.taskId));
+  return tasks.filter((task) => openRuns.has(task.rootTaskId) || shown.has(task.id));
 }
 
 /**

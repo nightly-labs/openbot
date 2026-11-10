@@ -25,6 +25,7 @@ const usageRows = accountUsageProviderRows({
       id: "cursor",
       primary: { usedPercent: 37, windowDurationMins: 43_200, resetsAt: nowSeconds + 18 * 86_400 },
       secondary: { usedPercent: 82, windowDurationMins: 43_200, resetsAt: nowSeconds + 18 * 86_400 },
+      tertiary: { usedPercent: 60, windowDurationMins: 43_200, resetsAt: nowSeconds + 18 * 86_400 },
     },
   ],
 });
@@ -90,6 +91,7 @@ function RailPreview(props: {
               onOpenChangelog={fn()}
               onOpenGuides={fn()}
               onOpenDiscord={fn()}
+              onReportProblem={fn()}
               onSendFeedback={fn()}
             />
           }

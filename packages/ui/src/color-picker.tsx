@@ -160,6 +160,8 @@ export interface ColorPickerProps {
   value: AvatarColor | null;
   /** Live: each drag frame, key, preset and field commit. */
   onChange: (value: AvatarColor | null) => void;
+  /** The name of the first swatch, which gives null. "No color" when it is absent. */
+  clearLabel?: string;
 }
 
 /** The area starts on this blue when there is no color yet. */
@@ -216,9 +218,17 @@ export function ColorPicker(props: ColorPickerProps) {
           />
         </Show>
       </div>
-      <Presets presets={props.presets} hex={hex()} cleared={cleared()} hsv={hsv()} update={update} clear={clear} />
-      <span class="ui-sr-only" aria-live="polite">
-        {cleared() ? t("settings.chatColor.none") : ""}
+      <Presets
+        presets={props.presets}
+        hex={hex()}
+        cleared={cleared()}
+        clearLabel={props.clearLabel ?? t("settings.chatColor.noColor")}
+        hsv={hsv()}
+        update={update}
+        clear={clear}
+      />
+      <span class="sr-only" aria-live="polite">
+        {cleared() ? (props.clearLabel ?? t("settings.chatColor.none")) : ""}
       </span>
     </fieldset>
   );
@@ -619,6 +629,7 @@ function Presets(props: {
   presets: readonly ColorPreset[];
   hex: string;
   cleared: boolean;
+  clearLabel: string;
   hsv: Hsv;
   update: (next: Hsv) => void;
   clear: () => void;
@@ -676,7 +687,7 @@ function Presets(props: {
         type="button"
         class="chat-color-picker-preset chat-color-none"
         data-preset="none"
-        aria-label={t("settings.chatColor.noColor")}
+        aria-label={props.clearLabel}
         aria-pressed={selected() === "none" ? "true" : "false"}
         onClick={props.clear}
       />

@@ -62,6 +62,13 @@ import {
 } from "./network-address";
 import { withTimeout } from "./with-timeout";
 
+/**
+ * OpenBot's OAuth client metadata document. `apps/auth-api` serves it, and its `redirect_uris`
+ * must hold every address that `redirectUrl` can be for this document. The `localhost` form comes
+ * only from an RFC 7591 registration, never from this document.
+ */
+const MCP_CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
+
 /** What one server's sign-in leaves behind, and all of it: nothing else is kept between runs. */
 export const mcpOAuthRecordSchema = z.object({
   /**
@@ -81,7 +88,11 @@ export const mcpOAuthRecordSchema = z.object({
       issuer: z.string().optional(),
     })
     .optional(),
-  /** This installation's registration with that authorization server, from RFC 7591. */
+  /**
+   * This installation's registration with that authorization server, from RFC 7591. For a client
+   * metadata document it is the document URL, and `redirect_uris` holds the address of the run that
+   * used it, so a run on another address uses the document again.
+   */
   client: OAuthClientInformationFullSchema.optional(),
   tokens: OAuthTokensSchema.optional(),
   /** When `tokens` arrived. `expires_in` is a duration, and a duration alone names no moment. */
@@ -252,6 +263,8 @@ export interface McpOAuthAuthority {
   needsSignIn: (url: string) => boolean;
   /** Whether this computer keeps a sign-in for this URL: current, expired, or ended by the server. */
   hasSignIn: (url: string) => boolean;
+  /** Whether Sign in would open a page for a server that answered without one. See `McpOAuth.offersSignIn`. */
+  offersSignIn: (url: string) => Effect.Effect<boolean>;
   /** Drops the tokens and keeps the sign-in app, so the next sign-in uses the same app. */
   signOut: (url: string) => Effect.Effect<void, McpOperationError>;
   /** Drops everything kept for this URL, the sign-in app included. Used when the row is removed. */
@@ -468,33 +481,8 @@ export class McpOAuth implements McpOAuthAuthority {
           return yield* withTimeout(
             Effect.gen(function* () {
               // A server that answers without a sign-in and names no authorization server takes none:
-              // the SDK would otherwise guess `/authorize` at the server's own origin. Any answer
-              // below 500 is such a server: a 404, a refusal, or a page that is not metadata. No
-              // answer, a server error, or a busy server (408, 429) says nothing about the server. It
-              // must not end the sign-in as if the server asked for none: that left the row showing
-              // the result of the earlier test, with no page and no words.
-              let metadataStatus: number | null = null;
-              const metadataFetch: FetchLike = async (input, init) => {
-                metadataStatus = null;
-                const response = await fetchFn(input, init);
-                metadataStatus = response.status;
-                return response;
-              };
-              const metadata = yield* mcpCall(() =>
-                discoverOAuthProtectedResourceMetadata(resource, undefined, metadataFetch),
-              ).pipe(
-                Effect.catch(() => {
-                  if (
-                    metadataStatus !== null &&
-                    metadataStatus < 500 &&
-                    metadataStatus !== 408 &&
-                    metadataStatus !== 429
-                  )
-                    return Effect.succeed(null);
-                  return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
-                }),
-              );
-              if (!metadata?.authorization_servers?.length) return false;
+              // the SDK would otherwise guess `/authorize` at the server's own origin.
+              if (!(yield* namesAuthorizationServer(resource, fetchFn))) return false;
               return (yield* mcpCall(() => auth(provider, { serverUrl: resource, fetchFn }))) === "REDIRECT";
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
@@ -598,6 +586,26 @@ export class McpOAuth implements McpOAuthAuthority {
     const record = key === null ? undefined : this.#options.storage.read(key);
     return record?.tokens !== undefined || record?.lostAt !== undefined;
   }
+
+  /**
+   * Whether Sign in would open a page for a server that answered without one: no token is on file,
+   * and its metadata names an authorization server. Some servers list their tools to anyone and want
+   * a token only to run one. Public documents only; a read that fails is a no, because nobody
+   * pressed Sign in to see its error.
+   */
+  readonly offersSignIn = Effect.fn("McpOAuth.offersSignIn")(function* (this: McpOAuth, url: string) {
+    const key = mcpOAuthAccountKey(url);
+    if (!key || this.#options.storage.read(key)?.tokens) return false;
+    const controller = new AbortController();
+    return yield* namesAuthorizationServer(mcpOAuthServerUrl(key), this.#fetch(key, controller.signal)).pipe(
+      Effect.timeoutOrElse({
+        duration: this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
+        orElse: () => Effect.succeed(false),
+      }),
+      Effect.catch(() => Effect.succeed(false)),
+      Effect.ensuring(Effect.sync(() => controller.abort())),
+    );
+  });
 
   get redirectUrl(): string {
     return this.#options.redirectUrl;
@@ -838,6 +846,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #activeIssuer: string | undefined;
   /** Full discovery for this attempt, including custom protected-resource metadata. */
   #discoveryState: OAuthDiscoveryState | undefined;
+  /**
+   * The client metadata document (CIMD, SEP-991) that names OpenBot. Set in `saveDiscoveryState`
+   * only for an authorization server with no RFC 7591 registration endpoint; ElevenLabs accepts only
+   * this. The SDK uses it only when the server sets `client_id_metadata_document_supported`. A server
+   * with a registration endpoint keeps the registration, so a sign-in that works now does not change
+   * to a different client.
+   */
+  clientMetadataUrl?: string;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
   #registrationPending = false;
   /** The status the authorization server answered the pending registration with. */
@@ -845,10 +861,21 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
+    this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
   }
 
+  /** The `localhost` form of this run's loopback address, for a server that refuses `127.0.0.1`. */
+  readonly #localhostRedirectUrl: string | null;
+
+  /**
+   * This run's address, or its `localhost` form when the registration on file names that form. A
+   * server that refused `127.0.0.1` registered that form (#5584), and the authorization request and
+   * the token request must send the address that was registered.
+   */
   get redirectUrl(): string {
-    return this.#options.redirectUrl;
+    const { app, client } = this.#record();
+    const localhost = this.#localhostRedirectUrl;
+    return localhost && !app && client?.redirect_uris.includes(localhost) ? localhost : this.#options.redirectUrl;
   }
 
   /**
@@ -944,7 +971,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       return this.#register();
     }
     if (!this.#options.state || this.#exchangingCode) return client;
-    if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
+    // A registration made before its scope named `offline_access` refuses the request that adds it.
+    // Only a scope from the resource's metadata is checked: with no scope to send, nothing is added.
+    const discovery = this.#discoveryState;
+    const scopeAllowed =
+      !client.scope ||
+      !discovery?.resourceMetadata?.scopes_supported?.length ||
+      !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
+    if (client.redirect_uris.includes(this.redirectUrl) && scopeAllowed) return client;
     const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
     this.#redirectAddressChecked = true;
     return refreshWorthTrying ? client : this.#register();
@@ -961,15 +995,45 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   /**
    * Matched by address, not by `#registrationPending`: the SDK also registers when it drops a
    * client bound to another issuer, which this provider never hears about.
+   *
+   * The registration asks for the scope the authorization request will ask for, `offline_access`
+   * included (SEP-2207). A server that limits a client to its registered scope refused the request
+   * otherwise: ActiveCampaign answered `invalid_scope` at the authorization page (#5419).
+   *
+   * A server that refuses the `127.0.0.1` address gets one more registration with the `localhost`
+   * form of the same address, which the listener also answers. The MCP authorization specification
+   * names `localhost` redirects, and some servers accept only that name (#5584).
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
-      const response = await fetch(input, init);
       const registrationUrl = this.#registrationUrl();
-      if (init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl)
-        this.#registrationStatus = response.status;
+      const registering =
+        init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl;
+      if (!registering) return fetch(input, init);
+      const request = this.#withOfflineAccessRegistration(init);
+      let response = await fetch(input, request);
+      const retry = this.#withLocalhostRedirect(request);
+      if (retry && (await refusesRedirectAddress(response))) response = await fetch(input, retry);
+      this.#registrationStatus = response.status;
       return response;
     };
+  }
+
+  /** The registration body with the `localhost` address, or `null` when it does not send this run's `127.0.0.1` address. */
+  #withLocalhostRedirect(init: RequestInit): RequestInit | null {
+    const localhost = this.#localhostRedirectUrl;
+    if (!localhost || typeof init.body !== "string") return null;
+    const body = registrationBodySchema.parse(JSON.parse(init.body));
+    if (body.redirect_uris?.length !== 1 || body.redirect_uris[0] !== this.#options.redirectUrl) return null;
+    return { ...init, body: JSON.stringify({ ...body, redirect_uris: [localhost] }) };
+  }
+
+  /** The SDK's registration body, with the `offline_access` that `withOfflineAccess` will request. */
+  #withOfflineAccessRegistration(init: RequestInit): RequestInit {
+    if (typeof init.body !== "string") return init;
+    const body = registrationBodySchema.parse(JSON.parse(init.body));
+    const scope = scopeWithOfflineAccess(body.scope ?? null, this.#discoveryState?.authorizationServerMetadata);
+    return scope ? { ...init, body: JSON.stringify({ ...body, scope }) } : init;
   }
 
   /** Where the SDK registers: the advertised endpoint, or `/register` when no metadata was found. */
@@ -1008,6 +1072,15 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (app) {
           if (!app.issuer && typeof information.issuer === "string" && information.client_id === app.clientId)
             yield* this.#save({ app: { ...app, issuer: information.issuer } });
+          return;
+        }
+        // For a client metadata document the SDK passes only its URL and the issuer. The store
+        // refuses a client with no `redirect_uris`, so the address of this run is added, as a
+        // registration has it. A later run on another port then uses the document again.
+        if (information.client_id === MCP_CLIENT_METADATA_URL) {
+          yield* this.#save({
+            client: { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" },
+          });
           return;
         }
         yield* this.#save({ client: information });
@@ -1171,6 +1244,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         this.#activeIssuer = discovery.authorizationServerUrl;
         this.#discoveryState = discovery;
+        const metadata = discovery.authorizationServerMetadata;
+        if (metadata && !metadata.registration_endpoint) this.clientMetadataUrl = MCP_CLIENT_METADATA_URL;
         // A pre-1.31 record has no safe issuer when its discovery state is absent. Do not let a
         // malicious resource install its authorization server as the binding for that record.
         // When old discovery exists, keep it until the old credentials have been stamped.
@@ -1320,6 +1395,33 @@ function mcpOAuthServerUrl(key: string): string {
   return normalizeResource(key) ?? key;
 }
 
+/**
+ * Whether the server publishes protected-resource metadata that names an authorization server, which
+ * is what a sign-in needs to open a page. Any answer below 500 that is not such metadata says no: a
+ * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
+ * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
+ * none, which left the row showing the result of the earlier test, with no page and no words.
+ */
+const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+  let metadataStatus: number | null = null;
+  const metadataFetch: FetchLike = async (input, init) => {
+    metadataStatus = null;
+    const response = await fetchFn(input, init);
+    metadataStatus = response.status;
+    return response;
+  };
+  const metadata = yield* mcpCall(() =>
+    discoverOAuthProtectedResourceMetadata(resource, undefined, metadataFetch),
+  ).pipe(
+    Effect.catch(() => {
+      if (metadataStatus !== null && metadataStatus < 500 && metadataStatus !== 408 && metadataStatus !== 429)
+        return Effect.succeed(null);
+      return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
+    }),
+  );
+  return Boolean(metadata?.authorization_servers?.length);
+});
+
 /** A legacy binding is useful only when it names an endpoint this client would send credentials to. */
 function legacyIssuer(record: McpOAuthRecord | null): string | undefined {
   const issuer = record?.discovery?.authorizationServerUrl;
@@ -1410,13 +1512,54 @@ function withAppScope(authorizationUrl: URL, app: McpOAuthApp | undefined): URL 
  * `offline_access` would replace.
  */
 function withOfflineAccess(authorizationUrl: URL, metadata: OAuthDiscoveryState["authorizationServerMetadata"]): URL {
-  const scope = authorizationUrl.searchParams.get("scope");
-  if (!scope || !metadata?.scopes_supported?.includes("offline_access")) return authorizationUrl;
-  if (scope.split(/\s+/).includes("offline_access")) return authorizationUrl;
+  const scope = scopeWithOfflineAccess(authorizationUrl.searchParams.get("scope"), metadata);
+  if (!scope) return authorizationUrl;
   const url = new URL(authorizationUrl);
-  url.searchParams.set("scope", `${scope} offline_access`);
+  url.searchParams.set("scope", scope);
   if (!url.searchParams.has("prompt")) url.searchParams.set("prompt", "consent");
   return url;
+}
+
+/** The fields of the SDK's registration body that `watchRegistration` changes; the rest stays. */
+const registrationBodySchema = z.looseObject({
+  scope: z.string().optional(),
+  redirect_uris: z.array(z.string()).optional(),
+});
+
+const registrationErrorSchema = z.looseObject({ error: z.string() });
+
+/**
+ * Whether a registration answer refuses the redirect address. RFC 7591 names `invalid_redirect_uri`
+ * for that; a server can also answer `invalid_client_metadata`, as #5584's does. A copy is read, so
+ * the SDK still reads the answer that is kept. The secure fetch has already limited the body.
+ */
+async function refusesRedirectAddress(response: Response): Promise<boolean> {
+  if (response.status !== 400) return false;
+  const body = registrationErrorSchema.safeParse(
+    await response
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+  return body.success && (body.data.error === "invalid_redirect_uri" || body.data.error === "invalid_client_metadata");
+}
+
+/** The `localhost` form of a `127.0.0.1` loopback address, or `null` for any other address. */
+function localhostRedirectUrl(redirectUrl: string): string | null {
+  const url = URL.parse(redirectUrl);
+  if (url?.protocol !== "http:" || url.hostname !== "127.0.0.1") return null;
+  url.hostname = "localhost";
+  return url.href;
+}
+
+/** `scope` with `offline_access` added, or `null` when `withOfflineAccess` leaves it as it is. */
+function scopeWithOfflineAccess(
+  scope: string | null,
+  metadata: OAuthDiscoveryState["authorizationServerMetadata"],
+): string | null {
+  if (!scope || !metadata?.scopes_supported?.includes("offline_access")) return null;
+  if (scope.split(/\s+/).includes("offline_access")) return null;
+  return `${scope} offline_access`;
 }
 
 /**

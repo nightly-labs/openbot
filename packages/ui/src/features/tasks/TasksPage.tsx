@@ -8,19 +8,24 @@ import {
   taskTone,
 } from "@openbot/team-client/agent-tasks";
 import {
+  ActiveCurrentRow,
   ArrowLeft,
   ArrowUp,
   Button,
   buttonVariants,
   Check,
   ChevronDown,
-  DropdownMenu,
+  Combobox,
   IconButton,
   LoaderCircle,
   Mic,
   PanelLeft,
+  Popover,
+  Search,
   X,
 } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { SwapLabel, type SwapMotion } from "@openbot/ui/components/SwapLabel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -41,10 +46,22 @@ import {
   VoiceRecordingMorph,
   voiceButtonLabel,
 } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
+import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, createUniqueId, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  createUniqueId,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { TasksEmptyBoard, TasksEmptyPitch } from "./TasksEmpty";
 
 /** The microphone of the Tasks composer. The page shows it; the app records and transcribes. */
@@ -59,6 +76,8 @@ export interface TasksVoice {
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
+  /** True while another message box on the page records. */
+  blocked?: boolean | undefined;
 }
 
 /** The task of the last start, in the line under the composer. */
@@ -113,10 +132,18 @@ interface TasksPageProps {
   onSelect: (taskId: string | null) => void;
   /** The conversation of one task, for the side panel. */
   panel: (taskId: string) => JSX.Element;
+  /** The width of the side panel that the user chose, in pixels. A narrow page shows it narrower. */
+  sideWidth: number;
+  /** Each move of the side panel edge. */
+  onSideResize: (width: number) => void;
+  /** The width at the end of a move, to keep for the next visit. */
+  onSideResizeEnd: (width: number) => void;
   /** What the task's running turn waits for from the person: an approval, or an answer in the chat. */
   waitOf?: ((task: AgentTask) => AgentTaskWait) | undefined;
   /** The user's send shortcut for the composer. */
   sendShortcut?: SendShortcut | undefined;
+  /** The window draws the macOS window controls over the image viewer's top start corner. */
+  macWindowControls?: boolean | undefined;
 }
 
 const agentOf = (agents: readonly AgentProfile[], agentId: string) => agents.find((agent) => agent.id === agentId);
@@ -129,9 +156,102 @@ const AGENT_SWAP: SwapMotion = {
   leave: { duration: 180, easing: "ease" },
 };
 
+/** Lower case, no accents, and `_`, `/` and `-` as spaces: "cafe" finds "Café Orders". */
+const foldChar = (char: string) =>
+  char
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[\s_/-]/g, " ");
+
 /**
- * The agent of a task, as a menu with the agent's face. A task has one agent, so the menu marks only
- * the chosen agent, as the routine trigger menu does.
+ * The folded text, and for each of its code units the index of the character in `text` that made
+ * it. Folding can change the length, so this map finds the matched part in the original name.
+ * A run of spaces and separators becomes one space: "Sales - EU" is "sales eu".
+ */
+function foldName(text: string) {
+  let folded = "";
+  const source: number[] = [];
+  let index = 0;
+  for (const char of text) {
+    const raw = foldChar(char);
+    const part = raw === " " && folded.endsWith(" ") ? "" : raw;
+    folded += part;
+    for (let unit = 0; unit < part.length; unit++) source.push(index);
+    index += char.length;
+  }
+  return { folded, source };
+}
+
+/** Where `query` is in `name`, and its rank: 0 at the start, 1 at the start of a word, 2 in a word. */
+function findMatch(name: string, query: string): { at: number; rank: number } | undefined {
+  if (name.startsWith(query)) return { at: 0, rank: 0 };
+  const first = name.indexOf(query);
+  for (let at = first; at > 0; at = name.indexOf(query, at + 1)) {
+    if (name[at - 1] === " ") return { at, rank: 1 };
+  }
+  return first < 0 ? undefined : { at: first, rank: 2 };
+}
+
+/** Names that start with the query, or have a word that does, come before names that only contain it. */
+function matchAgents(agents: readonly AgentProfile[], query: string): AgentProfile[] {
+  const text = foldName(query.trim()).folded;
+  if (!text) return [...agents];
+  return agents
+    .flatMap((agent) => {
+      const match = findMatch(foldName(agent.name).folded, text);
+      return match ? [{ agent, rank: match.rank }] : [];
+    })
+    .sort((a, b) => a.rank - b.rank)
+    .map((row) => row.agent);
+}
+
+/** The agent name with the matched part in bold, so the eye finds why a row is in the list. */
+function MatchedAgentName(props: { name: string; query: string }) {
+  const parts = createMemo(() => {
+    const text = foldName(props.query.trim()).folded;
+    const name = foldName(props.name);
+    const match = text ? findMatch(name.folded, text) : undefined;
+    if (!match) return { before: props.name, match: "", after: "" };
+    const start = name.source[match.at] ?? 0;
+    const end = name.source[match.at + text.length] ?? props.name.length;
+    return {
+      before: props.name.slice(0, start),
+      match: props.name.slice(start, end),
+      after: props.name.slice(end),
+    };
+  });
+  return (
+    <span class="tasks-page-agent-name">
+      {parts().before}
+      <Show when={parts().match}>
+        <b>{parts().match}</b>
+      </Show>
+      {parts().after}
+    </span>
+  );
+}
+
+/**
+ * Kobalte finds a row with an unescaped `[data-key="…"]` selector, to scroll it into view and to
+ * name the active row. A key with `"`, `\` or U+0000 matches no row, so the key is encoded.
+ */
+const agentKey = (id: string) => encodeURIComponent(id);
+
+/**
+ * True when the window has space under the trigger for the search field and three rows. The menu
+ * opens down, and opens up only when it would show no row there.
+ */
+function roomBelow(trigger: HTMLElement | undefined): boolean {
+  if (!trigger) return true;
+  const row = Number.parseFloat(getComputedStyle(trigger).getPropertyValue("--openbot-control-md")) || 32;
+  return window.innerHeight - trigger.getBoundingClientRect().bottom >= 5 * row;
+}
+
+/**
+ * The agent of a task, as a menu with the agent's face and a search field. A server can have many
+ * agents: typing filters the rows, the arrows move through them, and Enter takes the active row or
+ * the first match. A task has one agent, so the menu marks only the chosen agent.
  */
 function TaskAgentSelect(props: {
   agents: AgentProfile[];
@@ -143,15 +263,63 @@ function TaskAgentSelect(props: {
   const { t } = useText();
   const agent = () => agentOf(props.agents, props.agentId);
   let shownId = untrack(() => props.agentId);
+  const [open, setOpen] = createSignal(false);
+  const [query, setQuery] = createSignal("");
+  const matches = createMemo(() => matchAgents(props.agents, query()));
+  const fades = createScrollFades();
+  // Kobalte scrolls the current row into view before the list has its final height. So when the
+  // list resizes, the active row comes back into view.
+  let resize: ResizeObserver | undefined;
+  const keepActiveRow = () => {
+    const id = input?.getAttribute("aria-activedescendant");
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" });
+  };
+  onCleanup(() => {
+    fades.stop();
+    resize?.disconnect();
+  });
+  const [placement, setPlacement] = createSignal<"bottom-start" | "top-start">("bottom-start");
+  let trigger: HTMLElement | undefined;
+  let input: HTMLInputElement | undefined;
+  let panel: HTMLElement | undefined;
+  let list: HTMLElement | undefined;
+  const choose = (option: AgentProfile) => {
+    setOpen(false);
+    if (option.id !== props.agentId) props.onChange(option.id);
+  };
+  const toggle = (next: boolean) => {
+    if (next) {
+      setQuery("");
+      setPlacement(roomBelow(trigger) ? "bottom-start" : "top-start");
+    }
+    setOpen(next);
+  };
   return (
-    <DropdownMenu.Root placement="bottom-start" gutter={4}>
-      <DropdownMenu.Trigger
+    <Popover.Root
+      open={open()}
+      onOpenChange={toggle}
+      placement={placement()}
+      gutter={4}
+      // The list shrinks to the space next to the trigger, so it does not flip when a search adds rows.
+      flip={false}
+      modal
+    >
+      <Popover.Trigger
+        ref={(element: HTMLElement) => {
+          trigger = element;
+        }}
         class={`${buttonVariants({ variant: "ghost", size: "sm" })} tasks-page-agent`}
         aria-label={
           props.title === undefined
             ? t("conversation.tasks.page.agent", { name: agent()?.name ?? props.agentId })
             : t("conversation.tasks.page.reassign", { title: props.title, name: agent()?.name ?? props.agentId })
         }
+        onKeyDown={(event: KeyboardEvent) => {
+          // The arrow keys open the menu, as on a select.
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          toggle(true);
+        }}
       >
         {/* Keyed by agent, so the face of a newly chosen agent springs in, as the model mark does. */}
         <For each={[props.agentId]} keyed={(id) => id}>
@@ -167,25 +335,99 @@ function TaskAgentSelect(props: {
         </For>
         <SwapLabel text={agent()?.name ?? props.agentId} motion={AGENT_SWAP} />
         <ChevronDown class="tasks-page-agent-chevron" aria-hidden="true" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content class="tasks-page-agent-menu">
-          <DropdownMenu.RadioGroup value={props.agentId} onChange={(value) => props.onChange(value)}>
-            <For each={props.agents} keyed={(option) => option.id}>
-              {(option) => (
-                <DropdownMenu.RadioItem value={option().id} closeOnSelect class="tasks-page-agent-option">
-                  <AgentAvatar agent={option()} class="tasks-page-avatar" />
-                  <span>{option().name}</span>
-                  <Show when={props.agentId === option().id}>
-                    <Check aria-hidden="true" class="tasks-page-agent-check" />
-                  </Show>
-                </DropdownMenu.RadioItem>
-              )}
-            </For>
-          </DropdownMenu.RadioGroup>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          ref={(element: HTMLElement) => {
+            panel = element;
+          }}
+          class="ui-action-menu tasks-page-agent-menu"
+          aria-label={t("conversation.tasks.page.agents")}
+        >
+          <ContentExitMotion panel={() => panel} />
+          <Combobox.Root<AgentProfile>
+            class="tasks-page-agent-picker"
+            options={matches()}
+            optionValue={(option) => agentKey(option.id)}
+            optionTextValue="name"
+            optionLabel="name"
+            open={true}
+            modal={false}
+            triggerMode="manual"
+            allowsEmptyCollection={true}
+            shouldFocusWrap={true}
+            defaultFilter={() => true}
+            onInputChange={(value) => {
+              setQuery(value);
+              // A new search starts at the best match.
+              if (list) list.scrollTop = 0;
+            }}
+            onOpenChange={(next) => {
+              if (!next) setOpen(false);
+            }}
+            onChange={(option) => {
+              if (option) choose(option);
+            }}
+            itemComponent={(item) => (
+              <Combobox.Item
+                item={item.item}
+                class="tasks-page-agent-option"
+                // The combobox has no selection, so the row says that it is the current agent.
+                aria-selected={item.item.rawValue.id === props.agentId ? "true" : "false"}
+              >
+                <AgentAvatar agent={item.item.rawValue} class="tasks-page-avatar" />
+                <MatchedAgentName name={item.item.rawValue.name} query={query()} />
+                <Show when={item.item.rawValue.id === props.agentId}>
+                  <Check aria-hidden="true" class="tasks-page-agent-check" />
+                </Show>
+              </Combobox.Item>
+            )}
+          >
+            <Combobox.Control class="tasks-page-agent-search">
+              <Search aria-hidden="true" />
+              <Combobox.Input
+                ref={(element: HTMLInputElement) => {
+                  input = element;
+                }}
+                class="tasks-page-agent-search-input"
+                aria-label={t("conversation.tasks.page.searchAgents")}
+                placeholder={t("conversation.tasks.page.searchAgents")}
+                autocomplete="off"
+                spellcheck={false}
+                onKeyDown={(event: KeyboardEvent) => {
+                  // After typing, no row is active: then Enter takes the first match.
+                  if (event.key !== "Enter" || event.isComposing || !query().trim()) return;
+                  if (input?.getAttribute("aria-activedescendant")) return;
+                  const [first] = matches();
+                  if (!first) return;
+                  event.preventDefault();
+                  choose(first);
+                }}
+              />
+            </Combobox.Control>
+            <ActiveCurrentRow key={agentKey(props.agentId)} />
+            <Combobox.Listbox
+              ref={(element: HTMLElement) => {
+                list = element;
+                fades.bind(element);
+                resize?.disconnect();
+                resize = new ResizeObserver(keepActiveRow);
+                resize.observe(element);
+              }}
+              class={["tasks-page-agent-list", fades.classes()]}
+              style={{ "--tasks-agent-rows": String(matches().length) }}
+              onScroll={fades.measure}
+              aria-label={t("conversation.tasks.page.agents")}
+            />
+            <Show when={matches().length === 0}>
+              <p class="tasks-page-agent-empty" role="status">
+                {t("conversation.tasks.page.noAgent", { query: query().trim() })}
+              </p>
+            </Show>
+          </Combobox.Root>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -241,6 +483,7 @@ function TasksComposer(props: TasksPageProps) {
           pending={props.pendingImages}
           removeDisabled={phase() === "transcribing"}
           onRemove={(attachment) => props.onRemoveFile?.(attachment)}
+          macWindowControls={props.macWindowControls}
         />
         <div class="composer-input-label">
           <ComposerEditor
@@ -285,7 +528,7 @@ function TasksComposer(props: TasksPageProps) {
                       variant="ghost"
                       class="dictation-button"
                       aria-label={t(voiceButtonLabel(phase()))}
-                      disabled={busy()}
+                      disabled={busy() || voice().blocked === true}
                       onClick={() => voice().onStart()}
                     >
                       <Show when={busy()} fallback={<Mic aria-hidden="true" />}>
@@ -455,6 +698,11 @@ function TasksList(props: TasksPageProps) {
 /** The close transition is 200ms; this ends a close whose `transitionend` does not come. */
 const SIDE_CLOSE_FALLBACK_MS = 300;
 
+export const TASKS_SIDE_DEFAULT = 420;
+export const TASKS_SIDE_MIN = 320;
+/** What the list keeps for itself, however far the side panel is dragged. */
+const TASKS_LIST_MIN = 320;
+
 /**
  * The task panel at the right of the page. It makes the list narrower; it does not cover it. The
  * panel slides in from the right and out again, so it stays shown until its close ends.
@@ -464,8 +712,23 @@ function TasksSidePanel(props: {
   taskId: string | null;
   panel: (taskId: string) => JSX.Element;
   onClose: () => void;
+  width: number;
+  onResize: (width: number) => void;
+  onResizeEnd: (width: number) => void;
 }) {
-  const [view, setView] = createStore({ shownId: untrack(() => props.taskId), closing: false });
+  const { t } = useText();
+  const sideId = createUniqueId();
+  const [view, setView] = createStore<{
+    shownId: string | null;
+    closing: boolean;
+    /** The width of the page, once measured. A narrow page makes the panel narrower, not the saved width. */
+    pageWidth: number | null;
+  }>({ shownId: untrack(() => props.taskId), closing: false, pageWidth: null });
+  let side: HTMLDivElement | undefined;
+  /** The list keeps its minimum; a page too narrow for both keeps the panel minimum. */
+  const maxFor = (page: number | null | undefined) =>
+    page == null ? Number.POSITIVE_INFINITY : Math.max(TASKS_SIDE_MIN, page - TASKS_LIST_MIN);
+  const width = () => Math.round(Math.min(maxFor(view.pageWidth), Math.max(TASKS_SIDE_MIN, props.width)));
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
   const finishClose = () => {
     clearTimeout(closeTimer);
@@ -527,7 +790,10 @@ function TasksSidePanel(props: {
         });
         return (
           <div
+            ref={(element) => (side = element)}
+            id={sideId}
             class="tasks-page-side"
+            style={{ "--tasks-page-side-width": `${width()}px` }}
             data-closing={view.closing ? "" : undefined}
             onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "flex-basis" && view.closing) {
@@ -535,18 +801,38 @@ function TasksSidePanel(props: {
               }
             }}
           >
-            <For each={[taskId()]} keyed={(id) => id}>
-              {(id) => {
-                const current = untrack(id);
-                const entering = contentId !== null && contentId !== current;
-                contentId = current;
-                return (
-                  <div class="tasks-page-side-content" data-entering={entering ? "" : undefined}>
-                    {props.panel(current)}
-                  </div>
-                );
-              }}
-            </For>
+            <PanelResizer
+              class="right-panel-resizer"
+              label={t("conversation.tasks.panel.resize")}
+              controls={sideId}
+              direction="right"
+              value={width()}
+              defaultValue={TASKS_SIDE_DEFAULT}
+              min={TASKS_SIDE_MIN}
+              max={() => maxFor(side?.parentElement?.clientWidth)}
+              onResize={props.onResize}
+              onResizeEnd={props.onResizeEnd}
+              onParentResize={() =>
+                setView((draft) => {
+                  draft.pageWidth = side?.parentElement?.clientWidth ?? null;
+                })
+              }
+            />
+            {/* The panel clips its content while it opens and closes; the edge handle stays outside the clip. */}
+            <div class="tasks-page-side-clip">
+              <For each={[taskId()]} keyed={(id) => id}>
+                {(id) => {
+                  const current = untrack(id);
+                  const entering = contentId !== null && contentId !== current;
+                  contentId = current;
+                  return (
+                    <div class="tasks-page-side-content" data-entering={entering ? "" : undefined}>
+                      {props.panel(current)}
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
           </div>
         );
       }}
@@ -632,6 +918,9 @@ export function TasksPage(props: TasksPageProps) {
         taskId={props.selectedId}
         panel={props.panel}
         onClose={() => props.onSelect(null)}
+        width={props.sideWidth}
+        onResize={props.onSideResize}
+        onResizeEnd={props.onSideResizeEnd}
       />
     </section>
   );

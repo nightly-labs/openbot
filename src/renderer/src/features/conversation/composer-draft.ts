@@ -131,6 +131,45 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
   };
 }
 
+export const THREAD_QUEUE_EDIT_STORAGE_KEY = "openbot:thread-queue-edit";
+/**
+ * A queue edit in the message box of a side thread. It has its own record, so it does not take the
+ * place of an edit in the agent's own chat. `draftKey` is the thread's `threadDraftKey`.
+ */
+export interface StoredThreadQueueEdit extends StoredQueueEdit {
+  taskId: string;
+  draftKey: string;
+}
+
+export function readStoredThreadQueueEdit(): StoredThreadQueueEdit | null {
+  try {
+    return decodeStoredThreadQueueEdit(
+      JSON.parse(window.localStorage.getItem(THREAD_QUEUE_EDIT_STORAGE_KEY) ?? "null"),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function decodeStoredThreadQueueEdit(value: unknown): StoredThreadQueueEdit | null {
+  const edit = decodeStoredQueueEdit(value);
+  if (!edit || !isDynamicRecord(value) || !isString(value.taskId) || !isString(value.draftKey)) return null;
+  return { ...edit, taskId: value.taskId, draftKey: value.draftKey };
+}
+
+/** Throws when storage is full or unavailable: an edit that cannot be stored must not start. */
+export function storeThreadQueueEdit(edit: StoredThreadQueueEdit): void {
+  window.localStorage.setItem(THREAD_QUEUE_EDIT_STORAGE_KEY, JSON.stringify(edit));
+}
+
+export function clearStoredThreadQueueEdit(): void {
+  try {
+    window.localStorage.removeItem(THREAD_QUEUE_EDIT_STORAGE_KEY);
+  } catch {
+    // Storage is unavailable, so nothing was stored.
+  }
+}
+
 /** The thumbnail row of a message box: each image, also one that the text names, and each other file that the text does not name. */
 export function rowAttachments(text: string, attachments: readonly DraftAttachment[]): DraftAttachment[] {
   const referencedIds = attachmentReferenceIds(text);

@@ -1,4 +1,4 @@
-import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
+import { avatarHeadColor, avatarStyleForSeed } from "@openbot/brand/bloub-avatar";
 import { type AvatarMood, avatarMoodIsBusy, avatarMoodPresentation } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
@@ -13,6 +13,8 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -139,7 +141,8 @@ export const BloubAvatarPreview = memo(function BloubAvatarPreview(
 /**
  * The felt plush of an agent. A still plush is a picture drawn once and shown by the image view, so a
  * long list costs no drawing surface per row. A plush that moves draws its frames with Skia on the UI
- * thread; it keeps its canvas once it has moved, so a face that settles does not flash.
+ * thread; it keeps its canvas once it has moved, so a face that settles does not flash. A seed of the
+ * flat style shows the flat face of the desktop instead.
  */
 const PlushAvatar = memo(function PlushAvatar({
   seed,
@@ -193,7 +196,12 @@ const PlushAvatar = memo(function PlushAvatar({
           popStyle,
         ]}
       >
-        {live ? (
+        {avatarStyleForSeed(shown.seed) === "flat" ? (
+          // A flat face holds its picture, as the desktop does. A busy agent breathes.
+          <FlatBreath amount={animate ? avatarMoodPresentation(mood).breathe : 0} size={drawn}>
+            {picture}
+          </FlatBreath>
+        ) : live ? (
           <PlushCanvas
             seed={shown.seed}
             hue={shown.hue}
@@ -212,6 +220,28 @@ const PlushAvatar = memo(function PlushAvatar({
     </Animated.View>
   );
 });
+
+/** One breath of the desktop: the scale goes from `1 - amount` to `1 + amount` and back in 2.6 s. */
+const BREATH_MS = 1300;
+
+function FlatBreath({ amount, size, children }: { amount: number; size: number; children: ReactNode }) {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (amount <= 0) {
+      scale.set(withTiming(1, { duration: 300 }));
+      return;
+    }
+    const easing = Easing.inOut(Easing.sin);
+    scale.set(
+      withSequence(
+        withTiming(1 - amount, { duration: BREATH_MS / 2, easing }),
+        withRepeat(withTiming(1 + amount, { duration: BREATH_MS, easing }), -1, true),
+      ),
+    );
+  }, [amount, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  return <Animated.View style={[{ width: size, height: size }, style]}>{children}</Animated.View>;
+}
 
 /** The old plush shrinks away, the new one springs out. `cut`, or reduced motion, swaps at once. */
 function usePlushPop(seed: string, hue: AvatarHue | null, color: AvatarColor | null, pop: boolean) {

@@ -2,7 +2,7 @@ import type { WorkflowSummary } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Pin from "lucide-react-native/icons/pin";
-import WorkflowIcon from "lucide-react-native/icons/workflow";
+import Waypoints from "lucide-react-native/icons/waypoints";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -112,7 +112,7 @@ export function WorkflowRow({
             className="items-center justify-center"
             style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: String(iconBackground) }}
           >
-            <WorkflowIcon color={String(iconColor)} size={18} strokeWidth={1.9} />
+            <Waypoints color={String(iconColor)} size={18} strokeWidth={1.9} />
           </View>
           <View className="min-w-0 flex-1">
             <View className="flex-row items-center gap-1.5">

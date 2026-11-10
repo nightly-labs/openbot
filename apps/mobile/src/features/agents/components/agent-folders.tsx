@@ -31,6 +31,7 @@ import { PERMISSION_LABEL, useAgentAdminSettings } from "@/features/agents/compo
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import {
   type MobileAgent,
   type MobileServer,
@@ -119,6 +120,7 @@ export function AgentFoldersRow({
       : undefined;
   return (
     <SettingsRow
+      leading={<RowIcon icon={Folder} />}
       supportingText={value}
       onPress={() =>
         router.push({

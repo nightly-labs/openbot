@@ -82,6 +82,18 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "トークン",
   "customProvider.model.maxOutput": "モデル {number} の最大出力",
   "customProvider.model.maxOutputPlaceholder": "トークン",
+  "customProvider.model.efforts": "モデル {number} の推論の強さ",
+  "customProvider.model.effortsLabel": "推論の強さ",
+  "customProvider.model.effortsHintOpenCode":
+    "各モデルが受け付ける推論の強さを選択します。何も選択しないと、OpenCode は低・中・高を表示します。",
+  "customProvider.model.effortsHintPi":
+    "各モデルが受け付ける推論の強さを選択します。何も選択しないと、モデルは推論しません。",
+  "customProvider.model.inputs": "モデル {number} の入力",
+  "customProvider.model.inputsLabel": "入力",
+  "customProvider.model.inputImage": "画像",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "各モデルがテキスト以外に読めるものを選択します。",
+  "customProvider.model.foundValuesHint": "一部の値はエンドポイントから取得しました。変更できます。",
   "customProvider.model.remove": "モデル {number} を削除",
   "customProvider.model.add": "モデルを追加",
   "customProvider.headers": "ヘッダー",

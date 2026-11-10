@@ -15,6 +15,7 @@ import {
   type UpdateRoutineInput,
   type RoutineWebhookTrigger as WebhookTriggerFields,
 } from "@openbot/contracts/ipc";
+import type { EventRoutineOwner } from "@openbot/contracts/ipc-events";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
   type RoutineScheduleDraft,
@@ -34,6 +35,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import {
   type MobileAgent,
+  type MobileWorkspaceActions,
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
@@ -41,13 +43,16 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
 import { type RoutineResultChoice, RoutineResultDestinationSection } from "./routine-result-destination";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
 import { type RoutineTriggerChoice, RoutineTriggerPicker } from "./routine-trigger-picker";
 import { RoutineWebhookActivity } from "./routine-webhook-activity";
 import { type FilterDraft, filterDrafts, RoutineWebhookTrigger } from "./routine-webhook-trigger";
+
+/** An IANA time zone name. */
+const TIME_ZONE_PLACEHOLDER = "Europe/London";
 
 const DEFAULT_SCHEDULE: RoutineSchedule = { kind: "daily", time: "09:00" };
 
@@ -56,11 +61,40 @@ const MISSED_POLICY_TEXT = {
   "run-once": "mobile.agent.record.missedPolicy.runOnce",
 } as const satisfies Record<RoutineMissedPolicy, MobileTextKey>;
 
-type RoutineRecord = RoutineFields | EventRoutine;
+export type RoutineRecord = RoutineFields | EventRoutine;
 type WebhookRoutine = EventRoutine & { trigger: WebhookTriggerFields };
 
-function isWebhookRoutine(routine: RoutineRecord | null | undefined): routine is WebhookRoutine {
+export function isWebhookRoutine(routine: RoutineRecord | null | undefined): routine is WebhookRoutine {
   return Boolean(routine && "owner" in routine && routine.trigger.kind === "webhook");
+}
+
+/**
+ * Pauses or resumes a routine of an agent, or a webhook routine of an agent or a channel. A
+ * released channel routine has its own port. A webhook routine saves through the event routes,
+ * which take the whole record.
+ */
+export async function saveRoutineActive(
+  workspace: Pick<MobileWorkspaceActions, "saveEventRoutine" | "updateAgentRoutine">,
+  owner: EventRoutineOwner,
+  serverId: string,
+  routine: RoutineRecord,
+  active: boolean,
+): Promise<void> {
+  if (isWebhookRoutine(routine))
+    await workspace.saveEventRoutine(
+      {
+        id: routine.id,
+        owner,
+        name: routine.name,
+        instruction: routine.instruction,
+        active,
+        timezone: routine.timezone,
+        trigger: webhookTriggerInput(routine.trigger),
+        ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+      },
+      serverId,
+    );
+  else await workspace.updateAgentRoutine({ agentId: owner.id, routineId: routine.id, active }, serverId);
 }
 
 function useRecordDraftGuard(dirty: boolean, pending: boolean) {
@@ -315,6 +349,7 @@ export function RoutineEditor({
   };
 }) {
   const { t } = useText();
+  const nativeLabelFont = useNativeLabelFont();
   const workspace = useMobileWorkspaceActions();
   const action = useRecordAction(port?.queryKey);
   const toggle = useRecordAction(port?.queryKey);
@@ -337,22 +372,8 @@ export function RoutineEditor({
     setActiveOverride(active);
     void toggle.run(async () => {
       try {
-        if (webhookRoutine)
-          await workspace.saveEventRoutine(
-            {
-              id: webhookRoutine.id,
-              owner: eventOwner,
-              name: webhookRoutine.name,
-              instruction: webhookRoutine.instruction,
-              active,
-              timezone: webhookRoutine.timezone,
-              trigger: webhookTriggerInput(webhookRoutine.trigger),
-              ...(webhookRoutine.limitPolicy ? { limitPolicy: webhookRoutine.limitPolicy } : {}),
-            },
-            agent.serverId,
-          );
-        else if (port) await port.update({ routineId: routine.id, active });
-        else await workspace.updateAgentRoutine({ agentId: agent.id, routineId: routine.id, active }, agent.serverId);
+        if (port && !webhookRoutine) await port.update({ routineId: routine.id, active });
+        else await saveRoutineActive(workspace, eventOwner, agent.serverId, routine, active);
       } catch (cause) {
         setActiveOverride(null);
         throw cause;
@@ -646,6 +667,7 @@ export function RoutineEditor({
       {!routine ? (
         <SheetFormField
           label={t("mobile.agent.record.timeZone")}
+          placeholder={TIME_ZONE_PLACEHOLDER}
           value={timezone}
           editable={!disabled}
           onChangeText={setTimezone}

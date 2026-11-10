@@ -7,6 +7,7 @@ import type {
   HostStatus,
   InvitePreview,
   InviteSummary,
+  RemoteControlPolicy,
   RemoteDesktopConnectResult,
   RemoteDesktopSession,
   ScopedDirectMessageEvent,
@@ -30,6 +31,7 @@ import {
   decodeInviteSummary,
   decodeInviteUrl,
   decodePendingInvite,
+  decodeRemoteControlPolicy,
   decodeRemoteDesktopConnectResult,
   decodeRemoteDesktopSessions,
   decodeScopedDirectMessage,
@@ -248,6 +250,7 @@ describe("team decoders", () => {
     ],
     ["server with no hosted start", decodeServer, { ...remoteServer, hostedStart: null }],
     ["server on this computer", decodeServer, { ...remoteServer, thisComputer: true }],
+    ["hosted server with plan storage", decodeServer, { ...remoteServer, hosted: true, storageGb: 50 }],
     ["server with a key change time", decodeServer, { ...remoteServer, keyChangedAt: 1_700_000_000_000 }],
     ["invite preview", decodeInvitePreview, invitePreview],
     ["invite link", decodeInviteUrl, "openbot://join/invite-1"],
@@ -278,6 +281,11 @@ describe("team decoders", () => {
     ["direct read state", decodeDirectReadState, readState],
     ["direct message event", decodeScopedDirectMessage, directEvent],
     ["direct typing event", decodeScopedDirectTyping, typingEvent],
+    [
+      "remote control policy",
+      decodeRemoteControlPolicy,
+      { access: "admins", askOnHost: true } satisfies RemoteControlPolicy,
+    ],
   ] as const)("keeps a valid %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(decode(value)).toEqual(value);
   });
@@ -304,6 +312,8 @@ describe("team decoders", () => {
       { status: "refused", errorCode: "busy", message: "No." },
     ],
     ["remote desktop connection with an unknown status", decodeRemoteDesktopConnectResult, { status: "pending" }],
+    ["remote control policy with an unknown access", decodeRemoteControlPolicy, { access: "guests", askOnHost: false }],
+    ["remote control policy without a question choice", decodeRemoteControlPolicy, { access: "owner" }],
     ["server with an unknown state", decodeServers, [{ ...localServer, state: "asleep" }]],
     ["server without a role", decodeServer, { ...localServer, role: undefined }],
     [
@@ -325,6 +335,8 @@ describe("team decoders", () => {
     ],
     ["server with a hosted start without a time", decodeServer, { ...remoteServer, hostedStart: { step: "machine" } }],
     ["server on this computer marked false", decodeServer, { ...remoteServer, thisComputer: false }],
+    ["server with a fractional plan storage", decodeServer, { ...remoteServer, storageGb: 1.5 }],
+    ["server with a text plan storage", decodeServer, { ...remoteServer, storageGb: "50" }],
     ["server with a text key change time", decodeServer, { ...remoteServer, keyChangedAt: "2026-10-31" }],
     ["server with a negative key change time", decodeServer, { ...remoteServer, keyChangedAt: -1 }],
     ["invite preview for an owner", decodeInvitePreview, { ...invitePreview, role: "owner" }],

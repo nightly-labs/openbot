@@ -43,6 +43,13 @@ export type SkillRead = "idle" | "loading" | "loaded" | "failed";
 /** `connecting`: a sign-in started and waits, such as for a GitHub device code. */
 export type MarketplaceAppStatus = "connected" | "attention" | "connecting" | "idle";
 
+/**
+ * Why this account cannot connect catalog apps on the joined server. `checking`: the app has not read
+ * what the host serves yet; Connect is available when it has. `update`: the host is too old for apps.
+ * `member`: only an owner or admin connects apps on that host.
+ */
+export type MarketplaceAppsBlock = { reason: "checking" } | { reason: "update" | "member"; host: string };
+
 interface AppBase {
   id: string;
   name: string;
@@ -81,6 +88,11 @@ export interface MarketplaceAppConnection {
    * separate sign-in for each account (`mcp-accounts-v1`).
    */
   multipleAccounts: boolean;
+  /**
+   * The first row holds the key that a key flow of the listing names. A listing with a sign-in and
+   * a key then shows the key, not the sign-in. Absent is false.
+   */
+  keySaved?: boolean;
 }
 
 /**
@@ -113,6 +125,7 @@ const CONNECTOR_SETUP = {
   whatsapp: "channel",
   onepassword: "vault",
   bitwarden: "vault",
+  protonpass: "vault",
   github: "account",
 } as const satisfies Record<ConnectorId, AppSetup>;
 
@@ -218,6 +231,8 @@ export interface MarketplaceModel {
   apps: () => readonly MarketplaceApp[];
   /** False for a member of a joined server, who browses and connects no catalog app. */
   canConnectApps: () => boolean;
+  /** Why `canConnectApps` is false. Absent when it is true, or when no reason is known. */
+  appsBlocked?: (() => MarketplaceAppsBlock | undefined) | undefined;
   appBusy: (id: string) => boolean;
   /** Runs the connect step of a catalog app. False when the user closed it. */
   connectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => Promise<boolean>;

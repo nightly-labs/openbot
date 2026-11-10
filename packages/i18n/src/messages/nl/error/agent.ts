@@ -63,6 +63,8 @@ export const messages = {
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je een nieuwe chat start.",
   "error.agent.waitBeforeCompactContext":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de context comprimeert.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de geschiedenis wist.",
   "error.agent.compactContextUnavailable": "Deze agent kan de context nu niet comprimeren.",
   "error.agent.unknown": "Onbekende agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -82,6 +84,8 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.compactionConnectionLost":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding en stuur dan een bericht om verder te gaan.",
   "error.agent.selectedGone": "De gekozen agent bestaat niet meer.",
   "error.agent.profileEndpointsChanged":
     "De aangepaste endpoints zijn gewijzigd tijdens het maken. Probeer het opnieuw.",
@@ -114,6 +118,9 @@ export const messages = {
     "Alleen de computer waarop de agent draait, kan deze instelling wijzigen.",
   "error.agent.sideQuestionBusy": "Er lopen te veel zijvragen. Probeer het zo opnieuw.",
   "error.agent.sideQuestionFailed": "De agent kon de zijvraag niet beantwoorden. Probeer het opnieuw.",
+  "error.agent.webSearchSignIn": "Zoeken op het web vereist een Codex-aanmelding met een ChatGPT-account.",
+  "error.agent.webSearchBusy": "Er lopen te veel zoekopdrachten en zijvragen. Probeer het zo opnieuw.",
+  "error.agent.webSearchFailed": "De webzoekopdracht is niet voltooid. Probeer het opnieuw.",
   "error.agent.busyMessageModeLocalOnly":
     "Wat berichten doen terwijl de agent werkt, kun je alleen instellen op de computer waarop de agent draait.",
   "error.agent.backupModelsLocalOnly": "Reservemodellen kun je alleen instellen op de computer waarop de agent draait.",

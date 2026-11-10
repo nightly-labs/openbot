@@ -30,4 +30,5 @@ export const messages = defineMessages("error.host", {
   "error.host.tenantShutdownTimeout": "Tenant shutdown timed out. No application replacement was started.",
   "error.host.tenantHealthMissing":
     "Tenant health reports are missing or unhealthy after restart. Inspect tenant sessions before another update.",
+  "error.host.personalityInvalid": "This response style is not known.",
 });

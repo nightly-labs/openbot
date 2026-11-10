@@ -27,6 +27,14 @@ export const messages = {
   "status.agent.screenCaptureWindow": "ウィンドウ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureRegion":
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
+  "status.agent.reportProblem":
+    "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
+  "status.agent.serverInstallCommand":
+    "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
+  "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
+  "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
@@ -54,11 +62,27 @@ export const messages = {
   "status.agent.changesReviewing": "行った変更を確認しています…",
   "status.agent.agentCoordinating": "別のエージェントと調整しています…",
   "status.agent.agentResponseReviewing": "別のエージェントの応答を確認しています…",
+  "status.agent.commandRunningUnnamed": "コマンドを実行しています…",
   "status.agent.toolStepWorking": "次のツールステップを処理しています…",
+  "status.agent.webSearching": "Web で「{query}」を検索しています…",
+  "status.agent.urlFetching": "{host} を開いています…",
+  "status.agent.fileReading": "{name} を読んでいます…",
+  "status.agent.filesReading": "ファイルを読んでいます…",
+  "status.agent.filesListing": "{path} を確認しています…",
+  "status.agent.filesLooking": "ファイルを確認しています…",
+  "status.agent.textSearching": "「{query}」を検索しています…",
+  "status.agent.filesSearchingText": "ファイル内を検索しています…",
+  "status.agent.folderSizesMeasuring": "フォルダーのサイズを測っています…",
+  "status.agent.diskSpaceChecking": "ディスクの空き容量を確認しています…",
+  "status.agent.processesChecking": "実行中のプロセスを確認しています…",
+  "status.agent.gitChecking": "Git リポジトリを確認しています…",
+  "status.agent.commandRunning": "{program} を実行しています…",
   "status.agent.memoryChanges": "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却。",
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
+  "status.agent.compactionContinues":
+    "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
 } as const satisfies PartialTranslation<typeof source>;

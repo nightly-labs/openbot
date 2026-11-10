@@ -164,6 +164,10 @@ export const messages = {
 
   "workflow.output.title": "출력",
   "workflow.output.name": "출력",
+  "workflow.output.channel.openbot": "OpenBot",
+  "workflow.output.channel.search": "채널 검색",
+  "workflow.output.postsAs": "게시 방식",
+  "workflow.output.postsAsNote": "메모, 작업이 시작되지 않음",
   "workflow.output.target.file": "파일",
   "workflow.output.target.notify": "알림",
   "workflow.output.path": "파일 경로",

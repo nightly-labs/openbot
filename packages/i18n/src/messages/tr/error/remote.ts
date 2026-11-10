@@ -8,6 +8,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Uzak masaüstü testi kullanılamıyor.",
   "error.remote.controlUnavailable": "Uzaktan kontrol kullanılamıyor.",
   "error.remote.controlSessionNotFound": "Uzaktan kontrol oturumu bulunamadı.",
+  "error.remote.controlNotAllowed": "Bu bilgisayarın sahibi, rolünüzün onu kontrol etmesine izin vermiyor.",
+  "error.remote.controlDeclined": "Bu bilgisayarın başındaki kişi uzaktan kontrole izin vermedi.",
   "error.remote.testRuntimeUpdate": "Bu testi çalıştırmak için macOS uzak masaüstü çalışma zamanını güncelleyin.",
   "error.remote.testOtherSessions": "Bir teste başlamadan önce diğer uzak masaüstü oturumlarını sonlandırın.",
   "error.remote.testPermissions": "Testi başlatmadan önce ana makinedeki izinleri ve GUI oturumunu kontrol edin.",
@@ -185,6 +187,8 @@ export const messages = {
   "error.remote.memberLimitReached": "Bu ana makine üye sınırına ulaştı. Sahibinden yer açmasını isteyin.",
   "error.remote.hostNotRegistered": "Bu ana makine artık OpenBot hizmetine kayıtlı değil.",
   "error.remote.membershipEnded": "Artık bu ana makinenin üyesi değilsiniz. Sahibinden yeni bir davet isteyin.",
+  "error.remote.membershipChanged":
+    "Başka biri bu üyeyi aynı anda değiştirdi. Üyeleri yeniden yükleyin ve tekrar deneyin.",
   "error.remote.accountSessionInactive": "Oturumunuz artık etkin değil. Tekrar oturum açın.",
   "error.remote.hostOtherAccount": "Bu ana makine başka bir hesaba ait.",
   "error.remote.remoteNotConfigured": "Bu OpenBot hizmetinde uzak bağlantılar ayarlanmamış.",
@@ -192,6 +196,7 @@ export const messages = {
   // Channel actions on mobile.
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
+  "error.remote.hostRemoved": "Sahibi bu sunucuyu hesaptan kaldırdı.",
   "error.remote.channelsUnsupported": "Kanalları kullanmak için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",

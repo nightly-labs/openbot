@@ -125,6 +125,24 @@ export const messages = {
   "server.local.deleteConfirmDescription": "OpenBot zatrzyma serwer i przeniesie jego agentów, czaty i pliki do kosza.",
   "server.local.deleting": "Kasowanie serwera…",
   "server.local.deletedTitle": "Skasowano: {name}",
+  "server.install.title": "Nowy serwer na innym komputerze",
+  "server.install.description":
+    "Uruchom to polecenie na komputerze z Linuksem lub serwerze VPS, który należy do Ciebie. Polecenie instaluje OpenBot i dodaje serwer do tego konta.",
+  "server.install.making": "Tworzenie polecenia dla tego konta…",
+  "server.install.failed": "OpenBot nie może utworzyć polecenia. Sprawdź połączenie z internetem.",
+  "server.install.copyForAgent": "Kopiuj dla agenta AI",
+  "server.install.expiresIn": "Działa raz. Wygasa za {time}.",
+  "server.install.newCommand": "Nowe polecenie",
+  "server.install.waiting": "Czekam, aż polecenie uruchomi się na serwerze…",
+  "server.install.starting": "{name} jest zalogowany. Uruchamianie serwera…",
+  "server.install.connected": "{name} jest połączony.",
+  "server.install.offline": "{name} jest offline.",
+  "server.install.expired": "To polecenie wygasło. Utwórz nowe.",
+  "server.install.agentPrompt":
+    'Zainstaluj OpenBot na tym serwerze z Linuksem i zaloguj go do mojego konta OpenBot.\nUruchom to polecenie jako root. Nie zadaje pytań i trwa kilka minut:\n\n{command}\n\nKończy się wierszem "OpenBot is connected to your account." i kodem wyjścia 0.\nPolecenie działa raz, przez 15 minut. Nigdzie go nie zapisuj.',
+  "server.install.setUpWithAgent": "Skonfiguruj z agentem",
+  "server.install.sshAgentPrompt":
+    "Połącz się przez SSH z moim serwerem z Linuksem i zainstaluj na nim OpenBot jako serwer.\n\nAdres SSH (user@host):",
   "server.add.limit.title": "To konto ma maksymalną liczbę serwerów",
   "server.add.limit.description": {
     one: "Konto może mieć {count} płatny serwer. Aby dodać serwer, najpierw usuń jeden z istniejących.",
@@ -307,6 +325,7 @@ export const messages = {
   "server.settings.addLogo": "Dodaj logo serwera",
   "server.settings.removeLogo": "Usuń logo serwera",
   "server.settings.access": "Dostęp",
+  "server.companySignIn.desktopOnly": "Skonfiguruj logowanie jednokrotne w aplikacji OpenBot na komputer.",
   "server.settings.publish": "Opublikuj ten serwer",
   "server.settings.published": "Serwer jest opublikowany",
   "server.settings.setUpDesktopTitle": "Skonfiguruj zdalny pulpit",
@@ -333,7 +352,14 @@ export const messages = {
     other: "Co {count} tury",
   },
   "server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
-  "server.settings.rolesTitle": "Role",
+  "server.settings.skillLearning": "Uczenie się umiejętności",
+  "server.settings.skillLearningDescription":
+    "Czy agenci na tym serwerze zapisują to, czego się nauczą, jako umiejętności.",
+  "server.settings.skillLearningAutomatic": "Automatycznie",
+  "server.settings.skillLearningAsk": "Najpierw zapytaj",
+  "server.settings.skillLearningOff": "Wyłączone",
+  "server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
+  "server.settings.rolesTitle": "Uprawnienia",
   "server.settings.rolesDescription":
     "Wybierz agentów, których mogą używać członkowie. Członek dostaje najwyższy dostęp spośród roli Wszyscy i swoich ról. Właściciele i administratorzy mogą używać wszystkich agentów.",
   "server.settings.remoteOnline": "Host jest online. Publikacją zarządza jego właściciel.",
@@ -439,6 +465,7 @@ export const messages = {
   },
   "server.roles.agentList": "Agenci: {names}",
   "server.roles.agentLevel": "Dostęp roli {role} do agenta {agent}",
+  "server.roles.changeInEveryone": "Zmień w roli Wszyscy",
   "server.roles.setAll": "Ustaw wszystkie",
   "server.roles.setAllLabel": "Ustaw wszystkie: dostęp roli {role} do wszystkich agentów",
   "server.roles.loadFailed": "Nie udało się wczytać ról tego serwera.",
@@ -501,8 +528,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "Zaproszenie przestanie działać. Osoby, które dołączyły dzięki niemu, pozostaną członkami.",
   "server.desktop.accessTitle": "Dostęp do zdalnego pulpitu",
-  "server.desktop.gatewayDescription":
-    "Każdy aktywny członek serwera może sterować tym hostem. Nie ma osobnego hasła do zdalnego pulpitu.",
+  "server.desktop.gatewayPolicyDescription":
+    "Nie ma osobnego hasła do pulpitu zdalnego. Ustawienia poniżej określają, kto może sterować tym komputerem.",
   "server.desktop.componentInstalled": "Komponent hosta zainstalowany",
   "server.desktop.componentNotInstalled": "Komponent hosta niezainstalowany",
   "server.desktop.sessions": "Tryb bez nadzoru: {unattended} · Aktywne sesje: {active}/{max}",
@@ -515,13 +542,25 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Połącz się ponownie z hostem, zanim otworzysz jego pulpit.",
   "server.desktop.hostUpdateDescription": "Zaktualizuj OpenBot na hoście, aby używać zdalnego sterowania.",
   "server.desktop.serviceAvailable": "Usługa dostępna",
-  "server.desktop.serviceAvailableDescription":
-    "Sterowanie przez WebRTC jest dostępne dla wszystkich aktywnych członków.",
   "server.desktop.serviceNotReady": "Usługa nie jest gotowa",
   "server.desktop.serviceNotReadyDescription":
     "Uruchom zdalne sterowanie, aby sprawdzić komponenty i uprawnienia hosta. Host zgłosi każdy błąd konfiguracji.",
   "server.desktop.remoteControl": "Zdalne sterowanie",
   "server.desktop.startHint": "Uruchom zdalne sterowanie przyciskiem monitora w nagłówku serwera.",
+  "server.desktop.accessLabel": "Kto może sterować tym komputerem",
+  "server.desktop.accessDescription": "Członkowie, którzy mogą otworzyć pulpit tego komputera z innego urządzenia.",
+  "server.desktop.accessOwner": "Tylko właściciel",
+  "server.desktop.accessAdmins": "Właściciel i administratorzy",
+  "server.desktop.accessMembers": "Wszyscy członkowie",
+  "server.desktop.askLabel": "Pytaj na tym komputerze",
+  "server.desktop.askDescription":
+    "Każda sesja czeka, aż osoba przy tym komputerze na nią zezwoli. Bez odpowiedzi w ciągu 30 sekund OpenBot ją odrzuci.",
+  "server.desktop.activeTitle": "Aktywne sesje pulpitu zdalnego: {active}",
+  "server.desktop.activeDescription": "Od razu kończy każdą sesję. Członkowie mogą poprosić ponownie.",
+  "server.desktop.stopAll": "Zatrzymaj całe zdalne sterowanie",
+  "server.desktop.policyLoadFailed": "Nie udało się wczytać ustawień zdalnego sterowania.",
+  "server.desktop.policySaveFailed": "Nie udało się zapisać ustawień zdalnego sterowania.",
+  "server.desktop.stopFailed": "Nie udało się zatrzymać zdalnego sterowania.",
   "server.settings.providersTitle": "Dostawcy",
   "server.settings.providersDescription": "Zarządzaj dostawcami AI komputera, na którym działa ten serwer.",
   "server.settings.providersSwitchNote": "Przełącz na serwer {name}, aby zarządzać jego dostawcami AI.",
@@ -645,4 +684,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} uruchamia się ponownie, aby zainstalować aktualizację",
   "server.restartNotice.restartingDescription": "OpenBot połączy się ponownie automatycznie, gdy {name} wróci.",
   "server.restartNotice.backTitle": "{name} jest znów online",
+  "server.settings.personalityTitle": "Osobowość",
+  "server.settings.personalityDescription": "Wybierz, jak agenci na tym serwerze z Tobą rozmawiają.",
+  "server.settings.responseStyle": "Styl odpowiedzi",
+  "server.settings.responseStyleDescription":
+    "Naturalny: agenci wysyłają krótkie aktualizacje podczas pracy, a czat je pokazuje. Klasyczny: agenci odpowiadają raz, gdy skończą.",
+  "server.settings.responseStyleNatural": "Naturalny",
+  "server.settings.responseStyleClassic": "Klasyczny",
+  "server.settings.personalityLoadFailed": "Nie udało się wczytać osobowości serwera.",
 } as const satisfies PartialTranslation<typeof source>;

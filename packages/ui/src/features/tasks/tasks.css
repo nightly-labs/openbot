@@ -48,10 +48,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-.tasks-page-agent-option > span {
-  flex: 1 1 auto;
-}
-
 .tasks-page-header h2 span {
   color: var(--openbot-text-muted);
   font-weight: var(--openbot-weight-regular);
@@ -128,10 +124,154 @@
   color: var(--openbot-text-primary);
 }
 
-/* A server can have more agents than the window has rows, so the menu fits the space left and scrolls. */
-.tasks-page-agent-menu {
-  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+/*
+ * The agent menu: a search field and the agents under it. A server can have more agents than the
+ * window has rows, so the list fits the space left under the trigger and scrolls. The panel keeps the
+ * menu padding on all sides, so the field and the rows have the same inset and concentric corners.
+ * A fixed width keeps the panel still while a search changes the names.
+ */
+.tasks-page-agent-menu.ui-action-menu {
+  --tasks-agent-max: min(420px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 420px));
+
+  display: flex;
+  width: 240px;
+  max-height: var(--tasks-agent-max);
+  flex-direction: column;
+}
+
+.tasks-page-agent-picker {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--ui-menu-padding);
+}
+
+/*
+ * The search field looks as the one in the model picker: a filled row with the radius of a menu row.
+ * The field takes the focus each time the menu opens, so it shows no focus ring; the caret shows
+ * where typing goes.
+ */
+.tasks-page-agent-search {
+  display: flex;
+  height: var(--openbot-control-md);
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-radius: var(--ui-menu-item-radius);
+  background: var(--ui-menu-item-hover);
+  padding-inline: var(--ui-menu-inset);
+  cursor: text;
+}
+
+/* The icon takes the width of a row avatar, so the text starts where the names start. */
+.tasks-page-agent-search > svg {
+  width: 18px;
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.tasks-page-agent-search .tasks-page-agent-search-input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: var(--openbot-text-primary);
+  font: inherit;
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.tasks-page-agent-search .tasks-page-agent-search-input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+.tasks-page-agent-search-input::placeholder {
+  color: var(--openbot-text-muted);
+}
+
+/*
+ * The list is as high as its rows, up to what the panel has left under the field. A search that
+ * adds or removes rows eases the height, so the panel does not jump. The edge fades come from the
+ * shared .scroll-fade-* masks, so the list shows no scroll bar.
+ */
+.tasks-page-agent-list {
+  height: min(
+    calc(var(--tasks-agent-rows, 0) * var(--openbot-control-md)),
+    calc(var(--tasks-agent-max) - var(--openbot-control-md) - 3 * var(--ui-menu-padding))
+  );
+  min-height: 0;
+  flex: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  outline: 0;
+  padding: 0;
+  scrollbar-width: none;
+  transition: height var(--openbot-duration-slow) var(--ui-menu-ease);
+}
+
+.tasks-page-agent-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* A row looks as a row of the other menus. */
+.tasks-page-agent-option {
+  display: flex;
+  height: var(--openbot-control-md);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-radius: var(--ui-menu-item-radius);
+  padding: var(--openbot-space-1-5) var(--ui-menu-inset);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.tasks-page-agent-option > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.tasks-page-agent-option[data-highlighted] {
+  background: var(--ui-menu-item-hover);
+}
+
+.tasks-page-agent-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tasks-page-agent-name b {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+/* The empty text starts where the names start, and fades in after the list closes. */
+.tasks-page-agent-empty {
+  margin: 0;
+  padding: var(--openbot-space-1) var(--ui-menu-inset) var(--openbot-space-1-5)
+    calc(var(--ui-menu-inset) + 18px + var(--openbot-space-2));
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out) var(--openbot-duration-fast);
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .tasks-page-took {
@@ -271,8 +411,7 @@ li[data-arrived] > .tasks-page-row {
  */
 .tasks-page-side {
   position: relative;
-  flex: 0 0 420px;
-  overflow: hidden;
+  flex: 0 0 var(--tasks-page-side-width, 420px);
   transition:
     flex-basis var(--openbot-duration-overlay) var(--openbot-ease-out),
     opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
@@ -292,12 +431,29 @@ li[data-arrived] > .tasks-page-row {
   transition-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
 }
 
+/* The user draws the panel wider or narrower: the width follows the pointer with no transition. */
+html.panel-resizing .tasks-page-side {
+  transition: none;
+}
+
+.tasks-page-side[data-closing] > .panel-resizer {
+  visibility: hidden;
+}
+
+/* The clip of the opening and closing panel. The edge handle is outside it, so it stays whole. */
+.tasks-page-side-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
 .tasks-page-side-content {
   position: absolute;
   inset-block: 0;
   inset-inline: 0 auto;
   display: flex;
-  width: 420px;
+  width: var(--tasks-page-side-width, 420px);
   --browser-panel-width: 100%;
 }
 
@@ -308,12 +464,6 @@ li[data-arrived] > .tasks-page-row {
 
 .tasks-panel .file-preview-header {
   --task-list-glyph: 16px;
-}
-
-/* A question or a browser takeover waits: the chat answers it. */
-.tasks-panel-answer-footer {
-  display: flex;
-  justify-content: flex-end;
 }
 
 /* A change to a different task: the new task fades in at its place. */
@@ -489,6 +639,8 @@ li[data-arrived] > .tasks-page-row {
 
   .tasks-page-side,
   .tasks-page-agent-chevron,
+  .tasks-page-agent-list,
+  .tasks-page-agent-empty,
   .tasks-page-empty-row {
     transition: none;
   }

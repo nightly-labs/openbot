@@ -22,13 +22,15 @@ import {
   DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
+  MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
+import type { AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import {
   claudeModelName,
-  codexFastServiceTier,
+  fastServiceTier,
   isOpencodeModelUnusableWithStoredKey,
   modelsAfterOpenCodeDiscoveryFailure,
 } from "./agent/provider-models";
@@ -52,6 +54,7 @@ import {
   resolveGrokCli,
   resolveHermesCli,
   resolveKimiCli,
+  resolveMistralCli,
   resolveMuseCli,
   resolveOpencodeCli,
   resolvePiCli,
@@ -60,12 +63,14 @@ import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
+import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
+import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
   type CustomProviderSource,
   customProvidersOn,
@@ -92,6 +97,8 @@ import {
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
+  mistralHomeDirectory,
+  mistralStatePaths,
   museStatePaths,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
@@ -116,9 +123,10 @@ interface ProviderCliCommand {
   readonly closeInput?: true;
   /**
    * `argv` starts the CLI's ACP server, which signs out with ACP `logout`: for a CLI that has a
-   * `logout` method and no sign-out command. Only for a sign-out.
+   * `logout` method and no sign-out command. A method name is the server's own sign-out method,
+   * which it calls in place of `logout`. Only for a sign-out.
    */
-  readonly acpLogout?: true;
+  readonly acpLogout?: true | AcpExtensionMethod;
 }
 
 /**
@@ -425,6 +433,20 @@ const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "fa
 const COPILOT_ARGV: readonly string[] = ["--acp", "--no-auto-update"];
 
 /**
+ * Mistral Vibe 3.1.0 sends usage data to Mistral unless told not to (`PRIVACY.md`). Every process gets
+ * the variable, the sign-in and sign-out processes too. Without its model catalogue, Vibe 3.1.0 lists
+ * only Mistral Medium 3.5 and the models of `config.toml`. With it, each session asks Mistral for the
+ * models of the account, and a failed request keeps that list (#5712).
+ */
+const MISTRAL_ENV: Readonly<Record<string, string>> = {
+  VIBE_ENABLE_TELEMETRY: "false",
+  VIBE_EXPERIMENTAL_ENABLE_MODEL_CATALOG: "true",
+};
+
+/** `vibe-acp` serves the Agent Client Protocol on stdio, with no argument. */
+const MISTRAL_ARGV: readonly string[] = [];
+
+/**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
  * own endpoints.
  *
@@ -527,6 +549,11 @@ export interface ProviderClientContext {
    * same reason as `reportMcpDrops`: without it the CLI uses its own cache time.
    */
   readonly promptCacheTtl?: () => PromptCacheTtl;
+  /**
+   * Whether Claude loads the user's own Claude Code setup, read at each spawn. Optional for the same
+   * reason as `reportMcpDrops`: without it Claude does not load the setup, as the default is.
+   */
+  readonly claudeUserSetup?: () => boolean;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -581,6 +608,16 @@ interface ProviderModelCatalog {
   readonly slowList?: true;
   /** No models while the provider says that the user must sign in and it has no client. */
   readonly hiddenWhenSignedOut?: true;
+  /**
+   * The CLI can list only some of its models just after it starts, and the whole list a moment later.
+   * A list that lacks an agent's model is read once more before the agent leaves that model.
+   */
+  readonly partialListAtStart?: true;
+  /**
+   * With `partialListAtStart`: the list is read once more after each start, also when no agent is off
+   * it, because models that come later belong in the model picker too.
+   */
+  readonly relistAfterStart?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
@@ -799,7 +836,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: codexFastServiceTier },
+    catalog: { paged: true, modelFields: fastServiceTier },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new CodexAppServerClient(cli.executable, requestTimeoutMs, {
@@ -835,7 +872,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
-    catalog: { modelName: claudeModelName },
+    catalog: { modelName: claudeModelName, modelFields: fastServiceTier },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new ClaudeAgentClient(
@@ -851,6 +888,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         claudeAgentEnvironment(context),
         undefined,
         claudeFallbackApiKey(context),
+        context.claudeUserSetup,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -912,6 +950,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       ),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
+    // Grok 1.0.70 starts on its two built-in models when its sign-in has expired, renews the sign-in,
+    // and then fetches its catalogue. A `model/list` in between misses the newer models.
+    catalog: { partialListAtStart: true },
   },
   {
     id: "opencode",
@@ -937,12 +978,17 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: {},
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
-        extraEnv: () => ({
-          ...context.agentEnvironment?.(),
-          ...opencodeEnv(cli, context),
-          ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
-          ...(confinement ? OPENCODE_CONFINED_ENV : {}),
-        }),
+        extraEnv: () => {
+          const agentEnvironment = context.agentEnvironment?.();
+          return {
+            ...agentEnvironment,
+            ...opencodeEnv(cli, context),
+            // A file below the user's project config. `OPENCODE_AGENT_CONFIG` is above all of it.
+            ...openCodeAgentDefaultsEnv(context.providerStateDirectory, { ...process.env, ...agentEnvironment }),
+            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...(confinement ? OPENCODE_CONFINED_ENV : {}),
+          };
+        },
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
         // A stalled or refused turn on a custom endpoint names the endpoint, not OpenCode (#3234).
@@ -1279,6 +1325,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         // A confined process cannot write the CLI's shared package cache, so it unpacks its own.
         extraEnv: () => ({ ...context.agentEnvironment?.(), ...(confinement ? COPILOT_CONFINED_ENV : {}) }),
         signInMessage: sourceText("error.provider.copilotSignIn"),
+        // GitHub Copilot CLI 1.0.106 opens a session without an account, and lists no models then.
+        noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
@@ -1294,10 +1342,67 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         profileGeneration: true,
         env: { ...COPILOT_ENV },
         signInMessage: sourceText("error.provider.copilotSignIn"),
+        noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "copilot", email: account?.email ?? null }),
     validateAccount: () => undefined,
+  },
+  {
+    id: "mistral",
+    // The ACP `browser-auth` method opens Mistral AI Studio in the system browser, and asks Mistral
+    // until the user finishes there. Mistral Vibe 3.1.0 saves the API key that the sign-in makes in
+    // the system keychain, or in `.env` of its home folder when it has no keychain.
+    signIn: {
+      kind: "acp-authenticate",
+      methodId: "browser-auth",
+      argv: MISTRAL_ARGV,
+      env: MISTRAL_ENV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
+    // The CLI has no sign-out command, and its ACP server has no `logout` method. Its own
+    // `_auth/signOut` removes the saved key. A key in the user's environment stays.
+    signOut: { argv: MISTRAL_ARGV, env: () => ({ ...MISTRAL_ENV }), timeoutMs: 30_000, acpLogout: "_auth/signOut" },
+    // A sign-in without a keychain writes the key in `.env`. A sign-in also writes the provider and
+    // console page in `config.toml` when they change. A key in the keychain changes no file.
+    signInFiles: () => [join(mistralHomeDirectory(), ".env"), join(mistralHomeDirectory(), "config.toml")],
+    resolveCli: resolveMistralCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "mistral",
+        flavor: MISTRAL_ACP_FLAVOR,
+        argv: MISTRAL_ARGV,
+        env: { ...MISTRAL_ENV },
+        ...(confinement
+          ? {
+              confine: (target) =>
+                confineWithState(target, confinement, mistralStatePaths, context.agentEnvironment?.()),
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.mistralSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("mistral"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "mistral",
+        flavor: MISTRAL_ACP_FLAVOR,
+        argv: MISTRAL_ARGV,
+        profileGeneration: true,
+        env: { ...MISTRAL_ENV },
+        signInMessage: sourceText("error.provider.mistralSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "mistral", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+    // Vibe 3.1.0 adds the catalogue's models to a session only after it opens. A probe session that
+    // stays open saves the catalogue, and the next session lists it from the start (`MISTRAL_ACP_FLAVOR`).
+    catalog: { partialListAtStart: true, relistAfterStart: true },
   },
   {
     id: "hermes",
@@ -1336,7 +1441,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                 confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() }),
             }
           : {}),
-        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        // The OpenBot settings (`hermes-settings.ts`) for the Hermes folder that the process uses.
+        extraEnv: () => {
+          const agentEnvironment = context.agentEnvironment?.() ?? {};
+          return {
+            ...hermesSettingsEnvironment({ ...process.env, ...agentEnvironment }, context.providerStateDirectory),
+            ...agentEnvironment,
+          };
+        },
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
@@ -1353,6 +1465,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: HERMES_ARGV,
         profileGeneration: true,
         env: {},
+        extraEnv: () => hermesSettingsEnvironment(process.env, context.providerStateDirectory),
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
@@ -1366,7 +1479,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     signIn: { kind: "external" },
     // A custom agent can need more than 5 s to start and open a probe session in `initialize` and
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
-    catalog: { slowList: true },
+    // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
+    // the list is read once more after each start.
+    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(

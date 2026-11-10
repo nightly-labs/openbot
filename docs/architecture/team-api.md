@@ -29,14 +29,30 @@ the read state and the sections load. These three reads run together. Cached con
 again after Online, the open conversation first; a chat that did not load then loads when it opens.
 Transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
-adds no polling or health requests. Foreground resume reuses a healthy connection and reads the
-workspace again without showing a reconnect. The time away decides what happens to the connection:
+adds no polling or health requests. Foreground resume reuses a healthy connection without showing a
+reconnect. When the connection from before the background stays (`kept` on the `connect` result) and
+no read stopped at background entry, the first attempt only checks the path with the compatibility
+read and reads the open chats again; the event stream delivered every event, or an `event-reset`
+asks for a full load. A new connection, a stopped read, a refresh and a failed check load the
+workspace again. The time away decides what happens to the connection:
 after less than 30 s the path is kept. After 30 s the host stopped using the path (ICE consent), so the
 peer renews its Signal socket and restarts ICE; a host that dropped the connection answers with a new
 fingerprint, and the peer fails at once instead of after a read timeout. A connection that is lost
-while a return checks it is replaced at once, with no countdown, as when the check fails. After 160 s Signal has told
-the host to drop the connection (120 s socket idle timeout, then 30 s), so the peer is replaced on the
-same session at once, without a resume hello, and the first attempt connects. A server that was
+while a return checks it is replaced at once, with no countdown, as when the check fails. Signal
+closes the socket of a suspended phone after its 120 s idle timeout and drops the connection after the
+reconnect grace: 10 minutes for a host that multiplexes, 30 s for an older host or an older Signal
+(`reconnectGraceMs` in `ready`, `SIGNAL_CLIENT_RECONNECT_GRACE_MS`). After the idle timeout, the grace
+and 10 s more, the peer is replaced on the same session at once, without a resume hello, and the
+first attempt connects. A move to another kind of network, such as Wi-Fi to mobile data
+(`expo-network`, `apps/mobile/src/shared/lib/network-path.ts`), ends the connection, and the recovery
+makes a new one on the same session at once (`networkMoved`); the WebView's `online` event does not
+fire for such a move. In support logs, an ICE restart after a network move did not bring the path
+back within 6 s, and a new connection was up in 1.5–3 s. In other cases, a probe of the path waits up
+to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
+at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
+on the same session instead of an 11th. A new connection to a known host opens its Signal socket while the ticket request runs,
+and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
+holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
 5 s (`QUIET_RESUME_MS` in `server-connection.tsx`): the server is `resuming`, `showsOnline` is
 true, and no reconnect status, faded avatars or faded chat show. A workspace request to a resuming
@@ -104,8 +120,9 @@ links from email invitations. Email mode creates an address-bound invitation and
 the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
 remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
-Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
-clients reload their own read state even when the conversation content revision is unchanged.
+Moving a cursor emits a conversation invalidation without the reader's identity or cursor, only to the
+connections of that member; other members get no event, because their read state did not change. The
+member's clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
 Mobile attachments use the shared desktop filename allowlist in `packages/contracts/src/attachment-files.ts`.
 The native document and photo pickers and the in-chat camera panel prepare local drafts. The existing Team file protocol
@@ -143,6 +160,15 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+That route marks the whole chat. The optional `conversation-unread-from-v1` capability (protocol 9
+only, `packages/contracts/src/team-protocol/conversation-unread-from-v1.ts`, host route
+`src/main/team-api/route-conversation-unread-from.ts`) adds `POST /v1/conversations/unread-from` with
+`{ agentId, fromMessageId }`: the member's read mark moves to the message shown before it, and the
+answer is the new read state. It needs `view` on the agent, as the other read routes do. A message
+the chat does not show is not found. The phone's message sheet and the desktop message menu on a
+joined server use it for Mark unread. After it, the open chat does not read itself again until it
+opens again. The chat shows a NEW line above the first unread message. The line keeps the message
+that the host had as first unread when the chat opened, because the open chat then reads itself.
 Mobile external links enter through Expo Router's `+native-intent` and the links feature.
 Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
 local request ID. Invitations wait through sign-in and show a verified host preview before an
@@ -328,6 +354,29 @@ from the service gets 403 (not the member's message), 404 (no shown message with
 message is in a running turn), with the host's sentence. A delete removes the message from the host's
 history, search and attachments; the provider session can still remember it. The host sends its
 usual change events (`conversation-invalidated` and `channels-changed`), so other members refresh.
+
+The optional `chat-history-v1` capability (protocol 9 only) adds four POST routes with an empty
+acknowledgement: `/v1/agent-history/delete` (`agentId`), `/v1/channels/context/clear`,
+`/v1/channels/context/compact` and `/v1/channels/history/delete` (each `channelId`). They do on a
+joined server what "Delete history" of an agent chat, and "New conversation", "Compact now" and
+"Delete history" of a channel do on this computer. The host always advertises it to a protocol 9
+peer. `src/main/team-api/route-chat-history.ts` owns the authorization. An agent history delete needs
+a visible agent (else 404) and `manage` on it (else 403). A member who sees a channel starts a new
+conversation or compacts it; only owners and admins delete its history (else 403
+`membersCannotDeleteChannelHistory`). A host without channels answers the channel routes with 400
+`channelsUnsupported`. Work that still runs or waits, an archived channel, or a compaction that no
+member session can do, gets 409 with the host's sentence.
+
+The optional `agent-welcome-v1` capability (protocol 9 only) changes no route shape. A client that
+sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The
+host stores that message with `welcome: true` in its mailbox JSON and the item type `agent_welcome`.
+No conversation page, live snapshot, read state, search result, queue, runtime `work` item or preview
+shows it, for any member. While it waits or runs, the host's local queue snapshot has `welcome: true`, so
+the host's own window shows that the agent works and not the empty chat. `GET /v1/agents/:id/queue`
+keeps its released keys and does not send the flag: a remote member sees the empty chat until the
+welcome turn starts. The agent answers it, and that answer shows as usual. A client sends a setup message only to
+a host that advertises the capability; an older host still gets the released role text, which stays
+a visible user message there.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 

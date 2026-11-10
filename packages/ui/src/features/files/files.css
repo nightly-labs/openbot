@@ -167,7 +167,7 @@
   flex: 0 0 auto;
   margin-top: 1px;
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .storage-message[role="alert"] .storage-message-icon {
@@ -494,7 +494,7 @@
   width: 20px;
   height: 20px;
   color: var(--openbot-danger-text);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .file-list-message-title {
@@ -908,5 +908,331 @@
 
   .machine-resources-select {
     flex-basis: auto;
+  }
+}
+
+/* Library ----------------------------------------------------------------------- */
+
+/* The files and pictures of every chat of a server. The page fills the space that its caller gives it. */
+/* Holds the scrolled page and the selection pill over its bottom edge. */
+.library-frame {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.library-page {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-8) var(--openbot-space-8) var(--openbot-space-6);
+}
+
+/* The last row can scroll up above the pill. */
+.library-frame[data-pill] .library-page {
+  padding-bottom: calc(var(--openbot-space-8) * 3);
+}
+
+.library-page[data-marquee] {
+  cursor: default;
+  user-select: none;
+}
+
+/* The rectangle that a drag draws over the files to select them. */
+.library-marquee {
+  position: absolute;
+  z-index: 2;
+  border: 1px solid var(--openbot-accent);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-accent-soft);
+  pointer-events: none;
+}
+
+/* The selection pill has the surface of the jump-to-latest pill, with its ring and no drop shadow. */
+.library-pill {
+  position: absolute;
+  z-index: 5;
+  bottom: var(--openbot-space-6);
+  left: 50%;
+  display: flex;
+  box-sizing: border-box;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--openbot-shadow-ring);
+  color: var(--openbot-text-primary);
+  translate: -50% 0;
+  transition:
+    background-color var(--openbot-duration-normal) var(--openbot-ease-out),
+    border-color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.library-pill[data-tone="danger"] {
+  border-color: var(--openbot-danger-border);
+  /* The soft danger color is translucent: lay it over the opaque surface. */
+  background: linear-gradient(var(--openbot-danger-soft), var(--openbot-danger-soft)), var(--openbot-bg-surface-raised);
+}
+
+/* The content keeps its own width; the pill clips it while it springs to that width. */
+.library-pill-face {
+  position: relative;
+  display: flex;
+  width: max-content;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1-5);
+  white-space: nowrap;
+}
+
+.library-pill-progress {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: var(--openbot-accent-soft);
+  transition: width var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.library-pill-count,
+.library-pill-text {
+  display: inline-flex;
+  overflow: hidden;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+.library-pill-count > span {
+  display: inline-block;
+}
+
+.library-pill-status {
+  padding-inline: var(--openbot-space-3);
+}
+
+.ui-button.library-pill-button {
+  border-radius: var(--openbot-radius-pill);
+}
+
+.library-pill-rule {
+  width: 1px;
+  height: 18px;
+  margin-inline: var(--openbot-space-0-5);
+  background: var(--openbot-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-pill,
+  .library-pill-progress {
+    transition: none;
+  }
+}
+
+.library-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.library-title {
+  margin: 0;
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.library-tools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.library-views {
+  display: flex;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: var(--openbot-space-0-5);
+}
+
+.library-views [aria-pressed="true"] {
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+}
+
+.library-search {
+  width: min(320px, 40vw);
+}
+
+.library-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  columns: 4 220px;
+  column-gap: var(--openbot-space-3);
+}
+
+.library-tile {
+  position: relative;
+  margin-bottom: var(--openbot-space-3);
+  break-inside: avoid;
+}
+
+.ui-button.library-picture,
+.ui-button.library-file-card {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.library-picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* A square until the picture loads, so a picture below the fold does not load at once. */
+  aspect-ratio: auto 1 / 1;
+}
+
+.ui-button.library-file-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3);
+}
+
+.library-file-name {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  padding-inline-end: var(--openbot-space-6);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.library-file-source {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.library-file-source:empty {
+  display: none;
+}
+
+.library-tile-menu {
+  position: absolute;
+  top: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
+  opacity: 0;
+}
+
+.library-tile[data-kind="image"] .library-tile-menu {
+  background: var(--openbot-bg-overlay);
+}
+
+.library-tile:is(:hover, :focus-within) .library-tile-menu,
+.library-tile-menu[data-expanded] {
+  opacity: 1;
+}
+
+/* The check mark of a file that can be picked for a delete. The tile or row button holds the state. */
+.file-select-mark {
+  display: inline-flex;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  color: transparent;
+}
+
+.file-select-mark[data-selected] {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+}
+
+.file-select-mark svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: 2.5;
+}
+
+.file-row[data-selected] {
+  background: var(--openbot-accent-soft);
+}
+
+.library-tile-mark {
+  position: absolute;
+  top: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
+  pointer-events: none;
+}
+
+.library-tile[data-kind="image"] .library-tile-mark:not([data-selected]) {
+  background: var(--openbot-bg-overlay);
+}
+
+.library-tile[data-selected] :is(.library-picture, .library-file-card).ui-button {
+  border-color: var(--openbot-accent);
+  outline: 1px solid var(--openbot-accent);
+}
+
+@media (hover: hover) {
+  .ui-button.library-picture:hover,
+  .ui-button.library-file-card:hover {
+    border-color: var(--openbot-border-strong);
+    background: var(--openbot-bg-surface);
+    color: inherit;
+  }
+}
+
+@media (max-width: 720px) {
+  .library-page {
+    padding: var(--openbot-space-4);
+  }
+
+  .library-head {
+    flex-wrap: wrap;
+  }
+
+  .library-search {
+    width: auto;
+    flex: 1;
   }
 }

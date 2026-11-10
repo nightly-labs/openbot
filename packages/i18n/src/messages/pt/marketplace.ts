@@ -92,6 +92,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Grupos e conversas diretas no Telegram",
   "marketplace.app.whatsappTagline": "Seu próprio chat e as pessoas que você permitir no WhatsApp",
   "marketplace.app.bitwardenTagline": "Entre em sites com logins de uma pasta compartilhada",
+  "marketplace.app.protonPassTagline": "Entre em sites com logins de um cofre compartilhado",
   "marketplace.app.onePasswordCategory": "Gerenciamento de logins e credenciais",
   "marketplace.app.yourApps": "Seus apps",
   "marketplace.app.addCustom": "Adicionar personalizado",
@@ -116,6 +117,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "Roda no app para desktop do {name} em {address}.",
   "marketplace.app.setup.desktopConnected": "Conectado a {address}.",
   "marketplace.app.setup.open": "Não precisa de login nem de chave.",
+  "marketplace.app.blocked.update":
+    "{host} usa uma versão antiga do OpenBot que não consegue conectar apps. Atualize o OpenBot em {host} ou peça ao dono para atualizar.",
+  "marketplace.app.blocked.member":
+    "Só um dono ou administrador de {host} pode conectar apps lá. Peça a um deles para conectar {name} ou para atualizar o OpenBot em {host}, para que membros possam conectar apps.",
   "marketplace.app.connectAgain": "Conectar de novo",
   "marketplace.app.automation.askOnInstall": "Pedir acesso ao macOS na instalação",
   "marketplace.app.automation.title": "Acesso aos apps da Apple",
@@ -202,6 +207,25 @@ export const messages = {
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Use os estilos deste repositório e desenhe uma página de configurações no Paper.",
   "marketplace.plugin.paper.prompt.tokens": "Liste os design tokens do arquivo Paper aberto e compare com nosso tema.",
+  "marketplace.plugin.higgsfield.tagline": "Imagens, vídeos e áudio com IA",
+  "marketplace.plugin.higgsfield.description":
+    "O Higgsfield permite que agentes gerem imagens, vídeos, personagens e áudio com modelos do Higgsfield como Seedance, Kling, Veo e MiniMax Hailuo, consultem o saldo de créditos e naveguem pela Asset Library. Os resultados são salvos nos Assets do Higgsfield do usuário. Cada usuário entra na própria conta do Higgsfield pelo navegador. Cada geração usa créditos dessa conta na tarifa padrão, também em um plano ilimitado.",
+  "marketplace.plugin.higgsfield.app":
+    "Geração de imagens, vídeos e áudio, personagens, créditos e assets, pelo servidor MCP do Higgsfield com login no navegador.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Quantos créditos do Higgsfield eu tenho?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Faça no Higgsfield uma foto de produto de uma caneca de cerâmica sobre uma mesa de madeira.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Faça no Higgsfield um vídeo de 5 segundos de ondas ao pôr do sol.",
+  "marketplace.plugin.elevenlabs.tagline": "Fala, vozes e agentes de voz",
+  "marketplace.plugin.elevenlabs.description":
+    "O ElevenLabs permite que agentes transformem texto em fala, trabalhem com vozes e criem, testem e revisem agentes de voz do ElevenLabs e suas conversas. O áudio gerado volta como um link de download de curta duração. Cada usuário entra na própria conta do ElevenLabs pelo navegador, e cada geração usa créditos dessa conta.",
+  "marketplace.plugin.elevenlabs.app":
+    "Texto para fala, vozes e gestão de agentes de voz, pelo servidor MCP do ElevenLabs com login no navegador.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Leia este parágrafo em voz alta com uma voz calma do ElevenLabs e me dê o áudio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Liste meus agentes de voz do ElevenLabs e a voz que cada um usa.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Resuma as últimas dez conversas do meu agente de voz de suporte.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendário e mais no seu Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permite que agentes usem Mail, Calendário, Contatos, Lembretes, Notas, Mensagens e Safari neste Mac. Funciona somente no macOS. O OpenBot inicia o mcp-icloud, um servidor da comunidade que não é feito pela Apple nem pelo OpenBot. O servidor controla os apps com AppleScript, neste computador, e não precisa de conta nem de chave. Na instalação, o OpenBot pode pedir ao macOS acesso a todos esses apps de uma vez, com um pedido para cada app. Se você não fizer isso, o macOS pergunta na primeira vez que um agente usa um app. Para mudar isso depois, abra Ajustes do Sistema › Privacidade e Segurança › Automação. Os agentes podem enviar e-mails e iMessages, e alterar ou excluir eventos, contatos e lembretes, então revise cada gravação antes de aprová-la. O que as ferramentas leem, como o texto dos e-mails, vai para o provedor do modelo do agente.",
@@ -219,6 +243,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "Quais erros novos apareceram desde o deploy de ontem?",
   "marketplace.plugin.sentry.prompt.topCrash": "Explique o principal crash do projeto mobile e sua causa provável.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Quão saudável está o release atual em comparação com o anterior?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests e pipelines",
+  "marketplace.plugin.gitlab.description":
+    "O GitLab permite que agentes busquem projetos, leiam e criem issues, revisem e atualizem merge requests, leiam arquivos e commits do repositório e verifiquem pipelines e jobs de CI no GitLab.com. Cada usuário entra com a própria conta GitLab pelo navegador. Os agentes têm as mesmas permissões que o usuário: podem enviar commits, alterar issues e merge requests e fazer o merge deles. Para um GitLab auto-hospedado, adicione um servidor MCP com o endereço do seu GitLab seguido de /api/v4/mcp nas configurações de servidores MCP e entre por lá.",
+  "marketplace.plugin.gitlab.app":
+    "Projetos, issues, merge requests, repositórios e pipelines de CI, através do servidor MCP do GitLab com login pelo navegador.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Quais merge requests esperam a minha revisão?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Por que o último pipeline no branch padrão falhou?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Abra uma issue para o crash na fila de sincronização com passos de reprodução.",
   "marketplace.plugin.vercel.tagline": "Deploys, logs de build e projetos",
   "marketplace.plugin.vercel.description":
     "O Vercel permite que agentes listem projetos e deploys recentes, leiam logs de build e de execução, e descubram por que um build falhou. Cada usuário entra com a própria conta Vercel pelo navegador e escolhe as equipes que os agentes podem usar. Nessas equipes, os agentes têm as mesmas permissões da conta do usuário. Eles também podem alterar variáveis de ambiente, domínios, registros DNS e deploys, e comprar domínios.",
@@ -322,15 +355,24 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Envie o rascunho do anúncio de lançamento para a lista beta.",
   "marketplace.plugin.resend.prompt.status": "O e-mail da fatura chegou ao cliente?",
   "marketplace.plugin.resend.prompt.template": "Rascunhe um e-mail de redefinição de senha para o novo fluxo.",
-  "marketplace.plugin.composio.tagline": "Muitos apps pelo seu próprio link do Composio",
+  "marketplace.plugin.omnisend.tagline": "Marketing por e-mail e SMS",
+  "marketplace.plugin.omnisend.description":
+    "O Omnisend permite que os agentes leiam relatórios de campanhas e formulários, encontrem contatos e segmentos, e criem e editem campanhas, automações, modelos de e-mail, formulários e produtos. Cada usuário entra na própria conta do Omnisend pelo navegador e escolhe o nível de acesso na tela de consentimento. Com acesso de escrita, os agentes também podem enviar campanhas e excluir dados. Escolha acesso somente leitura quando os agentes só precisarem de relatórios.",
+  "marketplace.plugin.omnisend.app":
+    "Campanhas, automações, contatos, segmentos, formulários e relatórios, pelo servidor MCP do Omnisend com login no navegador.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Como foram as campanhas da semana passada em comparação com a semana anterior?",
+  "marketplace.plugin.omnisend.prompt.segment": "Quantos contatos há no segmento VIP e como ele mudou este mês?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Crie um rascunho de campanha para a nova coleção, mas não a envie.",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub e mais de 1.000 apps",
   "marketplace.plugin.composio.description":
-    "O Composio conecta agentes ao Gmail, Slack, GitHub e centenas de outros apps por um único servidor MCP. Conecte os apps que quiser na sua conta Composio e cole aqui a URL do MCP e a chave de API dela.",
+    "O Composio conecta seus agentes ao Gmail, Slack, GitHub e mais de 1.000 outros apps por um único servidor MCP. Entre com sua conta Composio. Quando um agente precisa de um app, ele pede que você o conecte.",
   "marketplace.plugin.composio.app":
-    "Os apps que você adiciona ao seu servidor MCP do Composio, através do link da sua conta Composio.",
+    "Os apps que você conecta na sua conta Composio. Um agente pede que você conecte um app quando precisa dele.",
   "marketplace.plugin.composio.prompt.inbox": "Resuma meus e-mails não lidos e rascunhe respostas para os urgentes.",
   "marketplace.plugin.composio.prompt.handoff": "Publique um resumo deste pull request no canal da nossa equipe.",
   "marketplace.plugin.composio.prompt.apps": "Quais apps e ações você pode usar pelo Composio?",
-  "marketplace.plugin.composio.hint.url": "O URL de um servidor MCP na sua conta Composio",
   "marketplace.plugin.composio.hint.apiKey": "Ela fica na sua conta Composio, em Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Projetos, branches e migrações de Postgres",
   "marketplace.plugin.neon.description":
@@ -448,7 +490,6 @@ export const messages = {
     "Encontre um dataset de séries temporais de clima e mostre as colunas dele.",
   "marketplace.auth.apiKey": "Chave de API",
   "marketplace.auth.personalApiKey": "Chave de API pessoal",
-  "marketplace.auth.mcpUrl": "URL do MCP",
   "marketplace.auth.createKey": "Criar uma chave",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Testar em {name}",

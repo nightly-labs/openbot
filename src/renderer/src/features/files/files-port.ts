@@ -7,12 +7,15 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface FilesPort {
   agent: Pick<OpenBotDesktopApi["agent"], "listAgents">;
   /**
-   * The old provider CLI versions and the machine use are optional: a client with no store of its
-   * own, such as the web client, has none.
+   * The old provider CLI versions, the machine use and the disk are optional: a client with no store
+   * of its own, such as the web client, has none.
    */
   storage: Pick<OpenBotDesktopApi["storage"], "clear" | "deleteFile" | "getUsage" | "openFile"> &
     Partial<
-      Pick<OpenBotDesktopApi["storage"], "getRemovableRuntimes" | "removeRemovableRuntimes" | "getMachineMetrics">
+      Pick<
+        OpenBotDesktopApi["storage"],
+        "getRemovableRuntimes" | "removeRemovableRuntimes" | "getMachineMetrics" | "getDisk"
+      >
     >;
   /** The machine alert settings, beside `storage.getMachineMetrics`. */
   hostAdmin?: Pick<OpenBotDesktopApi["hostAdmin"], "getMachineAlerts" | "setMachineAlerts">;

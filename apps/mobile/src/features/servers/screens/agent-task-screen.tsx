@@ -41,12 +41,13 @@ import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
   type ChatBubbleMessage,
   chatRowIndex,
-  latestReadableMessage,
+  latestReadBoundaryMessage,
   projectChatMessages,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
+import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
@@ -155,6 +156,7 @@ function AgentTaskChat({
   const queryClient = useQueryClient();
   const isDraft = taskId === DRAFT_THREAD_ID;
   const threadMenu = useChatThreadMenu(target, taskId);
+  const mentionReferences = useAgentMentionReferences(serverId, agentId, taskId);
   // A deleted thread has no screen: the agent's chat takes its place.
   const threadActions = useThreadActions(target.serverId, onThreadDeleted);
   const {
@@ -326,7 +328,7 @@ function AgentTaskChat({
     agentId,
     task ? taskId : null,
     isFocused && appActive && conversation.data
-      ? (latestReadableMessage(conversation.data.messages)?.id ?? null)
+      ? (latestReadBoundaryMessage(conversation.data.messages)?.id ?? null)
       : null,
     task?.updatedAt ?? null,
   );
@@ -716,6 +718,7 @@ function AgentTaskChat({
               replyFocusVersion={0}
               onCancelReply={() => {}}
               mentionAgents={serverAgents.filter((item) => item.id !== agentId)}
+              mentionReferences={mentionReferences}
               action={action}
               actionForeground={actionForeground}
               agentName={target.name}

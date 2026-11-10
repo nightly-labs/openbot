@@ -55,6 +55,7 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { StopIcon } from "../conversation/ConversationIcons";
 import { playIdleGreetingMotion } from "./idle-greeting-motion";
@@ -448,6 +449,9 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const [outgoingPresentation, setOutgoingPresentation] = createSignal<DynamicIslandPresentation>();
   const [modeTransitioning, setModeTransitioning] = createSignal(false);
   const [hovered, setHovered] = createSignal(false);
+  // The island is on screen all day, above every app. Work moves on it only while the pointer is on it:
+  // an island that a click expanded stays open after the user goes back to another app.
+  const ambientMotion = hovered;
   let transitionRoot: HTMLDivElement | undefined;
   let modeAnimations: Animation[] = [];
   let modeTransitionVersion = 0;
@@ -626,97 +630,100 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       ref={transitionRoot}
       class="openbot-dynamic-island-transition-root"
       data-mode-transitioning={modeTransitioning() ? "true" : undefined}
+      data-ambient-motion={ambientMotion() ? undefined : "paused"}
     >
-      <DynamicIsland
-        label={
-          props.displayMode === "island"
-            ? t("island.label.externalDisplay", { label: t(config().label) })
-            : t(config().label)
-        }
-        ariaLive={config().ariaLive}
-        state={props.state}
-        displayMode={props.displayMode}
-        notchSize={islandNotchSize()}
-        extendedHoverArea={props.extendedHoverArea}
-        suppressInitialHover={props.suppressInitialHover}
-        onStateChange={changeState}
-        compactWidth={compactWidth()}
-        compactHeight={compactHeight()}
-        // A mode change moves its own layers from the old place to the new one, in step with the surface.
-        compactContentFollowsResize={!modeTransitioning()}
-        sharedMotion={{
-          leading: sharedLeading()?.[props.displayMode === "island" ? "island" : "notch"],
-          trailing: sharedTrailing()?.[props.displayMode === "island" ? "island" : "notch"],
-        }}
-        hoverBehavior={config().badge ? "expand" : "grow"}
-        hoverContentMotion={OPENBOT_COMPACT_HOVER_MOTION}
-        onHoverChange={setHovered}
-        pointerToggle={config().badge ? false : undefined}
-        class={[
-          "openbot-dynamic-island",
-          `dynamic-island-${visiblePresentation().mode === "message" ? "message-first" : visiblePresentation().mode}`,
-          config().badge ? "dynamic-island-status" : undefined,
-          visiblePresentation().mode !== "idle" && visiblePresentation().mode !== "working"
-            ? "dynamic-island-panel-wide"
-            : undefined,
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        compactLeading={
-          <IslandModeSwap
-            slot="compact-leading"
-            presentation={visiblePresentation()}
-            outgoingPresentation={outgoingPresentation()}
-            renderOutgoing={(presentation) => (
-              <CompactLeading presentation={presentation} displayMode={props.displayMode} variant={props.variant} />
-            )}
-          >
-            <CompactLeading
+      <AmbientMotion when={ambientMotion()}>
+        <DynamicIsland
+          label={
+            props.displayMode === "island"
+              ? t("island.label.externalDisplay", { label: t(config().label) })
+              : t(config().label)
+          }
+          ariaLive={config().ariaLive}
+          state={props.state}
+          displayMode={props.displayMode}
+          notchSize={islandNotchSize()}
+          extendedHoverArea={props.extendedHoverArea}
+          suppressInitialHover={props.suppressInitialHover}
+          onStateChange={changeState}
+          compactWidth={compactWidth()}
+          compactHeight={compactHeight()}
+          // A mode change moves its own layers from the old place to the new one, in step with the surface.
+          compactContentFollowsResize={!modeTransitioning()}
+          sharedMotion={{
+            leading: sharedLeading()?.[props.displayMode === "island" ? "island" : "notch"],
+            trailing: sharedTrailing()?.[props.displayMode === "island" ? "island" : "notch"],
+          }}
+          hoverBehavior={config().badge ? "expand" : "grow"}
+          hoverContentMotion={OPENBOT_COMPACT_HOVER_MOTION}
+          onHoverChange={setHovered}
+          pointerToggle={config().badge ? false : undefined}
+          class={[
+            "openbot-dynamic-island",
+            `dynamic-island-${visiblePresentation().mode === "message" ? "message-first" : visiblePresentation().mode}`,
+            config().badge ? "dynamic-island-status" : undefined,
+            visiblePresentation().mode !== "idle" && visiblePresentation().mode !== "working"
+              ? "dynamic-island-panel-wide"
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          compactLeading={
+            <IslandModeSwap
+              slot="compact-leading"
               presentation={visiblePresentation()}
-              displayMode={props.displayMode}
-              variant={props.variant}
-            />
-          </IslandModeSwap>
-        }
-        compactTrailing={
-          <IslandModeSwap
-            slot="compact-trailing"
-            presentation={visiblePresentation()}
-            outgoingPresentation={outgoingPresentation()}
-            renderOutgoing={(presentation) => <CompactTrailing presentation={presentation} hovered={hovered()} />}
-          >
-            <CompactTrailing presentation={visiblePresentation()} hovered={hovered()} />
-          </IslandModeSwap>
-        }
-        expandedContent={
-          <IslandModeSwap
-            slot="expanded"
-            presentation={visiblePresentation()}
-            outgoingPresentation={outgoingPresentation()}
-            block
-            renderOutgoing={(presentation) => (
+              outgoingPresentation={outgoingPresentation()}
+              renderOutgoing={(presentation) => (
+                <CompactLeading presentation={presentation} displayMode={props.displayMode} variant={props.variant} />
+              )}
+            >
+              <CompactLeading
+                presentation={visiblePresentation()}
+                displayMode={props.displayMode}
+                variant={props.variant}
+              />
+            </IslandModeSwap>
+          }
+          compactTrailing={
+            <IslandModeSwap
+              slot="compact-trailing"
+              presentation={visiblePresentation()}
+              outgoingPresentation={outgoingPresentation()}
+              renderOutgoing={(presentation) => <CompactTrailing presentation={presentation} hovered={hovered()} />}
+            >
+              <CompactTrailing presentation={visiblePresentation()} hovered={hovered()} />
+            </IslandModeSwap>
+          }
+          expandedContent={
+            <IslandModeSwap
+              slot="expanded"
+              presentation={visiblePresentation()}
+              outgoingPresentation={outgoingPresentation()}
+              block
+              renderOutgoing={(presentation) => (
+                <ExpandedContent
+                  presentation={presentation}
+                  displayMode={props.displayMode}
+                  inlineReply={props.inlineReply}
+                  onAction={props.onAction}
+                  onHaptic={props.onHaptic}
+                  onClose={() => props.onStateChange("compact", "pointer")}
+                />
+              )}
+            >
               <ExpandedContent
-                presentation={presentation}
+                presentation={visiblePresentation()}
                 displayMode={props.displayMode}
                 inlineReply={props.inlineReply}
                 onAction={props.onAction}
+                actionError={props.actionError}
                 onHaptic={props.onHaptic}
                 onClose={() => props.onStateChange("compact", "pointer")}
               />
-            )}
-          >
-            <ExpandedContent
-              presentation={visiblePresentation()}
-              displayMode={props.displayMode}
-              inlineReply={props.inlineReply}
-              onAction={props.onAction}
-              actionError={props.actionError}
-              onHaptic={props.onHaptic}
-              onClose={() => props.onStateChange("compact", "pointer")}
-            />
-          </IslandModeSwap>
-        }
-      />
+            </IslandModeSwap>
+          }
+        />
+      </AmbientMotion>
     </div>
   );
 }
@@ -764,12 +771,19 @@ function CompactLeading(props: {
 }): JSX.Element {
   const statusAgent = () => compactStatusAgent(props.presentation);
   const working = () => (props.presentation.mode === "working" ? props.presentation.working : []);
+  // The logo blinks only while the pointer is on the island: each blink draws frames all day.
+  const ambientMotion = useAmbientMotion();
+  const logoAnimation = () => (ambientMotion() ? "blink" : "none");
   return (
     <span class="dynamic-island-surface-content-swap dynamic-island-surface-compact-swap">
       <Switch
         fallback={
           <span class="dynamic-island-surface-leading-anchor" data-island-spatial-anchor="center">
-            <AppLogo variant={props.variant ?? "production"} animation="blink" class="dynamic-island-surface-logo" />
+            <AppLogo
+              variant={props.variant ?? "production"}
+              animation={logoAnimation()}
+              class="dynamic-island-surface-logo"
+            />
           </span>
         }
       >
@@ -899,9 +913,10 @@ function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
 }
 
 /**
- * The greetings change every few seconds, and each one moves only while a pointer is on the island. A
- * motion makes the island window draw a frame on every display refresh, and the island is on screen
- * all day: moving at rest cost about a fifth of a core, in the renderers and the GPU process.
+ * While a pointer is on the island, the greetings change every few seconds and each one moves. Away from
+ * it, the greeting stays as it is. A motion or a crossfade makes the island window draw a frame on every
+ * display refresh, and the island is on screen all day: moving at rest cost about a fifth of a core, in
+ * the renderers and the GPU process, and the crossfades alone cost about 1% of a core on Linux.
  */
 function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
   const [index, setIndex] = createSignal(0);
@@ -934,22 +949,29 @@ function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
     },
   );
 
+  createEffect(
+    () => props.moving,
+    (moving) => {
+      if (!moving) return;
+      const timer = setInterval(() => {
+        const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
+        const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
+        const nextSlot = activeSlot() === 0 ? 1 : 0;
+        if (nextSlot === 0) setFirstEmoji(nextEmoji);
+        else setSecondEmoji(nextEmoji);
+        animationFrame = requestAnimationFrame(() => {
+          animationFrame = undefined;
+          setIndex(nextIndex);
+          setActiveSlot(nextSlot);
+          playMotion(nextSlot, nextEmoji, props.moving);
+        });
+      }, IDLE_GREETING_INTERVAL);
+      return () => clearInterval(timer);
+    },
+  );
+
   onSettled(() => {
-    const timer = setInterval(() => {
-      const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
-      const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
-      const nextSlot = activeSlot() === 0 ? 1 : 0;
-      if (nextSlot === 0) setFirstEmoji(nextEmoji);
-      else setSecondEmoji(nextEmoji);
-      animationFrame = requestAnimationFrame(() => {
-        animationFrame = undefined;
-        setIndex(nextIndex);
-        setActiveSlot(nextSlot);
-        playMotion(nextSlot, nextEmoji, props.moving);
-      });
-    }, IDLE_GREETING_INTERVAL);
     return () => {
-      clearInterval(timer);
       if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
       for (const motion of [...motions[0], ...motions[1]]) motion.cancel();
     };
@@ -1802,7 +1824,7 @@ function IslandAvatar(props: { agent: DynamicIslandAgentIdentity; working?: bool
       // avatar, 0.5% and one layout without, all day, whatever application the user
       // is actually in. `"hover"` holds the resting pose and brings the agent back the
       // moment a pointer reaches the island, so the motion is there when someone is
-      // looking at it. Work still animates on its own.
+      // looking at it. Work animates on its own only while the island is looked at: see `AmbientMotion`.
       motion="hover"
       mood={props.working ? "working" : "idle"}
       shape="cercle"

@@ -11,6 +11,7 @@ import type { LucideIcon } from "lucide-react-native";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import CalendarPlus from "lucide-react-native/icons/calendar-plus";
 import CalendarX2 from "lucide-react-native/icons/calendar-x-2";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CircleCheck from "lucide-react-native/icons/circle-check";
 import CirclePause from "lucide-react-native/icons/circle-pause";
 import CircleX from "lucide-react-native/icons/circle-x";
@@ -45,6 +46,7 @@ import {
 import Animated, {
   Easing,
   FadeInDown,
+  Keyframe,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
@@ -56,7 +58,7 @@ import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar"
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
-import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { ChatMarkdown, chatMarkdownHasTable } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row";
@@ -67,15 +69,21 @@ import { useMessageArrivals } from "@/features/chat/components/use-message-arriv
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import {
   type ChatBubbleMessage,
+  type ChatMarkerGroup,
   type ChatMessage,
+  chatRowHolding,
   chatRowIndex,
-  type ExchangeGroup,
+  firstChatRowOf,
   groupExchangeMarkers,
+  groupRoutineRunMarkers,
   indexChatMessages,
+  type RoutineMarker,
   type RoutineMarkerEvent,
+  type RoutineRunGroup,
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
-import { useAgentColorMessages } from "@/features/settings/model/message-color";
+import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useMessageColor } from "@/features/settings/model/message-color";
 import { stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -86,13 +94,16 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
+import { ChatFileActionsContext, type OpenMessageFile, useMessageFileOpener } from "./chat-file-actions";
 import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
 import { ChatImageViewerProvider, isStackImage, isViewableImage } from "./chat-image-viewer";
@@ -100,6 +111,7 @@ import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } fro
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
+import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
 import { HistoryShownContext } from "./use-history-shown";
 import { useReplyHaptics } from "./use-reply-haptics";
 
@@ -110,7 +122,7 @@ const TAP_DURATION_MS = 400;
 const HANDLE_MARGIN = 24;
 
 /** A row of the list. Thinking steps show in the activity row instead. */
-type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ExchangeGroup;
+type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ChatMarkerGroup;
 const NO_ROWS: VisibleMessage[] = [];
 /**
  * While the chat opens on Android, the list renders only the latest rows, which the reader sees
@@ -122,7 +134,7 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
-/** A user's message is at most this part of the list width, as `max-w-[92%]` on its row. */
+/** A user's text bubble is at most this part of the list width, as `max-w-[92%]` on its row. */
 const USER_BUBBLE_WIDTH = 0.92;
 
 /** The list keeps the sizes it measured by message, so rows that stay keep their place when the data changes. */
@@ -266,6 +278,8 @@ interface ChatMessageListProps {
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
+  /** True while the chat shows the messages that the phone kept and reads its latest page. */
+  catchingUp?: boolean;
   messages: ChatMessage[];
   messageAliases: ReadonlyMap<string, string>;
   referenceMessages: ChatMessage[];
@@ -284,6 +298,15 @@ interface ChatMessageListProps {
   onDeleteMessage?: (message: ChatBubbleMessage) => Promise<void>;
   /** The reader can delete the messages of others too, not only the ones that they sent. */
   deletesAnyMessage?: boolean;
+  /** Marks an agent's message and the messages after it unread. Absent where the host cannot. */
+  onMarkUnread?: (message: ChatBubbleMessage) => void;
+  /** The messages that Mark unread is on. All agent messages when unset. */
+  markUnreadMessageIds?: ReadonlySet<string>;
+  /**
+   * The host messages from the one where the NEW line shows to the newest, in chat order. The line
+   * shows above the first row of them. Keep the set stable while its ids stay the same.
+   */
+  unreadLineMessageIds?: ReadonlySet<string> | null;
   /** The open channels that the text of a message can go to. Keep the list stable while it stays the same. */
   sendChannels?: readonly { id: string; name: string }[];
   onSendToChannel?: (message: ChatBubbleMessage, channelId: string) => void;
@@ -336,10 +359,12 @@ interface MessageRowShared {
   themeMuted: string;
   foreground: ViewStyle["backgroundColor"];
   userForeground: string;
-  /** Unset when the user's messages do not use the agent color. */
+  /** Unset when the user's messages have no color. */
   userBubbleStyle: ComponentProps<typeof Animated.View>["style"] | undefined;
-  /** The agent color for the controls of an attachment, unset with the same setting. */
+  /** The message color for the controls of an attachment, unset with the same setting. */
   attachmentTint: AttachmentTint | undefined;
+  /** The colors of code in the user's bubble, unset with the same setting. */
+  bubbleTone: BubbleTone | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   /** Arriving replies animate: the screen is focused, online, active, and shows the response. */
   animationActive: boolean;
@@ -357,6 +382,8 @@ interface MessageRowShared {
   /** The host deletes messages. A message that the reader did not send also needs `deletesAny`. */
   canDelete: boolean;
   deletesAny: boolean;
+  /** The host marks an agent's message unread for the reader. */
+  canMarkUnread: boolean;
   /** The open channels that the text of a message can go to. Empty where it cannot go to one. */
   sendChannels: readonly { id: string; name: string }[];
   canSelectText: boolean;
@@ -365,12 +392,18 @@ interface MessageRowShared {
   branchPoints: ReadonlySet<string>;
   /** The width inside the list padding. The iOS menu of a queued message does not limit its width. */
   listWidth: number;
+  /** The agent of an agent chat. A workspace file that a message of no agent names is in its workspace. */
+  fileAgentId: string | undefined;
+  openFile: (file: MessageFileTarget, written: MessageFileTarget | null) => Promise<void>;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
     branch: (message: ChatBubbleMessage) => void;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     delete: (message: ChatBubbleMessage) => Promise<void>;
+    markUnread: (message: ChatBubbleMessage) => void;
+    /** Whether Mark unread is on this message. */
+    marksUnread: (message: ChatBubbleMessage) => boolean;
     sendToChannel: (message: ChatBubbleMessage, channelId: string) => void;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
@@ -392,13 +425,7 @@ const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
   cancelled: CirclePause,
 };
 
-function RoutineMarkerRow({
-  message,
-  muted,
-}: {
-  message: Extract<ChatMessage, { kind: "routine" }>;
-  muted: ViewStyle["backgroundColor"];
-}) {
+function RoutineMarkerRow({ message, muted }: { message: RoutineMarker; muted: ViewStyle["backgroundColor"] }) {
   const { t } = useText();
   const [success, danger] = useCSSVariable(["--openbot-success-text", "--openbot-danger-text"]);
   const Icon = ROUTINE_MARKER_ICONS[message.event];
@@ -425,6 +452,53 @@ function RoutineMarkerRow({
   );
 }
 
+/**
+ * Consecutive completed runs of one routine, drawn as one row as on desktop. The row names the
+ * routine and how many runs there are, and opens to show each run's own marker.
+ */
+function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; muted: ViewStyle["backgroundColor"] }) {
+  const { t } = useText();
+  const [success] = useCSSVariable(["--openbot-success-text"]);
+  const [open, setOpen] = useState(false);
+  const count = group.runs.length;
+  return (
+    <View className="items-center">
+      <View className="flex-row flex-wrap items-center justify-center gap-1.5 py-2">
+        <CircleCheck size={16} color={String(success)} strokeWidth={1.75} />
+        <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
+          {group.routineName}
+        </Typography.Paragraph>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={t(open ? "mobile.chat.routine.runGroup.hide" : "mobile.chat.routine.runGroup.show", {
+            count,
+            name: group.routineName,
+          })}
+          hitSlop={8}
+          onPress={() => {
+            void haptics.selection();
+            setOpen((value) => !value);
+          }}
+          className="flex-row items-center gap-1"
+          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+        >
+          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+            {t("mobile.chat.routine.runGroup.count", { count })}
+          </Typography.Paragraph>
+          <ChevronDown
+            size={14}
+            color={String(muted)}
+            strokeWidth={2}
+            style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
+          />
+        </Pressable>
+      </View>
+      {open ? group.runs.map((run) => <RoutineMarkerRow key={run.id} message={run} muted={muted} />) : null}
+    </View>
+  );
+}
+
 /** Where a new chat started, as the desktop divider shows it. The agent does not see the messages above. */
 function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] }) {
   const { t } = useText();
@@ -435,6 +509,78 @@ function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] 
         {t("mobile.chat.contextReset")}
       </Typography.Paragraph>
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
+    </View>
+  );
+}
+
+/*
+ * The NEW line arrives as on desktop: the badge comes in first, then each line grows out from it.
+ * Layout animations run on the UI thread. Reduced motion shows the line at once.
+ */
+const LINE_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const UNREAD_BADGE_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.9 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }], easing: LINE_EASE_OUT },
+})
+  .duration(200)
+  .reduceMotion(ReduceMotion.System);
+const UNREAD_LINE_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ scaleX: 0 }] },
+  100: { opacity: 1, transform: [{ scaleX: 1 }], easing: LINE_EASE_OUT },
+})
+  .duration(340)
+  .delay(60)
+  .reduceMotion(ReduceMotion.System);
+// Each line grows from its end at the badge. The row runs right to left in RTL, so the ends swap.
+const LINE_BEFORE_ORIGIN = END_X === 1 ? "100% 50%" : "0% 50%";
+const LINE_AFTER_ORIGIN = END_X === 1 ? "0% 50%" : "100% 50%";
+
+/**
+ * The NEW line above the first unread message of the chat, as on desktop. With chat colors on, it has
+ * the agent's color, as the reader's bubbles do; else the accent of the unread marks. It animates once
+ * for each new place: the list draws a row again when it scrolls back into view, and that draw shows
+ * the line at once. `animated` holds the rows where it already arrived.
+ */
+function UnreadLineRow({
+  rowId,
+  color,
+  animated,
+}: {
+  rowId: string;
+  color: string | undefined;
+  animated: Set<string>;
+}) {
+  const { t } = useText();
+  const [arrives] = useState(() => !animated.has(rowId));
+  useEffect(() => {
+    animated.add(rowId);
+  }, [animated, rowId]);
+  const line = color ? { backgroundColor: color } : undefined;
+  return (
+    <View
+      accessible
+      accessibilityLabel={t("mobile.chat.unread.lineLabel")}
+      className="flex-row items-center gap-2 pt-1 pb-3"
+    >
+      <Animated.View
+        entering={arrives ? UNREAD_LINE_IN : undefined}
+        className="h-px flex-1 bg-accent"
+        style={[{ transformOrigin: LINE_BEFORE_ORIGIN }, line]}
+      />
+      <Animated.View entering={arrives ? UNREAD_BADGE_IN : undefined}>
+        <Typography.Paragraph
+          type="body-xs"
+          className="font-semibold text-accent"
+          style={color ? { color } : undefined}
+        >
+          {t("mobile.chat.unread.line")}
+        </Typography.Paragraph>
+      </Animated.View>
+      <Animated.View
+        entering={arrives ? UNREAD_LINE_IN : undefined}
+        className="h-px flex-1 bg-accent"
+        style={[{ transformOrigin: LINE_AFTER_ORIGIN }, line]}
+      />
     </View>
   );
 }
@@ -566,6 +712,11 @@ const MessageRow = memo(function MessageRow({
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
           onDelete:
             shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
+          // As on desktop, only an agent's message marks the chat unread from it.
+          onMarkUnread:
+            shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
+              ? () => shared.actions.markUnread(bubble)
+              : undefined,
           sendToChannel:
             shared.sendChannels.length > 0 && bubble.body.trim()
               ? {
@@ -619,14 +770,32 @@ const MessageRow = memo(function MessageRow({
   );
   // The author of a channel message: its agent, or a person.
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
+  // A workspace file is in the workspace of the agent that wrote the message, as on desktop. A person's
+  // message in a channel names shared files only.
+  const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
+  const fileBody = message.kind === "message" ? message.body : "";
+  const finishedBody = message.kind !== "message" || !isStreamingReply(message);
+  // A table stands out of the bubble, between the bubbles of the text around it, as the screen is too
+  // narrow for a table in a bubble. While the reader selects text, the message is one bubble again,
+  // so the selectable text can cover it.
+  const tableOutside = useMemo(() => chatMarkdownHasTable(fileBody, finishedBody), [fileBody, finishedBody]);
+  const openFile = shared.openFile;
+  const openMessageFile = useMemo<OpenMessageFile>(() => {
+    const directory = messageFileDirectory(fileBody);
+    return (text) => {
+      const target = messageFileTarget(text, directory, fileAgentId);
+      return target ? () => void openFile(target.file, target.written) : null;
+    };
+  }, [fileBody, fileAgentId, openFile]);
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
     message.kind === "message" && message.sender ? avatarHeadColor(message.sender.id, null) : undefined;
-  const textColor =
+  const tone =
     message.kind === "message" && message.author === "user" && userBubbleStyle && !memberColor
-      ? userForeground
-      : foreground;
+      ? shared.bubbleTone
+      : undefined;
+  const textColor = tone ? userForeground : foreground;
   // A generation owns its first attachment, the image; any further files follow in order.
   const files =
     message.kind === "message"
@@ -638,9 +807,75 @@ const MessageRow = memo(function MessageRow({
   const gallery = message.kind === "message" ? files.filter(isStackImage) : [];
   const fileUpload = (attachment: AttachmentSummary) =>
     upload ? uploadProgressAt(files.indexOf(attachment), upload.completed, upload.current) : undefined;
+  const markdownProps = {
+    agents,
+    body: fileBody,
+    finished: finishedBody,
+    selectable: message.kind === "message" && message.author === "user" && !bubble,
+    color: textColor,
+    tone,
+    playback,
+    animationEnabled: shared.animationActive && arriving,
+    align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
+  };
+  // The wrappers keep their identity while their inputs stay, so `ChatMarkdown` and its table blocks
+  // keep their memo when the row renders again for another reason, such as its actions.
+  const bubbleFor = useCallback(
+    (children: ReactNode, key?: string) =>
+      message.kind === "message" ? (
+        <ChatBubble
+          key={key}
+          agent={message.author === "agent"}
+          collapsed={waiting}
+          animateSize={shared.textReveal}
+          className={
+            message.author === "user"
+              ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
+              : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
+          }
+          style={[
+            { borderCurve: "circular", overflow: "hidden" },
+            // A row with files is as wide as the list, and its column takes the width of its widest
+            // child. A percentage would be of that column: the text wraps after the row has its
+            // height, and the bubble covers the next row. The width in points does not depend on it.
+            message.author === "user" && message.attachments?.length
+              ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
+              : undefined,
+            message.author === "user"
+              ? memberColor
+                ? { backgroundColor: `${memberColor}38` }
+                : userBubbleStyle
+              : undefined,
+          ]}
+        >
+          {children}
+        </ChatBubble>
+      ) : null,
+    [message, waiting, shared.textReveal, shared.listWidth, userBubbleStyle, memberColor],
+  );
+  // A table out of the user's bubble is as wide as the widest bubble and on its side.
+  const sentTable = useCallback(
+    (table: ReactNode, key: string) => (
+      <View key={key} className="self-end" style={{ width: shared.listWidth * USER_BUBBLE_WIDTH }}>
+        {table}
+      </View>
+    ),
+    [shared.listWidth],
+  );
+  // With a message color, the card of the table stands on that color, with the corners of the table.
+  const tableOnColor = useCallback(
+    (card: ReactNode) => (
+      <Animated.View style={[{ borderRadius: 16, borderCurve: "continuous", overflow: "hidden" }, userBubbleStyle]}>
+        {card}
+      </Animated.View>
+    ),
+    [userBubbleStyle],
+  );
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+    ) : message.kind === "routine-run-group" ? (
+      <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "exchange-group" ? (
@@ -734,52 +969,40 @@ const MessageRow = memo(function MessageRow({
           </Button>
         ) : null}
         {message.body.trim() ? (
-          <ChatBubble
-            agent={message.author === "agent"}
-            collapsed={waiting}
-            animateSize={shared.textReveal}
-            className={
-              message.author === "user"
-                ? `self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
-                : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
-            }
-            style={[
-              { borderCurve: "circular", overflow: "hidden" },
-              message.author === "user"
-                ? memberColor
-                  ? { backgroundColor: `${memberColor}38` }
-                  : userBubbleStyle
-                : undefined,
-            ]}
-          >
-            {/* The message text stays mounted while the reader selects, so it does not change size or
-                play its reveal again. The selectable text covers it at the same place. */}
-            <View style={selecting ? { minHeight: selectionHeight } : undefined}>
-              <View
-                style={selecting ? { opacity: 0 } : undefined}
-                accessibilityElementsHidden={selecting}
-                importantForAccessibility={selecting ? "no-hide-descendants" : "auto"}
-              >
-                <ChatMarkdown
-                  agents={agents}
-                  body={message.body}
-                  finished={!isStreamingReply(message)}
-                  selectable={message.author === "user" && !bubble}
-                  color={textColor}
-                  playback={playback}
-                  animationEnabled={shared.animationActive && arriving}
-                />
-              </View>
-              {selecting ? (
-                <ChatSelectableText
-                  text={markdownPlainText(message.body)}
-                  color={textColor}
-                  onHeight={setSelectionHeight}
-                  onSelectionChange={actions.selectionChange}
-                />
-              ) : null}
-            </View>
-          </ChatBubble>
+          tableOutside && !selecting ? (
+            <ChatFileActionsContext value={openMessageFile}>
+              <ChatMarkdown
+                {...markdownProps}
+                renderText={bubbleFor}
+                renderTable={message.kind === "message" && message.author === "user" ? sentTable : undefined}
+                tableFrame={tone ? tableOnColor : undefined}
+              />
+            </ChatFileActionsContext>
+          ) : (
+            bubbleFor(
+              // The message text stays mounted while the reader selects, so it does not change size or
+              // play its reveal again. The selectable text covers it at the same place.
+              <View style={selecting ? { minHeight: selectionHeight } : undefined}>
+                <View
+                  style={selecting ? { opacity: 0 } : undefined}
+                  accessibilityElementsHidden={selecting}
+                  importantForAccessibility={selecting ? "no-hide-descendants" : "auto"}
+                >
+                  <ChatFileActionsContext value={openMessageFile}>
+                    <ChatMarkdown {...markdownProps} />
+                  </ChatFileActionsContext>
+                </View>
+                {selecting ? (
+                  <ChatSelectableText
+                    text={markdownPlainText(message.body)}
+                    color={textColor}
+                    onHeight={setSelectionHeight}
+                    onSelectionChange={actions.selectionChange}
+                  />
+                ) : null}
+              </View>,
+            )
+          )
         ) : null}
       </Animated.View>
     );
@@ -889,6 +1112,12 @@ interface RowContextValue {
   dayLabels: ReadonlyMap<string, string>;
   /** The "Branched from" line and the row that it follows. */
   branchDivider: { rowId: string; label: string | null; onOpen: (() => void) | undefined } | null;
+  /** The row that the NEW line shows above. */
+  unreadLineRowId: string | null;
+  /** The agent color of the NEW line, with chat colors on. */
+  unreadLineColor: string | undefined;
+  /** The rows where the NEW line already arrived, so a row drawn again does not animate it again. */
+  unreadLineAnimated: Set<string>;
 }
 
 const RowContext = createContext<RowContextValue | null>(null);
@@ -910,6 +1139,9 @@ function ChatRow({ message }: { message: VisibleMessage }) {
         <Typography.Paragraph type="body-xs" align="center" className="pb-3 pt-1 text-muted">
           {day}
         </Typography.Paragraph>
+      ) : null}
+      {message.id === row.unreadLineRowId ? (
+        <UnreadLineRow rowId={message.id} color={row.unreadLineColor} animated={row.unreadLineAnimated} />
       ) : null}
       {turn && openTurn ? (
         <ChatTurnStepsRow summary={turn} muted={row.shared.themeMuted} onPress={() => openTurn(turn.turnId)} />
@@ -1047,6 +1279,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onRespondApproval,
   foreground,
   historyState,
+  catchingUp = false,
   messages,
   messageAliases,
   referenceMessages,
@@ -1062,6 +1295,9 @@ export const ChatMessageList = memo(function ChatMessageList({
   onBranch,
   onDeleteMessage,
   deletesAnyMessage = false,
+  onMarkUnread,
+  markUnreadMessageIds,
+  unreadLineMessageIds = null,
   sendChannels = NO_CHANNELS,
   onSendToChannel,
   branchPoints = NO_IDS,
@@ -1119,18 +1355,15 @@ export const ChatMessageList = memo(function ChatMessageList({
       );
     }
   }, [approvals, agentsById, target.name, t]);
-  const [userForegroundColor, themeForegroundColor, themeMutedColor] = useCSSVariable([
-    "--openbot-text-on-light",
-    "--openbot-text-primary",
-    "--openbot-text-muted",
-  ]);
-  const userForeground = String(userForegroundColor);
+  const [themeForegroundColor, themeMutedColor] = useCSSVariable(["--openbot-text-primary", "--openbot-text-muted"]);
   const themeForeground = String(themeForegroundColor);
   const themeMuted = String(themeMutedColor);
   const reducedMotion = useReducedMotion();
   const textReveal = useMotionPreference("textReveal");
   const animateMessages = isFocused && online && appActive;
-  const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
+  // The latest page that a kept chat reads brings messages that the user did not watch arrive.
+  const watchesArrivals = animateMessages && historyState === "ready" && !catchingUp;
+  const replyHaptics = useReplyHaptics(watchesArrivals && motion.responseVisible);
   const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
   const replySession = useMemo(
     () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
@@ -1149,13 +1382,21 @@ export const ChatMessageList = memo(function ChatMessageList({
     },
     [replySession],
   );
-  const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
-  const agentColorMessages = useAgentColorMessages((state) => state.enabled);
-  const userBubbleColor = avatarHeadColor(
-    target.kind === "agent" ? target.avatarSeed : target.id,
-    target.kind === "agent" ? target.avatarHue : null,
-    target.kind === "agent" ? target.avatarColor : null,
-  );
+  const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
+  const messageColorMode = useMessageColor((state) => state.mode);
+  const customMessageColor = useMessageColor((state) => state.customColor);
+  const userBubbleColor =
+    messageColorMode === "custom"
+      ? customMessageColor
+      : avatarHeadColor(
+          target.kind === "agent" ? target.avatarSeed : target.id,
+          target.kind === "agent" ? target.avatarHue : null,
+          target.kind === "agent" ? target.avatarColor : null,
+        );
+  // A channel has no one agent color for the reader's messages.
+  const coloredMessages = messageColorMode === "custom" || (messageColorMode === "agent" && target.kind === "agent");
+  // Dark text on a light color and white text on a dark one, so the text stays readable.
+  const userForeground = readableOn(userBubbleColor);
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
   const green = Number.parseInt(userBubbleColor.slice(3, 5), 16);
@@ -1171,8 +1412,13 @@ export const ChatMessageList = memo(function ChatMessageList({
   });
 
   const visibleMessages = useMemo(
-    () => groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")),
-    [messages],
+    () =>
+      groupRoutineRunMarkers(groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")), {
+        unreadMessageIds: unreadLineMessageIds,
+        focusMessageId,
+        branchRowId: branchDivider?.afterId,
+      }),
+    [messages, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(() => chatDayLabels(visibleMessages, { t, format }), [visibleMessages, t, format]);
@@ -1233,6 +1479,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     onBranch,
     onReact,
     onDeleteMessage,
+    onMarkUnread,
+    markUnreadMessageIds,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1243,6 +1491,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     onBranch,
     onReact,
     onDeleteMessage,
+    onMarkUnread,
+    markUnreadMessageIds,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1255,6 +1505,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       delete: async (message) => actionHandlers.current.onDeleteMessage?.(message),
+      markUnread: (message) => actionHandlers.current.onMarkUnread?.(message),
+      marksUnread: (message) => actionHandlers.current.markUnreadMessageIds?.has(message.id) ?? true,
       sendToChannel: (message, channelId) => actionHandlers.current.onSendToChannel?.(message, channelId),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
@@ -1296,12 +1548,14 @@ export const ChatMessageList = memo(function ChatMessageList({
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
+  const canMarkUnread = Boolean(onMarkUnread);
   const shownSendChannels = onSendToChannel ? sendChannels : NO_CHANNELS;
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
   // The rows keep clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
+  const messageFiles = useMessageFileOpener(target.serverId);
   const shared = useMemo<MessageRowShared>(
     () => ({
       agents,
@@ -1312,12 +1566,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       themeMuted,
       foreground,
       userForeground,
-      // A channel has no one agent color for the reader's messages.
-      userBubbleStyle: target.kind === "agent" && agentColorMessages ? userBubbleStyle : undefined,
-      attachmentTint:
-        target.kind === "agent" && agentColorMessages
-          ? { color: userBubbleColor, foreground: userForeground }
-          : undefined,
+      userBubbleStyle: coloredMessages ? userBubbleStyle : undefined,
+      attachmentTint: coloredMessages ? { color: userBubbleColor, foreground: userForeground } : undefined,
+      bubbleTone: coloredMessages ? bubbleTone(userForeground) : undefined,
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
@@ -1330,11 +1581,14 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canDelete,
       deletesAny: deletesAnyMessage,
+      canMarkUnread,
       sendChannels: shownSendChannels,
       canSelectText,
       canSelectQuestion,
       branchPoints: shownBranchPoints,
       listWidth,
+      fileAgentId: target.kind === "agent" ? target.id : undefined,
+      openFile: messageFiles.open,
       actions,
     }),
     [
@@ -1349,7 +1603,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       userForeground,
       userBubbleStyle,
       userBubbleColor,
-      agentColorMessages,
+      coloredMessages,
       motion.firstMessageStyle,
       screenReaderEnabled,
       animationActive,
@@ -1361,11 +1615,14 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canDelete,
       deletesAnyMessage,
+      canMarkUnread,
       shownSendChannels,
       canSelectText,
       canSelectQuestion,
       shownBranchPoints,
       listWidth,
+      target.id,
+      messageFiles.open,
       actions,
     ],
   );
@@ -1379,20 +1636,23 @@ export const ChatMessageList = memo(function ChatMessageList({
   const responseIds = useMemo(() => new Set(rows.slice(tailIndex + 1).map((row) => row.id)), [rows, tailIndex]);
   // The opening rows do not start at the first message of the chat.
   const firstUserId = rowsShown && tailIndex === 0 && !hasOlder ? (rows[0]?.id ?? null) : null;
-  // The line follows its row, or the row of the exchange group that holds it.
+  // The line follows its row, or the row of the group that holds it.
   const openBranchSource = useRef(onOpenBranchSource);
   openBranchSource.current = onOpenBranchSource;
   const canOpenBranchSource = Boolean(onOpenBranchSource);
   const dividerRowId = useMemo(() => {
     const afterId = branchDivider?.afterId;
     if (!afterId) return null;
-    const row = visibleMessages.find(
-      (message) =>
-        message.id === afterId ||
-        (message.kind === "exchange-group" && message.exchanges.some((exchange) => exchange.id === afterId)),
-    );
-    return row?.id ?? null;
+    return visibleMessages[chatRowHolding(visibleMessages, afterId)]?.id ?? null;
   }, [branchDivider?.afterId, visibleMessages]);
+  // The NEW line shows above the first unread row. A message without a row, such as a thinking step,
+  // gives the line to the next row that has one.
+  const unreadLineColor = coloredMessages ? userBubbleColor : undefined;
+  const unreadLineAnimated = useRef(new Set<string>());
+  const unreadLineRowId = useMemo(() => {
+    if (!unreadLineMessageIds) return null;
+    return visibleMessages[firstChatRowOf(visibleMessages, unreadLineMessageIds)]?.id ?? null;
+  }, [unreadLineMessageIds, visibleMessages]);
   const rowBranchDivider = useMemo<RowContextValue["branchDivider"]>(
     () =>
       dividerRowId && branchDivider
@@ -1422,6 +1682,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       onOpenTurn,
       dayLabels,
       branchDivider: rowBranchDivider,
+      unreadLineRowId,
+      unreadLineColor,
+      unreadLineAnimated: unreadLineAnimated.current,
     }),
     [
       shared,
@@ -1440,6 +1703,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       onOpenTurn,
       dayLabels,
       rowBranchDivider,
+      unreadLineRowId,
+      unreadLineColor,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
@@ -1516,6 +1781,7 @@ export const ChatMessageList = memo(function ChatMessageList({
         activity?.phase !== "waiting",
     };
   };
+  const openTaggedTab = useTaggedTabOpener(target.serverId);
   const activityRows = useActivityPresence(
     (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
   );
@@ -1532,137 +1798,140 @@ export const ChatMessageList = memo(function ChatMessageList({
     >
       <ChatImageViewerProvider serverId={target.serverId} images={images}>
         {/* The history hides only once it is ready: a loading list shows what it has. */}
-        <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
-          <RowContext value={rowContext}>
-            <KeyboardAwareLegendList
-              ref={motion.listRef}
-              data={rows}
-              // A new data set when the latest messages replace a window around a searched message.
-              dataKey={`${conversationKey}:${motion.latestGeneration}`}
-              keyExtractor={rowKey}
-              getItemType={rowType}
-              renderItem={renderRow}
-              // Rows hold their own state: reveal progress, selection, media and animated sizes. A row
-              // reused for another message would show the state of the message before it.
-              recycleItems={false}
-              estimatedItemSize={ESTIMATED_ROW_SIZE}
-              estimatedListSize={estimatedListSize}
-              drawDistance={Math.round(screen.height * DRAW_SCREENS)}
-              experimental_adaptiveRender={ADAPTIVE_RENDER}
-              // A reply can be many times taller than the estimate. Until the list has its size, the row
-              // is laid out but not drawn, so the reader never sees it cut by the next row.
-              experimental_hideItemsUntilMeasured
-              initialScrollAtEnd={motion.startsAtEnd}
-              anchoredEndSpace={anchoredEndSpace}
-              maintainVisibleContentPosition={KEEP_VISIBLE_POSITION}
-              maintainScrollAtEnd={motion.followsEnd ? FOLLOW_END : false}
-              sharedValues={sharedValues}
-              contentInsetEndAdjustment={motion.composerHeight}
-              keyboardOffset={keyboardOffset}
-              keyboardLiftBehavior={motion.keyboardLiftBehavior}
-              applyWorkaroundForContentInsetHitTestBug
-              automaticallyAdjustKeyboardInsets={false}
-              onReady={onReady}
-              onStartReached={() => {
-                if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
-              }}
-              onStartReachedThreshold={0.5}
-              style={{ flex: 1 }}
-              contentContainerStyle={{
-                paddingLeft: insets.left + LIST_PADDING,
-                paddingRight: insets.right + LIST_PADDING,
-                paddingTop: header,
-              }}
-              contentInsetAdjustmentBehavior="never"
-              keyboardDismissMode="interactive"
-              keyboardShouldPersistTaps="handled"
-              alwaysBounceVertical
-              onContentSizeChange={motion.onContentSizeChange}
-              onLayout={motion.onViewportLayout}
-              onScrollBeginDrag={motion.onScrollBeginDrag}
-              onScrollEndDrag={motion.onScrollEndDrag}
-              onMomentumScrollEnd={motion.onScrollEndDrag}
-              showsVerticalScrollIndicator={false}
-              ListHeaderComponent={
-                <>
-                  {hasOlder ? (
-                    <View className="items-center pb-3">
-                      <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
-                        <Button.Label>
-                          {olderLoading
-                            ? t("mobile.chat.history.loadingOlder")
-                            : olderError
-                              ? t("mobile.chat.history.retryOlder")
-                              : t("mobile.chat.history.loadOlder")}
-                        </Button.Label>
-                      </Button>
-                    </View>
-                  ) : null}
-                  {historyState === "connecting" || historyState === "loading" ? (
-                    <View
-                      className="flex-1"
-                      accessible
-                      accessibilityLabel={
-                        historyState === "connecting"
-                          ? t("mobile.chat.history.connecting")
-                          : t("mobile.chat.history.loading")
-                      }
-                      accessibilityState={{ busy: true }}
-                    />
-                  ) : historyState === "error" ? (
-                    <View className="flex-1 items-center justify-center gap-2">
-                      <Typography.Paragraph align="center" className="text-text-secondary">
-                        {t("mobile.chat.history.loadFailed")}
-                      </Typography.Paragraph>
-                      <Button variant="tertiary" onPress={onRetryHistory}>
-                        <Button.Label>{t("common.tryAgain")}</Button.Label>
-                      </Button>
-                    </View>
-                  ) : null}
-                </>
-              }
-              ListFooterComponent={
-                <>
-                  <Animated.View style={motion.responseStyle}>
-                    {activityRows.map((spec) => (
-                      <ChatActivityRow
-                        key={spec.key}
-                        spec={spec}
-                        foreground={foreground ?? themeForeground}
-                        muted={muted ?? themeMuted}
+        <ChatTagActionsContext value={openTaggedTab}>
+          <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
+            <RowContext value={rowContext}>
+              <KeyboardAwareLegendList
+                ref={motion.listRef}
+                data={rows}
+                // A new data set when the latest messages replace a window around a searched message.
+                dataKey={`${conversationKey}:${motion.latestGeneration}`}
+                keyExtractor={rowKey}
+                getItemType={rowType}
+                renderItem={renderRow}
+                // Rows hold their own state: reveal progress, selection, media and animated sizes. A row
+                // reused for another message would show the state of the message before it.
+                recycleItems={false}
+                estimatedItemSize={ESTIMATED_ROW_SIZE}
+                estimatedListSize={estimatedListSize}
+                drawDistance={Math.round(screen.height * DRAW_SCREENS)}
+                experimental_adaptiveRender={ADAPTIVE_RENDER}
+                // A reply can be many times taller than the estimate. Until the list has its size, the row
+                // is laid out but not drawn, so the reader never sees it cut by the next row.
+                experimental_hideItemsUntilMeasured
+                initialScrollAtEnd={motion.startsAtEnd}
+                anchoredEndSpace={anchoredEndSpace}
+                maintainVisibleContentPosition={KEEP_VISIBLE_POSITION}
+                maintainScrollAtEnd={motion.followsEnd ? FOLLOW_END : false}
+                sharedValues={sharedValues}
+                contentInsetEndAdjustment={motion.composerHeight}
+                keyboardOffset={keyboardOffset}
+                keyboardLiftBehavior={motion.keyboardLiftBehavior}
+                applyWorkaroundForContentInsetHitTestBug
+                automaticallyAdjustKeyboardInsets={false}
+                onReady={onReady}
+                onStartReached={() => {
+                  if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
+                }}
+                onStartReachedThreshold={0.5}
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  paddingLeft: insets.left + LIST_PADDING,
+                  paddingRight: insets.right + LIST_PADDING,
+                  paddingTop: header,
+                }}
+                contentInsetAdjustmentBehavior="never"
+                keyboardDismissMode="interactive"
+                keyboardShouldPersistTaps="handled"
+                alwaysBounceVertical
+                onContentSizeChange={motion.onContentSizeChange}
+                onLayout={motion.onViewportLayout}
+                onScrollBeginDrag={motion.onScrollBeginDrag}
+                onScrollEndDrag={motion.onScrollEndDrag}
+                onMomentumScrollEnd={motion.onScrollEndDrag}
+                showsVerticalScrollIndicator={false}
+                ListHeaderComponent={
+                  <>
+                    {hasOlder ? (
+                      <View className="items-center pb-3">
+                        <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
+                          <Button.Label>
+                            {olderLoading
+                              ? t("mobile.chat.history.loadingOlder")
+                              : olderError
+                                ? t("mobile.chat.history.retryOlder")
+                                : t("mobile.chat.history.loadOlder")}
+                          </Button.Label>
+                        </Button>
+                      </View>
+                    ) : null}
+                    {historyState === "connecting" || historyState === "loading" ? (
+                      <View
+                        className="flex-1"
+                        accessible
+                        accessibilityLabel={
+                          historyState === "connecting"
+                            ? t("mobile.chat.history.connecting")
+                            : t("mobile.chat.history.loading")
+                        }
+                        accessibilityState={{ busy: true }}
                       />
-                    ))}
-                  </Animated.View>
-                  {activityAccessory}
-                  {onRespondApproval && approvals.length ? (
-                    <View className="gap-3 pb-3">
-                      {approvals.map((approval) => (
-                        <ChatApprovalCard
-                          key={String(approval.requestId)}
-                          approval={approval}
-                          agentName={agentsById.get(approval.agentId)?.name ?? target.name}
-                          showAgentName={target.kind === "channel"}
-                          serverName={serverName}
-                          canAnswer={canSend}
-                          respond={(decision) => onRespondApproval(approval, decision)}
+                    ) : historyState === "error" ? (
+                      <View className="flex-1 items-center justify-center gap-2">
+                        <Typography.Paragraph align="center" className="text-text-secondary">
+                          {t("mobile.chat.history.loadFailed")}
+                        </Typography.Paragraph>
+                        <Button variant="tertiary" onPress={onRetryHistory}>
+                          <Button.Label>{t("common.tryAgain")}</Button.Label>
+                        </Button>
+                      </View>
+                    ) : null}
+                  </>
+                }
+                ListFooterComponent={
+                  <>
+                    <Animated.View style={motion.responseStyle}>
+                      {activityRows.map((spec) => (
+                        <ChatActivityRow
+                          key={spec.key}
+                          spec={spec}
+                          foreground={foreground ?? themeForeground}
+                          muted={muted ?? themeMuted}
                         />
                       ))}
-                    </View>
-                  ) : null}
-                  {showStarter ? (
-                    <View className="gap-1 px-1 py-4">
-                      <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
-                      <Typography.Paragraph className="text-text-secondary">
-                        {t("mobile.chat.starter.body")}
-                      </Typography.Paragraph>
-                    </View>
-                  ) : null}
-                </>
-              }
-            />
-          </RowContext>
-        </HistoryShownContext>
+                    </Animated.View>
+                    {activityAccessory}
+                    {onRespondApproval && approvals.length ? (
+                      <View className="gap-3 pb-3">
+                        {approvals.map((approval) => (
+                          <ChatApprovalCard
+                            key={String(approval.requestId)}
+                            approval={approval}
+                            agentName={agentsById.get(approval.agentId)?.name ?? target.name}
+                            showAgentName={target.kind === "channel"}
+                            serverName={serverName}
+                            canAnswer={canSend}
+                            respond={(decision) => onRespondApproval(approval, decision)}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                    {showStarter ? (
+                      <View className="gap-1 px-1 py-4">
+                        <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
+                        <Typography.Paragraph className="text-text-secondary">
+                          {t("mobile.chat.starter.body")}
+                        </Typography.Paragraph>
+                      </View>
+                    ) : null}
+                  </>
+                }
+              />
+            </RowContext>
+          </HistoryShownContext>
+        </ChatTagActionsContext>
       </ChatImageViewerProvider>
+      {messageFiles.sheet}
     </Animated.View>
   );
 }, sameListProps);

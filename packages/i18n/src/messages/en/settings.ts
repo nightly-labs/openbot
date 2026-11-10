@@ -30,6 +30,12 @@ export const messages = defineMessages("settings", {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gray",
   "settings.logoColor.white": "White",
+  "settings.chatBackground.title": "Chat background",
+  "settings.chatBackground.description":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
+  "settings.chatBackground.light": "Chat background in Light",
+  "settings.chatBackground.dark": "Chat background in Dark",
+  "settings.chatBackground.default": "Default",
   "settings.chatColor.title": "Chat color",
   "settings.chatColor.description": "Tints the bubbles of your messages. People on your servers see it too.",
   "settings.chatColor.yours": "Your chat color",
@@ -66,6 +72,11 @@ export const messages = defineMessages("settings", {
     "Keep the computer awake on battery power too. The battery runs down faster.",
   "settings.restoreWorkspace.title": "Restore the last workspace on launch",
   "settings.restoreWorkspace.description": "Open the workspace and tasks from your previous session.",
+  "settings.quitGuard.title": "Hold ⌘Q to quit",
+  "settings.quitGuard.description": "Hold ⌘Q or press it twice to quit. With Never, one ⌘Q quits and stops the agents.",
+  "settings.quitGuard.working": "While agents work",
+  "settings.quitGuard.always": "Always",
+  "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
   "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
   // The two link targets. The saved value stays in English; only the label is translated.
@@ -88,9 +99,12 @@ export const messages = defineMessages("settings", {
   "settings.showAgentSteps.title": "Show agent steps",
   "settings.showAgentSteps.description":
     "Open the thinking, tool steps and memory changes of each turn by default on this device and browser.",
+  "settings.compactMessageActions.title": "Compact message actions",
+  "settings.compactMessageActions.description":
+    "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
-    "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",
+    "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
   // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "Defaults",
   "settings.agentDefaults.description": "Agents follow these defaults, unless you change them for an agent.",
@@ -108,6 +122,32 @@ export const messages = defineMessages("settings", {
   "settings.agentDefaults.setAllLabel": "Set {setting} for all agents",
   "settings.agentDefaults.agentLabel": "{setting} for {agent}",
   "settings.agentDefaults.loadFailed": "The agents could not be read.",
+  "settings.commitCoAuthor.sectionTitle": "Git commits",
+  "settings.commitCoAuthor.title": "Credit OpenBot in commits",
+  "settings.commitCoAuthor.description":
+    "Agents add OpenBot as a co-author to the commits they make. You stay the author.",
+  // "Start the work", under the default of "Show the plan before long tasks".
+  "settings.planStart.title": "Start the work",
+  "settings.planStart.wait": "When I press Start",
+  "settings.planStart.after": "After {time}",
+  "settings.planStart.custom": "Custom…",
+  "settings.planStart.waitNote": "The plan waits until you press Start. You get a notification.",
+  "settings.planStart.afterNote": "The work starts after {time}, or when you press Start.",
+  "settings.planStart.customTitle": "Custom time",
+  "settings.planStart.customPrefix": "After",
+  "settings.planStart.amountLabel": "Time before the work starts",
+  "settings.planStart.unitLabel": "Unit",
+  "settings.planStart.seconds": "sec",
+  "settings.planStart.minutes": "min",
+  "settings.planStart.customHint": "At least 5 seconds.",
+  "settings.planStart.customInvalid": "Enter a whole number of at least 5 seconds.",
+  "settings.planStart.set": "Set",
+  "settings.automationLimit.sectionTitle": "Limit",
+  "settings.automationLimit.sectionDescription": "It applies to all agents on this computer.",
+  "settings.automationLimit.title": "Requests an hour",
+  "settings.automationLimit.option": "{limit} an hour",
+  "settings.automationLimit.note":
+    "The most messages and routine runs that local scripts can send each agent in one hour.",
   "settings.backgroundProcesses.title": "Background processes",
   "settings.backgroundProcesses.description":
     "Programs that agents started and left running, such as dev servers. They keep running after the chat ends and after you quit OpenBot.",
@@ -165,7 +205,14 @@ export const messages = defineMessages("settings", {
   "settings.soundTheme.play": "Play {name}",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
+  "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
+  "settings.notch.xwayland.title": "Restart needed",
+  "settings.notch.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the Dynamic Island above other apps. Until then, the island does not show.",
+  "settings.notch.xwayland.unsupported":
+    "On Wayland without XWayland, the Dynamic Island cannot show above other apps.",
+  "settings.notch.xwayland.restart": "Restart",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
   "settings.notch.displays.title": "Show on additional displays",
@@ -182,6 +229,39 @@ export const messages = defineMessages("settings", {
   "settings.notch.size.height": "Height",
   "settings.notch.size.previewNotch": "Built-in display",
   "settings.notch.size.previewIsland": "External display",
+  "settings.agentDock.title": "Behavior",
+  "settings.agentDock.show.title": "Show the agent dock",
+  "settings.agentDock.show.description": "Show your agents at the screen edge, ready for a quick chat.",
+  "settings.agentDock.placement.title": "Position",
+  "settings.agentDock.placement.description":
+    "Above other apps keeps the dock on screen when OpenBot is in the background.",
+  "settings.agentDock.placement.screen": "Above other apps",
+  "settings.agentDock.placement.window": "In the OpenBot window",
+  "settings.agentDock.xwayland.title": "Restart needed",
+  "settings.agentDock.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the dock above other apps. Until then, the dock shows in the OpenBot window.",
+  "settings.agentDock.xwayland.unsupported":
+    "On Wayland without XWayland, the dock cannot show above other apps. It shows in the OpenBot window.",
+  "settings.agentDock.xwayland.restart": "Restart",
+  "settings.agentDock.display.title": "Display",
+  "settings.agentDock.display.description":
+    "If that display is not connected, the dock goes to the display of the OpenBot window.",
+  "settings.agentDock.display.window": "With the OpenBot window",
+  "settings.agentDock.display.primary": "Main display",
+  "settings.agentDock.display.all": "All displays",
+  "settings.agentDock.display.unnamed": "Display {number}",
+  "settings.agentDock.display.disconnected": "Display not connected",
+  "settings.agentDock.edge.title": "Screen edge",
+  "settings.agentDock.edge.description": "Drag the dock up or down to move it along the edge.",
+  "settings.agentDock.edge.right": "Right",
+  "settings.agentDock.edge.left": "Left",
+  "settings.agentDock.autoHide.title": "Hide when not in use",
+  "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
+  "settings.agentDock.results.title": "Show finished work",
+  "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
+  "settings.agentDock.agents.title": "Agents on the dock",
+  "settings.agentDock.agents.description": "The agents of {server}. Each server has its own dock.",
+  "settings.agentDock.agents.empty": "This server has no agents yet.",
   "settings.analytics.title": "Link analytics to my account",
   "settings.analytics.description":
     "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email, with the websites that you and your agents visit, tool use and a daily summary of your setup. Off: only basic usage, such as turns and token counts, goes with a random install ID. Chats, files and prompts are never sent.",
@@ -197,7 +277,7 @@ export const messages = defineMessages("settings", {
   "settings.tab.notifications.description": "Choose how OpenBot alerts you.",
   "settings.tab.voice.title": "Voice",
   "settings.tab.voice.description":
-    "Dictation in the message box. Local models run on this computer; ElevenLabs runs in the cloud.",
+    "Dictation in the message box. Local models run on this computer; ElevenLabs and Groq run in the cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Let agents on this computer's OpenBot see and use its apps. Agents on another server use that server's computer.",
@@ -207,6 +287,8 @@ export const messages = defineMessages("settings", {
   "settings.tab.mobileConnect.description": "Sign in securely on your phone.",
   "settings.tab.dynamicIsland.title": "Dynamic Island",
   "settings.tab.dynamicIsland.description": "Choose when the island shows and how large it is.",
+  "settings.tab.agentDock.title": "Agent dock",
+  "settings.tab.agentDock.description": "Choose where the dock shows and which agents are on it.",
   "settings.tab.updates.title": "Updates",
   "settings.tab.updates.description": "Keep OpenBot current on this computer.",
   "settings.tab.billing.title": "Billing",
@@ -550,13 +632,10 @@ export const messages = defineMessages("settings", {
   "settings.voice.model.cohere.description":
     "Slower. 14 languages. You set the spoken language. Uses about 4 GB of memory.",
   "settings.voice.model.size": "Download size: {size}",
-  "settings.voice.model.downloading": "Downloading · {received} of {total}",
   "settings.voice.model.failed": "The download stopped. Check the connection and try again.",
   "settings.voice.model.progressLabel": "Downloading {name}",
   "settings.voice.model.use": "Use",
-  "settings.voice.model.inUse": "In use",
   "settings.voice.model.downloadLabel": "Download {name}",
-  "settings.voice.model.cancelLabel": "Stop the download of {name}",
   "settings.voice.model.retryLabel": "Download {name} again",
   "settings.voice.model.useLabel": "Use {name} for dictation",
   "settings.voice.model.removeLabel": "Remove {name} from this computer",
@@ -578,14 +657,36 @@ export const messages = defineMessages("settings", {
   "settings.voice.removeFailed": "Could not remove the model. Try again.",
   "settings.voice.model.elevenlabs.description":
     "Streams your voice to ElevenLabs. Text shows while you speak and stays fixed. Uses your own API key, and ElevenLabs bills each use.",
-  "settings.voice.model.keySaved": "API key saved",
-  "settings.voice.model.keyMissing": "Needs an ElevenLabs API key",
-  "settings.voice.apiKey.label": "ElevenLabs API key",
+  "settings.voice.model.groqTurbo.description":
+    "Sends each recording to Groq when you stop. Fast, and knows many languages. Uses your own API key, and Groq bills each use.",
+  "settings.voice.model.groqLarge.description":
+    "Sends each recording to Groq when you stop. More accurate than turbo, but slower. Uses your own API key, and Groq bills each use.",
   "settings.voice.apiKey.placeholder": "Paste the key",
   "settings.voice.apiKey.save": "Save key",
   "settings.voice.apiKey.remove": "Remove key",
   "settings.voice.apiKey.saveFailed": "Could not save the API key. Try again.",
   "settings.voice.apiKey.removeFailed": "Could not remove the API key. Try again.",
+  "settings.voice.model.title": "Model",
+  "settings.voice.model.group.local": "On this computer",
+  "settings.voice.model.downloadingShort": "Downloading…",
+  "settings.voice.model.ready": "{name} is ready",
+  "settings.voice.model.serverDictates": "Your voice server takes dictation now.",
+  "settings.voice.apiKey.providerLabel": "{provider} API key",
+  "settings.voice.apiKey.needed": "Paste a key to use {provider}",
+  "settings.voice.apiKey.removeLabel": "Remove the {provider} API key",
+  "settings.voice.speech.model.flash.description":
+    "Fast. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.multilingual.description":
+    "More natural, and slower. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v3.description":
+    "Expressive, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4Turbo.description":
+    "Fast, in more than 90 languages. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4.description":
+    "The best quality, in more than 90 languages, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.xai.description":
+    "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
+  "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",
   "settings.voice.speech.section": "Spoken replies",
   "settings.voice.speech.model.description": "Reads replies aloud on this computer, in 31 languages.",
   "settings.voice.speech.readReplies.title": "Read replies aloud",
@@ -593,7 +694,7 @@ export const messages = defineMessages("settings", {
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
   "settings.voice.speech.codexLive.title": "Codex live voice",
   "settings.voice.speech.codexLive.description":
-    "Voice conversations with Codex agents use OpenAI live voice with your Codex sign-in. Your voice goes to OpenAI.",
+    "Voice conversations with any agent use OpenAI live voice with your Codex sign-in. Your voice, your requests and the agent's replies go to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",

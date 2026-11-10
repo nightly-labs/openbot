@@ -1,3 +1,4 @@
+import { INSTALL_SERVER_SCRIPT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type CentralAuthUser,
   LOCAL_SERVER_ID,
@@ -8,6 +9,7 @@ import {
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { classifyFailure } from "@openbot/telemetry";
 import { isAgentAccount } from "@openbot/ui/components/provider-accounts";
 import type { AcpRegistrySettingsApi } from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
@@ -27,6 +29,9 @@ import { useAgents } from "./features/agents/agents-context";
 import { desktopBrowserProfileCalls } from "./features/browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "./features/browser/stores/browser-profiles-store";
 import { useConnectors } from "./features/connectors/connectors-context";
+import { appendDraftText, EMPTY_DRAFT } from "./features/conversation/composer-draft";
+import { useConversationController } from "./features/conversation/conversation-controller-context";
+import { composerDraftKey } from "./features/conversation/conversation-keys";
 import { conversationPort } from "./features/conversation/conversation-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
@@ -41,6 +46,7 @@ import {
   HostedServerUpsell,
   hostedUpsellRoutineCreated,
 } from "./features/servers/hosted-server-upsell-controller";
+import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { useServerActions } from "./features/servers/server-actions";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
@@ -48,6 +54,7 @@ import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
@@ -110,6 +117,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <JoinServer account={props.account} />
       <AddServer />
       <CreateLocalServer />
+      <InstallServer />
       <HostedUpsell account={props.account} />
       <LeaveServer />
       <RestartServer />
@@ -244,16 +252,73 @@ function CreateLocalServer() {
   );
 }
 
+/** A server on another computer of the user, from one command that installs it and signs it in. */
+function InstallServer() {
+  const { servers, activeServer, installServerOpen, setInstallServerOpen } = useServers();
+  const { select } = useServerActions();
+  const { activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
+  const { selectAgent } = useNavigation();
+  const controller = useConversationController();
+  /* The task goes to the agent of the open chat, when its composer can take another line. */
+  const agentTarget = createMemo(() => {
+    const server = activeServer();
+    const agent = activeAgent();
+    if (!server || !agent || agentStatus().phase !== "ready" || (agentSetupOpen() && creatingAgent())) return undefined;
+    // The host makes the command for its own account: on a server of another person it is not this user's.
+    if (!server.thisComputer && server.role !== "owner") return undefined;
+    if (controller.submitting() || controller.voicePhase() !== "idle" || controller.editingDeliveryId())
+      return undefined;
+    return { serverId: server.id, agentId: agent.id };
+  });
+  function setUpWithAgent(): (() => void) | undefined {
+    const target = agentTarget();
+    if (!target) return undefined;
+    return () => {
+      selectAgent(target.agentId);
+      const task = currentText().t("server.install.sshAgentPrompt");
+      const key = composerDraftKey(target);
+      controller.setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        /* An earlier press left the same task, or an old task with a command in it. The new task replaces it. */
+        const next =
+          draft.text.trim() === task.trim() || draft.text.includes(INSTALL_SERVER_SCRIPT_URL)
+            ? { ...draft, text: task }
+            : appendDraftText(draft, task);
+        return { ...current, [key]: next };
+      });
+      setInstallServerOpen(false);
+      controller.setComposerFocusRequest((value) => value + 1);
+    };
+  }
+  return (
+    <InstallServerOverlay
+      open={installServerOpen()}
+      servers={servers()}
+      createClaim={() => appPort().hostedServers.createServerClaim()}
+      retryConnection={(serverId) => serversPort().servers.retryConnection(serverId)}
+      onSetUpWithAgent={setUpWithAgent()}
+      onOpenServer={select}
+      onClose={() => setInstallServerOpen(false)}
+    />
+  );
+}
+
 /** A hosted server: the plans, the payment, then the setup. */
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
-  const { select, createLocal } = useServerActions();
+  const { select, createLocal, installServer } = useServerActions();
   const { openAppSettings } = useSettings();
   const onCreateLocal =
     createLocal &&
     (() => {
       setAddServerOpen(false);
       createLocal();
+    });
+  const onInstallServer =
+    installServer &&
+    (() => {
+      setAddServerOpen(false);
+      installServer();
     });
 
   return (
@@ -274,6 +339,7 @@ function AddServer() {
         setJoinServerOpen(true);
       }}
       onCreateLocal={onCreateLocal}
+      onInstallServer={onInstallServer}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
@@ -505,6 +571,7 @@ function ServerSettings() {
   });
   // A host that updates or rolls back keeps its id, so the API key kind follows this capability too.
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
+  const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
   const vault = createMemo(() => {
     const serverId = vaultServerId();
     if (serverId === undefined) return undefined;
@@ -512,6 +579,7 @@ function ServerSettings() {
     return {
       store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
       apiKeys: vaultApiKeys(),
+      twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
     };
@@ -585,8 +653,16 @@ function ServerSettings() {
       },
       onAddCustomProvider: endpoints.saveCustomProvider,
       onDeleteCustomProvider: endpoints.deleteCustomProvider,
-      // The Team API has no edit route, so only this computer's endpoints have Edit.
-      onUpdateCustomProvider: local ? localEndpoints.updateCustomProvider : undefined,
+      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`. A list read
+      // before the host's capabilities arrived has no header names, and an edit from it would send no
+      // headers and delete the saved ones, so Edit waits for the list of that route.
+      get onUpdateCustomProvider() {
+        if (local) return endpoints.updateCustomProvider;
+        const editable =
+          serverSupportsCapability(server, "custom-provider-edit-v1") &&
+          endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
+        return editable ? endpoints.updateCustomProvider : undefined;
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },
@@ -717,6 +793,9 @@ function ServerSettings() {
           // The settings show only as a page of the window, so they wait for the page.
           open={serverSettingsOpen() && windowPage.settingsPlacement("server") !== undefined}
           page={windowPage.settingsPlacement("server")}
+          sectionQuery={windowPage.serverSettingsQuery()}
+          openFirstSectionRequest={windowPage.openFirstServerSectionRequest()}
+          onFirstSectionOpened={() => windowPage.setServerSettingsQuery("")}
           restoreFocusTarget={serverSettingsRestoreTarget()}
           platform={platform.appInfo()?.platform ?? "darwin"}
           server={server()}
@@ -808,9 +887,12 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
+          skillLearning={{}}
           hostPromptCacheTtl={{}}
+          claudeUserSetup
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
@@ -874,8 +956,22 @@ function AppSettings(props: AccountProps) {
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
   const { servers, activeServer, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
-  const { agentStatus } = useAgents();
+  const { agentStatus, agentList, userHiddenAgentIds } = useAgents();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const { openServerSettings } = useServerSettings();
+  /** The agent dock tab lists the agents of the active server in sidebar order, without hidden agents. */
+  const agentDockSettings = createMemo(() => {
+    const server = activeServer();
+    return {
+      server: server ? { id: server.id, name: server.name } : null,
+      agents: sidebarAgentOrder(agentList(), {
+        layout: sidebarLayout(),
+        pinnedItems: pinnedSidebarItems(),
+        hiddenAgentIds: userHiddenAgentIds(),
+      }),
+      hiddenAgentIds: userHiddenAgentIds(),
+    };
+  });
   /** Live voice runs on this computer's Codex, whose status shows only while this computer is active. */
   const codexLiveAccess = () =>
     activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
@@ -908,6 +1004,7 @@ function AppSettings(props: AccountProps) {
         chatWindow={platform.chatWindow !== null}
         builtInDisplayGeometry={builtInDisplayGeometry()}
         servers={servers()}
+        agentDock={agentDockSettings()}
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
         onOpenWhatsNew={

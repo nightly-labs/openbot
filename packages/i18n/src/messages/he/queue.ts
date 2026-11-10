@@ -1,0 +1,33 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/queue";
+
+export const messages = {
+  "queue.label": "תור הודעות",
+  "queue.moved": "הודעה בתור הועברה למקום {position} מתוך {total}.",
+  "queue.attachment": "קובץ מצורף",
+  "queue.hold.named": "ממתין - {name} עובד ב-{channel}",
+  "queue.hold.unnamed": "ממתין - הסוכן הזה עובד ב-{channel}",
+  "queue.item.label": "הודעה בתור {position}: {preview}",
+  "queue.item.labelEditing": "הודעה בתור {position}, בעריכה: {preview}",
+  "queue.item.editing": "בעריכה",
+  "queue.item.steerLabel": "הכוונת הודעה בתור {position}",
+  "queue.item.steerTooltip": "הכוונת ההודעה",
+  "queue.item.steering": "מכוון",
+  "queue.item.steer": "הכוונה",
+  "queue.item.sendNowLabel": "עצור את הסוכן ושלח עכשיו את ההודעה {position} מהתור",
+  "queue.item.sendNowTooltip": "עצור את הסוכן ושלח את ההודעה הזו עכשיו",
+  "queue.item.sendNow": "שלח עכשיו",
+  "queue.item.notSteered": "לא הוכוונה",
+  "queue.item.steerFallback.providerUnsupported": "הספק הזה לא יכול להכווין פעולה שרצה כרגע, ולכן ההודעה ממתינה בתור.",
+  "queue.item.steerFallback.steerFailed": "ההכוונה לא הצליחה, ולכן ההודעה ממתינה בתור.",
+  "queue.item.steerFallback.routineRun": "שגרה רצה כעת, ולכן ההודעה ממתינה בתור.",
+  "queue.item.runAsTask": "הרצה בשרשור חדש",
+  "queue.item.runAsTaskLabel": "הרצת הודעה בתור {position} בשרשור חדש",
+  "queue.item.deleteLabel": "מחיקת הודעה בתור {position}",
+  "queue.item.deleteTooltip": "מחיקת ההודעה",
+  "queue.item.editLabel": "עריכת הודעה בתור {position}",
+  "queue.item.editTooltip": "עריכת ההודעה",
+  "queue.deleteHeld.title": "למחוק את ההודעה בתור?",
+  "queue.deleteHeld.body": "מכשיר אחר עורך את ההודעה הזו. הסוכן לא יקבל אותה.",
+  "queue.deleteHeld.keep": "שמירה",
+} as const satisfies PartialTranslation<typeof source>;

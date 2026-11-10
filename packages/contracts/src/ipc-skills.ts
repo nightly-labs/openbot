@@ -330,6 +330,7 @@ function isMarketplaceSkillDetail(value: unknown): value is MarketplaceSkillDeta
   );
 }
 
+import { isIdentifier } from "./ipc-bounded-values";
 import { decodeRecord, requiredNumber, requiredString } from "./ipc-decoding";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -347,3 +348,71 @@ export interface LocalSkillRevisionInput {
 }
 /** Installs one exact revision, so the agent gets the copy the user read. */
 export type InstallLocalSkillInput = LocalSkillRevisionInput & { agentId: string; revision: number };
+
+/**
+ * What the background memory review does when a chat teaches the agent a skill: `automatic` writes
+ * and installs it, `ask` asks the user first in the chat, and `off` does neither. The default is
+ * `automatic`.
+ */
+export const SKILL_LEARNING_MODES = ["automatic", "ask", "off"] as const;
+export type SkillLearningMode = (typeof SKILL_LEARNING_MODES)[number];
+export const DEFAULT_SKILL_LEARNING_MODE: SkillLearningMode = "automatic";
+
+export function isSkillLearningMode(value: unknown): value is SkillLearningMode {
+  return isOneOf(SKILL_LEARNING_MODES, value);
+}
+
+/** The app setting, as it is stored. */
+export interface SkillLearningPreference {
+  mode: SkillLearningMode;
+}
+
+/**
+ * The skill learning of one server's agents (`skill-learning-v1`) and the values that host permits.
+ * A newer host can permit other values, so they are strings here, not `SkillLearningMode`.
+ */
+export interface HostSkillLearning {
+  mode: string;
+  choices: string[];
+}
+
+export function hostSkillLearning({ mode }: SkillLearningPreference): HostSkillLearning {
+  return { mode, choices: [...SKILL_LEARNING_MODES] };
+}
+
+/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
+export function decodeHostSkillLearning(value: unknown): HostSkillLearning {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.mode) ||
+    !Array.isArray(value.choices) ||
+    !value.choices.every(isString)
+  )
+    throw new Error("Invalid skill learning setting.");
+  return { mode: value.mode, choices: [...value.choices] };
+}
+
+/**
+ * Save on a skill suggestion of the `ask` mode in the agent's own chat: the host writes the skill in
+ * the background, not in a turn of the agent.
+ */
+export interface SaveSkillSuggestionInput {
+  agentId: string;
+  messageId: string;
+}
+
+/** False when the host could not save the skill; then the card sends the user's yes to the agent. */
+export interface SaveSkillSuggestionResult {
+  saved: boolean;
+}
+
+export function parseSaveSkillSuggestion(value: unknown): SaveSkillSuggestionInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isIdentifier(value.messageId))
+    throw new Error("Invalid skill suggestion.");
+  return { agentId: value.agentId, messageId: value.messageId };
+}
+
+export function decodeSaveSkillSuggestionResult(value: unknown): SaveSkillSuggestionResult {
+  if (!isDynamicRecord(value) || !isBoolean(value.saved)) throw new Error("Invalid skill suggestion result.");
+  return { saved: value.saved };
+}

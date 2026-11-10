@@ -5,6 +5,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CustomProviderHarness,
+  CustomProviderInputKind,
+  CustomProviderReasoningEffort,
   CustomProviderSummary,
   SaveCustomProviderInput,
   UpdateCustomProviderInput,
@@ -12,7 +14,9 @@ import type {
 import {
   AGENT_PROVIDERS,
   CUSTOM_PROVIDER_ID_PATTERN,
+  CUSTOM_PROVIDER_INPUT_KINDS,
   CUSTOM_PROVIDER_LIMITS,
+  CUSTOM_PROVIDER_REASONING_EFFORTS,
   composedCustomModelId,
   isAgentModel,
   isCustomProviderContextWindow,
@@ -29,6 +33,10 @@ export interface CustomModelDraft {
   contextWindow?: string;
   /** The largest completion, as typed. Blank keeps the guess from the context window. */
   maxOutput?: string;
+  /** The checked efforts, in any order. None keeps the harness's own efforts. */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
+  /** The checked input kinds beside text, in any order. Empty: text only. Absent: the harness's default. */
+  inputs?: CustomProviderInputKind[];
 }
 
 export interface CustomHeaderDraft {
@@ -96,6 +104,8 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
             name: model.name,
             contextWindow: model.contextWindow?.toString() ?? "",
             maxOutput: model.maxOutput?.toString() ?? "",
+            ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+            ...(model.inputs ? { inputs: [...model.inputs] } : {}),
           }))
         : [{ id: "", name: "" }],
     headers: savedHeaderDrafts(provider.headerNames),
@@ -105,7 +115,13 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
 
 /** A row the user has not filled in yet: carried by the form, ignored by validation and submit. */
 export function blankModel(model: CustomModelDraft): boolean {
-  return !model.id.trim() && !model.name.trim() && !model.contextWindow?.trim() && !model.maxOutput?.trim();
+  return (
+    !model.id.trim() &&
+    !model.name.trim() &&
+    !model.contextWindow?.trim() &&
+    !model.maxOutput?.trim() &&
+    !model.reasoningEfforts?.length
+  );
 }
 
 /**
@@ -307,11 +323,20 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
       const name = model.name.trim() || id;
       const contextWindow = contextWindowValue(model);
       const maxOutput = maxOutputValue(model);
+      // The contract wants each effort one time, in its own order.
+      const reasoningEfforts = CUSTOM_PROVIDER_REASONING_EFFORTS.filter((effort) =>
+        model.reasoningEfforts?.includes(effort),
+      );
+      // The same for the input kinds, where an empty list means text only. A kind that the harness
+      // cannot send stays saved, so that a change of harness and back loses nothing.
+      const inputs = model.inputs && CUSTOM_PROVIDER_INPUT_KINDS.filter((kind) => model.inputs?.includes(kind));
       return {
         id,
         name,
         ...(typeof contextWindow === "number" ? { contextWindow } : {}),
         ...(typeof maxOutput === "number" ? { maxOutput } : {}),
+        ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+        ...(inputs ? { inputs } : {}),
       };
     });
   return {
@@ -363,6 +388,44 @@ export interface DiscoveredModel {
   contextWindow?: number;
   /** For a saved model: the max output the user set, which Edit must keep. */
   maxOutput?: number;
+  /** For a saved model: the efforts the user set, which Edit must keep. */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
+  /** For a saved model: the input kinds the user set, which Edit must keep. */
+  inputs?: CustomProviderInputKind[];
+}
+
+/** The row holds a value that the list gives for its model, so the form can say where it comes from. */
+export function holdsFoundValues(row: CustomModelDraft, found: DiscoveredModel): boolean {
+  const window = found.contextWindow !== undefined && contextWindowValue(row) === found.contextWindow;
+  const inputs = found.inputs !== undefined && row.inputs?.join() === found.inputs.join();
+  const efforts =
+    found.reasoningEfforts !== undefined && row.reasoningEfforts?.join() === found.reasoningEfforts.join();
+  return window || inputs || efforts;
+}
+
+/**
+ * Puts what a model list says about a model into the empty fields of its row (#3946). A typed or
+ * saved value stays.
+ */
+export function fillFoundValues(row: CustomModelDraft, found: DiscoveredModel): void {
+  if (!row.contextWindow?.trim() && found.contextWindow !== undefined) {
+    row.contextWindow = found.contextWindow.toString();
+  }
+  // A max output needs a window, as `validateCustomProvider` says, and must leave room for the prompt.
+  const window = contextWindowValue(row);
+  if (
+    !row.maxOutput?.trim() &&
+    typeof window === "number" &&
+    found.maxOutput !== undefined &&
+    found.maxOutput < window
+  ) {
+    row.maxOutput = found.maxOutput.toString();
+  }
+  if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
+  // No checked effort is an empty field: the model keeps the efforts of the harness that runs it.
+  if (!row.reasoningEfforts?.length && found.reasoningEfforts !== undefined) {
+    row.reasoningEfforts = [...found.reasoningEfforts];
+  }
 }
 
 /** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */

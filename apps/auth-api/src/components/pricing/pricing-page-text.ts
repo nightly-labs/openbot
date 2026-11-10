@@ -14,6 +14,7 @@ export function pricingPageText(t: AppTranslate) {
   return {
     title: t("sitePage.pricing.title"),
     description: t("sitePage.pricing.description"),
+    imageAlt: t("sitePage.pricing.imageAlt"),
     heading: t("sitePage.pricing.heading"),
     personal: {
       title: t("sitePage.pricing.personal.title"),

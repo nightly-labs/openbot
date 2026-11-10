@@ -24,6 +24,8 @@ export const messages = {
   "error.update.siblingSessionSameAccount":
     "В этой учётной записи всё ещё работает другой процесс OpenBot. Завершите его, затем установите обновление снова.",
   "error.update.siblingCheckFailed": "Не удалось проверить другие сессии OpenBot. Повторите попытку перед установкой.",
+  "error.update.readOnlyLocation":
+    "OpenBot не может устанавливать обновления из этого места. Закройте OpenBot. В Finder перетащите OpenBot в папку «Программы» (если он уже там, перетащите его наружу и обратно). Затем откройте OpenBot и установите обновление снова.",
   "error.update.remoteDisabled": "Обновления от администраторов сервера отключены на этом компьютере.",
   "error.update.restartStarted": "OpenBot уже перезапускается для установки обновления.",
   "error.update.alreadyRestarting": "OpenBot уже перезапускается.",

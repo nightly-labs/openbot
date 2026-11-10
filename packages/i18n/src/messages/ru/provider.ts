@@ -113,6 +113,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Запуск входа в {name} на {host}…",
   "provider.codeLogin.pageOpening": "Открываем страницу входа {name} на {host}…",
   "provider.codeLogin.linkStep": "Войдите в {name}. OpenBot продолжит сам.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "В ChatGPT на компьютере откройте настройки безопасности и включите вход по коду устройства для Codex. Для рабочего аккаунта его включает администратор рабочего пространства.",
   "provider.useApp.title": "Подключите {name} в приложении OpenBot",
   "provider.useApp.description":
     "Вход в {name} возвращается на компьютер, который его начал, а вкладка браузера не может его принять. Подключите {name} в приложении OpenBot. Приложение завершит вход само.",
@@ -135,6 +137,8 @@ export const messages = {
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels": "У {name} нет доступных моделей.",
+  "provider.picker.museNoModels":
+    "Muse не прислал моделей для этой учётной записи. Возможно, Muse недоступен в стране, где работает этот агент. Выберите модель другого провайдера.",
   "provider.picker.customEmpty":
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
   "provider.picker.customPending":
@@ -174,7 +178,7 @@ export const messages = {
   "provider.geminiKey.label": "Ключ API Gemini",
   "provider.claudeKey.title": "Ключ API Anthropic",
   "provider.claudeKey.description":
-    "Сохраните API-ключ Anthropic на хосте. Anthropic выставляет счёт за каждый запрос на ключ. Чтобы использовать его для агента, выберите аккаунт «API-ключ» в меню моделей агента. Если в Claude не выполнен вход, все агенты используют ключ.",
+    "Сохраните API-ключ Anthropic на хосте. Anthropic списывает каждый запрос с кредитов API ключа, а не с тарифа Claude. Чтобы использовать его для агента, выберите аккаунт «API-ключ» в меню моделей агента. Если в Claude не выполнен вход, все агенты используют ключ.",
   "provider.claudeKey.label": "Ключ API Anthropic",
   "provider.inceptionKey.title": "Ключ API Inception",
   "provider.inceptionKey.description":
@@ -250,6 +254,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 час",
   "provider.settings.promptCacheDefault": "По умолчанию Claude Code",
   "provider.settings.promptCacheLoadFailed": "Не удалось загрузить время кэша промптов этого сервера.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
+  "provider.settings.claudeUserSetupDescription":
+    "Агенты загружают ваш CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude. Если выключить, каждый ход отправляет более короткий промпт. Файлы рабочей области загружаются по-прежнему.",
+  "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",

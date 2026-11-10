@@ -90,6 +90,9 @@ export interface ReceivedWebRtcFile {
   path: string;
 }
 
+/** A file that the protocol cannot send. The peer gets the reason, not a generic host failure. */
+export class TeamFileTooLargeError extends Error {}
+
 export class TeamWebRtcFileTransfer {
   readonly #bridge: FileTransferBridge;
   readonly #writingAbort = new AbortController();
@@ -253,11 +256,13 @@ export class TeamWebRtcFileTransfer {
   /** `own` is the stream that asks, so its bytes on disk are not counted twice. */
   #checkOutgoing(peerId: string, size: number, own?: { peerId: string; size: number }): void {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
-    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw new Error(sourceText("error.remote.fileTooLarge"));
+    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
+      throw new TeamFileTooLargeError(sourceText("error.remote.fileTooLarge"));
     const activeBytes = [...this.#outgoing.values(), ...[...this.#writing].filter((stream) => stream !== own)]
       .filter((transfer) => transfer.peerId === peerId)
       .reduce((sum, transfer) => sum + transfer.size, 0);
     if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
+      // Other transfers end and free the set, so this stays a retryable host failure.
       throw new Error(sourceText("error.remote.fileSetTooLarge"));
     }
   }

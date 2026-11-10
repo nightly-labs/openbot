@@ -114,7 +114,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "عندما يبلغ {model} حد الاستخدام قبل أن يبدأ {name} بالكتابة، يسألك {name} عن النموذج الذي يستخدمه.",
   "agentSettings.backupModels.introAutomatic":
-    "عندما يبلغ {model} حد الاستخدام أو يفشل بخطأ من المزوّد قبل أن يبدأ {name} بالكتابة، ينتقل {name} إلى أول نموذج متاح في الترتيب.",
+    "عندما يبلغ {model} حد الاستخدام، ينتقل {name} إلى أول نموذج متاح في الترتيب. وينتقل {name} أيضًا عندما يفشل {model} بخطأ من المزوّد قبل أن يبدأ {name} بالكتابة.",
   "agentSettings.backupModels.ask": "السؤال قبل التبديل",
   "agentSettings.backupModels.order": "الترتيب",
   "agentSettings.backupModels.listLabel": "النماذج الاحتياطية بالترتيب",
@@ -177,10 +177,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "نموذج الوكيل",
   "agentSettings.runtime.modelUnavailable": "تتوفر النماذج بعد اتصال CLI لوكيل.",
-  "agentSettings.runtime.reasoning": "الاستدلال",
-  "agentSettings.runtime.reasoningLabel": "مستوى استدلال الوكيل",
-  "agentSettings.runtime.selectReasoning": "اختيار الاستدلال",
-  "agentSettings.runtime.reasoningSetByProvider": "يحدّده {provider}",
   "agentSettings.runtime.access": "الوصول",
   "agentSettings.runtime.accessLabel": "وصول الوكيل",
   "agentSettings.runtime.busyMessage": "أثناء العمل",
@@ -220,6 +216,14 @@ export const messages = {
     "ينسى الوكيل هذه الدردشة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
+  "agentSettings.deleteHistory.title": "حذف السجل",
+  "agentSettings.deleteHistory.description": "تُحذف رسائل هذه الدردشة وينساها الوكيل. يبقى إعداده كما هو.",
+  "agentSettings.deleteHistory.button": "حذف",
+  "agentSettings.deleteHistory.confirmTitle": "هل تريد حذف سجل الدردشة مع {name}؟",
+  "agentSettings.deleteHistory.confirmDescription":
+    "تُحذف كل رسائل هذه الدردشة وملفاتها من OpenBot وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+  "agentSettings.deleteHistory.confirm": "حذف السجل",
+  "agentSettings.deleteHistory.failed": "تعذّر حذف السجل.",
 
   "agentSettings.fullAccess.title": "هل تريد منح هذا الوكيل وصولًا كاملًا؟",
   "agentSettings.fullAccess.askTitle": "هل تسمح لهذا الوكيل بالعمل خارج مساحة عمله؟",
@@ -282,8 +286,7 @@ export const messages = {
   "agentSettings.agentNewChat.title": "الوكيل يبدأ دردشات جديدة",
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
-  "agentSettings.quickAcknowledgement.description":
-    "قبل مهمة طويلة، يعرض الوكيل خطته. ويبدأ بعد 10 ثوانٍ، أو عند الضغط على «بدء».",
+  "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",

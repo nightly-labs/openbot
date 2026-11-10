@@ -58,10 +58,14 @@ export const messages = {
   "error.team.providersUnsupported": "Esta conexión no admite los ajustes de proveedores.",
   "error.team.providerNotManaged": "OpenBot no gestiona la CLI de este proveedor.",
   "error.team.channelsUnsupported": "Esta conexión no admite chats de canal.",
+  "error.team.channelContextUnsupported":
+    "Esta conexión no admite una nueva conversación ni la compactación en un canal.",
   "error.team.channelPictureUnsupported": "Esta conexión no admite imágenes de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexión no admite la eliminación de canales.",
+  "error.team.historyDeleteUnsupported": "Esta conexión no admite la eliminación del historial.",
   "error.team.channelTaskCancelUnsupported": "Esta conexión no admite la cancelación de tareas de canales.",
   "error.team.membersCannotDeleteChannels": "Los miembros no pueden eliminar canales.",
+  "error.team.membersCannotDeleteChannelHistory": "Los miembros no pueden eliminar el historial del canal.",
   "error.team.membersCannotArchiveChannels": "Los miembros no pueden archivar canales.",
   "error.team.membersCannotRestoreChannels": "Los miembros no pueden restaurar canales.",
   "error.team.sharedDataUnsupported": "Esta conexión no admite datos compartidos.",
@@ -69,6 +73,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Esta conexión no permite ocultar agentes.",
   "error.team.agentColorsUnsupported": "Esta conexión no admite colores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexión no admite colores de chat.",
+  "error.team.routineRunPlaceUnsupported": "Esta conexión no puede cambiar dónde se ejecuta una rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
@@ -83,6 +88,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Esta conexión no permite mostrar carpetas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexión no permite buscar archivos.",
   "error.team.sideQuestionUnsupported": "Esta conexión no permite preguntas aparte.",
+  "error.team.liveVoiceUnsupported":
+    "Este servidor no admite la voz en directo de Codex. Actualiza OpenBot en el equipo que lo ejecuta.",
   "error.team.routineFlowsUnsupported":
     "Este servidor no admite flujos de rutinas. Actualiza OpenBot en el equipo que lo ejecuta.",
   "error.team.routineCanvasTooLarge":
@@ -106,6 +113,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
+  "error.team.skillLearningUnsupported": "Esta conexión no admite el aprendizaje de habilidades.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
@@ -116,6 +124,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vista del navegador en directo no está disponible.",
   "error.team.browserSessionNotFound": "No se encontró la sesión de vista del navegador.",
   "error.team.mcpUnsupported": "Esta conexión no admite servidores MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Actualiza OpenBot en este dispositivo para usar más de {limit} servidores MCP en este servidor.",
   "error.team.storageUnsupported": "Esta conexión no admite almacenamiento.",
   "error.team.machineResourcesUnsupported": "Esta conexión no admite el uso de la máquina.",
   "error.team.machineAlertMemberInvalid":
@@ -141,6 +151,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Este cliente no admite autenticación segura.",
   "error.team.agentSettingsUnsupported": "Esta conexión no admite ajustes de agentes.",
   "error.team.adminRequired": "Se requiere acceso de administrador.",
+  "error.team.mcpServerNotYours": "Solo la persona que añadió este servidor MCP, o un administrador, puede cambiarlo.",
   "error.team.ownerRequired": "Solo el propietario de este servidor puede hacer esto.",
   "error.team.requestTooLarge": "El cuerpo de la solicitud es demasiado grande.",
   "error.team.signInRelayUnsupported":
@@ -153,4 +164,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Este inicio de sesión ya se envió.",
   "error.team.signInRelayMismatch": "Esta dirección no es de este inicio de sesión.",
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
+  "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
 } as const satisfies PartialTranslation<typeof source>;

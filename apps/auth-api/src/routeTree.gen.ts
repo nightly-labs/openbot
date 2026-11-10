@@ -9,7 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as ContactRouteImport } from './routes/_contact'
+import { Route as HomeRouteImport } from './routes/_home'
+import { Route as PricingRouteImport } from './routes/_pricing'
+import { Route as TeamsRouteImport } from './routes/_teams'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
 import { Route as BrandingRouteImport } from './routes/branding'
@@ -17,19 +20,22 @@ import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as ClaRouteImport } from './routes/cla'
 import { Route as CommercialLicenseRouteImport } from './routes/commercial-license'
 import { Route as CommerciallicenseRouteImport } from './routes/commerciallicense'
-import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DpaRouteImport } from './routes/dpa'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
-import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './routes/[.]well-known/apple-app-site-association'
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
+import { Route as ContactContactRouteImport } from './routes/_contact/contact'
+import { Route as HomeIndexRouteImport } from './routes/_home/index'
+import { Route as HomePlRouteImport } from './routes/_home/pl'
+import { Route as HomePtRouteImport } from './routes/_home/pt'
+import { Route as PricingPricingRouteImport } from './routes/_pricing/pricing'
+import { Route as TeamsTeamsRouteImport } from './routes/_teams/teams'
 import { Route as AgentsTemplateIdRouteImport } from './routes/agents/$templateId'
 import { Route as BillingReturnRouteImport } from './routes/billing/return'
 import { Route as BrandIndexRouteImport } from './routes/brand/index'
@@ -52,6 +58,7 @@ import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
+import { Route as OauthMcpClientDotjsonRouteImport } from './routes/oauth/mcp-client[.]json'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
@@ -59,7 +66,14 @@ import { Route as ProvidersSlugRouteImport } from './routes/providers/$slug'
 import { Route as ProvidersRssDotxmlRouteImport } from './routes/providers/rss[.]xml'
 import { Route as SlackConnectRouteImport } from './routes/slack/connect'
 import { Route as V1ContactRouteImport } from './routes/v1/contact'
+import { Route as V1FeedbackRouteImport } from './routes/v1/feedback'
 import { Route as V1MeRouteImport } from './routes/v1/me'
+import { Route as ContactPlContactRouteImport } from './routes/_contact/pl/contact'
+import { Route as ContactPtContactRouteImport } from './routes/_contact/pt/contact'
+import { Route as PricingPlPricingRouteImport } from './routes/_pricing/pl/pricing'
+import { Route as PricingPtPricingRouteImport } from './routes/_pricing/pt/pricing'
+import { Route as TeamsPlTeamsRouteImport } from './routes/_teams/pl/teams'
+import { Route as TeamsPtTeamsRouteImport } from './routes/_teams/pt/teams'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
 import { Route as DownloadPlatformLatestRouteImport } from './routes/download/$platform_/latest'
 import { Route as MarketplaceAgentsAgentIdRouteImport } from './routes/marketplace/agents/$agentId'
@@ -101,6 +115,7 @@ import { Route as V2DiscordAuthorizeRouteImport } from './routes/v2/discord/auth
 import { Route as V2DiscordCallbackRouteImport } from './routes/v2/discord/callback'
 import { Route as V2HostingPlansRouteImport } from './routes/v2/hosting/plans'
 import { Route as V2RemoteRouteWakeRouteImport } from './routes/v2/remote/route-wake'
+import { Route as V2ServerClaimsIndexRouteImport } from './routes/v2/server-claims/index'
 import { Route as V2ServerClaimsRedeemRouteImport } from './routes/v2/server-claims/redeem'
 import { Route as V2SlackAuthorizeRouteImport } from './routes/v2/slack/authorize'
 import { Route as V2SlackCallbackRouteImport } from './routes/v2/slack/callback'
@@ -123,6 +138,7 @@ import { Route as V1MeLicenseCheckoutRouteImport } from './routes/v1/me/license/
 import { Route as V1MeLicensePlanRouteImport } from './routes/v1/me/license/plan'
 import { Route as V1MeLicenseRenewalRouteImport } from './routes/v1/me/license/renewal'
 import { Route as V1MeLicenseUsersRouteImport } from './routes/v1/me/license/users'
+import { Route as V1MobileAuthCompanyExchangeRouteImport } from './routes/v1/mobile-auth/company/exchange'
 import { Route as V1MobileAuthDevicesSessionIdRouteImport } from './routes/v1/mobile-auth/devices/$sessionId'
 import { Route as V1MobileAuthEmailVerifyRouteImport } from './routes/v1/mobile-auth/email/verify'
 import { Route as V1SkillsSkillIdCardRouteImport } from './routes/v1/skills/$skillId/card'
@@ -199,9 +215,20 @@ import { Route as V2RemoteHostsHostIdCompanySignInTestRouteImport } from './rout
 import { Route as V2RemoteHostsHostIdMembersIndexRouteImport } from './routes/v2/remote/hosts/$hostId/members/index'
 import { Route as V2RemoteHostsHostIdMembersMembershipIdRouteImport } from './routes/v2/remote/hosts/$hostId/members/$membershipId'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ContactRoute = ContactRouteImport.update({
+  id: '/_contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeRoute = HomeRouteImport.update({
+  id: '/_home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/_pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsRoute = TeamsRouteImport.update({
+  id: '/_teams',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -239,11 +266,6 @@ const CommerciallicenseRoute = CommerciallicenseRouteImport.update({
   path: '/commerciallicense',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DpaRoute = DpaRouteImport.update({
   id: '/dpa',
   path: '/dpa',
@@ -257,11 +279,6 @@ const JoinRoute = JoinRouteImport.update({
 const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   id: '/llms.txt',
   path: '/llms.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -284,11 +301,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TeamsRoute = TeamsRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
@@ -304,6 +316,36 @@ const DotwellKnownJwksDotjsonRoute = DotwellKnownJwksDotjsonRouteImport.update({
   id: '/.well-known/jwks.json',
   path: '/.well-known/jwks.json',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ContactContactRoute = ContactContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const HomeIndexRoute = HomeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomePlRoute = HomePlRouteImport.update({
+  id: '/pl',
+  path: '/pl',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomePtRoute = HomePtRouteImport.update({
+  id: '/pt',
+  path: '/pt',
+  getParentRoute: () => HomeRoute,
+} as any)
+const PricingPricingRoute = PricingPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const TeamsTeamsRoute = TeamsTeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => TeamsRoute,
 } as any)
 const AgentsTemplateIdRoute = AgentsTemplateIdRouteImport.update({
   id: '/agents/$templateId',
@@ -415,6 +457,11 @@ const NewsRssDotxmlRoute = NewsRssDotxmlRouteImport.update({
   path: '/news/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthMcpClientDotjsonRoute = OauthMcpClientDotjsonRouteImport.update({
+  id: '/oauth/mcp-client.json',
+  path: '/oauth/mcp-client.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PluginsIndexRoute = PluginsIndexRouteImport.update({
   id: '/plugins/',
   path: '/plugins/',
@@ -450,10 +497,45 @@ const V1ContactRoute = V1ContactRouteImport.update({
   path: '/v1/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1FeedbackRoute = V1FeedbackRouteImport.update({
+  id: '/v1/feedback',
+  path: '/v1/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MeRoute = V1MeRouteImport.update({
   id: '/v1/me',
   path: '/v1/me',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ContactPlContactRoute = ContactPlContactRouteImport.update({
+  id: '/pl/contact',
+  path: '/pl/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactPtContactRoute = ContactPtContactRouteImport.update({
+  id: '/pt/contact',
+  path: '/pt/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const PricingPlPricingRoute = PricingPlPricingRouteImport.update({
+  id: '/pl/pricing',
+  path: '/pl/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingPtPricingRoute = PricingPtPricingRouteImport.update({
+  id: '/pt/pricing',
+  path: '/pt/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const TeamsPlTeamsRoute = TeamsPlTeamsRouteImport.update({
+  id: '/pl/teams',
+  path: '/pl/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsPtTeamsRoute = TeamsPtTeamsRouteImport.update({
+  id: '/pt/teams',
+  path: '/pt/teams',
+  getParentRoute: () => TeamsRoute,
 } as any)
 const ApiBrowserSplatRoute = ApiBrowserSplatRouteImport.update({
   id: '/api/browser/$',
@@ -664,6 +746,11 @@ const V2RemoteRouteWakeRoute = V2RemoteRouteWakeRouteImport.update({
   path: '/v2/remote/route-wake',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2ServerClaimsIndexRoute = V2ServerClaimsIndexRouteImport.update({
+  id: '/v2/server-claims/',
+  path: '/v2/server-claims/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V2ServerClaimsRedeemRoute = V2ServerClaimsRedeemRouteImport.update({
   id: '/v2/server-claims/redeem',
   path: '/v2/server-claims/redeem',
@@ -778,6 +865,12 @@ const V1MeLicenseUsersRoute = V1MeLicenseUsersRouteImport.update({
   path: '/license/users',
   getParentRoute: () => V1MeRoute,
 } as any)
+const V1MobileAuthCompanyExchangeRoute =
+  V1MobileAuthCompanyExchangeRouteImport.update({
+    id: '/v1/mobile-auth/company/exchange',
+    path: '/v1/mobile-auth/company/exchange',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1MobileAuthDevicesSessionIdRoute =
   V1MobileAuthDevicesSessionIdRouteImport.update({
     id: '/$sessionId',
@@ -1212,7 +1305,7 @@ const V2RemoteHostsHostIdMembersMembershipIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof HomeIndexRoute
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
@@ -1220,19 +1313,21 @@ export interface FileRoutesByFullPath {
   '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
-  '/contact': typeof ContactRoute
   '/dpa': typeof DpaRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
-  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/teams': typeof TeamsRoute
   '/terms': typeof TermsRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/contact': typeof ContactContactRoute
+  '/pl': typeof HomePlRoute
+  '/pt': typeof HomePtRoute
+  '/pricing': typeof PricingPricingRoute
+  '/teams': typeof TeamsTeamsRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
   '/billing/return': typeof BillingReturnRoute
   '/brand/$file': typeof BrandFileRoute
@@ -1249,11 +1344,13 @@ export interface FileRoutesByFullPath {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
+  '/v1/feedback': typeof V1FeedbackRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/brand/': typeof BrandIndexRoute
   '/compare/': typeof CompareIndexRoute
@@ -1263,6 +1360,12 @@ export interface FileRoutesByFullPath {
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/providers/': typeof ProvidersIndexRoute
+  '/pl/contact': typeof ContactPlContactRoute
+  '/pt/contact': typeof ContactPtContactRoute
+  '/pl/pricing': typeof PricingPlPricingRoute
+  '/pt/pricing': typeof PricingPtPricingRoute
+  '/pl/teams': typeof TeamsPlTeamsRoute
+  '/pt/teams': typeof TeamsPtTeamsRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/marketplace/agents/$agentId': typeof MarketplaceAgentsAgentIdRoute
@@ -1307,6 +1410,7 @@ export interface FileRoutesByFullPath {
   '/v1/agent-templates/': typeof V1AgentTemplatesIndexRoute
   '/v1/sites/': typeof V1SitesIndexRoute
   '/v1/skills/': typeof V1SkillsIndexRoute
+  '/v2/server-claims/': typeof V2ServerClaimsIndexRoute
   '/scim/v2/Users/$userId': typeof ScimV2UsersUserIdRoute
   '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
   '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
@@ -1322,6 +1426,7 @@ export interface FileRoutesByFullPath {
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
   '/v1/me/license/users': typeof V1MeLicenseUsersRoute
+  '/v1/mobile-auth/company/exchange': typeof V1MobileAuthCompanyExchangeRoute
   '/v1/mobile-auth/devices/$sessionId': typeof V1MobileAuthDevicesSessionIdRoute
   '/v1/mobile-auth/email/verify': typeof V1MobileAuthEmailVerifyRoute
   '/v1/skills/$skillId/card': typeof V1SkillsSkillIdCardRoute
@@ -1403,7 +1508,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/members/': typeof V2RemoteHostsHostIdMembersIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof HomeIndexRoute
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
@@ -1411,19 +1516,21 @@ export interface FileRoutesByTo {
   '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
-  '/contact': typeof ContactRoute
   '/dpa': typeof DpaRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
-  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/teams': typeof TeamsRoute
   '/terms': typeof TermsRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/contact': typeof ContactContactRoute
+  '/pl': typeof HomePlRoute
+  '/pt': typeof HomePtRoute
+  '/pricing': typeof PricingPricingRoute
+  '/teams': typeof TeamsTeamsRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
   '/billing/return': typeof BillingReturnRoute
   '/brand/$file': typeof BrandFileRoute
@@ -1440,11 +1547,13 @@ export interface FileRoutesByTo {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
+  '/v1/feedback': typeof V1FeedbackRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/brand': typeof BrandIndexRoute
   '/compare': typeof CompareIndexRoute
@@ -1454,6 +1563,12 @@ export interface FileRoutesByTo {
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
   '/providers': typeof ProvidersIndexRoute
+  '/pl/contact': typeof ContactPlContactRoute
+  '/pt/contact': typeof ContactPtContactRoute
+  '/pl/pricing': typeof PricingPlPricingRoute
+  '/pt/pricing': typeof PricingPtPricingRoute
+  '/pl/teams': typeof TeamsPlTeamsRoute
+  '/pt/teams': typeof TeamsPtTeamsRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/marketplace/agents/$agentId': typeof MarketplaceAgentsAgentIdRoute
@@ -1498,6 +1613,7 @@ export interface FileRoutesByTo {
   '/v1/agent-templates': typeof V1AgentTemplatesIndexRoute
   '/v1/sites': typeof V1SitesIndexRoute
   '/v1/skills': typeof V1SkillsIndexRoute
+  '/v2/server-claims': typeof V2ServerClaimsIndexRoute
   '/scim/v2/Users/$userId': typeof ScimV2UsersUserIdRoute
   '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
   '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
@@ -1513,6 +1629,7 @@ export interface FileRoutesByTo {
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
   '/v1/me/license/users': typeof V1MeLicenseUsersRoute
+  '/v1/mobile-auth/company/exchange': typeof V1MobileAuthCompanyExchangeRoute
   '/v1/mobile-auth/devices/$sessionId': typeof V1MobileAuthDevicesSessionIdRoute
   '/v1/mobile-auth/email/verify': typeof V1MobileAuthEmailVerifyRoute
   '/v1/skills/$skillId/card': typeof V1SkillsSkillIdCardRoute
@@ -1595,7 +1712,10 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_contact': typeof ContactRouteWithChildren
+  '/_home': typeof HomeRouteWithChildren
+  '/_pricing': typeof PricingRouteWithChildren
+  '/_teams': typeof TeamsRouteWithChildren
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
@@ -1603,19 +1723,21 @@ export interface FileRoutesById {
   '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
-  '/contact': typeof ContactRoute
   '/dpa': typeof DpaRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
-  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/teams': typeof TeamsRoute
   '/terms': typeof TermsRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/_contact/contact': typeof ContactContactRoute
+  '/_home/pl': typeof HomePlRoute
+  '/_home/pt': typeof HomePtRoute
+  '/_pricing/pricing': typeof PricingPricingRoute
+  '/_teams/teams': typeof TeamsTeamsRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
   '/billing/return': typeof BillingReturnRoute
   '/brand/$file': typeof BrandFileRoute
@@ -1632,12 +1754,15 @@ export interface FileRoutesById {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
+  '/v1/feedback': typeof V1FeedbackRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/_home/': typeof HomeIndexRoute
   '/brand/': typeof BrandIndexRoute
   '/compare/': typeof CompareIndexRoute
   '/download/': typeof DownloadIndexRoute
@@ -1646,6 +1771,12 @@ export interface FileRoutesById {
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/providers/': typeof ProvidersIndexRoute
+  '/_contact/pl/contact': typeof ContactPlContactRoute
+  '/_contact/pt/contact': typeof ContactPtContactRoute
+  '/_pricing/pl/pricing': typeof PricingPlPricingRoute
+  '/_pricing/pt/pricing': typeof PricingPtPricingRoute
+  '/_teams/pl/teams': typeof TeamsPlTeamsRoute
+  '/_teams/pt/teams': typeof TeamsPtTeamsRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform_/latest': typeof DownloadPlatformLatestRoute
   '/marketplace/agents/$agentId': typeof MarketplaceAgentsAgentIdRoute
@@ -1690,6 +1821,7 @@ export interface FileRoutesById {
   '/v1/agent-templates/': typeof V1AgentTemplatesIndexRoute
   '/v1/sites/': typeof V1SitesIndexRoute
   '/v1/skills/': typeof V1SkillsIndexRoute
+  '/v2/server-claims/': typeof V2ServerClaimsIndexRoute
   '/scim/v2/Users/$userId': typeof ScimV2UsersUserIdRoute
   '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
   '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
@@ -1705,6 +1837,7 @@ export interface FileRoutesById {
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
   '/v1/me/license/users': typeof V1MeLicenseUsersRoute
+  '/v1/mobile-auth/company/exchange': typeof V1MobileAuthCompanyExchangeRoute
   '/v1/mobile-auth/devices/$sessionId': typeof V1MobileAuthDevicesSessionIdRoute
   '/v1/mobile-auth/email/verify': typeof V1MobileAuthEmailVerifyRoute
   '/v1/skills/$skillId/card': typeof V1SkillsSkillIdCardRoute
@@ -1796,19 +1929,21 @@ export interface FileRouteTypes {
     | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
-    | '/contact'
     | '/dpa'
     | '/join'
     | '/llms.txt'
-    | '/pricing'
     | '/privacy'
     | '/privacy-policy'
     | '/report-site'
     | '/sitemap.xml'
-    | '/teams'
     | '/terms'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/contact'
+    | '/pl'
+    | '/pt'
+    | '/pricing'
+    | '/teams'
     | '/agents/$templateId'
     | '/billing/return'
     | '/brand/$file'
@@ -1825,11 +1960,13 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-client.json'
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/contact'
+    | '/v1/feedback'
     | '/v1/me'
     | '/brand/'
     | '/compare/'
@@ -1839,6 +1976,12 @@ export interface FileRouteTypes {
     | '/news/'
     | '/plugins/'
     | '/providers/'
+    | '/pl/contact'
+    | '/pt/contact'
+    | '/pl/pricing'
+    | '/pt/pricing'
+    | '/pl/teams'
+    | '/pt/teams'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/marketplace/agents/$agentId'
@@ -1883,6 +2026,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/'
     | '/v1/sites/'
     | '/v1/skills/'
+    | '/v2/server-claims/'
     | '/scim/v2/Users/$userId'
     | '/v1/agent-templates/$templateId/avatar'
     | '/v1/agent-templates/$templateId/card'
@@ -1898,6 +2042,7 @@ export interface FileRouteTypes {
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
     | '/v1/me/license/users'
+    | '/v1/mobile-auth/company/exchange'
     | '/v1/mobile-auth/devices/$sessionId'
     | '/v1/mobile-auth/email/verify'
     | '/v1/skills/$skillId/card'
@@ -1987,19 +2132,21 @@ export interface FileRouteTypes {
     | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
-    | '/contact'
     | '/dpa'
     | '/join'
     | '/llms.txt'
-    | '/pricing'
     | '/privacy'
     | '/privacy-policy'
     | '/report-site'
     | '/sitemap.xml'
-    | '/teams'
     | '/terms'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/contact'
+    | '/pl'
+    | '/pt'
+    | '/pricing'
+    | '/teams'
     | '/agents/$templateId'
     | '/billing/return'
     | '/brand/$file'
@@ -2016,11 +2163,13 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-client.json'
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/contact'
+    | '/v1/feedback'
     | '/v1/me'
     | '/brand'
     | '/compare'
@@ -2030,6 +2179,12 @@ export interface FileRouteTypes {
     | '/news'
     | '/plugins'
     | '/providers'
+    | '/pl/contact'
+    | '/pt/contact'
+    | '/pl/pricing'
+    | '/pt/pricing'
+    | '/pl/teams'
+    | '/pt/teams'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/marketplace/agents/$agentId'
@@ -2074,6 +2229,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates'
     | '/v1/sites'
     | '/v1/skills'
+    | '/v2/server-claims'
     | '/scim/v2/Users/$userId'
     | '/v1/agent-templates/$templateId/avatar'
     | '/v1/agent-templates/$templateId/card'
@@ -2089,6 +2245,7 @@ export interface FileRouteTypes {
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
     | '/v1/me/license/users'
+    | '/v1/mobile-auth/company/exchange'
     | '/v1/mobile-auth/devices/$sessionId'
     | '/v1/mobile-auth/email/verify'
     | '/v1/skills/$skillId/card'
@@ -2170,7 +2327,10 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/members'
   id:
     | '__root__'
-    | '/'
+    | '/_contact'
+    | '/_home'
+    | '/_pricing'
+    | '/_teams'
     | '/app'
     | '/app-preview'
     | '/branding'
@@ -2178,19 +2338,21 @@ export interface FileRouteTypes {
     | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
-    | '/contact'
     | '/dpa'
     | '/join'
     | '/llms.txt'
-    | '/pricing'
     | '/privacy'
     | '/privacy-policy'
     | '/report-site'
     | '/sitemap.xml'
-    | '/teams'
     | '/terms'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/_contact/contact'
+    | '/_home/pl'
+    | '/_home/pt'
+    | '/_pricing/pricing'
+    | '/_teams/teams'
     | '/agents/$templateId'
     | '/billing/return'
     | '/brand/$file'
@@ -2207,12 +2369,15 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-client.json'
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/contact'
+    | '/v1/feedback'
     | '/v1/me'
+    | '/_home/'
     | '/brand/'
     | '/compare/'
     | '/download/'
@@ -2221,6 +2386,12 @@ export interface FileRouteTypes {
     | '/news/'
     | '/plugins/'
     | '/providers/'
+    | '/_contact/pl/contact'
+    | '/_contact/pt/contact'
+    | '/_pricing/pl/pricing'
+    | '/_pricing/pt/pricing'
+    | '/_teams/pl/teams'
+    | '/_teams/pt/teams'
     | '/api/browser/$'
     | '/download/$platform_/latest'
     | '/marketplace/agents/$agentId'
@@ -2265,6 +2436,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/'
     | '/v1/sites/'
     | '/v1/skills/'
+    | '/v2/server-claims/'
     | '/scim/v2/Users/$userId'
     | '/v1/agent-templates/$templateId/avatar'
     | '/v1/agent-templates/$templateId/card'
@@ -2280,6 +2452,7 @@ export interface FileRouteTypes {
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
     | '/v1/me/license/users'
+    | '/v1/mobile-auth/company/exchange'
     | '/v1/mobile-auth/devices/$sessionId'
     | '/v1/mobile-auth/email/verify'
     | '/v1/skills/$skillId/card'
@@ -2362,7 +2535,10 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  ContactRoute: typeof ContactRouteWithChildren
+  HomeRoute: typeof HomeRouteWithChildren
+  PricingRoute: typeof PricingRouteWithChildren
+  TeamsRoute: typeof TeamsRouteWithChildren
   AppRoute: typeof AppRoute
   AppPreviewRoute: typeof AppPreviewRoute
   BrandingRoute: typeof BrandingRoute
@@ -2370,16 +2546,13 @@ export interface RootRouteChildren {
   ClaRoute: typeof ClaRoute
   CommercialLicenseRoute: typeof CommercialLicenseRoute
   CommerciallicenseRoute: typeof CommerciallicenseRoute
-  ContactRoute: typeof ContactRoute
   DpaRoute: typeof DpaRoute
   JoinRoute: typeof JoinRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
-  PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   ReportSiteRoute: typeof ReportSiteRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  TeamsRoute: typeof TeamsRoute
   TermsRoute: typeof TermsRoute
   DotwellKnownAppleAppSiteAssociationRoute: typeof DotwellKnownAppleAppSiteAssociationRoute
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
@@ -2399,11 +2572,13 @@ export interface RootRouteChildren {
   NewsSlugRoute: typeof NewsSlugRoute
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
+  OauthMcpClientDotjsonRoute: typeof OauthMcpClientDotjsonRoute
   PluginsSlugRoute: typeof PluginsSlugRoute
   ProvidersSlugRoute: typeof ProvidersSlugRoute
   ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
   SlackConnectRoute: typeof SlackConnectRoute
   V1ContactRoute: typeof V1ContactRoute
+  V1FeedbackRoute: typeof V1FeedbackRoute
   V1MeRoute: typeof V1MeRouteWithChildren
   BrandIndexRoute: typeof BrandIndexRoute
   CompareIndexRoute: typeof CompareIndexRoute
@@ -2453,6 +2628,7 @@ export interface RootRouteChildren {
   V1AgentTemplatesIndexRoute: typeof V1AgentTemplatesIndexRoute
   V1SitesIndexRoute: typeof V1SitesIndexRoute
   V1SkillsIndexRoute: typeof V1SkillsIndexRoute
+  V2ServerClaimsIndexRoute: typeof V2ServerClaimsIndexRoute
   ScimV2UsersUserIdRoute: typeof ScimV2UsersUserIdRoute
   V1AuthCompanyCallbackRoute: typeof V1AuthCompanyCallbackRoute
   V1AuthCompanyExchangeRoute: typeof V1AuthCompanyExchangeRoute
@@ -2461,6 +2637,7 @@ export interface RootRouteChildren {
   V1AuthEmailVerifyRoute: typeof V1AuthEmailVerifyRoute
   V1MarketplaceAgentsAgentIdRoute: typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   V1MarketplaceAgentsMineRoute: typeof V1MarketplaceAgentsMineRoute
+  V1MobileAuthCompanyExchangeRoute: typeof V1MobileAuthCompanyExchangeRoute
   V1MobileAuthEmailVerifyRoute: typeof V1MobileAuthEmailVerifyRoute
   V1SkillsAdminSubmissionsRoute: typeof V1SkillsAdminSubmissionsRouteWithChildren
   V1SkillsSlugSlugRoute: typeof V1SkillsSlugSlugRoute
@@ -2529,11 +2706,32 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_contact': {
+      id: '/_contact'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_home': {
+      id: '/_home'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_pricing': {
+      id: '/_pricing'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_teams': {
+      id: '/_teams'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof TeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -2585,13 +2783,6 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof CommerciallicenseRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/dpa': {
       id: '/dpa'
       path: '/dpa'
@@ -2611,13 +2802,6 @@ declare module '@tanstack/solid-router' {
       path: '/llms.txt'
       fullPath: '/llms.txt'
       preLoaderRoute: typeof LlmsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -2648,13 +2832,6 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/teams': {
-      id: '/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof TeamsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terms': {
       id: '/terms'
       path: '/terms'
@@ -2675,6 +2852,48 @@ declare module '@tanstack/solid-router' {
       fullPath: '/.well-known/jwks.json'
       preLoaderRoute: typeof DotwellKnownJwksDotjsonRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_contact/contact': {
+      id: '/_contact/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_home/': {
+      id: '/_home/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof HomeIndexRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/pl': {
+      id: '/_home/pl'
+      path: '/pl'
+      fullPath: '/pl'
+      preLoaderRoute: typeof HomePlRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/pt': {
+      id: '/_home/pt'
+      path: '/pt'
+      fullPath: '/pt'
+      preLoaderRoute: typeof HomePtRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_pricing/pricing': {
+      id: '/_pricing/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_teams/teams': {
+      id: '/_teams/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TeamsTeamsRouteImport
+      parentRoute: typeof TeamsRoute
     }
     '/agents/$templateId': {
       id: '/agents/$templateId'
@@ -2830,6 +3049,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof NewsRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/mcp-client.json': {
+      id: '/oauth/mcp-client.json'
+      path: '/oauth/mcp-client.json'
+      fullPath: '/oauth/mcp-client.json'
+      preLoaderRoute: typeof OauthMcpClientDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/plugins/': {
       id: '/plugins/'
       path: '/plugins'
@@ -2879,12 +3105,61 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/feedback': {
+      id: '/v1/feedback'
+      path: '/v1/feedback'
+      fullPath: '/v1/feedback'
+      preLoaderRoute: typeof V1FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/me': {
       id: '/v1/me'
       path: '/v1/me'
       fullPath: '/v1/me'
       preLoaderRoute: typeof V1MeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_contact/pl/contact': {
+      id: '/_contact/pl/contact'
+      path: '/pl/contact'
+      fullPath: '/pl/contact'
+      preLoaderRoute: typeof ContactPlContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/pt/contact': {
+      id: '/_contact/pt/contact'
+      path: '/pt/contact'
+      fullPath: '/pt/contact'
+      preLoaderRoute: typeof ContactPtContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_pricing/pl/pricing': {
+      id: '/_pricing/pl/pricing'
+      path: '/pl/pricing'
+      fullPath: '/pl/pricing'
+      preLoaderRoute: typeof PricingPlPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/pt/pricing': {
+      id: '/_pricing/pt/pricing'
+      path: '/pt/pricing'
+      fullPath: '/pt/pricing'
+      preLoaderRoute: typeof PricingPtPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_teams/pl/teams': {
+      id: '/_teams/pl/teams'
+      path: '/pl/teams'
+      fullPath: '/pl/teams'
+      preLoaderRoute: typeof TeamsPlTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/pt/teams': {
+      id: '/_teams/pt/teams'
+      path: '/pt/teams'
+      fullPath: '/pt/teams'
+      preLoaderRoute: typeof TeamsPtTeamsRouteImport
+      parentRoute: typeof TeamsRoute
     }
     '/api/browser/$': {
       id: '/api/browser/$'
@@ -3173,6 +3448,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteRouteWakeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/server-claims/': {
+      id: '/v2/server-claims/'
+      path: '/v2/server-claims'
+      fullPath: '/v2/server-claims/'
+      preLoaderRoute: typeof V2ServerClaimsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/server-claims/redeem': {
       id: '/v2/server-claims/redeem'
       path: '/v2/server-claims/redeem'
@@ -3326,6 +3608,13 @@ declare module '@tanstack/solid-router' {
       fullPath: '/v1/me/license/users'
       preLoaderRoute: typeof V1MeLicenseUsersRouteImport
       parentRoute: typeof V1MeRoute
+    }
+    '/v1/mobile-auth/company/exchange': {
+      id: '/v1/mobile-auth/company/exchange'
+      path: '/v1/mobile-auth/company/exchange'
+      fullPath: '/v1/mobile-auth/company/exchange'
+      preLoaderRoute: typeof V1MobileAuthCompanyExchangeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/v1/mobile-auth/devices/$sessionId': {
       id: '/v1/mobile-auth/devices/$sessionId'
@@ -3855,6 +4144,64 @@ declare module '@tanstack/solid-router' {
   }
 }
 
+interface ContactRouteChildren {
+  ContactContactRoute: typeof ContactContactRoute
+  ContactPlContactRoute: typeof ContactPlContactRoute
+  ContactPtContactRoute: typeof ContactPtContactRoute
+}
+
+const ContactRouteChildren: ContactRouteChildren = {
+  ContactContactRoute: ContactContactRoute,
+  ContactPlContactRoute: ContactPlContactRoute,
+  ContactPtContactRoute: ContactPtContactRoute,
+}
+
+const ContactRouteWithChildren =
+  ContactRoute._addFileChildren(ContactRouteChildren)
+
+interface HomeRouteChildren {
+  HomePlRoute: typeof HomePlRoute
+  HomePtRoute: typeof HomePtRoute
+  HomeIndexRoute: typeof HomeIndexRoute
+}
+
+const HomeRouteChildren: HomeRouteChildren = {
+  HomePlRoute: HomePlRoute,
+  HomePtRoute: HomePtRoute,
+  HomeIndexRoute: HomeIndexRoute,
+}
+
+const HomeRouteWithChildren = HomeRoute._addFileChildren(HomeRouteChildren)
+
+interface PricingRouteChildren {
+  PricingPricingRoute: typeof PricingPricingRoute
+  PricingPlPricingRoute: typeof PricingPlPricingRoute
+  PricingPtPricingRoute: typeof PricingPtPricingRoute
+}
+
+const PricingRouteChildren: PricingRouteChildren = {
+  PricingPricingRoute: PricingPricingRoute,
+  PricingPlPricingRoute: PricingPlPricingRoute,
+  PricingPtPricingRoute: PricingPtPricingRoute,
+}
+
+const PricingRouteWithChildren =
+  PricingRoute._addFileChildren(PricingRouteChildren)
+
+interface TeamsRouteChildren {
+  TeamsTeamsRoute: typeof TeamsTeamsRoute
+  TeamsPlTeamsRoute: typeof TeamsPlTeamsRoute
+  TeamsPtTeamsRoute: typeof TeamsPtTeamsRoute
+}
+
+const TeamsRouteChildren: TeamsRouteChildren = {
+  TeamsTeamsRoute: TeamsTeamsRoute,
+  TeamsPlTeamsRoute: TeamsPlTeamsRoute,
+  TeamsPtTeamsRoute: TeamsPtTeamsRoute,
+}
+
+const TeamsRouteWithChildren = TeamsRoute._addFileChildren(TeamsRouteChildren)
+
 interface V1MeRouteChildren {
   V1MeAnalyticsRoute: typeof V1MeAnalyticsRoute
   V1MeAvatarRoute: typeof V1MeAvatarRoute
@@ -4003,7 +4350,10 @@ const V1MarketplaceAgentsAdminSubmissionsRouteWithChildren =
   )
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  ContactRoute: ContactRouteWithChildren,
+  HomeRoute: HomeRouteWithChildren,
+  PricingRoute: PricingRouteWithChildren,
+  TeamsRoute: TeamsRouteWithChildren,
   AppRoute: AppRoute,
   AppPreviewRoute: AppPreviewRoute,
   BrandingRoute: BrandingRoute,
@@ -4011,16 +4361,13 @@ const rootRouteChildren: RootRouteChildren = {
   ClaRoute: ClaRoute,
   CommercialLicenseRoute: CommercialLicenseRoute,
   CommerciallicenseRoute: CommerciallicenseRoute,
-  ContactRoute: ContactRoute,
   DpaRoute: DpaRoute,
   JoinRoute: JoinRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
-  PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   ReportSiteRoute: ReportSiteRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  TeamsRoute: TeamsRoute,
   TermsRoute: TermsRoute,
   DotwellKnownAppleAppSiteAssociationRoute:
     DotwellKnownAppleAppSiteAssociationRoute,
@@ -4041,11 +4388,13 @@ const rootRouteChildren: RootRouteChildren = {
   NewsSlugRoute: NewsSlugRoute,
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
+  OauthMcpClientDotjsonRoute: OauthMcpClientDotjsonRoute,
   PluginsSlugRoute: PluginsSlugRoute,
   ProvidersSlugRoute: ProvidersSlugRoute,
   ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,
   SlackConnectRoute: SlackConnectRoute,
   V1ContactRoute: V1ContactRoute,
+  V1FeedbackRoute: V1FeedbackRoute,
   V1MeRoute: V1MeRouteWithChildren,
   BrandIndexRoute: BrandIndexRoute,
   CompareIndexRoute: CompareIndexRoute,
@@ -4095,6 +4444,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AgentTemplatesIndexRoute: V1AgentTemplatesIndexRoute,
   V1SitesIndexRoute: V1SitesIndexRoute,
   V1SkillsIndexRoute: V1SkillsIndexRoute,
+  V2ServerClaimsIndexRoute: V2ServerClaimsIndexRoute,
   ScimV2UsersUserIdRoute: ScimV2UsersUserIdRoute,
   V1AuthCompanyCallbackRoute: V1AuthCompanyCallbackRoute,
   V1AuthCompanyExchangeRoute: V1AuthCompanyExchangeRoute,
@@ -4103,6 +4453,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AuthEmailVerifyRoute: V1AuthEmailVerifyRoute,
   V1MarketplaceAgentsAgentIdRoute: V1MarketplaceAgentsAgentIdRouteWithChildren,
   V1MarketplaceAgentsMineRoute: V1MarketplaceAgentsMineRoute,
+  V1MobileAuthCompanyExchangeRoute: V1MobileAuthCompanyExchangeRoute,
   V1MobileAuthEmailVerifyRoute: V1MobileAuthEmailVerifyRoute,
   V1SkillsAdminSubmissionsRoute: V1SkillsAdminSubmissionsRouteWithChildren,
   V1SkillsSlugSlugRoute: V1SkillsSlugSlugRoute,

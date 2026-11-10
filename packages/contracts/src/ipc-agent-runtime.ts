@@ -68,6 +68,8 @@ export interface AgentRuntimePromptQuestion {
   id: string;
   header: string;
   question: string;
+  /** See `AgentPromptQuestion.detail`. */
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
   /** See `AgentPromptQuestion.multiSelect`. */
@@ -80,6 +82,7 @@ function isRuntimePromptQuestion(value: unknown): value is AgentRuntimePromptQue
     isIdentifier(value.id) &&
     isBoundedString(value.header, AGENT_RUNTIME_QUESTION_HEADER_LIMIT) &&
     isBoundedString(value.question, AGENT_RUNTIME_TEXT_LIMIT) &&
+    (value.detail === undefined || isBoundedString(value.detail, AGENT_RUNTIME_TEXT_LIMIT)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
@@ -252,6 +255,11 @@ export interface AgentRuntimeSnapshot {
    */
   usageLimitedModels?: AgentModelChoice[];
   /**
+   * Each provider account and model that a provider error holds for a while, so that a switch to a
+   * backup model passes over it. Absent from a released Team API snapshot, as `usageLimits` is.
+   */
+  failedModels?: AgentModelChoice[];
+  /**
    * The agents whose subagents still run, with the turn that started them. A background subagent
    * runs on after its turn, so its agent is still at work. Absent from a released Team API
    * snapshot, as `usageLimits` is.
@@ -322,6 +330,10 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
       (Array.isArray(value.usageLimitedModels) &&
         value.usageLimitedModels.length <= INPUT_LIMITS.agents &&
         value.usageLimitedModels.every(isAgentModelChoice))) &&
+    (value.failedModels === undefined ||
+      (Array.isArray(value.failedModels) &&
+        value.failedModels.length <= INPUT_LIMITS.agents &&
+        value.failedModels.every(isAgentModelChoice))) &&
     (value.subagentTurns === undefined ||
       (Array.isArray(value.subagentTurns) &&
         value.subagentTurns.length <= INPUT_LIMITS.agents &&

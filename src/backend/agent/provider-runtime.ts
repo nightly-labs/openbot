@@ -14,6 +14,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountStatus,
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
   ProviderUsageResets,
@@ -22,9 +23,11 @@ import {
   AGENT_PROVIDERS,
   accountUsageCoversModel,
   agentProviderDescriptor,
+  COMPUTER_USE_MCP_SERVER_ID,
   CUSTOM_AGENT_DEFAULT_MODEL,
   CUSTOM_AGENT_LIMITS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -46,6 +49,7 @@ import {
   resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
+import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
 import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
@@ -95,6 +99,7 @@ import {
   isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
+  isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
@@ -110,6 +115,7 @@ import {
   updateProviderStatus,
   waitForSuccessfulProcess,
 } from "./provider-status";
+import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 import { checkAgentFolders, workspaceExcludedFolders, workspaceWritableRoots } from "./workspace-sandbox";
@@ -187,6 +193,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
  * way, with any version of the CLI (#4995).
  */
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
+/** An ACP provider CLI that the system stopped, not one that ended by itself. */
+const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -200,6 +208,7 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "kimi",
   "devin",
   "copilot",
+  "mistral",
   "hermes",
   "acp",
 ];
@@ -446,6 +455,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
+  /** The MCP server failures shown in this run, by provider, server and kind. */
+  readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
   /**
@@ -587,13 +598,15 @@ export class ProviderRuntime implements ProviderPort {
             const temp = provider === "antigravity" ? antigravityTemp(this.#credentials) : undefined;
             return temp && { ...temp, provider: providerLabel(provider) };
           },
-          // The sign-in process waits for a slow start, so the check after it waits as long (#3546).
-          // A cancel or a removal must not wait for that start: the accounts start it uninterruptibly.
-          authenticate: (provider, cli, accountEnvironment, afterSignIn) =>
+          // An account check waits for a slow start as the sign-in process does (#3546): the checks of
+          // all accounts start together, and on a busy computer each took longer than the request
+          // timeout (#5927). A cancel or a removal must not wait for that start: the accounts start it
+          // uninterruptibly.
+          authenticate: (provider, cli, accountEnvironment, longStart) =>
             this.#authenticateClient(provider, cli, {
               accountEnvironment,
               interruptibleStart: true,
-              ...(afterSignIn ? { startTimeoutMs: this.#longStartWaitMs(provider) } : {}),
+              ...(longStart ? { startTimeoutMs: this.#longStartWaitMs(provider) } : {}),
             }).pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause }))),
           stopClient: (client) =>
             Effect.gen({ self: this }, function* () {
@@ -622,6 +635,20 @@ export class ProviderRuntime implements ProviderPort {
           readUsage: (client, model) =>
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
+            ),
+          // Read as the own sign-in's catalogue is. An account process never gets the saved key.
+          readModels: (client) =>
+            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+              Effect.map(({ models }) => models),
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("A provider account did not list its models.", {
+                    provider: client.provider,
+                    timeout: isProviderTimeout(failure.cause),
+                  });
+                  return null;
+                }),
+              ),
             ),
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
@@ -678,7 +705,9 @@ export class ProviderRuntime implements ProviderPort {
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
-            ? this.#providerAccounts?.rows(row.id, row.email ?? null)
+            ? this.#providerAccounts
+                ?.rows(row.id, row.email ?? null)
+                ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const withAccounts = accounts ? { ...withSource, accounts } : withSource;
         return this.#restartsWhenIdle.has(row.id) ? { ...withAccounts, restartPending: true } : withAccounts;
@@ -909,9 +938,29 @@ export class ProviderRuntime implements ProviderPort {
     for (const { client } of this.#confined.values()) if (client.releaseIdleThreads) yield* client.releaseIdleThreads();
   }).bind(this);
 
+  /** Closes the threads that only quiet background work holds, in each client, when memory is low. */
+  readonly releaseQuietBackgroundThreads = Effect.fn("ProviderRuntime.releaseQuietBackgroundThreads")(function* (
+    this: ProviderRuntime,
+  ) {
+    for (const client of this.#clients.values())
+      if (client.releaseQuietBackgroundThreads) yield* client.releaseQuietBackgroundThreads();
+    for (const { client } of this.#confined.values())
+      if (client.releaseQuietBackgroundThreads) yield* client.releaseQuietBackgroundThreads();
+  }).bind(this);
+
   listModels(): AgentModelOption[] {
     return this.#modelCatalog.list().filter((model) => !this.#off.has(model.provider));
   }
+
+  /**
+   * Reads the model list of each connected provider again and answers the providers that gave a fresh
+   * one. The status event tells the renderer to read the catalogue again.
+   */
+  readonly refreshModels = Effect.fn("ProviderRuntime.refreshModels")(function* (this: ProviderRuntime) {
+    const fresh = yield* this.#refreshModelCatalog();
+    this.#setStatus({});
+    return fresh;
+  }).bind(this);
 
   /**
    * A client for one generation without tools. With `accountId`, it signs in as that provider account,
@@ -1746,6 +1795,24 @@ export class ProviderRuntime implements ProviderPort {
     return (this.#providerAccounts?.keyChanged(provider) ?? Effect.void).pipe(Effect.map(() => this.status()));
   }
 
+  /**
+   * The row with only the models that the provider's catalogue does not list. The picker shows the
+   * catalogue, with the models an admin turned off left out, and then these (#5217).
+   */
+  #extraModels(provider: AgentProvider, account: ProviderAccountStatus): ProviderAccountStatus {
+    if (!account.models) return account;
+    const catalogue = this.#modelCatalog.list().filter((model) => model.provider === provider);
+    const models = account.models.filter((model) => !catalogue.some((listed) => listed.id === model.id));
+    return { ...account, models };
+  }
+
+  /** The models of an account after the first, from its last check. Empty for the own sign-in. */
+  accountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] {
+    // A turned-off provider offers no model, as `listModels` does.
+    if (this.#off.has(provider)) return [];
+    return this.#providerAccounts?.models(provider, accountId) ?? [];
+  }
+
   /** True when `accountId` names an account after the first that this computer holds. */
   hasProviderAccount(provider: AgentProvider, accountId: string): boolean {
     return this.#providerAccounts?.account(provider, accountId) != null;
@@ -2197,6 +2264,11 @@ export class ProviderRuntime implements ProviderPort {
       return this.#hooks.isProviderBusy(provider);
     });
     if (busy) return null;
+    // The system stops each copy in the same way, so a download only waits for the user's fix (#4848).
+    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
+    const stoppedByLimit = this.#status.providers?.find((row) => row.id === provider)?.message === realtimeLimitZero;
+    if (stoppedByLimit && (yield* providerStep(hasZeroRealtimeLimit)))
+      return yield* new ProviderOperationFailed({ cause: new Error(realtimeLimitZero) });
     const previousVersion = this.#cli.get(provider)?.version ?? null;
     const previousExecutable = this.#bundledExecutables[provider];
     // Main names the install path of a managed provider also before its first download, so only a
@@ -2873,6 +2945,10 @@ export class ProviderRuntime implements ProviderPort {
     // The CLI's words name a database step, not a cause the user can act on.
     if (CODEX_STATE_BUSY.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
+    // "Stopped (signal SIGKILL)" does not tell the user that the fix is in the system. Only the ending
+    // counts: the stderr line can quote another process.
+    if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
+      return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     return detailed;
   }
 
@@ -3237,6 +3313,8 @@ export class ProviderRuntime implements ProviderPort {
       // The new copy is not at fault: the old one fails the same way until the lease ends. Removing the
       // copy showed "could not update", and the next start downloaded it again (#4995).
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
+      // The system stops each copy in the same way, so the copy stays for the start after the user's fix.
+      if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         // The update reason keeps catalog text only, so other text would leave only "Try again.".
         // The log keeps the start failure as the cause.
@@ -3452,7 +3530,7 @@ export class ProviderRuntime implements ProviderPort {
           stage = "account";
           stageStartedAt = performance.now();
           const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000)
+            .request("account/read", { refreshToken: false }, decodeAccountReadResult, providerCheckTimeoutMs(5_000))
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
@@ -3660,7 +3738,8 @@ export class ProviderRuntime implements ProviderPort {
       // what it sent, so an API key or an inherited credential is in the line that is about to be
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
-      const message = shortenDiagnostic(this.#redactMcp(raw));
+      const redacted = this.#redactMcp(raw);
+      const message = shortenDiagnostic(redacted);
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
@@ -3670,18 +3749,16 @@ export class ProviderRuntime implements ProviderPort {
         });
         return;
       }
-      // Also the name a provider was given. One with no letter or digit, such as `__`, would match
-      // every `mcp__server__tool` line.
-      const names = new Set(
-        [...this.#credentials.mcpServers().map((config) => config.name), ...this.#mcpHandoff.names()].flatMap(
-          (name) => {
-            const given = providerMcpServerName(name);
-            return /[A-Za-z0-9]/u.test(given) ? [name, given] : [name];
-          },
-        ),
-      );
-      if (isMcpSubsystemDiagnostic(message, [...names])) {
-        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+      // A failed tool call names its server too, but is not a server that did not start. A built-in
+      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      const mcpServer =
+        isMcpSubsystemDiagnostic(message) && !isToolCallDiagnostic(message)
+          ? this.#configuredMcpServerIn(redacted)
+          : undefined;
+      if (mcpServer !== undefined && !mcpServer?.builtIn) {
+        const server = mcpServer?.name ?? null;
+        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+        if (server) this.#reportMcpServerFailure(client.provider, server, redacted);
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {
@@ -3735,6 +3812,14 @@ export class ProviderRuntime implements ProviderPort {
         // stderr is the Python log, `2026-11-02 10:00:00 [WARNING] mcp: …`, which repeats them as
         // records and tracebacks, one "Hermes error" toast per line at each start.
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "mistral") {
+        // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
+        // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the
+        // Python log, such as `WARNING:...:Retrying model completion (attempt 1, ...): ReadError('')`
+        // for a request that it sends again by itself, one "Mistral error" toast per line (#5923).
+        stderrLogger.warn("Mistral Vibe logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (isGlogBelowErrorDiagnostic(message) || isRustLogBelowErrorDiagnostic(message)) {
@@ -3795,7 +3880,9 @@ export class ProviderRuntime implements ProviderPort {
     const providers = updateProviderStatus(this.#status.providers, client.provider, {
       state: "error",
       version: this.#cli.get(client.provider)?.version ?? null,
-      message: startStopped ? this.#startStoppedMessage(client.provider) : this.#redactMcp(error.message),
+      message: startStopped
+        ? this.#startStoppedMessage(client.provider, error.message)
+        : this.#redactMcp(error.message),
     });
     const anotherProviderIsReady = this.#clients.size > 0 || this.#released.size > 0;
 
@@ -3813,7 +3900,7 @@ export class ProviderRuntime implements ProviderPort {
               providers,
               capabilities: { ...this.#status.capabilities, chat: "unavailable" },
               message: startStopped
-                ? this.#startStoppedMessage(client.provider)
+                ? this.#startStoppedMessage(client.provider, error.message)
                 : `${providerLabel(client.provider)} stopped repeatedly. Restart OpenBot after checking the CLI.`,
             },
       );
@@ -3866,10 +3953,12 @@ export class ProviderRuntime implements ProviderPort {
    * The `initialize` wait of a start that has no wait of its own. Codex gets the long wait on each
    * start path: its first start after a restore can read its state database for longer than the
    * request timeout, and a stop in that step holds the database for 15 minutes, so each start in that
-   * time fails (#4995).
+   * time fails (#4995). While the disk of a hosted server is restored, the other CLIs wait longer too:
+   * their files arrive over the network on first read, and a start in the request timeout failed.
    */
   #defaultStartTimeoutMs(provider: AgentProvider): number | undefined {
-    return provider === "codex" ? this.#longStartTimeoutMs : undefined;
+    if (provider === "codex") return this.#longStartTimeoutMs;
+    return diskRestoring() ? Math.max(this.#requestTimeoutMs, DISK_RESTORE_WAIT_MS) : undefined;
   }
 
   /**
@@ -3897,14 +3986,17 @@ export class ProviderRuntime implements ProviderPort {
     return true;
   }
 
-  #startStoppedMessage(provider: AgentProvider): string {
+  #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
+    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
+    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
+    if (reason === realtimeLimitZero) return realtimeLimitZero;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */
   #showStartStopped(provider: AgentProvider): string {
-    const message = this.#startStoppedMessage(provider);
     const row = this.#status.providers?.find((candidate) => candidate.id === provider);
+    const message = this.#startStoppedMessage(provider, row?.message);
     this.#setStatus({
       providers: updateProviderStatus(this.#status.providers, provider, {
         state: "error",
@@ -3990,6 +4082,63 @@ export class ProviderRuntime implements ProviderPort {
     }
     this.#emitError(`${provider}_${kind}`, error, agentId, context);
     this.#setStatus({});
+  }
+
+  /**
+   * The MCP server from this app's list that a provider's MCP line is about, or null for a server
+   * from the user's own provider files, which goes to the log only. The line is read whole, before
+   * it is shortened, because a long line can quote the URL near its end.
+   *
+   * A line can name the server by its URL rather than its name: Grok's `rmcp` worker quotes only the
+   * OAuth metadata address, `https://<host>/.well-known/oauth-protected-resource/<path>`, so the host
+   * is what the two forms share, and the longest path that matches picks between two servers on one
+   * host. The URL is read first. The host counts only as a whole URL authority, so `example.com` is
+   * not in `mcp.example.com` and `localhost:3000` is not in `localhost:30001`. A name counts only as
+   * a whole word, so `git` is not in `github`; a name the provider was given counts too, and one with
+   * no letter or digit, such as `__`, would match every `mcp__server__tool` line.
+   */
+  #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
+    const configs = this.#credentials.mcpServers();
+    const builtIn = (id: string) => id === COMPUTER_USE_MCP_SERVER_ID || id === GITHUB_CONNECTOR_MCP_SERVER_ID;
+    const bounded = (text: string, before: string, after: string) =>
+      new RegExp(`${before}${RegExp.escape(text)}${after}`, "u").test(message);
+    const byHost = configs
+      .flatMap((config) => {
+        const url = config.transport === "http" ? URL.parse(config.url) : null;
+        return url?.host && bounded(url.host, "(?<=//|@)", "(?![\\w.-])") ? [{ config, path: url.pathname }] : [];
+      })
+      .sort((a, b) => b.path.length - a.path.length);
+    const byUrl = byHost.find((row) => row.path !== "/" && message.includes(row.path)) ?? byHost[0];
+    if (byUrl) return { name: byUrl.config.name, builtIn: builtIn(byUrl.config.id) };
+    const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
+    const named = (name: string) => {
+      const given = providerMcpServerName(name);
+      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
+    };
+    const config = configs.find((row) => named(row.name));
+    if (config) return { name: config.name, builtIn: builtIn(config.id) };
+    const handedOff = this.#mcpHandoff.names().find(named);
+    return handedOff ? { name: handedOff, builtIn: false } : null;
+  }
+
+  /**
+   * Shows that a provider could not use an MCP server from this app's list, once for each server and
+   * kind in this run: a server spawns for each session, so the same line arrives at every start. The
+   * provider works without the server, so its row keeps no error, and the toast sends the user to
+   * the MCP settings, where Sign in and Test connection give the cause.
+   */
+  #reportMcpServerFailure(provider: AgentProvider, server: string, message: string): void {
+    const signIn = isMcpSignInDiagnostic(message);
+    const key = [provider, server, signIn].join("\u0000");
+    if (this.#reportedMcpFailures.has(key)) return;
+    this.#reportedMcpFailures.add(key);
+    this.#emitError(
+      "mcp_server_not_started",
+      sourceText(signIn ? "error.backend.mcpServerSignInForProvider" : "error.backend.mcpServerFailedForProvider", {
+        provider: providerLabel(provider),
+        name: server,
+      }),
+    );
   }
 
   #recordProviderError(provider: AgentProvider, error: unknown): void {

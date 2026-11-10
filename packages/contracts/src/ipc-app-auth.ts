@@ -1,4 +1,5 @@
 import type { InstallerProviderId, ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
+import type { AboveAppsSupport } from "./ipc-agent-dock";
 import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
@@ -7,6 +8,8 @@ import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
+/** A 12-hour clock with AM and PM, or a 24-hour clock. */
+export type HourCycle = "h12" | "h23";
 
 export interface AppInfo {
   name: string;
@@ -22,6 +25,13 @@ export interface AppInfo {
    * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
    */
   softwareRendering?: boolean;
+  /**
+   * The clock that the macOS "24-hour time" setting selects. Chromium does not read it, so times
+   * follow it only through this value. Not set when the language's own clock applies.
+   */
+  hourCycle?: HourCycle;
+  /** Set when the agent dock and the Dynamic Island cannot show above other apps now: on Linux with Wayland windows. */
+  aboveAppsSupport?: AboveAppsSupport;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -556,6 +566,16 @@ export interface ChatWindowTarget {
   agentId: string;
 }
 
+/**
+ * The messages that the user sent to agents on this computer, from the database. The social toast
+ * reads it, so a user who used OpenBot before the toast shipped gets it on time.
+ */
+export interface SentMessageStats {
+  /** When the first message was written, as ISO 8601 text, or null before the first message. */
+  firstSentAt: string | null;
+  sentCount: number;
+}
+
 export type ExternalDestination =
   | "opencode-install"
   | "opencode-auth"
@@ -563,6 +583,8 @@ export type ExternalDestination =
   | "claude-install"
   | "hermes-install"
   | "feedback"
+  // The GitHub bug report form, from the Help menu, with the version and the system filled in.
+  | "report-problem"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
   // The community card of the sidebar also opens Discord.
@@ -571,8 +593,24 @@ export type ExternalDestination =
   | "discord"
   // The OpenBot repository, from the toast that asks for a GitHub star.
   | "github"
-  // The OpenBot account on X, from the community card of the sidebar.
+  // The OpenBot account on X, from the community card of the sidebar and the social toast.
   | "x"
+  // The OpenBot profiles and community that the social toast asks the user to follow or join.
+  | "threads"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "linkedin"
+  | "reddit"
+  // The pages that start a post about OpenBot, from the social toast. Main writes the first post
+  // in the app language.
+  | "x-post"
+  | "threads-post"
+  | "linkedin-post"
+  | "reddit-post"
+  | "facebook-post"
+  | "instagram-post"
+  | "tiktok-post"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.

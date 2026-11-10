@@ -30,7 +30,7 @@ interface CustomProviderHostOptions {
   /** Absent, or absent for this host's props, leaves the state alone: no note and no error. */
   onAdd?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart> | undefined;
   onDelete?: (id: string) => Promise<CustomProviderRestart> | undefined;
-  /** This computer only: the Team API has no edit route. */
+  /** Without it the form cannot edit. A joined server's host edits only with `custom-provider-edit-v1`. */
   onUpdate?: (input: UpdateCustomProviderInput) => Promise<CustomProviderRestart> | undefined;
   /** Onboarding selects the endpoint it has just saved, and its first model with it. */
   onSaved?: (value: SaveCustomProviderInput) => void;

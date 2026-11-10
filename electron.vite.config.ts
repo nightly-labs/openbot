@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { lazyLanguageCatalogs } from "./packages/i18n/src/vite-plugin";
 
 const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
 
@@ -48,6 +49,7 @@ export default defineConfig({
         input: {
           index: resolve("src/preload/index.ts"),
           teamWebrtc: resolve("src/preload/team-webrtc.ts"),
+          browserPage: resolve("src/preload/browser-page.ts"),
         },
         output: {
           format: "cjs",
@@ -57,7 +59,9 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [solidPlugin(), tailwindcss({ optimize: false })],
+    // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
+    // in a chat drop frames that the built app does not drop. Set this to true for a trace.
+    plugins: [solidPlugin({ performanceTracks: false }), tailwindcss({ optimize: false }), lazyLanguageCatalogs()],
     optimizeDeps: {
       // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
       // code away from the images, so Vite serves the package as it is.

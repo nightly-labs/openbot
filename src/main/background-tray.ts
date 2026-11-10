@@ -1,5 +1,5 @@
 import type { AppTranslate } from "@openbot/i18n";
-import { Menu, type NativeImage, Tray } from "electron";
+import { Menu, type MenuItemConstructorOptions, type NativeImage, Tray } from "electron";
 
 export interface BackgroundTray {
   /** Shows the icon when OpenBot keeps running after its window closes, and removes it otherwise. */
@@ -8,6 +8,12 @@ export interface BackgroundTray {
   relabel: () => void;
   /** Shows the app icon in the logo color that the user chose. */
   setIcon: (icon: NativeImage) => void;
+  /**
+   * The names of the members who control this computer now, one per remote desktop session. While
+   * there is one, the icon shows also when OpenBot does not run in the background, and its menu names
+   * them and can stop all remote control.
+   */
+  setRemoteControl: (memberNames: readonly string[]) => void;
   destroy: () => void;
 }
 
@@ -27,15 +33,33 @@ export function createBackgroundTray(options: {
   translate: AppTranslate;
   open: () => void;
   quit: () => void;
+  /** Ends every remote desktop session on this computer. */
+  stopRemoteControl: () => void;
 }): BackgroundTray {
   let tray: Tray | null = null;
   let icon = options.icon;
+  let keepRunningInBackground = false;
+  let remoteControl: readonly string[] = [];
 
   function relabel(): void {
     if (!tray) return;
-    tray.setToolTip(options.translate("menu.trayTooltip"));
+    const controlled = remoteControl.length > 0;
+    tray.setToolTip(options.translate(controlled ? "remoteDesktop.host.trayTooltip" : "menu.trayTooltip"));
+    const remoteItems: MenuItemConstructorOptions[] = controlled
+      ? [
+          ...remoteControl.map(
+            (name): MenuItemConstructorOptions => ({
+              label: options.translate("remoteDesktop.host.trayControlledBy", { name }),
+              enabled: false,
+            }),
+          ),
+          { label: options.translate("remoteDesktop.host.stopAll"), click: options.stopRemoteControl },
+          { type: "separator" },
+        ]
+      : [];
     tray.setContextMenu(
       Menu.buildFromTemplate([
+        ...remoteItems,
         { label: options.translate("menu.trayOpen"), click: options.open },
         { type: "separator" },
         { label: options.translate("menu.trayQuit"), click: options.quit },
@@ -48,21 +72,32 @@ export function createBackgroundTray(options: {
     tray = null;
   }
 
-  return {
-    sync: (keepRunningInBackground) => {
-      if (!keepRunningInBackground) {
-        destroy();
-        return;
-      }
-      if (tray) return;
+  /** The icon shows while OpenBot runs in the background or a member controls this computer. */
+  function update(): void {
+    if (!keepRunningInBackground && remoteControl.length === 0) {
+      destroy();
+      return;
+    }
+    if (!tray) {
       tray = new Tray(options.menuBarIcon ?? trayIcon(icon));
       tray.on("click", options.open);
-      relabel();
+    }
+    relabel();
+  }
+
+  return {
+    sync: (next) => {
+      keepRunningInBackground = next;
+      update();
     },
     relabel,
     setIcon: (next) => {
       icon = next;
       if (!options.menuBarIcon) tray?.setImage(trayIcon(icon));
+    },
+    setRemoteControl: (memberNames) => {
+      remoteControl = [...memberNames];
+      update();
     },
     destroy,
   };

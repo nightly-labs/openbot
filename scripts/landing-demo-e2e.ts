@@ -33,7 +33,8 @@ const TIME_ZONE = "Europe/Warsaw";
 const IFRAME = 'iframe[title="Interactive OpenBot application preview"]';
 const AGENTS = ["Atlas", "Scout", "Forge", "Pulse"] as const;
 const QUESTION = "Which channels should the launch use?";
-const AUTO_ANSWER = "Blog and changelog, X, Newsletter";
+/** The first of the automatic answers. The summary shows each answer on its own row. */
+const AUTO_ANSWER = "Blog and changelog";
 const SCENE_PROMPTS: Record<string, string> = {
   Scout: "Could anything steal our news on Friday?",
   Forge: "Show me the launch banner before it ships.",
@@ -187,9 +188,9 @@ try {
     for (const channel of ["LinkedIn", "Product Hunt"]) {
       await choices.locator(`input[value="${channel}"]`).check();
     }
-    await app.getByRole("button", { name: "Submit answer" }).click();
+    await app.getByRole("button", { name: "Done", exact: true }).click();
     const sent = app.getByRole("region", { name: "Answers sent" });
-    await sent.getByText("LinkedIn, Product Hunt").waitFor();
+    for (const channel of ["LinkedIn", "Product Hunt"]) await sent.getByText(channel).waitFor();
 
     const plan = launchPlan(app);
     await plan.waitFor({ timeout: SCENE_TIMEOUT_MS });
@@ -282,7 +283,7 @@ try {
       .getByRole("group", { name: /^Reactions: / })
       .waitFor();
     await early.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await early.app.getByRole("button", { name: "Submit answer" }).count(), 0);
+    assert.equal(await early.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await early.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await early.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-left-mid-scene.png") });
     assert.deepEqual(early.errors, []);
@@ -323,7 +324,7 @@ try {
     const stillPlan = launchPlan(still.app);
     await stillPlan.getByRole("group", { name: /^Reactions: / }).waitFor();
     await still.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await still.app.getByRole("button", { name: "Submit answer" }).count(), 0);
+    assert.equal(await still.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await still.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await still.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-reduced-motion.png") });
     assert.deepEqual(still.errors, []);

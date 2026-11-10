@@ -7,6 +7,7 @@ import {
   SettingsPanelContent,
   SettingsPanelHeader,
 } from "@openbot/ui/components/SettingsPanel";
+import { ChannelContextActions } from "@openbot/ui/features/channels/ChannelContextActions";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
@@ -50,6 +51,12 @@ function ChannelPanelBody() {
           <SettingsLinkRow label="Memories" value="0 saved" onClick={fn()} />
           <SettingsLinkRow label="Routines" value="0 configured" onClick={fn()} />
         </SettingsLinkGroup>
+        <ChannelContextActions
+          channelName="Project Falcon"
+          startNewConversation={fn(async () => {})}
+          compact={fn(async () => {})}
+          deleteHistory={fn(async () => {})}
+        />
         <section class="channel-members" aria-label="Members">
           <h3 class="channel-members-title">Members</h3>
           <ItemGroup class="channel-member-list">

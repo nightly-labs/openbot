@@ -148,7 +148,7 @@ function drawEye(canvas: SkCanvas, eye: PlushEye, art: PlushArt) {
 }
 
 /** The colour matrix of SVG `saturate`. */
-function saturationMatrix(s: number): number[] {
+export function saturationMatrix(s: number): number[] {
   "worklet";
   return [
     0.213 + 0.787 * s,

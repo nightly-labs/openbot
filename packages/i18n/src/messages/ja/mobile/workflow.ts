@@ -94,6 +94,7 @@ export const messages = {
   "mobile.workflow.webhook.secretFailed": "シークレットを作成できませんでした",
   "mobile.workflow.output.notify": "通知",
   "mobile.workflow.output.channel": "メッセージの送信先",
+  "mobile.workflow.output.chatChannel": "OpenBot のチャンネル",
   "mobile.workflow.output.file": "ファイル",
   "mobile.workflow.status.running": "実行中",
   "mobile.workflow.status.approval": "対応待ち",
@@ -134,6 +135,7 @@ export const messages = {
   "mobile.workflow.step.sendTo": "送信先",
   "mobile.workflow.step.channelHint":
     "メッセージの送信先は、オーナーまたは管理者がコンピューターの OpenBot で選択します。",
+  "mobile.workflow.step.chatChannelHint": "オーナーまたは管理者が、コンピュータの OpenBot でチャンネルを選びます。",
   "mobile.workflow.problem.noTitle": "名前を入力してください。",
   "mobile.workflow.problem.noAgent": "エージェントを選択",
   "mobile.workflow.problem.agentGone": "エージェントを利用できません。エージェントを選択",
@@ -216,6 +218,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "リンクされた Telegram チャットで返信、投稿、またはリアクションを追加します。",
+  "mobile.workflow.output.slackHint": "Slack チャンネルで返信、投稿、またはリアクションを追加します。",
   "mobile.workflow.run.stopStep": "ステップを停止",
   "mobile.workflow.run.stopStepFailed": "ステップを停止できませんでした",
   "mobile.workflow.version.history": "バージョン履歴",
@@ -358,8 +362,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "スレッドで返信",
   "mobile.workflow.telegram.hostOnly":
     "Telegram のチャットは OpenBot を実行しているコンピューターにだけあります。このステップはそのコンピューターの OpenBot で変更してください。",
-  "mobile.workflow.telegram.triggerComputerOnly":
-    "このトリガーは、それを実行しているコンピューターの OpenBot で変更してください。",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "チャット",
   "mobile.workflow.telegram.anyChat": "リンク済みのすべてのチャット",
@@ -376,4 +378,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "チャットに投稿",
   "mobile.workflow.telegram.action.react": "リアクションを追加",
   "mobile.workflow.telegram.emoji": "絵文字",
+  "mobile.workflow.chats.adminOnly": "このステップを変更できるのはオーナーまたは管理者だけです。",
+  "mobile.workflow.chats.loadFailed": "このサーバーのチャットを読み込めませんでした。後でもう一度お試しください。",
+  "mobile.workflow.slack.hostOnly":
+    "Slack ワークスペースは OpenBot を実行しているコンピューターだけにあります。このステップはそのコンピューターの OpenBot で変更してください。",
+  "mobile.workflow.slack.workspace": "ワークスペース",
+  "mobile.workflow.slack.chooseWorkspace": "ワークスペースを選択",
+  "mobile.workflow.slack.oneWorkspace": "1 つのワークスペース",
+  "mobile.workflow.slack.chooseChannel": "チャンネルを選択",
+  "mobile.workflow.slack.needsWorkspace": "ワークスペースを選択してください。選択しないとトリガーは開始しません。",
+  "mobile.workflow.slack.needsChannel": "投稿するワークスペースとチャンネルを選択してください。",
 } as const satisfies PartialTranslation<typeof source>;

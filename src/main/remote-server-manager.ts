@@ -53,6 +53,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentNotificationLevelsSnapshot,
+  type BrowserComputerSharing,
+  decodeBrowserProxyComputer,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
   EMPTY_AGENT_NOTIFICATION_LEVELS,
@@ -68,6 +70,8 @@ import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
+import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
@@ -78,6 +82,7 @@ import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openb
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
@@ -177,6 +182,7 @@ interface RemoteServerEvents {
   directMessage: [serverId: string, event: DirectMessageRealtimeEvent];
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
+  liveVoice: [serverId: string, event: LiveVoiceEvent];
   attachmentDownload: [progress: AttachmentDownloadProgress];
   attachmentImportProgress: [progress: AttachmentImportProgress];
 }
@@ -264,6 +270,8 @@ export interface DevelopmentRemoteServerConnection {
 }
 
 const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+// The 30 seconds that a host can ask its user, and the time that it needs to start the runtime.
+const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 /** An export of up to 100 MB goes up and is read in one request, and apply creates many agents. */
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 // How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
@@ -457,6 +465,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
       onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
+      onLiveVoice: (serverId, event) => this.emit("liveVoice", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
       onChanged: () => this.#emitChanged(),
     });
@@ -468,7 +477,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
       this.#events.clearReconnectBackoff(serverId);
+      this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
+      const hostedStartAt = this.#hostedStartAt.get(serverId);
+      if (hostedStartAt !== undefined)
+        this.#connectTrace?.hostedStart(serverId, Math.max(0, Date.now() - hostedStartAt));
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
@@ -508,6 +521,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
       const wasOnline = this.#connections.statusFor(serverId).state === "online";
+      if (wasOnline) this.#events.markSeenOnline(serverId);
       // A host the app has stopped reconnecting to is not merely offline. The recorded failure is
       // the reason it will not come back, and this disconnect is that failure's own tail -- the one
       // `#suspendServer` asked for. Writing "offline" over an "incompatible" would leave the issue
@@ -517,6 +531,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
       this.#events.scheduleReconnect(serverId);
       if (wasOnline) this.emit("directoryInvalidated");
+    });
+    // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
+    // with no issue, and the full-window loading screen waits for an issue to end (#5273).
+    this.#webrtcTransport?.on("connectFailed", (serverId) => {
+      if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
+      this.#connections.reportUnreachable(serverId, "transport/connect_failed");
+      this.#emitChanged();
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
@@ -880,6 +901,45 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean {
     return this.#connections.compatibilityFor(serverId)?.capabilities.includes(capability) ?? false;
   }
+
+  /**
+   * Whether this computer shares its connection with a joined server (`browser-egress-v1`). Null when
+   * it cannot: this computer's own server, a server over HTTPS, or a host without the capability.
+   */
+  browserComputerSharing(serverId: string): BrowserComputerSharing | null {
+    if (serverId === LOCAL_SERVER_ID || this.#store.find(serverId)?.transport !== "webrtc-v2") return null;
+    if (!this.supportsCapability(serverId, BROWSER_EGRESS_CAPABILITY)) return null;
+    return { sharing: this.#store.sharesBrowserEgress(serverId) };
+  }
+
+  /** Whether the egress channel to a server must be open now: sharing is on and the server is connected. */
+  browserEgressWanted(serverId: string): boolean {
+    return (
+      this.browserComputerSharing(serverId)?.sharing === true && this.#webrtcTransport?.isConnected(serverId) === true
+    );
+  }
+
+  /** Turning sharing on also adds this member's computer to the proxies of the host. */
+  readonly setBrowserComputerSharing = Effect.fn("RemoteManager.setBrowserComputerSharing")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      sharing: boolean,
+    ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
+      if (this.browserComputerSharing(serverId) === null)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.agentSettingsUnsupported")) });
+      if (sharing)
+        yield* RemoteRequest.use((service) =>
+          service.request(serverId, BROWSER_PROXIES_ROUTES.computer, decodeBrowserProxyComputer, {
+            method: "POST",
+            body: {},
+          }),
+        );
+      yield* this.#store.setBrowserEgress(serverId, sharing);
+      this.#emitChanged();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   readonly startEventConnections = Effect.fn("RemoteManager.startEventConnections")(function* (
     this: RemoteServerManager,
@@ -1395,6 +1455,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const blockedState = this.#connections.hasIssue(serverId)
         ? (this.#connections.stateFor(serverId) ?? "error")
         : "error";
+      // A Retry after a failed read also comes here for a server that reads online (#5912). The server
+      // stays online while the check runs. Only a host that does not answer replaces the connection.
+      const online = this.#connections.stateFor(serverId) === "online" && !this.#connections.hasIssue(serverId);
       const attempt1 = yield* Effect.gen({ self: this }, function* () {
         if (server.transport === "webrtc-v2") {
           if (!transport)
@@ -1404,8 +1467,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           // because `scheduleReconnect` still sees the host paused -- the HTTPS arm below gets the
           // same reset from `restart(serverId, true)`.
           this.#events.resumeReconnect(serverId);
-          this.#connections.setState(serverId, "connecting");
-          this.#emitChanged();
+          if (!online || !transport.isConnected(serverId)) {
+            this.#connections.setState(serverId, "connecting");
+            this.#emitChanged();
+          }
           yield* transport.retry(serverId);
           // The `connected` handler is what turns that "connecting" back into "online", and a host
           // that was already connected raises no such event -- the session it would announce is the
@@ -1420,6 +1485,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           }
           return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
         }
+        // The check is for a WebRTC connection. An online HTTPS server keeps its state and event stream.
+        if (online) return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
         this.#connections.setState(serverId, "connecting");
         this.#emitChanged();
         yield* this.#client.ensureCompatibility(server, true);
@@ -1491,6 +1558,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#scheduleHostedStartRead(serverId);
     }
     this.#events.setHostStarting(serverId, true);
+    // Signal holds the next attempt until the host connects, so the connection starts at once.
+    this.#webrtcTransport?.setWaitForHost(serverId, true);
     const sleepChanged = this.#connections.setHostedSleep(serverId, "waking");
     const step = (server && hostedStartStep(server)) ?? this.#connections.statusFor(serverId).hostedStart?.step;
     if (this.#applyHostedStartStep(serverId, step ?? "machine") || sleepChanged) this.#emitChanged();
@@ -1537,13 +1606,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (!hosted || this.#stopping || !this.#hostedStartAt.has(serverId)) return;
     const revision = this.#hostedStartRevision.get(serverId) ?? 0;
     const status = yield* hosted.status(serverId).pipe(Effect.catch(() => Effect.succeed(null)));
-    if (
-      this.#stopping ||
-      !this.#hostedStartAt.has(serverId) ||
-      !this.#store.has(serverId) ||
-      this.#connections.stateFor(serverId) === "online"
-    )
+    if (this.#stopping || !this.#hostedStartAt.has(serverId) || this.#connections.stateFor(serverId) === "online")
       return;
+    // A late wake reply can start a server after its removal cleared the start state but before the
+    // store dropped it. Nothing else ends that start, and it hides the next start of the same id.
+    if (!this.#store.has(serverId)) {
+      this.#clearHostedStart(serverId);
+      this.#events.setHostStarting(serverId, false);
+      this.#connections.setHostedSleep(serverId, null);
+      return;
+    }
     // A wake during the read changed the start. Its state is read again later.
     if ((this.#hostedStartRevision.get(serverId) ?? 0) !== revision) {
       this.#scheduleHostedStartRead(serverId);
@@ -1664,6 +1736,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#hostedRunningSince.delete(serverId);
     this.#hostedFailedReads.delete(serverId);
     this.#connections.setHostedStart(serverId, null);
+    this.#webrtcTransport?.setWaitForHost(serverId, false);
   }
 
   #expireHostedStart(serverId: string): void {
@@ -1974,12 +2047,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
     ): Effect.fn.Return<RemoteDesktopSession, RemoteWorkflowError, RemoteRequest> {
       const viewerProxy = this.#remoteViewerProxy;
-
+      const webRtc = (yield* remoteDecode(() => this.#store.require(serverId))).transport === "webrtc-v2";
+      // The host can wait for its user to allow the session. A WebRTC request already waits longer.
       const session = yield* this.request(serverId, TEAM_API_ROUTES.remoteScreen.sessions, decodeRemoteDesktopSession, {
         method: "POST",
         body: {},
+        ...(webRtc ? {} : { timeoutMs: REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS }),
       });
-      if ((yield* remoteDecode(() => this.#store.require(serverId))).transport !== "webrtc-v2") return session;
+      if (!webRtc) return session;
       if (!viewerProxy)
         return yield* new RemoteWorkflowError({
           cause: new Error(sourceText("error.remote.viewerProxyUnavailable")),
@@ -2513,6 +2588,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
+    else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
     else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
   }
 

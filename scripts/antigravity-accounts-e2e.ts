@@ -3,7 +3,7 @@
 // runtime 1.4.0 and later do. Checks that a runtime before 1.4.0 offers no account after the first,
 // that a sign-in on the host opens Google's page and writes the token in the account's folder only,
 // that each process of that account gets the folder and never the saved API key while the first
-// account keeps the key, that a Reconnect signs the account out first, that Remove deletes the
+// account keeps the key, that the account lists its own models (#5217), that a Reconnect signs the account out first, that Remove deletes the
 // folder, and that a new account stays when its usage reading fails after the sign-in.
 // `bun scripts/antigravity-accounts-e2e.ts`.
 // Writes .openbot-build/antigravity-accounts-e2e/report.json.
@@ -29,7 +29,8 @@ const GOOGLE_PAGE = "https://accounts.google.com/o/oauth2/v2/auth?client_id=fake
 
 // Each process appends what it started with and each method it was called with to `FAKE_AGY_LOG`.
 // `authenticate` with `oauth-personal` prints Google's page, as the real server does, and writes the
-// token when the file `FAKE_AGY_APPROVE` exists: the test writes it when the page opens.
+// token when the file `FAKE_AGY_APPROVE` exists: the test writes it when the page opens. A folder other
+// than `FAKE_AGY_FREE_HOME` is a paid plan, which also serves `gemini-fake-pro`.
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -75,7 +76,13 @@ function handle(message) {
         return write({ id: message.id, error: { code: -32000, message: "Authentication required" } });
       return write({ id: message.id, result: {
         sessionId: "s-" + message.id,
-        models: { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" },
+        models: {
+          availableModels: [
+            { modelId: "gemini-fake", name: "Gemini Fake" },
+            ...(home === process.env.FAKE_AGY_FREE_HOME ? [] : [{ modelId: "gemini-fake-pro", name: "Gemini Fake Pro" }]),
+          ],
+          currentModelId: "gemini-fake",
+        },
       } });
     case "session/prompt":
       if (message.params.prompt?.[0]?.text === "/usage" && fs.existsSync(process.env.FAKE_AGY_USAGE_FAIL))
@@ -111,6 +118,7 @@ interface Report {
   passed: boolean;
   oldRuntime?: { accounts: boolean; connectError: string };
   signIn?: { pageOpened: string[]; accountState: string | undefined; tokenInAccount: boolean };
+  models?: { firstAccount: string[]; account: string[] };
   processes?: { firstAccountHasKey: boolean; accountProcesses: number; accountProcessesWithKey: number };
   idleUsage?: { processesStarted: number };
   busyReconnect?: { error: string; loggedOut: boolean; agentProcessKept: boolean };
@@ -129,6 +137,7 @@ const savedEnvironment = { GEMINI_HOME: process.env.GEMINI_HOME };
 process.env.FAKE_AGY_LOG = log;
 process.env.FAKE_AGY_APPROVE = approve;
 process.env.FAKE_AGY_USAGE_FAIL = usageFails;
+process.env.FAKE_AGY_FREE_HOME = defaultHome;
 // The first account's folder: the runtime's own processes inherit it.
 process.env.GEMINI_HOME = defaultHome;
 
@@ -253,6 +262,23 @@ try {
   assert.equal(report.signIn.accountState, "connected");
   assert.ok(tokenInAccount);
   assert.equal(await readFile(join(defaultHome, "antigravity-acp", "acp_token.json"), "utf8"), defaultToken);
+
+  // The account check reads the account's own models: its plan serves one that the first account's
+  // does not, and the catalogue of the first account stays as it was. The row carries only that one;
+  // the picker adds it to the catalogue, which keeps the models an admin turned off out (#5217).
+  report.models = {
+    firstAccount: runtime
+      .listModels()
+      .filter((model) => model.provider === "antigravity")
+      .map((model) => model.id),
+    account: accountRows(runtime)?.[1]?.models?.map((model) => model.id) ?? [],
+  };
+  assert.deepEqual(report.models.account, ["gemini-fake-pro"], "the row carries only the account's own model");
+  assert.ok(!report.models.firstAccount.includes("gemini-fake-pro"), "the first account does not list it");
+  assert.deepEqual(
+    runtime.accountModels("antigravity", account.id).map((model) => model.id),
+    ["gemini-fake", "gemini-fake-pro"],
+  );
 
   // 3. The first account keeps the saved key. Every process of the new account runs in its folder,
   // the sign-in and the account check included, and none of them gets the key.

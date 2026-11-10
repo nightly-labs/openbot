@@ -14,6 +14,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   normalizeUiBlockSpec,
+  UI_API_KEY_SCOPE_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
@@ -39,7 +40,7 @@ export function secretElicitationField(id: string, property: DynamicRecord | und
   return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
 }
 
-export function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
+function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
@@ -86,6 +87,12 @@ export function commandText(params: unknown): string | null {
   return null;
 }
 
+/** The short line under a question, when the request has one. */
+function promptQuestionDetail(question: DynamicRecord): { detail?: string } {
+  const detail = getString(question, "detail")?.trim();
+  return detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {};
+}
+
 export function promptQuestions(params: unknown): AgentPromptQuestion[] {
   return getArray(params, "questions")
     .filter(isRecord)
@@ -93,6 +100,7 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
       id: getString(question, "id") ?? randomUUID(),
       header: getString(question, "header") ?? "Question",
       question: getString(question, "question") ?? "The agent needs more information.",
+      ...promptQuestionDetail(question),
       isSecret: question.isSecret === true,
       options: Array.isArray(question.options)
         ? question.options.filter(isRecord).map((option) => ({
@@ -125,18 +133,24 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   };
 }
 
-/** One question per requested field, so a plugin can collect an API key or any other value. */
-function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+/**
+ * One question per requested field, so a plugin can collect an API key or any other value. When a
+ * field has its own text, the request message goes under the first question, so it is not lost.
+ */
+export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
-  const message = getString(params, "message")?.trim();
-  return Object.entries(properties).flatMap(([id, property]) => {
+  const message = getString(params, "message")?.trim() || undefined;
+  return Object.entries(properties).flatMap(([id, property], index) => {
     if (!isRecord(property)) return [];
-    const question = getString(property, "description") ?? message ?? `${subject} needs more information.`;
+    const description = getString(property, "description");
+    const question = description ?? message ?? `${subject} needs more information.`;
+    const detail = index === 0 && description && message && message !== description ? message : undefined;
     return [
       {
         id,
         header: (getString(property, "title") ?? id).slice(0, INPUT_LIMITS.promptHeader),
         question: question.slice(0, INPUT_LIMITS.promptQuestion),
+        ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
         options: elicitationOptions(property),
       },
@@ -300,6 +314,24 @@ export function expiredPromptResult(
   };
 }
 
+/**
+ * The answer for a question or block that the user did not answer because they wrote a new message
+ * in the chat. Only the model reads it. The message reaches the agent as a steer or as the next turn.
+ */
+export function userMessagePromptResult(
+  responseKind: "dynamic-tool" | "user-input" | "ui-block",
+  blockId: string | undefined,
+): DynamicToolResult | { answers: Record<string, never> } {
+  // `request_user_input` has no field for a note: empty answers are what a skip gives.
+  if (responseKind === "user-input") return { answers: {} };
+  const value = {
+    status: "skipped",
+    ...(blockId ? { blockId } : {}),
+    next: "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.",
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
 /** What a blocking UI block (`ask_ui`) ended with. */
 export type UiBlockPromptOutcome =
   | { status: "answered"; blockId: string; response: UiBlockResponse }
@@ -326,16 +358,26 @@ export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolR
 /** The id of the one secret field in the form of `request_api_key`. */
 export const API_KEY_FIELD_ID = "key";
 
+/** The id of the field of the `request_api_key` form that selects who can use the key. */
+export const API_KEY_SCOPE_FIELD_ID = UI_API_KEY_SCOPE_FIELD_ID;
+
+/** The option of the scope field that keeps the key for the asking agent only. */
+export const API_KEY_SCOPE_AGENT = sourceText("status.agent.apiKeyScope.agent");
+
 /**
  * The form of `request_api_key`: one required secret field. Its label is the variable name, because
- * the user finds the key by that name at the service. Null when the contract refuses it.
+ * the user finds the key by that name at the service. With `vault`, a second field saves the key in the
+ * Vault for every agent, which is the first option, or for the asking agent only. Null when the contract
+ * refuses it.
  */
 export function apiKeyFormSpec(input: {
   name: string;
   title: string;
   placeholder?: string | undefined;
   submit?: string | undefined;
+  vault?: boolean | undefined;
 }): UiBlockSpec | null {
+  const allAgents = sourceText("status.agent.apiKeyScope.vault");
   return normalizeUiBlockSpec({
     type: "form",
     title: input.title,
@@ -348,6 +390,18 @@ export function apiKeyFormSpec(input: {
         secret: true,
         ...(input.placeholder ? { placeholder: input.placeholder } : {}),
       },
+      ...(input.vault
+        ? [
+            {
+              id: API_KEY_SCOPE_FIELD_ID,
+              kind: "segmented",
+              label: sourceText("status.agent.apiKeyScope.label"),
+              options: [allAgents, API_KEY_SCOPE_AGENT],
+              required: true,
+              value: allAgents,
+            },
+          ]
+        : []),
     ],
     ...(input.submit ? { submit: input.submit } : {}),
   });
@@ -359,7 +413,13 @@ export function apiKeyFormSpec(input: {
  */
 export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): DynamicToolResult {
   const value = saved
-    ? { status: "saved", blockId, name: saved.name, path: saved.path }
+    ? {
+        status: "saved",
+        blockId,
+        name: saved.name,
+        path: saved.path,
+        ...(saved.source ? { source: saved.source } : {}),
+      }
     : { status: "skipped", blockId };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }

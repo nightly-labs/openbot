@@ -59,6 +59,8 @@ export interface UsageLimitKey {
 interface ProviderFailure extends UsageLimitKey {
   /** Epoch milliseconds when the hold ends. */
   endsAt: number;
+  /** A spent balance that names no reset: no wait gives it back. */
+  spent: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -157,12 +159,18 @@ export class UsageLimitGate {
     return this.#failures.has(limitKey(limit.provider, limit.accountId, limit.model));
   }
 
+  /** Whether the provider error that passes over this provider account and model was a spent balance. */
+  isSpent(limit: UsageLimitKey): boolean {
+    return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === true;
+  }
+
   /**
    * A provider error failed a turn of this agent on `model`, the agent's current model when null.
    * The model is passed over until the hold ends or a turn on it completes. Then the agents that
    * left it go back. `resetDelayMs` is the wait until the reset that the error names, when it names one.
+   * `spent` marks a spent balance that names no reset.
    */
-  failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null): void {
+  failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null, spent = false): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
@@ -179,8 +187,11 @@ export class UsageLimitGate {
       accountId,
       model: turnModel,
       endsAt,
+      // A later error of another kind does not end a spent balance that is still held.
+      spent: spent || previous?.spent === true,
       timer: this.#armFailure(key, endsAt),
     });
+    this.#hooks.emitRuntimeSnapshot();
   }
 
   /** Releases the failure at `endsAt`. A wait longer than `MAX_TIMER_MS` is armed again when it fires. */
@@ -209,6 +220,15 @@ export class UsageLimitGate {
       provider: limit.provider,
       model: limit.model,
       ...(limit.accountId ? { providerAccountId: limit.accountId } : {}),
+    }));
+  }
+
+  /** Each provider account and model that a provider error holds, for the runtime snapshot. */
+  failedModels(): NonNullable<AgentRuntimeSnapshot["failedModels"]> {
+    return [...this.#failures.values()].slice(0, INPUT_LIMITS.agents).map((failure) => ({
+      provider: failure.provider,
+      model: failure.model,
+      ...(failure.accountId ? { providerAccountId: failure.accountId } : {}),
     }));
   }
 
@@ -396,6 +416,7 @@ export class UsageLimitGate {
     if (!failure) return;
     clearTimeout(failure.timer);
     this.#failures.delete(key);
+    this.#hooks.emitRuntimeSnapshot();
     yield* this.#hooks.released({ provider: failure.provider, accountId: failure.accountId, model: failure.model });
   });
 

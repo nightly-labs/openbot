@@ -27,6 +27,14 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Das Fenster {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureRegion":
     "Den Bildschirmbereich bei {x}, {y}, {width} × {height} Punkten aufnehmen und das Bild an das Modell des Agenten senden.",
+  "status.agent.reportProblem":
+    "Daraus wird ein öffentliches GitHub-Issue mit der App-Version und deinem System. Dein Name wird nicht angezeigt.",
+  "status.agent.sendIdea": "Daraus wird ein öffentliches GitHub-Issue. Dein Name wird nicht angezeigt.",
+  "status.agent.feedbackSent": "An das OpenBot-Team gesendet: {title}",
+  "status.agent.serverInstallCommand":
+    "Einen einmaligen Befehl erstellen, der OpenBot auf einem anderen Computer als Server {name} installiert und bei deinem Konto anmeldet. Der Agent führt ihn dort aus.",
+  "status.agent.serverInstallCard": "Installationsbefehl für den Server {name}",
+  "status.agent.feedbackSending": "Dein Feedback wird an das OpenBot-Team gesendet…",
   "status.agent.workflowDelete":
     "Den Workflow {title} mit seinen Ausführungen und Versionen löschen. Seine offenen Schritte werden beendet.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
@@ -58,12 +66,28 @@ export const messages = {
   "status.agent.changesReviewing": "Die vorgenommenen Änderungen werden geprüft…",
   "status.agent.agentCoordinating": "Es wird mit einem anderen Agenten abgestimmt…",
   "status.agent.agentResponseReviewing": "Die Antwort des anderen Agenten wird geprüft…",
+  "status.agent.commandRunningUnnamed": "Befehl wird ausgeführt…",
   "status.agent.toolStepWorking": "Der nächste toolgestützte Schritt wird abgearbeitet…",
+  "status.agent.webSearching": "Suche im Web nach „{query}“…",
+  "status.agent.urlFetching": "{host} wird geöffnet…",
+  "status.agent.fileReading": "{name} wird gelesen…",
+  "status.agent.filesReading": "Dateien werden gelesen…",
+  "status.agent.filesListing": "{path} wird durchgesehen…",
+  "status.agent.filesLooking": "Dateien werden durchgesehen…",
+  "status.agent.textSearching": "Suche nach „{query}“…",
+  "status.agent.filesSearchingText": "Dateien werden durchsucht…",
+  "status.agent.folderSizesMeasuring": "Ordnergrößen werden gemessen…",
+  "status.agent.diskSpaceChecking": "Freier Speicherplatz wird geprüft…",
+  "status.agent.processesChecking": "Laufende Prozesse werden geprüft…",
+  "status.agent.gitChecking": "Git-Repository wird geprüft…",
+  "status.agent.commandRunning": "{program} wird ausgeführt…",
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
   "status.agent.memoryChangesWithConflicts":
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
   "status.agent.nextStepContinues":
     "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
+  "status.agent.compactionContinues":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
 } as const satisfies PartialTranslation<typeof source>;

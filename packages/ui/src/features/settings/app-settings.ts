@@ -6,6 +6,7 @@ import {
   DEFAULT_AGENT_MEMORY_LIMIT,
   DEFAULT_EXTERNAL_LINK_PREFERENCE,
   type ExternalLinkTarget,
+  type QuitGuard,
 } from "@openbot/contracts/ipc";
 /** Which chord sends a message. Re-exported here so settings state can name the same type. */
 import type { SendShortcutMode } from "../conversation/send-shortcut";
@@ -32,6 +33,8 @@ export interface GeneralSettingsValue {
   /** Null where `keepAwake` is null. */
   keepAwakeOnBattery: boolean | null;
   restoreLastWorkspace: boolean;
+  /** Null hides the select: only the Mac desktop app guards `Cmd + Q`. */
+  quitGuard: QuitGuard | null;
   externalLinkTarget: ExternalLinkTarget;
   desktopNotifications: boolean;
   /** Notifications show the start of the agent's reply, question or command. */
@@ -52,6 +55,8 @@ export interface GeneralSettingsValue {
   sendShortcut: SendShortcutMode;
   /** The steps of an agent's turn (thinking, progress, memory changes) are open at first. */
   showAgentSteps: boolean;
+  /** A message shows React, Reply and More beside it, and the agent chat shows the time between messages. */
+  compactMessageActions: boolean;
   /** What a message sent to a busy agent does, unless the agent or the message sets its own. */
   busyMessageMode: BusyMessageMode;
   /** What an agent of this computer does when it has no value of its own for the setting. */
@@ -77,6 +82,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   keepAwake: null,
   keepAwakeOnBattery: null,
   restoreLastWorkspace: true,
+  quitGuard: null,
   externalLinkTarget: DEFAULT_EXTERNAL_LINK_PREFERENCE.target,
   desktopNotifications: true,
   notificationPreview: true,
@@ -91,6 +97,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   taskSound: "classic",
   sendShortcut: "enter",
   showAgentSteps: false,
+  compactMessageActions: true,
   busyMessageMode: "queue",
   agentDefaults: DEFAULT_AGENT_DEFAULTS,
   agentMemoryLimit: DEFAULT_AGENT_MEMORY_LIMIT,

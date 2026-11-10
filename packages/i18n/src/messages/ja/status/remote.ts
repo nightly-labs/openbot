@@ -32,4 +32,6 @@ export const messages = {
   "status.remote.attemptFailed": { other: "接続の試行に失敗しました。{count} 秒後に再試行します。" },
   "status.remote.reconnectingDetail": { other: "再接続しています {attempt}/{count}\n{detail}" },
   "status.remote.reconnecting": { other: "再接続しています {attempt}/{count}" },
+  "status.remote.messageCut":
+    "[このメッセージのうち {size} MB はこのデバイスに表示されません。全文を読むには、サーバーを実行しているコンピューターで開いてください。]",
 } as const satisfies PartialTranslation<typeof source>;

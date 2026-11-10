@@ -64,9 +64,14 @@ const Navigation = createSimpleContext({
       nonce: number;
     } | null>(null);
 
-    /** False when the chat opens in another window. */
-    function selectAgent(agentId: string): boolean {
+    /**
+     * False when the chat opens in another window. With `tabId`, the agent opens at that thread tab, not
+     * at the tab it showed last: a link from a message opens a conversation of that message.
+     */
+    function selectAgent(agentId: string, tabId?: string): boolean {
       if (agentSetupOpen() && creatingAgent()) return false;
+      // The tab is written first, so a chat window that opens for the agent reads it.
+      if (tabId !== undefined) agentThreads.open(agentId, tabId);
       // A chat window shows its one chat, and main marks that chat in the sidebar. Another agent
       // opens in its own chat window, from search, a schedule or the Dynamic Island.
       const chatWindow = platform.chatWindow;

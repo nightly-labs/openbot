@@ -75,6 +75,23 @@
   }
 }
 
+/* The leading icon of a section is muted at rest, as in menus and on the page rail. It takes the primary text
+ * color with the label on hover, on keyboard focus and on the open section. The line does not change. Other
+ * icons in the row, such as the warning of a marketplace app, keep their own colors. */
+.settings-modal-nav-item > svg:first-child {
+  color: var(--openbot-text-muted);
+}
+
+.settings-modal-nav-item:is([aria-current], [data-selected], :focus-visible) > svg:first-child {
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-modal-nav-item:hover > svg:first-child {
+    color: var(--openbot-text-primary);
+  }
+}
+
 .settings-modal-main {
   position: relative;
   min-width: 0;
@@ -328,7 +345,7 @@
 
 .settings-modal :where(.ui-button-variant-default) {
   background: var(--openbot-accent);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-accent);
 }
 
 .settings-modal :where(.ui-button-variant-outline, .ui-button-variant-secondary) {
@@ -337,7 +354,7 @@
 
 .settings-modal :where(.ui-button-variant-destructive) {
   background: var(--openbot-danger);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-accent);
 }
 
 .settings-modal .ui-switch[data-checked] {
@@ -345,7 +362,7 @@
 }
 
 .settings-modal .ui-switch-thumb[data-checked] {
-  background: var(--openbot-text-primary);
+  background: var(--openbot-text-on-accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -355,7 +372,7 @@
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
     background: var(--openbot-danger-hover);
-    color: var(--openbot-text-primary);
+    color: var(--openbot-text-on-accent);
   }
 }
 

@@ -26,7 +26,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 | CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
 | Deep link | Slack, Discord (`openbot://slack-workspace`, `openbot://discord-guild`), MCP fallback (`openbot://mcp-auth`) | A hosted page ends in an `openbot://` link, which reaches only the computer that opened it. | Slack and Discord: `connectors-v1`. The client sends the sealed grant on to the host that started the install. The browser client gets the grant from a return page of its own origin (`web-messaging-install.ts`). |
 | Terminal | Pi | OpenBot opens the CLI in a terminal on the host ([`provider-terminal-login.ts`](../../src/backend/provider-terminal-login.ts)). | Sign in on the host. |
-| Key or local session | API keys, 1Password, Bitwarden | The user types a key or gives a CLI session. | Keys go to the host over the encrypted channel. Vault approval stays on the host. A Bitwarden session key works only on the computer that made it; a joined server gets an API key and the master password. |
+| Key or local session | API keys, 1Password, Bitwarden, Proton Pass | The user types a key or gives a CLI session. Proton Pass also signs in on Proton's web page. | Keys go to the host over the encrypted channel. Vault approval stays on the host. A Bitwarden session key works only on the computer that made it; a joined server gets an API key and the master password. Proton Pass: `password-managers-v1`; the client opens the host's sign-in page. |
 
 The sign-in kinds of providers are in `ProviderSignIn` and `ProviderCodeSignIn` in
 [`provider-drivers.ts`](../../src/backend/provider-drivers.ts). The kinds of applications are the
@@ -80,6 +80,37 @@ message tags the account with `@<row name>`.
 | Joined server | The client offers Add account only when the host sends `mcp-accounts-v1`. An older host keys sign-ins by the address without the fragment, so two accounts would share one sign-in. |
 
 Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
+
+### Members and the MCP servers of a joined server
+
+A host with `mcp-member-access-v1` lets a member, not only an owner or admin, use the routes of
+`mcp-servers-v1`, `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`.
+The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api/mcp-member-access.ts).
+
+| Part | Rule |
+| --- | --- |
+| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer, and `canManageMcpServers` what the phone offers. |
+| Read and add | A member reads the whole list, with its `env` and header values, tests a server, and adds a server, a stdio command too. |
+| Change | A member changes, turns on or off, or removes only a server that the member added. Any other row gets 403 `error.team.mcpServerNotYours`. Owners and admins change every row. |
+| Owners | `McpServerOwnersStore` keeps the member ID of each row that a joined server added, in `openbot-mcp-server-owners-v1.json`. A row with no entry, such as one added on the host, counts as an admin's. A damaged file reads as empty. |
+| Sign-in | A sign-in belongs to an address (`mcpOAuthAccountKey`), not to a row. A member starts, cancels or signs out a sign-in, or changes a sign-in app, only when each row on that address is the member's. Each server keeps one sign-in, which every agent of the host uses. |
+| Providers | Provider sign-ins, account starts and agent links on the relay stay with owners and admins. |
+
+Run `bun run test:mcp-member-access` to check these rules on a real host.
+
+### How many MCP servers a host keeps
+
+A computer keeps up to 100 MCP servers (`INPUT_LIMITS.mcpServers`). Disabled rows count too. The
+released codecs of `mcp-servers-v1` and `mcp-sign-in-v1` read at most 32 rows in one list, and they
+are frozen. The protocol 9 capability `mcp-many-servers-v1`
+([`mcp-many-servers-v1.ts`](../../packages/contracts/src/team-protocol/mcp-many-servers-v1.ts)) lets a
+list hold 100 rows when both peers send it. The rows and the requests keep their frozen shapes.
+
+| Peer | Rule |
+| --- | --- |
+| Client with the capability | Reads lists of up to 100 rows. |
+| Client without it | Works while the host has 32 rows or fewer. When a route would answer with more, or a save would add the 33rd row, the host refuses it with 409 `error.team.mcpServerListNeedsUpdate` before it changes anything (`requireMcpListFits` in [`route-mcp.ts`](../../src/main/team-api/route-mcp.ts)). |
+| Transfer file | An export can hold up to 100 rows. An app before this change refuses the Settings section of a file with more than 32. |
 
 ### How an agent reaches a signed-in MCP server
 
@@ -197,17 +228,19 @@ capability answers that the sign-in must be done on the host.
 
 ### Rules
 
-- Only an owner or admin can use a relay route. `requireAdmin` runs on every route.
+- Only an owner or admin can use a relay route. `requireAdmin` runs on every route. With
+  `mcp-member-access-v1`, a member also uses `mcp/start`, `status`, `complete` and `cancel`, under
+  the rules of [Members and the MCP servers of a joined server](#members-and-the-mcp-servers-of-a-joined-server).
 - `flowId` is 128 random bits. A flow completes once, only for the member who started it, and
   ends after `SIGN_IN_RELAY_TTL_MS` (10 minutes). An unknown flow, an expired flow and the flow of
   another member get the same `404`.
 - The client sends only the query of the callback. The host checks `state` against the page address
   that its own sign-in made. A client can never choose a host port, host name or path.
 - The host names a callback only for `http:` on `127.0.0.1`, `localhost` or `[::1]`, with a port.
-- The host chooses the page, so a host that is not honest could ask for a grant of another account
-  in the user's browser. The client therefore:
-  - opens only an `https:` page, and only when the user clicks "Open sign-in page" in the dialog
-    that shows the page's host name;
+- The host chooses the page. The client therefore:
+  - opens only an `https:` page. The desktop app opens it as soon as the sign-in waits, and the
+    dialog shows the page's host name, with "Open sign-in page" to open it again. The browser client
+    opens it only on that click, because a browser blocks a page that no click opened;
   - reads the callback port and path from the page's `redirect_uri`, not from the host's `callback`;
   - refuses a page with no `state`, so its listener hands on only the callback of this sign-in.
 - The client listener refuses a request whose `Host` header is not a loopback name, a method that
@@ -234,7 +267,7 @@ capability answers that the sign-in must be done on the host.
 
 - [ ] The host builds the full callback address from its own record. The client sends only a query.
 - [ ] The host checks `state` before it delivers. The client refuses a page with no `state`.
-- [ ] Nothing opens the page before the user sees its host name and asks.
+- [ ] The client opens only an `https:` page, and the dialog shows its host name.
 - [ ] One flow completes once, for one member, before its deadline.
 - [ ] The code is registered with `registerSecretValue` and never logged.
 - [ ] The route uses `requireAdmin`, and its codec is in an optional capability (not in bootstrap).
@@ -326,7 +359,8 @@ is one folder per plugin in [`marketplace/plugin-catalog/`](../../marketplace/pl
    names how the user connects:
    - `link`: a browser sign-in. OpenBot is the OAuth client (`McpOAuth` in
      [`mcp-oauth-provider.ts`](../../src/backend/mcp-oauth-provider.ts)): discovery, dynamic
-     registration, PKCE and refresh. The tokens stay in encrypted storage. No bridge program.
+     registration or a client metadata document, PKCE and refresh. The tokens stay in encrypted
+     storage. No bridge program.
    - `key`: one or two fields that go into a `header` (http) or an `env` value (stdio).
    - `local`: steps that the user does on the computer that runs the server.
 
@@ -357,11 +391,20 @@ only when the smoke passes for it:
 | `auth` | The server must |
 | --- | --- |
 | None | Answer `initialize` with no credential. |
-| `link` | Refuse `initialize` with a 401 and a `Bearer` challenge. Publish protected-resource metadata that names an authorization server. That server's metadata lists a `registration_endpoint`, `S256` in `code_challenge_methods_supported` and the `code` response type. Its endpoints use https and public addresses. |
+| `link` | Refuse `initialize` with a 401 and a `Bearer` challenge. Publish protected-resource metadata that names an authorization server. That server's metadata lists a `registration_endpoint` or sets `client_id_metadata_document_supported`, and lists `S256` in `code_challenge_methods_supported` and the `code` response type. Its endpoints use https and public addresses. |
 
-A `link` server with no `registration_endpoint` fails: each user would have to register a sign-in app
-first. Use a `key` flow for it, or leave it out. The smoke reads metadata only. It never registers a
-client and never sends a credential.
+A `link` server with neither fails: each user would have to register a sign-in app first. Use a `key`
+flow for it, or leave it out. The smoke reads metadata only. It never registers a client and never
+sends a credential.
+
+A server with no `registration_endpoint` that sets `client_id_metadata_document_supported` gets
+OpenBot's client metadata document (CIMD, SEP-991) as the `client_id`:
+`https://openbot.run/oauth/mcp-client.json`, which `apps/auth-api` serves
+([`mcp-client[.]json.ts`](../../apps/auth-api/src/routes/oauth/mcp-client%5B.%5Djson.ts)). Its
+`redirect_uris` holds only `http://127.0.0.1:28417/mcp-auth`: ElevenLabs refuses a document that
+also lists a custom scheme such as `openbot://mcp-auth` (#5748). A server that
+offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
+loopback address has another port, and a server that compares ports refuses it.
 
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the
@@ -407,6 +450,7 @@ state on each of them.
 | Telegram | `src/backend/messaging/telegram/` | A one-use link code in a `t.me` link. No OAuth | `telegram-app.ts`, `ipc-messaging.ts` |
 | 1Password | [`onepassword-connector-service.ts`](../../src/main/onepassword-connector-service.ts) | The user's `op` session creates a read-only service account, or the user pastes a token | `ipc-onepassword-connector.ts`; joined server: `onepassword-connector-v1` (token only) |
 | Bitwarden | [`bitwarden-connector-service.ts`](../../src/main/bitwarden-connector-service.ts) | A `bw` session key, kept in memory only; a joined server signs in with an API key and the master password | `ipc-bitwarden-connector.ts`; joined server: `bitwarden-connector-v1` |
+| Proton Pass | [`proton-pass-driver.ts`](../../src/main/password-managers/proton-pass-driver.ts) | A web sign-in in a temporary `pass-cli` session makes an agent access key, or the user pastes one | `ipc-password-managers.ts`; joined server: `password-managers-v1` |
 
 To add a connector:
 
@@ -481,6 +525,13 @@ client uses the same WhatsApp page through `hostWhatsAppPort`
 ([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
 carries a stored key; the QR code text holds the one-use secret of its link.
 
+The phone uses the same routes in Marketplace › Apps › WhatsApp
+(`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
+pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The
+link page reads `linkState` every second while it waits, and cancels the link when the person leaves
+the page before `linked`. The phone adds the WhatsApp Orchestrator with no model choice, so the host
+uses its default provider and model. A host older than this capability shows no WhatsApp row.
+
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),
 host route [`route-onepassword-connector.ts`](../../src/main/team-api/route-onepassword-connector.ts))
@@ -505,11 +556,47 @@ restart. The host must reach the server address over HTTPS; the instance firewal
 [several instances on one host](../docker.md#several-instances-on-one-host) blocks private
 addresses. A host older than this capability hides Bitwarden.
 
-The phone uses the same routes in Server settings › Connectors › Bitwarden
+The phone uses the same routes in Marketplace › Apps › Bitwarden
 (`apps/mobile/src/features/servers/components/bitwarden-connector-page.tsx`). It reads `status`
 every 3 seconds while the page shows, as for the other connectors, and keeps no copy of the API key
 or the master password. For a host older than this capability, the phone shows Bitwarden as
 "Desktop app only", with no action.
+
+### Password managers on a joined server
+
+The password-manager engine
+([`password-managers-service.ts`](../../src/main/password-managers/password-managers-service.ts))
+keeps one driver for each manager
+([`driver.ts`](../../src/main/password-managers/driver.ts)). A driver owns the sign-in, the stored
+access, the CLI and the logins of its manager. The engine owns the list, the checks that every
+manager shares, and the login sources of `password-vault-router.ts`. Proton Pass is its only
+driver: 1Password and Bitwarden keep their own services, panels and capabilities, and the router
+reads their logins directly. A new manager needs a driver, an id in `PASSWORD_MANAGER_IDS` and a
+Marketplace descriptor; no new IPC group or route.
+
+The optional capability `password-managers-v1`
+([`password-managers-v1.ts`](../../packages/contracts/src/team-protocol/password-managers-v1.ts),
+host route [`route-password-managers.ts`](../../src/main/team-api/route-password-managers.ts),
+protocol 9) carries `list`, `connect`, `cancel` and `disconnect` for every manager of the host. All
+routes are for an owner or admin. An access key or an extra password goes to the host once, in
+`connect`; no answer carries it. The host refuses a manager that it does not know and a method that
+the manager's status does not list.
+
+Proton Pass has two methods. With `browser`, the host runs `pass-cli login` in a temporary session
+and reports Proton's sign-in page in `signInUrl`. The client opens that page on its own computer
+only when it is an `https:` page on `account.proton.me`
+([`password-managers-handlers.ts`](../../src/main/ipc/password-managers-handlers.ts)); the renderer
+never names a URL. When the account has an extra password, the status step is `extra-password`, and
+the client sends it with `connect`. The CLI reads it from a FIFO (a named pipe on Windows), never
+from an argument or a file on disk. The host then finds or makes the vault `Shared with OpenBot`,
+makes an agent access key that reads only that vault and ends after one year, and signs the
+temporary session out. With `key`, the user pastes an agent access key that they made. The host
+keeps only the access key, in `openbot-protonpass-connector-v1.json`, and the CLI session in
+`<userData>/provider-state/protonpass-host`. It installs the `pass-cli` release that
+[`proton-pass-cli-installer.ts`](../../src/main/password-managers/proton-pass-cli-installer.ts)
+pins, with a SHA-256 per target, into `<userData>/provider-state/protonpass-cli`. Disconnect removes
+the record and the session; the agent access key stays on the Proton account until it ends or the
+user removes it there.
 
 ## Add a Team API capability
 
@@ -568,7 +655,7 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 | --- | --- |
 | A sign-in that returns to a public `https:` address of the provider | The provider finishes it by itself. The host only waits. Nothing comes back to a loopback port. |
 | A sign-in that opens an app on the host, such as Pi, which opens Terminal | The step happens on the host's screen. There is no page address to open somewhere else. |
-| A vault that approves in its desktop app, such as 1Password or Bitwarden | The approval is in the vault app on the host. A relay cannot approve for it. 1Password on a joined server uses a service account token (`onepassword-connector-v1`); Bitwarden uses an API key and the master password (`bitwarden-connector-v1`). |
+| A vault that approves in its desktop app, such as 1Password or Bitwarden | The approval is in the vault app on the host. A relay cannot approve for it. 1Password on a joined server uses a service account token (`onepassword-connector-v1`); Bitwarden uses an API key and the master password (`bitwarden-connector-v1`). Proton Pass signs in on the host and the client opens Proton's page (`password-managers-v1`). |
 | The Slack development return address (`returnUrl`) | Development builds only. It returns to `http://127.0.0.1:<port>/...` on the host, and the relay does not carry it. Use the hosted install. |
 | An agent link for a member who is not an admin | The relay routes are admin only. The link opens as it is, and its callback cannot reach the host. |
 | An agent link in a command, tool output or commentary | The host relays only a link that the text of an agent message holds. |

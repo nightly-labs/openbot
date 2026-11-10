@@ -1,11 +1,13 @@
 import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
+import Bell from "lucide-react-native/icons/bell";
 import { useState } from "react";
 import { Alert } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { NOTIFICATION_LEVEL_KEYS } from "@/features/push-notifications/components/server-notification-settings";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { effectiveServerLevel, useSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { serverNotificationSetting, usePushNotificationPreference } from "@/features/settings/model/push-notifications";
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
@@ -35,6 +37,7 @@ export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
           : t("mobile.agent.notificationLevel.serverValue", { level: t(NOTIFICATION_LEVEL_KEYS[serverLevel]) });
   return (
     <SettingsRow
+      leading={<RowIcon icon={Bell} />}
       supportingText={value}
       onPress={() =>
         // The agent sheet shows Settings > Notifications in its own stack, not as a second sheet.

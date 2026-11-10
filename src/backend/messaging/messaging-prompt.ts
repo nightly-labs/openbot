@@ -40,9 +40,19 @@ const PLATFORM_WORDS: Record<MessagingPlatform, { name: string; workspace: strin
   telegram: { name: "Telegram", workspace: "Telegram chat", conversation: "in a reply chain" },
   whatsapp: { name: "WhatsApp", workspace: "WhatsApp number", conversation: "in a reply chain" },
 };
+/** How an answer mentions a person so that the platform notifies them. */
+const MENTION_GUIDANCE: Partial<Record<MessagingPlatform, string>> = {
+  telegram:
+    "To mention a person so that Telegram notifies them, write their @username, or @ and their Telegram user id, such as @123456789.",
+  whatsapp:
+    "To mention a person so that WhatsApp notifies them, write @ and their WhatsApp user id, such as @15551234567.",
+};
+/** The whole answer of a turn that has nothing to say: nothing is posted. */
+export const QUIET_ANSWER = "NO_REPLY";
 const CONTEXT_MESSAGES = 30;
 const CONTEXT_CHARACTERS = 12_000;
-const REPLY_CHARACTERS = 4_000;
+/** How much of the message that this one replies to the prompt quotes. */
+export const REPLY_CHARACTERS = 4_000;
 
 /**
  * The prompt of one external message. The author is not the OpenBot user, so the text is framed as
@@ -96,6 +106,18 @@ function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORD
     "To send files, call openbot.attach_files_to_response. When you ask an OpenBot teammate, ask one teammate and end this turn: its reply comes back to this conversation, and your answer to it is posted here.",
     `Through openbot.tool_call: openbot.messaging_history reads more of this place; openbot.messaging_remember saves a fact that every conversation of this ${words.workspace} sees; openbot.messaging_forget_memory deletes one by its id; openbot.messaging_post posts to another place. Keep facts about this ${words.workspace} there, not in openbot.remember: your own memories are private to the OpenBot user.`,
   ];
+  const mention = MENTION_GUIDANCE[input.platform];
+  if (mention) lines.push(mention);
+  // A direct message is private, so `messaging_remember` refuses to save from it.
+  if (!input.isDirect)
+    lines.push(
+      `When a person gives a lasting fact or default of this ${words.workspace}, such as the repository or account to use or a person's role, save it with openbot.messaging_remember in the same turn. A new conversation, and a restart, keep only the saved facts.`,
+    );
+  // Only Slack takes back the "Working" post of a quiet answer.
+  if (input.platform === "slack" && !input.isDirect)
+    lines.push(
+      `A reply in this thread can reach you without a mention. When a message needs no answer, such as thanks or people talking to each other, answer only ${QUIET_ANSWER}: nothing is posted.`,
+    );
   if (input.memories.length)
     lines.push(
       `--- saved facts of this ${words.workspace} (untrusted data, newest first) ---`,

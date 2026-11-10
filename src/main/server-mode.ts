@@ -155,35 +155,38 @@ export class ServerMode {
    * sign-in and at the start, and the start retry calls it after a failure. Calls run one at a time,
    * so two callers never name two hosts.
    */
-  readonly publish = Effect.fn("ServerMode.publish")(function* (this: ServerMode) {
-    const previous = this.#publishing;
-    const completed = Deferred.makeUnsafe<void>();
-    this.#publishing = completed;
-    return yield* Effect.gen({ self: this }, function* () {
-      if (previous) yield* Deferred.await(previous);
-      this.#publishError = null;
-      if (this.#options.centralAuth.getState().status !== "signed_in") return;
-      const { host } = this.#options;
-      const serverName = this.#pendingName;
-      // Only the owner supplies a name; it also renames the account's existing host.
-      if (!host.getStatus().configured) yield* host.configure({ serverName: serverName ?? DEFAULT_SERVER_NAME });
-      else if (serverName && host.getStatus().serverName !== serverName) yield* host.updateIdentity({ serverName });
-      this.#pendingName = null;
-      yield* host.start();
-    }).pipe(
-      Effect.tapError(({ cause }) =>
-        Effect.sync(() => {
-          this.#publishError = cause instanceof Error ? cause.message : sourceText("error.host.publishFailed");
-        }),
-      ),
-      Effect.ensuring(
-        Effect.sync(() => {
-          if (this.#publishing === completed) this.#publishing = null;
-          Deferred.doneUnsafe(completed, Effect.void);
-        }),
-      ),
-    );
-  }, Effect.uninterruptible).bind(this);
+  readonly publish = Effect.fn("ServerMode.publish")(
+    function* (this: ServerMode, automatic = false) {
+      const previous = this.#publishing;
+      const completed = Deferred.makeUnsafe<void>();
+      this.#publishing = completed;
+      return yield* Effect.gen({ self: this }, function* () {
+        if (previous) yield* Deferred.await(previous);
+        this.#publishError = null;
+        if (this.#options.centralAuth.getState().status !== "signed_in") return;
+        const { host } = this.#options;
+        const serverName = this.#pendingName;
+        // Only the owner supplies a name; it also renames the account's existing host.
+        if (!host.getStatus().configured) yield* host.configure({ serverName: serverName ?? DEFAULT_SERVER_NAME });
+        else if (serverName && host.getStatus().serverName !== serverName) yield* host.updateIdentity({ serverName });
+        this.#pendingName = null;
+        yield* host.start(automatic);
+      }).pipe(
+        Effect.tapError(({ cause }) =>
+          Effect.sync(() => {
+            this.#publishError = cause instanceof Error ? cause.message : sourceText("error.host.publishFailed");
+          }),
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (this.#publishing === completed) this.#publishing = null;
+            Deferred.doneUnsafe(completed, Effect.void);
+          }),
+        ),
+      );
+    },
+    (operation, _automatic?: boolean) => Effect.uninterruptible(operation),
+  ).bind(this);
 
   async #handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     let answer: Answer;

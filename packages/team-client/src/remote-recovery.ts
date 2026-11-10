@@ -179,9 +179,14 @@ export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: st
     : sourceText("status.remote.reconnecting", { attempt: status.attempt, count: REMOTE_RETRY_LIMIT });
 }
 
-/** One recovery attempt at a time. Background time never starts network work. */
+/**
+ * One recovery attempt at a time. Background time never starts network work. `connect` gets `check`
+ * on the first attempt after a return to the app while the connection was online: the consumer can
+ * check the connection that it kept instead of loading everything again. A refresh, a lost
+ * connection and a failed check load everything.
+ */
 export function createRemoteConnectionRecovery(
-  connect: () => Promise<void>,
+  connect: (check: boolean) => Promise<void>,
   onError: (error: unknown) => void,
   onStatus: (status: RemoteRecoveryStatus) => void = () => {},
   /** The wait while the host starts, such as a hosted server after a wake. It replaces the backoff. */
@@ -197,6 +202,8 @@ export function createRemoteConnectionRecovery(
   let interrupted = false;
   /** The running attempt checks a connection that was online, such as on a return to the app. */
   let checking = false;
+  /** The next attempt is the first after a return to the app with an online connection. */
+  let checkOnReturn = false;
   let attempt = 0;
   let retryAt: number | null = null;
   /** Chosen when an attempt starts, so its status can show the wait that follows a failure. */
@@ -258,6 +265,8 @@ export function createRemoteConnectionRecovery(
     running = true;
     const checkingConnection = online;
     checking = checkingConnection;
+    const check = checkOnReturn && checkingConnection;
+    checkOnReturn = false;
     retryRequested = false;
     refreshRequested = false;
     interrupted = false;
@@ -267,7 +276,7 @@ export function createRemoteConnectionRecovery(
     // until the transport reports a failure or the read fails.
     if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: Math.ceil(retryDelay / 1000) });
     yield* Effect.gen(function* () {
-      const result = yield* recoveryCall(connect).pipe(Effect.result);
+      const result = yield* recoveryCall(() => connect(check)).pipe(Effect.result);
       if (Result.isFailure(result)) {
         const error = result.failure;
         if (error instanceof Error && error.message === sourceText("error.remote.appInBackground")) {
@@ -332,12 +341,16 @@ export function createRemoteConnectionRecovery(
         suspended = false;
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
-        else startRun();
+        else {
+          checkOnReturn = online;
+          startRun();
+        }
       }
     },
     offline(error?: unknown) {
       if (disposed) return;
       online = false;
+      checkOnReturn = false;
       if (error !== undefined) onError(error);
       retryRequested = true;
       // Losing a connection is not a failed reconnection attempt. Neither is losing the connection that
@@ -379,6 +392,7 @@ export function createRemoteConnectionRecovery(
     },
     refresh() {
       if (disposed) return;
+      checkOnReturn = false;
       suspended = false;
       retryAt = null;
       attempt = 0;

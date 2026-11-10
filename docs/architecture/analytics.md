@@ -126,6 +126,14 @@ decode; the phase is any string in the file and the event drops a value outside 
 child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
 trace.
 
+At each sample, `ResourceMonitor` reads the heaps of the app window renderers from main through
+`webContents.debugger`: it attaches, sends `Runtime.getHeapUsage` and `Memory.getDOMCounters`, and
+detaches, with a 2 s deadline for each renderer process. The page runs no script for this, and
+`performance.memory` is not used because Blink rounds it and caches it for minutes. A renderer can
+answer with any number, so a schema with bounds decodes the answer. A window that is loading, has
+another debugger session or does not answer gives the sample no heap figures, because a part of the
+sum would be too low. The renderer needs no channel or preload change.
+
 App windows (`src/renderer/src/renderer-timing.ts`) count long tasks and input delays with
 `PerformanceObserver` and send the counts at most once a minute over `app:report-renderer-timing`.
 The main handler decodes bounded counts only; `ResourceMonitor` buffers them and adds them to the day
@@ -135,6 +143,15 @@ at the next sample. The same channel carries the main window's `workspaceReady` 
 `startup-history.json` to tell a cold start from a warm one. Turn timing comes from the drain
 scheduler and `TurnLifecycle`, which keep the queue pick, the provider start and the first output of
 each turn until `HostAnalytics` takes them at `turn-completed`.
+
+`RemoteConnectTrace` (`src/main/remote-connect-trace.ts`) times each connection to a remote host for
+the trace file and gives `HostAnalytics` one summary, sent as `system_remote_connect`: when an attempt
+makes its first request, and for the first failed attempt after a connection or a cancel. Later
+failures are counted in the next connection. An attempt is keyed by the id that `begin` returns, so
+an old attempt that ends late does not change a newer one. The host id stays in memory and is never
+sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
+the hosted start itself: `start_requested_at` on `hosted_servers` holds the request time, and the
+first observation of a usable sandbox clears it and sends the `ready` action once.
 
 ## Agent usage analytics
 

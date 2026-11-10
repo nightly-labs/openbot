@@ -58,10 +58,13 @@ export const messages = {
   "error.team.providersUnsupported": "Это подключение не поддерживает настройки провайдеров.",
   "error.team.providerNotManaged": "OpenBot не управляет CLI этого провайдера.",
   "error.team.channelsUnsupported": "Это подключение не поддерживает чаты каналов.",
+  "error.team.channelContextUnsupported": "Это подключение не поддерживает новый разговор и сжатие в канале.",
   "error.team.channelPictureUnsupported": "Это подключение не поддерживает изображения каналов.",
   "error.team.channelDeleteUnsupported": "Это подключение не поддерживает удаление каналов.",
+  "error.team.historyDeleteUnsupported": "Это подключение не поддерживает удаление истории.",
   "error.team.channelTaskCancelUnsupported": "Это подключение не поддерживает отмену задач каналов.",
   "error.team.membersCannotDeleteChannels": "Участники не могут удалять каналы.",
+  "error.team.membersCannotDeleteChannelHistory": "Участники не могут удалять историю канала.",
   "error.team.membersCannotArchiveChannels": "Участники не могут архивировать каналы.",
   "error.team.membersCannotRestoreChannels": "Участники не могут восстанавливать каналы.",
   "error.team.sharedDataUnsupported": "Это подключение не поддерживает общие данные.",
@@ -69,6 +72,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Это подключение не поддерживает скрытие агентов.",
   "error.team.agentColorsUnsupported": "Это подключение не поддерживает цвета агентов.",
   "error.team.chatColorsUnsupported": "Это подключение не поддерживает цвета чата.",
+  "error.team.routineRunPlaceUnsupported": "Это подключение не может изменить, где выполняется регулярная задача.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
@@ -83,6 +87,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Это подключение не поддерживает показ папок.",
   "error.team.conversationFileSearchUnsupported": "Это подключение не поддерживает поиск файлов.",
   "error.team.sideQuestionUnsupported": "Это подключение не поддерживает побочные вопросы.",
+  "error.team.liveVoiceUnsupported":
+    "Этот сервер не поддерживает живой голос Codex. Обновите OpenBot на компьютере, где он работает.",
   "error.team.routineFlowsUnsupported":
     "Этот сервер не поддерживает цепочки регулярных задач. Обновите OpenBot на компьютере, где он работает.",
   "error.team.routineCanvasTooLarge":
@@ -106,6 +112,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
+  "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
@@ -116,6 +123,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "Просмотр браузера в реальном времени недоступен.",
   "error.team.browserSessionNotFound": "Сессия вида браузера не найдена.",
   "error.team.mcpUnsupported": "Это подключение не поддерживает серверы MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} серверов MCP.",
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.machineResourcesUnsupported": "Это подключение не поддерживает данные о машине.",
   "error.team.machineAlertMemberInvalid":
@@ -141,6 +150,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Этот клиент не поддерживает безопасную аутентификацию.",
   "error.team.agentSettingsUnsupported": "Это подключение не поддерживает настройки агентов.",
   "error.team.adminRequired": "Требуется доступ администратора.",
+  "error.team.mcpServerNotYours": "Изменить этот MCP-сервер может только тот, кто его добавил, или администратор.",
   "error.team.ownerRequired": "Это может сделать только владелец сервера.",
   "error.team.requestTooLarge": "Тело запроса слишком большое.",
   "error.team.signInRelayUnsupported": "Этот сервер не может передавать входы. Обновите OpenBot на хосте.",
@@ -151,4 +161,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Этот вход уже отправлен.",
   "error.team.signInRelayMismatch": "Этот адрес не относится к этому входу.",
   "error.team.signInRelayLinkUnknown": "Ни один агент на этом сервере не показывал эту ссылку для входа.",
+  "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -7,6 +7,7 @@
 
 import { AGENT_PROVIDERS, type AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import type { AgentReasoningEffort } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -64,6 +65,73 @@ export interface CustomProviderModel {
    * OpenCode entry writes no limit without a window. This computer only, like `contextWindow`.
    */
   maxOutput?: number;
+  /**
+   * The reasoning efforts that the endpoint accepts for this model, in `CUSTOM_PROVIDER_REASONING_EFFORTS`
+   * order, never empty (#4154). Absent: OpenCode offers its own Low, Medium and High, and Pi offers no
+   * effort. This computer only, like `contextWindow`.
+   */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
+  /**
+   * The input kinds that the model accepts in addition to text, in `CUSTOM_PROVIDER_INPUT_KINDS`
+   * order (#4154). Empty: text only. Absent: the harness's own default, `CUSTOM_PROVIDER_DEFAULT_INPUTS`.
+   * Pi takes images only, so it ignores `pdf`. This computer only, like `contextWindow`.
+   */
+  inputs?: CustomProviderInputKind[];
+}
+
+/** The input kinds that a custom model can declare: the `modalities.input` values of OpenCode beside text. */
+export const CUSTOM_PROVIDER_INPUT_KINDS = ["image", "pdf"] as const;
+export type CustomProviderInputKind = (typeof CUSTOM_PROVIDER_INPUT_KINDS)[number];
+
+/** The input kinds that each harness can send to a model. Pi's model `input` is `("text" | "image")[]`. */
+export const CUSTOM_PROVIDER_HARNESS_INPUT_KINDS: Readonly<
+  Record<CustomProviderHarness, readonly CustomProviderInputKind[]>
+> = { opencode: CUSTOM_PROVIDER_INPUT_KINDS, pi: ["image"] };
+
+/**
+ * What a model with no saved `inputs` accepts beside text. OpenCode 2.2.5 gives a configured model
+ * text and image input (`Capabilities.default` in `packages/schema/src/model.ts`); OpenBot gives a Pi
+ * model text only.
+ */
+export const CUSTOM_PROVIDER_DEFAULT_INPUTS: Readonly<
+  Record<CustomProviderHarness, readonly CustomProviderInputKind[]>
+> = { opencode: ["image"], pi: [] };
+
+/** A list of input kinds, maybe empty, each one time, in `CUSTOM_PROVIDER_INPUT_KINDS` order. */
+export function isCustomProviderInputs(value: unknown): value is CustomProviderInputKind[] {
+  return (Array.isArray(value) && value.length === 0) || isOrderedSubset(CUSTOM_PROVIDER_INPUT_KINDS, value);
+}
+
+/**
+ * The efforts that a custom model can declare: the `reasoning_effort` values of OpenAI-compatible
+ * endpoints, and Pi's thinking levels, with `none` for Pi's `off`.
+ */
+export const CUSTOM_PROVIDER_REASONING_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const satisfies readonly AgentReasoningEffort[];
+export type CustomProviderReasoningEffort = (typeof CUSTOM_PROVIDER_REASONING_EFFORTS)[number];
+
+/** A non-empty list of efforts, each one time, in `CUSTOM_PROVIDER_REASONING_EFFORTS` order. */
+export function isCustomProviderReasoningEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
+  return isOrderedSubset(CUSTOM_PROVIDER_REASONING_EFFORTS, value);
+}
+
+/** A non-empty list of known values, each one time, in the order of `known`. */
+function isOrderedSubset(known: readonly unknown[], value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  let previous = -1;
+  for (const item of value) {
+    const index = known.indexOf(item);
+    if (index <= previous) return false;
+    previous = index;
+  }
+  return true;
 }
 
 /** A context window that OpenCode can use for a model. */
@@ -116,8 +184,8 @@ export interface SaveCustomProviderInput {
 }
 
 /**
- * Renderer to main, on this computer only: the Team API has no edit route. The id names a saved
- * endpoint and does not change. A field that is absent keeps its stored value, so the form can send
+ * Renderer to main, for this computer or for a joined server's host with `custom-provider-edit-v1`.
+ * The id names a saved endpoint and does not change. A field that is absent keeps its stored value, so the form can send
  * a blank key without discarding the key that the user does not type again. `headers` replaces the
  * saved list: a header with a `null` value keeps its saved value, and a saved header that is not in
  * the list is removed. There is no way to clear a stored key here: remove the endpoint and add it
@@ -130,7 +198,7 @@ export interface UpdateCustomProviderInput {
   models: CustomProviderModel[];
   apiKey?: string;
   headers?: CustomProviderHeaderInput[];
-  /** Absent: the saved harness stays. */
+  /** Absent: the saved harness stays. This computer only: a host keeps the harness on a Team API edit. */
   harness?: CustomProviderHarness;
 }
 
@@ -146,7 +214,7 @@ export interface CustomProviderSummary {
   hasApiKey: boolean;
   /**
    * The names of the saved headers, so Edit can show them. The values never come back. Absent in a
-   * Team API list, which keeps its released fields.
+   * `providers-v1` or `custom-provider-harness-v1` list, which keeps its released fields.
    */
   headerNames?: string[];
   /**
@@ -230,7 +298,9 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
-    (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput))
+    (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput)) &&
+    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts)) &&
+    (value.inputs === undefined || isCustomProviderInputs(value.inputs))
   );
 }
 

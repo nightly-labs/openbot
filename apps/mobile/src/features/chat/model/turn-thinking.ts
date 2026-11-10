@@ -13,12 +13,17 @@ export function turnThinkingSteps(
 ): TurnThinkingStep[] {
   const thoughts = messages.filter((message) => message.turnId === turnId && isTurnThought(message));
   const known = new Set(thoughts.map((message) => message.id));
-  const linesAfter = (id: string | null) =>
-    lines
-      // A line after a thought that the phone no longer holds goes before the first thought.
-      .filter((line) => (id === null ? line.after === null || !known.has(line.after) : line.after === id))
-      .map((line): TurnThinkingStep => ({ id: line.id, kind: "progress", text: line.text }));
-  const steps = linesAfter(null);
+  // One pass over the lines: a long turn has many thoughts, and this runs on each streamed frame.
+  const byThought = new Map<string | null, TurnThinkingStep[]>();
+  for (const line of lines) {
+    // A line after a thought that the phone no longer holds goes before the first thought.
+    const after = line.after !== null && known.has(line.after) ? line.after : null;
+    const group = byThought.get(after) ?? [];
+    group.push({ id: line.id, kind: "progress", text: line.text });
+    byThought.set(after, group);
+  }
+  const linesAfter = (id: string | null) => byThought.get(id) ?? [];
+  const steps = [...linesAfter(null)];
   for (const message of thoughts) {
     steps.push({
       id: message.id,
@@ -30,6 +35,14 @@ export function turnThinkingSteps(
     steps.push(...linesAfter(message.id));
   }
   return steps;
+}
+
+/**
+ * True when `messages` hold the start of the turn: a message of another turn comes before its first
+ * message. A long turn has more thoughts than one page, so its start can be in an older page.
+ */
+export function turnStartLoaded(messages: readonly ConversationMessage[], turnId: string): boolean {
+  return messages.findIndex((message) => message.turnId === turnId) > 0;
 }
 
 /**

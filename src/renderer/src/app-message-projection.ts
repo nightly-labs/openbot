@@ -1,6 +1,9 @@
+import { feedbackSentIssue } from "@openbot/contracts/feedback";
+import { serverInstallEvent } from "@openbot/contracts/hosted-servers";
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+  AGENT_WELCOME_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -16,8 +19,10 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
   skillConversationEvent,
+  skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
   AgentDeliveryMarkerStatus,
@@ -30,6 +35,12 @@ import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-time
 import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
+
+/** The title in the host's thank-you text, which ends with it. Text from another host gives none. */
+function feedbackSentTitle(text: string): string {
+  const prefix = englishSourceText("status.agent.feedbackSent", { title: "" });
+  return text.startsWith(prefix) ? text.slice(prefix.length) : "";
+}
 
 export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
   return {
@@ -184,6 +195,8 @@ export function toAgentMessages(
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }
+    // A new agent's setup message is for the agent only: the chat starts with the agent's welcome.
+    if (message.itemType === AGENT_WELCOME_ITEM_TYPE) continue;
     if (message.author !== "assistant" || message.itemType !== "commentary") {
       result.push(convert(message, index));
       continue;
@@ -196,6 +209,7 @@ export function toAgentMessages(
       existing.items = [...(existing.items ?? []), text];
       existing.itemIds = [...(existing.itemIds ?? []), message.id];
       existing.itemCreatedAt = [...(existing.itemCreatedAt ?? []), message.createdAt];
+      existing.itemStreaming = [...(existing.itemStreaming ?? []), message.status === "streaming"];
       existing.streaming = existing.streaming || message.status === "streaming";
       if (message.trace) existing.trace = message.trace;
       continue;
@@ -215,6 +229,7 @@ export function toAgentMessages(
       items: [text],
       itemIds: [message.id],
       itemCreatedAt: [message.createdAt],
+      itemStreaming: [message.status === "streaming"],
       ...(message.trace === undefined ? {} : { trace: message.trace }),
     };
     thinkingByTurn.set(key, thinking);
@@ -305,6 +320,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
     JSON.stringify(left.items) === JSON.stringify(right.items) &&
     JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
+    JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
     JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
     JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
   );
@@ -336,6 +352,7 @@ function chatActionMarker(
       messageId: message.exchange.messageId,
       replyToMessageId: message.exchange.replyToMessageId,
       expectsReply: message.exchange.expectsReply !== false,
+      ...(message.exchange.senderTaskId === undefined ? {} : { senderTaskId: message.exchange.senderTaskId }),
     };
   }
   if (isContextResetMarker(message)) return { kind: "context-reset", timestamp: message.createdAt };
@@ -359,8 +376,15 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const skillSuggestion = skillSuggestionEvent(message);
+  if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
   if (signIn) return { kind: "mcp-sign-in", mcpServerId: signIn.mcpServerId, timestamp: message.createdAt };
+  const install = serverInstallEvent(message);
+  if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
+  const issue = feedbackSentIssue(message);
+  if (issue)
+    return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",
@@ -435,18 +459,32 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-export function retainThinkingMessages(previous: AgentMessage[], next: AgentMessage[]): AgentMessage[] {
+/**
+ * Keeps the steps of the running turn that a snapshot does not hold yet. A turn that ended is
+ * not kept: its last snapshot is what the thread stores, and a quiet routine run removes its
+ * steps there on purpose, so a kept copy would show text that a reload no longer shows.
+ */
+export function retainThinkingMessages(
+  previous: AgentMessage[],
+  next: AgentMessage[],
+  activeTurnId: string | null,
+): AgentMessage[] {
   const result = [...next];
   const nextIds = new Set(result.map((message) => message.id));
   for (const thinking of previous) {
     if (thinking.kind !== "thinking" || nextIds.has(thinking.id) || !thinking.turnId) continue;
+    if (thinking.turnId !== activeTurnId) continue;
     const sameTurnIndexes = result.flatMap((message, index) => (message.turnId === thinking.turnId ? [index] : []));
     if (sameTurnIndexes.length === 0) continue;
     const finalAnswerIndex = result.findIndex(
       (message) => message.turnId === thinking.turnId && message.author === "agent" && message.kind !== "thinking",
     );
     const insertionIndex = finalAnswerIndex >= 0 ? finalAnswerIndex : (sameTurnIndexes.at(-1) ?? result.length - 1) + 1;
-    result.splice(insertionIndex, 0, { ...thinking, streaming: false });
+    result.splice(insertionIndex, 0, {
+      ...thinking,
+      streaming: false,
+      ...(thinking.itemStreaming ? { itemStreaming: thinking.itemStreaming.map(() => false) } : {}),
+    });
     nextIds.add(thinking.id);
   }
   return result;

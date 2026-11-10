@@ -34,4 +34,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Impossibile installare la CLI di Bitwarden su questo server. Controlla la sua connessione di rete, poi connetti di nuovo.",
   "error.connector.bitwardenFileUnreadable": "Il file di connessione di Bitwarden non è leggibile.",
+  "error.connector.passwordManagerUnknown": "OpenBot non conosce questo gestore di password.",
+  "error.connector.passwordManagerMethod": "Questo gestore di password non può connettersi in questo modo.",
+  "error.connector.passwordManagerNoSignIn": "Nessuna pagina di accesso è aperta. Connetti di nuovo.",
+  "error.connector.protonPassFailed": "Impossibile connettere Proton Pass. Connetti di nuovo.",
+  "error.connector.protonPassCliInstallFailed":
+    "Impossibile installare la CLI di Proton Pass. Controlla la connessione di rete, poi connetti di nuovo.",
+  "error.connector.protonPassPlan":
+    "Il tuo piano Proton non consente la CLI di Proton Pass. Cambia piano, poi connetti di nuovo.",
+  "error.connector.protonPassExpired": "L’accesso a Proton Pass è terminato. Connetti di nuovo.",
+  "error.connector.protonPassKeyInvalid": "Inserisci una chiave di accesso di Proton Pass che inizia con pst_.",
+  "error.connector.protonPassExtraPassword": "La password aggiuntiva non è corretta. Inseriscila di nuovo.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass non ha chiesto una password aggiuntiva.",
+  "error.connector.protonPassFileUnreadable": "Il file di connessione di Proton Pass non è leggibile.",
+  "error.connector.protonPassSignInTimeout": "L’accesso a Proton ha richiesto troppo tempo. Connetti di nuovo.",
+  "error.connector.protonPassSetupFailed":
+    "Impossibile creare la cassaforte Shared with OpenBot o la sua chiave di accesso in Proton Pass. Connetti di nuovo.",
 } as const satisfies PartialTranslation<typeof source>;

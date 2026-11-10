@@ -48,4 +48,6 @@ export const messages = {
     one: "Verbindung wird wiederhergestellt {attempt}/{count}",
     other: "Verbindung wird wiederhergestellt {attempt}/{count}",
   },
+  "status.remote.messageCut":
+    "[{size} MB dieser Nachricht werden auf diesem Gerät nicht angezeigt. Öffnen Sie sie auf dem Computer, auf dem der Server läuft, um sie ganz zu lesen.]",
 } as const satisfies PartialTranslation<typeof source>;

@@ -25,6 +25,8 @@ export const messages = {
   "error.workflow.notRetryable": "실패했거나 중지된 단계만 다시 실행할 수 있어요.",
   "error.workflow.noDecision": "이 단계는 결정을 기다리고 있지 않아요.",
   "error.workflow.outputPlaceMissing": "이 출력의 메시징 위치를 선택하세요.",
+  "error.workflow.outputChannelMissing": "이 출력의 채널을 선택하세요.",
+  "error.workflow.outputChannelFailed": "OpenBot이 결과를 채널에 게시하지 못했습니다. 단계를 다시 실행하세요.",
   "error.workflow.discordNoMessage":
     "이 출력은 실행을 시작한 Discord 메시지에 작동합니다. Discord 멘션으로 실행을 시작하거나 채널에 게시를 선택하세요.",
   "error.workflow.slackNoMessage":

@@ -16,6 +16,7 @@ import type {
   MarketplaceApp,
   MarketplaceAppAccount,
   MarketplaceAppConnection,
+  MarketplaceAppsBlock,
   MarketplaceModel,
 } from "@openbot/ui/features/marketplace/marketplace-model";
 import {
@@ -24,6 +25,7 @@ import {
 } from "@openbot/ui/features/marketplace/marketplace-view";
 import { McpConnectDialog } from "@openbot/ui/features/settings/McpConnectDialog";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
+import type { MarketplacePluginApp } from "@openbot/ui/features/settings/marketplace-plugins";
 import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, createStore, onSettled, Show, untrack } from "solid-js";
@@ -40,6 +42,14 @@ import {
 } from "../src/preview/fixtures";
 import { CONNECTED_CONNECTOR_DETAILS, STORY_CONNECTOR_DETAILS, storyConnectorSet } from "./connector-fixtures";
 import { type ConnectOutcome, connectAs, subjectFor } from "./mcp-connect-stage";
+
+type ConnectFlows = readonly [McpConnectFlow, ...McpConnectFlow[]];
+
+/** The ways into one app, as the connect dialog takes them, or null for an app that asks for nothing. */
+function connectFlows(entry: MarketplacePluginApp): ConnectFlows | null {
+  const [first, ...rest] = entry.server.auth ?? [];
+  return first ? [first, ...rest] : null;
+}
 
 function page<T extends { name: string; description: string; category?: string | undefined }>(
   items: readonly T[],
@@ -232,6 +242,8 @@ type HeldState = "connected" | "signInNeeded";
 export interface StoryProps {
   /** A member of a joined server browses and adds nothing. */
   member?: boolean;
+  /** Why a member cannot connect apps, as the app page says it. */
+  blocked?: MarketplaceAppsBlock;
   empty?: boolean;
   /** What the app's server answers when Connect opens its dialog. */
   outcome?: ConnectOutcome;
@@ -248,6 +260,8 @@ export interface StoryProps {
   connected?: boolean;
   /** The window runs on a Mac, so the Apple apps listing can ask macOS for access. */
   macOS?: boolean;
+  /** Slugs of real catalog listings to add to the fixture listings. */
+  catalog?: readonly string[];
   /** 50 agents, as a user with a large team has. */
   manyAgents?: boolean;
   /** No agent has a skill yet. */
@@ -296,12 +310,14 @@ function pluginStatus(held: HeldState | undefined): MarketplaceApp["status"] {
 export function MarketplaceStory(props: StoryProps) {
   const {
     member,
+    blocked,
     empty,
     start,
     held = FIRST_HELD,
     accounts,
     connected,
     macOS,
+    catalog = [],
     manyAgents,
     noSkills,
     dialogSkill,
@@ -339,7 +355,11 @@ export function MarketplaceStory(props: StoryProps) {
     installed: noSkills ? {} : startSkills(userAgents),
     apps: [
       ...connectorApps,
-      ...[...STORY_MARKETPLACE_PLUGINS, ...(macOS ? APPLE_APPS : [])].map((plugin): MarketplaceApp => {
+      ...[
+        ...STORY_MARKETPLACE_PLUGINS,
+        ...(macOS ? APPLE_APPS : []),
+        ...MARKETPLACE_PLUGINS.filter((plugin) => catalog.includes(plugin.slug)),
+      ].map((plugin): MarketplaceApp => {
         const listed = accounts?.[plugin.slug];
         const state = held[plugin.slug] ?? (listed ? "connected" : undefined);
         return {
@@ -375,14 +395,14 @@ export function MarketplaceStory(props: StoryProps) {
   /** The connect dialog on screen, as the Marketplace window opens it for an app's way in. */
   const [pending, setPending] = createSignal<{
     subject: McpConnectSubject;
-    flow: McpConnectFlow;
+    flows: ConnectFlows;
     settle: (config: McpServerConfig | null) => void;
   } | null>(null);
-  const connectStep = (subject: McpConnectSubject, flow: McpConnectFlow) =>
+  const connectStep = (subject: McpConnectSubject, flows: ConnectFlows) =>
     new Promise<McpServerConfig | null>((resolve) =>
       setPending({
         subject,
-        flow,
+        flows,
         settle: (config) => {
           setPending(null);
           resolve(config);
@@ -526,13 +546,14 @@ export function MarketplaceStory(props: StoryProps) {
 
     apps: () => state.apps,
     canConnectApps: () => !member,
+    appsBlocked: () => (member ? blocked : undefined),
     appBusy: (id) => Boolean(state.busy[id]),
     connectApp: async (app) => {
       setBusy(app.id, true);
       for (const entry of app.plugin.apps) {
-        const flow = (entry.server.auth ?? [])[0];
+        const flows = connectFlows(entry);
         // Closing the dialog is a decision, not a failure: the app stays as it was.
-        if (flow && !(await connectStep(subjectFor(entry), flow))) {
+        if (flows && !(await connectStep(subjectFor(entry), flows))) {
           setBusy(app.id, false);
           return false;
         }
@@ -547,10 +568,10 @@ export function MarketplaceStory(props: StoryProps) {
     },
     reconnectApp: async (app, appId, accountId) => {
       const entry = app.plugin.apps.find((one) => one.id === appId);
-      const flow = entry?.server.auth?.[0];
-      if (!entry || !flow) return false;
+      const flows = entry && connectFlows(entry);
+      if (!entry || !flows) return false;
       setBusy(app.id, true);
-      const config = await connectStep(subjectFor(entry), flow);
+      const config = await connectStep(subjectFor(entry), flows);
       setBusy(app.id, false);
       // With no account named, the first account that needs a sign-in, as the controller does.
       const target =
@@ -564,10 +585,10 @@ export function MarketplaceStory(props: StoryProps) {
     },
     addAccount: async (app, appId) => {
       const entry = app.plugin.apps.find((one) => one.id === appId);
-      const flow = entry?.server.auth?.[0];
-      if (!entry || !flow) return false;
+      const flows = entry && connectFlows(entry);
+      if (!entry || !flows) return false;
       setBusy(app.id, true);
-      const config = await connectStep(subjectFor(entry), flow);
+      const config = await connectStep(subjectFor(entry), flows);
       setBusy(app.id, false);
       if (!config) return false;
       changeAccounts(
@@ -649,7 +670,7 @@ export function MarketplaceStory(props: StoryProps) {
         {(step) => (
           <McpConnectDialog
             subject={step.subject}
-            flow={step.flow}
+            flows={step.flows}
             onTest={server(step.subject.name)}
             onSignIn={signIn(step.subject.name)}
             onConnected={(config) => step.settle(config)}

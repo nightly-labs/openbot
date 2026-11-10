@@ -52,6 +52,31 @@ export function mix(start: number, end: number, progress: number): number {
   return start + (end - start) * progress;
 }
 
+const flagHolders = new WeakMap<Element, Map<string, number>>();
+
+/**
+ * Sets `data-<name>` on `element` while at least one caller holds it, and returns the release.
+ * Style rules read these attributes instead of `:has()` on the body or the conversation panel: a
+ * `:has()` on an ancestor of the chat makes the browser restyle the whole page each time the chat
+ * adds an element.
+ */
+export function holdFlag(element: Element, name: string): () => void {
+  const holders = flagHolders.get(element) ?? new Map<string, number>();
+  flagHolders.set(element, holders);
+  const count = holders.get(name) ?? 0;
+  holders.set(name, count + 1);
+  if (count === 0) element.setAttribute(`data-${name}`, "");
+  return () => {
+    const left = (holders.get(name) ?? 1) - 1;
+    if (left > 0) {
+      holders.set(name, left);
+      return;
+    }
+    holders.delete(name);
+    element.removeAttribute(`data-${name}`);
+  };
+}
+
 /** Reads a CSS time custom property from the root element, in milliseconds. */
 export function motionDuration(name: string, fallback: number): number {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();

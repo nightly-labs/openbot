@@ -5,6 +5,7 @@ import type {
   RoutineLimitPolicy,
   RoutineMissedPolicy,
   RoutineRunFields,
+  RoutineRunPlace,
   RoutineRunSource,
   RoutineRunStatus,
   RoutineSchedule,
@@ -14,6 +15,7 @@ import {
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_COUNT_LIMIT,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   ROUTINE_RUN_SOURCES,
 } from "@openbot/contracts/ipc";
 import type { EventFilter, EventJsonValue, EventRoutineOwner } from "@openbot/contracts/ipc-events";
@@ -62,6 +64,8 @@ export interface RoutineTables {
   eventPrefix: string;
   limit: number;
   limitMessage: string;
+  /** Only agent routines have the `run_in` column. A channel routine runs in its channel. */
+  runInColumn: boolean;
 }
 
 /** A routine read back with the owner column it was stored under. */
@@ -93,6 +97,7 @@ export interface RoutineInputFields {
   schedule: RoutineSchedule;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  runIn?: RoutineRunPlace;
 }
 
 export interface RoutineUpdateFields {
@@ -103,6 +108,7 @@ export interface RoutineUpdateFields {
   schedule?: RoutineSchedule;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  runIn?: RoutineRunPlace;
 }
 
 interface RoutineWebhookFields {
@@ -133,6 +139,8 @@ export interface RoutineRecordInput {
   timezone: string;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  /** Left out, a save keeps the saved place, and a new routine runs in the chat. */
+  runIn?: RoutineRunPlace;
   trigger:
     | { kind: "schedule"; schedule: RoutineSchedule }
     /** A null secret keeps the stored one. */
@@ -173,7 +181,7 @@ export class RoutineStore {
 
   protected get routineColumns(): string {
     return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
-            created_at, updated_at`;
+            ${this.tables.runInColumn ? "run_in, " : ""}created_at, updated_at`;
   }
 
   protected get runColumns(): string {
@@ -271,6 +279,7 @@ export class RoutineStore {
           createdAt,
           sequence,
         );
+        this.#writeRunIn(db, routineId, input.runIn ?? "chat");
         this.#insertTrigger(db, routineId, input.timezone, schedule, createdAt, sequence, now);
         return this.#require(routineId, ownerId);
       },
@@ -319,6 +328,7 @@ export class RoutineStore {
           input.routineId,
           ownerId,
         );
+        if (input.runIn) this.#writeRunIn(db, input.routineId, input.runIn);
         if (input.schedule) {
           db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(input.routineId);
           this.#insertTrigger(db, input.routineId, current.timezone, schedule, updatedAt, sequence, now);
@@ -369,6 +379,7 @@ export class RoutineStore {
       : (input.limitPolicy ?? current?.limitPolicy ?? "wait");
     const missedPolicy =
       input.missedPolicy ?? current?.missedPolicy ?? (schedule ? defaultMissedPolicy(schedule) : "skip");
+    const runIn = this.tables.runInColumn ? (input.runIn ?? current?.runIn ?? "chat") : undefined;
     const timestamp = now.toISOString();
     // A routine that runs already keeps its schedule; a new run time must still be ahead.
     const running =
@@ -398,6 +409,7 @@ export class RoutineStore {
             timezone: input.timezone,
             limitPolicy,
             missedPolicy,
+            ...(runIn ? { runIn } : {}),
             trigger: eventTrigger,
           },
         },
@@ -427,6 +439,7 @@ export class RoutineStore {
           timestamp,
           sequence,
         );
+        if (runIn) this.#writeRunIn(db, id, runIn);
         if (schedule) {
           if (current?.trigger.kind === "webhook") {
             revokeRoutineWebhooks(db, this.tables.ownerKind, [id], { forget: false }, now);
@@ -670,7 +683,8 @@ export class RoutineStore {
         .prepare(
           `SELECT trigger.trigger_id, trigger.next_run_at, trigger.schedule_json, routine.routine_id,
                   routine.${ownerColumn}, routine.name, routine.instruction, routine.active, routine.timezone,
-                  routine.limit_policy, routine.missed_policy, routine.created_at, routine.updated_at
+                  routine.limit_policy, routine.missed_policy, ${this.tables.runInColumn ? "routine.run_in, " : ""}
+                  routine.created_at, routine.updated_at
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
            WHERE routine.active = 1 AND trigger.next_run_at <= ?
@@ -1070,9 +1084,23 @@ export class RoutineStore {
       timezone: requiredStringColumn(row, "timezone"),
       limitPolicy,
       missedPolicy,
+      ...this.#runIn(row),
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
     };
+  }
+
+  #runIn(row: DynamicRecord): { runIn?: RoutineRunPlace } {
+    if (!this.tables.runInColumn) return {};
+    const runIn = requiredStringColumn(row, "run_in");
+    if (!isOneOf(ROUTINE_RUN_PLACES, runIn)) throw new Error("The stored routine run place is invalid.");
+    return { runIn };
+  }
+
+  /** The column exists only on the agent table, so it is written apart from the shared insert. */
+  #writeRunIn(db: OpenBotDatabase["connection"], routineId: string, runIn: RoutineRunPlace): void {
+    if (!this.tables.runInColumn) return;
+    db.prepare(`UPDATE ${this.tables.routineTable} SET run_in = ? WHERE routine_id = ?`).run(runIn, routineId);
   }
 
   #scheduleTrigger(routineId: string): OwnedRoutine["trigger"] {

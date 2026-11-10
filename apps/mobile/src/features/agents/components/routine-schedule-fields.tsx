@@ -21,7 +21,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
 import { RoutineTimePicker } from "./routine-schedule-time";
 
@@ -56,6 +56,7 @@ export function RoutineScheduleFields({
   onChange: (draft: RoutineScheduleDraft) => void;
 }) {
   const { t, format } = useText();
+  const nativeLabelFont = useNativeLabelFont();
   const { theme } = useUniwind();
   const colorScheme = theme === "dark" ? "dark" : "light";
   const problem = routineDraftProblemCode(draft);

@@ -47,7 +47,7 @@ function shouldAutoCompactSidebar(
 }
 
 /** The pages in the rail until the user chooses. The others start in the More menu. */
-const RAIL_PINNED_BY_DEFAULT: ReadonlySet<PageRailPinnablePage> = new Set(["tasks", "workflows", "usage"]);
+const RAIL_PINNED_BY_DEFAULT: ReadonlySet<PageRailPinnablePage> = new Set(["tasks", "workflows", "usage", "library"]);
 
 // A record, not an object: a page that only another version knows keeps its choice when this version saves.
 const railPinChoicesSchema = z.record(z.string(), z.boolean().optional().catch(undefined));
@@ -119,9 +119,12 @@ const Layout = createSimpleContext({
     /**
      * Whether the window draws the vertical server rail. The frame class and
      * the rail itself need the answer. `appInfo` is null
-     * until main answers, and no rail is drawn before then.
+     * until main answers, and no rail is drawn before then. A chat window
+     * shows no rail, so its frame keeps no space for one (#5346).
      */
-    const serverRailVisible = createMemo(() => platform.appInfo() !== null && serverView() === "rail");
+    const serverRailVisible = createMemo(
+      () => platform.appInfo() !== null && platform.chatWindow === null && serverView() === "rail",
+    );
 
     function updateResponsiveSidebar(): void {
       setLeftPanelAutoCompact(shouldAutoCompactSidebar(platform.appInfo()?.platform, leftPanelWidth(), serverView()));

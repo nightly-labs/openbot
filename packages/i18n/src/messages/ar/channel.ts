@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "إعادة إسناد المهمة المتوقفة لـ {name}",
   "channel.stoppedTask.reassign": "إعادة الإسناد",
   "channel.stoppedTask.cancel": "إلغاء المهمة",
+  "channel.stoppedTask.assignmentLoop":
+    "تبادل {names} هذه المهمة فيما بينهم مرات كثيرة جدًا. توقفت لمنع تكرارها بلا نهاية.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "تبادل الأعضاء هذه المهمة فيما بينهم مرات كثيرة جدًا. توقفت لمنع تكرارها بلا نهاية.",
   "channel.conversation.noMembers": "أضف وكلاء في إعدادات القناة لبدء العمل.",
   "channel.conversation.archivedNotice": "قناة محذوفة. معاينة فقط.",
   "channel.composer.label": "رسالة إلى القناة",
@@ -27,6 +31,25 @@ export const messages = {
     many: "{count} عنصرًا محفوظًا",
     other: "{count} عنصر محفوظ",
   },
+  "channel.settings.newConversation.title": "محادثة جديدة",
+  "channel.settings.newConversation.description": "ينسى الأعضاء الرسائل السابقة. تبقى إعدادات القناة.",
+  "channel.settings.newConversation.button": "ابدأ",
+  "channel.settings.newConversation.confirmTitle": "هل تريد بدء محادثة جديدة في {name}؟",
+  "channel.settings.newConversation.confirmDescription":
+    "ينسى الأعضاء الرسائل السابقة في هذه القناة. تبقى الرسائل ظاهرة فوق فاصل. لا يتغير الأعضاء والتعليمات والذكريات والمهام الروتينية.",
+  "channel.settings.newConversation.confirm": "ابدأ محادثة جديدة",
+  "channel.settings.newConversation.failed": "تعذر بدء محادثة جديدة.",
+  "channel.settings.compact.title": "ضغط السياق",
+  "channel.settings.compact.description": "يحتفظ الأعضاء بملخص قصير لجلسة القناة ويستخدمون رموزًا أقل.",
+  "channel.settings.compact.failed": "تعذر ضغط سياق القناة.",
+  "channel.settings.deleteHistory.title": "حذف السجل",
+  "channel.settings.deleteHistory.description": "تُحذف الرسائل وينساها الأعضاء. يبقى إعداد القناة كما هو.",
+  "channel.settings.deleteHistory.button": "حذف",
+  "channel.settings.deleteHistory.confirmTitle": "هل تريد حذف سجل {name}؟",
+  "channel.settings.deleteHistory.confirmDescription":
+    "تُحذف كل رسائل هذه القناة وملفاتها من OpenBot وينساها الأعضاء. لا يمكن التراجع عن ذلك. لا يتغير الأعضاء والتعليمات والذكريات والروتينات والمهام.",
+  "channel.settings.deleteHistory.confirm": "حذف السجل",
+  "channel.settings.deleteHistory.failed": "تعذّر حذف السجل.",
   "channel.settings.routines": "المهام الدورية",
   "channel.settings.routineCount": {
     zero: "لا مهام مُعدّة",

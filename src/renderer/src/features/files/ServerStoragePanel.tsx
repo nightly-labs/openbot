@@ -1,12 +1,15 @@
-import { LOCAL_SERVER_ID, type RemovableRuntimes, type TeamMemberSummary } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "@openbot/ui/data";
+import {
+  LOCAL_SERVER_ID,
+  type RemovableRuntimes,
+  type StorageDisk,
+  type TeamMemberSummary,
+} from "@openbot/contracts/ipc";
 import { MachineResources } from "@openbot/ui/features/files/MachineResources";
 import { StorageOverview } from "@openbot/ui/features/files/StorageOverview";
-import { createEffect, createSignal, Show, untrack } from "solid-js";
-import { toAgentProfile } from "../../app-message-projection";
+import { createEffect, createSignal, Show } from "solid-js";
 import { type FilesPort, filesPort } from "./files-port";
 import { createMachineResources } from "./machine-resources";
-import { createStorageUsage } from "./storage-usage";
+import { createServerAgents, createStorageUsage, planDisk } from "./storage-usage";
 
 export interface ServerStorageOptions {
   /** The computer the numbers belong to, such as "This Mac" or the server name. */
@@ -26,27 +29,17 @@ export interface ServerStorageOptions {
  * stored file. The agents are read for this server, because the dialog can be open for a server
  * that is not the selected one and the selected server's agents would name the wrong rows.
  */
-export function ServerStoragePanel(props: ServerStorageOptions & { serverId: string }) {
+export function ServerStoragePanel(
+  props: ServerStorageOptions & {
+    serverId: string;
+    /** The plan storage in GB of a hosted server. The free space is then what the plan has left. */
+    storageGb?: number | null;
+  },
+) {
   const calls = () => props.calls ?? filesPort();
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), calls);
   const machine = createMachineResources(() => ({ serverId: props.serverId, canManage: props.canManage }), calls);
-  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
-  createEffect(
-    () => props.serverId,
-    (serverId) => {
-      let current = true;
-      untrack(calls)
-        .agent.listAgents(serverId)
-        .then((list) => {
-          if (current) setAgents(list.map(toAgentProfile));
-        })
-        // Without names the rows still show sizes; the storage read reports its own failure.
-        .catch(() => undefined);
-      return () => {
-        current = false;
-      };
-    },
-  );
+  const agents = createServerAgents(() => props.serverId, calls);
 
   // Only this computer: a server removes its own old versions, and its store is not reachable here.
   const runtimes = () => {
@@ -88,6 +81,33 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
     }
   }
 
+  // A hosted server shows the free space of its plan, as the sidebar storage card does. The disk is read
+  // again after each scan; until it comes, the free space of the disk shows.
+  const [disk, setDisk] = createSignal<{ scan: unknown; disk: StorageDisk } | null>(null);
+  createEffect(
+    () => [storage.state.usage, props.storageGb, calls().storage.getDisk] as const,
+    ([scan, storageGb, getDisk]) => {
+      if (!scan || !storageGb || !getDisk) return;
+      let current = true;
+      getDisk(props.serverId)
+        .then((answer) => {
+          if (current) setDisk(answer ? { scan, disk: answer } : null);
+        })
+        .catch(() => {
+          if (current) setDisk(null);
+        });
+      return () => {
+        current = false;
+      };
+    },
+  );
+  const freeBytes = () => {
+    const scan = storage.state.usage;
+    const read = disk();
+    if (!scan) return null;
+    return props.storageGb && read?.scan === scan ? planDisk(read.disk, props.storageGb).freeBytes : scan.freeBytes;
+  };
+
   const usage = () => storage.state.usage;
 
   return (
@@ -97,7 +117,7 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
       error={storage.error()}
       scannedAt={usage()?.scannedAt ?? null}
       breakdown={usage()?.breakdown ?? []}
-      freeBytes={usage()?.freeBytes ?? null}
+      freeBytes={freeBytes()}
       agents={agents()}
       agentUsage={usage()?.agents ?? []}
       conversations={usage()?.conversations ?? []}

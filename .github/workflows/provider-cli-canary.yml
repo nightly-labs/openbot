@@ -2,7 +2,7 @@ name: Provider CLI canary
 
 # Users get each new provider CLI release within an hour of its publication, with no OpenBot release
 # between. This run reads the newest release of each provider for each target, installs the newest
-# OpenCode, and runs the conformance cases on it with a free model and no account
+# OpenCode, and runs the conformance cases on it with a fake model on loopback and no account
 # (scripts/provider-cli-canary.ts). When a release breaks OpenBot, add its version to
 # `provider-runtime-blocklist.json` on `main` to stop the offer. The `alert` job opens one issue on
 # the second failed run in a row and closes it after a run that passes. An issue that a person closes

@@ -109,9 +109,16 @@ export function decodeAgentSummaries(value: unknown): RemoteAgent[] {
   return value.map(decodeAgent);
 }
 
-export function decodeConversationReads(value: unknown): Record<string, { unreadCount: number }> {
+/** The host read state of one agent chat that the phone keeps. */
+export interface MobileConversationRead {
+  unreadCount: number;
+  /** The first unread message, where the chat shows its NEW line. */
+  firstUnreadMessageId: string | null;
+}
+
+export function decodeConversationReads(value: unknown): Record<string, MobileConversationRead> {
   if (!isDynamicRecord(value)) throw new Error("The server returned invalid read states.");
-  const reads: Record<string, { unreadCount: number }> = {};
+  const reads: Record<string, MobileConversationRead> = {};
   for (const [agentId, readState] of Object.entries(value)) {
     if (
       !isDynamicRecord(readState) ||
@@ -121,7 +128,9 @@ export function decodeConversationReads(value: unknown): Record<string, { unread
     ) {
       throw new Error("The server returned an invalid read state.");
     }
-    reads[agentId] = { unreadCount: readState.unreadCount };
+    // Only the line reads it, so a value the phone cannot use shows no line rather than refuse the state.
+    const firstUnreadMessageId = isString(readState.firstUnreadMessageId) ? readState.firstUnreadMessageId : null;
+    reads[agentId] = { unreadCount: readState.unreadCount, firstUnreadMessageId };
   }
   return reads;
 }

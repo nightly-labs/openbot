@@ -80,6 +80,18 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Токены",
   "customProvider.model.maxOutput": "Максимальный вывод модели {number}",
   "customProvider.model.maxOutputPlaceholder": "Токены",
+  "customProvider.model.efforts": "Уровень усилий модели {number}",
+  "customProvider.model.effortsLabel": "Уровень усилий",
+  "customProvider.model.effortsHintOpenCode":
+    "Выберите уровни усилий, которые принимает каждая модель. Без выбора OpenCode предлагает Низкое, Среднее и Высокое.",
+  "customProvider.model.effortsHintPi":
+    "Выберите уровни усилий, которые принимает каждая модель. Без выбора модель не рассуждает.",
+  "customProvider.model.inputs": "Входные данные модели {number}",
+  "customProvider.model.inputsLabel": "Принимает",
+  "customProvider.model.inputImage": "Изображения",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Выберите, что каждая модель может читать помимо текста.",
+  "customProvider.model.foundValuesHint": "Некоторые значения получены от эндпоинта. Вы можете их изменить.",
   "customProvider.model.remove": "Удалить модель {number}",
   "customProvider.model.add": "Добавить модель",
   "customProvider.headers": "Заголовки",

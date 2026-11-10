@@ -84,6 +84,18 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Token'lar",
   "customProvider.model.maxOutput": "Model {number} en fazla çıktı",
   "customProvider.model.maxOutputPlaceholder": "Token'lar",
+  "customProvider.model.efforts": "Model {number} eforu",
+  "customProvider.model.effortsLabel": "Efor",
+  "customProvider.model.effortsHintOpenCode":
+    "Her modelin kabul ettiği efor düzeylerini seçin. Seçim yoksa OpenCode Düşük, Orta ve Yüksek sunar.",
+  "customProvider.model.effortsHintPi":
+    "Her modelin kabul ettiği efor düzeylerini seçin. Seçim yoksa model akıl yürütmez.",
+  "customProvider.model.inputs": "Model {number} girdileri",
+  "customProvider.model.inputsLabel": "Kabul eder",
+  "customProvider.model.inputImage": "Görseller",
+  "customProvider.model.inputPdf": "PDF",
+  "customProvider.model.inputsHint": "Her modelin metin dışında okuyabileceklerini seçin.",
+  "customProvider.model.foundValuesHint": "Bazı değerler uç noktadan geliyor. Bunları değiştirebilirsiniz.",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
   "customProvider.headers": "Başlıklar",

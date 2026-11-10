@@ -175,6 +175,9 @@ const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "low";
 const LEGACY_AGENTS_STATE_FILE = "bots.json";
 const LEGACY_AGENTS_STATE_KEY = "bots";
 const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
+// The `command_id` of the one-time reset of Claude fast mode. Its receipt stops the reset from running
+// again, so the id never changes.
+const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
@@ -328,6 +331,7 @@ export class AgentStore {
           this.#database.deactivateProviderSessions(threadId);
         }
       }
+      this.#resetClaudeFastModeOnce();
       yield* this.#reconcileLegacyDirectoriesEffect();
       yield* this.#recoverPendingDuplicationsEffect();
       yield* this.#profileCreationRecovery.recover(this.#database, (agentId) =>
@@ -431,6 +435,11 @@ export class AgentStore {
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
+      // A named profile carries over; "Only this agent" would give the copy a new, empty session.
+      if (source.browserProfileId !== undefined) {
+        record.browserProfileId = source.browserProfileId;
+        record.ownBrowserSession = true;
+      }
       record.avatarSeed = source.avatarSeed;
       record.avatarHue = source.avatarHue;
       if (source.avatarColor) record.avatarColor = source.avatarColor;
@@ -785,6 +794,9 @@ export class AgentStore {
       if (input.fastMode !== undefined) {
         if (!isBoolean(input.fastMode)) throw new Error("Invalid fast mode value.");
         next.fastMode = input.fastMode;
+      } else if (input.provider !== undefined && input.provider !== agent.provider && next.fastMode) {
+        // The new provider has its own price, and Claude fast mode needs the user's confirmation.
+        next.fastMode = false;
       }
       // A provider change without an account returns the agent to the new provider's own sign-in.
       if (
@@ -1129,6 +1141,7 @@ export class AgentStore {
       let relocated = false;
       for (const agent of this.#state.agents) {
         relocated = (yield* this.#reconcileWorkspaceDirectoryEffect(agent)) || relocated;
+        relocated = (yield* this.#rebaseForeignWorkspaceEffect(agent)) || relocated;
         yield* this.#reconcileAvatarDirectoryEffect(agent);
       }
       if (relocated) this.#persist("agent.workspace-relocated");
@@ -1224,6 +1237,40 @@ export class AgentStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible);
+
+  /**
+   * Answers whether the agent's stored workspace path had to change. A database copied from another
+   * computer, or restored for another user, keeps the full workspace path of that home, and the folder
+   * cannot be made here: Windows refuses `mkdir` under another user's folder with `EPERM`, so the agent has
+   * no workspace and no screen can change it. Only an application-made path is changed -- `Agents/<id>` or
+   * `Bots/<id>` outside this computer's OpenBot root -- and only when nothing is there, so a path the
+   * user can still reach keeps its files. No file is moved or deleted.
+   */
+  #rebaseForeignWorkspaceEffect = Effect.fn("AgentStore.rebaseForeignWorkspace")(function* (
+    this: AgentStore,
+    agent: StoredAgent,
+  ): Effect.fn.Return<boolean> {
+    const stored = agent.workspacePath;
+    if (!isApplicationWorkspacePath(stored, agent.id) || isPathInside(dirname(this.#agentsRoot), stored)) return false;
+    const probe = yield* Effect.result(storedIO(() => lstat(stored)));
+    if (Result.isSuccess(probe) || !isRecord(probe.failure.cause) || probe.failure.cause.code !== "ENOENT") {
+      return false;
+    }
+    const targetPath = join(this.#agentsRoot, agent.id);
+    const created = yield* Effect.result(storedIO(() => mkdir(targetPath, { recursive: true, mode: 0o700 })));
+    if (Result.isFailure(created)) {
+      logger.warn(
+        "Could not create the workspace of an agent from another computer.",
+        toLogValue(created.failure.cause),
+      );
+    }
+    logger.warn("An agent workspace path from another computer was changed to this computer.");
+    // An exclusion in the old workspace applies to the same folder in the new one, as for a duplicate.
+    if (agent.excludedFolders)
+      agent.excludedFolders = agent.excludedFolders.map((folder) => rebasedFolder(folder, stored, targetPath));
+    agent.workspacePath = targetPath;
+    return true;
+  });
 
   /**
    * An uploaded avatar lives under the agent id, and `avatarUrl` derives that directory from the id
@@ -1568,6 +1615,22 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * After "Delete history": the row shows the localized "no messages" text, and the agent keeps its
+   * place in the list.
+   */
+  clearPreview = Effect.fn("AgentStore.clearPreview")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.#requireAgent(id).preview = "";
+      this.#persist("agent.preview-updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
   #readStateEffect = Effect.fn("AgentStore.readState")(function* (
     this: AgentStore,
   ): Effect.fn.Return<StoredState, StoredStateFailure> {
@@ -1667,6 +1730,45 @@ export class AgentStore {
     this.#state = { ...this.#state, agents: [...this.#state.agents, ...restored] };
     this.#persist("agents.replaced");
     logger.warn("Agents were restored to the roster from the event log.", restored.length);
+  }
+
+  /**
+   * Turns fast mode off one time for each Claude agent. Before Claude fast mode existed, only Codex read
+   * `fastMode`, so a Claude agent has `true` only from a provider change. The user never confirmed the
+   * Claude price for it. The receipt of the command is the marker that stops a second run: the event of
+   * its own aggregate stays, so no roster write or sweep deletes the receipt.
+   */
+  #resetClaudeFastModeOnce(): void {
+    if (this.#database.commandResult(CLAUDE_FAST_MODE_RESET_COMMAND_ID) !== undefined) return;
+    const agentIds = this.#state.agents
+      .filter((agent) => agent.provider === "claude" && agent.fastMode)
+      .map((agent) => agent.id);
+    const previous = this.#state.agents;
+    try {
+      this.#database.dispatch(
+        CLAUDE_FAST_MODE_RESET_COMMAND_ID,
+        [
+          {
+            aggregateType: "agent-fast-mode",
+            aggregateId: "claude-reset",
+            eventType: "agent-fast-mode.claude-reset",
+            payload: { agentIds },
+          },
+        ],
+        () => {
+          if (agentIds.length === 0) return null;
+          this.#state.agents = previous.map((agent) =>
+            agentIds.includes(agent.id) ? { ...agent, fastMode: false } : agent,
+          );
+          this.#persist("agents.claude-fast-mode-reset");
+          return null;
+        },
+      );
+    } catch (cause) {
+      this.#state.agents = previous;
+      throw cause;
+    }
+    if (agentIds.length > 0) logger.info("Fast mode was turned off for Claude agents.", { count: agentIds.length });
   }
 
   #persist(eventType: string, modelChange?: AgentModelChange): void {
@@ -1867,6 +1969,30 @@ const probeDirectoryEffect = Effect.fn("AgentStore.probeDirectory")((path: strin
     ),
   ),
 );
+
+/**
+ * Whether a stored workspace has the shape this application gives one: `Agents/<id>`, or `Bots/<id>` from
+ * before the rename. Both separators are read, because the database can come from Windows or from macOS.
+ */
+function isApplicationWorkspacePath(workspacePath: string, agentId: string): boolean {
+  const parts = workspacePath.split(/[\\/]+/);
+  const name = parts.at(-1);
+  const folder = parts.at(-2);
+  if (folder === "Agents") return name === agentId;
+  return folder === "Bots" && (name === agentId || name === legacyAgentId(agentId));
+}
+
+/**
+ * `folder` moved from `from` to `to` when it is inside `from`, else `folder`. A Windows path on macOS or
+ * Linux has no native separator, so its segments are compared when the native check does not match.
+ */
+function rebasedFolder(folder: string, from: string, to: string): string {
+  if (isPathInside(from, folder)) return join(to, relative(from, folder));
+  const fromParts = from.split(/[\\/]+/);
+  const parts = folder.split(/[\\/]+/);
+  const inside = parts.length > fromParts.length && fromParts.every((part, index) => part === parts[index]);
+  return inside ? join(to, ...parts.slice(fromParts.length)) : folder;
+}
 
 function titleFromId(id: string): string {
   return id

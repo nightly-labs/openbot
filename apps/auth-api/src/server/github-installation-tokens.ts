@@ -12,8 +12,10 @@ import { importPKCS8, SignJWT } from "jose";
  * A user token (`ghu_`) makes GitHub show "user with OpenBotGit". An installation token (`ghs_`)
  * makes GitHub show `openbotgit[bot]`, but it needs the app's private key, which only this Worker
  * holds. An installation token can do everything that the installation allows, so this service
- * gives one only for the repositories where the user of the token can push. The desktop keeps the
- * user token for every other repository.
+ * gives one only for the repositories where the user of the token can push, and never with
+ * `administration`. GitHub limits a user token to what its user can do. It does not limit an
+ * installation token, so a user with push access would get admin access through one. The desktop
+ * keeps the user token for every other repository and for repository creation.
  *
  * The Worker keeps nothing: it does not store or log a token.
  */
@@ -65,6 +67,8 @@ const MAX_INSTALLATIONS = 20;
 const MAX_REPOSITORY_PAGES = 10;
 /** GitHub limits `repository_ids` to 500 in one token. */
 const MAX_REPOSITORIES_PER_TOKEN = 500;
+/** The installation permissions that a bot token never gets. See the class comment. */
+const USER_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(["administration"]);
 
 const appSchema = Schema.Struct({ id: Schema.Number });
 const installationsSchema = Schema.Struct({
@@ -74,6 +78,8 @@ const installationsSchema = Schema.Struct({
       app_id: Schema.Number,
       account: Schema.Struct({ login: Schema.String }),
       events: Schema.optional(Schema.Array(Schema.String)),
+      /** What the owner of the installation granted, such as `{ contents: "write" }`. */
+      permissions: Schema.optional(Schema.Record(Schema.String, Schema.String)),
     }),
   ),
 });
@@ -94,8 +100,16 @@ const repositoriesSchema = Schema.Struct({
   ),
 });
 const accessTokenSchema = Schema.Struct({ token: Schema.NonEmptyString, expires_at: Schema.String });
+const repositoryInstallationSchema = Schema.Struct({ id: Schema.Number });
+const issueSchema = Schema.Struct({ number: Schema.Number, html_url: Schema.String });
 
-type Credential = { kind: "user"; token: string } | { kind: "app" };
+/** An issue that the app opened. */
+export interface GitHubIssue {
+  number: number;
+  url: string;
+}
+
+type Credential = { kind: "user"; token: string } | { kind: "app" } | { kind: "installation"; token: string };
 const APP: Credential = { kind: "app" };
 
 interface WritableRepository {
@@ -103,11 +117,23 @@ interface WritableRepository {
   fullName: string;
 }
 
+/**
+ * The granted permissions of an installation without `USER_ONLY_PERMISSIONS`. GitHub refuses a
+ * token request for a permission that the installation does not have, so the request names only
+ * granted ones. Null when GitHub did not name them.
+ */
+function botPermissions(granted: Readonly<Record<string, string>> | undefined): Record<string, string> | null {
+  if (!granted) return null;
+  const permissions = Object.fromEntries(Object.entries(granted).filter(([name]) => !USER_ONLY_PERMISSIONS.has(name)));
+  return Object.keys(permissions).length > 0 ? permissions : null;
+}
+
 export class GitHubInstallationTokens {
   readonly #options: GitHubInstallationTokensOptions;
   readonly #now: () => number;
   #key: CryptoKey | null = null;
   #appId: number | null = null;
+  readonly #repositoryInstallations = new Map<string, number>();
 
   constructor(options: GitHubInstallationTokensOptions) {
     this.#options = options;
@@ -125,8 +151,11 @@ export class GitHubInstallationTokens {
     const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
     const tokens: GitHubInstallationToken[] = [];
     for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
+      const permissions = botPermissions(installation.permissions);
+      // Without the granted permissions, the request cannot leave out `administration`.
+      if (!permissions) continue;
       const result = yield* Effect.result(
-        this.#issueForInstallation(installation.id, installation.account.login, user),
+        this.#issueForInstallation(installation.id, installation.account.login, permissions, user),
       );
       // A suspended installation or SAML SSO refusal must not block the others.
       if (Result.isFailure(result)) {
@@ -171,10 +200,42 @@ export class GitHubInstallationTokens {
     return routes;
   }).bind(this);
 
+  /**
+   * Opens an issue as `openbotgit[bot]` in a repository of the app's own installation. The token can
+   * only write issues of that one repository, and it is dropped after the request.
+   */
+  readonly openIssue = Effect.fn("GitHubInstallationTokens.openIssue")(function* (
+    this: GitHubInstallationTokens,
+    repository: string,
+    issue: { title: string; body: string; labels: readonly string[] },
+  ): Effect.fn.Return<GitHubIssue, GitHubInstallationTokensError> {
+    const [, name] = repository.split("/");
+    let installationId = this.#repositoryInstallations.get(repository);
+    if (installationId === undefined) {
+      installationId = (yield* this.#get(`/repos/${repository}/installation`, APP, repositoryInstallationSchema)).id;
+      this.#repositoryInstallations.set(repository, installationId);
+    }
+    // A reinstalled app has a new installation ID, so a failed mint looks it up again next time.
+    const minted = yield* this.#post(
+      `/app/installations/${installationId}/access_tokens`,
+      APP,
+      { repositories: [name], permissions: { issues: "write" } },
+      accessTokenSchema,
+    ).pipe(Effect.tapError(() => Effect.sync(() => this.#repositoryInstallations.delete(repository))));
+    const opened = yield* this.#post(
+      `/repos/${repository}/issues`,
+      { kind: "installation", token: minted.token },
+      issue,
+      issueSchema,
+    );
+    return { number: opened.number, url: opened.html_url };
+  }).bind(this);
+
   readonly #issueForInstallation = Effect.fn("GitHubInstallationTokens.issueForInstallation")(function* (
     this: GitHubInstallationTokens,
     installationId: number,
     account: string,
+    permissions: Readonly<Record<string, string>>,
     user: Credential,
   ): Effect.fn.Return<GitHubInstallationToken[], GitHubInstallationTokensError> {
     const writable = yield* this.#writableRepositories(installationId, user);
@@ -184,7 +245,7 @@ export class GitHubInstallationTokens {
       const minted = yield* this.#post(
         `/app/installations/${installationId}/access_tokens`,
         APP,
-        { repository_ids: part.map((repository) => repository.id) },
+        { repository_ids: part.map((repository) => repository.id), permissions },
         accessTokenSchema,
       );
       tokens.push({
@@ -302,7 +363,7 @@ export class GitHubInstallationTokens {
     schema: Schema.Decoder<T>,
   ): Effect.fn.Return<T, GitHubInstallationTokensError> {
     const route = path.split("?")[0];
-    const authorization = credential.kind === "user" ? `token ${credential.token}` : `Bearer ${yield* this.#appJwt()}`;
+    const authorization = credential.kind === "app" ? `Bearer ${yield* this.#appJwt()}` : `token ${credential.token}`;
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         this.#options.fetch(`${GITHUB_API}${path}`, {

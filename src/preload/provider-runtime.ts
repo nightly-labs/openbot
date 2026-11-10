@@ -30,6 +30,7 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       muse: decodeProviderRuntimeStatus(providers.muse),
       devin: decodeProviderRuntimeStatus(providers.devin),
       copilot: decodeProviderRuntimeStatus(providers.copilot),
+      mistral: decodeProviderRuntimeStatus(providers.mistral),
       // Main sends a Hermes status only where it can run the Hermes installer.
       ...(providers.hermes === undefined ? {} : { hermes: decodeProviderRuntimeStatus(providers.hermes) }),
     },
