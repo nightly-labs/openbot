@@ -25,6 +25,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { thinkingRowId } from "./turn-thinking";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
 
@@ -403,7 +404,7 @@ export function projectChatMessages(
       const key = message.turnId ?? message.id;
       let thinking = thinkingByTurn.get(key);
       if (!thinking) {
-        thinking = { id: `thinking:${key}`, kind: "thinking", turnId: message.turnId, steps: [] };
+        thinking = { id: thinkingRowId(key), kind: "thinking", turnId: message.turnId, steps: [] };
         thinkingByTurn.set(key, thinking);
         result.push(thinking);
       }

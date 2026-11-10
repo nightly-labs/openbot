@@ -156,6 +156,8 @@ export interface ChatViewProps {
   needsAction?: boolean;
   /** The lead of a channel. Its browser opens when no member asks for a browser step. */
   channelLeadAgentId?: string | null;
+  /** The steps row of each finished channel turn with no answer, by the row of its first thought. */
+  channelTurnSummaries?: ReadonlyMap<string, TurnStepsSummary>;
   /** Rows under the agent's activity, such as the tasks that the agent works on. */
   activityAccessory?: ReactNode;
   /** The agent's threads, in the menu of the agent's name in the header. */
@@ -266,6 +268,7 @@ export function ChatView({
   onSelectQuestion,
   needsAction = false,
   channelLeadAgentId = null,
+  channelTurnSummaries,
   activityAccessory,
   threadMenu,
   threadId = null,
@@ -450,13 +453,14 @@ export function ChatView({
   const conversationMessages = conversation?.messages;
   const conversationTurnId = conversation?.activeTurnId ?? null;
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
-  const turnSummaries = useMemo(() => {
+  const agentTurnSummaries = useMemo(() => {
     lastTurnSummaries.current =
       conversationMessages && target.kind === "agent"
         ? finishedTurnSummaries(conversationMessages, conversationTurnId, turnLines, lastTurnSummaries.current)
         : undefined;
     return lastTurnSummaries.current;
   }, [conversationMessages, conversationTurnId, turnLines, target.kind]);
+  const turnSummaries = agentTurnSummaries ?? channelTurnSummaries;
   const thinkingAgentId = target.kind === "agent" ? target.id : null;
   const openTurn = useCallback(
     (turnId: string) => {
@@ -618,8 +622,9 @@ export function ChatView({
     keyboardOffset,
     // The list takes its place at the latest message once its rows render.
     ready && rowsShown,
-    // The list draws a row for each message except the thinking steps, which the activity row shows.
-    rowsShown && messages.some((message) => message.kind !== "thinking"),
+    // The list draws a row for each message except the thinking steps, which the activity row or a
+    // steps row shows. A finished turn with no answer draws its steps row on its thinking row.
+    rowsShown && messages.some((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
     lastUserId,
     questionForm?.question ? (questionForm.messageId ?? null) : null,
     holdOpening,

@@ -7,6 +7,7 @@ import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
+import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
@@ -100,6 +101,24 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     serverBrowserRequests,
     threadIds,
   ]);
+  // A finished turn of a member with no answer, such as a stopped one, shows its steps in its own row.
+  // A member's running turn shows them in its activity row. An activity with no turn is the member's latest turn.
+  const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
+  const turnSummaries = useMemo(() => {
+    const entries = page?.messages ?? [];
+    const latestTurns = new Map<string, string>();
+    for (const entry of entries)
+      if (entry.author.kind === "agent" && entry.message.turnId) latestTurns.set(entry.author.id, entry.message.turnId);
+    lastTurnSummaries.current = unansweredChannelTurnSummaries(
+      entries,
+      (turnId, agentId) =>
+        activities.some(
+          (activity) => activity.agentId === agentId && (activity.turnId ?? latestTurns.get(agentId)) === turnId,
+        ),
+      lastTurnSummaries.current,
+    );
+    return lastTurnSummaries.current;
+  }, [page?.messages, activities]);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
@@ -184,6 +203,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       loadOlder={loadOlder}
       needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0}
       channelLeadAgentId={channel?.leadAgentId ?? null}
+      channelTurnSummaries={turnSummaries}
       onLeave={leaveChat}
     />
   );
