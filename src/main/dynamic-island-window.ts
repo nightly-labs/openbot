@@ -19,6 +19,7 @@ import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
+import type { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 
 const logger = createOpenBotLogger("dynamic-island-window");
@@ -71,6 +72,8 @@ export interface DynamicIslandWindowControllerOptions {
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
+  /** Windows: forwards the pointer moves to an island window only while the cursor is on it. */
+  pointerForwarding?: PointerForwardingGate | null;
   logger?: Logger;
 }
 
@@ -170,7 +173,7 @@ export class DynamicIslandWindowController {
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(bounds, false);
     if (this.#options.windowKind === "x11") this.#applyShape(displayId, window);
-    else window.setIgnoreMouseEvents(!interactive, { forward: true });
+    else this.#letPointerThrough(window, !interactive);
     // On macOS, focusability also allows the panel to become a main window in AltTab. The panel is
     // focusable only while a text field on it needs key input. A panel becomes key without
     // activating the app, so the main window stays where it is.
@@ -216,6 +219,13 @@ export class DynamicIslandWindowController {
       return;
     }
     window.setShape(this.#inputRegions.get(displayId) ?? []);
+  }
+
+  /** Outside the island, the pointer goes to the apps under the window; the page still gets its moves. */
+  #letPointerThrough(window: BrowserWindow, through: boolean): void {
+    const gate = this.#options.pointerForwarding;
+    if (gate) gate.setIgnoring(window, through);
+    else window.setIgnoreMouseEvents(through, { forward: true });
   }
 
   /** On X11 the island stays below the top panel of the desktop, as the clock and the tray do. */
@@ -410,7 +420,7 @@ export class DynamicIslandWindowController {
       // Until the island renderer reports its shape, no part of the window takes the pointer or shows.
       window.setShape([]);
     } else {
-      window.setIgnoreMouseEvents(true, { forward: true });
+      this.#letPointerThrough(window, true);
     }
     window.setFocusable(false);
     window.webContents.on("did-finish-load", () => {
