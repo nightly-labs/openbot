@@ -294,8 +294,8 @@ peer connection. When the relay is full, coturn refuses each new allocation with
 connection that needs a relay fails. The `signal_capacity` analytics event shows the allocations of
 each relay every 5 minutes.
 
-Production uses `turn2.openbot.run` on the standby host as the second relay; see
-[the deployment procedure](../docs/remote-session-deployment.md#standby-signal).
+Production uses `turn2.openbot.run` on the second Signal machine as the second relay; see
+[the deployment procedure](../docs/remote-session-deployment.md#second-signal-machine).
 
 Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
 Reconnecting one session replaces only that session's Signal socket. Disconnecting or revoking one device
