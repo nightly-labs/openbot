@@ -74,6 +74,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   TelegramCallError,
+  WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
 import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
@@ -2377,7 +2378,10 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
   const code =
-    cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
+    cause instanceof SlackApiError ||
+    cause instanceof DiscordApiError ||
+    cause instanceof TelegramCallError ||
+    cause instanceof WhatsAppRefusedError
       ? cause.code
       : "no_answer";
   return `The platform refused the call: ${code}. Check the connection and place ids with openbot.messaging_list_places.`;
