@@ -2382,12 +2382,28 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
 const WHATSAPP_NO_PLACES =
   "OpenBot posts only to WhatsApp chats that the user allowed, and this number allows none. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
 
+/** Why a WhatsApp number did not post: it is not linked, or its connection is down now. */
+const WHATSAPP_NOT_CONNECTED =
+  "WhatsApp is not connected on this number now, so the message was not delivered. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
+
+/** What the user does when OpenBot itself stops a WhatsApp post, by the code of the WhatsApp adapter. */
+const WHATSAPP_LOCAL_REFUSALS = new Map([
+  [
+    "place_not_allowed",
+    "OpenBot sent nothing: the user did not allow this WhatsApp chat. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat. Then the post can go to it.",
+  ],
+  ["not_connected", WHATSAPP_NOT_CONNECTED],
+  ["not_linked", WHATSAPP_NOT_CONNECTED],
+]);
+
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
   // A new attempt is refused too, and counts against the number at WhatsApp.
   if (cause instanceof WhatsAppRefusedError)
     return `WhatsApp refused the message: ${cause.code}. It was not delivered. Do not post it again: tell the user that WhatsApp did not deliver it.`;
+  const local = cause instanceof Error ? WHATSAPP_LOCAL_REFUSALS.get(cause.message) : undefined;
+  if (local) return local;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code
