@@ -702,6 +702,34 @@ a voice model is present, or if the application contains a second native Claude 
 If a release is bad, publish a newer patch version. Do not replace an already published version with
 different binaries.
 
+## Release health after publishing
+
+Before a staged rollout goes to 100%, run the release health check. It compares how the new release
+starts and keeps running with the release before it, over the same hours after each GitHub Release was
+published, from production analytics. Run it with the read-only ClickHouse access of the `openpanel`
+skill (`.agents/skills/openpanel/SKILL.md`):
+
+```sh
+MAIN="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+./node_modules/.bin/dotenvx run -q -f apps/auth-api/.env.dev -fk "$MAIN/.env.keys" -- \
+  bun scripts/release-health.ts <version>
+```
+
+It prints a table per platform and for servers, and writes `.openbot-build/release-health/report.json`.
+The metrics are finished starts, crashes, startup crashes, quit hangs, and update arrivals: the share
+of the computers that started an update install and then started the new release. The thresholds are
+in the script header.
+
+- Exit code 0: no metric is clearly worse. Raise the rollout.
+- Exit code 1: a metric is clearly worse. Keep the rollout where it is, find the cause, and publish a
+  patch version if the release is bad.
+- Exit code 3: not enough data yet. Run it again later. The previous release gets the same number of
+  hours, so a check soon after the release is fair, but it needs 200 starts in each group.
+
+`.github/workflows/release-health.yml` runs the check for the newest release every two hours in its
+first 72 hours. When a metric is worse, or the check fails, it posts to the private release regression
+Discord channel, not to the public release channel.
+
 Before working this checklist, audit the changes since the last released tag with the
 `.agents/skills/release-upgrade-safety/` skill: it covers the upgrade and data-loss hazards an
 installed user cannot undo — the in-place database migration, the `userData` files nothing backs up,
