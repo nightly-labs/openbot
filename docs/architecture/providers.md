@@ -318,6 +318,8 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   the routing before it sends `thread/unsubscribe`, so the next turn sends `thread/resume` after the
   unsubscribe. Codex unloads a thread with no subscriber after `thread_unload_delay_secs` (60 s by
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
+  An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
+  so Windows can remove the workspace (#6266).
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
