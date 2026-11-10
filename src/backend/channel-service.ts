@@ -1624,16 +1624,15 @@ export class ChannelService {
             decision = decoded.success;
           } catch (error) {
             if (!(error instanceof StructuredOutputError)) throw error;
-            // The answer can quote the request, so the log gives only its size and the fields it had.
-            this.hooks.error(
-              new Error(
-                `${error.message} Routing answer: ${response.length} characters, fields ${
-                  keys ? JSON.stringify(keys.slice(0, 8).map((key) => key.slice(0, 40))) : "none"
-                }. The lead takes the request.`,
-              ),
-            );
-            // An unreadable answer is an unclear routing, which the prompt gives to the lead. It paused
-            // the task for the person to reassign before, when a lead answered in prose (#6277).
+            // An unreadable answer is an unclear routing, which the prompt gives to the lead. Before, it
+            // paused the task for the person to reassign and showed a provider error (#6277). The answer
+            // can quote the request, so the log gives only its size and the fields it had.
+            logger.warn("A routing answer was unreadable, so the lead takes the request.", {
+              channelId,
+              reason: error.message,
+              characters: response.length,
+              fields: keys ? keys.slice(0, 8).map((key) => key.slice(0, 40)) : [],
+            });
             decision = { agentId: lead.id };
           }
           if ("taskId" in decision) {
