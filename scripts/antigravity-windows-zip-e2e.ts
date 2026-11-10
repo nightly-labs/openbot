@@ -31,9 +31,14 @@ function sha256(bytes: Uint8Array): string {
 async function lockedArchive(): Promise<Buffer> {
   const flag = process.argv.indexOf("--archive");
   const path = flag >= 0 ? process.argv[flag + 1] : undefined;
-  const bytes = path
-    ? await readFile(path)
-    : Buffer.from(await (await fetch(spec.url, { redirect: "follow" })).arrayBuffer());
+  if (flag >= 0) assert.ok(path, "--archive needs the path of the zip");
+  let bytes: Buffer;
+  if (path) bytes = await readFile(path);
+  else {
+    const response = await fetch(spec.url, { redirect: "follow" });
+    assert.ok(response.ok, `the download of ${spec.url} failed with HTTP ${response.status}`);
+    bytes = Buffer.from(await response.arrayBuffer());
+  }
   assert.equal(sha256(bytes), spec.archiveDigest?.hex, "the archive is not the locked asset");
   return bytes;
 }
