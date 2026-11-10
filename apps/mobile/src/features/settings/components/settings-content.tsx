@@ -147,14 +147,7 @@ export function SettingsRow({
   const onRowLayout = measures
     ? (event: LayoutChangeEvent) => setRowWidth(Math.round(event.nativeEvent.layout.width))
     : undefined;
-  const measuredTrailing = (
-    <View
-      className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 shrink"}
-      onLayout={(event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width))}
-    >
-      {trailing}
-    </View>
-  );
+  const trailingContent = trailing || chevron;
   const title = (
     <>
       {children}
@@ -165,22 +158,24 @@ export function SettingsRow({
       ) : null}
     </>
   );
-  // A measured value keeps one place in the tree in both layouts. If it moved to another parent,
-  // React would mount a new native control, which is narrow until it measures its contents. The
-  // row would then change its layout again at each mount and flicker.
-  const content = measures ? (
+  // The title and the value keep one place in the tree in all layouts; only the styles change. If
+  // the value moved to another parent, React would mount a new native control, which is narrow
+  // until it measures its contents. The row would then change its layout again at each mount and
+  // flicker.
+  const content = (
     <>
       {leading}
       <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
         <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
-        {measuredTrailing}
+        {trailingContent ? (
+          <View
+            className={stacked ? "max-w-full self-start overflow-hidden" : measures ? "min-w-0 shrink" : undefined}
+            onLayout={measures ? (event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width)) : undefined}
+          >
+            {trailingContent}
+          </View>
+        ) : null}
       </View>
-    </>
-  ) : (
-    <>
-      {leading}
-      <View className="min-w-0 flex-1 gap-1">{title}</View>
-      {trailing || chevron}
     </>
   );
   return onPress ? (
