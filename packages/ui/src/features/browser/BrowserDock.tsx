@@ -173,11 +173,16 @@ export function BrowserDock(props: BrowserDockProps) {
   let tab: HTMLButtonElement | undefined;
   /** A question arrived while the box was shrinking, so the box grows back when it is a tab. */
   let reopen = false;
+  /** The tab fades out before the phase changes, so this stops a second `show` in that time. */
+  let showing = false;
 
+  /** An effect asks for the box. `flush` does nothing in an effect, so the box changes after it. */
   function requestShow() {
-    const current = untrack(phase);
-    if (current === "hidden") void show();
-    else if (current === "hiding") reopen = true;
+    queueMicrotask(() => {
+      const current = untrack(phase);
+      if (current === "hidden") void show();
+      else if (current === "hiding") reopen = true;
+    });
   }
 
   createEffect(
@@ -253,6 +258,8 @@ export function BrowserDock(props: BrowserDockProps) {
 
   async function tuck() {
     if (untrack(phase) !== "open") return;
+    // A reply waits while the box is a tab, so its close timer stops here.
+    clearTimeout(closeTimer);
     if (dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
     const from = form?.getBoundingClientRect();
     if (!from || !tab || prefersReducedMotion()) {
@@ -287,7 +294,16 @@ export function BrowserDock(props: BrowserDockProps) {
   }
 
   async function show() {
-    if (untrack(phase) !== "hidden") return;
+    if (untrack(phase) !== "hidden" || showing) return;
+    showing = true;
+    try {
+      await grow();
+    } finally {
+      showing = false;
+    }
+  }
+
+  async function grow() {
     reopen = false;
     const from = tab?.getBoundingClientRect();
     if (!from || !form || prefersReducedMotion()) {
