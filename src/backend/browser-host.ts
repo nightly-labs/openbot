@@ -79,7 +79,7 @@ import {
   toPublicTab,
 } from "./browser-host-tab";
 import { sessionBrowserUserAgent } from "./browser-identity";
-import { describeBrowserTarget, navigateAndWait } from "./browser-navigation";
+import { describeBrowserTarget, navigateAndWait, waitForLoading } from "./browser-navigation";
 import {
   browserLoadOptions,
   browserRequestHeaders,
@@ -1597,9 +1597,7 @@ export class BrowserHost {
                       // blocked until navigation has replaced the document and this operation ends.
                       yield* boundEngineOperation(
                         tab,
-                        navigateAndWait(tab.contents, () =>
-                          tab.contents.loadURL(currentTabUrl(tab), browserLoadOptions()),
-                        ),
+                        reloadWithGet(tab),
                         10_000,
                         "Authentication page reload timed out.",
                         keepQueueBlocked,
@@ -1817,6 +1815,34 @@ export class BrowserHost {
     this.#takeoverTabIds.delete(tabId);
     this.#syncAttachedView();
     this.#emitChanged();
+    // A failed submission can leave the secret in a page that never loads a new document, such as a
+    // single-page sign-in. Load the page again with GET, as `submit` does, so that the commit ends
+    // the protection. Without it the tab stays hidden and every tool, close included, is refused.
+    const protection = tab?.secret;
+    if (tab && protection?.submitted && !protection.running)
+      Effect.runFork(
+        this.#enqueue(
+          tabId,
+          (current) =>
+            Effect.gen(function* () {
+              // A sign-in that the person started in the takeover can still commit a new document,
+              // which ends the protection. Do not cancel that load with the reload.
+              if (current.contents.isLoadingMainFrame())
+                yield* waitForLoading(current.contents, 10_000).pipe(Effect.ignore);
+              if (current.secret !== protection) return;
+              yield* untilStopped(current, reloadWithGet(current));
+            }),
+          true,
+        ).pipe(
+          Effect.tapError((error) =>
+            Effect.sync(() =>
+              logger.warn("Unable to reload a protected browser tab after a takeover", { error: toLogValue(error) }),
+            ),
+          ),
+          Effect.ignore,
+          Effect.forkIn(tab.scope, { startImmediately: true }),
+        ),
+      );
   }
 
   readonly setVisible = Effect.fn("BrowserHost.setVisible")(function* (
@@ -4364,6 +4390,11 @@ function paddedCaptureDataUrl(image: NativeImage): string {
   for (let row = 0; row < size.height; row++)
     pixels.copy(padded, row * width * 4, row * size.width * 4, (row + 1) * size.width * 4);
   return nativeImage.createFromBitmap(padded, { width, height }).toDataURL();
+}
+
+/** Loads the current page with GET, so that a form POST is not sent again. */
+function reloadWithGet(tab: BrowserHostTab): Effect.Effect<void, BrowserOperationError> {
+  return navigateAndWait(tab.contents, () => tab.contents.loadURL(currentTabUrl(tab), browserLoadOptions()));
 }
 
 /** A load that `BrowserHost.stop` ended succeeds: the person chose to keep the page as it is. */
