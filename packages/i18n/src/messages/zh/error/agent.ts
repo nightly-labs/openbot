@@ -43,6 +43,7 @@ export const messages = {
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
+  "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":
     "{provider} 没有可用模型，其他已登录的服务商也没有。请登录某个服务商，或在“服务器设置 → 服务商”中更改默认服务商。",
   "error.agent.noStartingModel":

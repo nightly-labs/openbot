@@ -55,6 +55,8 @@ export const messages = {
     "Er is nu geen model van {provider} beschikbaar. Roep list_models aan om de beschikbare modellen te zien.",
   "error.agent.reasoningEffortUnsupported":
     "Model “{model}” ondersteunt redeneerniveau “{effort}” niet. Ondersteunde niveaus: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Model “{model}” heeft geen instelling voor het redeneerniveau, dus je kunt het niveau niet wijzigen.",
   "error.agent.noStartingModelInSettings":
     "{provider} heeft geen model beschikbaar, en geen andere aanbieder waarbij je bent ingelogd heeft er een. Log in bij een aanbieder, of wijzig de standaardaanbieder in Serverinstellingen → Aanbieders.",
   "error.agent.noStartingModel":

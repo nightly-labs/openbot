@@ -303,12 +303,27 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
 export function requireReasoningEffort(model: AgentModelOption, effort: AgentReasoningEffort): void {
   if (model.supportedReasoningEfforts.includes(effort)) return;
   throw new AgentSettingsRefused(
-    sourceText("error.agent.reasoningEffortUnsupported", {
-      model: model.id,
-      effort,
-      efforts: model.supportedReasoningEfforts.join(", "),
-    }),
+    // A model with no effort setting lists only a `medium` placeholder, which `list_models` hides (#6372).
+    model.reasoningEffortConfigurable === false
+      ? sourceText("error.agent.reasoningEffortNotConfigurable", { model: model.id })
+      : sourceText("error.agent.reasoningEffortUnsupported", {
+          model: model.id,
+          effort,
+          efforts: model.supportedReasoningEfforts.join(", "),
+        }),
   );
+}
+
+/**
+ * The effort of an agent as the agent tools report it. A model with no effort setting gets none:
+ * its stored effort never reaches the provider, and `list_models` shows no effort for it (#6372).
+ */
+export function agentReasoningEffort(
+  agent: Pick<AgentSummary, "provider" | "model" | "reasoningEffort">,
+  models: AgentModelOption[],
+): { reasoningEffort?: AgentReasoningEffort } {
+  const model = models.find((candidate) => candidate.provider === agent.provider && candidate.id === agent.model);
+  return model?.reasoningEffortConfigurable === false ? {} : { reasoningEffort: agent.reasoningEffort };
 }
 
 /**

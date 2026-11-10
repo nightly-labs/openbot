@@ -50,6 +50,8 @@ export const messages = {
     "Сейчас нет доступных моделей {provider}. Вызовите list_models, чтобы увидеть доступные модели.",
   "error.agent.reasoningEffortUnsupported":
     "Модель «{model}» не поддерживает уровень усилий «{effort}». Поддерживаются: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "У модели «{model}» нет настройки уровня усилий, поэтому его нельзя изменить.",
   "error.agent.noStartingModelInSettings":
     "У {provider} нет доступных моделей, и у других подключённых провайдеров их тоже нет. Войдите в аккаунт провайдера или измените провайдера по умолчанию в разделе Настройки сервера → Провайдеры.",
   "error.agent.noStartingModel":

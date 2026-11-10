@@ -46,6 +46,7 @@ export const messages = {
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',
   "error.agent.noStartingModelInSettings":
     "אין מודל זמין ב-{provider}, וגם לאף ספק מחובר אחר אין. יש להתחבר לספק, או לשנות את ספק ברירת המחדל בהגדרות השרת ← ספקים.",
   "error.agent.noStartingModel":

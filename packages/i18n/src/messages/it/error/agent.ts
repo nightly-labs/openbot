@@ -54,6 +54,8 @@ export const messages = {
     "Al momento nessun modello di {provider} è disponibile. Chiama list_models per vedere i modelli disponibili.",
   "error.agent.reasoningEffortUnsupported":
     "Il modello «{model}» non supporta il livello di impegno «{effort}». Livelli supportati: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Il modello «{model}» non ha un'impostazione del livello di impegno, quindi non puoi modificarlo.",
   "error.agent.noStartingModelInSettings":
     "{provider} non ha modelli disponibili e nessun altro provider con accesso ne ha. Accedi a un provider, oppure cambia il provider predefinito in Impostazioni del server → Provider.",
   "error.agent.noStartingModel":

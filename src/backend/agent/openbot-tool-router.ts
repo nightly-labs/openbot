@@ -125,6 +125,7 @@ import {
 } from "./mcp-tools";
 import {
   agentAccountSetup,
+  agentReasoningEffort,
   listModelsPayload,
   modelList,
   type ProviderAccountRows,
@@ -1272,7 +1273,10 @@ export class OpenBotToolRouter {
       description: agent.description,
       provider: agent.provider,
       model: agent.model,
-      reasoningEffort: agent.reasoningEffort,
+      ...agentReasoningEffort(
+        agent,
+        this.#hooks.agentModels({ provider: agent.provider, providerAccountId: agent.providerAccountId }),
+      ),
       ...agentAccountSetup(agent),
       access: workspaceAccessEnforced(agent) ? "workspace" : "full",
       computerUse,
@@ -2446,7 +2450,10 @@ export class OpenBotToolRouter {
               avatarUrl: updated.avatarUrl,
               provider: updated.provider,
               model: updated.model,
-              reasoningEffort: updated.reasoningEffort,
+              ...agentReasoningEffort(
+                updated,
+                this.#hooks.agentModels({ provider: updated.provider, providerAccountId: updated.providerAccountId }),
+              ),
               // A runtime change during work applies before the next turn.
               ...(updated.pendingRuntime ? { pendingRuntime: updated.pendingRuntime } : {}),
               ...agentAccountSetup(updated),
