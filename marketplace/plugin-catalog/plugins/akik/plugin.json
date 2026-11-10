@@ -1,0 +1,33 @@
+{
+  "slug": "akik",
+  "name": "Akik",
+  "tagline": "Your notes as long-term memory for AI agents",
+  "description": "Akik is a local-first notes app for Mac (iPhone and iPad coming soon) with folders, tags and wiki links. This connector lets AI agents work with the notes you sync to your Akik account: search and read notes, collect open to-dos, follow links, read shared memory and write notes that carry the agent's name. According to Akik, notes tagged \"Gizli\" (secret) are never visible to any agent. You choose which tags each agent may read and whether it may write to shared memory.",
+  "category": "productivity",
+  "creatorName": "CSY Studio",
+  "iconUrl": "https://cansoykanyilmaz.com/assets/img/akik/simge.png",
+  "version": "1.1.0",
+  "prompts": [
+    { "id": "prompt-open-todos", "text": "What's still open in my Akik notes this week?" },
+    { "id": "prompt-links", "text": "Summarize my Launch plan note and everything it links to." },
+    { "id": "prompt-search", "text": "Find what I wrote about pricing last month." }
+  ],
+  "apps": [
+    {
+      "id": "app-akik-mcp",
+      "name": "Akik",
+      "description": "Search, read and write your Akik notes, over Akik's MCP server with browser sign-in.",
+      "iconUrl": "https://cansoykanyilmaz.com/assets/img/akik/simge.png",
+      "server": {
+        "name": "akik",
+        "transport": "http",
+        "url": "https://cansoykanyilmaz.com/akik/mcp.php",
+        "auth": [{ "id": "akik-oauth", "kind": "link", "label": "Sign in to Akik" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://cansoykanyilmaz.com/akik/",
+  "privacyPolicyUrl": "https://cansoykanyilmaz.com/akik/gizlilik/",
+  "termsUrl": null
+}
