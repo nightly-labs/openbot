@@ -2099,6 +2099,7 @@ export class MailboxStore {
     this: MailboxStore,
     deliveryId: string,
     taskOpen: (taskId: string) => boolean,
+    agentExists: (agentId: string) => boolean,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
@@ -2108,6 +2109,8 @@ export class MailboxStore {
     const originAgentId = this.chainOriginAgentId(request.id);
     if (
       requesterId === teammateId ||
+      // The user deleted the agent that asked. A note for it would make the agent again (#6106).
+      !agentExists(requesterId) ||
       !originAgentId ||
       originAgentId === teammateId ||
       request.expectsReply === false ||
@@ -2152,6 +2155,18 @@ export class MailboxStore {
         (delivery) => delivery.messageId === message.id && delivery.recipientAgentId === recipientAgentId,
       );
     });
+  }
+
+  /** Whether the turn sent another agent a request that waits for a reply. */
+  hasRequestFromTurn(agentId: string, turnId: string): boolean {
+    const turnIds = this.#sourceTurnIds();
+    return this.#state.messages.some(
+      (message) =>
+        message.sender.kind === "agent" &&
+        message.sender.agentId === agentId &&
+        message.expectsReply !== false &&
+        turnIds.get(message.id) === turnId,
+    );
   }
 
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (

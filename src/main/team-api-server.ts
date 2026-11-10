@@ -283,6 +283,7 @@ import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeBrowserProxies } from "./team-api/route-browser-proxies";
 import { routeChannels } from "./team-api/route-channels";
 import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/route-chat-colors";
+import { routeChatHistory } from "./team-api/route-chat-history";
 import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
@@ -1185,6 +1186,7 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
+      if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
       if ((await routeConversationUnreadFrom(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;

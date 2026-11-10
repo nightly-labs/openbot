@@ -273,6 +273,8 @@ export const messages = {
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.imageTooSmall":
+    "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.opencodeSessionRejected":
     "رفض OpenCode الطلب ولم يذكر السبب. قد يحدث هذا في دردشة طويلة أو بعد تغيير النموذج. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا مختلفًا أو مستوى جهد أقل.",
   "error.provider.museMcpStartupFault":
@@ -392,6 +394,8 @@ export const messages = {
   "error.provider.museEmptyInput": "يحتاج Muse إلى نص أو صورة.",
   "error.provider.museMethodUnsupported": "لا يدعم Muse {method}.",
   "error.provider.museTurnFailed": "فشل دور Muse.",
+  "error.provider.museModelUnavailable":
+    "لا يمكن لـ Muse استخدام هذا النموذج. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل، أو قد لا يملك هذا الحساب إذنًا بالوصول إلى النموذج. اختر نموذجًا آخر، ثم حاول مرة أخرى.\n{detail}",
   "error.provider.museProfileUnsupported":
     "لا يستطيع Muse إنشاء ملف تعريف بدون الوصول إلى أدوات خارجية. استخدم مزوّدًا آخر لإنشاء ملف التعريف، ثم اختر Muse للوكيل.",
   "error.provider.museAuthUnverified": "لم يتم التحقق من مصادقة Muse. اتصل على الحاسوب المضيف، أو عيّن مفتاح Meta API.",

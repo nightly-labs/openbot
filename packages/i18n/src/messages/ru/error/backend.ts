@@ -71,6 +71,8 @@ export const messages = {
     "У канала есть неподтверждённый запуск назначения. Проверьте его результат, прежде чем удалять канал.",
   "error.backend.channelNotFound": "Канал не найден.",
   "error.backend.channelMemberUnavailable": "Участник канала недоступен.",
+  "error.backend.channelInstructionsTooLong":
+    "Сократите инструкции до 2000 символов. Более длинные инструкции не сохраняются.",
   "error.backend.channelWaitBeforeNewConversation":
     "Дождитесь окончания работы в этом канале, затем начните новый разговор.",
   "error.backend.channelWaitBeforeCompact": "Дождитесь окончания работы в этом канале, затем сожмите его.",

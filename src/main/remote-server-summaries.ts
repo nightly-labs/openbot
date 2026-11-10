@@ -64,6 +64,7 @@ export function remoteServerSummaries(
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
         ...(server.hosted === undefined ? {} : { hosted: server.hosted }),
+        ...(server.storageGb === undefined ? {} : { storageGb: server.storageGb }),
         ...(changedAt === undefined ? {} : { keyChangedAt: changedAt }),
         ...(isThisComputer(server.id) ? { thisComputer: true as const } : {}),
         compatibility: status.compatibility,

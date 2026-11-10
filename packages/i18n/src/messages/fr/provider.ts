@@ -129,6 +129,8 @@ export const messages = {
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
   "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.museNoModels":
+    "Muse n’a envoyé aucun modèle pour ce compte. Muse n’est peut-être pas disponible dans le pays où cet agent s’exécute. Choisissez un modèle d’un autre fournisseur.",
   "provider.picker.customEmpty":
     "Ajoutez un point de terminaison compatible OpenAI : un serveur de modèles sur cet ordinateur, ou tout service avec une URL de base et une clé.",
   "provider.picker.customPending":

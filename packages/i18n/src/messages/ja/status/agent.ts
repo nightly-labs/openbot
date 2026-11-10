@@ -31,6 +31,9 @@ export const messages = {
     "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
+  "status.agent.serverInstallCommand":
+    "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
+  "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
   "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",

@@ -148,6 +148,22 @@ export const EmptyCatalog = at(tab("agents"), { empty: true });
 /** A member of a joined server: no Add, no Add custom, no install menu and no Connect. */
 export const Member: Story = { args: { member: true } };
 
+/** A member of a host that lets only owners and admins connect apps: the page says whom to ask. */
+export const MemberPluginApp = at(plugin("cloudflare"), {
+  catalog: ["cloudflare"],
+  member: true,
+  held: {},
+  blocked: { reason: "member", host: "Studio" },
+});
+
+/** The app has not read yet what the joined server serves: Connect waits, then connects. */
+export const PluginAppChecking = at(plugin("cloudflare"), {
+  catalog: ["cloudflare"],
+  member: true,
+  held: {},
+  blocked: { reason: "checking" },
+});
+
 const connector = (id: string) => at((nav) => nav.go({ kind: "app", id }), { connected: true });
 
 /** A chat channel: one connected Slack workspace. */

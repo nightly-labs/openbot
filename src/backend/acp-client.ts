@@ -1031,8 +1031,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A session with a process of its own fails with how that process ended.
     const transport = (sessionId ? this.#threads.get(sessionId)?.transport : null) ?? this.#transport;
     const ended = transport.ended;
+    let result = yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs));
+    // A session open or a settings change that a lost turn refused did not run, so it goes again once.
+    if (
+      Result.isFailure(result) &&
+      sessionId &&
+      (method === "turn/start" || method === "thread/resume") &&
+      (yield* this.#discardLostTurns(sessionId, result.failure.cause))
+    )
+      result = yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs));
     try {
-      return providerResult(yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs)));
+      return providerResult(result);
     } catch (error) {
       if (error instanceof TimeoutError)
         yield* Effect.forkIn(
@@ -2282,7 +2291,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
       const send = () => this.#sendPrompt(thread, turn, prompt, params);
-      let response = providerResult(yield* send());
+      let sent = yield* send();
+      // A prompt that the agent took and then lost is not sent again: it can have run.
+      if (
+        Result.isFailure(sent) &&
+        thread.activeTurn === turn &&
+        !turn.stopped &&
+        (yield* this.#discardLostTurns(thread.id, sent.failure.cause)) &&
+        this.#flavor.lostTurns?.unsent.test(failureText(sent.failure.cause)) &&
+        // The user can stop the turn while the discard runs.
+        thread.activeTurn === turn &&
+        !turn.stopped
+      )
+        sent = yield* send();
+      let response = providerResult(sent);
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
@@ -2349,6 +2371,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // A session's own process that ended names how it ended, as the agent's process does.
       const transport = thread.transport;
       const failure = transport && !turn.stopped ? (yield* this.#explainSessionEnd(transport, error)).cause : error;
+      // A prompt that failed because the model gave no answer ends as a turn with no answer does:
+      // quietly when the turn needs no answer, and else with a plain message (#6073).
+      if (!turn.stopped && this.#flavor.emptyAnswerError?.test(failureText(failure))) {
+        if (turn.answerOptional) {
+          yield* this.#completeTurn(thread, turn, "completed", null);
+          return;
+        }
+        turn.failureCause = "empty_answer";
+        yield* this.#completeTurn(
+          thread,
+          turn,
+          "failed",
+          sourceText("error.provider.acpNoAnswer", { provider: this.#label }),
+        );
+        return;
+      }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
     }
   });
@@ -2440,6 +2478,30 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#configuration.applyConfig(thread, model, null, this.#models);
     yield* this.#applyTurnSettings(thread, params);
     this.#publishSessionSettings(thread);
+  });
+
+  /**
+   * Discards the turns that the agent lost, when it refused a request of this session because of
+   * them. True when the discard ran, so the refused request can go again once.
+   */
+  readonly #discardLostTurns = Effect.fn("AcpAgentClient.discardLostTurns")(function* (
+    this: AcpAgentClient,
+    sessionId: string,
+    error: unknown,
+  ): Effect.fn.Return<boolean> {
+    const lostTurns = this.#flavor.lostTurns;
+    if (!lostTurns || !(error instanceof RequestError) || !lostTurns.refusal.test(failureText(error))) return false;
+    const transport = this.#threads.get(sessionId)?.transport ?? this.#transport;
+    const discarded = yield* Effect.result(transport.run(lostTurns.discard(sessionId), this.#requestTimeoutMs));
+    if (Result.isFailure(discarded)) {
+      logger.warn("OpenBot could not discard the turns that an ACP agent lost.", {
+        provider: this.provider,
+        reason: this.#redact(failureText(discarded.failure.cause)),
+      });
+      return false;
+    }
+    logger.info("OpenBot discarded the turns that an ACP agent lost.", { provider: this.provider });
+    return true;
   });
 
   /**

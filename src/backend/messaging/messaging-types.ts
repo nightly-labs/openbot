@@ -293,6 +293,16 @@ export class TelegramCallError extends Error {
   }
 }
 
+/** A post that WhatsApp's server refused in its ack, such as 463 for a chat it does not let this number start. */
+export class WhatsAppRefusedError extends Error {
+  readonly code: string;
+  constructor(errorCode: string) {
+    super(`WhatsApp refused the message: ${errorCode}`);
+    this.name = "WhatsAppRefusedError";
+    this.code = `whatsapp_${errorCode}`;
+  }
+}
+
 /**
  * The relay that brings a platform's HTTP requests to this host: Signal's `ingress` socket, which
  * the main process owns. It is open while anything holds it.

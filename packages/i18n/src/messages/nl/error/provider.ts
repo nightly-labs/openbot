@@ -293,6 +293,8 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageTooSmall":
+    "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.museMcpStartupFault":
@@ -422,6 +424,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse heeft tekst of een afbeelding nodig.",
   "error.provider.museMethodUnsupported": "Muse ondersteunt {method} niet.",
   "error.provider.museTurnFailed": "De Muse-beurt is mislukt.",
+  "error.provider.museModelUnavailable":
+    "Muse kan dit model niet gebruiken. Muse is mogelijk niet beschikbaar in het land waar deze agent draait, of dit account heeft geen toegang tot het model. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kan geen profiel maken zonder toegang tot externe tools. Gebruik een andere aanbieder om het profiel te maken en kies daarna Muse voor de agent.",
   "error.provider.museAuthUnverified":

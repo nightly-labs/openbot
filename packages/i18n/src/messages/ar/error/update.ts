@@ -20,6 +20,8 @@ export const messages = {
   "error.update.siblingSessionSameAccount":
     "لا تزال عملية OpenBot أخرى تعمل في حساب المستخدم هذا. أغلقها، ثم ثبّت التحديث مرة أخرى.",
   "error.update.siblingCheckFailed": "تعذّر التحقق من جلسات OpenBot الأخرى. حاول مرة أخرى قبل التثبيت.",
+  "error.update.readOnlyLocation":
+    "لا يمكن لـ OpenBot تثبيت التحديثات من هذا الموقع. أغلق OpenBot. في Finder، اسحب OpenBot إلى مجلد التطبيقات (إذا كان موجودًا هناك بالفعل، فاسحبه خارجه ثم أعده إليه). ثم افتح OpenBot وثبّت التحديث مرة أخرى.",
   "error.update.remoteDisabled": "التحديثات من مسؤولي الخوادم معطّلة على هذا الحاسوب.",
   "error.update.restartStarted": "يعيد OpenBot التشغيل بالفعل لتثبيت التحديث.",
   "error.update.alreadyRestarting": "يعيد OpenBot التشغيل بالفعل.",

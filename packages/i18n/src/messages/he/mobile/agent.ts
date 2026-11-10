@@ -527,6 +527,7 @@ export const messages = {
     two: "שתי הודעות שלא נקראו",
     other: "{count} הודעות שלא נקראו",
   },
+  "mobile.agent.list.unreadThreads": "הודעות שלא נקראו בשרשורים",
   "mobile.agent.list.waiting.title": "דורש את תשומת לבך",
   "mobile.agent.list.waiting.label": {
     one: "דורש אותך, סוכן אחד",

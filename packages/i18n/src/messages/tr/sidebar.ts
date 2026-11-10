@@ -82,6 +82,7 @@ export const messages = {
   "sidebar.state.working": "Düşünüyor",
   "sidebar.state.responded": "Yanıtladı",
   "sidebar.state.unread": { one: "{count} yeni yanıt", other: "{count} yeni yanıt" },
+  "sidebar.state.unreadThreads": "Mesaj dizilerinde yeni yanıtlar",
   "sidebar.state.waitingQuestion": "Yanıtınızı bekliyor",
   "sidebar.state.waitingApproval": "Onayınızı bekliyor",
   "sidebar.state.waitingTakeover": "Tarayıcıda sizi bekliyor",

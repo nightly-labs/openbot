@@ -1,9 +1,11 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelCommand,
   type ChannelMessage,
+  type ChannelTask,
   canAdministerServer,
   isReleasedRoutineSchedule,
   parseChannelCommand,
@@ -79,7 +81,10 @@ export async function routeChannels(
   if (list)
     return json(
       200,
-      channels.store.list(member.id).filter((channel) => seesChannel(channel.members, channelHiddenAgentIds)),
+      channels.store
+        .list(member.id)
+        .filter((channel) => seesChannel(channel.members, channelHiddenAgentIds))
+        .map(peerChannel),
     );
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
@@ -89,8 +94,16 @@ export async function routeChannels(
     // remote client.
     for (let limit = 100; ; limit = Math.floor(limit / 2)) {
       const page = channels.store.page(input.channelId, input.beforeSequence, limit);
-      const body = { ...page, messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)) };
-      const bytes = Buffer.byteLength(JSON.stringify(body));
+      let body = {
+        ...page,
+        channel: peerChannel(page.channel),
+        messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
+      };
+      let bytes = Buffer.byteLength(JSON.stringify(body));
+      if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
+        body = { ...body, tasks: pageTasks(body.tasks, body.messages) };
+        bytes = Buffer.byteLength(JSON.stringify(body));
+      }
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, body);
       if (limit === 1) {
         // One message alone is too large: cut its text, so the channel opens and the older pages load.
@@ -126,9 +139,11 @@ export async function routeChannels(
   if (input.type === "save") requireChatForAddedAgents(context, input, channels, hiddenAgentIds);
   return json(
     200,
-    await runCauseEffect(
-      channels.command(input, { id: member.id, name: member.name ?? "Team member" }, (queued) =>
-        keepHiddenMembers(queued, channels, hiddenAgentIds),
+    peerChannel(
+      await runCauseEffect(
+        channels.command(input, { id: member.id, name: member.name ?? "Team member" }, (queued) =>
+          keepLongInstructions(keepHiddenMembers(queued, channels, hiddenAgentIds), channels),
+        ),
       ),
     ),
   );
@@ -143,10 +158,28 @@ function seesChannel(members: readonly { agentId: string }[], hiddenAgentIds: Re
 }
 
 /** A channel that the list leaves out answers as a channel that does not exist. */
-function requireVisibleChannel(channels: ChannelService, channelId: string, hiddenAgentIds: ReadonlySet<string>): void {
+export function requireVisibleChannel(
+  channels: Pick<ChannelService, "store">,
+  channelId: string,
+  hiddenAgentIds: ReadonlySet<string>,
+): void {
   if (hiddenAgentIds.size === 0 || !channels.store.exists(channelId)) return;
   if (!seesChannel(channels.store.get(channelId).members, hiddenAgentIds))
     throw new HttpError(404, sourceText("error.backend.channelNotFound"));
+}
+
+/**
+ * The tasks that a page shows: every task of a run with open work (Stop, the stopped-task cards and
+ * the awaiting replies read them), and the tasks of the messages on the page. A channel keeps every
+ * task it ever had, one for each member of each request, so in a large channel the tasks alone
+ * passed one WebRTC frame and the channel did not open on a remote client (#6045).
+ */
+function pageTasks(tasks: readonly ChannelTask[], messages: readonly ChannelMessage[]): ChannelTask[] {
+  const openRuns = new Set(
+    tasks.flatMap((task) => (task.state === "completed" || task.state === "cancelled" ? [] : [task.rootTaskId])),
+  );
+  const shown = new Set(messages.map((item) => item.taskId));
+  return tasks.filter((task) => openRuns.has(task.rootTaskId) || shown.has(task.id));
 }
 
 /**
@@ -182,6 +215,35 @@ function keepHiddenMembers(
       : input.draft.leadAgentId;
   if (kept.length === 0 && leadAgentId === input.draft.leadAgentId) return input;
   return { ...input, draft: { ...input.draft, members: [...input.draft.members, ...kept], leadAgentId } };
+}
+
+/**
+ * Released peers read at most `agentDescription` characters of instructions, and the channel codec
+ * refuses more, so stored instructions over the limit (#5929) go to a peer cut to it.
+ */
+function peerInstructions(text: string): string {
+  if (text.length <= INPUT_LIMITS.agentDescription) return text;
+  const cut = text.slice(0, INPUT_LIMITS.agentDescription);
+  // Do not end on half of a surrogate pair.
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
+
+function peerChannel<T extends { instructions: string }>(channel: T): T {
+  const instructions = peerInstructions(channel.instructions);
+  return instructions === channel.instructions ? channel : { ...channel, instructions };
+}
+
+/**
+ * A peer's save carries the whole draft, so a member change on a peer sends back the cut text that
+ * `peerChannel` gave it. That text keeps the stored instructions, rather than losing their end.
+ * Like `keepHiddenMembers`, it runs when the save's turn in the command queue comes.
+ */
+function keepLongInstructions(input: ChannelCommand, channels: ChannelService): ChannelCommand {
+  if (input.type !== "save" || !channels.store.exists(input.channelId)) return input;
+  const stored = channels.store.get(input.channelId).instructions;
+  if (stored.length <= INPUT_LIMITS.agentDescription || input.draft.instructions !== peerInstructions(stored))
+    return input;
+  return { ...input, draft: { ...input.draft, instructions: stored } };
 }
 
 /** An agent that a save adds to a channel talks there, so the member needs `chat` for it. */

@@ -260,13 +260,21 @@ function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
   return rest;
 }
 
-export function isChannelDraft(value: unknown): value is ChannelDraft {
+/**
+ * `instructionsLimit` is `storedChannelInstructions` where the instructions can be the stored ones
+ * unchanged: a read, and a save, which sends the whole draft. The backend refuses a save that
+ * changes them to more than `agentDescription`.
+ */
+export function isChannelDraft(
+  value: unknown,
+  instructionsLimit: number = INPUT_LIMITS.agentDescription,
+): value is ChannelDraft {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     value.name.trim().length > 0 &&
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
-    isBoundedString(value.instructions, INPUT_LIMITS.agentDescription) &&
+    isBoundedString(value.instructions, instructionsLimit) &&
     (value.isolated === undefined || typeof value.isolated === "boolean") &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
@@ -326,7 +334,7 @@ function sequence(value: unknown): value is number {
 export function isChannel(value: unknown): value is Channel {
   return (
     isDynamicRecord(value) &&
-    isChannelDraft(value) &&
+    isChannelDraft(value, INPUT_LIMITS.storedChannelInstructions) &&
     isIdentifier(value.id) &&
     typeof value.archived === "boolean" &&
     sequence(value.revision) &&
@@ -467,7 +475,7 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
     throw new Error("Provide a valid channel command.");
   const common = { operationId: value.operationId, channelId: value.channelId };
   const draft = normalizeChannelDraft(value.draft);
-  if (value.type === "save" && isChannelDraft(draft))
+  if (value.type === "save" && isChannelDraft(draft, INPUT_LIMITS.storedChannelInstructions))
     return {
       ...common,
       type: value.type,

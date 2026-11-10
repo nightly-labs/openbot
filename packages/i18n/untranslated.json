@@ -3109,7 +3109,7 @@
     "tr",
     "zh"
   ],
-  "settings.voice.speech.model.v4Turbo.description": [
+  "settings.voice.speech.model.v4.description": [
     "ar",
     "de",
     "es",
@@ -3125,7 +3125,7 @@
     "tr",
     "zh"
   ],
-  "settings.voice.speech.model.v4.description": [
+  "settings.voice.speech.model.v4Turbo.description": [
     "ar",
     "de",
     "es",

@@ -1819,7 +1819,25 @@ textarea {
 }
 
 /* The rows fade in under the folder headers that stay at the top, so no row is cut at a header's
-   edge. `--agent-list-stuck-height` is the bottom of those headers, or 0 when none is at the top. */
+   edge. `--agent-list-stuck-height` is the bottom of those headers, or 0 when none is at the top.
+   These properties do not inherit: the list sets them while it scrolls, and an inherited change
+   restyles every row under it (issue 6019). */
+@property --agent-list-stuck-height {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --agent-list-fade-top {
+  syntax: "*";
+  inherits: false;
+}
+
+@property --agent-list-fade-bottom {
+  syntax: "*";
+  inherits: false;
+}
+
 .sidebar .agent-list:is(.scroll-fade-top, .scroll-fade-bottom) {
   --agent-list-fade-top: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
   --agent-list-fade-bottom: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
@@ -3124,7 +3142,7 @@ textarea {
   position: relative;
   z-index: var(--openbot-layer-tooltip);
   display: grid;
-  width: min(300px, calc(100vw - var(--openbot-space-4)));
+  width: min(340px, calc(100vw - var(--openbot-space-4)));
   max-height: min(60vh, 420px);
   overflow: auto;
   padding: var(--openbot-space-2);
@@ -3176,12 +3194,13 @@ textarea {
 }
 
 /* Columns: logo, window label, bar, percent left, reset countdown. Each provider row and each
-   window row is a subgrid, so the bars line up across providers. */
+   window row is a subgrid, so the bars line up across providers. A long window label is cut
+   before the bar gets narrower than its minimum. */
 .account-usage-providers {
   display: grid;
   margin: 0;
   padding: 0;
-  grid-template-columns: auto max-content minmax(0, 1fr) max-content max-content;
+  grid-template-columns: auto minmax(0, max-content) minmax(var(--openbot-space-8), 1fr) max-content max-content;
   column-gap: var(--openbot-space-2);
   row-gap: var(--openbot-space-1);
   list-style: none;
@@ -3279,6 +3298,11 @@ textarea {
 .account-usage-window-reset {
   color: var(--openbot-text-muted);
   white-space: nowrap;
+}
+
+.account-usage-window-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .account-usage-window-reset {

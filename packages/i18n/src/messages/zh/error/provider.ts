@@ -261,6 +261,8 @@ export const messages = {
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
+  "error.provider.imageTooSmall":
+    "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
   "error.provider.museMcpStartupFault":
@@ -370,6 +372,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse 需要文本或图片。",
   "error.provider.museMethodUnsupported": "Muse 不支持 {method}。",
   "error.provider.museTurnFailed": "Muse 本轮对话失败。",
+  "error.provider.museModelUnavailable":
+    "Muse 无法使用此模型。Muse 可能在此智能体运行的国家或地区不可用，或者此账号无权访问该模型。请选择其他模型，然后重试。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse 在无法使用外部工具时无法生成资料。请改用其他服务商生成资料，然后为该助手选择 Muse。",
   "error.provider.museAuthUnverified": "Muse 身份验证尚未确认。请在主机电脑上连接，或设置 Meta API 密钥。",

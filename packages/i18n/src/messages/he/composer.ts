@@ -114,6 +114,10 @@ export const messages = {
   "composer.error.changeModel": "לא ניתן לשנות מודל. יש לנסות שוב.",
   "composer.error.changeEffort": "לא ניתן לשנות את רמת המאמץ. יש לנסות שוב.",
   "composer.error.changeFastMode": "לא ניתן לשנות את המצב המהיר. יש לנסות שוב.",
+  "composer.fastMode.confirmTitle": "להפעיל את המצב המהיר?",
+  "composer.fastMode.confirmDescription":
+    "Claude עונה מהר יותר, אבל כל טוקן עולה יותר. עם מינוי Claude, המצב המהיר משתמש תמיד בקרדיטים לשימוש, גם כשנשאר שימוש בתוכנית.",
+  "composer.fastMode.confirm": "הפעלה",
   "composer.context.label": "ההקשר מלא ב-{percent}",
   "composer.context.labelEstimated": "ההקשר מלא בכ-{percent}",
   "composer.context.labelCompacting": "מכווץ את ההקשר",

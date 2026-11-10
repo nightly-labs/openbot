@@ -20,6 +20,8 @@ export const messages = {
   "error.update.siblingSessionSameAccount":
     "תהליך אחר של OpenBot עדיין פועל בחשבון המשתמש הזה. יש לסגור אותו ואז להתקין את העדכון שוב.",
   "error.update.siblingCheckFailed": "לא ניתן לאמת סשנים אחרים של OpenBot. יש לנסות שוב לפני ההתקנה.",
+  "error.update.readOnlyLocation":
+    "OpenBot לא יכול להתקין עדכונים מהמיקום הזה. צא מ-OpenBot. ב-Finder, גרור את OpenBot לתיקייה 'יישומים' (אם הוא כבר שם, גרור אותו החוצה ובחזרה פנימה). לאחר מכן פתח את OpenBot והתקן את העדכון שוב.",
   "error.update.remoteDisabled": "עדכונים ממנהלי שרת כבויים במחשב הזה.",
   "error.update.restartStarted": "OpenBot כבר מופעל מחדש כדי להתקין את העדכון.",
   "error.update.alreadyRestarting": "OpenBot כבר מופעל מחדש.",

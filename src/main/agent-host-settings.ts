@@ -166,10 +166,13 @@ export function createAgentHostSettings({
     updatePlanCard: (input) => updatePlanCard(input).pipe(Effect.uninterruptible),
     readFastMode: (agentId) => fastMode(requireAgent(agentId)),
     updateFastMode: (input) => updateFastMode(input).pipe(Effect.uninterruptible),
+    // Claude fast mode needs the price confirmation, and released member apps show the switch without it.
     listFastModels: () =>
       agents
         .listModels()
-        .flatMap(({ provider, id, fastServiceTier }) => (fastServiceTier ? [{ provider, id, fastServiceTier }] : [])),
+        .flatMap(({ provider, id, fastServiceTier }) =>
+          fastServiceTier && provider !== "claude" ? [{ provider, id, fastServiceTier }] : [],
+        ),
   };
 }
 

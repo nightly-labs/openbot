@@ -82,6 +82,7 @@ export const messages = {
   "sidebar.state.working": "생각 중",
   "sidebar.state.responded": "응답함",
   "sidebar.state.unread": { other: "새 답변 {count}개" },
+  "sidebar.state.unreadThreads": "스레드에 새 답변",
   "sidebar.state.waitingQuestion": "내 답변을 기다리는 중",
   "sidebar.state.waitingApproval": "내 승인을 기다리는 중",
   "sidebar.state.waitingTakeover": "브라우저에서 내 조작을 기다리는 중",

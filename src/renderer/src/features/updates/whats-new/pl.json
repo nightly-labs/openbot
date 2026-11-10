@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agenci sami uczą się nowych umiejętności po poprawce lub po metodzie, która zadziałała. Wybierz Automatycznie, Najpierw zapytaj lub Wyłączone w Ustawienia serwera → Ogólne.",
+          "Dane logowania w Sejfie mogą przechowywać kod weryfikacji dwuetapowej, a agenci mogą się nim logować.",
+          "W systemie Windows Dynamic Island i dok agentów pokazują twoich agentów, tak jak na Macu. Dok agentów może też zawierać kanały.",
+          "Agenci mogą oglądać publiczne filmy w sieci, na przykład linki z YouTube lub TikToka.",
+          "Zaznacz wiele plików w Bibliotece, aby pobrać lub usunąć je naraz.",
+          "Agenci mogą wysłać za ciebie zgłoszenie błędu lub pomysł na funkcję do zespołu OpenBot."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Członkowie kanału odpowiadają, gdy pracują we własnym czacie, a powitanie lub niejasna wiadomość trafia do lidera kanału.",
+          "Nowy agent otwiera się z krótkim powitaniem i trzema pierwszymi zadaniami do wyboru.",
+          "Połącz Composio, logując się w przeglądarce. Nie wpisujesz już adresu URL ani klucza API.",
+          "Ustawienia nazywają się teraz Twoje ustawienia, a Ustawienia serwera mają pole wyszukiwania.",
+          "Ikona aplikacji w macOS ma nowy, szklany wygląd."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Kolejka agenta nie uruchamia już w kółko tej samej wiadomości, gdy agent czeka na odpowiedź na własne pytanie.",
+          "Agent ChatGPT nie kompaktuje już kontekstu w kółko i nie zostaje bez końca na „Kompaktowanie kontekstu”.",
+          "Agenci w Cursor i kilku innych dostawcach zachowują swoje narzędzia OpenBot po ponownym uruchomieniu OpenBot.",
+          "Agenci mogą używać zdalnego serwera MCP, na którym masz zalogowane konto, na przykład n8n, w najnowszej wersji MCP."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.65.0",
     "date": "2026-11-08",
     "notices": [],

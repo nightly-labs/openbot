@@ -69,6 +69,7 @@ export const messages = {
   "error.team.channelTaskCancelUnsupported":
     "L’annulation des tâches de canal n’est pas prise en charge par cette connexion.",
   "error.team.membersCannotDeleteChannels": "Les membres ne peuvent pas supprimer de canaux.",
+  "error.team.membersCannotDeleteChannelHistory": "Les membres ne peuvent pas supprimer l’historique du canal.",
   "error.team.membersCannotArchiveChannels": "Les membres ne peuvent pas archiver de canaux.",
   "error.team.membersCannotRestoreChannels": "Les membres ne peuvent pas restaurer de canaux.",
   "error.team.sharedDataUnsupported": "Les données partagées ne sont pas prises en charge par cette connexion.",

@@ -137,6 +137,8 @@ export interface SettingsAgentsTabProps {
   onPlanStartChange: (value: number | null) => void;
   /** Sets how many messages and routine runs local scripts can send each agent in one hour. */
   onAutomationLimitChange: (value: number) => void;
+  /** Turns the OpenBot co-author line of the agents' git commits on or off, for all agents. */
+  onCommitCoAuthorChange: (on: boolean) => void;
   /** Gives `choice` to each agent of `agentIds`. */
   onChoiceChange: (agentIds: readonly string[], setting: AgentDefaultSetting, choice: AgentDefaultChoice) => void;
 }
@@ -213,6 +215,19 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
             );
           }}
         </For>
+      </ItemGroup>
+    </SettingsSection>
+  );
+
+  const commitSection = () => (
+    <SettingsSection title={t("settings.commitCoAuthor.sectionTitle")}>
+      <ItemGroup class="settings-modal-card">
+        <SwitchField
+          checked={props.defaults.commitCoAuthor}
+          onChange={props.onCommitCoAuthorChange}
+          label={t("settings.commitCoAuthor.title")}
+          description={t("settings.commitCoAuthor.description")}
+        />
       </ItemGroup>
     </SettingsSection>
   );
@@ -356,7 +371,16 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
   return (
     <>
       {loadError()}
-      <Show when={props.setting} fallback={list()} keyed>
+      <Show
+        when={props.setting}
+        fallback={
+          <>
+            {list()}
+            {commitSection()}
+          </>
+        }
+        keyed
+      >
         {(setting) => settingPage(setting)}
       </Show>
     </>

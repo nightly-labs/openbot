@@ -65,6 +65,7 @@ export const messages = {
   "error.team.historyDeleteUnsupported": "Esta conexión no admite la eliminación del historial.",
   "error.team.channelTaskCancelUnsupported": "Esta conexión no admite la cancelación de tareas de canales.",
   "error.team.membersCannotDeleteChannels": "Los miembros no pueden eliminar canales.",
+  "error.team.membersCannotDeleteChannelHistory": "Los miembros no pueden eliminar el historial del canal.",
   "error.team.membersCannotArchiveChannels": "Los miembros no pueden archivar canales.",
   "error.team.membersCannotRestoreChannels": "Los miembros no pueden restaurar canales.",
   "error.team.sharedDataUnsupported": "Esta conexión no admite datos compartidos.",

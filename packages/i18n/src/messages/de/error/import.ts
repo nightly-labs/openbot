@@ -50,6 +50,8 @@ export const messages = {
   "error.import.hostBusy": "Der Server liest andere Exporte. Versuche es in einigen Minuten erneut.",
   "error.import.skillKept":
     "{name}: Der Server hat die Fähigkeit „{skill}“ bereits. Der Agent verwendet daher diese Fähigkeit. Bitte einen Administrator, sie zu aktualisieren.",
+  "error.import.skillRenamed":
+    "{name}: Der Name der Fähigkeit „{skill}“ ist dem Namen einer anderen Fähigkeit zu ähnlich. Daher wird sie als „{renamed}“ gespeichert.",
   "error.import.transferRemoteTooLarge":
     "Eine Übertragungsdatei für einen beigetretenen Server muss kleiner als 100 MB sein. Deaktiviere die Dateien der Arbeitsbereiche oder exportiere weniger Agenten.",
   "error.import.transferNotFile": "Diese Datei ist keine OpenBot-Übertragungsdatei.",

@@ -81,6 +81,7 @@ export const messages = defineMessages("sidebar", {
   "sidebar.state.working": "Thinking",
   "sidebar.state.responded": "Responded",
   "sidebar.state.unread": { one: "{count} new reply", other: "{count} new replies" },
+  "sidebar.state.unreadThreads": "New replies in threads",
   "sidebar.state.waitingQuestion": "Waiting for your answer",
   "sidebar.state.waitingApproval": "Waiting for your approval",
   "sidebar.state.waitingTakeover": "Waiting for you in the browser",

@@ -690,6 +690,32 @@ export class GitHubConnectorService {
     };
   });
 
+  /**
+   * Whether the user token can read `owner/name`, for the hint of the MCP proxy. GitHub answers 404 for a
+   * private repository where the app is not installed. Null for another answer or no answer.
+   */
+  readonly #canRead = Effect.fn("GitHubConnector.canRead")(
+    function* (
+      this: GitHubConnectorService,
+      owner: string,
+      name: string,
+      signal: AbortSignal,
+    ): Effect.fn.Return<boolean | null, GitHubOperationError, GitHubPlatform> {
+      const token = yield* this.accessToken();
+      if (!token) return null;
+      const response = yield* GitHubPlatform.use((platform) =>
+        platform.fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`, {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS)]),
+          headers: githubApiHeaders(token),
+        }),
+      );
+      void response.body?.cancel();
+      if (response.status === 404) return false;
+      return response.ok ? true : null;
+    },
+    (operation) => this.#owned(operation).pipe(Effect.catch(() => Effect.succeed(null))),
+  ).bind(this);
+
   readonly #getGitHubEffect = Effect.fn("GitHubConnector.getGitHub")(function* <T>(
     this: GitHubConnectorService,
     url: string,
@@ -702,12 +728,7 @@ export class GitHubConnectorService {
       return yield* GitHubPlatform.use((platform) =>
         platform.fetch(url, {
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${accessToken}`,
-            "User-Agent": "OpenBot",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
+          headers: githubApiHeaders(accessToken),
         }),
       );
     }).pipe(Effect.result);
@@ -963,6 +984,7 @@ export class GitHubConnectorService {
       secret: () => this.#mcpProxySecret,
       userToken: () => this.accessToken(),
       botToken: (owner, name) => this.#botTokens.forRepository(owner, name),
+      canRead: (owner, name, signal) => this.#canRead(owner, name, signal),
     });
     const attempt5 = yield* Effect.gen({ self: this }, function* () {
       return yield* proxy.start(record?.mcpProxy?.port ?? null);
@@ -1072,4 +1094,13 @@ function gitConfigCount(value: string | undefined): number {
 /** One POSIX shell word. Git runs a `!` helper with `sh`, on Windows too. */
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function githubApiHeaders(accessToken: string): Record<string, string> {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${accessToken}`,
+    "User-Agent": "OpenBot",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
 }

@@ -304,6 +304,8 @@ export const messages = {
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageTooSmall":
+    "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.museMcpStartupFault":
@@ -438,6 +440,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse にはテキストまたは画像が必要です。",
   "error.provider.museMethodUnsupported": "Muse は {method} に対応していません。",
   "error.provider.museTurnFailed": "Muse のターンに失敗しました。",
+  "error.provider.museModelUnavailable":
+    "Muse はこのモデルを使用できません。このエージェントが動作している国では Muse を利用できないか、このアカウントにモデルへのアクセス権がない可能性があります。別のモデルを選択してから、もう一度お試しください。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse は外部ツールにアクセスできないため、プロフィールを生成できません。別のプロバイダーでプロフィールを生成してから、エージェントに Muse を選択してください。",
   "error.provider.museAuthUnverified":

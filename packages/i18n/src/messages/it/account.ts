@@ -40,6 +40,7 @@ export const messages = {
   "account.usage.window.otherModels": "Altri modelli",
   "account.usage.window.total": "Totale",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} rimanente",
   "account.update.failedRetry": "Aggiornamento non riuscito. Riprova.",
   "account.update.managedByHost": "Gestito dall'host",
   "account.update.restart": "Riavvia",

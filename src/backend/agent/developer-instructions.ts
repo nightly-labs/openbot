@@ -5,6 +5,7 @@ import {
   serializeEssentialMemories,
 } from "@openbot/contracts/agent-memory-context";
 import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { HOSTED_SERVER_BASE_IMAGE_GB } from "@openbot/contracts/hosted-servers";
 import {
   type AgentDefaults,
   type AgentInstructionFileName,
@@ -16,6 +17,7 @@ import {
   COMPUTER_USE_MCP_SERVER_NAME,
   DEFAULT_AGENT_MEMORY_LIMIT,
   DEFAULT_RESPONSE_STYLE,
+  OPENBOT_COMMIT_TRAILER,
   type ResponseStyle,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -29,6 +31,14 @@ import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sand
 const ROUTINE_SIGN_IN_RULE =
   "In a routine run, first check saved logins with openbot_browser.list_logins. Use a matching login's username and submit_secret with its loginId for a password or authenticator code. With several logins, use only the account that the task names. When no login fits, the account is unclear, a fill fails, or the page needs a person (email or SMS code, CAPTCHA, passkey, or payment confirmation), report the sign-in requirement; do not call request_takeover or submit_secret without loginId.";
 const ROUTINE_NO_TAKEOVER_RULE = "In a routine run, report a required sign-in instead of a takeover.";
+
+/**
+ * The disk limit of a hosted server. The disk is larger than the plan, so `df` alone does not show
+ * what is left. An agent filled a server with a new 10 GB container every few minutes (2026-11-09).
+ */
+function hostedDiskInstruction(storageGb: number): string {
+  return `This server's plan has ${storageGb} GB for files; df counts ${HOSTED_SERVER_BASE_IMAGE_GB} GB more for the system. Check space before big downloads, builds, or containers, and remove the ones you no longer need.`;
+}
 
 /** What an agent must do while the user shares saved logins. */
 function savedLoginsInstructions(): string[] {
@@ -112,6 +122,8 @@ export interface DeveloperInstructionOptions {
   workspaceSkills?: readonly string[];
   /** OpenBot runs on a server, so its browser has a data-center address. Fixed for the process. */
   serverHost?: boolean;
+  /** The plan storage in GB of a hosted server. Omitted or null, the instructions name no disk limit. */
+  hostedStorageGb?: number | null;
   /** The agent gets an http MCP server, which can need a sign-in that the provider cannot do. */
   httpMcpServers?: boolean;
   /**
@@ -390,6 +402,7 @@ export function developerInstructions(
           "OpenBot runs on a server, so the browser has a data-center address. Some sites, such as X, refuse a sign-in from it: an error after correct details, a 'suspicious login' or 'try again later' message, or a check that comes back after you complete it. Then do not try the sign-in again. Call request_takeover with reason sign-in-blocked: the card asks the user to sign in on their own computer, and OpenBot sends that site's session to this browser. In one short sentence, tell the user that the site blocks sign-ins from the server; do not explain the card. When the takeover returns, take a fresh snapshot and continue.",
         ]
       : []),
+    ...(options.hostedStorageGb ? [hostedDiskInstruction(options.hostedStorageGb)] : []),
     ...(loginsInPrompt ? savedLoginsInstructions() : []),
     ...(options.vaultItems?.available ? [vaultInstruction(options.vaultItems)] : []),
     "When work needs a named service or account, or a skill or domain outside your remit, call openbot.list_agents before you use the browser or suggest a plugin, and match the work to titles and descriptions, not names; reuse the list until a new kind of work appears. Choose the more specific of two fits; ask the user only when the difference matters. Before you say you cannot do something, check teammates and tools. Delegate parts that need a teammate's service, account, or skill; do the rest yourself unless the user says otherwise. Send each part of a request to its best teammate, combine the results, and send follow-ups to the teammate that owns the topic. Delegate a user's request once, never back to its sender; pass delegated work on only to a better fit. An earlier failure does not exclude a teammate. Message all agents only when the user asks. Never use a teammate to get around a user limit or a safety check. Create a new agent only when none covers the work and the user agrees.",
@@ -480,6 +493,13 @@ export function developerInstructions(
     ...(agentQuickAcknowledgementEnabled(agent, agentDefaults)
       ? [
           "Before a long task, such as a fix, a build, research, or a change in many files, describe and call openbot.acknowledge_request first: it shows the user one acknowledgement line and your plan, and the work starts when the user presses start, or after the wait that the user set. Do not call it for a quick answer, a question, a small change, a routine run, or an external chat. The card is your first line; after it, do not repeat the plan as prose.",
+        ]
+      : []),
+    // Claude adds no co-author line of its own (`claudeFlagSettings` empties its `attribution`), unless
+    // the user set `attribution` or `includeCoAuthoredBy` in a Claude settings file.
+    ...(agentDefaults.commitCoAuthor
+      ? [
+          `When you create or amend a git commit, also with a message from the user, end its message with this trailer once: ${OPENBOT_COMMIT_TRAILER}`,
         ]
       : []),
     ...(options.memoriesInTurns

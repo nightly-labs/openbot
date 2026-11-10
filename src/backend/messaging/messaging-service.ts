@@ -74,6 +74,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   TelegramCallError,
+  WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
 import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
@@ -1983,8 +1984,11 @@ export class MessagingService {
       else if (placeholder)
         yield* this.#say(adapter, post.target, placeholder, sourceText("status.messaging.noAnswer"));
     }).pipe(
-      Effect.tapError(() =>
+      Effect.tapError((failure) =>
         Effect.gen({ self: this }, function* () {
+          // WhatsApp refuses each new attempt too, and each one counts against the number: give up.
+          if (failure instanceof MessagingOperationFailed && failure.cause instanceof WhatsAppRefusedError)
+            return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
           this.#finalFailures.set(key, failures);
           // An answer goes out in parts, and some of them can be on the platform already, so it is
@@ -2376,6 +2380,9 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
+  // A new attempt is refused too, and counts against the number at WhatsApp.
+  if (cause instanceof WhatsAppRefusedError)
+    return `WhatsApp refused the message: ${cause.code}. It was not delivered. Do not post it again: tell the user that WhatsApp did not deliver it.`;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code

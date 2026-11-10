@@ -139,6 +139,7 @@ import {
   agentStepText,
   conditionAnswer,
   conditionPrompt,
+  currentAnswers,
   fieldText,
   inputText,
   modelStepPrompt,
@@ -1053,6 +1054,31 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             new Set([...latest.values()].filter((step) => step.status === "done").map((step) => step.nodeId)),
           );
 
+        /**
+         * The graph that an answer ran with: the graph of its run. A step alone has no run, and a retry
+         * ran with the node's settings at the time of the retry, so their graph is not known. Each run
+         * is read once.
+         */
+        const answerGraphs = () => {
+          const read = new Map<string, { graph: WorkflowGraph; steps: StoredWorkflowStep[] } | null>();
+          return (step: StoredWorkflowStep) => {
+            if (step.runId === null) return undefined;
+            let run = read.get(step.runId);
+            if (run === undefined) {
+              const found = runs.run(step.runId);
+              run = found ? { graph: found.graph, steps: runs.steps(found.id) } : null;
+              read.set(step.runId, run);
+            }
+            const retry = run?.steps.some(
+              (earlier) =>
+                earlier.nodeId === step.nodeId &&
+                earlier.attempt === step.attempt - 1 &&
+                (earlier.status === "failed" || earlier.status === "stopped"),
+            );
+            return run && !retry ? run.graph : undefined;
+          };
+        };
+
         /** Starts every node of the run that can start now, then sets the run's status. */
         const advance = Effect.fn("Workflows.advance")(function* (runId: string) {
           const run = runs.run(runId);
@@ -1270,7 +1296,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             fromNodeId: from && from.kind !== "trigger" ? from.id : null,
           };
           const workflowId = detail.summary.id;
-          const answered = runs.latestDone(workflowId);
+          const answered = currentAnswers(detail.graph, runs.latestDone(workflowId), answerGraphs());
           const scope = runScope(detail.graph, start, new Set(answered.keys()));
           if (detail.graph.nodes.some((node) => scope.nodes.has(node.id) && unsupportedNode(node)))
             return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));

@@ -74,6 +74,8 @@ export const messages = {
     "Le canal a un démarrage de tâche non confirmé. Vérifiez son résultat avant de le supprimer.",
   "error.backend.channelNotFound": "Canal introuvable.",
   "error.backend.channelMemberUnavailable": "Un membre du canal est indisponible.",
+  "error.backend.channelInstructionsTooLong":
+    "Raccourcissez les instructions à 2 000 caractères. Les instructions plus longues ne sont pas enregistrées.",
   "error.backend.channelWaitBeforeNewConversation":
     "Attendez la fin du travail dans ce canal, puis démarrez une nouvelle conversation.",
   "error.backend.channelWaitBeforeCompact": "Attendez la fin du travail dans ce canal, puis compactez-le.",

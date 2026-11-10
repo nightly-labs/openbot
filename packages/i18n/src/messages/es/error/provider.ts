@@ -301,6 +301,8 @@ export const messages = {
     "La clave de API de Anthropic no tiene crédito de API. Un plan de Claude no paga las solicitudes con una clave de API. Añade crédito en la Anthropic Console, o inicia sesión en Claude en Ajustes y selecciona la cuenta de Claude en el menú de modelos del agente.",
   "error.provider.foreignReasoning":
     "{provider} no aceptó el razonamiento anterior de este chat porque lo recibió otra cuenta o clave de API. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
+  "error.provider.imageTooSmall":
+    "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.opencodeSessionRejected":
     "OpenCode rechazó la solicitud y no indicó la causa. Esto puede ocurrir en un chat largo o después de cambiar de modelo. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo o un esfuerzo menor.",
   "error.provider.museMcpStartupFault":
@@ -431,6 +433,8 @@ export const messages = {
   "error.provider.museEmptyInput": "Muse necesita texto o una imagen.",
   "error.provider.museMethodUnsupported": "Muse no admite {method}.",
   "error.provider.museTurnFailed": "Falló el turno de Muse.",
+  "error.provider.museModelUnavailable":
+    "Muse no puede usar este modelo. Es posible que Muse no esté disponible en el país donde se ejecuta este agente, o que esta cuenta no tenga acceso al modelo. Elige otro modelo y vuelve a intentarlo.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse no puede generar un perfil sin acceso a herramientas externas. Usa otro proveedor para generar el perfil y luego selecciona Muse para el agente.",
   "error.provider.museAuthUnverified":

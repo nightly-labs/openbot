@@ -262,6 +262,19 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   });
 
   /**
+   * Sets the title that the Codex app and ChatGPT show for the thread. Without a name they show the
+   * first text of the first turn, which is an OpenBot turn context block.
+   */
+  readonly nameThread = Effect.fn("CodexAppServer.nameThread")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+    name: string,
+  ) {
+    if (!this.running) return;
+    yield* this.request("thread/name/set", { threadId, name }, decodeRecordResponse);
+  });
+
+  /**
    * Reads Codex history without asking the app server for the legacy full thread snapshot.
    *
    * The app server returns turns newest first. Items are read one turn at a time in ascending

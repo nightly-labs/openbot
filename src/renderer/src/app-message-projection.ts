@@ -1,4 +1,5 @@
 import { feedbackSentIssue } from "@openbot/contracts/feedback";
+import { serverInstallEvent } from "@openbot/contracts/hosted-servers";
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
@@ -379,6 +380,8 @@ function chatActionMarker(
   if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
   if (signIn) return { kind: "mcp-sign-in", mcpServerId: signIn.mcpServerId, timestamp: message.createdAt };
+  const install = serverInstallEvent(message);
+  if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
   const issue = feedbackSentIssue(message);
   if (issue)
     return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };

@@ -116,6 +116,10 @@ export const messages = {
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",
   "composer.error.changeEffort": "Kan het denkniveau niet wijzigen. Probeer het opnieuw.",
   "composer.error.changeFastMode": "Kan de snelle modus niet wijzigen. Probeer het opnieuw.",
+  "composer.fastMode.confirmTitle": "Snelle modus inschakelen?",
+  "composer.fastMode.confirmDescription":
+    "Claude antwoordt sneller, maar elk token kost meer. Met een Claude-abonnement gebruikt de snelle modus altijd gebruikstegoed, ook als je abonnement nog gebruik over heeft.",
+  "composer.fastMode.confirm": "Inschakelen",
   "composer.context.label": "Context {percent} vol",
   "composer.context.labelEstimated": "Context ongeveer {percent} vol",
   "composer.context.labelCompacting": "Context comprimeren",

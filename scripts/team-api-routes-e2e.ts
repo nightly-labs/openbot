@@ -118,12 +118,14 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_COMPACT_ROUTES,
   ContextCompactRefusedError,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
+import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
@@ -799,6 +801,22 @@ const fakeAgents: TeamApiAgents = {
     return Effect.void;
   },
   clearAgentContext: unused("clearAgentContext"),
+  // `agent-oc` has work that runs, as the agent service answers it.
+  deleteAgentHistory: (agentId) => {
+    record("deleteAgentHistory", agentId);
+    if (agentId === "agent-oc")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "delete agent history",
+          cause: new ContextResetBusyError(sourceText("error.agent.waitBeforeDeleteHistory")),
+        }),
+      );
+    return Effect.succeed(undefined);
+  },
+  // This host has no channel service, so no channel route reaches these.
+  clearChannelContext: unused("clearChannelContext"),
+  compactChannelContext: unused("compactChannelContext"),
+  deleteChannelHistory: unused("deleteChannelHistory"),
   compactAgentContext: (agentId) => Effect.sync(() => record("compactAgentContext", agentId)),
   compactTaskContext: (input) => {
     record("compactTaskContext", input);
@@ -3434,6 +3452,114 @@ try {
         errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("compactAgentContext").length === 1,
       [summary(missing), summary(hidden)],
+    );
+  }
+
+  // ---- Delete history and channel context (chat-history-v1) ----
+  {
+    const historyCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, CHAT_HISTORY_CAPABILITY];
+    const deletes = () => callsOf("deleteAgentHistory");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises chat-history-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CHAT_HISTORY_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(CHAT_HISTORY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    const unsupportedChannel = await call("POST", CHAT_HISTORY_ROUTES.channelClear, {
+      token: bobToken,
+      json: { channelId: "channel-1" },
+    });
+    check(
+      "the routes without the capability get 400 historyDeleteUnsupported or channelContextUnsupported, and delete nothing",
+      errorIs(unsupported, 400, sourceText("error.team.historyDeleteUnsupported")) &&
+        errorIs(unsupportedChannel, 400, sourceText("error.team.channelContextUnsupported")) &&
+        deletes().length === 0,
+      [summary(unsupported), summary(unsupportedChannel)],
+    );
+    const deleted = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: historyCapabilities,
+    });
+    check(
+      "a member who manages the agent deletes the history of its chat, with an empty answer",
+      deleted.status === 200 && isDeepStrictEqual(deleted.body, {}) && isDeepStrictEqual(deletes(), [["agent-ada"]]),
+      summary(deleted),
+    );
+    const busy = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: bobToken,
+      json: { agentId: "agent-oc" },
+      capabilities: historyCapabilities,
+    });
+    check(
+      "a delete while work runs gets 409 with the host's sentence",
+      errorIs(busy, 409, sourceText("error.agent.waitBeforeDeleteHistory")),
+      summary(busy),
+    );
+    accessLevels = { revision: 1, everyone: { "agent-ada": "chat" }, roles: [] };
+    const chatOnly = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: historyCapabilities,
+    });
+    const admin = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: historyCapabilities,
+    });
+    accessLevels = { revision: 2, everyone: {}, roles: [] };
+    check(
+      "with chat on the agent, a member gets 403 agentManageDenied; an admin deletes the history",
+      errorIs(chatOnly, 403, sourceText("error.team.agentManageDenied")) &&
+        admin.status === 200 &&
+        isDeepStrictEqual(deletes(), [["agent-ada"], ["agent-oc"], ["agent-ada"]]),
+      [summary(chatOnly), summary(admin)],
+    );
+    const missing = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities: historyCapabilities,
+    });
+    const hidden = await call("POST", CHAT_HISTORY_ROUTES.agentDelete, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities: historyCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and delete nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        deletes().length === 3,
+      [summary(missing), summary(hidden)],
+    );
+    // This host has no channel service, so the channel routes answer as every channel route does.
+    // `channel-notifications-e2e.ts` runs the real channel service.
+    const channelRoutes = [
+      CHAT_HISTORY_ROUTES.channelClear,
+      CHAT_HISTORY_ROUTES.channelCompact,
+      CHAT_HISTORY_ROUTES.channelDelete,
+    ];
+    const channel = await Promise.all(
+      channelRoutes.map((route) =>
+        call("POST", route, {
+          token: bobToken,
+          json: { channelId: "channel-1" },
+          capabilities: [...historyCapabilities, CHANNEL_CHATS_CAPABILITY],
+        }),
+      ),
+    );
+    check(
+      "the channel routes on a host without channels get 400 channelsUnsupported",
+      channel.every((answer) => errorIs(answer, 400, sourceText("error.team.channelsUnsupported"))),
+      channel.map(summary),
     );
   }
 

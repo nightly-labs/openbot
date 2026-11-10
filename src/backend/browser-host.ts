@@ -46,6 +46,7 @@ import {
   type Input,
   Menu,
   type NativeImage,
+  nativeImage,
   type Rectangle,
   type Session,
   session,
@@ -204,6 +205,11 @@ export interface BrowserSiteVisit {
 }
 
 const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
+/**
+ * The shortest side of an image for the model. Some model endpoints refuse an image with a shorter
+ * side, and the image stays in the session, so each later turn fails too (#6188).
+ */
+const MIN_CAPTURE_SIDE = 64;
 /**
  * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
  * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
@@ -376,10 +382,15 @@ const BROWSER_WEB_PREFERENCES = {
   backgroundThrottling: false,
 };
 
+/** macOS and Windows draw no page of a minimized or hidden window, so they use `#backgroundWindow`. */
+const USES_BACKGROUND_WINDOW = process.platform === "darwin" || process.platform === "win32";
+
 /** The window of `BrowserHost.#backgroundWindow`. It has no page of its own. */
 function createBackgroundWindow(): BaseWindow {
   const window = new BaseWindow({
     show: false,
+    // A Windows tool window is not in Alt+Tab or the taskbar.
+    ...(process.platform === "win32" ? { type: "toolbar" } : {}),
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -394,7 +405,7 @@ function createBackgroundWindow(): BaseWindow {
   });
   window.setIgnoreMouseEvents(true);
   window.setOpacity(0);
-  window.excludedFromShownWindowsMenu = true;
+  if (process.platform === "darwin") window.excludedFromShownWindowsMenu = true;
   return window;
 }
 
@@ -574,10 +585,11 @@ export class BrowserHost {
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   /**
-   * macOS draws no page of a hidden or minimized window. A page that loads there gives no image, so a
-   * snapshot or screenshot waits until its deadline (#5580). While the main window is hidden or
-   * minimized, the views of its tabs are in this window: shown, but transparent, click-through and
-   * never focused. `#mountedViews` still names the main window for them.
+   * macOS and Windows draw no page of a hidden or minimized window. A page that loads there gives
+   * no image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991).
+   * While the main window is hidden or minimized, the views of its tabs are in this window: shown,
+   * but transparent, click-through and never focused. `#mountedViews` still names the main window
+   * for them.
    */
   #backgroundWindow: BaseWindow | null = null;
   #mainViewsInBackground = false;
@@ -637,7 +649,7 @@ export class BrowserHost {
     } = {},
   ) {
     this.#window = window;
-    if (process.platform === "darwin") {
+    if (USES_BACKGROUND_WINDOW) {
       const syncBackgroundWindow = () => {
         if (this.#syncBackgroundWindow()) this.#syncAttachedView();
       };
@@ -697,12 +709,9 @@ export class BrowserHost {
 
     const tabs: BrowserHostTab[] = [];
     for (const saved of state.tabs) {
+      // Each saved tab passed the tab limit when it opened, so a restart does not drop one. The reown can
+      // put the tabs of several chats in the agent's main chat, which then lists and closes all of them.
       const stored = reownStoredBrowserTab(saved, agents);
-      const ownerAgentId =
-        stored.ownerAgentId ??
-        agents.find((agent) => agent.threadId === stored.ownerThreadId && stored.ownerThreadId !== null)?.id ??
-        null;
-      if (!this.#hasTabCapacity(stored.ownerThreadId, ownerAgentId)) continue;
       // A tab comes back in the session it opened in, whatever the agent's setting is now. A tab of
       // a deleted profile does not come back: no other session may load its page.
       const tabSession = storedTabSession(stored);
@@ -1098,12 +1107,18 @@ export class BrowserHost {
     }).pipe(Effect.onInterrupt(() => this.close(tab.id).pipe(Effect.ignore)));
   }).bind(this);
 
+  /**
+   * The limit counts the open tabs of the owner thread: the tabs that `list_tabs` of that thread shows
+   * and that it can close. Tabs of the agent's other threads do not count, as the thread cannot see them.
+   */
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
-    const tabs = [...this.#tabs.values()].filter((tab) => {
-      if (tab.ownerAgentId && ownerAgentId) return tab.ownerAgentId === ownerAgentId;
-      if (tab.ownerThreadId) return tab.ownerThreadId === ownerThreadId;
-      return tab.ownerAgentId === null && ownerAgentId === null && ownerThreadId === null;
-    });
+    const tabs = [...this.#tabs.values()].filter(
+      (tab) =>
+        !tab.closing &&
+        !tab.contents.isDestroyed() &&
+        tab.ownerThreadId === ownerThreadId &&
+        (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
+    );
     return tabs.length < INPUT_LIMITS.browserTabs;
   }
 
@@ -1935,9 +1950,10 @@ export class BrowserHost {
           "Browser screenshot timed out.",
           keepQueueBlocked,
         );
+        const imageUrl = yield* browserSync(() => boundedCaptureDataUrl(image));
         // An element image can scroll the page to the element, so it does not pass an earlier one on.
         if (!target) markImageTaken(tab);
-        return boundedCaptureDataUrl(image);
+        return imageUrl;
       }),
     );
   }).bind(this);
@@ -2217,8 +2233,8 @@ export class BrowserHost {
                     "Browser screenshot timed out.",
                     keepQueueBlocked,
                   );
+                  imageUrl = yield* browserSync(() => boundedCaptureDataUrl(image));
                   markImageTaken(tab);
-                  imageUrl = boundedCaptureDataUrl(image);
                 }),
             );
             return { result, imageUrl };
@@ -3921,14 +3937,19 @@ export class BrowserHost {
   #syncBackgroundWindow(): boolean {
     const window = this.#window;
     // Hide OpenBot (⌘H) also hides the background window. Showing it then would show OpenBot again.
-    if (process.platform !== "darwin" || window.isDestroyed() || this.#destroying || app.isHidden()) return false;
+    if (
+      !USES_BACKGROUND_WINDOW ||
+      window.isDestroyed() ||
+      this.#destroying ||
+      (process.platform === "darwin" && app.isHidden())
+    )
+      return false;
     const background = !window.isVisible() || window.isMinimized();
     if (background === this.#mainViewsInBackground) return false;
     const from = this.#nativeParent(window);
     if (background) {
       this.#backgroundWindow ??= createBackgroundWindow();
-      // The views keep their bounds, so the window has the size of the main window's content.
-      this.#backgroundWindow.setBounds(window.getContentBounds());
+      this.#backgroundWindow.setBounds(this.#backgroundBounds(window));
       this.#backgroundWindow.showInactive();
     }
     this.#mainViewsInBackground = background;
@@ -3940,6 +3961,25 @@ export class BrowserHost {
     }
     if (!background) this.#backgroundWindow?.hide();
     return true;
+  }
+
+  /**
+   * The views keep their bounds, so the background window has the size of the main window's content.
+   * A minimized Windows window reports a tiny content size off screen, so there the background window
+   * takes the restored place and covers each view.
+   */
+  #backgroundBounds(window: BrowserWindow): Rectangle {
+    if (process.platform !== "win32" || !window.isMinimized()) return window.getContentBounds();
+    const { x, y, width, height } = window.getNormalBounds();
+    let right = width;
+    let bottom = height;
+    for (const [view, owner] of this.#mountedViews) {
+      if (owner !== window) continue;
+      const bounds = view.getBounds();
+      right = Math.max(right, bounds.x + bounds.width);
+      bottom = Math.max(bottom, bounds.y + bounds.height);
+    }
+    return { x, y, width: right, height: bottom };
   }
 
   #closeBackgroundWindow(): void {
@@ -4285,17 +4325,45 @@ function readConsoleMessage(args: unknown[]): BrowserConsoleMessageDetails | nul
 
 function boundedCaptureDataUrl(image: NativeImage): string {
   const size = image.getSize();
-  if (size.width <= 0 || size.height <= 0) throw new Error("Browser screenshot is empty.");
+  // A typed failure in `browserSync`, so the agent reads the reason, not a failed tool request (#5991).
+  if (size.width <= 0 || size.height <= 0)
+    throw new Error(
+      "Browser screenshot is empty: the page drew no image. This can happen while the OpenBot window is minimized or hidden. If it is, ask the person to open the OpenBot window, then try again.",
+    );
   const area = size.width * size.height;
-  if (area <= MAX_ENCODED_CAPTURE_PIXELS) return image.toDataURL();
   const scale = Math.sqrt(MAX_ENCODED_CAPTURE_PIXELS / area);
-  return image
-    .resize({
-      width: Math.max(1, Math.floor(size.width * scale)),
-      height: Math.max(1, Math.floor(size.height * scale)),
-      quality: "good",
-    })
-    .toDataURL();
+  const fitted =
+    area <= MAX_ENCODED_CAPTURE_PIXELS
+      ? image
+      : image.resize({
+          width: Math.max(1, Math.floor(size.width * scale)),
+          height: Math.max(1, Math.floor(size.height * scale)),
+          quality: "good",
+        });
+  const fittedSize = fitted.getSize();
+  if (fittedSize.width < MIN_CAPTURE_SIDE || fittedSize.height < MIN_CAPTURE_SIDE) return paddedCaptureDataUrl(fitted);
+  return fitted.toDataURL();
+}
+
+/**
+ * Extends a small capture to `MIN_CAPTURE_SIDE` on the right and the bottom with its top-left pixel,
+ * the page around an element. The content keeps its scale and position, so a point in the image is
+ * still the same pixel.
+ */
+function paddedCaptureDataUrl(image: NativeImage): string {
+  const encoded = image.toDataURL();
+  // One representation in the encoded pixels: `getSize` gives a 2x capture in half of them.
+  const source = nativeImage.createFromDataURL(encoded);
+  const size = source.getSize();
+  const width = Math.max(MIN_CAPTURE_SIDE, size.width);
+  const height = Math.max(MIN_CAPTURE_SIDE, size.height);
+  if (width === size.width && height === size.height) return encoded;
+  const pixels = source.toBitmap();
+  const padded = Buffer.alloc(width * height * 4);
+  padded.fill(pixels.subarray(0, 4));
+  for (let row = 0; row < size.height; row++)
+    pixels.copy(padded, row * width * 4, row * size.width * 4, (row + 1) * size.width * 4);
+  return nativeImage.createFromBitmap(padded, { width, height }).toDataURL();
 }
 
 /** A load that `BrowserHost.stop` ended succeeds: the person chose to keep the page as it is. */
