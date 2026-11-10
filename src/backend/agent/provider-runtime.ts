@@ -37,7 +37,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
-import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
+import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -3329,6 +3329,9 @@ export class ProviderRuntime implements ProviderPort {
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
       // The system stops each copy in the same way, so the copy stays for the start after the user's fix.
       if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
+      // OpenCode can fail a start in this way, and the start tries again in a few seconds. Removing the
+      // copy left that retry with no CLI, and the row said that OpenCode is not downloaded (#6335).
+      if (status?.message === OPENCODE_INTERNAL_FAILURE && this.#restartTimers.has(provider)) return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         // The update reason keeps catalog text only, so other text would leave only "Try again.".
         // The log keeps the start failure as the cause.
