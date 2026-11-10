@@ -29,11 +29,12 @@ function textCatalogOf(loaderData: unknown): string | undefined {
 }
 
 export function getRouter() {
+  const nonce = cspNonce();
   const router = createRouter({
     routeTree,
     defaultPreload: "intent",
     // The script nonce of a page with a strict `Content-Security-Policy`, such as `/near/sign`.
-    ssr: { nonce: cspNonce() },
+    ssr: nonce === undefined ? {} : { nonce },
     // Components that read the catalog in the browser (the pricing order form) need it before hydration, or they
     // render English over the server's text. Loader data comes too late for that, so the router carries the locale.
     dehydrate: (): { textCatalog: string | undefined } => ({

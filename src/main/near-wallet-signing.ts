@@ -5,7 +5,7 @@
 import { createPublicKey, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
-import type { Intent } from "@near-intents-agent-api/sdk";
+import type { Intent, SignedData } from "@near-intents-agent-api/sdk";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import type { NearOwnerAction, NearOwnerMethod } from "@openbot/contracts/ipc";
@@ -36,8 +36,8 @@ export type NearSigningResult =
   | { kind: "eip712"; signature: string }
   | { kind: "webauthn"; credential: NearWebAuthnCredential };
 
-/** An `AuthenticationResponseJSON`, as the Agent API takes it. */
-export type NearWebAuthnCredential = z.infer<typeof webauthnResultSchema>["credential"];
+/** An `AuthenticationResponseJSON`, as the Agent API takes it: an optional field is absent, not undefined. */
+export type NearWebAuthnCredential = Extract<SignedData, { standard: "webauthn" }>["credential"];
 
 /** The fragment that the page reads. It has no secret but the nonce, which is used once. */
 interface SigningFragment {
@@ -273,8 +273,15 @@ export class NearOwnerSigning {
       };
     }
     if (request.intent.standard === "eip712") return { kind: "eip712", ...eip712ResultSchema.parse(value) };
-    const result = webauthnResultSchema.parse(value);
-    return { kind: "webauthn", credential: result.credential };
+    const { credential } = webauthnResultSchema.parse(value);
+    const { userHandle, ...response } = credential.response;
+    const { authenticatorAttachment, response: _response, ...fields } = credential;
+    const sent: NearWebAuthnCredential = {
+      ...fields,
+      response: userHandle === undefined ? response : { ...response, userHandle },
+    };
+    if (authenticatorAttachment !== undefined) sent.authenticatorAttachment = authenticatorAttachment;
+    return { kind: "webauthn", credential: sent };
   }
 
   #end(nonce: string, error: Error | null, result?: NearSigningResult): void {
