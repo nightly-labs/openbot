@@ -38,7 +38,7 @@ const modifiers = z
   .optional();
 
 /** The number of matches that a target with `nth` can choose from. */
-export const MAX_TARGET_NTH = 50;
+const MAX_TARGET_NTH = 50;
 
 // The 0-based index of one match, for a target that matches more than one element.
 const nth = z
