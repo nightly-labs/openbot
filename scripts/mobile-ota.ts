@@ -17,9 +17,12 @@
 //   bun scripts/mobile-ota.ts publish --platform <p> --message <text> [--channel <c>] [--rollout 1-100] [--dry-run]
 //   bun scripts/mobile-ota.ts rollout --platform <p> --rollout 1-100 [--channel <c>] [--runtime <version>]
 //   bun scripts/mobile-ota.ts rollback --platform <p> [--to-embedded] [--channel <c>] [--runtime <version>]
-//   bun scripts/mobile-ota.ts verify-build --platform <p> --artifact <.ipa or .aab> [--channel <c>]
-//       stops when a store build has not the update server, channel, certificate and runtime version
-//       of this checkout (the release workflows)
+//   bun scripts/mobile-ota.ts runtime-version --platform <p>
+//       prints the runtime version of this checkout, and gives it to the next workflow steps
+//   bun scripts/mobile-ota.ts verify-build --platform <p> --artifact <.ipa or .aab> --runtime <version>
+//       [--channel <c>] stops when a store build has not the update server, channel and certificate of
+//       this checkout, or not the runtime version that `runtime-version` gave before the build (the
+//       release workflows)
 //   bun scripts/mobile-ota.ts record-build --platform <p> --build <number> --runtime <version>
 //       tags the commit of a store build with its runtime version (the release workflows)
 //   bun scripts/mobile-ota.ts compare-runtime --base-dir <checkout>
@@ -575,7 +578,14 @@ async function commandVerifyBuild(options: Options) {
     platform === "ios"
       ? await iosSettings(artifact, config, channel, certificate)
       : await androidSettings(artifact, config, channel, certificate);
-  const expected = await fingerprint(platform, MOBILE);
+  // The native build on a Linux runner changes the result of a fingerprint of the same checkout:
+  // run 42826070568 gave another value after the build than a clean checkout and the binary have.
+  // So the release workflows compute the value before the build and give it here.
+  const given = options.values.get("runtime");
+  if (given !== undefined && !RUNTIME_VERSION_PATTERN.test(given)) {
+    throw new UsageError("--runtime is empty or not valid. The step before the build must give the runtime version.");
+  }
+  const expected = given ?? (await fingerprint(platform, MOBILE));
   const problems = [
     ...(settings.url ? [] : [`The binary does not use the update server ${config.updatesUrl}.`]),
     ...(settings.channel ? [] : [`The binary does not send the channel ${channel}.`]),
@@ -622,6 +632,18 @@ async function commandRecordBuild(options: Options) {
     throw new Error(`GitHub answered ${response.status} for the tag ${tag}.`);
   }
   summarize([`Store build tag: \`${tag}\``, `Runtime version: \`${runtimeVersion}\``]);
+  return 0;
+}
+
+/** The runtime version of a clean checkout, for a workflow step that runs before the native build. */
+async function commandRuntimeVersion(options: Options) {
+  const platforms = platformsOf(options);
+  const [platform] = platforms;
+  if (!platform || platforms.length !== 1) throw new UsageError("Give --platform ios or android.");
+  const runtimeVersion = await fingerprint(platform, MOBILE);
+  const output = process.env.GITHUB_OUTPUT;
+  if (output) appendFileSync(output, `runtime=${runtimeVersion}\n`);
+  out(runtimeVersion);
   return 0;
 }
 
@@ -697,13 +719,15 @@ async function main() {
       return commandVerifyBuild(parseOptions(rest));
     case "record-build":
       return commandRecordBuild(parseOptions(rest));
+    case "runtime-version":
+      return commandRuntimeVersion(parseOptions(rest));
     case "compare-runtime":
       return commandCompareRuntime(parseOptions(rest));
     case "dispatch":
       return commandDispatch(rest[0], parseOptions(rest.slice(1)));
     default:
       throw new UsageError(
-        "Give a command: check, status, dispatch, publish, rollout, rollback, verify-build, record-build or compare-runtime.",
+        "Give a command: check, status, dispatch, publish, rollout, rollback, runtime-version, verify-build, record-build or compare-runtime.",
       );
   }
 }
