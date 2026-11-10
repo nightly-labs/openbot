@@ -4392,12 +4392,12 @@ function paddedCaptureDataUrl(image: NativeImage): string {
   return nativeImage.createFromBitmap(padded, { width, height }).toDataURL();
 }
 
-/** A load that `BrowserHost.stop` ended succeeds: the person chose to keep the page as it is. */
 /** Loads the current page with GET, so that a form POST is not sent again. */
 function reloadWithGet(tab: BrowserHostTab): Effect.Effect<void, BrowserOperationError> {
   return navigateAndWait(tab.contents, () => tab.contents.loadURL(currentTabUrl(tab), browserLoadOptions()));
 }
 
+/** A load that `BrowserHost.stop` ended succeeds: the person chose to keep the page as it is. */
 function untilStopped(
   tab: BrowserHostTab,
   load: Effect.Effect<void, BrowserOperationError>,
