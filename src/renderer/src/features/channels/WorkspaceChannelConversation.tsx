@@ -12,6 +12,7 @@ import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
+  remoteMcpSignIn,
   remoteRoutineRecovery,
   serverCanAdminister,
   serverSendsWebhookTests,
@@ -51,7 +52,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const auth = useAuth();
   const { teamPresence, currentTeamMember } = usePresence();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
-  const { serverSettingsOpen } = useServerSettings();
+  const { serverSettingsOpen, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } = useServerSettings();
   const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userHiddenAgentIds } = useAgents();
   const { approvals, pendingPrompts } = useTurns();
@@ -170,6 +171,16 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onStop={view.onStop}
       onDeleteMessage={view.deleteMessageAction()}
       canDeleteMessage={view.canDeleteMessage}
+      // A member's Sign in card signs in as the agent chat's does: on this computer, or through a host
+      // that relays its sign-in page.
+      onOpenMcpSignIn={(() => {
+        const server = activeServer();
+        if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
+        return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
+      })()}
+      mcpSignedIn={(mcpServerId) =>
+        serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
+      }
     />
   );
 }

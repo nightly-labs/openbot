@@ -26,6 +26,7 @@ import {
   type DeleteChannelMemoryInput,
   type DeleteChannelMessageInput,
   isContextResetMarker,
+  mcpSignInEvent,
   type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
@@ -2764,10 +2765,13 @@ export class ChannelService {
     for (let message of turnId === undefined
       ? snapshot.messages
       : snapshot.messages.filter((item) => item.turnId === turnId)) {
+      // A member's Sign in card for an MCP server is the channel's too: the agent tells the channel
+      // that the card is in this conversation, and the person signs in from it (#6228).
       if (
         message.author !== "assistant" &&
         !message.questionPrompt &&
-        !(message.attachments?.length && message.author !== "user")
+        !(message.attachments?.length && message.author !== "user") &&
+        !mcpSignInEvent(message)
       )
         continue;
       const owner = assignments.find((item) => item.turnId === message.turnId);
