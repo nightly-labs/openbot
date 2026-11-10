@@ -455,6 +455,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
+  /** The providers whose model list is read again after it timed out. */
+  readonly #relisting = new Set<AgentProvider>();
   /** The MCP server failures shown in this run, by provider, server and kind. */
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
@@ -4059,7 +4061,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
     const errorSerialAtStart = this.#errorSerial;
-    const fresh = yield* this.#modelCatalog.refresh();
+    const { fresh, timedOut } = yield* this.#modelCatalog.refresh();
     let cleared = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
@@ -4068,7 +4070,33 @@ export class ProviderRuntime implements ProviderPort {
       cleared = true;
     }
     if (cleared) this.#setStatus({});
+    // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
+    // the picker kept the built-in models until a provider started again (#6212).
+    for (const provider of timedOut) {
+      if (this.#relisting.has(provider)) continue;
+      this.#relisting.add(provider);
+      yield* this.#relistModels(provider).pipe(
+        Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider))),
+        Effect.forkIn(this.#scope),
+      );
+    }
     return fresh;
+  });
+
+  /**
+   * Reads the model list of a provider again, once, with the full request timeout. A fresh list
+   * clears the provider's last error, when the error is older than this read, and publishes the
+   * status, so the renderer reads the catalogue again.
+   */
+  readonly #relistModels = Effect.fn("ProviderRuntime.relistModels")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const errorSerialAtStart = this.#errorSerial;
+    if (!(yield* this.#modelCatalog.relist(provider))) return;
+    const lastError = this.#lastErrors.get(provider);
+    if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
+    this.#setStatus({});
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */

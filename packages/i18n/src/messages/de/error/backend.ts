@@ -263,6 +263,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "Die Antwort auf die Anmeldung kam nicht rechtzeitig an.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot konnte die Anmeldeinformationen dieses Servers nicht lesen. Prüfe die Serveradresse und versuche es erneut.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Der Anmeldeserver hat eine Antwort gesendet, die OpenBot nicht lesen kann. Wenn der Dienst dir einen API-Schlüssel oder ein Token gibt, füge ihn in den Einstellungen dieses Servers hinzu und teste die Verbindung erneut.",
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",

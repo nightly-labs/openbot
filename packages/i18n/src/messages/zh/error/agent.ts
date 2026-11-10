@@ -4,7 +4,11 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "该请求的历史记录不可用，请重新读取最近的历史，或在频道工作中使用 channel_history。",
+  "error.agent.historyArgumentsInvalid":
+    "历史记录参数不正确：{detail} 请更正参数后重试。openbot.tool_describe 可提供架构。",
   "error.agent.toolRequestInvalid": "工具发现参数无效。请使用声明的 schema 和原始的完整工具名。",
+  "error.agent.toolCallArgumentsNotObject":
+    "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",

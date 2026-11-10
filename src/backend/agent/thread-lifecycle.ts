@@ -218,6 +218,8 @@ export interface ThreadLifecycleOptions {
   channelThread?: (threadId: string) => boolean;
   /** Whether a side thread is a branch: a copy of another conversation, which its first session must receive. */
   branchThread?: (threadId: string) => boolean;
+  /** Whether a transfer from another computer wrote the thread's history, which its first session must receive. */
+  importedHistory?: (threadId: string) => boolean;
   /** Whether a side thread takes the runs of a routine. */
   routineThread?: (threadId: string) => boolean;
 }
@@ -257,6 +259,7 @@ export class ThreadLifecycle {
   readonly #sectionTeammates: (agentId: string) => SectionTeammates | null;
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
+  readonly #importedHistory: (threadId: string) => boolean;
   readonly #routineThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   /**
@@ -310,6 +313,7 @@ export class ThreadLifecycle {
     this.#sectionTeammates = options.sectionTeammates ?? (() => null);
     this.#channelThread = options.channelThread ?? (() => false);
     this.#branchThread = options.branchThread ?? (() => false);
+    this.#importedHistory = options.importedHistory ?? (() => false);
     this.#routineThread = options.routineThread ?? (() => false);
   }
 
@@ -1847,7 +1851,8 @@ export class ThreadLifecycle {
     const sessions = this.#store.database.listProviderSessions(threadId);
     // A branch starts with a copied conversation and no session, so its first session gets the copy.
     const branch = this.#conversation.isTaskThread(threadId) && this.#branchThread(threadId);
-    if (sessions.length < 1 && !branch) return null;
+    // An imported chat has no session here either, so its first session gets the imported history.
+    if (sessions.length < 1 && !branch && !this.#importedHistory(threadId)) return null;
     const agentNames = agentNamesById(this.#store.list());
     const history = readHandoffHistory(this.#store.database, agentId, threadId, agentNames);
     const captures = new Map<string, Map<string, string> | null>();

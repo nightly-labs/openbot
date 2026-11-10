@@ -1,4 +1,5 @@
 import {
+  type AgentModelOption,
   type AgentProviderId,
   type AgentReasoningEffort,
   agentProviderName,
@@ -12,11 +13,13 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { useQuery } from "@tanstack/react-query";
+import { type Href, router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
 import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
+import { useAgentModelPicker } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   PLAN_LIMIT_RESET_FORMAT,
@@ -55,10 +58,12 @@ const EFFORT_LABELS = {
  * names, so a cap only removes the part of a name that tells two models apart.
  */
 const MAX_PICKER_LABEL = 28;
-function pickerLabel(text: string, selected: boolean): string {
-  if (Platform.OS === "android" || !selected) return text;
+function shortLabel(text: string): string {
   const characters = Array.from(text);
   return characters.length > MAX_PICKER_LABEL ? `${characters.slice(0, MAX_PICKER_LABEL).join("").trimEnd()}…` : text;
+}
+function pickerLabel(text: string, selected: boolean): string {
+  return Platform.OS === "android" || !selected ? text : shortLabel(text);
 }
 
 /**
@@ -108,8 +113,11 @@ export function AgentRuntimeFields({
   onChange,
   onAccountChange,
   fastMode,
+  modelPickerRoute,
 }: {
   serverId: string;
+  /** The model list page in the stack of this form. */
+  modelPickerRoute: Href;
   available: boolean;
   saving: boolean;
   provider?: AgentProviderId;
@@ -147,6 +155,16 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
+  const openModelPicker = useAgentModelPicker((state) => state.open);
+  const chooseModel = (next: AgentModelOption) => {
+    onChange({
+      model: next.id,
+      reasoningEffort:
+        reasoningEffort && next.supportedReasoningEfforts.includes(reasoningEffort)
+          ? reasoningEffort
+          : next.defaultReasoningEffort,
+    });
+  };
   return (
     <>
       <SettingsSection title={title} footer={spentLimit}>
@@ -220,40 +238,15 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
         {showsModel ? (
+          // A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
           <SettingsRow
-            trailing={
-              <SettingsPicker<string>
-                value={model ?? ""}
-                options={[
-                  ...(!selected
-                    ? [
-                        {
-                          value: model ?? "",
-                          label: model ? pickerLabel(model, true) : t("mobile.agent.runtime.unavailable"),
-                        },
-                      ]
-                    : []),
-                  ...options.map((option) => ({
-                    value: option.id,
-                    label: pickerLabel(option.name, option.id === model),
-                  })),
-                ]}
-                enabled={enabled}
-                dark={theme === "dark"}
-                label={t("mobile.agent.runtime.model")}
-                onChange={(id) => {
-                  const next = options.find((option) => option.id === id);
-                  if (!next) return;
-                  onChange({
-                    model: next.id,
-                    reasoningEffort:
-                      reasoningEffort && next.supportedReasoningEfforts.includes(reasoningEffort)
-                        ? reasoningEffort
-                        : next.defaultReasoningEffort,
-                  });
-                }}
-              />
-            }
+            disabled={!enabled}
+            value={shortLabel(selected?.name ?? model ?? t("mobile.agent.runtime.unavailable"))}
+            onPress={() => {
+              if (!provider) return;
+              openModelPicker({ serverId, provider, model, choose: chooseModel });
+              router.push(modelPickerRoute);
+            }}
           >
             <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
           </SettingsRow>

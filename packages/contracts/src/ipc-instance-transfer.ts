@@ -53,6 +53,11 @@ export interface ExportInstanceInput {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
+  /**
+   * The agents' chats and side threads with the files of their messages. Absent is off: the Team API
+   * route `instance-transfer-v1` does not carry it.
+   */
+  includeHistory?: boolean;
 }
 
 export interface InstanceExportResult {
@@ -126,7 +131,13 @@ export function parseExportInstanceInput(value: unknown): ExportInstanceInput {
   if (!isUniqueList(input.agentIds, INPUT_LIMITS.agents, isIdentifier) || input.agentIds.length === 0)
     invalid("agent selection");
   if (!isBoolean(input.includeFiles) || !isBoolean(input.includeSettings)) invalid("export request");
-  return { agentIds: input.agentIds, includeFiles: input.includeFiles, includeSettings: input.includeSettings };
+  if (input.includeHistory !== undefined && !isBoolean(input.includeHistory)) invalid("export request");
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    ...(input.includeHistory ? { includeHistory: true } : {}),
+  };
 }
 
 export function parseApplyInstanceTransferInput(value: unknown): ApplyInstanceTransferInput {

@@ -571,8 +571,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   });
 
   onCleanup(() => {
-    if (lastAgentId) flushDirtyTextFields(lastAgentId);
+    // First, so the saves below do not read `props.agent`: the parent's <Show> that holds it is
+    // already closed and throws on the read, which lost an edit closed with Escape (#6205).
     disposed = true;
+    if (lastAgentId) flushDirtyTextFields(lastAgentId);
   });
 
   async function saveAgentPatch(
@@ -703,7 +705,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
+  // The blur that a closing panel causes comes after its cleanup, which saved the field already.
   function saveName(): void {
+    if (disposed) return;
     const value = draft.fields.name.trim() || t("agent.setup.nameFallback");
     setDraft((state) => {
       state.fields.name = value;
@@ -712,6 +716,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   function saveTitle(): void {
+    if (disposed) return;
     const value = draft.fields.title.trim();
     setDraft((state) => {
       state.fields.title = value;
@@ -720,6 +725,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   function saveDescription(): void {
+    if (disposed) return;
     cancelInstructionsSaveTimer();
     queueTextSave(textSaveRequest("description", props.agent.id));
   }

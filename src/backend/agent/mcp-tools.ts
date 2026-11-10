@@ -101,8 +101,11 @@ export interface AgentMcpServers {
   save(config: McpServerConfig): Effect.Effect<unknown, ToolOperationFailed>;
   setEnabled(mcpServerId: string, enabled: boolean): Effect.Effect<unknown, ToolOperationFailed>;
   remove(mcpServerId: string): Effect.Effect<unknown, ToolOperationFailed>;
-  /** A silent test: stored sign-ins only, never a browser. */
-  inspect(config: McpServerConfig): Effect.Effect<McpProbeOutcome, ToolOperationFailed>;
+  /**
+   * A silent test: stored sign-ins only, never a browser. `tested`: the agent asked for this test,
+   * so a saved server with new tools refreshes the sessions.
+   */
+  inspect(config: McpServerConfig, tested?: boolean): Effect.Effect<McpProbeOutcome, ToolOperationFailed>;
   /** Whether an http server that answered without a sign-in offers one. Public documents only. */
   offersSignIn(config: McpServerConfig): Effect.Effect<boolean>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
@@ -126,10 +129,10 @@ export function mcpServersFromGateway(
     save: (config) => gateway.save({ config }).pipe(toToolFailure),
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
-    inspect: (config) =>
+    inspect: (config, tested) =>
       (prepareTest?.(config) ?? Effect.void).pipe(
         Effect.mapError((cause) => new ToolOperationFailed({ cause })),
-        Effect.andThen(gateway.inspect(config).pipe(toToolFailure)),
+        Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
       ),
     offersSignIn: (config) => gateway.offersSignIn(config),
     redact: (text) => gateway.redact(text),
@@ -228,7 +231,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
     case "test_mcp_server": {
       const { name } = yield* toolStep(() => namedServerSchema.parse(call.arguments));
       const config = yield* findServer(servers, name);
-      const outcome = yield* servers.inspect(config);
+      const outcome = yield* servers.inspect(config, true);
       // A server can list its tools to anyone and want a sign-in only to run one: the test passes
       // and those tools fail. Only a test the agent asks for reads the metadata, not each search.
       if (outcome.error === null && (yield* servers.offersSignIn(config))) {

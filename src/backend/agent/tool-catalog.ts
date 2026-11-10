@@ -1,9 +1,10 @@
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
-import type { DynamicToolCallParams } from "../protocol";
+import { type DynamicToolCallParams, isRecord } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
 import { toolGuidance } from "./tool-guidance";
 
@@ -275,6 +276,97 @@ function requireTool(name: string, catalog = BUILTIN_TOOL_CATALOG) {
   return tool;
 }
 
+const JSON_ESCAPES = new Set(['"', "\\", "/", "b", "f", "n", "r", "t"]);
+const PATH_ESCAPES = new Set(["b", "f", "n", "r", "t"]);
+
+function startsUnicodeEscape(text: string, index: number): boolean {
+  return text.charAt(index + 1) === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(index + 2, index + 6));
+}
+
+/**
+ * The end of the word at `start`, up to a space or a quote, and whether it holds an escaped backslash
+ * or a backslash that starts no valid escape, as a path such as `C:\Users` does. In such a word, `\n` or
+ * `\t` is part of the path, such as `C:\new`.
+ */
+function pathWord(text: string, start: number): { end: number; path: boolean } {
+  let index = start;
+  let path = false;
+  while (index < text.length && !/[\s"]/.test(text.charAt(index))) {
+    if (text.charAt(index) === "\\") {
+      const next = text.charAt(index + 1);
+      if (next === "\\" || (!JSON_ESCAPES.has(next) && !startsUnicodeEscape(text, index))) path = true;
+      index++;
+    }
+    index++;
+  }
+  return { end: index, path };
+}
+
+/**
+ * Inside the strings of JSON text, escapes each control character and each backslash that does not
+ * start a valid escape. In a word with such a backslash, it also escapes the backslash of `\b`, `\f`,
+ * `\n`, `\r` and `\t`. Models write a Windows path such as `C:\Users` or a line break in `arguments`
+ * text without the escape that JSON needs, so the text did not parse (#6243).
+ */
+function repairJsonText(text: string): string {
+  let repaired = "";
+  let inString = false;
+  let word = { end: 0, path: false };
+  for (let index = 0; index < text.length; index++) {
+    const char = text.charAt(index);
+    if (char === '"') inString = !inString;
+    if (inString && index >= word.end) word = pathWord(text, index);
+    if (!inString || char === '"') {
+      repaired += char;
+    } else if (char === "\\") {
+      const next = text.charAt(index + 1);
+      const path = word.path && PATH_ESCAPES.has(next);
+      if (!path && (JSON_ESCAPES.has(next) || startsUnicodeEscape(text, index))) {
+        repaired += char + next;
+        index++;
+      } else {
+        repaired += "\\\\";
+      }
+    } else {
+      const code = char.charCodeAt(0);
+      repaired += code < 0x20 ? `\\u${code.toString(16).padStart(4, "0")}` : char;
+    }
+  }
+  return repaired;
+}
+
+/** The object in `arguments` text, also after a repair, or null when the text holds no object. */
+function decodeArgumentsText(text: string): DynamicRecord | null {
+  for (const candidate of [text, repairJsonText(text)]) {
+    try {
+      const value = JSON.parse(candidate);
+      return isRecord(value) ? value : null;
+    } catch {
+      // The repaired text is tried next.
+    }
+  }
+  return null;
+}
+
+/** Decodes a `tool_call` envelope. Models send `arguments` as JSON text, so the text is decoded first. */
+function parseCall(params: DynamicToolCallParams) {
+  const envelope = params.arguments;
+  if (!isRecord(envelope) || typeof envelope.arguments !== "string") return callSchema.safeParse(envelope);
+  return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(envelope.arguments) });
+}
+
+/**
+ * The error for a `tool_call` that `resolveDeferredTool` refused because its `arguments` is not an
+ * object, or null for another reason. A general error made the agent send the same text again.
+ */
+export function deferredCallArgumentsError(params: DynamicToolCallParams): string | null {
+  const parsed = parseCall(params);
+  const sent = isRecord(params.arguments) && params.arguments.arguments !== undefined;
+  return sent && !parsed.success && parsed.error.issues.some(({ path }) => path[0] === "arguments")
+    ? sourceText("error.agent.toolCallArgumentsNotObject")
+    : null;
+}
+
 /**
  * Returns null for an invalid envelope or a tool outside the catalog of `provider`. No supplied
  * values are echoed into errors or logs.
@@ -283,7 +375,7 @@ export function resolveDeferredTool(
   params: DynamicToolCallParams,
   provider: AgentProviderId,
 ): DynamicToolCallParams | null {
-  const parsed = callSchema.safeParse(params.arguments);
+  const parsed = parseCall(params);
   if (!parsed.success) return null;
   const name = parsed.data.name ?? parsed.data.tool;
   const entry = catalogFor(provider).find((tool) => tool.name === name);

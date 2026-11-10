@@ -4,8 +4,12 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "De geschiedenis is niet beschikbaar voor dit verzoek. Lees de recente geschiedenis opnieuw, of gebruik channel_history voor werk in een kanaal.",
+  "error.agent.historyArgumentsInvalid":
+    "Onjuiste geschiedenisargumenten: {detail} Corrigeer de argumenten en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.toolRequestInvalid":
     "Ongeldige argumenten voor het zoeken naar tools. Gebruik het opgegeven schema en een oorspronkelijke, volledige toolnaam.",
+  "error.agent.toolCallArgumentsNotObject":
+    "De tool is niet uitgevoerd. In tool_call moet arguments een JSON-object zijn, geen tekst. Stuur de aanroep opnieuw met arguments als object.",
   "error.agent.approvalWhileDeleting": "Je kunt geen toestemming geven terwijl de agent wordt verwijderd.",
   "error.agent.accessLocalOnly": "Toegang van de agent kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.duplicateCleanupFailed":

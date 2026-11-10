@@ -244,6 +244,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "Odpowiedź logowania nie dotarła na czas.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot nie mógł odczytać informacji o logowaniu tego serwera. Sprawdź adres serwera i spróbuj ponownie.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Serwer logowania wysłał odpowiedź, której OpenBot nie może odczytać. Jeśli usługa daje Ci klucz API lub token, dodaj go w ustawieniach tego serwera, a potem ponownie przetestuj połączenie.",
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",

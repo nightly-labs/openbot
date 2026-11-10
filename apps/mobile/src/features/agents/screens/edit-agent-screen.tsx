@@ -426,6 +426,10 @@ function AgentForm({
       {page === "runtime" ? (
         <AgentRuntimeFields
           serverId={agent.serverId}
+          modelPickerRoute={{
+            pathname: "/agent-info/[agentId]/model-picker",
+            params: { agentId: agent.id, serverId: agent.serverId },
+          }}
           available={available}
           saving={saving}
           provider={provider}

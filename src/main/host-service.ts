@@ -877,8 +877,16 @@ export class HostService extends EventEmitter<HostEvents> {
     return identity ? { hostId: identity.serverId, fingerprint: identity.fingerprint } : null;
   }
 
+  /**
+   * `background` is a configuration with no user action (`register`): a failed registration then
+   * fails the call and leaves the status as it is, so the user sees no error for it.
+   */
   readonly configure = Effect.fn("HostService.configure")(
-    function* (this: HostService, input: ConfigureHostInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+    function* (
+      this: HostService,
+      input: ConfigureHostInput,
+      background = false,
+    ): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
       const account = yield* remoteDecode(() => this.#options.getSignedInUser());
@@ -914,7 +922,8 @@ export class HostService extends EventEmitter<HostEvents> {
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
       const attempt0 = yield* Effect.gen({ self: this }, function* () {
         if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
-        if (optionalRegisterRemoteHost) yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId);
+        if (optionalRegisterRemoteHost)
+          yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId, background);
         if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
           yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
             Effect.succeed(undefined);
@@ -925,6 +934,7 @@ export class HostService extends EventEmitter<HostEvents> {
           message: sourceText("status.host.registered"),
         });
       }).pipe(Effect.result);
+      if (Result.isFailure(attempt0) && background) return yield* attempt0.failure;
       if (Result.isFailure(attempt0)) {
         const error = attempt0.failure.cause;
         // A failure that arrives after another account signed in belongs to the host that is
@@ -1055,6 +1065,26 @@ export class HostService extends EventEmitter<HostEvents> {
     },
     (operation) => this.#hostKeyLock.withPermit(operation),
   );
+
+  /**
+   * Registers this host for the signed-in account without publishing it, as `configure` does. A
+   * host with no name gets the name that a phone connection gives it. A webhook route needs the
+   * machine token that the registration gives (#6029).
+   */
+  readonly register = Effect.fn("HostService.register")(function* (this: HostService) {
+    // After a sign-in, `applySignedInAccount` binds the account's host a moment later. Its status
+    // change starts the next route sync, so the host is not made a second time here.
+    if (this.#boundAccountId !== this.#signedInAccountId()) return;
+    if (!this.#options.store.configured) {
+      yield* this.configure({ serverName: "OpenBot" }, true);
+      return;
+    }
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    // `automatic`: the account service refuses a host that its owner removed (#5273).
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()), true);
+  }).bind(this);
 
   /**
    * Every remote step runs under the signed-in account's authentication, so one that started

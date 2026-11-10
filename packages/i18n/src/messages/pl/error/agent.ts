@@ -4,8 +4,12 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Historia jest niedostępna dla tego żądania. Odczytaj ponownie najnowszą historię lub użyj channel_history do pracy z kanałem.",
+  "error.agent.historyArgumentsInvalid":
+    "Nieprawidłowe argumenty historii: {detail} Popraw argumenty i spróbuj ponownie. openbot.tool_describe podaje schemat.",
   "error.agent.toolRequestInvalid":
     "Nieprawidłowe argumenty wyszukiwania narzędzi. Użyj zadeklarowanego schematu i oryginalnej kwalifikowanej nazwy narzędzia.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Narzędzie nie zostało uruchomione. W tool_call pole arguments musi być obiektem JSON, a nie tekstem. Wyślij wywołanie ponownie z arguments jako obiektem.",
   "error.agent.approvalWhileDeleting": "Nie można udzielić zatwierdzenia podczas usuwania agenta.",
   "error.agent.accessLocalOnly": "Dostęp agenta można zmienić tylko na komputerze, na którym działa agent.",
   "error.agent.duplicateCleanupFailed": "Duplikowanie agenta nie powiodło się i nie udało się usunąć niepełnej kopii.",

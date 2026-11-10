@@ -122,4 +122,5 @@ export const messages = defineMessages("status.agent", {
   "status.agent.compactionContinues":
     "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
+  "status.agent.importedChatTitle": "Imported chat",
 });
