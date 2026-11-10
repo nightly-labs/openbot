@@ -100,16 +100,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
-  // The agent menu offers Mark read for these, as the sidebar badge counts the side threads too.
+  // The agent menu offers Mark read for these. The count also holds the side threads, as the badge does.
   const unreadAgentIds = createMemo(
-    () =>
-      new Set(
-        agentList()
-          .map((agent) => agent.id)
-          .filter(
-            (agentId) => (agentUnreadReplies()[agentId] ?? 0) > 0 || (agentTasks.unreadTotals()[agentId] ?? 0) > 0,
-          ),
-      ),
+    () => new Set(agentList().flatMap((agent) => ((agentUnreadReplies()[agent.id] ?? 0) > 0 ? [agent.id] : []))),
   );
   /**
    * Opens the agent's chat with a new thread. A host without threads has no such item, and neither has a
