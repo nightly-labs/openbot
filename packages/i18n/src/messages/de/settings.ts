@@ -673,6 +673,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex-Live-Sprache",
   "settings.voice.speech.codexLive.description":
     "Sprachgespräche mit jedem Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme, deine Anfragen und die Antworten des Agenten gehen an OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Sprachgespräche mit jedem Agenten nutzen OpenAI-Live-Sprache mit der Codex-Anmeldung des Servers. Deine Stimme, deine Anfragen und die Antworten des Agenten gehen an OpenAI.",
   "settings.voice.speech.speed.title": "Geschwindigkeit",
   "settings.voice.speech.voice.title": "Stimme",
   "settings.voice.speech.voice.female": "Weibliche Stimme {number}",

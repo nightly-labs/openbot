@@ -16,7 +16,7 @@ import {
   githubConnectorPort,
   hostGitHubConnectorPort,
 } from "../connectors/github-connector-port";
-import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
 /** The methods that take only the server. */
@@ -42,15 +42,28 @@ export interface WorkflowHost {
    * workflow. Only this computer names it; a joined server does not.
    */
   onChanged(changed: (workflowId: string | null, agentId?: string) => void): () => void;
-  /** Only this computer keeps messaging places; a joined server gives none. */
+  /**
+   * The messaging places that an output can post to: this computer's, or a joined server's for an owner
+   * or admin when the host serves `routine-results-v1`. A member gets none, as the host lets only an
+   * owner or admin choose a place.
+   */
   places(): Promise<WorkflowPlace[]>;
-  /** The open channels that an output can post to. Only this computer gives them. */
+  /**
+   * The open channels that an output can post to: this computer's, or a joined server's for an owner
+   * or admin when the host serves `workflows-channels-v1`.
+   */
   channels(): Promise<WorkflowChannel[]>;
-  /** Only this computer runs Discord triggers and outputs; a joined server gives none. */
+  /**
+   * Only this computer runs Discord triggers and outputs; a joined server gives none. A Discord node
+   * filters by role, and no Team API route sends the host's Discord roles (`workflows-chats-v1`).
+   */
   discordServers(): Promise<WorkflowDiscordServer[]>;
-  /** Only this computer runs Telegram triggers and outputs; a joined server gives none. */
+  /**
+   * The Telegram chats of triggers and outputs: this computer's, or a joined server's for an owner or
+   * admin when the host serves `workflows-chats-v1` and `routine-results-v1`.
+   */
   telegramChats(): Promise<WorkflowTelegramChat[]>;
-  /** Only this computer runs Slack triggers and outputs; a joined server gives none. */
+  /** The Slack workspaces of triggers and outputs, with the same gate as `telegramChats`. */
   slackWorkspaces(): Promise<WorkflowSlackWorkspace[]>;
   /** The level of this account on each agent that it sees, or null when it manages all of them. */
   agentLevels(): Promise<AgentAccessLevels | null>;
@@ -75,6 +88,12 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
   const api = () => window.openbot.workflows;
   /** A server that has not loaded yet is this computer, as the page reads it. */
   const local = () => server()?.kind !== "remote";
+  /** A joined server lets only an owner or admin read its connections (`routine-results-v1`). */
+  const placesSupported = () => local() || serverCanAdminister(server(), "routine-results-v1");
+  /** The host runs Telegram and Slack nodes, and their chats and workspaces come from its connections. */
+  const chatsSupported = () => local() || (placesSupported() && serverCanAdminister(server(), "workflows-chats-v1"));
+  const channelsSupported = () => local() || serverCanAdminister(server(), "workflows-channels-v1");
+  const options = () => window.openbot.routineResults.options(serverId);
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
   // A joined server without GitHub workflows gets no call: its port rejects before main.
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
@@ -118,8 +137,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       };
     },
     async places() {
-      if (!local()) return [];
-      const connections = await window.openbot.routineResults.options();
+      if (!placesSupported()) return [];
+      const connections = await options();
       return connections.flatMap((connection) =>
         connection.places.map((place) => ({
           connectionId: connection.connectionId,
@@ -132,17 +151,15 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       );
     },
     async channels() {
-      if (!local()) return [];
+      if (!channelsSupported()) return [];
       const channels = await window.openbot.agent.listChannels(serverId);
       return channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name }));
     },
     async discordServers() {
+      // Local only: the role filter needs the host's Discord roles, which no Team API route sends.
       if (!local()) return [];
-      const [options, overview] = await Promise.all([
-        window.openbot.routineResults.options(),
-        window.openbot.messaging.getDiscordOverview(),
-      ]);
-      const discord = options.filter((option) => option.platform === "discord");
+      const [connections, overview] = await Promise.all([options(), window.openbot.messaging.getDiscordOverview()]);
+      const discord = connections.filter((option) => option.platform === "discord");
       return Promise.all(
         discord.map(async (option) => {
           // The options name a server only by its name; two servers with one name get no roles.
@@ -167,16 +184,14 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       );
     },
     async telegramChats() {
-      if (!local()) return [];
-      const options = await window.openbot.routineResults.options();
-      return options
+      if (!chatsSupported()) return [];
+      return (await options())
         .filter((option) => option.platform === "telegram")
         .map((option) => ({ connectionId: option.connectionId, name: option.connectionName }));
     },
     async slackWorkspaces() {
-      if (!local()) return [];
-      const options = await window.openbot.routineResults.options();
-      return options
+      if (!chatsSupported()) return [];
+      return (await options())
         .filter((option) => option.platform === "slack")
         .map((option) => ({
           connectionId: option.connectionId,

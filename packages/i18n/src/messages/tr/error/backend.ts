@@ -203,7 +203,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Bu ajanın bu kimliğe sahip bir rutini yok.",
   "error.backend.agentWaitNoRoutine":
     "Bir beklemeyi yalnızca rutinlerinizden birinin çalıştırılması uyandırır ve hiç rutininiz yok. openbot.create_routine ile bir rutin oluşturun, ardından beklemeyi açın.",
-  "error.backend.agentWaitRemoteUnsupported": "Açık beklemeler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.markUnreadRemoteUnsupported":
     "Bir mesajı okunmadı olarak işaretleme yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.messageDeleteUnsupported": "Bu sunucu mesaj silmeyi desteklemiyor.",

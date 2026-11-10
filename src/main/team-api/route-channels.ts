@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
+import { isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   CHANNEL_CHATS_CAPABILITY,
@@ -366,6 +366,8 @@ async function routeChannelImage(
   const mimeType = request.headers["content-type"]?.split(";", 1)[0]?.trim() ?? "";
   if (!isAvatarMimeType(mimeType)) throw new HttpError(415, sourceText("error.team.avatarType"));
   const bytes = await readBinary(request, AVATAR_IMAGE_LIMITS.storedBytes);
+  // Bad input is the peer's error: 400, not the 500 of a failed write.
+  if (!isValidAvatarImage(mimeType, bytes)) throw new HttpError(400, sourceText("error.team.logoInvalid"));
   return json(200, peerChannel(await runCauseEffect(channels.setImage(id, { mimeType, bytes }))));
 }
 

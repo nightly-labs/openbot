@@ -61,7 +61,7 @@ interface ChatActionMarkerProps {
   onToggleAgentMessage?: ((messageId: string) => void) | undefined;
   /** Draws the text of an open agent message under its marker, by its `messageId`. */
   agentMessageText?: ((messageId: string) => JSX.Element) | undefined;
-  /** The instruction file of a local agent, for View and Undo on its change line. */
+  /** The instruction file of the agent, for View and Undo on its change line. */
   instructions?: AgentInstructionsFileCalls | undefined;
   /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
   onOpenInstructions?: ((agentId: string) => void) | undefined;

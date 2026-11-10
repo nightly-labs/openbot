@@ -218,8 +218,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "このエージェントにはこの ID のルーティンがありません。",
   "error.backend.agentWaitNoRoutine":
     "待機を再開できるのは自分のルーティンの実行だけですが、ルーティンがありません。openbot.create_routine でルーティンを作成してから、待機を開いてください。",
-  "error.backend.agentWaitRemoteUnsupported":
-    "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.markUnreadRemoteUnsupported":
     "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.messageDeleteUnsupported": "このサーバーはメッセージの削除に対応していません。",

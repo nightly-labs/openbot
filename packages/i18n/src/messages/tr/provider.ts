@@ -244,6 +244,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Kendi Claude Code kurulumumu kullan",
   "provider.settings.claudeUserSetupDescription":
     "Ajanlar CLAUDE.md dosyanızı, becerilerinizi, ajanlarınızı, kancalarınızı ve eklentilerinizi ~/.claude klasöründen yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Ajanlar sunucudaki ~/.claude konumundan CLAUDE.md, beceriler, ajanlar, hook’lar ve eklentileri yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code ayarı yüklenemedi.",
   "provider.settings.models": "Modeller",
   "provider.settings.modelsDescription": {

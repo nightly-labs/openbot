@@ -17,6 +17,7 @@ import {
   serverCanAdminister,
   serverSendsWebhookTests,
   serverSetsWebhookSenderSecret,
+  serverSupportsCapability,
 } from "../servers/server-capabilities";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
@@ -87,6 +88,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     connectionReady: () => scope.loaded(),
     routines: {
       localHost: () => activeServer()?.kind === "local",
+      onceSchedule: () => serverSupportsCapability(activeServer(), "routines-once-v1"),
       eventsServerId: () => (serverCanAdminister(activeServer(), "events-v1") ? activeServer()?.id : undefined),
       routineRecovery: () => remoteRoutineRecovery(activeServer()),
       webhookTests: () => serverSendsWebhookTests(activeServer()),

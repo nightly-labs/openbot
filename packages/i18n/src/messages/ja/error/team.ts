@@ -72,6 +72,12 @@ export const messages = {
   "error.team.agentColorsUnsupported": "この接続ではエージェントの色を使用できません。",
   "error.team.chatColorsUnsupported": "この接続ではチャットの色を使用できません。",
   "error.team.routineRunPlaceUnsupported": "この接続ではルーティンの実行場所を変更できません。",
+  "error.team.routinesOnceUnsupported": "この接続では 1 回のみ実行するルーティンを保存できません。",
+  "error.team.routineRunCommandUnsupported": "この接続ではルーティンの実行コマンドを取得できません。",
+  "error.team.threadQueueUnsupported": "この接続ではサイドスレッドのキューを表示できません。",
+  "error.team.usageLimitUnsupported": "この接続ではエージェントの使用量の上限を表示または変更できません。",
+  "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
+  "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
@@ -85,6 +91,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "この接続はメッセージの削除に対応していません。",
   "error.team.workspaceDirectoryUnsupported": "この接続ではフォルダーを表示できません。",
   "error.team.conversationFileSearchUnsupported": "この接続ではファイルを検索できません。",
+  "error.team.threadMessageSearchUnsupported": "この接続ではサイドスレッドを検索できません。",
   "error.team.sideQuestionUnsupported": "この接続ではサイド質問を使えません。",
   "error.team.liveVoiceUnsupported":
     "このサーバーは Codex ライブ音声に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
@@ -113,6 +120,7 @@ export const messages = {
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
   "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
+  "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",
@@ -164,4 +172,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "このアドレスはこのサインインのものではありません。",
   "error.team.signInRelayLinkUnknown": "このサーバーのエージェントはこのサインインリンクを表示していません。",
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
+  "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
+  "error.team.queuedMessageThreadUnsupported":
+    "この接続では、キュー内のメッセージを新しいスレッドとして実行できません。",
+  "error.team.backgroundProcessesUnsupported": "この接続ではバックグラウンドプロセスを使用できません。",
+  "error.team.providerUseUnsupported": "この接続ではプロバイダーのオン・オフを切り替えられません。",
+  "error.team.providerUseInvalid": "このプロバイダーにはオン・オフの切り替えがありません。",
 } as const satisfies PartialTranslation<typeof source>;

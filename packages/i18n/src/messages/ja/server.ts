@@ -360,7 +360,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "サーバーキーを変更しました",
   "server.settings.hostKeyChanged": "最終変更",
   "server.settings.hostKeyChangedDescription": "{date}。以前のキーと新しいキーの両方がこの変更に署名しました。",
-  "server.settings.hostKeyLocalOnly": "ここでキーを変更できるのは、このコンピューターのサーバーだけです。",
+  "server.settings.hostKeyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
   "server.settings.removeTitle": "サーバーを削除",
   "server.settings.removeDescription":
     "すべてのメンバーについて、このサーバーをアカウントサービスから削除します。サーバーのコンピューターが使えなくなったときに使います。",

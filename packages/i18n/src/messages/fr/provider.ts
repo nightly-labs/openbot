@@ -253,6 +253,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Utiliser ma configuration Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Les agents chargent votre CLAUDE.md, vos skills, agents, hooks et plugins depuis ~/.claude. Désactivé, chaque tour envoie un prompt plus court. Les fichiers de l’espace de travail restent chargés.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Les agents chargent CLAUDE.md, les skills, agents, hooks et plugins depuis ~/.claude sur le serveur. Désactivé, chaque tour envoie un prompt plus court. Les fichiers de l’espace de travail restent chargés.",
   "provider.settings.claudeUserSetupLoadFailed": "Impossible de charger le réglage Claude Code.",
   "provider.settings.models": "Modèles",
   "provider.settings.modelsDescription": {

@@ -21,6 +21,7 @@ import { AGENT_NEW_CHAT_CAPABILITY } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "./agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
+import { AGENT_QUEUE_TASK_CAPABILITY } from "./agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "./agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "./agent-task-ui-blocks-v1";
@@ -28,11 +29,15 @@ import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "./agent-thread-files-v1";
 import { AGENT_THREAD_PAGES_CAPABILITY } from "./agent-thread-pages-v1";
+import { AGENT_THREAD_QUEUE_CAPABILITY } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
+import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
+import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
@@ -57,6 +62,7 @@ import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { CLAUDE_USER_SETUP_CAPABILITY } from "./claude-user-setup-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
@@ -71,6 +77,7 @@ import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
+import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
@@ -101,9 +108,11 @@ import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v2";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
+import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY } from "./provider-use-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CAPABILITY } from "./providers-v2";
 import { PROVIDERS_SIGN_IN_V3_CAPABILITY } from "./providers-v3";
@@ -119,7 +128,9 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
@@ -131,6 +142,7 @@ import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
+import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
@@ -143,6 +155,7 @@ import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -222,6 +235,7 @@ export {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
+  AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_UI_BLOCKS_CAPABILITY,
@@ -233,8 +247,10 @@ export {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
+  AGENT_WAITS_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
+  BACKGROUND_PROCESSES_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
   BROWSER_PAGE_STATE_CAPABILITY,
@@ -291,6 +307,7 @@ export {
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
+  PROVIDER_USE_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
@@ -304,6 +321,7 @@ export {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
+  ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
@@ -332,6 +350,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
@@ -340,6 +359,7 @@ export {
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   WORKFLOWS_CAPABILITY,
+  WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
@@ -512,6 +532,19 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHAT_HISTORY_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
+  WORKFLOWS_CHANNELS_CAPABILITY,
+  AGENT_WAITS_CAPABILITY,
+  AGENT_QUEUE_TASK_CAPABILITY,
+  BACKGROUND_PROCESSES_CAPABILITY,
+  PROVIDER_USE_CAPABILITY,
+  ROUTINES_ONCE_CAPABILITY,
+  ROUTINE_RUN_COMMAND_CAPABILITY,
+  CLAUDE_USER_SETUP_CAPABILITY,
+  AGENT_THREAD_QUEUE_CAPABILITY,
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  HERMES_IMPORT_CAPABILITY,
+  PROVIDER_DETECTION_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
 ] as const;
 
@@ -698,6 +731,19 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHAT_HISTORY_CAPABILITY &&
     capability !== CHANNEL_PICTURE_CAPABILITY &&
     capability !== AGENT_IMPORT_V2_CAPABILITY &&
+    capability !== THREAD_MESSAGE_SEARCH_CAPABILITY &&
+    capability !== WORKFLOWS_CHANNELS_CAPABILITY &&
+    capability !== AGENT_WAITS_CAPABILITY &&
+    capability !== AGENT_QUEUE_TASK_CAPABILITY &&
+    capability !== BACKGROUND_PROCESSES_CAPABILITY &&
+    capability !== PROVIDER_USE_CAPABILITY &&
+    capability !== ROUTINES_ONCE_CAPABILITY &&
+    capability !== ROUTINE_RUN_COMMAND_CAPABILITY &&
+    capability !== CLAUDE_USER_SETUP_CAPABILITY &&
+    capability !== AGENT_THREAD_QUEUE_CAPABILITY &&
+    capability !== AGENT_USAGE_LIMIT_CAPABILITY &&
+    capability !== HERMES_IMPORT_CAPABILITY &&
+    capability !== PROVIDER_DETECTION_CAPABILITY &&
     capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY,
 );
 /**
@@ -759,6 +805,19 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHAT_HISTORY_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
+  WORKFLOWS_CHANNELS_CAPABILITY,
+  AGENT_WAITS_CAPABILITY,
+  AGENT_QUEUE_TASK_CAPABILITY,
+  BACKGROUND_PROCESSES_CAPABILITY,
+  PROVIDER_USE_CAPABILITY,
+  ROUTINES_ONCE_CAPABILITY,
+  ROUTINE_RUN_COMMAND_CAPABILITY,
+  CLAUDE_USER_SETUP_CAPABILITY,
+  AGENT_THREAD_QUEUE_CAPABILITY,
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  HERMES_IMPORT_CAPABILITY,
+  PROVIDER_DETECTION_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -904,6 +963,19 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHAT_HISTORY_CAPABILITY &&
       capability !== CHANNEL_PICTURE_CAPABILITY &&
       capability !== AGENT_IMPORT_V2_CAPABILITY &&
+      capability !== THREAD_MESSAGE_SEARCH_CAPABILITY &&
+      capability !== WORKFLOWS_CHANNELS_CAPABILITY &&
+      capability !== AGENT_WAITS_CAPABILITY &&
+      capability !== AGENT_QUEUE_TASK_CAPABILITY &&
+      capability !== BACKGROUND_PROCESSES_CAPABILITY &&
+      capability !== PROVIDER_USE_CAPABILITY &&
+      capability !== ROUTINES_ONCE_CAPABILITY &&
+      capability !== ROUTINE_RUN_COMMAND_CAPABILITY &&
+      capability !== CLAUDE_USER_SETUP_CAPABILITY &&
+      capability !== AGENT_THREAD_QUEUE_CAPABILITY &&
+      capability !== AGENT_USAGE_LIMIT_CAPABILITY &&
+      capability !== HERMES_IMPORT_CAPABILITY &&
+      capability !== PROVIDER_DETECTION_CAPABILITY &&
       capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY,
   );
 }

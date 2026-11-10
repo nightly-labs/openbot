@@ -288,6 +288,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":
     "智能体会从 ~/.claude 加载你的 CLAUDE.md、技能、智能体、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
+  "provider.settings.claudeUserSetupServerDescription":
+    "代理会从服务器上的 ~/.claude 加载 CLAUDE.md、技能、代理、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
   "provider.settings.claudeUserSetupLoadFailed": "无法加载 Claude Code 设置。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {

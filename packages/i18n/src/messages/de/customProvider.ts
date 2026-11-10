@@ -135,6 +135,7 @@ export const messages = {
     other: "Läuft · {count} Modelle",
   },
   "customProvider.detected.title": "Auf diesem Computer gefunden",
+  "customProvider.detected.titleServer": "Auf dem Server gefunden",
   "customProvider.detected.scanning": "Lokale Modelle und Agenten werden gesucht.",
   "customProvider.detected.scanAgain": "Erneut suchen",
   "customProvider.detected.empty": "OpenBot hat keinen lokalen Modellserver oder ACP-Agenten gefunden.",
@@ -157,6 +158,8 @@ export const messages = {
   "customProvider.detection.enabled": "Nach lokalen Modellen und Agenten suchen",
   "customProvider.detection.enabledDescription":
     "OpenBot prüft die Standardadressen von Ollama und LM Studio und sucht in deinem PATH nach bekannten ACP-Agenten.",
+  "customProvider.detection.enabledDescriptionServer":
+    "Der Server prüft die Standardadressen von Ollama und LM Studio und sucht in seinem PATH nach bekannten ACP-Agenten.",
   "customProvider.detection.addresses": "Weitere Modellserver-Adressen",
   "customProvider.detection.address.label": "Adresse {number}",
   "customProvider.detection.address.remove": "Adresse {number} entfernen",
@@ -176,6 +179,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Kleinbuchstaben, Zahlen oder Bindestriche. Du kannst die ID später nicht ändern.",
   "customProvider.acp.command": "Befehl",
   "customProvider.acp.commandHint": "Das zu startende Programm. OpenBot sucht es in deinem PATH.",
+  "customProvider.acp.commandHintServer": "Das zu startende Programm. Der Server sucht es in seinem PATH.",
   "customProvider.acp.args": "Argumente",
   "customProvider.acp.argsHint":
     "Trenne Argumente mit Leerzeichen. Setze Argumente mit Leerzeichen in Anführungszeichen.",
@@ -202,6 +206,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Dieser Befehl wird auf deinem Computer ausgeführt",
   "customProvider.acp.trustDescription":
     "OpenBot startet ihn mit deinem Benutzerkonto. Der Agent kann Dateien lesen und ändern sowie Befehle ausführen. Füge nur Agenten hinzu, denen du vertraust.",
+  "customProvider.acp.hostTrustTitle": "Dieser Befehl wird auf dem Server ausgeführt",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot startet ihn mit dem Benutzerkonto des Servers. Der Agent kann Dateien auf dem Server lesen und ändern sowie dort Befehle ausführen. Füge nur Agenten hinzu, denen du vertraust.",
   "customProvider.acp.submit": "Agenten hinzufügen",
   "customProvider.acp.editTitle": "Eigenen ACP-Agenten bearbeiten",
   "customProvider.acp.submitEdit": "Agenten speichern",
@@ -219,6 +226,7 @@ export const messages = {
     "Verwende Kleinbuchstaben, Zahlen oder Bindestriche. Beginne mit einem Buchstaben oder einer Zahl. Verwende höchstens 40 Zeichen.",
   "customProvider.agents.title": "Eigene Agenten",
   "customProvider.agents.description": "ACP-Agenten, die OpenBot auf diesem Computer startet.",
+  "customProvider.agents.hostDescription": "ACP-Agenten, die OpenBot auf dem Computer des Servers startet.",
   "customProvider.agents.empty": "Noch keine eigenen Agenten.",
   "customProvider.agents.add": "Agenten hinzufügen",
   "customProvider.agents.restart": "Agenten neu starten",

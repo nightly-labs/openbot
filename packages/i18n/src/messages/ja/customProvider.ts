@@ -132,6 +132,7 @@ export const messages = {
   "customProvider.probe.running": { other: "実行中 · モデル {count} 個" },
 
   "customProvider.detected.title": "このコンピューターで見つかったもの",
+  "customProvider.detected.titleServer": "サーバーで見つかったもの",
   "customProvider.detected.scanning": "ローカルのモデルとエージェントを探しています。",
   "customProvider.detected.scanAgain": "再スキャン",
   "customProvider.detected.empty": "OpenBot はローカルのモデルサーバーも ACP エージェントも見つけられませんでした。",
@@ -152,6 +153,8 @@ export const messages = {
   "customProvider.detection.enabled": "ローカルのモデルとエージェントを探す",
   "customProvider.detection.enabledDescription":
     "OpenBot は Ollama と LM Studio のデフォルトのアドレスを確認し、PATH にある既知の ACP エージェントを探します。",
+  "customProvider.detection.enabledDescriptionServer":
+    "サーバーは Ollama と LM Studio のデフォルトのアドレスを確認し、サーバーの PATH にある既知の ACP エージェントを探します。",
   "customProvider.detection.addresses": "その他のモデルサーバーのアドレス",
   "customProvider.detection.address.label": "アドレス {number}",
   "customProvider.detection.address.remove": "アドレス {number} を削除",
@@ -172,6 +175,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "小文字の英字、数字、ハイフン。あとから変更できません。",
   "customProvider.acp.command": "コマンド",
   "customProvider.acp.commandHint": "起動するプログラムです。OpenBot は PATH からこれを探します。",
+  "customProvider.acp.commandHintServer": "起動するプログラムです。サーバーは自身の PATH からこれを探します。",
   "customProvider.acp.args": "引数",
   "customProvider.acp.argsHint": "引数はスペースで区切ってください。スペースを含む引数は引用符で囲んでください。",
   "customProvider.acp.usagePrompt": "使用量コマンド",
@@ -196,6 +200,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "このコマンドはこのコンピューターで実行されます",
   "customProvider.acp.trustDescription":
     "OpenBot はあなたのユーザーアカウントでこれを起動します。エージェントはファイルの読み取りと変更、コマンドの実行ができます。信頼できるエージェントだけを追加してください。",
+  "customProvider.acp.hostTrustTitle": "このコマンドはサーバーで実行されます",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot はサーバーのユーザーアカウントでこれを起動します。エージェントはサーバー上のファイルの読み取りと変更、コマンドの実行ができます。信頼できるエージェントだけを追加してください。",
   "customProvider.acp.submit": "エージェントを追加",
   "customProvider.acp.editTitle": "カスタム ACP エージェントを編集",
   "customProvider.acp.submitEdit": "エージェントを保存",
@@ -213,6 +220,7 @@ export const messages = {
 
   "customProvider.agents.title": "カスタムエージェント",
   "customProvider.agents.description": "OpenBot がこのコンピューターで起動する ACP エージェントです。",
+  "customProvider.agents.hostDescription": "OpenBot がサーバーのコンピューターで起動する ACP エージェントです。",
   "customProvider.agents.empty": "カスタムエージェントはまだありません。",
   "customProvider.agents.add": "エージェントを追加",
   "customProvider.agents.restart": "エージェントを再起動",

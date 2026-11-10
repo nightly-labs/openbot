@@ -244,6 +244,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "自分の Claude Code 設定を使う",
   "provider.settings.claudeUserSetupDescription":
     "エージェントは ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
+  "provider.settings.claudeUserSetupServerDescription":
+    "エージェントはサーバー上の ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code の設定を読み込めませんでした。",
   "provider.settings.models": "モデル",
   "provider.settings.modelsDescription": { other: "{count} 件中 {shown} 件のモデルがモデル選択に表示されます。" },

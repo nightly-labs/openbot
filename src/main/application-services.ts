@@ -178,6 +178,7 @@ import { AppBehaviorService } from "./app-behavior-service";
 import { AppearanceService } from "./appearance-service";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
 import { AutomationServer } from "./automation-server";
+import { listBackgroundProcesses, stopBackgroundProcess } from "./background-processes";
 import { BillingDesktopService } from "./billing-service";
 import { managedBitwardenCli } from "./bitwarden-cli-installer";
 import { BitwardenConnectorService } from "./bitwarden-connector-service";
@@ -196,7 +197,8 @@ import {
 } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
-  type ClaudeUserSetupPreferenceStore,
+  type ClaudeUserSetupControl,
+  claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
 import { createComputerIdle } from "./computer-idle";
@@ -237,6 +239,7 @@ import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
+import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
@@ -701,7 +704,7 @@ export interface ApplicationServices {
   serverTimezone: ServerTimezonePreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
-  claudeUserSetup: ClaudeUserSetupPreferenceStore;
+  claudeUserSetup: ClaudeUserSetupControl;
   modelVisibility: ModelVisibility;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   externalLinkPreference: ExternalLinkPreferenceStore;
@@ -2160,6 +2163,7 @@ export async function createApplicationServices({
   });
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
   promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
+  const claudeUserSetupSetting = claudeUserSetupControl(claudeUserSetup, () => service.notifyProviderSettingsChanged());
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
   const modelVisibility = new ModelVisibility({
     path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
@@ -2964,6 +2968,12 @@ export async function createApplicationServices({
     storage: storageUsage,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
+    // Present, so the host advertises `background-processes-v1`. The routes are admin-only. A Windows
+    // host answers a null list, as Settings > Agents does there.
+    backgroundProcesses: {
+      list: () => listBackgroundProcesses(process.platform, service.listAgents()),
+      stop: (id) => stopBackgroundProcess(process.platform, id),
+    },
     // Present, so the host advertises `live-voice-v1`. A member's voice uses the Codex sign-in of this host.
     liveVoice: {
       startLiveVoice: (input, voice, owner) => service.startLiveVoice(input, voice, owner),
@@ -2977,6 +2987,13 @@ export async function createApplicationServices({
     hostedSites,
     // Present, so the host advertises `agent-import-v1`. Any member can import.
     agentImport,
+    // Present, so the host advertises `hermes-import-v1`. Only owners and admins. The host reads its own
+    // Hermes folder: a joined client cannot name a folder.
+    hermesImport: {
+      read: () => hermesImport.stage(hermesRoot()),
+      apply: (input) => hermesImport.apply(input),
+      discard: (token) => hermesImport.discard(token),
+    },
     // Present, so the host advertises `instance-transfer-v1`. Only owners and admins.
     instanceTransfer,
     // Present, so the host advertises `routine-flows-v1`. Any member who can see the agents.
@@ -3041,6 +3058,8 @@ export async function createApplicationServices({
       memoryReview,
       skillLearning,
       promptCacheTtl,
+      claudeUserSetup: claudeUserSetupSetting,
+      providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
       modelVisibility,
       // The local Settings save does the same two steps (`saveSetup`).
       defaultProvider: {
@@ -3069,6 +3088,7 @@ export async function createApplicationServices({
           ),
       },
       routineResults: routineResultRuntime,
+      routineRunCommand: service,
       // The desktop app's own server only. The servers are made below, after this host.
       ...(localServerChild || serverModeEnvironment || hostedServer
         ? {}
@@ -4090,7 +4110,7 @@ export async function createApplicationServices({
     serverTimezone,
     serverPersonality,
     promptCacheTtl,
-    claudeUserSetup,
+    claudeUserSetup: claudeUserSetupSetting,
     modelVisibility,
     remoteSessionReuse,
     externalLinkPreference,

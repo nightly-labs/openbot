@@ -299,6 +299,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":
     "הסוכנים טוענים את CLAUDE.md, הכישורים, הסוכנים, ה-hooks והתוספים שלך מ-~/.claude. כשהאפשרות כבויה, כל תור שולח הנחיה קצרה יותר. קבצי סביבת העבודה עדיין נטענים.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "הסוכנים טוענים את CLAUDE.md, המיומנויות, הסוכנים, ה-hooks והתוספים מ-~/.claude בשרת. כשהמתג כבוי, כל תור שולח הנחיה קצרה יותר. קובצי סביבת העבודה עדיין נטענים.",
   "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {

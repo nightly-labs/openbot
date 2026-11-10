@@ -120,8 +120,11 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   const canLeave = () => Boolean(props.onLeaveServer) && !local() && props.server.role !== "owner";
   /** The owner removes the server from the account instead. The host does not need to be online. */
   const canRemove = () => Boolean(props.onRemoveServer) && !local() && props.server.role === "owner";
-  /** The key handover goes through the account service, so the server must be published. */
-  const canRotateKey = () => Boolean(props.onRotateHostKey) && local() && published();
+  /**
+   * The key handover goes through the account service, so this computer's server must be published.
+   * A joined server's owner asks the host while it is online.
+   */
+  const canRotateKey = () => Boolean(props.onRotateHostKey) && (local() ? published() : actionsAvailable());
   /** The last key change that the previous and the new key both signed. Every member sees it. */
   const keyChangedAt = () => props.server.keyChangedAt;
   const identityDirty = () =>

@@ -312,6 +312,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.claudeUserSetup": "Use my Claude Code setup",
   "provider.settings.claudeUserSetupDescription":
     "Agents load your CLAUDE.md, skills, agents, hooks and plugins from ~/.claude. Off, each turn sends a shorter prompt. Workspace files still load.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on the server. Off, each turn sends a shorter prompt. Workspace files still load.",
   "provider.settings.claudeUserSetupLoadFailed": "Could not load the Claude Code setting.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {

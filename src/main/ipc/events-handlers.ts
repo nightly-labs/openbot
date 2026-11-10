@@ -6,7 +6,9 @@ import {
   decodeSaveEventRoutineResult,
   decodeWebhookSecret,
   decodeWebhookTestResult,
+  type EventRoutine,
   type EventRoutineOwner,
+  type ListEventRoutinesInput,
 } from "@openbot/contracts/ipc-events";
 import { EVENTS_CAPABILITY, EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import {
@@ -19,6 +21,7 @@ import {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_ROUTES,
@@ -26,6 +29,12 @@ import {
 import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import {
+  listOnceEventRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  saveOnceEventRoutine,
+} from "@openbot/team-client/routines-once";
 import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -53,6 +62,7 @@ interface EventsRemoteServers {
       | typeof EVENTS_CAPABILITY
       | typeof ROUTINE_RECOVERY_CAPABILITY
       | typeof ROUTINE_RUN_PLACE_CAPABILITY
+      | typeof ROUTINES_ONCE_CAPABILITY
       | typeof WEBHOOK_TESTS_CAPABILITY
       | typeof WEBHOOK_SENDER_SECRET_CAPABILITY,
   ): boolean;
@@ -79,11 +89,35 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
   function recovery(serverId: string): boolean {
     return remoteServers.supportsCapability(serverId, ROUTINE_RECOVERY_CAPABILITY);
   }
+  async function listReleased(input: ListEventRoutinesInput, serverId: string): Promise<EventRoutine[]> {
+    const routines = remote(
+      serverId,
+      recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines,
+      decodeEventRoutines,
+      input,
+    );
+    const agentId = runPlaceAgent(serverId, input.owner);
+    if (agentId === null) return routines;
+    const [list, places] = await Promise.all([
+      routines,
+      remote(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+    ]);
+    return withRoutineRunPlaces(list, places);
+  }
   /** A host with `routine-run-place-v1` keeps where an agent routine runs, which the event routes drop. */
   function runPlaceAgent(serverId: string, owner: EventRoutineOwner): string | null {
     return owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)
       ? owner.id
       : null;
+  }
+  /**
+   * A host with `routines-once-v1` lists and saves the `once` routines, which the event routes leave
+   * out and refuse. Null for a host without it.
+   */
+  function onceSend(serverId: string): RoutinesOncePost | null {
+    if (!remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY)) return null;
+    return (path, decode, body) =>
+      runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
   }
   return {
     events: {
@@ -97,24 +131,22 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       listRoutines: scopedHandler(parseListEventRoutines, {
         local: (input) => runCauseEffect(events.listRoutines(input)),
         remote: async (input, serverId) => {
-          const routines = remote(
-            serverId,
-            recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines,
-            decodeEventRoutines,
-            input,
-          );
-          const agentId = runPlaceAgent(serverId, input.owner);
-          if (agentId === null) return routines;
-          const [list, places] = await Promise.all([
-            routines,
-            remote(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+          const send = onceSend(serverId);
+          const [released, once] = await Promise.all([
+            listReleased(input, serverId),
+            send ? listOnceEventRoutines(send, input.owner) : [],
           ]);
-          return withRoutineRunPlaces(list, places);
+          return [...released, ...once];
         },
       }),
       saveRoutine: scopedHandler(parseSaveEventRoutine, {
         local: (input) => runCauseEffect(events.saveRoutine(input)),
         remote: async (input, serverId) => {
+          const send = onceSend(serverId);
+          if (send) {
+            const once = await saveOnceEventRoutine(send, input);
+            if (once) return once;
+          } else if (input.trigger.kind === "schedule") requireReleasedScheduleOn(input.trigger.schedule, false);
           const saved = await remote(
             serverId,
             recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.saveRoutine : EVENTS_ROUTES.saveRoutine,

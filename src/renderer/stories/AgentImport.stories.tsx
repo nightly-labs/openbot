@@ -174,7 +174,7 @@ export const Sources: Story = {
   name: "Import: Sources",
   render: () => (
     <Stage>
-      <AgentImportSources transfer onHermes={fn()} onGrok={fn()} onTransfer={fn()} />
+      <AgentImportSources transfer hermesFolder="computer" onHermes={fn()} onGrok={fn()} onTransfer={fn()} />
     </Stage>
   ),
 };
@@ -229,12 +229,22 @@ export const HermesSkillYourself: Story = {
   ),
 };
 
-/** A joined server cannot read this computer's folder, so Hermes offers the export only. */
+/** A joined server without `hermes-import-v1`, or a member: Hermes offers the export only. */
 export const HermesStepsJoinedServer: Story = {
   name: "Hermes: Steps on a joined server",
   render: () => (
     <Stage>
       <AgentImportView {...hermesGuideArgs({ setup: "command", onReadFolder: undefined })} />
+    </Stage>
+  ),
+};
+
+/** An owner or admin of a joined server with `hermes-import-v1`: the server reads its own folder. */
+export const HermesStepsServerFolder: Story = {
+  name: "Hermes: Steps on a joined server that reads its folder",
+  render: () => (
+    <Stage>
+      <AgentImportView {...hermesGuideArgs({ folderOnServer: true })} />
     </Stage>
   ),
 };
@@ -299,6 +309,16 @@ export const HermesNotFound: Story = {
   render: () => (
     <Stage>
       <HermesImportView {...hermesArgs({ phase: "missing", preview: null })} />
+    </Stage>
+  ),
+};
+
+/** A joined server has no Hermes profiles. The folder dialog is on this computer, so there is no choice. */
+export const HermesNotFoundOnServer: Story = {
+  name: "Hermes: No profiles on a joined server",
+  render: () => (
+    <Stage>
+      <HermesImportView {...hermesArgs({ phase: "missing", preview: null, server: true, onChooseFolder: undefined })} />
     </Stage>
   ),
 };

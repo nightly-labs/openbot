@@ -381,7 +381,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "服务器密钥已更换",
   "server.settings.hostKeyChanged": "上次更改",
   "server.settings.hostKeyChangedDescription": "{date}。之前的密钥和新密钥都为这次更改签了名。",
-  "server.settings.hostKeyLocalOnly": "只有这台电脑上的服务器可以在此更换其密钥。",
+  "server.settings.hostKeyOwnerOnly": "只有所有者可以更改服务器密钥。",
   "server.settings.removeTitle": "移除服务器",
   "server.settings.removeDescription": "为所有成员从账号服务中移除该服务器。当它的电脑已不可用时使用该项。",
   "server.settings.removeConfirmTitle": "移除 {name}？",

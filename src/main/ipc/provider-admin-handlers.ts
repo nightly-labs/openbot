@@ -58,6 +58,7 @@ import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -86,6 +87,7 @@ import {
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
   decodeProviderUsageResetsFromHost,
+  decodeProviderUseFromHost,
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -101,6 +103,7 @@ import {
   parseConnectProviderAccountInput,
   parseDownloadableProviderId,
   parseProviderApiKeyInput,
+  parseProviderUseInput,
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
@@ -252,6 +255,16 @@ export function providerAdminIpcHandlers({
   }
 
   /**
+   * The on/off switch of a joined server's host's built-in providers, which only a host with
+   * `provider-use-v1` serves. This computer's own switch is `providers.setProviderOn`.
+   */
+  function providerUse(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_USE_CAPABILITY))
+      throw new Error(sourceText("error.team.providerUseUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeProviderUseFromHost, { method: "POST", body }));
+  }
+
+  /**
    * The usage reset credits of a joined server's host's accounts, which only a host with
    * `provider-usage-reset-v1` spends. This computer's own go through `providers`.
    */
@@ -398,6 +411,14 @@ export function providerAdminIpcHandlers({
             provider: input.preferredProvider,
             model: input.preferredModel,
           }),
+      }),
+      providerUse: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.list, {}),
+      }),
+      setProviderUse: scopedHandler(parseProviderUseInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (input, serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.set, input),
       }),
       usageResets: usageResetRequest(
         parseProviderId,

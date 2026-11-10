@@ -15,6 +15,8 @@ import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protoc
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
@@ -37,6 +39,7 @@ import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-re
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
+import { PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
 import { PUSH_NOTIFICATION_THREADS_ROUTES } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -45,6 +48,7 @@ import { PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-protocol/push
 import { ROUTINE_RECOVERY_ROUTES } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_ROUTES } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -73,6 +77,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   ROUTINE_RESULTS_ROUTES.options,
   ROUTINE_RESULTS_ROUTES.destination,
   ROUTINE_RUN_PLACE_ROUTES.list,
+  ROUTINES_ONCE_ROUTES.list,
   HOST_UPDATE_ROUTES.status,
   HOST_RELEASE_ROUTES.status,
   HOST_MEMBER_UPDATE_ROUTES.status,
@@ -85,6 +90,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
   PROVIDER_DEFAULT_ROUTES.settings,
+  PROVIDER_USE_ROUTES.list,
   LOCAL_SERVERS_ROUTES.list,
   DISCORD_ACCESS_ROUTES.access,
   WHATSAPP_CONNECTOR_ROUTES.overview,
@@ -105,6 +111,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   STORAGE_DISK_ROUTES.disk,
   MACHINE_RESOURCES_ROUTES.metrics,
   MACHINE_RESOURCES_ROUTES.alerts,
+  BACKGROUND_PROCESSES_ROUTES.list,
+  AGENT_WAITS_ROUTES.list,
   AGENT_ADMIN_ROUTES.settings,
   AGENT_HOST_SETTINGS_ROUTES.settings,
   AGENT_BACKUP_MODELS_ROUTES.settings,
