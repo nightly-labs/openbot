@@ -45,9 +45,26 @@ export function senderDecision(rules: WhatsAppSenderRules, facts: SenderFacts): 
   // The owner's own messages in other chats are their personal conversations.
   if (facts.fromMe) return { type: "ignore" };
   if (facts.isGroup) return rules.groups.has(facts.chatJid) ? { type: "allow" } : { type: "ignore" };
-  if (facts.authorNumber && rules.contacts.has(facts.authorNumber)) return { type: "allow" };
+  if (facts.authorNumber && allowsContact(rules, facts.authorNumber)) return { type: "allow" };
   if (rules.ownNumber || !facts.authorNumber) return { type: "ignore" };
   return { type: "pair" };
+}
+
+/**
+ * The forms of one phone number that WhatsApp can use for the same person. Brazil put a 9 before each
+ * mobile number, but an account made before that keeps its WhatsApp number without the 9, so the number
+ * that people type and the number that WhatsApp sends can differ. Only mobile numbers get the other form.
+ */
+export function whatsAppNumberForms(number: string): string[] {
+  const brazil = /^55([1-9]{2})(9?)([6-9][0-9]{7})$/u.exec(number);
+  if (!brazil) return [number];
+  const [, area, nine, local] = brazil;
+  return [number, nine ? `55${area}${local}` : `55${area}9${local}`];
+}
+
+/** True when the number is an allowed contact, in any of its forms. */
+export function allowsContact(rules: WhatsAppSenderRules, number: string): boolean {
+  return whatsAppNumberForms(number).some((form) => rules.contacts.has(form));
 }
 
 /**
