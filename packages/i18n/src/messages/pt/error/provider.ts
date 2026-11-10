@@ -220,6 +220,8 @@ export const messages = {
     "O provedor de modelos do OpenCode reportou uma requisição de upload inválida. Escolha outro modelo e continue. Verifique as rotinas salvas antes de recriá-las.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Este modelo não consegue ler um arquivo ou uma imagem neste chat. Escolha um modelo que leia arquivos e envie sua mensagem de novo.",
+  "error.provider.opencodeContextTooSmall":
+    "Esta conversa não cabe na janela de contexto do modelo, então o modelo não consegue responder. Servidores de modelos locais costumam carregar o modelo com uma janela pequena. Carregue o modelo com um comprimento de contexto maior no Ollama ou no LM Studio e informe a mesma janela de contexto para o modelo nas configurações do provedor no OpenBot. Ou escolha um modelo com uma janela maior. Depois, envie sua mensagem de novo.",
   "error.provider.opencodeFreeLimit":
     "Os modelos gratuitos do OpenCode atingiram o limite de uso. Todos os modelos gratuitos compartilham esse limite. Para continuar, cole uma chave do OpenCode Go nas configurações do OpenCode ou escolha um modelo de outro provedor.",
   "error.provider.opencodeProviderFailed":

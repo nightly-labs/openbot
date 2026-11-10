@@ -212,6 +212,8 @@ export const messages = {
     "Dostawca modelu OpenCode zgłosił nieprawidłowe żądanie przesłania. Wybierz inny model i kontynuuj. Sprawdź zapisane rutyny, zanim utworzysz je ponownie.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Ten model nie może odczytać pliku lub obrazu w tym czacie. Wybierz model, który odczytuje pliki, a potem wyślij wiadomość ponownie.",
+  "error.provider.opencodeContextTooSmall":
+    "Ten czat nie mieści się w oknie kontekstu modelu, więc model nie może odpowiedzieć. Lokalne serwery modeli często wczytują model z małym oknem. Wczytaj model z większą długością kontekstu w Ollama lub LM Studio i wpisz to samo okno kontekstu dla modelu w ustawieniach jego dostawcy w OpenBot. Możesz też wybrać model z większym oknem. Potem wyślij wiadomość ponownie.",
   "error.provider.opencodeFreeLimit":
     "Darmowe modele OpenCode osiągnęły limit użycia. Wszystkie darmowe modele mają wspólny limit. Aby kontynuować, wklej klucz OpenCode Go w ustawieniach OpenCode albo wybierz model innego dostawcy.",
   "error.provider.opencodeProviderFailed":

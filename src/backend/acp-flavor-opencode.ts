@@ -80,6 +80,16 @@ const OPENCODE_UNREADABLE_CONTENT =
   /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
 
 /**
+ * A request that is larger than the model's context window, also after OpenCode 2.2.6 compacted the
+ * chat. OpenCode names its own failure `compaction.failed` ("cannot be reduced further") or
+ * `compaction.unavailable` ("Nothing to compact yet", when only the first exchange is there); a model
+ * server's refusal comes as its own text: LM Studio, llama.cpp, and OpenAI-compatible servers. A local
+ * server often loads a model with a window smaller than the agent's instructions and tools (#6195).
+ */
+const OPENCODE_CONTEXT_TOO_SMALL =
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+
+/**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
  * reports each kind as `Upstream request failed: <reason>`, so billing and the rate limit come
  * first. The provider's own failure comes before the network: a gateway that could not reach its
@@ -137,6 +147,11 @@ function openCodeRequestFailure(
   // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
+  if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
+    log(`OpenCode request does not fit the model's context window: ${reason}`);
+    return sourceText("error.provider.opencodeContextTooSmall");
+  }
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
