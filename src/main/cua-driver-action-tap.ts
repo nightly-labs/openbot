@@ -265,8 +265,9 @@ class CallAnswerLines extends Transform {
 
 /** One whole answer line, ending in its newline, with the copy added when there is one to add. */
 function withCopy(line: Buffer): Buffer {
-  // Most answers have no structured result and are no refusal, and this search costs far less than the parse.
-  if (!line.includes('"structuredContent"') && !line.includes('"ok":false')) return line;
+  // Most answers have no structured result and are no refusal or error, and this search costs far less than the parse.
+  if (!line.includes('"structuredContent"') && !line.includes('"ok":false') && !line.includes('"isError":true'))
+    return line;
   const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
   return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
 }
