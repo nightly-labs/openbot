@@ -255,7 +255,6 @@ export const Populated: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** A joined server has a new OpenBot version. The header button opens its update. */
 /** "Unread in a group": the chats with unread replies leave their sections for a group under "Needs you". */
 export const UnreadGroup: Story = {
   args: { chatOrder: "unread-group", pinnedItems: pinnedOne },
@@ -268,6 +267,7 @@ export const UnreadFirst: Story = {
   decorators: Populated.decorators,
 };
 
+/** A joined server has a new OpenBot version. The header button opens its update. */
 export const ServerUpdate: Story = {
   args: { serverName: "Research server", serverUpdate: { version: "0.24.0", running: false, onOpen: fn() } },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],

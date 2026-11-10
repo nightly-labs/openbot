@@ -22,6 +22,7 @@ export function SidebarWaitingGroup() {
   return (
     <SidebarChatGroup
       chats={waitingChats()}
+      count={waitingChats().length}
       title={t("sidebar.waiting.title")}
       label={t("sidebar.waiting.label", { count: waitingChats().length })}
     />
@@ -29,28 +30,42 @@ export function SidebarWaitingGroup() {
 }
 
 export function SidebarUnreadGroup() {
-  const { unreadChats } = useSidebarScope();
+  const { props, unreadChats } = useSidebarScope();
   const { t } = useText();
+  // The open chat stays in the group after the user reads it. It is not unread, so it is not counted.
+  const count = () =>
+    unreadChats().filter((chat) =>
+      chat.kind === "agent" ? props.agentStates[chat.id]?.kind === "unread" : chat.channel.unreadCount > 0,
+    ).length;
   return (
     <SidebarChatGroup
       chats={unreadChats()}
+      count={count()}
       title={t("sidebar.unread.title")}
-      label={t("sidebar.unread.label", { count: unreadChats().length })}
+      label={t("sidebar.unread.label", { count: count() })}
       class="sidebar-unread-group"
     />
   );
 }
 
-function SidebarChatGroup(props: { chats: SidebarChatItem[]; title: string; label: string; class?: string }) {
+function SidebarChatGroup(props: {
+  chats: SidebarChatItem[];
+  count: number;
+  title: string;
+  label: string;
+  class?: string;
+}) {
   return (
     <Show when={props.chats.length > 0}>
       <section class={["sidebar-chat-group sidebar-waiting-group", props.class]} aria-label={props.label}>
         <header>
           <h2 class="sidebar-waiting-group-name">
             {props.title}
-            <span class="sidebar-waiting-group-count" aria-hidden="true">
-              {props.chats.length}
-            </span>
+            <Show when={props.count > 0}>
+              <span class="sidebar-waiting-group-count" aria-hidden="true">
+                {props.count}
+              </span>
+            </Show>
           </h2>
         </header>
         <For each={props.chats}>

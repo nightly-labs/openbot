@@ -22,8 +22,7 @@ import { sidebarPinnedItemKey } from "../sidebar-pins";
 import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sidebar-types";
 
 /** When a chat last had activity, in epoch milliseconds: the agent's last update, or the channel's last message. */
-function sidebarChatActivity(item: SidebarChatItem): number {
-  const at = item.kind === "agent" ? item.agent.updatedAt : (item.channel.lastMessage?.at ?? item.channel.createdAt);
+function sidebarChatActivity(at: string | null | undefined): number {
   const time = at ? Date.parse(at) : Number.NaN;
   return Number.isNaN(time) ? 0 : time;
 }
@@ -199,9 +198,39 @@ export function createSidebarDataStore(deps: {
       return items;
     });
   }
+  /**
+   * The last activity of each chat, for the unread orders. The key holds still during a drag, for the
+   * same reasons as `waitingKey`: a reply that arrives during a drag must not move the rows.
+   */
+  let heldActivityKey = "";
+  const activityKey = createMemo(() => {
+    if (chatOrder() === "manual") {
+      heldActivityKey = "";
+      return "";
+    }
+    const next = [
+      ...props.agents.map((agent) => `${agent.id}\t${sidebarChatActivity(agent.updatedAt)}`),
+      ...channels().map(
+        (channel) => `${channel.id}\t${sidebarChatActivity(channel.lastMessage?.at ?? channel.createdAt)}`,
+      ),
+    ].join("\n");
+    if (!deps.dragActive()) heldActivityKey = next;
+    return heldActivityKey;
+  });
+  const activityById = createMemo(
+    () =>
+      new Map(
+        (activityKey() ? activityKey().split("\n") : []).map((entry) => {
+          const [chatId = "", time = "0"] = entry.split("\t");
+          return [chatId, Number(time)] as const;
+        }),
+      ),
+  );
   /** The most recent chat first. The sort is stable, so chats with the same time keep their layout order. */
-  const byRecent = (items: SidebarChatItem[]) =>
-    [...items].sort((left, right) => sidebarChatActivity(right) - sidebarChatActivity(left));
+  const byRecent = (items: SidebarChatItem[]) => {
+    const activity = activityById();
+    return [...items].sort((left, right) => (activity.get(right.id) ?? 0) - (activity.get(left.id) ?? 0));
+  };
   /**
    * The chats in the sections. In the "unread first" order, each section shows its unread chats first
    * and then the others, both by their last activity. The saved `agentOrder` does not change.
