@@ -2627,16 +2627,22 @@ export function claudeOpenBotTools(call: (name: string, args: unknown) => Promis
  * which never answers 401, so their marks are from before the sign-in, when the row's own URL
  * refused the CLI. The file is the CLI's own: a missing or unknown file stays as it is.
  */
-function clearClaudeNeedsAuthMarks(configDirectory: string, names: readonly string[]): Effect.Effect<void> {
-  if (names.length === 0) return Effect.void;
-  const file = join(configDirectory, "mcp-needs-auth-cache.json");
-  return Effect.gen(function* () {
+const clearClaudeNeedsAuthMarks = Effect.fn("ClaudeAgentClient.clearNeedsAuthMarks")(
+  function* (configDirectory: string, names: readonly string[]) {
+    if (names.length === 0) return;
+    const file = join(configDirectory, "mcp-needs-auth-cache.json");
     const marks = yield* providerCall(async (): Promise<unknown> => JSON.parse(await readFile(file, "utf8")));
-    if (!isRecord(marks) || !names.some((name) => Object.hasOwn(marks, name))) return;
-    const kept = Object.fromEntries(Object.entries(marks).filter(([name]) => !names.includes(name)));
+    if (!isRecord(marks)) return;
+    const isMark = (name: string) => {
+      const mark = marks[name];
+      return isRecord(mark) && typeof mark.timestamp === "number";
+    };
+    if (!names.some(isMark)) return;
+    const kept = Object.fromEntries(Object.entries(marks).filter(([name]) => !(names.includes(name) && isMark(name))));
     yield* providerCall(() => writeFile(file, JSON.stringify(kept)));
-  }).pipe(Effect.ignore);
-}
+  },
+  (effect) => Effect.ignore(effect),
+);
 
 /** A file that cannot be deleted must not stop the close. */
 function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
