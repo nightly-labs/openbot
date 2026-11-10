@@ -52,6 +52,8 @@ export const messages = {
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    '"{model}" modelinin akıl yürütme eforu ayarı yok, bu yüzden eforunu değiştiremezsiniz.',
   "error.agent.noStartingModelInSettings":
     "{provider} için kullanılabilir model yok ve oturum açılmış diğer sağlayıcılarda da yok. Bir sağlayıcıda oturum açın veya Sunucu ayarları → Sağlayıcılar bölümünden varsayılan sağlayıcıyı değiştirin.",
   "error.agent.noStartingModel":

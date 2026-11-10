@@ -44,6 +44,8 @@ export const messages = {
   "error.agent.providerNotListed": "لا يتوفر أي نموذج من {provider} الآن. استدعِ list_models لعرض النماذج المتاحة.",
   "error.agent.reasoningEffortUnsupported":
     "النموذج «{model}» لا يدعم مستوى الاستدلال «{effort}». المستويات المدعومة: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "النموذج «{model}» ليس له إعداد لمستوى الاستدلال، لذلك لا يمكنك تغيير مستواه.",
   "error.agent.noStartingModelInSettings":
     "لا يتوفر نموذج لدى {provider}، ولا لدى أي مزوّد آخر مسجّل الدخول. سجّل الدخول إلى مزوّد، أو غيّر المزوّد الافتراضي في إعدادات الخادم ← المزوّدون.",
   "error.agent.noStartingModel":
