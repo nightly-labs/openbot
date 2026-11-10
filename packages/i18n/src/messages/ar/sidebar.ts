@@ -110,6 +110,7 @@ export const messages = {
     many: "{count} ردًا جديدًا",
     other: "{count} رد جديد",
   },
+  "sidebar.state.unreadThreads": "ردود جديدة في السلاسل",
   "sidebar.state.waitingQuestion": "في انتظار إجابتك",
   "sidebar.state.waitingApproval": "في انتظار موافقتك",
   "sidebar.state.waitingTakeover": "في انتظارك في المتصفح",

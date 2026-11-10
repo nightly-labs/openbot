@@ -82,6 +82,7 @@ export const messages = {
   "sidebar.state.working": "考え中",
   "sidebar.state.responded": "返信しました",
   "sidebar.state.unread": { other: "新しい返信 {count} 件" },
+  "sidebar.state.unreadThreads": "スレッドに新しい返信",
   "sidebar.state.waitingQuestion": "回答を待っています",
   "sidebar.state.waitingApproval": "承認を待っています",
   "sidebar.state.waitingTakeover": "ブラウザーでの操作を待っています",

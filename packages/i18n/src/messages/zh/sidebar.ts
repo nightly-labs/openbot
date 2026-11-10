@@ -82,6 +82,7 @@ export const messages = {
   "sidebar.state.working": "思考中",
   "sidebar.state.responded": "已回复",
   "sidebar.state.unread": { one: "{count} 条新回复", other: "{count} 条新回复" },
+  "sidebar.state.unreadThreads": "话题中有新回复",
   "sidebar.state.waitingQuestion": "等待你的回答",
   "sidebar.state.waitingApproval": "等待你的批准",
   "sidebar.state.waitingTakeover": "等待你在浏览器中操作",

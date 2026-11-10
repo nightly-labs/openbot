@@ -85,6 +85,7 @@ export const messages = {
   "sidebar.state.working": "Réflexion",
   "sidebar.state.responded": "A répondu",
   "sidebar.state.unread": { one: "{count} nouvelle réponse", other: "{count} nouvelles réponses" },
+  "sidebar.state.unreadThreads": "Nouvelles réponses dans les fils",
   "sidebar.state.waitingQuestion": "Attend votre réponse",
   "sidebar.state.waitingApproval": "Attend votre approbation",
   "sidebar.state.waitingTakeover": "Vous attend dans le navigateur",

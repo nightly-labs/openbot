@@ -90,6 +90,7 @@ export const messages = {
   "sidebar.state.working": "חושב",
   "sidebar.state.responded": "הגיב",
   "sidebar.state.unread": { one: "תשובה חדשה אחת", two: "שתי תשובות חדשות", other: "{count} תשובות חדשות" },
+  "sidebar.state.unreadThreads": "תשובות חדשות בשרשורים",
   "sidebar.state.waitingQuestion": "ממתין לתשובתך",
   "sidebar.state.waitingApproval": "ממתין לאישורך",
   "sidebar.state.waitingTakeover": "ממתין לך בדפדפן",

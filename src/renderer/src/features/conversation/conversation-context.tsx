@@ -1130,7 +1130,7 @@ const Conversation = createSimpleContext({
       // Only listed agents: a read of an id the host no longer knows creates that agent again.
       const agentIds = agentList().map((agent) => agent.id);
       const unread = agentIds.filter((agentId) => (unreadReplies()[agentId] ?? 0) > 0);
-      // The sidebar count includes the open side threads, such as a routine's thread.
+      // The sidebar badge also shows the open side threads, such as a routine's thread.
       const threadsUnread = agentIds.filter((agentId) => (agentTasks.unreadTotals()[agentId] ?? 0) > 0);
       await Promise.all([
         ...unread.map(async (agentId) => {

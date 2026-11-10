@@ -557,9 +557,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // The read state changes on each message, so the counts become a string first: the map, and with it
   // `renderItem`, change only when the count of a closed folder changes.
   const unreadCounts = useUnreadCounts();
-  // The unread messages of the agents' side threads count too, as on the desktop.
+  // Loads the read marks of the agents' side threads for their badges. As on the desktop, those
+  // threads add no number to the count of a folder.
   const activeAgentIds = useMemo(() => activeAgents.map((agent) => agent.id), [activeAgents]);
-  const threadUnread = useHomeThreadState(activeServer.id, activeAgentIds);
+  useHomeThreadState(activeServer.id, activeAgentIds);
   const folderUnreadKey = useMemo(() => {
     if (!collapsedSectionIds.size) return "[]";
     const unread = new Set(unreadAgentIds);
@@ -573,12 +574,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         const count =
           item.kind === "channel"
             ? item.channel.unreadCount
-            : (unread.has(item.id) ? Math.max(1, unreadCounts[item.id] ?? 1) : 0) + (threadUnread.get(item.id) ?? 0);
+            : unread.has(item.id)
+              ? Math.max(1, unreadCounts[item.id] ?? 1)
+              : 0;
         if (count > 0) for (const folderId of folderIds) counts.set(folderId, (counts.get(folderId) ?? 0) + count);
       }
     }
     return JSON.stringify([...counts]);
-  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts, threadUnread]);
+  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts]);
   const folderUnread = useMemo(() => new Map<string, number>(JSON.parse(folderUnreadKey)), [folderUnreadKey]);
   const sidebarLayout = sidebar?.layout ?? null;
   const serverId = activeServer.id;

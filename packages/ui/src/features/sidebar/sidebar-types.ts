@@ -164,6 +164,7 @@ export type SidebarAgentState =
   | { kind: "waiting"; reason: SidebarWaitReason; detail: string | null }
   | { kind: "working" }
   | { kind: "responded" }
+  /** `count` is the unread replies of the agent's chat. 0: only its side threads have unread replies. */
   | { kind: "unread"; count: number }
   | { kind: "routine"; phase: SidebarRoutinePhase; count: number }
   /** The provider plan is spent, so the queue waits. `resetsAt` is in epoch seconds, `null` when unknown. */

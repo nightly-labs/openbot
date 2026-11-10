@@ -91,6 +91,7 @@ export const messages = {
     one: "{count} respuesta nueva",
     other: "{count} respuestas nuevas",
   },
+  "sidebar.state.unreadThreads": "Respuestas nuevas en hilos",
   "sidebar.state.waitingQuestion": "Esperando tu respuesta",
   "sidebar.state.waitingApproval": "Esperando tu aprobación",
   "sidebar.state.waitingTakeover": "Esperándote en el navegador",
