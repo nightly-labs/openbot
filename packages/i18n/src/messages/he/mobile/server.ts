@@ -1788,7 +1788,7 @@ export const messages = {
   "mobile.server.import.reading": "קורא את הייצוא…",
   "mobile.server.import.sending": "שולח את הייצוא… {percent}%",
   "mobile.server.import.chooseNote":
-    "יש להניח קודם את הקובץ בטלפון הזה, למשל ב-Files. גודלו חייב להיות עד 100 MB. הסוכנים שבו מוצגים לפני שמשהו משתנה.",
+    "יש להניח קודם את הקובץ בטלפון הזה, למשל ב-Files. הסוכנים שבו מוצגים לפני שמשהו משתנה.",
   "mobile.server.import.readFailed": "לא ניתן לקרוא את הייצוא.",
   "mobile.server.import.reviewTitle": "ייצוא מ-{source}",
   "mobile.server.import.exported": "יוצא ב-{date}",

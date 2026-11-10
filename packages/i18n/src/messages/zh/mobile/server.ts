@@ -1274,7 +1274,7 @@ export const messages = {
   "mobile.server.import.reading": "正在读取导出文件…",
   "mobile.server.import.sending": "正在发送导出文件… {percent}%",
   "mobile.server.import.chooseNote":
-    "先把文件放到这部手机上，例如放进“文件”。文件必须小于 100 MB。在改动任何内容之前，你可以先看清里面的助手。",
+    "先把文件放到这部手机上，例如放进“文件”。在改动任何内容之前，你可以先看清里面的助手。",
   "mobile.server.import.readFailed": "无法读取该导出文件。",
   "mobile.server.import.reviewTitle": "{source} 导出",
   "mobile.server.import.exported": "导出于 {date}",

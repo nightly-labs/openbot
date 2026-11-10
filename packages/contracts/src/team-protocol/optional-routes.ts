@@ -12,6 +12,7 @@ import { AGENT_FOLDERS_CODECS } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CODECS } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CODECS } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CODECS } from "./agent-import-v1";
+import { AGENT_IMPORT_V2_CODECS } from "./agent-import-v2";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
 import { AGENT_INSTRUCTIONS_CODECS } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
@@ -150,6 +151,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CONTEXT_RESET_CODECS,
   ...EVENTS_CODECS,
   ...AGENT_IMPORT_CODECS,
+  ...AGENT_IMPORT_V2_CODECS,
   ...INSTANCE_TRANSFER_CODECS,
   ...AGENT_PUBLISH_CODECS,
   ...LIVE_ACTIVITY_PUSH_CODECS,

@@ -979,7 +979,7 @@ for teammates and the Team API; it keeps its meaning and its 2,000-character lim
 ## Agent import
 
 Server Settings > Import moves agents from a `.zip` export into the local host, or into a remote host
-that serves `agent-import-v1` (see [Agent import from a joined server](servers.md#agent-import-from-a-joined-server)).
+that serves `agent-import-v2` or `agent-import-v1` (see [Agent import from a joined server](servers.md#agent-import-from-a-joined-server)).
 The format is `openbot-import.json` plus `agents/<key>/`
 folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
 reads it; both are a product contract, so add only optional fields and raise `version` for a change

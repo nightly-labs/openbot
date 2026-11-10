@@ -351,7 +351,10 @@ export type TeamApiAgentTasks = Pick<
 export type TeamApiBrowserProfiles = BrowserProfileService;
 
 /** Its presence is what `#protocolSupport` advertises `agent-import-v1` on. Any member can use it. */
-export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply" | "discard">;
+export type TeamApiAgentImport = Pick<
+  AgentImportService,
+  "stageUpload" | "openUpload" | "writeUpload" | "stageParts" | "apply" | "discard"
+>;
 
 /** Its presence is what `#protocolSupport` advertises `instance-transfer-v1` on. Only admins use it. */
 export type TeamApiInstanceTransfer = Pick<

@@ -40,6 +40,10 @@ export const messages = {
   "error.import.empty": "التصدير فارغ.",
   "error.import.remoteZipTooLarge": "للاستيراد إلى خادم منضم إليه، يجب أن يكون التصدير ملف .zip بحجم أقل من 100 MB.",
   "error.import.hostBusy": "يقرأ الخادم عمليات تصدير أخرى. حاول مرة أخرى بعد بضع دقائق.",
+  "error.import.uploadDiskSpace":
+    "يحتاج التصدير إلى {size} GB من المساحة الفارغة على قرص الخادم، والمتاح {free} GB. أفرغ مساحة على الخادم، ثم اختر التصدير مرة أخرى.",
+  "error.import.remoteZipTooLargeOldHost":
+    "يقبل هذا الخادم تصديرًا حتى 100 MB. حدّث OpenBot على الخادم لاستيراد تصدير أكبر.",
   "error.import.skillKept":
     "{name}: لدى الخادم المهارة «{skill}» بالفعل، لذا يستخدم الوكيل تلك المهارة. اطلب من مسؤول تحديثها.",
   "error.import.hermesNoProfiles":

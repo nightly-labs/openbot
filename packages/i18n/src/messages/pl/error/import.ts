@@ -47,6 +47,10 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Aby zaimportować na dołączony serwer, eksport musi być plikiem .zip poniżej 100 MB.",
   "error.import.hostBusy": "Serwer odczytuje inne eksporty. Spróbuj ponownie za kilka minut.",
+  "error.import.uploadDiskSpace":
+    "Eksport potrzebuje {size} GB wolnego miejsca na serwerze, a wolne jest {free} GB. Zwolnij miejsce na serwerze, a potem wybierz eksport ponownie.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Ten serwer przyjmuje eksport do 100 MB. Zaktualizuj OpenBot na serwerze, aby zaimportować większy eksport.",
   "error.import.skillKept":
     "{name}: serwer ma już umiejętność „{skill}”, więc agent używa tej umiejętności. Poproś administratora o jej aktualizację.",
   "error.import.transferRemoteTooLarge":

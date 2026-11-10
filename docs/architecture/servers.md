@@ -234,6 +234,20 @@ gets the existing skill and the result warns. `POST /v1/agent-import/discard` re
 desktop, main opens the dialog, reads the file and sends it (`agent-import:choose` is server-scoped);
 the web client uses the browser chooser and ships the export skill in its bundle.
 
+`agent-import-v2` (protocol 9 only) removes the 100 MB limit: the client sends the export in parts.
+`POST /v1/agent-import/v2/open` takes `{ size }` and answers `{ uploadId }`; the host refuses a size
+that its free disk space cannot hold (`error.import.uploadDiskSpace`). `POST /v1/agent-import/v2/chunk?upload=<id>&offset=<n>`
+takes the next part, at most 8 MiB, as the raw body, and answers `{ received }`; the offset must be the
+bytes the host has, so a part is never written twice or out of order. `POST /v1/agent-import/v2/stage`
+takes `{ uploadId }` and answers the v1 preview; `apply` and `discard` stay the v1 routes. Every part
+is far under the 100 MB WebRTC file limit, so the transport does not change. The upload holds one of the
+four upload slots, the same member keeps one upload or export, and an upload that gets no part for
+10 minutes is released. A complete upload has the limits of a local import (200,000 files, no byte
+limit, and the free disk space check of each agent's files). Desktop main reads the file one part at a
+time; the web client slices the `File`, and the phone reads parts with an `expo-file-system` file
+handle. A client sends v1 to an older host, and refuses a file over 100 MB there with
+`error.import.remoteZipTooLargeOldHost`.
+
 ### Instance transfer with a joined server
 
 `instance-transfer-v1` moves a server's agents and server settings to or from an OpenBot transfer file

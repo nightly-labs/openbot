@@ -1341,7 +1341,7 @@ export const messages = {
   "mobile.server.import.reading": "Export lezen…",
   "mobile.server.import.sending": "Export versturen… {percent}%",
   "mobile.server.import.chooseNote":
-    "Zet het bestand eerst op deze telefoon, bijvoorbeeld in Bestanden. Het moet kleiner zijn dan 100 MB. Je ziet de agents voordat er iets verandert.",
+    "Zet het bestand eerst op deze telefoon, bijvoorbeeld in Bestanden. Je ziet de agents voordat er iets verandert.",
   "mobile.server.import.readFailed": "De export kon niet worden gelezen.",
   "mobile.server.import.reviewTitle": "Export van {source}",
   "mobile.server.import.exported": "Geëxporteerd {date}",

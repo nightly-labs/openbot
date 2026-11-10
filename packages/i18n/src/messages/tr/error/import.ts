@@ -45,6 +45,10 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Katılınan bir sunucuya içe aktarmak için dışa aktarım 100 MB altında bir .zip olmalıdır.",
   "error.import.hostBusy": "Sunucu diğer dışa aktarımları okuyor. Birkaç dakika sonra tekrar deneyin.",
+  "error.import.uploadDiskSpace":
+    "Dışa aktarım sunucuda {size} GB boş disk alanı gerektiriyor ve {free} GB boş. Sunucuda yer açın, ardından dışa aktarımı yeniden seçin.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Bu sunucu en fazla 100 MB'lık bir dışa aktarım kabul ediyor. Daha büyük bir dışa aktarımı içe aktarmak için sunucudaki OpenBot'u güncelleyin.",
   "error.import.skillKept":
     '{name}: sunucu zaten "{skill}" becerisine sahip, bu yüzden ajan bu beceriyi kullanıyor. Bir yöneticiden güncellemesini isteyin.',
   "error.import.transferRemoteTooLarge":

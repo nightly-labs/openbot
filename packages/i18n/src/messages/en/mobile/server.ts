@@ -1763,7 +1763,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.import.reading": "Reading the export…",
   "mobile.server.import.sending": "Sending the export… {percent}%",
   "mobile.server.import.chooseNote":
-    "Put the file on this phone first, for example in Files. It must be under 100 MB. You see its agents before anything changes.",
+    "Put the file on this phone first, for example in Files. You see its agents before anything changes.",
   "mobile.server.import.readFailed": "The export could not be read.",
   "mobile.server.import.reviewTitle": "{source} export",
   "mobile.server.import.exported": "Exported {date}",

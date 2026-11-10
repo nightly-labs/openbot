@@ -9,9 +9,6 @@ import {
   parseAgentImportSkillSource,
   type RemoteAgentImportResult,
 } from "@openbot/contracts/ipc";
-import { AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
-import { sourceText } from "@openbot/i18n/source";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import * as Clipboard from "expo-clipboard";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
@@ -25,7 +22,7 @@ import {
   NotesSection,
   toggledKeys,
 } from "@/features/servers/components/import-parts";
-import { pickZipUpload } from "@/features/servers/model/transfer-file";
+import { type PickedZip, pickZipFile } from "@/features/servers/model/transfer-file";
 import { IMPORT_SOURCE_NAMES } from "@/features/servers/screens/server-import-screen";
 import {
   SettingsContent,
@@ -95,9 +92,9 @@ export function ServerImportGuideScreen() {
     setPhase("reading");
     setError(null);
     setProgress(null);
-    let upload: RemoteFileUpload | null;
+    let file: PickedZip | null;
     try {
-      upload = await pickZipUpload(AGENT_IMPORT_UPLOAD_BYTES, sourceText("error.import.remoteZipTooLarge"));
+      file = await pickZipFile();
     } catch (caught) {
       // Nothing went to the host, so the open export stays open.
       setPhase(open ? "review" : "guide");
@@ -105,13 +102,13 @@ export function ServerImportGuideScreen() {
       void haptics.notification("error");
       return;
     }
-    if (!upload) {
+    if (!file) {
       setPhase(open ? "review" : "guide");
       return;
     }
     try {
       // A new export releases the earlier one on the host.
-      const next = await stageAgentImport(upload, serverId, (fraction) => setProgress(Math.floor(fraction * 100)));
+      const next = await stageAgentImport(file, serverId, (fraction) => setProgress(Math.floor(fraction * 100)));
       if (closed.current) {
         void discardAgentImport(next.token, serverId).catch(() => undefined);
         return;
@@ -126,6 +123,7 @@ export function ServerImportGuideScreen() {
       setError(errorMessage(caught, t("mobile.server.import.readFailed")));
       void haptics.notification("error");
     } finally {
+      file.release();
       setProgress(null);
     }
   }

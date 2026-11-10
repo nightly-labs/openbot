@@ -44,6 +44,10 @@ export const messages = defineMessages("error.import", {
   "error.import.empty": "The export is empty.",
   "error.import.remoteZipTooLarge": "To import into a joined server, the export must be a .zip under 100 MB.",
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",
+  "error.import.uploadDiskSpace":
+    "The export needs {size} GB of free disk space on the server, and {free} GB is free. Free up space on the server, then choose the export again.",
+  "error.import.remoteZipTooLargeOldHost":
+    "This server accepts an export of up to 100 MB. Update OpenBot on the server to import a larger export.",
   "error.import.skillKept":
     '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
   // Hermes Agent import from a folder on this computer.

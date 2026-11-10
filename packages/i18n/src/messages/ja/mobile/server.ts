@@ -1346,7 +1346,7 @@ export const messages = {
   "mobile.server.import.reading": "エクスポートを読み込んでいます…",
   "mobile.server.import.sending": "エクスポートを送信しています… {percent}%",
   "mobile.server.import.chooseNote":
-    "まず、ファイルをこのスマートフォンの「ファイル」などに保存してください。ファイルは 100 MB 未満である必要があります。何かが変わる前に、含まれるエージェントを確認できます。",
+    "まず、ファイルをこのスマートフォンの「ファイル」などに保存してください。何かが変わる前に、含まれるエージェントを確認できます。",
   "mobile.server.import.readFailed": "エクスポートを読み込めませんでした。",
   "mobile.server.import.reviewTitle": "{source} のエクスポート",
   "mobile.server.import.exported": "{date} にエクスポート",

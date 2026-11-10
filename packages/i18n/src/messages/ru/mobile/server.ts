@@ -1538,7 +1538,7 @@ export const messages = {
   "mobile.server.import.reading": "Чтение экспорта…",
   "mobile.server.import.sending": "Отправка экспорта… {percent}%",
   "mobile.server.import.chooseNote":
-    "Сначала поместите файл на этот телефон, например в «Файлы». Его размер должен быть меньше 100 МБ. Вы увидите его агентов, прежде чем что-либо изменится.",
+    "Сначала поместите файл на этот телефон, например в «Файлы». Вы увидите его агентов, прежде чем что-либо изменится.",
   "mobile.server.import.readFailed": "Не удалось прочитать экспорт.",
   "mobile.server.import.reviewTitle": "Экспорт {source}",
   "mobile.server.import.exported": "Экспортировано {date}",

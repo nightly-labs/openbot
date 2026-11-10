@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { open } from "node:fs/promises";
 import { basename } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "@openbot/contracts/invite-links";
@@ -66,6 +67,11 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import {
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+  agentImportV2ChunkPath,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
@@ -2206,6 +2212,59 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
       );
       const value = yield* remoteCall(() => response.json());
+      return yield* remoteDecode(() => decodeRemoteAgentImportPreview(value));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * Sends a Grok Bot export of any size to the host in parts with `agent-import-v2`, and answers its
+   * preview. The file is read one part at a time.
+   */
+  readonly stageAgentImportInParts = Effect.fn("RemoteManager.stageAgentImportInParts")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      path: string,
+      size: number,
+    ): Effect.fn.Return<AgentImportPreview, RemoteWorkflowError, RemoteRequest> {
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const post = (route: string, contentType: string, body: string | Buffer<ArrayBuffer>) =>
+        Effect.gen({ self: this }, function* () {
+          const url = new URL(route, server.apiUrl);
+          const response = yield* this.#client.fetch(
+            server,
+            url,
+            { method: "POST", headers: { "Content-Type": contentType }, body },
+            true,
+            AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+          );
+          yield* this.#rejectHostError(response, url);
+          return yield* remoteCall(() => response.json());
+        });
+      const opened = yield* post(AGENT_IMPORT_V2_ROUTES.open, "application/json", JSON.stringify({ size }));
+      const uploadId = yield* remoteDecode(() => {
+        if (!isDynamicRecord(opened) || typeof opened.uploadId !== "string")
+          throw new Error("The server answered an invalid upload.");
+        return opened.uploadId;
+      });
+      yield* Effect.acquireUseRelease(
+        remoteCall(() => open(path, "r")),
+        (file) =>
+          Effect.gen(function* () {
+            for (let offset = 0; offset < size; ) {
+              const part = Buffer.alloc(Math.min(AGENT_IMPORT_V2_CHUNK_BYTES, size - offset));
+              const { bytesRead } = yield* remoteCall(() => file.read(part, 0, part.length, offset));
+              // The file became shorter after it was chosen.
+              if (bytesRead === 0)
+                return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.import.exportChanged")) });
+              yield* post(agentImportV2ChunkPath(uploadId, offset), "application/zip", part.subarray(0, bytesRead));
+              offset += bytesRead;
+            }
+          }),
+        (file) => remoteCall(() => file.close()).pipe(Effect.ignore),
+      );
+      const value = yield* post(AGENT_IMPORT_V2_ROUTES.stage, "application/json", JSON.stringify({ uploadId }));
       return yield* remoteDecode(() => decodeRemoteAgentImportPreview(value));
     },
     (operation) => this.#owned(operation),

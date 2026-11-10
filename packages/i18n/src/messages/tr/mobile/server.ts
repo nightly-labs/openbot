@@ -1366,7 +1366,7 @@ export const messages = {
   "mobile.server.import.reading": "Dışa aktarım okunuyor…",
   "mobile.server.import.sending": "Dışa aktarım gönderiliyor… %{percent}",
   "mobile.server.import.chooseNote":
-    "Önce dosyayı bu telefona, örneğin Dosyalar uygulamasına koyun. Dosya 100 MB'tan küçük olmalıdır. Herhangi bir şey değişmeden önce ajanlarını görürsünüz.",
+    "Önce dosyayı bu telefona, örneğin Dosyalar uygulamasına koyun. Herhangi bir şey değişmeden önce ajanlarını görürsünüz.",
   "mobile.server.import.readFailed": "Dışa aktarım okunamadı.",
   "mobile.server.import.reviewTitle": "{source} dışa aktarımı",
   "mobile.server.import.exported": "{date} tarihinde dışa aktarıldı",

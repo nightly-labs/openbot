@@ -47,6 +47,10 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Om te importeren in een server waaraan je deelneemt, moet de export een .zip van minder dan 100 MB zijn.",
   "error.import.hostBusy": "De server leest andere exports. Probeer het over een paar minuten opnieuw.",
+  "error.import.uploadDiskSpace":
+    "De export heeft {size} GB vrije schijfruimte op de server nodig, en er is {free} GB vrij. Maak ruimte vrij op de server en kies de export dan opnieuw.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Deze server accepteert een export tot 100 MB. Werk OpenBot op de server bij om een grotere export te importeren.",
   "error.import.skillKept":
     "{name}: de server heeft de vaardigheid “{skill}” al, dus de agent gebruikt die vaardigheid. Vraag een beheerder om deze bij te werken.",
   "error.import.hermesNoProfiles":

@@ -182,6 +182,15 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+
+/** An export file on this phone, read when it is sent. */
+export interface AgentExportFile {
+  name: string;
+  size: number;
+  readAll: () => Promise<string>;
+  readPart: (offset: number, length: number) => Promise<string>;
+}
+
 import type {
   HostLocalServer,
   HostLocalServerList,
@@ -561,9 +570,12 @@ export interface MobileWorkspaceContextValue {
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
   /** The text of a CSV password export. The host adds its logins and answers only the counts. */
   importVaultCsv: (csv: string, serverId: string) => Promise<VaultHostImportResult>;
-  /** Sends a Grok Bot or Hermes export to the host, which keeps it under the preview's token. */
+  /**
+   * Sends a Grok Bot or Hermes export to the host, which keeps it under the preview's token. A host
+   * with `agent-import-v2` gets it in parts; an older host takes up to 100 MB.
+   */
   stageAgentImport: (
-    upload: RemoteFileUpload,
+    file: AgentExportFile,
     serverId: string,
     onProgress?: (fraction: number) => void,
   ) => Promise<AgentImportPreview>;

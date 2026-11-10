@@ -30,6 +30,7 @@ import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/age
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v2";
 import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
@@ -1216,6 +1217,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   };
   const agentImportCalls = createWebAgentImportCalls({
     request: hostRequest,
+    sendsParts: () => workspace.state.capabilities.includes(AGENT_IMPORT_V2_CAPABILITY),
     listAgents: () => workspace.runtime.listAgents(),
     saveFile,
   });

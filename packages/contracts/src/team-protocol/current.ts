@@ -12,6 +12,7 @@ import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
+import { AGENT_IMPORT_V2_CAPABILITY } from "./agent-import-v2";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
@@ -209,6 +210,7 @@ export {
   AGENT_HIDDEN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
@@ -501,6 +503,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -682,7 +685,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
     capability !== VAULT_V3_CAPABILITY &&
-    capability !== CHAT_HISTORY_CAPABILITY,
+    capability !== CHAT_HISTORY_CAPABILITY &&
+    capability !== AGENT_IMPORT_V2_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -740,6 +744,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -880,6 +885,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
       capability !== VAULT_V3_CAPABILITY &&
-      capability !== CHAT_HISTORY_CAPABILITY,
+      capability !== CHAT_HISTORY_CAPABILITY &&
+      capability !== AGENT_IMPORT_V2_CAPABILITY,
   );
 }
