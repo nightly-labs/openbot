@@ -243,6 +243,27 @@ export const CustomTabWithModels: Story = {
   },
 };
 
+/** Saved endpoints that wait for OpenCode to restart: their models come after the current task. */
+export const CustomTabPending: Story = {
+  args: {
+    provider: "opencode",
+    value: "opencode/example",
+    agentStatus: { ...STORY_AGENT_STATUS, providers: [{ ...openCodeStatus.providers[0], endpointsPending: true }] },
+    customProviders,
+    onAddCustomProvider: fn(),
+    onManageProviders: fn(),
+    modelOptions: openCodeCatalog([["opencode/example", "OpenCode Zen/Example"]]),
+  },
+};
+
+/** OpenCode read the saved endpoints but lists none of their models, so no restart brings them. */
+export const CustomTabUnlisted: Story = {
+  args: {
+    ...CustomTabPending.args,
+    agentStatus: { ...STORY_AGENT_STATUS, providers: [{ ...openCodeStatus.providers[0], endpointsPending: false }] },
+  },
+};
+
 /** The same catalog on the OpenCode tab, which must not list the two custom endpoints again. */
 export const OpenCodeTabExcludesCustom: Story = {
   args: {

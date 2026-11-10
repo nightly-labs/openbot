@@ -29,6 +29,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
+  isCustomProviderHarness,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
@@ -332,6 +333,11 @@ export interface ProviderHooks {
    * so a change made while it starts is not in the process that arrives.
    */
   captureConfigRevision(): number;
+  /**
+   * True while a saved endpoint of `harness` waits for a process that reads it. Without the hook,
+   * the status does not say.
+   */
+  endpointsPending?(harness: CustomProviderHarness): boolean;
 }
 
 /**
@@ -712,7 +718,13 @@ export class ProviderRuntime implements ProviderPort {
                 ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const withAccounts = accounts ? { ...withSource, accounts } : withSource;
-        return this.#restartsWhenIdle.has(row.id) ? { ...withAccounts, restartPending: true } : withAccounts;
+        const endpointsPending =
+          isCustomProviderHarness(row.id) && this.#hooks.endpointsPending
+            ? { endpointsPending: this.#hooks.endpointsPending(row.id) }
+            : {};
+        return this.#restartsWhenIdle.has(row.id)
+          ? { ...withAccounts, ...endpointsPending, restartPending: true }
+          : { ...withAccounts, ...endpointsPending };
       }),
     };
   }

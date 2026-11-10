@@ -126,6 +126,8 @@ export const messages = {
     "Aggiungi un endpoint compatibile con OpenAI: un server di modelli su questo computer, o qualsiasi servizio con un URL di base e una chiave.",
   "provider.picker.customPending":
     "I modelli dei tuoi endpoint non sono ancora caricati. Il provider li legge dopo la fine della sua attività in corso.",
+  "provider.picker.customUnlisted": "{name} non elenca i modelli dei tuoi endpoint.",
+  "provider.picker.editEndpoints": "Modifica endpoint",
   "provider.picker.defaultModelLabel": "{name}, predefinito",
   "provider.picker.usageLimit": "Limite di utilizzo raggiunto",
   "provider.picker.usageLimitWindow": "Limite ({window})",

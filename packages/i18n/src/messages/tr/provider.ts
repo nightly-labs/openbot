@@ -126,6 +126,8 @@ export const messages = {
     "OpenAI uyumlu bir uç nokta ekleyin — bu bilgisayardaki bir model sunucusu veya bir temel URL ve anahtara sahip herhangi bir hizmet.",
   "provider.picker.customPending":
     "Uç noktalarınızın modelleri henüz yüklenmedi. Sağlayıcı bunları geçerli görevi durduktan sonra okur.",
+  "provider.picker.customUnlisted": "{name}, uç noktalarınızın modellerini listelemiyor.",
+  "provider.picker.editEndpoints": "Uç noktaları düzenle",
   "provider.picker.defaultModelLabel": "{name}, varsayılan",
   "provider.picker.usageLimit": "Kullanım sınırına ulaşıldı",
   "provider.picker.usageLimitWindow": "{window} sınırı",
