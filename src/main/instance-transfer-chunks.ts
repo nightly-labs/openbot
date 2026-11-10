@@ -27,8 +27,15 @@ export interface InstanceTransferChunkFiles {
   directory: () => Effect.Effect<string, ArchiveOperationError>;
   /** Stages a complete file of the folder. From then on the staging owns the file and removes it. */
   stage: (path: string, owner: string) => Effect.Effect<InstanceTransferPreview, ArchiveOperationError>;
-  /** Writes an export to `path`, with the limits of an export on the host's own computer. */
-  exportTo: (path: string, input: ExportInstanceInput) => Effect.Effect<unknown, ArchiveOperationError>;
+  /**
+   * Writes an export to `path`, with the limits of an export on the host's own computer. `exporter`
+   * is the member who asked for the export.
+   */
+  exportTo: (
+    path: string,
+    input: ExportInstanceInput,
+    exporter: string,
+  ) => Effect.Effect<{ warnings: readonly string[] }, ArchiveOperationError>;
 }
 
 interface Upload {
@@ -64,6 +71,8 @@ export interface InstanceTransferExportState {
   sha256: string;
   chunkBytes: number;
   chunks: string[];
+  /** What the export left out, as a local export shows it. */
+  warnings: string[];
 }
 
 /** The byte range of one export part. */
@@ -93,7 +102,7 @@ async function readFully(handle: FileHandle, buffer: Buffer, position: number, l
   let read = 0;
   while (read < length) {
     const { bytesRead } = await handle.read(buffer, read, length - read, position + read);
-    if (bytesRead === 0) throw new Error("The transfer file is shorter than expected.");
+    if (bytesRead === 0) throw new Error(sourceText("error.import.transferPartInvalid"));
     read += bytesRead;
   }
   return buffer.subarray(0, length);
@@ -254,9 +263,9 @@ export class InstanceTransferChunks {
     const id = randomUUID();
     const path = join(directory, `${id}.zip`);
     const hashed = yield* Effect.gen({ self: this }, function* () {
-      yield* this.files.exportTo(path, input);
+      const { warnings } = yield* this.files.exportTo(path, input, owner);
       const { size } = yield* archiveCall(() => stat(path));
-      return { size, ...(yield* archiveCall(() => hashParts(path, size))) };
+      return { size, warnings, ...(yield* archiveCall(() => hashParts(path, size))) };
     }).pipe(Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)));
     const entry: Export = {
       id,
@@ -274,6 +283,7 @@ export class InstanceTransferChunks {
       sha256: hashed.sha256,
       chunkBytes: INSTANCE_TRANSFER_CHUNK_BYTES,
       chunks: hashed.chunks,
+      warnings: hashed.warnings.slice(0, 200).map((warning) => warning.slice(0, 500)),
     };
   }).bind(this);
 

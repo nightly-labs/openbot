@@ -106,5 +106,5 @@ function decodeWorkflow(value: unknown): TransferWorkflow | null {
 
 function reason(error: unknown): string {
   const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
-  return cause instanceof Error ? cause.message.slice(0, 500) : "The workflow was not saved.";
+  return cause instanceof Error ? cause.message.slice(0, 500) : sourceText("error.import.transferStepFailed");
 }

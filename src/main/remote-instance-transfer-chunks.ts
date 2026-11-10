@@ -43,6 +43,7 @@ interface ExportState {
   sha256: string;
   chunkBytes: number;
   chunks: string[];
+  warnings: string[];
 }
 
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -85,7 +86,9 @@ function decodeExportState(value: unknown): ExportState {
     !isPartSize(value.chunkBytes) ||
     !Array.isArray(value.chunks) ||
     value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
-    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk))
+    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
+    !Array.isArray(value.warnings) ||
+    !value.warnings.every(isString)
   )
     throw protocolError();
   return {
@@ -94,6 +97,7 @@ function decodeExportState(value: unknown): ExportState {
     sha256: value.sha256,
     chunkBytes: value.chunkBytes,
     chunks: value.chunks.filter(isString),
+    warnings: value.warnings.filter(isString),
   };
 }
 
@@ -203,7 +207,7 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
   serverId: string,
   input: ExportInstanceInput,
   destination: string,
-): Effect.fn.Return<void, TransferError> {
+): Effect.fn.Return<{ warnings: string[] }, TransferError> {
   const file = yield* remote.request(serverId, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, decodeExportState, {
     method: "POST",
     body: input,
@@ -244,4 +248,5 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
         .pipe(Effect.ignore),
     ),
   );
+  return { warnings: file.warnings };
 });

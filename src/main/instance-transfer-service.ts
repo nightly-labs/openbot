@@ -194,7 +194,6 @@ interface InstanceTransferAgents extends TransferPreferenceAgents, TransferHisto
     store: {
       ids(): string[];
       get(channelId: string): Channel;
-      markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): unknown;
     };
     images: { resolve(channel: Channel): { path: string; mimeType: AvatarImageInput["mimeType"] } | null };
     command(command: ChannelCommand, actor: ChannelActor): Effect.Effect<Channel, unknown>;
@@ -303,7 +302,7 @@ export class InstanceTransferService {
         return this.#prepareUploadDirectory(directory).pipe(Effect.as(directory));
       },
       stage: (path, owner) => this.#stageFile(path, owner, true, ARCHIVE),
-      exportTo: (path, input) => this.exportTo(path, input),
+      exportTo: (path, input, exporter) => this.exportTo(path, input, ARCHIVE, exporter),
     });
   }
 
@@ -340,6 +339,8 @@ export class InstanceTransferService {
     path: string,
     input: ExportInstanceInput,
     limits: ArchiveLimits = ARCHIVE,
+    /** The person whose channel messages the import gives to the person who imports. */
+    exporter?: string,
   ): Effect.fn.Return<InstanceExportResult, ArchiveOperationError> {
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
@@ -522,7 +523,7 @@ export class InstanceTransferService {
       settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents) : null,
       shared,
       signedIn: this.options.settings.signedInProviders(),
-      ...(channels.length > 0 ? { channels, exporter: this.options.channelActor().id } : {}),
+      ...(channels.length > 0 ? { channels, exporter: exporter ?? this.options.channelActor().id } : {}),
     };
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     entries.unshift({ name: INSTANCE_TRANSFER_MANIFEST, read: () => Promise.resolve(manifestBytes) });
@@ -541,12 +542,13 @@ export class InstanceTransferService {
   readonly exportForMember = Effect.fn("InstanceTransfer.exportForMember")(function* (
     this: InstanceTransferService,
     input: ExportInstanceInput,
+    memberId: string,
   ): Effect.fn.Return<string, ArchiveOperationError> {
     const directory = this.options.uploadDirectory;
     if (!directory) return yield* archiveFailure(new Error("Instance transfer uploads are not available."));
     yield* this.#prepareUploadDirectory(directory);
     const path = join(directory, `${randomUUID()}.zip`);
-    yield* this.exportTo(path, input, REMOTE_ARCHIVE).pipe(
+    yield* this.exportTo(path, input, REMOTE_ARCHIVE, memberId).pipe(
       Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
     );
     return path;
@@ -1220,10 +1222,16 @@ export class InstanceTransferService {
               exporter,
               actor,
             });
-            // The history was read on the other computer, so it does not arrive unread.
-            const last = port.channels.store.messages(channel.id).at(-1);
+            // The history was read on the other computer, so it does not arrive unread. The command
+            // also tells the open views about the messages.
+            const last = port.channels.store.messages(channel.id, undefined, 1).at(-1);
             if (last)
-              yield* archiveSync(() => port.channels.store.markRead(channel.id, actor.id, last.sequence, randomUUID()));
+              yield* port.channels
+                .command(
+                  { type: "read", operationId: randomUUID(), channelId: channel.id, throughSequence: last.sequence },
+                  actor,
+                )
+                .pipe(Effect.mapError(failure));
           }
           if (source.archived)
             yield* port.channels

@@ -105,9 +105,9 @@ export function instanceTransferIpcHandlers({
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
     if (inParts(serverId)) {
-      await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
+      const { warnings } = await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
       lastExport = path;
-      return { saved: true, fileName: basename(path), warnings: [] };
+      return { saved: true, fileName: basename(path), warnings };
     }
     // `instance-transfer-v1` carries no chat history.
     const { includeHistory: _history, ...v1 } = input;

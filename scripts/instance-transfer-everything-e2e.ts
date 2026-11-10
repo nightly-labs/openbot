@@ -14,7 +14,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent, type AgentSummary } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -441,6 +441,11 @@ try {
   // --- Import into the second profile.
   const preview = await runCauseEffect(target.transfer.stage(file));
   pass("preview offers both agents", preview.agents.length === 2);
+  // The open views read a channel again on each change that the channel service publishes.
+  const published: { channelId: string; revision: number }[] = [];
+  target.agents.on("event", (event: AgentEvent) => {
+    if (event.type === "channels-changed") published.push({ channelId: event.channelId, revision: event.revision });
+  });
   const result = await runCauseEffect(
     target.transfer.apply({
       token: preview.token,
@@ -549,6 +554,12 @@ try {
     ),
   );
   const newSummary = target.agents.channels.store.list("local").find((item) => item.id === newChannel.id);
+  pass(
+    "the open views get the imported channel messages",
+    published.at(-1)?.channelId === newChannel.id &&
+      published.at(-1)?.revision === target.agents.channels.store.get(newChannel.id).revision,
+    JSON.stringify(published.filter((entry) => entry.channelId === newChannel.id)),
+  );
   pass(
     "imported channel messages are not unread",
     newSummary !== undefined && newSummary.unreadCount === 0,

@@ -201,7 +201,6 @@ try {
         get: () => assert.fail("The instance has no channels."),
         messages: () => [],
         update: () => assert.fail("The instance has no channels."),
-        markRead: () => assert.fail("The instance has no channels."),
       },
       images: { resolve: () => null },
       command: () => Effect.die("The instance has no channels."),

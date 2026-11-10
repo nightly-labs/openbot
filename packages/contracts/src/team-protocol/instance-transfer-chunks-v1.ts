@@ -15,7 +15,8 @@
 // discard take. `upload/abort` ends an upload.
 //
 // An export starts with `export/begin`, which takes the `instance-transfer-v1` export input, writes
-// the file on the host and answers its size, its SHA-256 and the SHA-256 of each part.
+// the file on the host and answers its size, its SHA-256, the SHA-256 of each part and the warnings
+// of the export.
 // `export/chunk` answers one part as an attachment. `export/done` removes the file. The host removes
 // an upload or export that has no request for 30 minutes. Widening any of it needs a second
 // capability string.
@@ -29,6 +30,7 @@ import {
   identifier,
   list,
   type OptionalRouteCodec,
+  string,
 } from "./admin-wire";
 import { INSTANCE_TRANSFER_PREVIEW } from "./instance-transfer-v1";
 
@@ -81,7 +83,14 @@ export const INSTANCE_TRANSFER_CHUNKS_CODECS: ReadonlyMap<string, OptionalRouteC
         { agentIds: list(identifier, 100), includeFiles: boolean, includeSettings: boolean },
         { includeHistory: boolean },
       ),
-      fields({ exportId: identifier, size: count, sha256, chunkBytes: count, chunks: list(sha256, parts) }),
+      fields({
+        exportId: identifier,
+        size: count,
+        sha256,
+        chunkBytes: count,
+        chunks: list(sha256, parts),
+        warnings: list(string(500), 200),
+      }),
     ),
   ],
   // The response is the part itself, sent as an attachment; only an error envelope is JSON.

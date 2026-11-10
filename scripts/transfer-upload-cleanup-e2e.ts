@@ -73,7 +73,7 @@ async function verifyArchives(directory: string, expected: number): Promise<stri
 async function seed(directory: string): Promise<string[]> {
   const previous = service(directory);
   await run(previous.stageUpload(async () => bytes, "previous-owner"));
-  await run(previous.exportForMember(exportInput));
+  await run(previous.exportForMember(exportInput, "export-member"));
   await writeFile(join(directory, "interrupted.zip.part"), bytes);
   // An upload in parts that the previous process did not finish, and one that it finished.
   const upload = await run(previous.chunks.beginUpload({ size: bytes.length, sha256 }, "parts-owner"));
@@ -101,7 +101,7 @@ async function checkRestart(root: string, firstWriter: "upload" | "export"): Pro
   const orphans = await restart(directory);
   const current = service(directory);
   let exported: string | undefined;
-  if (firstWriter === "export") exported = await run(current.exportForMember(exportInput));
+  if (firstWriter === "export") exported = await run(current.exportForMember(exportInput, "export-member"));
   const [alice, bob] = await Promise.all([
     run(current.stageUpload(async () => bytes, "alice")),
     run(current.stageUpload(async () => bytes, "bob")),
@@ -109,7 +109,7 @@ async function checkRestart(root: string, firstWriter: "upload" | "export"): Pro
   for (const orphan of orphans) {
     await assert.rejects(readFile(join(directory, orphan)), { code: "ENOENT" }, `Old file remains: ${orphan}`);
   }
-  if (!exported) exported = await run(current.exportForMember(exportInput));
+  if (!exported) exported = await run(current.exportForMember(exportInput, "export-member"));
   await verifyArchives(directory, 3);
   const before = await names(directory);
   await run(current.discard(alice.token, "bob"));
@@ -131,7 +131,7 @@ async function checkConcurrent(root: string): Promise<void> {
   const current = service(directory);
   const [alice, exported, bob] = await Promise.all([
     run(current.stageUpload(async () => bytes, "alice")),
-    run(current.exportForMember(exportInput)),
+    run(current.exportForMember(exportInput, "export-member")),
     run(current.stageUpload(async () => bytes, "bob")),
   ]);
   await verifyArchives(directory, 3);
@@ -151,7 +151,7 @@ async function checkRetry(root: string): Promise<void> {
   const current = service(directory);
   const failed = await Promise.allSettled([
     run(current.stageUpload(async () => bytes, "alice")),
-    run(current.exportForMember(exportInput)),
+    run(current.exportForMember(exportInput, "export-member")),
   ]);
   assert.ok(failed.every((result) => result.status === "rejected"));
   await rm(blocker);

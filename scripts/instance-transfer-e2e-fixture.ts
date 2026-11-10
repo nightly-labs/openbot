@@ -71,9 +71,6 @@ export function emptyInstanceTransferService(
         update: (_channel, _changes) => {
           throw unexpected("channels.update");
         },
-        markRead: (_channelId, _memberId, _sequence, _operationId) => {
-          throw unexpected("channels.markRead");
-        },
       },
       images: {
         resolve: (_channel) => {

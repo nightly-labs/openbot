@@ -43,7 +43,7 @@ export async function routeInstanceTransfer(
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Invalid export.");
       }
-      const path = await answer(() => runCauseEffect(instanceTransfer.exportForMember(input)), 400);
+      const path = await answer(() => runCauseEffect(instanceTransfer.exportForMember(input, member.id)), 400);
       try {
         return await sendFile(response, path, null, (size) => ({
           "Content-Type": "application/zip",

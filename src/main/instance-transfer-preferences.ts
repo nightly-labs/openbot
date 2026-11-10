@@ -135,5 +135,5 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
 
 function reason(error: unknown): string {
   const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
-  return cause instanceof Error ? cause.message.slice(0, 500) : "The setting was not saved.";
+  return cause instanceof Error ? cause.message.slice(0, 500) : sourceText("error.import.transferStepFailed");
 }

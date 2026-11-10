@@ -276,7 +276,7 @@ function parsed<T>(bytes: Uint8Array | undefined, decode: (value: unknown) => T,
 export interface TransferChannelHistory {
   store: {
     get(channelId: string): Channel;
-    messages(channelId: string): ChannelMessage[];
+    messages(channelId: string, before?: number, limit?: number): ChannelMessage[];
     update(channel: Channel, changes: { messages: ChannelMessage[] }, operationId?: string): Channel;
   };
 }

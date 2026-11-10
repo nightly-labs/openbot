@@ -259,8 +259,8 @@ as `stage` does, with the local limits. It answers the `stage` preview; `apply` 
 `instance-transfer-v1` take its token. `POST /v1/instance-transfer-chunks/upload/abort` ends an upload.
 `POST /v1/instance-transfer-chunks/export/begin` takes the `export` input with an optional
 `includeHistory`, which `instance-transfer-v1` export drops, writes the file with the local
-limits and answers `{ exportId, size, sha256, chunkBytes, chunks }`, where `chunks` is the SHA-256 of
-each part. `POST /v1/instance-transfer-chunks/export/chunk` takes `{ exportId, index }` and sends that
+limits and answers `{ exportId, size, sha256, chunkBytes, chunks, warnings }`, where `chunks` is the
+SHA-256 of each part and `warnings` is what a local export would show. `POST /v1/instance-transfer-chunks/export/chunk` takes `{ exportId, index }` and sends that
 byte range as an attachment. `POST /v1/instance-transfer-chunks/export/done` removes the file. An
 upload or export with no request for 30 minutes is removed. The desktop client reads and writes one
 part at a time, checks each part it gets, and sends or reads a part again up to three times when the

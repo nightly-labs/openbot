@@ -110,5 +110,6 @@ export const messages = defineMessages("error.import", {
   // A transfer file that goes to or from a joined server in parts.
   "error.import.transferPartsClosed": "The transfer with the server stopped. Try again.",
   "error.import.transferPartInvalid": "Part of the transfer file did not arrive correctly. Try again.",
+  "error.import.transferStepFailed": "This server did not save it.",
   "error.import.transferNoSpace": "There is not enough free disk space on the server for this transfer file.",
 });

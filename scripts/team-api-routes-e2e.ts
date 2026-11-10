@@ -6651,6 +6651,7 @@ try {
           exportParts.map((part) => sha256(part.bytes)),
         ) &&
         field(exported.body, "sha256") === sha256(whole) &&
+        Array.isArray(field(exported.body, "warnings")) &&
         exportParts[0]?.headers.get("content-type") === "application/octet-stream" &&
         unzipSync(whole)["agents/agent-transfer/workspace/random.bin"]?.length ===
           INSTANCE_TRANSFER_CHUNK_BYTES + 4096 &&
