@@ -79,6 +79,18 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "223912ea4e10146bc8518f7d6cfa45cd19f52de7f76cee37e11c9e8c3be2dde5",
     },
     {
+      slug: "honcho",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "8b9b660dfb579801df22667e90e1d659dfcfc86dc03089a4cfdfcffa8edde310",
+    },
+    {
+      slug: "hindsight",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "208d293b53a7aa3a954136656274ce2ceabd48ab1f688d9c93d494d2188dbb8b",
+    },
+    {
       slug: "figma",
       version: "1.1.0",
       featured: true,
@@ -654,6 +666,129 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://cobrain.space",
     privacyPolicyUrl: "https://cobrain.space/privacy",
     termsUrl: "https://cobrain.space/terms",
+    skills: [],
+  },
+  honcho: {
+    slug: "honcho",
+    name: "Honcho",
+    tagline: "Your memory across AI tools",
+    description:
+      "Honcho by Plastic Labs gives agents a long-term memory of you that other AI tools you connect can share. Agents save what they learn, and Honcho reasons over it to build a model of your preferences, goals and ways of working. Agents ask it questions before they start. OpenBot agents keep their own memory too; Honcho is the memory that follows you to other tools. Messages that agents save go to your Honcho account.",
+    category: "productivity",
+    creatorName: "Plastic Labs",
+    iconUrl: "https://honcho.dev/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-recall", text: "Ask Honcho what it knows about how I like to work before we start." },
+      { id: "prompt-save", text: "Save the decisions from this thread to Honcho." },
+      { id: "prompt-preferences", text: "What does Honcho say about my writing style? Use it for this draft." },
+    ],
+    apps: [
+      {
+        id: "app-honcho-mcp",
+        name: "Honcho",
+        description: "Save and query long-term memory in your Honcho workspaces over one MCP server.",
+        iconUrl: "https://honcho.dev/favicon.ico",
+        server: {
+          name: "honcho",
+          transport: "http",
+          url: "https://mcp.honcho.dev",
+          auth: [
+            { id: "honcho-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "honcho-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "hch-…",
+                  hint: "Create a key at app.honcho.dev.",
+                },
+                {
+                  id: "workspace-id",
+                  label: "Workspace ID",
+                  header: "X-Honcho-Workspace-ID",
+                  hint: "The workspace agents use when they do not name one.",
+                  optional: true,
+                },
+              ],
+              docsUrl: "https://honcho.dev/docs/v3/guides/integrations/mcp",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://honcho.dev",
+    privacyPolicyUrl: "https://app.honcho.dev/privacy",
+    termsUrl: "https://app.honcho.dev/tos",
+    skills: [],
+  },
+  hindsight: {
+    slug: "hindsight",
+    name: "Hindsight",
+    tagline: "Memory that learns over time",
+    description:
+      "Hindsight by Vectorize gives agents a long-term memory in Hindsight Cloud. Agents retain facts and events, recall them by meaning, time and entity, and reflect on them to form mental models. Memories are kept in banks, and agents can make a bank for each project or person. OpenBot agents keep their own memory too; Hindsight is the memory that other AI tools you connect can share. What agents retain goes to your Hindsight Cloud account.",
+    category: "productivity",
+    creatorName: "Vectorize",
+    iconUrl: "https://ui.hindsight.vectorize.io/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-recall", text: "Recall from Hindsight what we know about this project before we start." },
+      { id: "prompt-retain", text: "Retain the decisions and open questions from this thread in Hindsight." },
+      {
+        id: "prompt-reflect",
+        text: "Reflect on my Hindsight memories: what patterns do you see in my last month of work?",
+      },
+    ],
+    apps: [
+      {
+        id: "app-hindsight-mcp",
+        name: "Hindsight",
+        description: "Retain, recall and reflect on memories in your Hindsight Cloud banks over one MCP server.",
+        iconUrl: "https://ui.hindsight.vectorize.io/apple-touch-icon.png",
+        server: {
+          name: "hindsight",
+          transport: "http",
+          url: "https://api.hindsight.vectorize.io/mcp",
+          auth: [
+            { id: "hindsight-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "hindsight-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "hsk_…",
+                  hint: "Create a key on the Connect page of Hindsight Cloud.",
+                },
+                {
+                  id: "bank-id",
+                  label: "Bank",
+                  header: "X-Bank-Id",
+                  hint: 'The bank agents use when they do not name one. Without it, Hindsight uses the bank "default".',
+                  optional: true,
+                },
+              ],
+              docsUrl: "https://ui.hindsight.vectorize.io/connect",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://hindsight.vectorize.io",
+    privacyPolicyUrl: "https://vectorize.io/privacy",
+    termsUrl: "https://vectorize.io/terms",
     skills: [],
   },
   figma: {

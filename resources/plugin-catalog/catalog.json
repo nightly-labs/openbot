@@ -63,6 +63,18 @@
       "detailSha256": "223912ea4e10146bc8518f7d6cfa45cd19f52de7f76cee37e11c9e8c3be2dde5"
     },
     {
+      "slug": "honcho",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "8b9b660dfb579801df22667e90e1d659dfcfc86dc03089a4cfdfcffa8edde310"
+    },
+    {
+      "slug": "hindsight",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "208d293b53a7aa3a954136656274ce2ceabd48ab1f688d9c93d494d2188dbb8b"
+    },
+    {
       "slug": "figma",
       "version": "1.1.0",
       "featured": true,
