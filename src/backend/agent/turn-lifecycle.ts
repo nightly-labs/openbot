@@ -1934,7 +1934,11 @@ export class TurnLifecycle {
   /** Sends the agent that asked the note that its request failed. A failed note does not stop the turn's end. */
   #answerFailedRequest(agentId: string, deliveryId: string): Effect.Effect<void> {
     return this.#mailbox
-      .answerFailedRequest(deliveryId, (taskId) => this.#hooks.taskOpen(taskId))
+      .answerFailedRequest(
+        deliveryId,
+        (taskId) => this.#hooks.taskOpen(taskId),
+        (id) => this.#store.list().some((agent) => agent.id === id),
+      )
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
@@ -1957,6 +1961,8 @@ export class TurnLifecycle {
     const messageId = delivery.delivery.messageId;
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
     const recipientAgentId = delivery.delivery.sender.agentId;
+    // The user deleted the agent that asked. A result for it would make the agent again (#6106).
+    if (!this.#store.list().some((agent) => agent.id === recipientAgentId)) return;
     // The requests of this sender that the turn read. A reply to one of them answers only that one.
     const requestIds = new Set(
       turnDeliveries

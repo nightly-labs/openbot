@@ -1184,7 +1184,11 @@ export class DrainScheduler {
   /** Sends the agent that asked the note that its request failed. A failed note does not stop the drain. */
   #answerFailedRequest(deliveryId: string, agentId: string): Effect.Effect<void> {
     return this.#mailbox
-      .answerFailedRequest(deliveryId, (taskId) => this.#tasks.threadId(taskId) !== null)
+      .answerFailedRequest(
+        deliveryId,
+        (taskId) => this.#tasks.threadId(taskId) !== null,
+        (id) => this.#store.list().some((agent) => agent.id === id),
+      )
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
