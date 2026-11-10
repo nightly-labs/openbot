@@ -348,3 +348,14 @@ export function isImageTooSmallDiagnostic(message: string): boolean {
     /\bimage length and width do not meet the model restrictions\b/iu.test(message)
   );
 }
+
+/**
+ * Whether a model endpoint refused an image in the request because it is too large. As for a too
+ * small image, the provider session keeps the image and sends it on each turn, so each turn fails
+ * the same way until a new session (#6429). A model behind OpenCode writes "Inline image exceeds
+ * maximum dimensions of 1024px on its longest side.", and Anthropic "At least one of the image
+ * dimensions exceed max allowed size for many-image requests: 2000 pixels".
+ */
+export function isImageTooLargeDiagnostic(message: string): boolean {
+  return /\bimage\b[^.\n]{0,80}\bexceeds? (?:the )?max(?:imum)? (?:allowed size|dimensions?)\b/iu.test(message);
+}
