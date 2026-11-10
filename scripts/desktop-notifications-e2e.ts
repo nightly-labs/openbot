@@ -340,8 +340,9 @@ try {
   const finished: AgentEvent = { type: "turn-completed", agentId, ...ids, status: "completed" };
   const routineThreadId = "routine-thread-1";
   const routineFinished: AgentEvent = {
-    type: "routine-thread-turn-completed",
+    type: "thread-turn-completed",
     taskId: "routine-task-1",
+    routine: true,
     turn: { type: "turn-completed", agentId, threadId: routineThreadId, turnId: "routine-turn-1", status: "completed" },
   };
 
@@ -370,6 +371,21 @@ try {
     assert.equal(shown.length, from + 1, "The level Only when it needs me showed a routine run.");
     await setLevel("all");
     return { shown: shownSince(from), opened: opened.slice(opens) };
+  });
+
+  await step("A turn of a side thread that is not a routine thread shows no desktop notification", async () => {
+    await setLevel("all");
+    const from = shown.length;
+    desktop({
+      type: "thread-turn-completed",
+      taskId: "side-task-1",
+      routine: false,
+      turn: { type: "turn-completed", agentId, threadId: "side-thread-1", turnId: "side-turn-1", status: "completed" },
+    });
+    // The routine thread after it shows, so the forwarder ran for both events.
+    desktop(routineFinished);
+    assert.deepEqual(shownSince(from), [english("notification.finished")]);
+    return { shown: shownSince(from) };
   });
 
   await step("A message that did not start notifies at the level All only", async () => {

@@ -26,6 +26,18 @@ library, so the phone composes its layout with the two widget keys and the App G
 state carry an HMAC signature, which the app checks with the key of the host that the action goes
 to, so one host cannot sign an action for another.
 
+A question, an approval or a browser step can be of a side thread of an agent or of a channel thread.
+The tap link and the button links of such a view name the thread of the request in a `thread`
+parameter (`DynamicIslandCoordinator.requestThreadId`). The runtime work of an agent has the work of
+its side threads too, so a view that shows work names the side thread that runs the turn
+(`DynamicIslandCoordinator.workingTurn`; the host reads the thread from `AgentService.listTasks`, the
+phone from the thread lists that it has read). The parameter only says which conversation
+the app opens, so it is outside the signed action, and an app from before it reads the same links
+and opens the agent's chat. The app opens the thread as it opens the thread of a notification (see
+[Side thread notifications](#side-thread-notifications)). A link that starts the app gives the
+route of the agent's chat, and the thread opens when the app can navigate
+(`live-activity-link.ts`).
+
 ## iPhone notifications
 
 A host sends an iOS notification when an agent finishes a turn, stops with an error, cannot start a
@@ -110,7 +122,31 @@ The Notification Service Extension of the app (`apps/mobile/plugins/with-notific
 `NotificationService.swift`) opens the seal with the keys that the app writes into the App Group
 file `push-notifications.json`, and shows the agent name and the text. It refuses content that names
 another server than the one whose keys open it. A notification that it cannot open keeps the app
-name only. A tap opens the chat of the agent.
+name only. A tap opens the conversation of the thread that the notification names: the channel of a
+channel thread, a side thread of the agent, or else the chat of the agent.
+
+### Side thread notifications
+
+A turn in a side thread sends no `turn-completed` outside `AgentTasks`. When the turn is not quiet,
+`AgentTasks` sends the local `thread-turn-completed` event, with `routine: true` for the thread of a
+routine. `PushNotificationService` sends a routine thread turn to each phone, as it did when a
+routine ran in the agent's chat. It sends the turn of another side thread only to a phone that
+advertises `push-notification-threads-v1`, because an app from before it opens the agent's chat, and
+only while that phone did not turn these notifications off (`POST /v1/push-notifications/threads`
+with `replies`; Settings > Notifications > Thread replies). The host keeps the choice with the
+registration of the session in `openbot-push-notifications-v1.json` (`threadReplies`), also when the
+phone registers again. A request for input, an approval or a browser step of a side thread does not
+read the choice. The level, the mute, the preview and the Live Activity check apply as for the
+agent's chat, but the Live Activity shows the replies of the agent's own chat only, so it never
+replaces the notification of a side thread reply. The desktop notification and the completion sound
+still use routine thread turns only.
+
+The notification data has the thread of the event, not a task id, and the phone does not know the
+thread of an agent's own chat. So the app (`outside-target.ts`, used by `(app)/_layout.tsx`) opens
+the channel whose thread it is, or the side thread when the phone has read the agent's thread list.
+Else it opens the agent's chat at once and reads the thread list from the host
+(`agent-tasks-v1`); when the thread is a side thread, it opens on top of that chat. While the app is
+on screen, a notification of the chat or the side thread that shows is not shown again.
 
 ## Android notifications
 

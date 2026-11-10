@@ -118,6 +118,7 @@ import {
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_V4_CAPABILITY,
   PROVIDERS_V5_CAPABILITY,
+  PUSH_NOTIFICATION_THREADS_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   QUIET_TURN_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
@@ -2505,6 +2506,7 @@ export class TeamApiServer {
           if (
             capability === PUSH_NOTIFICATIONS_CAPABILITY ||
             capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === PUSH_NOTIFICATION_THREADS_CAPABILITY ||
             capability === COMPUTER_ACTIVITY_CAPABILITY
           )
             return this.#options.pushNotifications !== undefined;

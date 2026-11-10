@@ -131,6 +131,9 @@ export const messages = {
     "Muestra el inicio de una respuesta, una pregunta o la acción que hay que aprobar. Apple y el servicio de cuentas de OpenBot no pueden leerlo.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Muestra el inicio de una respuesta, una pregunta o la acción que hay que aprobar. Google y el servicio de cuentas de OpenBot no pueden leerlo.",
+  "mobile.settings.notifications.threadReplies": "Respuestas en hilos",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Las respuestas en hilos te avisan cuando un agente termina o se detiene con un error en un hilo. Sin ellas, un hilo te sigue avisando cuando necesita tu respuesta o una aprobación.",
   "mobile.settings.notifications.sound": "Sonido",
   "mobile.settings.notifications.playSound": "Reproducir sonido",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

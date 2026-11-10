@@ -1889,7 +1889,9 @@ host.
 ## iPhone notifications
 
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs
-an answer, an approval, or a step in the browser, while the app is not on screen. The host does not
+an answer, an approval, or a step in the browser, while the app is not on screen. This includes the
+side threads of an agent, unless you turn Thread replies off in the app; the phone then tells each
+host that choice, and the host keeps it with the other notification choices of the phone. The host does not
 send one while the member uses a desktop app or the computer that it runs on. For this, it keeps in
 memory the time of the last send, answer or typing of each session, and on its own computer it reads
 whether the OpenBot window has focus and how long the computer has had no input. The desktop app also

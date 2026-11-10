@@ -121,6 +121,9 @@ export const messages = {
     "显示回复的开头、问题内容或待批准的操作。Apple 与 OpenBot 账号服务都无法读取。",
   "mobile.settings.notifications.previewFooterAndroid":
     "显示回复的开头、问题内容或待批准的操作。Google 与 OpenBot 账号服务都无法读取。",
+  "mobile.settings.notifications.threadReplies": "话题回复",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "开启话题回复后，助手在话题中完成或出错停止时会通知你。关闭后，话题需要你输入或审批时仍会通知你。",
   "mobile.settings.notifications.sound": "提示音",
   "mobile.settings.notifications.playSound": "播放提示音",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

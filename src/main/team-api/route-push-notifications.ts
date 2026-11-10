@@ -1,3 +1,8 @@
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  PUSH_NOTIFICATION_THREADS_CAPABILITY,
+  PUSH_NOTIFICATION_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import {
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_ROUTES,
@@ -16,13 +21,26 @@ import { readJson } from "./request-helpers";
 /**
  * The phone of the calling member gives or removes its push token and the events it wants. The host
  * sends notifications only for what this member can see. Frozen by `push-notifications-v1` for an
- * iPhone and by `push-notifications-android-v1` for an Android phone.
+ * iPhone and by `push-notifications-android-v1` for an Android phone. A phone of either platform says
+ * through `push-notification-threads-v1` whether it takes the notifications of side thread turns.
  */
 export async function routePushNotifications(
   context: TeamApiRequestContext,
   notifications: PushNotificationService | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, request, json, member, sessionId, protocol } = context;
+  if (method === "POST" && url.pathname === PUSH_NOTIFICATION_THREADS_ROUTES.set) {
+    if (!notifications || !capabilities.has(PUSH_NOTIFICATION_THREADS_CAPABILITY)) {
+      throw new HttpError(400, sourceText("error.team.pushNotificationsUnsupported"));
+    }
+    // `readJson` has already run the body through the push-notification-threads wire codec.
+    const choice = await readJson(request);
+    if (!isDynamicRecord(choice) || typeof choice.replies !== "boolean") {
+      throw new HttpError(400, sourceText("error.team.pushNotificationsUnsupported"));
+    }
+    notifications.setThreadReplies(sessionId, choice.replies);
+    return json(200, {});
+  }
   const route = pushRoute(url.pathname);
   if (method !== "POST" || !route) return "unmatched";
   if (!notifications || !capabilities.has(route.capability)) {

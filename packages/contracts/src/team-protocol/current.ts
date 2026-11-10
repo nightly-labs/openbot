@@ -110,6 +110,7 @@ import { PROVIDERS_SIGN_IN_V3_CAPABILITY } from "./providers-v3";
 import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
 import { PROVIDERS_V5_CAPABILITY } from "./providers-v5";
 import { PROVIDERS_V8_CAPABILITY } from "./providers-v8";
+import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "./push-notification-threads-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
@@ -296,6 +297,7 @@ export {
   PROVIDERS_V4_CAPABILITY,
   PROVIDERS_V5_CAPABILITY,
   PROVIDERS_V8_CAPABILITY,
+  PUSH_NOTIFICATION_THREADS_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   QUIET_TURN_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
@@ -510,6 +512,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHAT_HISTORY_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
+  PUSH_NOTIFICATION_THREADS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -694,7 +697,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
     capability !== CHAT_HISTORY_CAPABILITY &&
     capability !== CHANNEL_PICTURE_CAPABILITY &&
-    capability !== AGENT_IMPORT_V2_CAPABILITY,
+    capability !== AGENT_IMPORT_V2_CAPABILITY &&
+    capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -755,6 +759,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHAT_HISTORY_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
+  PUSH_NOTIFICATION_THREADS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -898,6 +903,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
       capability !== CHAT_HISTORY_CAPABILITY &&
       capability !== CHANNEL_PICTURE_CAPABILITY &&
-      capability !== AGENT_IMPORT_V2_CAPABILITY,
+      capability !== AGENT_IMPORT_V2_CAPABILITY &&
+      capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY,
   );
 }
