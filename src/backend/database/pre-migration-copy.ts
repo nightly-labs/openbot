@@ -9,7 +9,7 @@ import { type StoredStateFailure, storedIO, storedSync } from "../stored-state-e
 /** The folder next to `openbot.db` that holds the copies. */
 export const DATABASE_COPY_DIRECTORY = "openbot-db-copies";
 /** The number of copies that stay. A new copy removes the older ones. */
-export const KEPT_DATABASE_COPIES = 2;
+const KEPT_DATABASE_COPIES = 2;
 // Free space that stays after the copy, in addition to the size of the database: a migration that
 // rebuilds a table, and the VACUUM after it, need about that much. A copy must not take the space
 // that the migration needs.
@@ -24,7 +24,7 @@ export interface DatabaseCopyOptions {
   freeDiskBytes?: (directory: string) => Promise<number>;
 }
 
-export type DatabaseCopyResult =
+type DatabaseCopyResult =
   | { status: "copied"; fileName: string; removedCopies: number }
   | { status: "kept"; fileName: string }
   | { status: "skipped"; requiredBytes: number; freeBytes: number };
