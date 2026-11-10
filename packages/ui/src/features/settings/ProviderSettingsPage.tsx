@@ -11,9 +11,9 @@ import {
   type AgentProviderId,
   type AgentProviderStatus,
   agentProviderName,
-  CLAUDE_COMPACT_WINDOW_CHOICES,
   type ClaudeCompactWindowSetting,
   type CustomProviderSummary,
+  claudeCompactWindowSizes,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
@@ -1594,15 +1594,8 @@ function CompactWindowSection(props: {
   menuMount: HTMLElement | undefined;
 }) {
   const { t, format } = useText();
-  const choices = (): CompactWindowChoice[] => {
-    const saved = props.compaction.value?.tokens ?? null;
-    const sizes: (number | null)[] = [...CLAUDE_COMPACT_WINDOW_CHOICES];
-    if (!sizes.includes(saved)) sizes.push(saved);
-    return [
-      ...sizes.filter((size) => size === null),
-      ...sizes.filter((size): size is number => size !== null).sort((a, b) => a - b),
-    ].map(compactWindowChoice);
-  };
+  const choices = (): CompactWindowChoice[] =>
+    claudeCompactWindowSizes(props.compaction.value?.tokens ?? null).map(compactWindowChoice);
   const label = (choice: CompactWindowChoice) =>
     choice === "default"
       ? t("provider.settings.compactWindowDefault")

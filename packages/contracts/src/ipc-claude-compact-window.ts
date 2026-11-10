@@ -24,6 +24,16 @@ export const CLAUDE_COMPACT_WINDOW_CHOICES = [
   1_000_000,
 ] as const;
 
+/**
+ * The sizes to offer when `saved` is the saved size: `null` first, then the sizes from small to large.
+ * A size that another client saved and that is not a choice is added, so it still shows.
+ */
+export function claudeCompactWindowSizes(saved: number | null): (number | null)[] {
+  const sizes = new Set<number>();
+  for (const size of [...CLAUDE_COMPACT_WINDOW_CHOICES, saved]) if (size !== null) sizes.add(size);
+  return [null, ...[...sizes].sort((a, b) => a - b)];
+}
+
 export interface ClaudeCompactWindowSetting {
   /** The size in tokens, or `null` for Claude Code's own size for each model. */
   tokens: number | null;

@@ -41,6 +41,9 @@ export function createProviderClaudeCompactWindow(
   /** Bumped for each read and each save, so only the last answer shows. */
   let reads = 0;
 
+  /** A status event came during a save, so the size is read again after it. */
+  let changedDuringSave = false;
+
   function load(serverId: string, request: number): void {
     const read = ++reads;
     untrack(calls)
@@ -79,7 +82,9 @@ export function createProviderClaudeCompactWindow(
       return;
     }
     const serverId = untrack(source)?.serverId;
-    if (serverId !== undefined && !untrack(() => state.pending)) load(serverId, generation);
+    if (serverId === undefined) return;
+    if (untrack(() => state.pending)) changedDuringSave = true;
+    else load(serverId, generation);
   });
 
   async function choose(tokens: number | null): Promise<void> {
@@ -87,6 +92,7 @@ export function createProviderClaudeCompactWindow(
     if (serverId === undefined || state.pending) return;
     const request = generation;
     reads++;
+    changedDuringSave = false;
     setState((draft) => {
       draft.pending = true;
       draft.error = null;
@@ -103,10 +109,16 @@ export function createProviderClaudeCompactWindow(
           draft.error = errorMessage(error, t("error.provider.useChangeFailed"));
         });
     } finally {
-      if (request === generation)
+      if (request === generation) {
         setState((draft) => {
           draft.pending = false;
         });
+        // Another client can have changed the size during the save.
+        if (changedDuringSave) {
+          changedDuringSave = false;
+          load(serverId, request);
+        }
+      }
     }
   }
 

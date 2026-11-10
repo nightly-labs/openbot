@@ -1,7 +1,7 @@
 import {
   type AgentProviderId,
   type AgentProviderStatus,
-  CLAUDE_COMPACT_WINDOW_CHOICES,
+  claudeCompactWindowSizes,
   isAgentProvider,
   isInstallerProvider,
   isKeyOnlyProvider,
@@ -624,19 +624,13 @@ function CompactWindowSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const label = t("mobile.server.providers.compactWindow");
-  const saved = current.data?.tokens ?? null;
-  const sizes: (number | null)[] = [...CLAUDE_COMPACT_WINDOW_CHOICES];
-  if (!sizes.includes(saved)) sizes.push(saved);
-  const options = [
-    { value: compactWindowChoice(null), label: t("mobile.server.providers.compactWindowDefault") },
-    ...sizes
-      .filter((size): size is number => size !== null)
-      .sort((a, b) => a - b)
-      .map((size) => ({
-        value: compactWindowChoice(size),
-        label: t("mobile.server.providers.compactWindowTokens", { size: format.compact(size) }),
-      })),
-  ];
+  const options = claudeCompactWindowSizes(current.data?.tokens ?? null).map((size) => ({
+    value: compactWindowChoice(size),
+    label:
+      size === null
+        ? t("mobile.server.providers.compactWindowDefault")
+        : t("mobile.server.providers.compactWindowTokens", { size: format.compact(size) }),
+  }));
   return (
     <SettingsSection
       footer={

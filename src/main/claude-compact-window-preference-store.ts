@@ -4,7 +4,7 @@ import {
   isClaudeCompactWindowTokens,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { Effect } from "effect";
+import { Effect, Semaphore } from "effect";
 import { PreferenceStore } from "./preference-file";
 
 /**
@@ -33,13 +33,19 @@ export type ClaudeCompactWindowControl = ReturnType<typeof claudeCompactWindowCo
  * settings page, on this computer and on a joined client, reads the size again.
  */
 export function claudeCompactWindowControl(store: ClaudeCompactWindowPreferenceStore, changed: () => void) {
+  // One change at a time: two saves that read the same earlier size could both skip the event.
+  const changes = Semaphore.makeUnsafe(1);
   return {
     get: () => store.get(),
     set: Effect.fn("ClaudeCompactWindow.set")(function* (tokens: number | null) {
-      const before = store.get().tokens;
-      const next = yield* store.set({ tokens });
-      if (before !== tokens) changed();
-      return next;
+      return yield* changes.withPermit(
+        Effect.gen(function* () {
+          const before = store.get().tokens;
+          const next = yield* store.set({ tokens });
+          if (before !== tokens) changed();
+          return next;
+        }),
+      );
     }),
   };
 }
