@@ -1224,9 +1224,9 @@ export class OpenBotToolRouter {
 
   /**
    * The errors that the chat had in the last hour, for a report: the failed tool steps of earlier
-   * turns, and the OpenBot tool failures of this turn. A failed message keeps the partial reply, not
-   * an error, so it is not taken. A shell command's output is
-   * the user's own work, so it is not taken. Each line is redacted and cut; the user reads them on the card.
+   * turns, and the OpenBot tool failures of this turn. A failed message keeps the partial reply, and a
+   * shell command's output is the user's own work, so neither is taken. Each line is redacted and
+   * cut; the user reads them on the card.
    */
   #recentErrors(agentId: string, threadId: string, turnId: string): string {
     const since = Date.now() - FEEDBACK_ERROR_AGE_MS;
