@@ -165,14 +165,22 @@ export function SettingsRow({
       ) : null}
     </>
   );
-  const content = (
+  // A measured value keeps one place in the tree in both layouts. If it moved to another parent,
+  // React would mount a new native control, which is narrow until it measures its contents. The
+  // row would then change its layout again at each mount and flicker.
+  const content = measures ? (
     <>
       {leading}
-      <View className="min-w-0 flex-1 gap-1">
-        {title}
-        {stacked ? measuredTrailing : null}
+      <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
+        <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
+        {measuredTrailing}
       </View>
-      {stacked ? null : measures ? measuredTrailing : trailing || chevron}
+    </>
+  ) : (
+    <>
+      {leading}
+      <View className="min-w-0 flex-1 gap-1">{title}</View>
+      {trailing || chevron}
     </>
   );
   return onPress ? (
