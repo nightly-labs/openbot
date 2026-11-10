@@ -1817,6 +1817,23 @@ export class BrowserHost {
     this.#takeoverTabIds.delete(tabId);
     this.#syncAttachedView();
     this.#emitChanged();
+    // A failed submission can leave the secret in a page that never loads a new document, such as a
+    // single-page sign-in. Load the page again with GET, as `submit` does, so that the commit ends
+    // the protection. Without it the tab stays hidden and every tool, close included, is refused.
+    if (tab?.secret?.submitted && !tab.secret.running)
+      Effect.runFork(
+        this.#enqueue(
+          tabId,
+          (current) =>
+            untilStopped(
+              current,
+              navigateAndWait(current.contents, () =>
+                current.contents.loadURL(currentTabUrl(current), browserLoadOptions()),
+              ),
+            ),
+          true,
+        ).pipe(Effect.ignore, Effect.forkIn(tab.scope, { startImmediately: true })),
+      );
   }
 
   readonly setVisible = Effect.fn("BrowserHost.setVisible")(function* (
