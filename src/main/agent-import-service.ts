@@ -156,6 +156,13 @@ interface ImportContext {
   reviseSkills: boolean;
   /** The digest of each skill that an imported agent of this run has, by slug. */
   skills: Map<string, string>;
+  /** Each skill of this run that got a new name, by its slug in the export and its digest. */
+  renamed: Map<string, ImportSkill>;
+}
+
+interface ImportSkill {
+  files: Array<readonly [string, Uint8Array]>;
+  slug: string;
 }
 
 /** The owner of the exports the local user stages. A member's owner is the member id. */
@@ -374,6 +381,7 @@ export class AgentImportService {
         timezone: caller?.timezone && validTimezone(caller.timezone) ? caller.timezone : this.timezone(),
         reviseSkills: caller?.reviseSkills ?? true,
         skills: new Map(),
+        renamed: new Map(),
       });
     }).pipe(
       Effect.ensuring(
@@ -535,11 +543,19 @@ export class AgentImportService {
         .map((entry) => [entry.name.slice(folder.length), entry] as const);
     };
     // Every skill is checked before the agent exists, so a bad one publishes nothing.
-    const skills: Array<{ files: Array<readonly [string, Uint8Array]>; slug: string }> = [];
+    const skills: ImportSkill[] = [];
     const planned = new Map(context.skills);
+    const renames = new Map(context.renamed);
     for (const path of source.skills) {
       const skill = yield* readSkillEffect(archive, under(path));
       const digest = skillDigest(skill.files);
+      // The same skill as one that got a new name keeps that name.
+      const key = `${skill.slug}\0${digest}`;
+      const renamedBefore = renames.get(key);
+      if (renamedBefore) {
+        skills.push(renamedBefore);
+        continue;
+      }
       const earlier = planned.get(skill.slug);
       if (earlier === undefined || earlier === digest) {
         planned.set(skill.slug, digest);
@@ -558,6 +574,7 @@ export class AgentImportService {
         sourceText("error.import.skillRenamed", { name: source.name, skill: renamed.from, renamed: renamed.name }),
       );
       planned.set(renamed.slug, digest);
+      renames.set(key, renamed);
       skills.push(renamed);
     }
     const files = source.files ? under(source.files) : [];
@@ -682,6 +699,7 @@ export class AgentImportService {
                 .pipe(Effect.mapError((error) => archiveFailure(error.cause)))
                 .pipe(Effect.uninterruptible);
             for (const [slug, digest] of planned) context.skills.set(slug, digest);
+            for (const [key, skill] of renames) context.renamed.set(key, skill);
             completed = true;
             return agent;
           } catch (error) {
@@ -722,9 +740,15 @@ function renameSkill(files: ReadonlyArray<readonly [string, Uint8Array]>, taken:
     frontmatter.set("name", name);
     const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
     const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
-    const renamed = files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file));
-    const { slug } = inspectArchive(zipSync(Object.fromEntries(renamed)));
-    if (!taken.has(slug)) return { files: renamed, slug, from, name };
+    // The slug comes from SKILL.md alone, so the other files are not zipped for each number.
+    const { slug } = inspectArchive(zipSync({ "SKILL.md": skillFile }));
+    if (!taken.has(slug))
+      return {
+        files: files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file)),
+        slug,
+        from,
+        name,
+      };
   }
   throw new Error(sourceText("error.skill.localNameTaken"));
 }
