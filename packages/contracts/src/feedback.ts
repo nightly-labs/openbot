@@ -385,6 +385,8 @@ export interface SimilarFeedbackIssue {
   readonly number: number;
   readonly title: string;
   readonly url: string;
+  /** What the issue says happened, so that a comment adds only what is new. */
+  readonly summary: string;
 }
 
 /**

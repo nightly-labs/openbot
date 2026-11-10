@@ -116,6 +116,7 @@ const searchSchema = Schema.Struct({
       number: Schema.Number,
       title: Schema.String,
       html_url: Schema.String,
+      body: Schema.optional(Schema.NullOr(Schema.String)),
       pull_request: Schema.optional(Schema.Unknown),
     }),
   ),
@@ -123,6 +124,8 @@ const searchSchema = Schema.Struct({
 const commentSchema = Schema.Struct({ id: Schema.Number });
 
 const SIMILAR_ISSUES = 5;
+/** Enough of an issue for the agent to see what a new report adds to it. */
+const SIMILAR_SUMMARY_LENGTH = 300;
 /** The app's slug. Its issues show `openbotgit[bot]`; reports add to those issues only. */
 const FEEDBACK_APP = "openbotgit";
 
@@ -137,6 +140,16 @@ export interface GitHubSimilarIssue {
   number: number;
   title: string;
   url: string;
+  /** The issue's "What happened?", "Problem" or "Proposed behavior" answer, cut. */
+  summary: string;
+}
+
+/** The first text answer of an issue that the app opened from a report. */
+function issueSummary(body: string | null | undefined): string {
+  const answer = /(?:^|\n)### (?:What happened\?|Problem|Proposed behavior)\n+([\s\S]*?)(?=\n### |\n---\n|$)/.exec(
+    body ?? "",
+  );
+  return (answer?.[1] ?? "").replace(/\s+/g, " ").trim().slice(0, SIMILAR_SUMMARY_LENGTH);
 }
 
 type Credential = { kind: "user"; token: string } | { kind: "app" } | { kind: "installation"; token: string };
@@ -291,7 +304,12 @@ export class GitHubInstallationTokens {
     const found = yield* this.#get(`/search/issues?${query.toString()}`, token, searchSchema);
     return found.items
       .filter((item) => item.pull_request === undefined)
-      .map((item) => ({ number: item.number, title: item.title, url: item.html_url }));
+      .map((item) => ({
+        number: item.number,
+        title: item.title,
+        url: item.html_url,
+        summary: issueSummary(item.body),
+      }));
   }).bind(this);
 
   /** A token for one repository of the app's own installation, with only `permissions`. */

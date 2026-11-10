@@ -819,7 +819,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .int()
         .positive()
         .describe(
-          "The number of an open issue from the similar issues that is the same problem. The report becomes a comment on it.",
+          "The number of an open issue from the similar issues that is the same problem. The report becomes a comment on it, so write what this user adds to that issue.",
         )
         .optional(),
     },

@@ -6,7 +6,7 @@ import {
 } from "@openbot/contracts/feedback";
 import type { CentralAuthState } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredNumber, requiredString } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { app } from "electron";
@@ -49,6 +49,7 @@ function similarIssues(value: unknown): SimilarFeedbackIssue[] {
         number: requiredNumber(entry, "number"),
         title: requiredString(entry, "title"),
         url: requiredString(entry, "url"),
+        summary: isString(entry.summary) ? entry.summary : "",
       },
     ];
   });
