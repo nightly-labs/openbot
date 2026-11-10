@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const memoryId = z.string().min(1).max(INPUT_LIMITS.identifier);
 
-export const searchMemoriesInput = z.strictObject({
+const searchMemoriesInput = z.strictObject({
   query: z.string().trim().min(1).max(256),
   limit: z.number().int().min(1).max(10).optional(),
 });
