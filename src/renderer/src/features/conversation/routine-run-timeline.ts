@@ -11,6 +11,8 @@ type RoutineRunMarker = RoutineRunMarkerModel;
 
 interface IndexedTransition extends RoutineRunMarkerTransition {
   index: number;
+  message: AgentMessage;
+  marker: RoutineRunMarker;
 }
 
 /**
@@ -27,27 +29,28 @@ export function summarizeRoutineRunMessages(messages: readonly AgentMessage[]): 
     const marker = routineRunMarker(message);
     if (!marker) return;
     const transitions = transitionsByRun.get(marker.runId) ?? [];
-    transitions.push({ index, status: marker.status, timestamp: marker.timestamp });
+    transitions.push({ index, status: marker.status, timestamp: marker.timestamp, message, marker });
     transitionsByRun.set(marker.runId, transitions);
   });
 
   return messages.flatMap((message, index) => {
     const marker = routineRunMarker(message);
     if (!marker) return [message];
-    const transitions = transitionsByRun.get(marker.runId);
-    if (!transitions || transitions.length === 1) return [message];
-    const first = transitions[0];
+    const transitions = transitionsByRun.get(marker.runId) ?? [];
     const latest = transitions.at(-1);
-    const latestMessage = latest ? messages[latest.index] : undefined;
-    const latestMarker = latestMessage && routineRunMarker(latestMessage);
-    if (first?.index === index && latestMessage && latestMarker) {
+    if (!latest || transitions.length === 1) return [message];
+    if (transitions[0]?.index === index) {
+      const { createdAt: _latestCreatedAt, ...latestRow } = latest.message;
       return [
         {
-          ...latestMessage,
-          // The day separators read the place of the row, which is the start of the run.
+          ...latestRow,
+          // The row keeps the id, time and place of the first state, so it stays the same row while
+          // the run changes state, and the day separators match its place.
+          id: message.id,
+          time: message.time,
           ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
           actionMarker: {
-            ...latestMarker,
+            ...latest.marker,
             previousTransitions: transitions.slice(0, -1).map(({ status, timestamp }) => ({ status, timestamp })),
           },
         },
