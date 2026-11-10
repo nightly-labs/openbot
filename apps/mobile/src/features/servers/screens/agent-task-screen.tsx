@@ -349,7 +349,7 @@ function AgentTaskChat({
     insets.top + 84,
     keyboardOffset,
     ready && rowsShown,
-    rowsShown && messages.some((row) => row.kind !== "thinking"),
+    rowsShown && messages.some((row) => row.kind !== "thinking" || turnSummaries?.has(row.id)),
     lastUserId,
     questionForm.question ? (questionForm.messageId ?? null) : null,
     // As a chat that opens at a message from search: the list does not take the latest message first.

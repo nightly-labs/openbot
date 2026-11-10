@@ -121,8 +121,14 @@ const TAP_DURATION_MS = 400;
 /** The selection handles stand this far out of the row of the selected message. */
 const HANDLE_MARGIN = 24;
 
-/** A row of the list. Thinking steps show in the activity row instead. */
-type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ChatMarkerGroup;
+type ThinkingRow = Extract<ChatMessage, { kind: "thinking" }>;
+/** A row that draws a message or a marker. */
+type MessageRowMessage = Exclude<ChatMessage, ThinkingRow> | ChatMarkerGroup;
+/**
+ * A row of the list. Thinking steps show in the activity row or in the steps row above the answer.
+ * Only the thinking row of a finished turn with no answer draws its steps row itself.
+ */
+type VisibleMessage = MessageRowMessage | ThinkingRow;
 const NO_ROWS: VisibleMessage[] = [];
 /**
  * While the chat opens on Android, the list renders only the latest rows, which the reader sees
@@ -261,7 +267,7 @@ interface ChatMessageListProps {
   online: boolean;
   appActive: boolean;
   activeTurnId: string | null;
-  /** The steps row of each finished turn, by the id of its first answer. */
+  /** The steps row of each finished turn, by the id of its first answer or, with no answer, of its thinking row. */
   turnSummaries?: ReadonlyMap<string, TurnStepsSummary>;
   /** Opens the thinking of a turn. Absent where no sheet can show it, such as a channel. */
   onOpenTurn?: (turnId: string) => void;
@@ -673,7 +679,7 @@ const MessageRow = memo(function MessageRow({
   revealed,
   shared,
 }: {
-  message: VisibleMessage;
+  message: MessageRowMessage;
   /** The first message of the chat, sent from this phone: it rises from the composer. */
   isFirstUser: boolean;
   arriving: boolean;
@@ -1143,25 +1149,31 @@ function ChatRow({ message }: { message: VisibleMessage }) {
       {message.id === row.unreadLineRowId ? (
         <UnreadLineRow rowId={message.id} color={row.unreadLineColor} animated={row.unreadLineAnimated} />
       ) : null}
-      {turn && openTurn ? (
-        <ChatTurnStepsRow summary={turn} muted={row.shared.themeMuted} onPress={() => openTurn(turn.turnId)} />
+      {turn ? (
+        <ChatTurnStepsRow
+          summary={turn}
+          muted={row.shared.themeMuted}
+          onPress={openTurn ? () => openTurn(turn.turnId) : undefined}
+        />
       ) : null}
-      <MessageRow
-        message={message}
-        isFirstUser={message.id === row.firstUserId}
-        source={
-          message.kind === "message" && message.replyToMessageId
-            ? row.messagesById.get(message.replyToMessageId)
-            : undefined
-        }
-        questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
-        upload={row.upload?.messageId === message.id ? row.upload : undefined}
-        outbox={row.outboxStatuses?.get(message.id)}
-        selecting={message.id === row.selectingMessageId}
-        arriving={row.arrivals.has(message.id)}
-        revealed={row.revealedIds.has(message.id)}
-        shared={row.shared}
-      />
+      {message.kind === "thinking" ? null : (
+        <MessageRow
+          message={message}
+          isFirstUser={message.id === row.firstUserId}
+          source={
+            message.kind === "message" && message.replyToMessageId
+              ? row.messagesById.get(message.replyToMessageId)
+              : undefined
+          }
+          questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+          upload={row.upload?.messageId === message.id ? row.upload : undefined}
+          outbox={row.outboxStatuses?.get(message.id)}
+          selecting={message.id === row.selectingMessageId}
+          arriving={row.arrivals.has(message.id)}
+          revealed={row.revealedIds.has(message.id)}
+          shared={row.shared}
+        />
+      )}
       {row.branchDivider?.rowId === message.id ? (
         <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />
       ) : null}
@@ -1413,12 +1425,17 @@ export const ChatMessageList = memo(function ChatMessageList({
 
   const visibleMessages = useMemo(
     () =>
-      groupRoutineRunMarkers(groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")), {
-        unreadMessageIds: unreadLineMessageIds,
-        focusMessageId,
-        branchRowId: branchDivider?.afterId,
-      }),
-    [messages, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
+      groupRoutineRunMarkers(
+        groupExchangeMarkers(
+          messages.filter((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+        ),
+        {
+          unreadMessageIds: unreadLineMessageIds,
+          focusMessageId,
+          branchRowId: branchDivider?.afterId,
+        },
+      ),
+    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(() => chatDayLabels(visibleMessages, { t, format }), [visibleMessages, t, format]);
