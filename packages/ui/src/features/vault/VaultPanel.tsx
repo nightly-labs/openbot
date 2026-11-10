@@ -1390,6 +1390,12 @@ function ItemDialog(props: {
                 onChange={(event) => set(contact(), { country: event.currentTarget.value })}
               >
                 <option value="">{t("vault.chooseCountry")}</option>
+                {/* A country outside the list, such as one that an agent saved, stays a choice under its code. */}
+                <Show
+                  when={contact().country && !props.countries.some((country) => country.code === contact().country)}
+                >
+                  <option value={contact().country}>{contact().country}</option>
+                </Show>
                 <For each={props.countries}>{(country) => <option value={country.code}>{country.name}</option>}</For>
               </NativeSelect>
             </Field>
