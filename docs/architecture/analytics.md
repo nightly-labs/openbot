@@ -118,8 +118,8 @@ starts of one app version that did not finish. It writes `starting` before the d
 the migrations, and clears the attempt when the main window has loaded with the database open. A
 start error, an uncaught exception before that point, and a `starting` attempt with a new `.dmp`
 file in `crashDumps` count as a failure. A quit (`recordExit` writes `quitting`), an OS shutdown or
-restart (the `powerMonitor` event, or a boot time after the attempt), and a kill from outside (no
-dump) do not count and keep the count. A new version starts from zero. After 3 failures in a row,
+restart (the `powerMonitor` event, or a boot time after the attempt) with no error and no dump, and a
+kill from outside (no dump) do not count and keep the count. A new version starts from zero. After 3 failures in a row,
 the desktop shows `start-recovery-window.ts` before the start continues. The window has its own
 in-memory session, no preload and no IPC: the page is a `data:` URL whose links go to fixed
 `https://openbot.invalid/recovery/<action>` URLs, and `will-navigate` stops each navigation and runs

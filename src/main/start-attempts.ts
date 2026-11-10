@@ -194,16 +194,18 @@ export class StartAttempts {
   }
 }
 
-function classify(record: StartAttemptsRecord, options: StartAttemptsOptions): PreviousStartOutcome {
+function classify(record: StartAttemptsRecord, options: StartAttemptsOptions): Exclude<PreviousStartOutcome, "none"> {
   const attempt = record.attempt;
   if (!attempt) return "finished";
-  // An OS shutdown, a restart or a power loss stops a start that can be healthy.
-  if (attempt.osShutdown || options.bootedAt > attempt.startedAt) return "os_restart";
   if (attempt.state === "failed") return "failed";
   if (attempt.state === "quitting") return "quit";
   // The process ended in `starting` with no quit. Crashpad writes a dump for a crash, but not for a
-  // kill from outside.
-  return countCrashDumps(options.crashDumpsPath, attempt.startedAt, options.now) > 0 ? "crashed" : "stopped";
+  // kill from outside. A restart after the crash does not remove the crash: users often restart
+  // when an app does not open.
+  if (countCrashDumps(options.crashDumpsPath, attempt.startedAt, options.now) > 0) return "crashed";
+  // With no sign of a failure, an OS shutdown, a restart or a power loss stopped a start that can be healthy.
+  if (attempt.osShutdown || options.bootedAt > attempt.startedAt) return "os_restart";
+  return "stopped";
 }
 
 /** The start failure that `scripts/start-recovery-e2e.ts` forces. */
