@@ -79,6 +79,7 @@ import {
   browserTakeoverError,
   browserTakeoverResult,
   commandText,
+  declinedMcpElicitationText,
   dynamicPromptResult,
   expiredPromptResult,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
@@ -1807,11 +1808,7 @@ export class AttentionRegistry {
     const questions = mcpElicitationQuestions(request.params);
     if (!threadId || !turnId || !agentId || !publicThreadId || !questions) {
       client.respond(request.id, { action: "decline", content: null, _meta: null });
-      this.#emitError(
-        "mcp_safety_handoff",
-        "A local plugin requested an unsupported security hand-off, so OpenBot declined it.",
-        agentId,
-      );
+      this.#emitError("mcp_safety_handoff", declinedMcpElicitationText(request.params), agentId);
       return;
     }
     if (this.#answerMcpToolConsentWithoutAsking(client, request, agentId)) return;
