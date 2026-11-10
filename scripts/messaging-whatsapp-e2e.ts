@@ -67,6 +67,9 @@ const OWNER_LID = "777001";
 const FRIEND = "48600100300";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
+/** A Brazilian mobile number as people type it, and the older form that its WhatsApp account keeps. */
+const BRAZIL_TYPED = "5531988887777";
+const BRAZIL_ACCOUNT = "553188887777";
 const GROUP = "120363000000000001@g.us";
 const OTHER_GROUP = "120363000000000002@g.us";
 const PAIRING_CODE: string = "ABCD1234";
@@ -239,9 +242,12 @@ class FakeSocket implements WhatsAppSocket {
     return group(jid, jid === GROUP ? "Team" : "Family");
   }
 
-  /** Each number has an account, in the form it was asked for. */
+  /** Each number has an account, in the form it was asked for, except the Brazilian one, which keeps its older form. */
   async onWhatsApp(...phoneNumbers: string[]) {
-    return phoneNumbers.map((number) => ({ jid: `${number}@s.whatsapp.net`, exists: true }));
+    return phoneNumbers.map((number) => ({
+      jid: `${number === BRAZIL_TYPED ? BRAZIL_ACCOUNT : number}@s.whatsapp.net`,
+      exists: true,
+    }));
   }
 
   async updateMediaMessage(message: WAMessage): Promise<WAMessage> {
@@ -776,6 +782,41 @@ try {
       return { chat: `${LID_FRIEND}@s.whatsapp.net` };
     });
 
+    await step(
+      "Brazilian numbers: a contact typed with the 9 gets work through the form that WhatsApp sends",
+      async () => {
+        const accountJid = `${BRAZIL_ACCOUNT}@s.whatsapp.net`;
+        // A contact saved before WhatsApp named the form: the typed number is in the settings.
+        agents.messaging.store.addAllowedSender(connectionId(agents), {
+          id: BRAZIL_TYPED,
+          kind: "contact",
+          name: "Bia",
+        });
+        const saved = message({ chat: accountJid, text: "oi, tudo bem?" });
+        phone.current().receive([saved]);
+        await until(() => received(agents, accountJid, saved.key.id ?? ""), "the message of the saved contact");
+        const values = credentials.get(connectionId(agents));
+        assert.ok(values);
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        await runCauseEffect(adapter.identify());
+        await runCauseEffect(
+          adapter.postAnswer({ platformChannelId: accountJid, replyThreadId: null }, "Resposta", null),
+        );
+        await until(() => phone.textsTo(accountJid).includes("Resposta"), "the answer to the saved contact");
+        // A contact added while the number is connected gets the form that WhatsApp has.
+        agents.messaging.store.removeAllowedSender(connectionId(agents), BRAZIL_TYPED);
+        const input = parseWhatsAppSenderInput({
+          workspaceId: OWNER,
+          sender: { id: "+55 31 9 8888-7777", kind: "contact", name: "Bia" },
+        });
+        await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+        const ids = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
+        assert.ok(ids.includes(BRAZIL_ACCOUNT), "The contact was not saved in the form that WhatsApp has.");
+        assert.ok(!ids.includes(BRAZIL_TYPED), "The contact was saved as typed.");
+        return { saved: BRAZIL_ACCOUNT };
+      },
+    );
+
     await step("burst: short messages of one person within 1.5 s become one request", async () => {
       const strangerJid = `${STRANGER}@s.whatsapp.net`;
       const first = message({ chat: strangerJid, text: "one more thing" });
@@ -1089,6 +1130,7 @@ try {
         [OWNER_JID]: OWNER,
         [`${STRANGER}@s.whatsapp.net`]: STRANGER,
         [`${LID_FRIEND}@s.whatsapp.net`]: LID_FRIEND,
+        [`${BRAZIL_ACCOUNT}@s.whatsapp.net`]: BRAZIL_ACCOUNT,
         [GROUP]: FRIEND,
       };
       for (const link of agents.messaging.store.links(orchestrator ?? ""))
