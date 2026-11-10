@@ -185,22 +185,24 @@ function sameInstructionsFile(a: InstructionsFileText | null, b: InstructionsFil
 
 /**
  * The instruction file block to send with the next user turn, or `null` when the agent already has
- * it. `undefined` for `delivered` means that the context can hold an earlier text: a resumed session,
- * or one after a compaction. Then the block goes also when the file is gone now.
+ * it. `current` is null when there is no text to give: no file, an empty file, or a file that the CLI
+ * reads by itself. `undefined` for `delivered` means that the context can hold an earlier text: a
+ * resumed session, or one after a compaction. Then only a text sends a block, as for saved logins:
+ * the notice that the earlier text no longer applies goes only after a block with text.
  */
 export function instructionsFileUpdate(
   delivered: InstructionsFileText | null | undefined,
   current: InstructionsFileText | null,
 ): string | null {
-  if (delivered !== undefined && sameInstructionsFile(delivered, current)) return null;
+  if (delivered === undefined ? !current : sameInstructionsFile(delivered, current)) return null;
   return [
     INSTRUCTIONS_FILE_BLOCK_START,
     ...(current
       ? instructionsFileLines(
           current,
-          `Your instruction file, ${current.fileName} at your workspace root, as it is now. It replaces any earlier text of the file:`,
+          `Your instruction file, ${current.fileName} at your workspace root: your Instructions, as they are now. This text replaces any earlier text of the file:`,
         )
-      : ["You have no instruction file at your workspace root now. Earlier text of the file no longer applies."]),
+      : ["The earlier text of your instruction file in these blocks no longer applies."]),
     "</openbot_agent_instructions>",
   ].join("\n");
 }
