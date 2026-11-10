@@ -45,8 +45,9 @@ const BASE64_TEXT = /^[A-Za-z0-9+/]+={0,2}$/u;
  * One daemon answer line with the copy added, or `null` to pass the line on unchanged.
  *
  * The line is the daemon's own answer to a `call`: `{"ok":true,"result":{content, isError,
- * structuredContent}}`. Anything else - a refusal, an answer with no structured result, a line
- * that is not JSON - is `null`.
+ * structuredContent}}`. A refusal gets its reason in the structured result; see
+ * `refusalWithMessage`. Anything else - an answer with no structured result, a line that is not
+ * JSON - is `null`.
  */
 export function rewriteCallAnswer(line: string): string | null {
   // A rewritten answer is parsed and serialized again, which would round an integer that JavaScript
@@ -63,9 +64,40 @@ export function rewriteCallAnswer(line: string): string | null {
   } catch {
     return null;
   }
-  if (unsafeInteger || !isDynamicRecord(parsed) || parsed.ok !== true) return null;
+  if (unsafeInteger || !isDynamicRecord(parsed)) return null;
+  if (parsed.ok === false) return refusalWithMessage(parsed);
+  if (parsed.ok !== true) return null;
   const result = withStructuredText(parsed.result);
   return result ? JSON.stringify({ ...parsed, result }) : null;
+}
+
+/**
+ * A refused call as the tool result the proxy would make of it, with the reason also in
+ * `structuredContent`, or `null` when the refusal names no reason.
+ *
+ * The daemon refuses a call with `{"ok":false,"error":…,"exit_code":…}`, and the proxy puts the
+ * reason only in the text and sends `{"code":"tool_invocation_failed","exit_code":…}` as the
+ * structured result. Codex shows the model that structured result alone, so the agent read only
+ * the code and could not see why the call failed, such as an ended session it could start again.
+ * This answer gives the proxy the same text, `isError` and code, and adds the reason as `message`.
+ * The proxy keeps an error result that has a `code` as it is, and its output schema accepts other
+ * fields beside the code.
+ */
+function refusalWithMessage(answer: DynamicRecord): string | null {
+  const { error, exit_code: exitCode } = answer;
+  if (typeof error !== "string" || error.length === 0) return null;
+  return JSON.stringify({
+    ok: true,
+    result: {
+      content: [{ type: "text", text: error }],
+      isError: true,
+      structuredContent: {
+        exit_code: typeof exitCode === "number" ? exitCode : 1,
+        code: "tool_invocation_failed",
+        message: error,
+      },
+    },
+  });
 }
 
 /**
