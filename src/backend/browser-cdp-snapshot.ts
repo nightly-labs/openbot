@@ -37,9 +37,10 @@ const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
 /**
  * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
- * do not use the scan budget before the walk gets to what is visible. Each walk that uses it gives
- * nothing from a hidden element or its descendants, with the same tests as here. A skipped subtree
- * counts as one node in the `scanned` count of the walk, so the budget still bounds the work.
+ * do not use the scan budget before the walk gets to what is visible. It is the hidden test of each
+ * walk that uses it: a walk gets no node with a hidden ancestor, because a shadow root or a frame is
+ * queued only from a host that the filter accepted. A skipped subtree counts as one node in the
+ * `scanned` count of the walk, so the budget still bounds the work.
  */
 const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
@@ -204,18 +205,6 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         let hasVisualSurface = false;
         let hasFrame = false;
         const visibleRects = node => {
-          let element = node.parentElement;
-          while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
-            const style = getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
-            const parent = element.parentElement;
-            if (parent) element = parent;
-            else {
-              const root = element.getRootNode();
-              element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-            }
-          }
           const range = node.ownerDocument.createRange();
           range.selectNodeContents(node);
           const rects = [...range.getClientRects()];
@@ -349,18 +338,6 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
           let chars = 0;
           let scanned = 0;
           const isVisibleText = node => {
-            let element = node.parentElement;
-            while (element) {
-              if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-              const style = getComputedStyle(element);
-              if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-              const parent = element.parentElement;
-              if (parent) element = parent;
-              else {
-                const root = element.getRootNode();
-                element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-              }
-            }
             const range = node.ownerDocument.createRange();
             range.selectNodeContents(node);
             return range.getClientRects().length > 0;
@@ -554,18 +531,6 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
         let truncated = false;
         const isCandidate = node => {
           if (node.nodeType !== 1) return false;
-          let element = node;
-          while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-            const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-            if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-            const parent = element.parentElement;
-            if (parent) element = parent;
-            else {
-              const root = element.getRootNode();
-              element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-            }
-          }
           const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
           const tag = node.localName;
           const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
@@ -847,24 +812,11 @@ function actionableNodesExpression(limit: number): string {
     };
     const isCandidate = node => {
       if (node.nodeType !== 1) return false;
-      // The walk can visit every scanned node, so the cheap tag and role check runs before the style walk.
       const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
       const tag = node.localName;
       const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
         tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
       if (!semantic && !roles.has(explicitRole)) return false;
-      let element = node;
-      while (element) {
-        if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
-        const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-        if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
-        const parent = element.parentElement;
-        if (parent) element = parent;
-        else {
-          const root = element.getRootNode();
-          element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
-        }
-      }
       return node.getClientRects().length > 0;
     };
     const limit = ${Math.max(0, limit)};
