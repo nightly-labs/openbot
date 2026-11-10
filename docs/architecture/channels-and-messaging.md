@@ -504,6 +504,14 @@ the "Keep memories in this channel" setting. The channels-v1 codec drops the fie
 server or the browser client shows the switch only when the host advertises the capability (#5380).
 A save without the field keeps the stored value, so a phone or an older client does not turn it off.
 
+On a host with `channel-picture-v1`, each channel record carries its picture: `icon` and the
+`openbot-avatar://channel/` `imageUrl`, which names only the image version. A `save` draft can carry
+`icon`; absent keeps the stored icon, and null removes it. `/v1/channels/image?channelId=` reads the
+image bytes by version (`GET`), sets them (`PUT`) and removes them (`DELETE`). The phone keeps the
+images beside the agent photos in its cache and edits the picture in Channel info, as the desktop
+channel settings do. The browser client cannot open the host URL, so it drops `imageUrl` and shows
+the icon or the faces. A joined desktop still shows the member faces.
+
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does
 not. An older host gives no threads: the channel shows the approvals of the members that run one of

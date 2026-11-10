@@ -101,14 +101,27 @@ export function ChatHeader({
     () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
     [target],
   );
+  const channelPicture = useMemo(
+    () =>
+      target.kind === "channel"
+        ? {
+            id: target.id,
+            members: target.members.map((member) => ({ agentId: member.id })),
+            icon: target.icon,
+            imageUrl: target.imageUrl,
+          }
+        : { members: [] },
+    [target],
+  );
   const iconColor = String(foreground);
   const identity = (
     <>
       {target.kind === "channel" ? (
         <ChannelAvatar
-          channel={{ members: target.members.map((member) => ({ agentId: member.id })) }}
+          channel={channelPicture}
           agents={members}
           size={28}
+          serverId={target.serverId}
           disconnected={disconnected}
         />
       ) : (

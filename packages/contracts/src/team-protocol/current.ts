@@ -52,6 +52,7 @@ import {
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
+import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -242,6 +243,7 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
@@ -504,6 +506,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   VAULT_V3_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -686,7 +689,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
     capability !== VAULT_V3_CAPABILITY &&
     capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
-    capability !== CHAT_HISTORY_CAPABILITY,
+    capability !== CHAT_HISTORY_CAPABILITY &&
+    capability !== CHANNEL_PICTURE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -745,6 +749,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   VAULT_V3_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -886,6 +891,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
       capability !== VAULT_V3_CAPABILITY &&
       capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
-      capability !== CHAT_HISTORY_CAPABILITY,
+      capability !== CHAT_HISTORY_CAPABILITY &&
+      capability !== CHANNEL_PICTURE_CAPABILITY,
   );
 }

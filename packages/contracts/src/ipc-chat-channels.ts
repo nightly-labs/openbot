@@ -83,8 +83,8 @@ export interface ChannelDraft {
    */
   isolated?: boolean;
   /**
-   * Absent keeps the stored icon, and null removes it. Only this computer keeps it: the Team API
-   * channel codecs do not carry it, so a joined server and a phone show the member faces.
+   * Absent keeps the stored icon, and null removes it. The host keeps it. The Team API carries it
+   * only to a client with `channel-picture-v1` (the phone); a joined desktop shows the member faces.
    */
   icon?: ChannelIcon | null;
 }

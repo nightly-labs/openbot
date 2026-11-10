@@ -163,8 +163,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   );
   const name = channel?.name ?? t("mobile.channel.chat.fallbackName");
   const target = useMemo(
-    () => ({ kind: "channel" as const, id: channelId, serverId, name, members }),
-    [channelId, serverId, name, members],
+    () => ({
+      kind: "channel" as const,
+      id: channelId,
+      serverId,
+      name,
+      members,
+      icon: channel?.icon,
+      imageUrl: channel?.imageUrl,
+    }),
+    [channelId, serverId, name, members, channel?.icon, channel?.imageUrl],
   );
   return (
     <ChatView
