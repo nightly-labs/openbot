@@ -22,6 +22,7 @@ import type { z } from "zod";
 import type {
   createAgentToolSchema,
   listModelsToolSchema,
+  updateAgentsToolSchema,
   updateProfileToolSchema,
 } from "../src/backend/agent/profile-tools";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -30,7 +31,8 @@ import { isProcessAlive } from "./dev-automation/registry-files";
 /** The arguments the fake passes to a profile tool; read_agent takes a subset. */
 type ProfileToolArgs = z.input<typeof updateProfileToolSchema> &
   Pick<z.input<typeof createAgentToolSchema>, "initialMessage"> &
-  z.input<typeof listModelsToolSchema>;
+  z.input<typeof listModelsToolSchema> &
+  Pick<z.input<typeof updateAgentsToolSchema>, "agentIds">;
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-profile-accounts-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-profile-accounts-"));
@@ -190,6 +192,8 @@ interface ProfileToolBody {
   providerAccountId?: string;
   backupModels?: { automatic: boolean; order: ChoiceBody[] } | null;
   usageLimitReturn?: unknown;
+  /** update_agents: the number of agents that changed. */
+  updated?: number;
 }
 
 const report: {
@@ -542,6 +546,21 @@ try {
       JSON.stringify(afterAccountModel.backupModels) ===
         JSON.stringify({ automatic: false, order: [{ provider: "codex", model: MODEL }] }),
     `${accountModel.text}\n${JSON.stringify(afterAccountModel.backupModels)}`,
+  );
+  // update_agents checks each agent against the models of its own account, for a model and for an
+  // effort alone.
+  const bulkModel = await callTool("update_agents to the account model", coordinator.id, "update_agents", {
+    agentIds: [worker.id],
+    model: ACCOUNT_MODEL,
+  });
+  const bulkEffort = await callTool("update_agents effort on the account model", coordinator.id, "update_agents", {
+    agentIds: [worker.id],
+    reasoningEffort: "medium",
+  });
+  pass(
+    "update_agents accepts a model that only the agent's account serves",
+    bulkModel.body?.updated === 1 && bulkEffort.body?.updated === 1 && storedAgent(worker.id).model === ACCOUNT_MODEL,
+    `${bulkModel.text}\n${bulkEffort.text}`,
   );
 
   // 8. A delete stops the agent's own process. On Windows a live process in the workspace makes the

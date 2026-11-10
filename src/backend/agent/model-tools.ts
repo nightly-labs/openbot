@@ -219,7 +219,6 @@ export function requestedBackupModels(
   if (request === null) return null;
   const order: AgentModelChoice[] = [];
   for (const { provider, model, providerAccountId } of request.order) {
-    requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
     const accountId = providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const rows = accounts(provider);
     if (rows ? !rows.some((account) => account.id === accountId) : accountId !== DEFAULT_PROVIDER_ACCOUNT_ID) {
@@ -227,6 +226,7 @@ export function requestedBackupModels(
         sourceText("error.provider.accountNotFound", { provider: providerLabel(provider) }),
       );
     }
+    requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
     const choice: AgentModelChoice = {
       provider,
       model,
