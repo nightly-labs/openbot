@@ -19,7 +19,7 @@ import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle, Screen } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
-import type { PointerForwardingGate } from "./pointer-forwarding-gate";
+import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 
 const logger = createOpenBotLogger("agent-dock-window");
@@ -195,7 +195,8 @@ export class AgentDockWindowController {
     const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
     if (!window) return;
     // On X11 the window shape lets the pointer through: a window that ignores the pointer gets no moves.
-    if (this.#options.windowKind !== "x11") this.#letPointerThrough(window, !input.interactive);
+    if (this.#options.windowKind !== "x11")
+      letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
     if (keyboard && !window.isFocused()) window.focus();
@@ -210,13 +211,6 @@ export class AgentDockWindowController {
     if (!window) return;
     if (this.#options.windowKind === "x11") window.setShape(rects);
     else this.#options.pointerForwarding?.setZone(window, rects);
-  }
-
-  /** Outside the dock shapes, the pointer goes to the apps under the window; the page still gets its moves. */
-  #letPointerThrough(window: BrowserWindow, through: boolean): void {
-    const gate = this.#options.pointerForwarding;
-    if (gate) gate.setIgnoring(window, through);
-    else window.setIgnoreMouseEvents(through, { forward: true });
   }
 
   /**
@@ -391,14 +385,13 @@ export class AgentDockWindowController {
           // Until the dock renderer reports its shape, no part of the window takes the pointer or shows.
           window.setShape([]);
         } else {
-          this.#letPointerThrough(window, true);
+          letPointerThrough(this.#options.pointerForwarding, window, true);
         }
         window.setFocusable(false);
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;
-          // A reloaded dock renderer has no open chat and no drag. It reports its parts again.
+          // A reloaded dock renderer has no open chat and no drag.
           this.#release(entry);
-          this.#options.pointerForwarding?.setZone(window, null);
           sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, this.#presentation);
         });
         window.webContents.on("render-process-gone", () => {

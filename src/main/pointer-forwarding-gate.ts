@@ -15,6 +15,19 @@ const CURSOR_POLL_MS = 50;
  */
 const POLLS_TO_STOP = 2;
 
+/**
+ * Lets the pointer through the window to the apps under it, or not, and keeps the pointer moves going to
+ * its page: through the gate on Windows, and with a plain forward on the other systems.
+ */
+export function letPointerThrough(
+  gate: PointerForwardingGate | null | undefined,
+  window: BrowserWindow,
+  through: boolean,
+): void {
+  if (gate) gate.setIgnoring(window, through);
+  else window.setIgnoreMouseEvents(through, { forward: true });
+}
+
 interface GatedWindow {
   /** The window lets the pointer through to the apps under it. */
   ignoring: boolean;
