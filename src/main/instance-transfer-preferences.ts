@@ -86,6 +86,8 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
   value: unknown,
   agents: TransferPreferenceAgents,
   port: TransferPreferencePort | null,
+  /** The pins and the notification level are the owner's, so a team member's import leaves them. */
+  owner: boolean,
   warnings: string[],
 ) {
   if (!isDynamicRecord(value)) return;
@@ -111,12 +113,14 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
   if (value.access === "workspace") yield* step(agents.updateAgent({ agentId: agent.id, access: "workspace" }));
   if (value.hidden === true) yield* step(agents.setAgentHidden({ agentId: agent.id, hidden: true }));
 
-  if (port) {
+  if (port && owner) {
     if (isServerNotificationLevel(value.notificationLevel))
       yield* step(port.setNotificationLevel(agent.id, value.notificationLevel));
     if (value.pinned === true) yield* step(port.pin(agent.id));
-    if (value.autoApprove === false && port.autoApproves(agent.id)) yield* step(port.setAutoApprove(agent.id, false));
   }
+  // The approval rule belongs to the server, as for an admin in agent settings.
+  if (port && value.autoApprove === false && port.autoApproves(agent.id))
+    yield* step(port.setAutoApprove(agent.id, false));
   // Only when this computer asks first: its default can already allow the agent.
   if (value.autoApprove === true && !port?.autoApproves(agent.id))
     warnings.push(sourceText("error.import.transferAlwaysAllow", { name }));

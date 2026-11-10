@@ -1396,7 +1396,8 @@ export class InstanceTransferService {
             agent,
             source.preferences,
             this.options.agents,
-            staged.owner === LOCAL_OWNER ? (this.options.preferences ?? null) : null,
+            this.options.preferences ?? null,
+            staged.owner === LOCAL_OWNER,
             warnings,
           );
           completed = true;
