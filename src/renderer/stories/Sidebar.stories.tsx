@@ -258,13 +258,13 @@ export const Populated: Story = {
 /** "Unread in a group": the chats with unread replies leave their sections for a group under "Needs you". */
 export const UnreadGroup: Story = {
   args: { chatOrder: "unread-group", pinnedItems: pinnedOne },
-  decorators: Populated.decorators,
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
 /** "Unread first in folders": each section shows its unread chats first, then the others by recency. */
 export const UnreadFirst: Story = {
   args: { chatOrder: "unread-first", pinnedItems: pinnedOne },
-  decorators: Populated.decorators,
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
 /** A joined server has a new OpenBot version. The header button opens its update. */
