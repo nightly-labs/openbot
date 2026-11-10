@@ -2329,6 +2329,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     foldersSupported={
                       workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-folders-v1")
                     }
+                    chatOrder={layout.sidebarChatOrder()}
+                    onChatOrderChange={layout.setSidebarChatOrder}
                     collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                     onMutateLayout={workspace.mutateSidebarLayout}
                     sectionDuplicateSupported={
