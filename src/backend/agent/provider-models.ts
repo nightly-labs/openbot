@@ -106,7 +106,7 @@ const MODEL_VARIANT_PARTS = new Set([
  * `gemini-3.8-flash-high` is `gemini-flash`. A context window in brackets stays, so
  * `claude-opus-4-7[1m]` is `claude-opus[1m]`.
  */
-export function modelFamily(id: string): string | null {
+function modelFamily(id: string): string | null {
   const [, base = "", window = ""] = /^(.*?)(\[[^\]]*\])?$/u.exec(id.trim().toLowerCase()) ?? [];
   const parts = base
     .split(/[-_/]/u)
