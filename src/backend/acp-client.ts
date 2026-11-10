@@ -3219,6 +3219,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     for (const [turnId, owner] of this.#subagentThreads) if (owner === threadId) turnIds.add(turnId);
     if (turnIds.size === 0) return;
     for (const change of stopSubagents(this.#subagents, new Date().toISOString(), turnIds)) this.#emitSubagents(change);
+    // A turn whose subagents had all ended sends no change, so its entry is removed here.
+    for (const turnId of turnIds) if (!this.#subagents.turns.has(turnId)) this.#subagentThreads.delete(turnId);
   }
 
   readonly #completeTurn = Effect.fn("AcpAgentClient.completeTurn")(function* (
