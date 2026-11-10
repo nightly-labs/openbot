@@ -598,6 +598,34 @@ pins, with a SHA-256 per target, into `<userData>/provider-state/protonpass-cli`
 the record and the session; the agent access key stays on the Proton account until it ends or the
 user removes it there.
 
+## NEAR Intents wallet
+
+The Crypto tab of the Vault connects one NEAR Intents agent account (Agent API, SDK
+`@near-intents-agent-api/sdk`) for agent payments. Main owns it:
+[`near-wallet-service.ts`](../../src/main/near-wallet-service.ts) and
+[`near-wallet-store.ts`](../../src/main/near-wallet-store.ts). The renderer, the backend and the
+agent processes never get the partner key, the grant token or a signature.
+
+- **Owner.** A passkey or an EVM wallet. Each owner action (register, create, grant, budget, freeze,
+  unfreeze, auto-pay, a vote on a payment) opens `/near/sign` of the account service in the system
+  browser ([`near-wallet-signing.ts`](../../src/main/near-wallet-signing.ts)). The request is in the
+  URL fragment, which no server gets. The page returns the signature with
+  `openbot://near-signature?nonce=…&data=…`; a development build uses a loopback listener. Main takes
+  only the result of the one waiting nonce (32 random bytes, used once) and checks its shape, the EVM
+  signer and the passkey key type.
+- **Grant.** OpenBot holds an agent grant for 30 days. Payments use it; Renew signs a new one.
+- **Payments.** An agent calls `request_near_payment`
+  ([`attention-registry.ts`](../../src/backend/agent/attention-registry.ts)). Only the agents that the
+  owner chose can ask, and a request from a Slack, Discord or Telegram chat is refused. A payment that
+  no rule allows waits for the owner on the chat card. A rule of "Pay without asking" allows a
+  recipient for a domain up to a daily USD limit; the first rule turns off `owner_approval` with one
+  signature. The Agent API keeps the daily budget of all payments.
+- **No double payment.** A payment is stored with its idempotency key before it is sent. A lost
+  answer is `uncertain`: OpenBot sends it again with the same key, also after a restart, for one hour.
+- **Test.** `bun run test:near-wallet-e2e` runs the service against a fake Agent API on 127.0.0.1
+  with a real secp256k1 owner key. The real Agent API has no test network; do not run payments
+  against it without the owner's consent.
+
 ## Add a Team API capability
 
 A new remote feature is a new optional capability. Do not change a shipped capability: released
@@ -655,6 +683,7 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 | --- | --- |
 | A sign-in that returns to a public `https:` address of the provider | The provider finishes it by itself. The host only waits. Nothing comes back to a loopback port. |
 | A sign-in that opens an app on the host, such as Pi, which opens Terminal | The step happens on the host's screen. There is no page address to open somewhere else. |
+| The owner signature of the NEAR Intents wallet | The passkey belongs to the `api.openbot.run` page on the host's browser, and the Agent API checks its origin. The wallet is on this computer only; a joined server has no Crypto tab. |
 | A vault that approves in its desktop app, such as 1Password or Bitwarden | The approval is in the vault app on the host. A relay cannot approve for it. 1Password on a joined server uses a service account token (`onepassword-connector-v1`); Bitwarden uses an API key and the master password (`bitwarden-connector-v1`). Proton Pass signs in on the host and the client opens Proton's page (`password-managers-v1`). |
 | The Slack development return address (`returnUrl`) | Development builds only. It returns to `http://127.0.0.1:<port>/...` on the host, and the relay does not carry it. Use the hosted install. |
 | An agent link for a member who is not an admin | The relay routes are admin only. The link opens as it is, and its callback cannot reach the host. |

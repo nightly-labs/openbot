@@ -1,8 +1,11 @@
+import type { SettingsCrumb } from "@openbot/ui/features/settings/SettingsDialogShell";
+import type { NearWalletAgent } from "@openbot/ui/features/vault/VaultNearWallet";
 import { VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
 import { useText } from "@openbot/ui/text";
 import { onSettled, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import type { LinkAccountStore } from "./stores/link-account-store";
+import type { NearWalletStore } from "./stores/near-wallet-store";
 import type { VaultStore } from "./stores/vault-store";
 
 export interface ServerVaultOptions {
@@ -14,13 +17,22 @@ export interface ServerVaultOptions {
   twoStep: boolean;
   /** The Link account of this computer. Absent for a joined server: its host has no Link. */
   link?: LinkAccountStore | undefined;
+  /** The NEAR Intents wallet of this computer. Absent for a joined server. */
+  near?: NearWalletStore | undefined;
+  /** The agents that the wallet can let pay. */
+  nearAgents?: (() => readonly NearWalletAgent[]) | undefined;
 }
 
 /**
  * The Vault section of the server settings. It lists the items each time it opens, and shows each
  * list that main sends while it is open.
  */
-export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLElement | undefined }) {
+export function ServerVaultPanel(
+  props: ServerVaultOptions & {
+    menuMount: HTMLElement | undefined;
+    onDetailChange?: ((detail: SettingsCrumb | null) => void) | undefined;
+  },
+) {
   const { t, errorMessage } = useText();
   onSettled(() => {
     const store = props.store;
@@ -29,9 +41,13 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
     const link = props.link;
     const stopLink = link?.subscribe();
     link?.refresh().catch((error: unknown) => actionToast.error(errorMessage(error, t("vault.link.failed"))));
+    const near = props.near;
+    const stopNear = near?.subscribe();
+    near?.refresh().catch((error: unknown) => actionToast.error(errorMessage(error, t("vault.near.failed"))));
     return () => {
       unsubscribe();
       stopLink?.();
+      stopNear?.();
     };
   });
   const linkAccount = () => {
@@ -43,6 +59,11 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
       onCancel: link.cancel,
       onDisconnect: link.disconnect,
     };
+  };
+  const nearWallet = () => {
+    const near = props.near;
+    if (!near) return undefined;
+    return { status: near.state.status, agents: props.nearAgents?.() ?? [], actions: near.actions };
   };
   const onCodes = () => (props.twoStep ? props.store.codes : undefined);
   return (
@@ -67,6 +88,8 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
           onReset={props.store.reset}
           menuMount={props.menuMount}
           link={linkAccount()}
+          near={nearWallet()}
+          onDetailChange={props.onDetailChange}
         />
       )}
     </Show>

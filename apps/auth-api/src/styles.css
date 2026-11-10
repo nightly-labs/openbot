@@ -11879,6 +11879,64 @@ a {
   flex: 0 0 auto;
 }
 
+/* The NEAR wallet signature page: the owner account and the EIP-712 data that the wallet signs. */
+.near-sign-summary {
+  overflow-wrap: anywhere;
+}
+
+.near-sign-facts,
+.near-sign-details {
+  width: 100%;
+  margin: 22px 0 0;
+  text-align: start;
+}
+
+.near-sign-facts dt,
+.near-sign-details-title {
+  margin: 0 0 6px;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.near-sign-facts dd {
+  margin: 0;
+}
+
+.near-sign-details dl {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.near-sign-details dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 12px;
+  padding: 5px 0;
+}
+
+.near-sign-details dt {
+  color: var(--openbot-text-muted);
+}
+
+.near-sign-details dd {
+  margin: 0;
+  color: var(--openbot-text-primary);
+}
+
+.near-sign-mono {
+  font-family: var(--openbot-font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 /* The brand page --------------------------------------------------------- */
 .brand-hero-row {
   display: flex;

@@ -308,6 +308,9 @@ import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owner
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
+import { NearWalletService } from "./near-wallet-service";
+import { NearOwnerSigning } from "./near-wallet-signing";
+import { NearWalletStore } from "./near-wallet-store";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
@@ -477,6 +480,8 @@ const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 /** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
 const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
+/** The NEAR Intents wallet: partner key, grant token, rules and payments in flight, with the same cipher. */
+const NEAR_WALLET_FILE = "openbot-near-wallet-v1.json";
 /** The 1Password service account token of this computer, with the same cipher. */
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
@@ -567,6 +572,8 @@ const TEARDOWN_ORDER = {
   githubConnector: 107,
   // Before the agent service, so no payment wait outlives the agents that asked for it.
   linkAccount: 107.5,
+  // Before the agent service, so no payment or signature wait outlives the agents that asked for it.
+  nearWallet: 107.6,
   // Before the agent service, so no script starts a run while the service stops.
   automation: 108,
   storageUsage: 109,
@@ -651,6 +658,8 @@ export interface ApplicationServices {
   githubConnector: GitHubConnectorService;
   /** The Link account (link.com) that agents ask for one-time cards. */
   linkAccount: LinkAccountService;
+  /** The NEAR Intents wallet that agents ask to pay from. */
+  nearWallet: NearWalletService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
   passwordManagers: PasswordManagersService;
@@ -1722,6 +1731,17 @@ export async function createApplicationServices({
   await Effect.runPromise(linkAccount.load());
   teardown.push(TEARDOWN_ORDER.linkAccount, "the Link account", () => Effect.runPromise(linkAccount.dispose()));
   /*
+   * The NEAR Intents wallet. The owner signs on the account service's page; a development build
+   * returns there through a loopback listener and can name another Agent API for tests.
+   */
+  const nearWallet = new NearWalletService({
+    store: new NearWalletStore(join(app.getPath("userData"), NEAR_WALLET_FILE), secretCipher),
+    signing: new NearOwnerSigning({ pageOrigin: centralAuthApiUrl, openExternal: openLink, loopback: !app.isPackaged }),
+    baseUrl: app.isPackaged ? undefined : process.env.OPENBOT_DEV_NEAR_AGENT_API_URL || undefined,
+  });
+  await Effect.runPromise(nearWallet.load());
+  teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
+  /*
    * The Bitwarden connection. A host connection's API key and master password are stored, so the
    * host unlocks again after a restart; its CLI data and OpenBot's copy of `bw` stay outside every
    * root an agent can write.
@@ -2111,6 +2131,7 @@ export async function createApplicationServices({
     ]),
     vaultItems: vault.items,
     linkWallet: linkAccount,
+    nearWallet,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
@@ -4051,6 +4072,7 @@ export async function createApplicationServices({
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
     linkAccount,
+    nearWallet,
     onePasswordConnector,
     bitwardenConnector,
     passwordManagers,

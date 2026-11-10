@@ -32,6 +32,7 @@ const BROWSER_VAULT_TOOLS = new Set([
   "request_vault_item",
   "delete_vault_item",
   "request_link_payment",
+  "request_near_payment",
 ]);
 
 /**

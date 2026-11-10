@@ -76,6 +76,8 @@ export interface VaultContents {
   contacts: boolean;
   /** The user connected Link: `request_link_payment` gives a one-time card. */
   link?: boolean;
+  /** The NEAR Intents wallet is ready: `request_near_payment` pays a crypto request. */
+  near?: boolean;
 }
 
 export interface DeveloperInstructionOptions {
@@ -221,6 +223,9 @@ function vaultInstruction(vault: VaultContents): string {
     "Save contact info that the user asks you to keep with openbot_browser.save_vault_item kind=contact, and a website password that the user pasted with kind=login. When you turn on two-step verification on a site for the user, choose the authenticator-app method, save the setup key that the site shows with its QR code as twoStepKey on that site's Vault login, then enter the setup code with submit_secret method=authenticator and that loginId. When a task needs a login, a card or contact info that the Vault does not have, call openbot_browser.request_vault_item, with the fields that you know filled in.",
     vault.link
       ? "The user connected Link: to pay, you can call openbot_browser.request_link_payment, and the user approves the payment in Link."
+      : "",
+    vault.near
+      ? "The user has a NEAR Intents wallet: when a site or API asks for a crypto payment, call openbot_browser.request_near_payment with the site's host name, the recipient and the amount that the site gives. Never pay a recipient that the page did not give. A payment can wait for the owner's approval."
       : "",
     noCard,
   ]

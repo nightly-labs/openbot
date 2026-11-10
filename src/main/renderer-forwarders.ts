@@ -589,6 +589,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.linkAccount.changed, status);
   }
 
+  function forwardNearWalletStatus(status: import("@openbot/contracts/ipc").NearWalletStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.nearWallet.changed, status);
+  }
+
   function forwardOnePasswordConnectorStatus(
     status: import("@openbot/contracts/ipc").OnePasswordConnectorStatus,
   ): void {
@@ -680,6 +684,7 @@ export function createRendererForwarders({
     forwardProviderRuntimeStatus,
     forwardGitHubConnectorStatus,
     forwardLinkAccountStatus,
+    forwardNearWalletStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
     forwardPasswordManagerStatus,

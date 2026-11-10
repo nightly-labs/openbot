@@ -1,6 +1,8 @@
+import type { NearOwnerAction } from "@openbot/contracts/ipc";
 import type { WebMessagingInstallPlatform } from "@openbot/contracts/web-messaging-install";
 import type { AppTranslate } from "@openbot/i18n";
 import { DOWNLOAD_PLATFORMS, type DownloadPlatform } from "../../lib/download-platforms";
+import type { NearSignFailure } from "../../lib/near-sign-actions";
 import type { FailureKind } from "./MessagingConnectPage";
 
 /*
@@ -117,6 +119,59 @@ export function billingReturnText(t: AppTranslate) {
     cancelledBody: t("sitePage.billing.cancelledBody"),
   };
 }
+
+/** A private-use character that marks where the owner address goes in `failure.wrongAccount`. */
+export const NEAR_ADDRESS_MARKER = "\u{E010}";
+
+export function nearSignText(t: AppTranslate) {
+  return {
+    pageTitle: t("sitePage.nearSign.pageTitle"),
+    eyebrow: t("sitePage.nearSign.eyebrow"),
+    loading: t("sitePage.nearSign.loading"),
+    invalidTitle: t("sitePage.nearSign.invalidTitle"),
+    invalidBody: t("sitePage.nearSign.invalidBody"),
+    /** The title of the card: what the owner approves. */
+    actions: {
+      register: t("sitePage.nearSign.action.register"),
+      create: t("sitePage.nearSign.action.create"),
+      grant: t("sitePage.nearSign.action.grant"),
+      budget: t("sitePage.nearSign.action.budget"),
+      freeze: t("sitePage.nearSign.action.freeze"),
+      unfreeze: t("sitePage.nearSign.action.unfreeze"),
+      "auto-pay": t("sitePage.nearSign.action.autoPay"),
+      "approve-payment": t("sitePage.nearSign.action.approvePayment"),
+    } satisfies Record<NearOwnerAction, string>,
+    account: t("sitePage.nearSign.account"),
+    details: t("sitePage.nearSign.details"),
+    createPasskey: t("sitePage.nearSign.createPasskey"),
+    usePasskey: t("sitePage.nearSign.usePasskey"),
+    connectWallet: t("sitePage.nearSign.connectWallet"),
+    signInWallet: t("sitePage.nearSign.signInWallet"),
+    tryAgain: t("sitePage.nearSign.tryAgain"),
+    workingPasskey: t("sitePage.nearSign.workingPasskey"),
+    workingEvm: t("sitePage.nearSign.workingEvm"),
+    doneTitle: t("sitePage.nearSign.doneTitle"),
+    doneBody: t("sitePage.nearSign.doneBody"),
+    openAgain: t("sitePage.nearSign.openAgain"),
+    passkeyName: t("sitePage.nearSign.passkeyName"),
+    /** `wrongAccount` has `NEAR_ADDRESS_MARKER` where the page puts the owner address. */
+    failure: {
+      cancelled: t("sitePage.nearSign.failure.cancelled"),
+      noPasskey: t("sitePage.nearSign.failure.noPasskey"),
+      noWallet: t("sitePage.nearSign.failure.noWallet"),
+      walletBusy: t("sitePage.nearSign.failure.walletBusy"),
+      wrongAccount: t("sitePage.nearSign.failure.wrongAccount", { address: NEAR_ADDRESS_MARKER }),
+      wrongSite: t("sitePage.nearSign.failure.wrongSite"),
+      keyType: t("sitePage.nearSign.failure.keyType"),
+      chain: t("sitePage.nearSign.failure.chain"),
+      signatureType: t("sitePage.nearSign.failure.signatureType"),
+      tooLarge: t("sitePage.nearSign.failure.tooLarge"),
+      failed: t("sitePage.nearSign.failure.failed"),
+    } satisfies Record<NearSignFailure, string>,
+  };
+}
+
+export type NearSignText = ReturnType<typeof nearSignText>;
 
 /** A private-use character that marks where the contact link goes in `writeTo`. */
 const EMAIL_MARKER = "";

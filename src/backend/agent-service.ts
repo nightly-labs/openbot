@@ -271,6 +271,7 @@ import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
+import type { NearWallet } from "./near-wallet";
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
@@ -469,6 +470,8 @@ export interface AgentServiceOptions {
   vaultItems?: VaultItems | null;
   /** The Link account of this computer, or `null`. Agents ask it for one-time cards. */
   linkWallet?: LinkWallet | null;
+  /** The NEAR Intents wallet of this computer, or `null`. Agents ask it to pay in crypto. */
+  nearWallet?: NearWallet | null;
   /** Where the API keys that users enter through `request_api_key` are saved, or `null`. */
   agentApiKeys?: AgentApiKeys | null;
   /**
@@ -1113,6 +1116,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.passwordVault === undefined ? {} : { passwordVault: options.passwordVault }),
       ...(options.vaultItems === undefined ? {} : { vaultItems: options.vaultItems }),
       linkWallet: options.linkWallet ?? null,
+      nearWallet: options.nearWallet ?? null,
       agentName: (agentId) => store.list().find((candidate) => candidate.id === agentId)?.name,
       // The router is made later; a note comes only from a tool call, after both exist.
       noteVaultChange: (agentId, threadId, turnId, text) => this.#tools.postVaultNote(agentId, threadId, turnId, text),
@@ -1227,6 +1231,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         cards: options.vaultItems?.hasCards() ?? false,
         contacts: options.vaultItems?.hasContacts() ?? false,
         link: options.linkWallet?.connected() ?? false,
+        near: options.nearWallet?.ready() ?? false,
       }),
       // Only a server has a memory reading.
       serverHost: hostMemory !== null,

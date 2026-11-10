@@ -100,6 +100,7 @@ import { marketplaceLinkIpcHandlers } from "./ipc/marketplace-link-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
+import { nearWalletIpcHandlers } from "./ipc/near-wallet-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
 import { passwordManagersIpcHandlers } from "./ipc/password-managers-handlers";
@@ -438,7 +439,10 @@ let quitStarted = false;
  * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
  * answered by the sign-in that started it, and there is no such sign-in before the app is running.
  */
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
+type RendererDeepLink = Exclude<
+  DeepLink,
+  { kind: "mcp-auth" | "slack-workspace" | "discord-guild" | "near-signature" }
+>;
 
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
@@ -500,6 +504,7 @@ const {
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
   forwardLinkAccountStatus,
+  forwardNearWalletStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
   forwardPasswordManagerStatus,
@@ -766,6 +771,7 @@ function registerIpcHandlers({
   hostedSites,
   githubConnector,
   linkAccount,
+  nearWallet,
   onePasswordConnector,
   bitwardenConnector,
   passwordManagers,
@@ -900,6 +906,7 @@ function registerIpcHandlers({
     }),
     ...githubConnectorIpcHandlers({ githubConnector, remoteServers, openExternal: openLink }),
     ...linkAccountIpcHandlers({ linkAccount }),
+    ...nearWalletIpcHandlers({ nearWallet }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
     ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
@@ -1222,6 +1229,10 @@ function acceptDeepLink(link: DeepLink): void {
     receiveMessagingInstall(link);
     return;
   }
+  if (link.kind === "near-signature") {
+    receiveNearSignature(link);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -1265,9 +1276,28 @@ function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
+  return link &&
+    link.kind !== "mcp-auth" &&
+    link.kind !== "slack-workspace" &&
+    link.kind !== "discord-guild" &&
+    link.kind !== "near-signature"
     ? link
     : null;
+}
+
+/**
+ * Hands the NEAR wallet the owner's signature. The wallet checks the nonce first; a link that no
+ * signature of this run waits for does nothing and raises no window.
+ */
+function receiveNearSignature(link: Extract<DeepLink, { kind: "near-signature" }>): void {
+  const current = services;
+  if (!current) return;
+  if (!current.nearWallet.receiveSignature(link.nonce, link.data)) {
+    logger.warn("A NEAR signature link was not accepted: no signature of this run waits for it.");
+    return;
+  }
+  const window = windowHolder.current;
+  if (window && !window.isDestroyed()) showMainWindow(window);
 }
 
 /**
@@ -1552,6 +1582,7 @@ if (!hasSingleInstanceLock) {
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
       built.linkAccount.onChanged(forwardLinkAccountStatus);
+      built.nearWallet.onChanged(forwardNearWalletStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);

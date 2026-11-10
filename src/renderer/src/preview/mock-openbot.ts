@@ -221,6 +221,7 @@ import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
+import { createMockNearWallet } from "./mock-near-wallet";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
@@ -1625,6 +1626,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     githubConnector: createMockGitHubConnector(),
     linkAccount: createMockLinkAccount(),
+    nearWallet: createMockNearWallet(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
     passwordManagers: createMockPasswordManagers(),

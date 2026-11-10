@@ -430,6 +430,14 @@ import type {
   WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
+import type {
+  NearAllowPaymentInput,
+  NearDepositAddress,
+  NearDepositInput,
+  NearRuleInput,
+  NearWalletCreateInput,
+  NearWalletStatus,
+} from "./ipc-near-wallet";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   OnePasswordConnectInput,
@@ -1440,6 +1448,26 @@ export const IPC_ENDPOINTS = {
     disconnect: request<undefined, LinkAccountStatus>()("link-account:disconnect"),
     changed: event<LinkAccountStatus>()("link-account:changed"),
   },
+  // The NEAR Intents wallet of this computer, for agent payments. The partner key goes to main once,
+  // with `setKey`, and never comes back; grant tokens never leave main. A joined server has no wallet.
+  nearWallet: {
+    status: request<undefined, NearWalletStatus>()("near-wallet:status"),
+    setKey: request<string, NearWalletStatus>()("near-wallet:set-key"),
+    create: request<NearWalletCreateInput, NearWalletStatus>()("near-wallet:create"),
+    setBudget: request<{ dailyBudgetUsd: string }, NearWalletStatus>()("near-wallet:set-budget"),
+    setAgents: request<{ agentIds: string[] }, NearWalletStatus>()("near-wallet:set-agents"),
+    renewGrant: request<undefined, NearWalletStatus>()("near-wallet:renew-grant"),
+    freeze: request<undefined, NearWalletStatus>()("near-wallet:freeze"),
+    unfreeze: request<undefined, NearWalletStatus>()("near-wallet:unfreeze"),
+    deposit: request<NearDepositInput, NearDepositAddress>()("near-wallet:deposit"),
+    saveRule: request<NearRuleInput, NearWalletStatus>()("near-wallet:save-rule"),
+    removeRule: request<{ domain: string }, NearWalletStatus>()("near-wallet:remove-rule"),
+    allowPayment: request<NearAllowPaymentInput, NearWalletStatus>()("near-wallet:allow-payment"),
+    openSigning: request<undefined, void>()("near-wallet:open-signing"),
+    cancelSigning: request<undefined, NearWalletStatus>()("near-wallet:cancel-signing"),
+    disconnect: request<undefined, NearWalletStatus>()("near-wallet:disconnect"),
+    changed: event<NearWalletStatus>()("near-wallet:changed"),
+  },
   // The Vault of this computer. Lists carry no password, card number or security code: `reveal`
   // returns one when the user asks, and `copy` writes one to the clipboard in main. The `host*`
   // endpoints do the same for one server: a joined server answers through `vault-v1`, to an owner
@@ -2261,6 +2289,7 @@ export const IPC_GROUP_PATHS = {
   bitwardenConnector: "bitwardenConnector",
   passwordManagers: "passwordManagers",
   linkAccount: "linkAccount",
+  nearWallet: "nearWallet",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",

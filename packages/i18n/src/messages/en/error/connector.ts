@@ -21,6 +21,37 @@ export const messages = defineMessages("error.connector", {
   "error.connector.linkNoCard": "The Link account has no card. Add a card in Link.",
   "error.connector.linkFileUnreadable": "The Link connection file is unreadable.",
   "error.connector.linkFileTooLarge": "The Link connection file is too large.",
+  // The NEAR Intents wallet: the partner key, the owner's signatures in the browser, and agent payments.
+  "error.connector.nearNoKey": "Add a NEAR Intents partner key in Server settings > Vault > Crypto.",
+  "error.connector.nearKeyRejected": "The NEAR Intents Agent API did not accept the partner key.",
+  "error.connector.nearNoWallet": "No NEAR Intents wallet is set up. Set it up in Server settings > Vault > Crypto.",
+  "error.connector.nearWalletExists": "A NEAR Intents wallet is already set up.",
+  "error.connector.nearFrozen": "The NEAR Intents wallet is frozen. Unfreeze it in Server settings > Vault > Crypto.",
+  "error.connector.nearAgentNotAllowed":
+    "This agent cannot pay from the NEAR Intents wallet. Turn it on in Server settings > Vault > Crypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot has no payment grant for the NEAR Intents wallet. Renew it in Server settings > Vault > Crypto.",
+  "error.connector.nearUnknownAsset": "The NEAR Intents wallet has no asset {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} is not a valid amount of {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} is not a NEAR account or a chain:address.",
+  "error.connector.nearRefused": "The NEAR Intents Agent API refused the request: {detail}",
+  "error.connector.nearUnexpected": "The NEAR Intents Agent API sent an unexpected answer: {detail}",
+  "error.connector.nearUnreachable": "OpenBot cannot reach the NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "The NEAR Intents wallet file is unreadable.",
+  "error.connector.nearFileTooLarge": "The NEAR Intents wallet file is too large.",
+  "error.connector.nearSigningCanceled": "The signature was canceled.",
+  "error.connector.nearSigningExpired": "The signature did not arrive in time. Try again.",
+  "error.connector.nearSigningInvalid": "The signature from the browser is not valid.",
+  "error.connector.nearSigningBusy": "Another signature waits in the browser. Finish or cancel it first.",
+  "error.connector.nearPolicyCooldown": "The NEAR Intents Agent API allows the next policy change at {time}.",
+  "error.connector.nearPolicyPending": "The policy change did not finish. Try again in a few minutes.",
+  "error.connector.nearDeclined": "The owner declined the payment.",
+  "error.connector.nearUncertain":
+    "OpenBot does not know if the payment was sent. Do not pay again. The owner can check the wallet history.",
+  "error.connector.nearPaymentFailed": "The payment failed: {detail}",
+  "error.connector.nearPaymentUnknown": "This payment does not wait for an answer any more.",
+  "error.connector.nearRuleFull": "A payment rule can have at most {limit} recipients.",
+  "error.connector.nearRulesFull": "The wallet can have at most {limit} payment rules.",
   // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",

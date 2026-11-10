@@ -72,9 +72,16 @@ import {
 } from "@openbot/ui";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import type { SettingsCrumb } from "../settings/SettingsDialogShell";
 import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
+import {
+  nearWalletConnected,
+  VaultNearWalletPage,
+  type VaultNearWalletProps,
+  VaultNearWalletRow,
+} from "./VaultNearWallet";
 import {
   createDraftTwoStepCode,
   createSavedTwoStepCodes,
@@ -111,9 +118,15 @@ export interface VaultPanelProps {
   menuMount?: HTMLElement | undefined;
   /** The Link account of this computer, above the cards. Absent for a joined server. */
   link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
+  /** The NEAR Intents wallet of this computer, in the Crypto tab. Absent for a joined server. */
+  near?: VaultNearWalletProps | undefined;
+  /** Set while the wallet page is open, so the header reads `Vault › NEAR Intents`. */
+  onDetailChange?: ((detail: SettingsCrumb | null) => void) | undefined;
 }
 
 type Filter = VaultItemKind | "all";
+/** The Crypto tab is not a kind of item: it holds the wallet. */
+type Tab = Filter | "crypto";
 
 const FILTERS = [
   { value: "all", label: "vault.filter.all", empty: "vault.empty" },
@@ -124,6 +137,7 @@ const FILTERS = [
 ] as const satisfies readonly { value: Filter; label: AppTextKey; empty: AppTextKey }[];
 
 const isFilter = (value: string): value is Filter => FILTERS.some((item) => item.value === value);
+const isCrypto = (value: string): value is "crypto" => value === "crypto";
 
 const KIND_LABEL = {
   login: "vault.kind.login",
@@ -385,8 +399,9 @@ function useCountries() {
  */
 export function VaultPanel(props: VaultPanelProps) {
   const { t, errorDetails } = useText();
-  const [filter, setFilter] = createSignal<Filter>("all");
+  const [filter, setFilter] = createSignal<Tab>("all");
   const [query, setQuery] = createSignal("");
+  const [nearPage, setNearPage] = createSignal(false);
   const [ui, setUi] = createStore<{
     editing: { kind: VaultItemKind; item: VaultItemSummary | null } | null;
     deleting: VaultItemSummary | null;
@@ -436,6 +451,18 @@ export function VaultPanel(props: VaultPanelProps) {
   const visible = (kind: Filter) =>
     props.state.items.filter((item) => (kind === "all" || item.kind === kind) && itemMatches(item, query()));
   const empty = () => props.state.items.length === 0;
+  const nearConnected = () => (props.near ? nearWalletConnected(props.near.status) : false);
+  /** The wallet page takes the place of the tabs, as a detail page does. */
+  const nearOpen = () => nearPage() && nearConnected();
+  const selectTab = (value: string) => {
+    if (isFilter(value) || (isCrypto(value) && props.near)) setFilter(value);
+  };
+  // The dialog outlives this panel, so the cleanup clears a title that names a page that is gone.
+  createEffect(nearOpen, (open) => {
+    if (!open) return;
+    props.onDetailChange?.({ title: t("vault.near.name"), back: () => setNearPage(false) });
+    return () => props.onDetailChange?.(null);
+  });
 
   /** Runs one change of a confirm dialog. A failure stays in the dialog. */
   async function run(action: () => Promise<void>, fallback: AppTextKey = "vault.failed"): Promise<boolean> {
@@ -528,8 +555,18 @@ export function VaultPanel(props: VaultPanelProps) {
           </Alert>
         </Match>
       </Switch>
-      <Show when={ready()}>
-        <SlidingTabs.Root value={filter()} onChange={(value) => isFilter(value) && setFilter(value)}>
+      <Show when={nearOpen() && props.near}>
+        {(near) => (
+          <VaultNearWalletPage
+            status={near().status}
+            agents={near().agents}
+            actions={near().actions}
+            menuMount={props.menuMount}
+          />
+        )}
+      </Show>
+      <Show when={ready() && !nearOpen()}>
+        <SlidingTabs.Root value={filter()} onChange={selectTab}>
           <SettingsSection
             title={t("vault.items.title")}
             description={t("vault.items.description")}
@@ -560,8 +597,13 @@ export function VaultPanel(props: VaultPanelProps) {
                     </SlidingTabs.Trigger>
                   )}
                 </For>
+                <Show when={props.near}>
+                  <SlidingTabs.Trigger value="crypto">
+                    {t("vault.near.tab")} <span class="vault-count">{nearConnected() ? 1 : 0}</span>
+                  </SlidingTabs.Trigger>
+                </Show>
               </SlidingTabs.List>
-              <Show when={!empty()}>
+              <Show when={!empty() && filter() !== "crypto"}>
                 <label class="server-settings-search">
                   <Search aria-hidden="true" />
                   <span class="sr-only">{t("vault.search")}</span>
@@ -677,6 +719,20 @@ export function VaultPanel(props: VaultPanelProps) {
                   </SlidingTabs.Content>
                 )}
               </For>
+              <Show when={props.near}>
+                {(near) => (
+                  <SlidingTabs.Content value="crypto">
+                    <ItemGroup class="settings-modal-card" surface="subtle" aria-label={t("vault.near.tab")}>
+                      <VaultNearWalletRow
+                        status={near().status}
+                        agents={near().agents}
+                        actions={near().actions}
+                        onOpen={() => setNearPage(true)}
+                      />
+                    </ItemGroup>
+                  </SlidingTabs.Content>
+                )}
+              </Show>
             </SlidingTabs.ContentSlot>
           </SettingsSection>
         </SlidingTabs.Root>

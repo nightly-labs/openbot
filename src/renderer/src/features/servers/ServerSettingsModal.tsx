@@ -43,6 +43,7 @@ import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
 import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/ProviderSettingsPage";
 import {
   SaveBarDock,
+  type SettingsCrumb,
   SettingsDialogShell,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
@@ -359,8 +360,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   /** Set while an import source is open, so the header reads `Import › Hermes Agent`. */
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
+  /** Set while the wallet page is open, so the header reads `Vault › NEAR Intents`. */
+  const [vaultDetail, setVaultDetail] = createSignal<SettingsCrumb | null>(null);
   const crumbDetail = () => {
     if (section() === "mcp") return mcpDetail();
+    if (section() === "vault") return vaultDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
     return section() === "providers" ? providerDetail() : null;
@@ -861,7 +865,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">
-              <ServerVaultPanel {...vault()} menuMount={modalElement()} />
+              <ServerVaultPanel {...vault()} menuMount={modalElement()} onDetailChange={setVaultDetail} />
             </Tabs.Content>
           )}
         </Show>

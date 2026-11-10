@@ -54,6 +54,7 @@ import { Route as HealthLiveRouteImport } from './routes/health/live'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as MarketplaceIndexRouteImport } from './routes/marketplace/index'
 import { Route as MarketplaceAppsRouteImport } from './routes/marketplace/apps'
+import { Route as NearSignRouteImport } from './routes/near/sign'
 import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
@@ -435,6 +436,11 @@ const MarketplaceIndexRoute = MarketplaceIndexRouteImport.update({
 const MarketplaceAppsRoute = MarketplaceAppsRouteImport.update({
   id: '/marketplace/apps',
   path: '/marketplace/apps',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NearSignRoute = NearSignRouteImport.update({
+  id: '/near/sign',
+  path: '/near/sign',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewsIndexRoute = NewsIndexRouteImport.update({
@@ -1341,6 +1347,7 @@ export interface FileRoutesByFullPath {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -1544,6 +1551,7 @@ export interface FileRoutesByTo {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -1751,6 +1759,7 @@ export interface FileRoutesById {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -1957,6 +1966,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -2160,6 +2170,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -2366,6 +2377,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -2569,6 +2581,7 @@ export interface RootRouteChildren {
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
   MarketplaceAppsRoute: typeof MarketplaceAppsRoute
+  NearSignRoute: typeof NearSignRoute
   NewsSlugRoute: typeof NewsSlugRoute
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
@@ -3019,6 +3032,13 @@ declare module '@tanstack/solid-router' {
       path: '/marketplace/apps'
       fullPath: '/marketplace/apps'
       preLoaderRoute: typeof MarketplaceAppsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/near/sign': {
+      id: '/near/sign'
+      path: '/near/sign'
+      fullPath: '/near/sign'
+      preLoaderRoute: typeof NearSignRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/news/': {
@@ -4385,6 +4405,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
   MarketplaceAppsRoute: MarketplaceAppsRoute,
+  NearSignRoute: NearSignRoute,
   NewsSlugRoute: NewsSlugRoute,
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,

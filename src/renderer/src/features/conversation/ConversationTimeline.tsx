@@ -60,6 +60,7 @@ import {
   toggleSpokenReply,
 } from "../speech/speech-replies";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
+import { createNearWalletStore } from "../vault/stores/near-wallet-store";
 import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
@@ -358,6 +359,21 @@ export function ConversationTimeline() {
   /** View and Undo on an instructions change line: the file is in the workspace on this computer. */
   const localInstructionsCalls = () =>
     props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
+  /** The NEAR Intents wallet of this computer: its payments wait in the chat as approvals. */
+  const nearWallet = createNearWalletStore();
+  const nearWalletLocal = () => props.server?.kind === "local" && !props.runtime;
+  createEffect(nearWalletLocal, (local) => {
+    if (!local) return;
+    const stop = nearWallet.subscribe();
+    void nearWallet.refresh().catch(() => undefined);
+    return stop;
+  });
+  /** The payment that `approval` asks for, when the wallet holds it. */
+  const nearPayment = (approval: AgentApproval) => {
+    if (approval.kind !== "permissions" || !nearWalletLocal()) return undefined;
+    const requestId = String(approval.requestId);
+    return nearWallet.state.status.payments.find((payment) => payment.requestId === requestId);
+  };
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
 
@@ -376,6 +392,16 @@ export function ConversationTimeline() {
     if (props.messages.length !== held.rows || props.activeTurnId !== held.turnId) return undefined;
     return held.approval;
   });
+  const approvalCard = (approval: AgentApproval) => (
+    <ApprovalCard
+      approval={approval}
+      agentName={interactionAgentName()}
+      sending={heldFeedback() !== undefined}
+      onApprove={() => approve(approval)}
+      onReject={() => props.onRespondToApproval("decline")}
+      onAlwaysAllow={props.onAlwaysAllowApproval}
+    />
+  );
   async function approve(approval: AgentApproval) {
     if (feedbackApproval(approval)) {
       setSendingFeedback({ approval, rows: props.messages.length, turnId: props.activeTurnId });
@@ -1724,14 +1750,17 @@ export function ConversationTimeline() {
             <Show keyed when={props.approval ?? heldFeedback()}>
               {(approval) => (
                 <Loading>
-                  <ApprovalCard
-                    approval={approval}
-                    agentName={interactionAgentName()}
-                    sending={heldFeedback() !== undefined}
-                    onApprove={() => approve(approval)}
-                    onReject={() => props.onRespondToApproval("decline")}
-                    onAlwaysAllow={props.onAlwaysAllowApproval}
-                  />
+                  <Show when={nearPayment(approval)} fallback={approvalCard(approval)}>
+                    {(payment) => (
+                      <NearPaymentCard
+                        payment={payment()}
+                        status={nearWallet.state.status}
+                        actions={nearWallet.actions}
+                        onApprove={() => approve(approval)}
+                        onReject={() => props.onRespondToApproval("decline")}
+                      />
+                    )}
+                  </Show>
                 </Loading>
               )}
             </Show>
@@ -1805,6 +1834,9 @@ export function ConversationTimeline() {
 
 const ApprovalCard = lazy(() =>
   import("@openbot/ui/features/conversation/ConversationPrompts").then((module) => ({ default: module.ApprovalCard })),
+);
+const NearPaymentCard = lazy(() =>
+  import("@openbot/ui/features/vault/NearPaymentCard").then((module) => ({ default: module.NearPaymentCard })),
 );
 const QuestionPromptBubble = lazy(() =>
   import("@openbot/ui/components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),

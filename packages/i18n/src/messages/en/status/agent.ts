@@ -38,6 +38,16 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":
     "Fill the one-time Link card {card} on {site}. You approved this payment in Link for {merchant}.",
+  "status.agent.nearSignatureReceived": "OpenBot received the signature. You can close this tab.",
+  "status.agent.nearSignatureUnknown": "OpenBot does not wait for this signature. Start it again in OpenBot.",
+  "status.agent.nearPayment":
+    "Pay {amount} {symbol} to {recipient} from the NEAR Intents wallet, for {domain}: {reason}",
+  "status.agent.nearSummaryCreate": "Make the NEAR Intents wallet of OpenBot, with a daily budget of {amount} USD.",
+  "status.agent.nearSummaryGrant": "Let this OpenBot app pay from the wallet for {days} days, within your rules.",
+  "status.agent.nearSummaryBudget": "Change the daily budget of the wallet to {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Let OpenBot pay without your signature when a payment rule allows it. Other payments still ask you in the chat.",
+  "status.agent.nearSummaryPayment": "Approve the payment of {amount} to {recipient}.",
   "status.agent.screenCaptureProgress": "Asking to capture the screen…",
   "status.agent.screenCaptureReviewing": "Reviewing the screen capture…",
   "status.agent.browserOpening": "Opening a web page…",

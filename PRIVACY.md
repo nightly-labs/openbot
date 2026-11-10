@@ -817,6 +817,13 @@ server can change it.
   Disconnect deletes the file and asks Link to revoke the sign-in. A one-time Link card is not
   stored: OpenBot reads it from Link for each fill and types it into the page. The tokens and the
   card number are redacted from logs, exports and diagnostics.
+- The NEAR Intents wallet (Server settings › Vault › Crypto) is kept in
+  `~/Library/Application Support/OpenBot/openbot-near-wallet-v1.json`, encrypted by the operating
+  system's secret storage. It holds the partner key, the payment grant token, the owner's passkey
+  credential ID and public key or EVM address, the agents that can pay, the payment rules, today's
+  spend, and the payments that wait for an answer. The app window never receives the key or the
+  token. Disconnect deletes the file. The key and the token are redacted from logs, exports and
+  diagnostics.
 - The ElevenLabs API key for dictation and spoken replies is kept in
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -1180,6 +1187,15 @@ Network traffic can also occur when:
   merchant name and address, and the agent's description of the purchase. Link asks the user to
   approve it, and OpenBot then reads the one-time card from `api.link.com`. Nothing else about the
   user's agents, conversations or files is sent to Link;
+- the user sets up the NEAR Intents wallet in Server settings › Vault › Crypto. OpenBot sends the
+  partner key, the owner's public key or EVM address, the daily budget and the signed owner actions to
+  the NEAR Intents Agent API (`api.agentsonintents.com`). When an agent pays, OpenBot sends the
+  recipient, the asset, the amount and an idempotency key. The owner signs on the OpenBot page
+  `api.openbot.run/near/sign` in the system browser; the request is in the address fragment, which the
+  browser does not send to the server, and the page sends the signature back to OpenBot only. The
+  agent's reason and the domain of a payment stay on this computer. The chat card and the Crypto tab
+  load the icon of the payment's domain from that domain (`/favicon.ico`), with no referrer. Nothing
+  else about the user's agents, conversations or files is sent to the Agent API;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex, Kimi, GitHub Copilot and Mistral, `registry.npmjs.org` for Claude,

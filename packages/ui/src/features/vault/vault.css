@@ -288,3 +288,180 @@
 .vault-two-step-check {
   text-align: center;
 }
+
+/* NEAR Intents wallet. */
+.near-wallet-logo > svg {
+  inline-size: 62%;
+  block-size: 62%;
+}
+
+.near-wallet-risk .ui-alert-content {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.near-wallet-accept {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  font-size: var(--openbot-text-sm);
+}
+
+.near-wallet-accept a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.near-wallet-funds {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.near-wallet-qr {
+  display: grid;
+  place-items: center;
+}
+
+.near-wallet-address {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.near-wallet-address-input {
+  flex: 1;
+  min-inline-size: 0;
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+}
+
+.near-wallet-network {
+  color: var(--openbot-text-muted);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.near-wallet-amount {
+  display: grid;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.near-wallet-total {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.near-wallet-step {
+  align-self: center;
+  margin-inline-end: auto;
+}
+
+.near-wallet-waiting {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-3);
+  align-items: center;
+  justify-content: center;
+  min-block-size: 160px;
+}
+
+.near-wallet-waiting-actions {
+  display: flex;
+  flex-basis: 100%;
+  gap: var(--openbot-space-2);
+  justify-content: center;
+}
+
+.near-wallet-page {
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
+.near-wallet-meter {
+  max-inline-size: 320px;
+  margin-block-start: var(--openbot-space-2);
+}
+
+.near-wallet-chevron {
+  inline-size: 16px;
+  block-size: 16px;
+  color: var(--openbot-text-muted);
+}
+
+/* A long "Allow …" label shortens; Cancel keeps its size. */
+.near-wallet-dialog .ui-confirm-dialog-actions > .near-wallet-grant-submit {
+  min-inline-size: 0;
+  flex-shrink: 1;
+}
+
+.near-wallet-grant-submit > span {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The agent list: the dock "Add agent" search on top, then the Settings → Agent dock rows. */
+.near-wallet-picker > .near-wallet-picker-list::before {
+  content: none;
+}
+
+.near-wallet-picker .near-wallet-picker-input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.near-wallet-picker .near-wallet-picker-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.near-wallet-picker-list {
+  --near-wallet-fade-top: 0px;
+  --near-wallet-fade-bottom: 0px;
+  display: grid;
+  max-block-size: calc(var(--openbot-space-1) * 90);
+  overflow-y: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-transparent),
+    var(--openbot-text-primary) var(--near-wallet-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--near-wallet-fade-bottom)),
+    var(--openbot-transparent)
+  );
+}
+
+.near-wallet-picker-list::-webkit-scrollbar {
+  display: none;
+}
+
+.near-wallet-picker-list.scroll-fade-top {
+  --near-wallet-fade-top: calc(var(--openbot-space-1) * 6);
+}
+
+.near-wallet-picker-list.scroll-fade-bottom {
+  --near-wallet-fade-bottom: calc(var(--openbot-space-1) * 6);
+}
+
+.near-wallet-picker-list > .ui-item {
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.near-wallet-picker-none {
+  padding: var(--openbot-space-4);
+}
+
+/* The favicon fills the tile, as an app icon does; the border shows only around the letter. */
+.near-site-icon:has(> img) {
+  border: 0;
+}
+
+.near-chat-card .ui-block-title {
+  font-variant-numeric: tabular-nums;
+}
+
+/* While the owner signs, the waiting badge shares the title row, so Cancel and Open again go under it. */
+.near-chat-card[data-inline-actions] > .ui-block-content > .ui-block-header:has(> .ui-block-status) {
+  flex-basis: 100%;
+}

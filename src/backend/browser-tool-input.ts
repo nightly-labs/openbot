@@ -39,6 +39,7 @@ const SECRET_TOOLS = new Set([
   "request_vault_item",
   "delete_vault_item",
   "request_link_payment",
+  "request_near_payment",
 ]);
 
 /** `tab_id`, as Python libraries name it. No browser tool field has an underscore. */

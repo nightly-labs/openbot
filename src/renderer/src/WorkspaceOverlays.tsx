@@ -64,6 +64,7 @@ import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
 import { createLinkAccountStore } from "./features/vault/stores/link-account-store";
+import { createNearWalletStore } from "./features/vault/stores/near-wallet-store";
 import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -449,7 +450,8 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
+  const { activeServer, hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } =
+    useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -572,6 +574,8 @@ function ServerSettings() {
   // A host that updates or rolls back keeps its id, so the API key kind follows this capability too.
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
   const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
+  /** The agents of this computer. The list holds the agents of the active server only. */
+  const nearAgents = () => (activeServer()?.kind === "local" ? agentList() : []);
   const vault = createMemo(() => {
     const serverId = vaultServerId();
     if (serverId === undefined) return undefined;
@@ -582,6 +586,9 @@ function ServerSettings() {
       twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      // The wallet pays for the agents of this computer only.
+      near: local ? createNearWalletStore() : undefined,
+      nearAgents,
     };
   });
   // The workspace belongs to the selected server. For another server, the switch comes first and

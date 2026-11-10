@@ -50,6 +50,7 @@ import type { BrowserCardVault } from "../browser-tool-actions";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
+import type { NearWallet } from "../near-wallet";
 import { type PasswordVault, type PasswordVaultError, websiteUrl } from "../password-vault";
 import {
   type AppServerRequest,
@@ -204,6 +205,9 @@ const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], read
 
 const LINK_UNAVAILABLE =
   "Link is not connected. Ask the user to connect Link in Server settings > Vault > Cards, or use a saved card.";
+
+const NEAR_UNAVAILABLE =
+  "The NEAR Intents wallet is not ready. Ask the user to set it up or unfreeze it in Server settings > Vault > Crypto.";
 
 /** The host name of an https address, or null. */
 function httpsHost(address: string): string | null {
@@ -457,6 +461,8 @@ export interface AttentionRegistryOptions {
   vaultItems?: VaultItems | null | undefined;
   /** The Link account of this computer, or null. Agents ask it for one-time cards that the user approves in Link. */
   linkWallet?: LinkWallet | null | undefined;
+  /** The NEAR Intents wallet of this computer, or null. Agents ask it to pay; the owner approves in the chat. */
+  nearWallet?: NearWallet | null | undefined;
   /** The name of an agent now. An item that an agent adds to the Vault keeps it. */
   agentName?(agentId: string): string | undefined;
   /** Adds a note to the chat that an agent changed the Vault. `text` is source text. */
@@ -501,6 +507,7 @@ export class AttentionRegistry {
   readonly #passwordVault: PasswordVault | null;
   readonly #vaultItems: VaultItems | null;
   readonly #linkWallet: LinkWallet | null;
+  readonly #nearWallet: NearWallet | null;
   readonly #agentName: (agentId: string) => string | undefined;
   readonly #noteVaultChange: (agentId: string, threadId: string, turnId: string, text: string) => void;
   readonly #apiKeys: AgentApiKeys | null;
@@ -523,6 +530,7 @@ export class AttentionRegistry {
     this.#passwordVault = options.passwordVault ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#linkWallet = options.linkWallet ?? null;
+    this.#nearWallet = options.nearWallet ?? null;
     this.#agentName = options.agentName ?? (() => undefined);
     this.#noteVaultChange = options.noteVaultChange ?? (() => undefined);
     this.#apiKeys = options.apiKeys ?? null;
@@ -1330,6 +1338,76 @@ export class AttentionRegistry {
         : "Do not ask Link again for this purchase. Tell the user.";
     return {
       success: result.status === "approved",
+      contentItems: [{ type: "inputText", text: JSON.stringify({ ...result, next }) }],
+    } satisfies DynamicToolResult;
+  }).bind(this);
+
+  /**
+   * Answers `request_near_payment`. The wallet checks the request first. A payment that no rule of the
+   * owner allows waits for the owner in the chat, and only the owner can approve it. The agent never gets
+   * the partner key or the grant token. A request from an external chat is refused: a stranger there
+   * could tell the agent to pay.
+   */
+  readonly requestNearPayment = Effect.fn("AttentionRegistry.requestNearPayment")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("request_near_payment", params.arguments));
+    if (call.tool !== "request_near_payment")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid NEAR payment request.") });
+    const wallet = this.#nearWallet;
+    const agentId = params.ownerAgentId;
+    if (!wallet?.ready() || !agentId) return browserTakeoverError(NEAR_UNAVAILABLE);
+    if (this.#messagingThread(params.threadId) || this.#messagingRequestTurn(agentId, params.turnId))
+      return browserTakeoverError(
+        "request_near_payment does not work for a request from a Slack, Discord or Telegram chat. Ask the user to start the payment in the OpenBot chat.",
+      );
+    const requestId = String(request.id);
+    const plan = yield* Effect.result(wallet.prepare({ agentId, threadId: params.threadId, requestId, ...call.args }));
+    if (Result.isFailure(plan))
+      return browserTakeoverError(`NEAR payment refused: ${plan.failure.message} Do not try again; tell the user.`);
+    if (plan.success.kind === "ask") {
+      const decision = yield* this.awaitToolApproval(
+        client,
+        request,
+        {
+          requestId: request.id,
+          agentId,
+          threadId: params.threadId,
+          turnId: params.turnId,
+          kind: "permissions",
+          command: null,
+          cwd: null,
+          reason: sourceText("status.agent.nearPayment", {
+            amount: plan.success.amount,
+            symbol: plan.success.symbol,
+            recipient: call.args.recipient,
+            domain: call.args.domain,
+            reason: call.args.reason,
+          }),
+          grantRoot: null,
+          permissions: null,
+        },
+        { ownerOnly: true },
+      ).pipe(Effect.onInterrupt(() => Effect.sync(() => wallet.drop(requestId))));
+      if (decision !== "accept") {
+        wallet.drop(requestId);
+        return browserTakeoverError("The owner declined this NEAR payment. Do not ask again; tell the user.");
+      }
+    }
+    const paid = yield* Effect.result(wallet.pay(requestId));
+    if (Result.isFailure(paid)) return browserTakeoverError(`NEAR payment failed: ${paid.failure.message}`);
+    const result = paid.success;
+    const next =
+      result.status === "paid"
+        ? "Go back to the site and continue."
+        : result.status === "uncertain"
+          ? "Do not pay again. OpenBot finishes this payment; tell the user to check the wallet in Server settings > Vault > Crypto."
+          : "Do not try again; tell the user.";
+    return {
+      success: result.status === "paid",
       contentItems: [{ type: "inputText", text: JSON.stringify({ ...result, next }) }],
     } satisfies DynamicToolResult;
   }).bind(this);

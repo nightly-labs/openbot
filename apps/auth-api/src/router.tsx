@@ -1,4 +1,5 @@
 import { createRouter } from "@tanstack/solid-router";
+import { cspNonce } from "./lib/csp-nonce";
 import { routeTree } from "./routeTree.gen";
 
 const CHUNK_RELOAD_KEY = "openbot:chunk-reload-at";
@@ -31,6 +32,8 @@ export function getRouter() {
   const router = createRouter({
     routeTree,
     defaultPreload: "intent",
+    // The script nonce of a page with a strict `Content-Security-Policy`, such as `/near/sign`.
+    ssr: { nonce: cspNonce() },
     // Components that read the catalog in the browser (the pricing order form) need it before hydration, or they
     // render English over the server's text. Loader data comes too late for that, so the router carries the locale.
     dehydrate: (): { textCatalog: string | undefined } => ({
