@@ -1,4 +1,4 @@
-import type { ConversationTurnTrace } from "@openbot/contracts/ipc";
+import { CONVERSATION_TRACE_STEP_LIMIT, type ConversationTurnTrace } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
@@ -49,7 +49,10 @@ function traceSteps(trace: ConversationTurnTrace): string | null {
     const name = step.command ? `$ ${step.command}` : `tool ${step.text ?? "step"}`;
     return [[`${name} (${status})`, ...(step.error ? [step.error] : [])].join("\n")];
   });
-  return steps.length ? ["[work steps]", ...steps, "[end work steps]"].join("\n") : null;
+  if (!steps.length) return null;
+  // The trace keeps only the first steps of a turn.
+  const cut = trace.steps.length >= CONVERSATION_TRACE_STEP_LIMIT ? ["(later steps left out)"] : [];
+  return ["[work steps]", ...steps, ...cut, "[end work steps]"].join("\n");
 }
 
 const id = z.string().min(1).max(512);
@@ -397,6 +400,7 @@ export class HistoryTools {
     const maximum = search ? 8000 : 16000;
     const sessions = read?.includeWorkSteps ? store.database.listProviderSessions(threadId) : [];
     const captures = new Map<string, Map<string, string> | null>();
+    const traces = new Map<string, string | null>();
     let more = page.messages.length > scanLimit;
     for (const row of page.messages.slice(0, scanLimit)) {
       if (result.messages.length === limit) {
@@ -439,16 +443,18 @@ export class HistoryTools {
       if (read?.includeWorkSteps) {
         const session = sessions.find((candidate) => candidate.id === row.providerSessionId);
         if (session && !captures.has(session.id)) captures.set(session.id, yield* this.#options.capturedSteps(session));
-        // A capture exists only for a session that a provider switch or a rotation replaced. A turn of
-        // the current session, such as a routine run, has the trace that the chat shows.
-        const trace = message.turnId
-          ? page.messages.find((other) => other.message.turnId === message.turnId && other.message.trace)?.message.trace
-          : undefined;
-        const stepText = redact(
-          (session && message.turnId ? captures.get(session.id)?.get(message.turnId) : null) ??
-            (trace ? traceSteps(trace) : null) ??
-            "Captured work steps are unavailable.",
-        );
+        let steps = session && message.turnId ? captures.get(session.id)?.get(message.turnId) : undefined;
+        // Only a session that a provider switch or a rotation replaced has a capture. A turn of the
+        // current session, such as a routine run, has the trace that the chat shows.
+        const turnId = message.turnId;
+        if (!steps && turnId) {
+          if (!traces.has(turnId)) {
+            const trace = yield* toolStep(() => store.database.readTurnTrace(threadId, turnId));
+            traces.set(turnId, trace ? traceSteps(trace) : null);
+          }
+          steps = traces.get(turnId) ?? undefined;
+        }
+        const stepText = redact(steps ?? "Captured work steps are unavailable.");
         const stepOffset = read.workStepsOffset ?? 0;
         if (stepOffset > stepText.length) throw new Error(sourceText("error.agent.historyUnavailable"));
         let size = Math.min(4000, stepText.length - stepOffset);

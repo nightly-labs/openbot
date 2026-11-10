@@ -213,6 +213,10 @@ export class OpenBotDatabase {
     return this.#agentHistory.read(agentId, threadId, selection);
   }
 
+  readTurnTrace(threadId: string, turnId: string) {
+    return this.#agentHistory.turnTrace(threadId, turnId);
+  }
+
   readConversationMessages(
     agentId: string,
     threadId: string | null,
