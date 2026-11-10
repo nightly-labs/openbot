@@ -522,10 +522,8 @@ export class MobileChannelStore {
     // The phone keeps the image it sent, so the new version shows without a download.
     if (image && result.imageUrl)
       saveChannelImage(serverId, channelId, result.imageUrl, `data:${image.mimeType};base64,${image.base64}`);
-    if (entry.valid) {
-      this.applyChannel(entry, result);
-      void this.refresh(serverId);
-    }
+    // The answer is the whole channel, so no list read follows. The host event refreshes the rest.
+    if (entry.valid) this.applyChannel(entry, result);
     return result;
   }
   /**
