@@ -29,6 +29,33 @@ This runs *before* `docs/RELEASING.md`, which stays authoritative for the publis
 - It never runs `bun run dev:seed` or `dev:reset` — both destroy the developer's own profile — and
   never `pkill -f`, which kills other sessions' work mid-write.
 
+## Subagents and models
+
+Give each gate, and each release task after the audit, to its own subagent. Do not give every
+subagent the session model. Select the smallest tier that can do the task, and set the model
+explicitly on each spawn: an omitted model uses the session model. In Claude Code, set `model` on
+the `Agent` call. In a harness that has no model choice, use a lower reasoning effort.
+
+| Tier | Claude Code | Tasks |
+| --- | --- | --- |
+| Strong | the session model | Step 1 residue, gates A, B, C and E, gate F when `electron-updater` moved, the Step 3 verdict |
+| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the translation wording review, the Discord announcement draft |
+| Small | `haiku` | gate H, the `whats-new/<locale>.json` translations, mechanical `git grep` and file inventories |
+
+- **Translations:** give each small-tier subagent a few locales, the English entry, and the
+  [i18n.md terms](../../../docs/i18n.md#terms). Then run `bun scripts/whats-new-translations.ts <version>`
+  once. It checks only the version, the date and the counts of notices and items, not the wording.
+  Then give all locales to one medium-tier subagent. It compares the terms, the tone, the screen
+  names and the headline endings with the i18n terms, and corrects them. Accept a translation only
+  after this review.
+- **Do not raise the tier because a gate is long.** Raise it when the task needs judgment: a hazard
+  that can lose user data, or a frozen wire format.
+- **Check the evidence of each report** before you accept it, as `AGENTS.md` says. A small-tier
+  "no hit" passes only when its command can still find a hit (see Step 2). When a report has no
+  evidence, run the task again one tier higher. Do not do it again yourself.
+- The session model writes the Step 3 table and each stop. A subagent verdict is evidence, not the
+  verdict.
+
 ## Step 1 — establish the range, then account for every file in it
 
 ```bash
