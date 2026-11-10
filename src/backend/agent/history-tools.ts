@@ -1,3 +1,4 @@
+import type { ConversationTurnTrace } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
@@ -35,6 +36,20 @@ function windowBound(text: string, now: number): string | null {
   // Only an ISO time: V8 parses loose text such as "1" or "June" as a year-2001 date.
   const time = ISO_TIME.test(text) ? Date.parse(text) : Number.NaN;
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
+/**
+ * The tool steps of a turn trace, in the form of a capture. Null when the turn has no tool step.
+ * Thinking and answers stay out: the answers are in the history, and reasoning stays with the provider.
+ */
+function traceSteps(trace: ConversationTurnTrace): string | null {
+  const steps = trace.steps.flatMap((step) => {
+    if (step.kind !== "tool") return [];
+    const status = step.failed ? "failed" : step.endedAt === null ? "unfinished" : "completed";
+    const name = step.command ? `$ ${step.command}` : `tool ${step.text ?? "step"}`;
+    return [[`${name} (${status})`, ...(step.error ? [step.error] : [])].join("\n")];
+  });
+  return steps.length ? ["[work steps]", ...steps, "[end work steps]"].join("\n") : null;
 }
 
 const id = z.string().min(1).max(512);
@@ -424,8 +439,14 @@ export class HistoryTools {
       if (read?.includeWorkSteps) {
         const session = sessions.find((candidate) => candidate.id === row.providerSessionId);
         if (session && !captures.has(session.id)) captures.set(session.id, yield* this.#options.capturedSteps(session));
+        // A capture exists only for a session that a provider switch or a rotation replaced. A turn of
+        // the current session, such as a routine run, has the trace that the chat shows.
+        const trace = message.turnId
+          ? page.messages.find((other) => other.message.turnId === message.turnId && other.message.trace)?.message.trace
+          : undefined;
         const stepText = redact(
           (session && message.turnId ? captures.get(session.id)?.get(message.turnId) : null) ??
+            (trace ? traceSteps(trace) : null) ??
             "Captured work steps are unavailable.",
         );
         const stepOffset = read.workStepsOffset ?? 0;
