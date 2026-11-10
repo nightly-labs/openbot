@@ -11,6 +11,7 @@ export const messages = {
   "menu.zoomIn": "放大",
   "menu.zoomOut": "缩小",
   "menu.copyLink": "复制链接",
+  "menu.copyImage": "复制图片",
   "menu.quit": "退出 OpenBot",
   "menu.quitConfirmTitle": "退出 OpenBot？",
   "menu.quitConfirmBody": "在你再次打开 OpenBot 之前，助手和自动化任务会停止。",

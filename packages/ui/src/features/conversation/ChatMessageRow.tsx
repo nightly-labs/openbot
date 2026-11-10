@@ -160,7 +160,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
     },
     props.class,
   ];
-  // The native menu copies selected text and links, and Shift opens Inspect Element. These cases
+  // The native menu copies selected text, links and images, and Shift opens Inspect Element. These cases
   // stop the event before the trigger's delegated handler, which would prevent its default, so the
   // native menu still opens. The keyboard opens the menu with a synthetic event, which always opens it.
   const onSelection = (event: MouseEvent) => {
@@ -195,8 +195,10 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
         const selected = pressOnSelection ?? onSelection(event);
         pressOnSelection = undefined;
         if (!event.isTrusted) return;
-        const link = event.target instanceof Element && event.target.closest("a[href]") !== null;
-        if (event.shiftKey || link || selected) event.stopPropagation();
+        const target = event.target instanceof Element ? event.target : null;
+        const link = Boolean(target?.closest("a[href]"));
+        const image = target instanceof HTMLImageElement && target.closest(".message-author-avatar") === null;
+        if (event.shiftKey || link || image || selected) event.stopPropagation();
       },
       { capture: true },
     );
