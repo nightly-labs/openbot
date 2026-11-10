@@ -1715,6 +1715,7 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
   mcpServer: URL | null,
 ): Effect.fn.Return<Response, McpOperationError> {
   let url = yield* mcpSync(() => new URL(input instanceof URL ? input.toString() : input));
+  const requested = url;
   const mcpTraffic = mcpServer !== null && withoutHash(url) === withoutHash(mcpServer);
   let request: RequestInit = { ...init, ...(signal ? { signal } : {}), redirect: "manual" };
   for (let hop = 0; ; hop++) {
@@ -1747,7 +1748,7 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
           }),
         );
     const location = REDIRECT_STATUSES.has(response.status) ? response.headers.get("location") : null;
-    if (location === null) return unlimited ? response : yield* missingUnlessJson(response, url, request.method);
+    if (location === null) return mcpTraffic ? response : yield* readableAnswer(response, requested, request.method);
     // Redirect response bodies are not consumed by the SDK.
     yield* mcpCall(() => response.body?.cancel()).pipe(Effect.catch(() => Effect.void));
     if (hop >= MAX_OAUTH_REDIRECTS)
@@ -1802,20 +1803,37 @@ function limited(response: Response, origin: string): Effect.Effect<Response, Mc
 }
 
 /**
- * A 200 answer to a metadata request with a body that is not JSON, as a 404.
+ * An OAuth answer that a web page took the place of.
  *
- * A web host often answers every path with its own page, `/.well-known/…` too. RFC 8414 and RFC 9728
- * allow only a JSON object as a successful answer, but the SDK reads any 200 as JSON, so the page
- * stopped the discovery with a parser error before the next address was tried (#6204). The SDK
- * skips a 404. `limited` has already read the body, so the copy is cheap.
+ * A web host often answers every path with its own page, `/.well-known/…` too, also after a redirect
+ * to its home or login page. RFC 8414 and RFC 9728 allow only a JSON object as a successful metadata
+ * answer, but the SDK reads any 2xx as JSON, so the page stopped the discovery with a parser error
+ * before the next address was tried (#6204). Such an answer to a metadata request becomes the 404
+ * that the SDK skips. A page from another endpoint, such as the registration or the token endpoint,
+ * fails with words the user can act on. An empty answer, such as a revocation's, is not changed.
+ * `limited` has already read the body, so the copy is cheap.
  */
-const missingUnlessJson = Effect.fnUntraced(function* (response: Response, url: URL, method: string | undefined) {
-  if (response.status !== 200 || (method ?? "GET").toUpperCase() !== "GET" || !url.pathname.includes("/.well-known/"))
-    return response;
+const readableAnswer = Effect.fnUntraced(function* (response: Response, requested: URL, method: string | undefined) {
+  if (!response.ok) return response;
+  const metadata = (method ?? "GET").toUpperCase() === "GET" && requested.pathname.includes("/.well-known/");
+  const page = (response.headers.get("content-type") ?? "").includes("text/html");
+  if (!metadata && !page) return response;
   const body = yield* mcpCall(() => response.clone().text());
-  if (Result.isSuccess(Result.try(() => JSON.parse(body)))) return response;
-  return new Response(null, { status: 404, statusText: "Not Found" });
+  if (isJsonObject(body)) return response;
+  if (metadata) return new Response(null, { status: 404, statusText: "Not Found" });
+  if (body.trim() === "") return response;
+  return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInAnswerUnreadable")));
 });
+
+function isJsonObject(body: string): boolean {
+  const parsed = Result.try((): unknown => JSON.parse(body));
+  return (
+    Result.isSuccess(parsed) &&
+    typeof parsed.success === "object" &&
+    parsed.success !== null &&
+    !Array.isArray(parsed.success)
+  );
+}
 
 /** The statuses whose response cannot have a body. */
 const NULL_BODY_STATUSES = new Set([204, 205, 304]);
