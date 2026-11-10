@@ -682,7 +682,8 @@ that its store build accepts.
 ### How a phone gets an update
 
 The app asks the server at a cold start, and again when it comes back to the foreground, at most
-one time in a minute (`src/features/app-update/model/app-update.ts`). It downloads a new bundle in
+one time in 15 minutes (`src/features/app-update/model/app-update.ts`). The cold start counts as a
+check, so to see a new update or a rollback at once, close the app fully and open it. It downloads a new bundle in
 the background. The home header then shows **A new OpenBot is ready**, and **Update** restarts the
 app with the new bundle. Without the tap, the next cold start uses it. The bundle is about 25 MB;
 the server sends it compressed, and the phone downloads only the assets that it does not have.
@@ -756,7 +757,7 @@ of the first version that uses this server, and after a change to `updates` in `
 
 1. Install the build from TestFlight and from the Play internal track.
 2. Publish a small visible change with `--rollout 100`. Only the phones with this new build get it.
-3. Open the app, leave it and come back after one minute, or close and open it two times. Confirm
+3. Open the app, leave it and come back after 15 minutes, or close and open it two times. Confirm
    the home header, the restart, the change, and the update ID in **Settings → About**.
 4. Open a chat with a diagram, a PDF and an HTML page, to check the DOM components of the update.
 5. Run `bun run mobile:ota:rollback -- --platform all` and confirm that the change goes away.

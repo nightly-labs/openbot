@@ -39,9 +39,9 @@ const NOTES_STALE_MS = 10 * 60_000;
 const key = "openbot.mobile.appUpdate.dismissed.v1";
 
 // `expo-updates` asks the update server only at a cold start, and a phone can keep the app in memory
-// for days. So the app asks again when it comes back to the foreground. The interval only stops a
-// burst of requests when the user changes apps fast: a fix or a rollback must not wait for a restart.
-const UPDATE_CHECK_INTERVAL_MS = 60_000;
+// for days. So the app asks again when it comes back to the foreground, at most this often. The
+// cold start counts as a check, so a return to the app in the first 15 minutes asks nothing.
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
 // The cold start of this process asked already.
 let lastUpdateCheck = Date.now();
 let updateCheckRuns = false;

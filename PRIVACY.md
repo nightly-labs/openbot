@@ -571,7 +571,7 @@ addresses. The app never sends the log. **Settings → Support** shows it and le
 clear it.
 
 The mobile app asks an update server for a newer JavaScript bundle each time it starts, and when
-you come back to it, at most one time in a minute. App versions after 1.4.8 ask OpenBot's server
+you come back to it, at most one time in 15 minutes. App versions after 1.4.8 ask OpenBot's server
 `updates.openbot.run`, a Cloudflare Worker; version 1.4.8 and earlier versions ask Expo's server
 `u.expo.dev`. The request has the platform, the runtime version of the build, the build channel, the
 ID of the bundle that runs, a random ID that the update client made for this install, the IDs of
