@@ -71,6 +71,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       let initiationPending = false;
       let committed = false;
       let successorStarted = false;
+      let documentPending = false;
       let timer: NodeJS.Timeout | undefined;
       const cleanup = () => {
         clearTimeout(timer);
@@ -79,6 +80,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         contents.off("did-stop-loading", didStopLoading);
         contents.off("did-navigate-in-page", didNavigateInPage);
         contents.off("did-fail-load", didFailLoad);
+        contents.off("did-fail-provisional-load", didFailProvisionalLoad);
         contents.off("destroyed", destroyed);
       };
       const finish = (error?: unknown) => {
@@ -102,11 +104,13 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
         if (!isMainFrame) return;
         if (committed && !isInPlace) successorStarted = true;
+        if (!isInPlace) documentPending = true;
         // A page that calls `pushState` while it loads must not end the wait for that load.
         inPlace = started ? inPlace && isInPlace : isInPlace;
         started = true;
       };
       const didNavigate = () => {
+        documentPending = false;
         if (started) committed = true;
       };
       const didStopLoading = () => {
@@ -115,9 +119,28 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const didNavigateInPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
         if (started && inPlace && isMainFrame) complete();
       };
-      const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-        if (!started || !isMainFrame || supersededBy(code)) return;
+      const fail = (code: number, description: string) => {
+        if (supersededBy(code)) return;
         finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
+      };
+      // A new document that does not commit reports `did-fail-provisional-load` first. A document that
+      // still loads, such as a streaming page, aborts its load with `ERR_ABORTED` when the next page
+      // starts, and reports only `did-fail-load`. That failure belongs to the old document: wait for
+      // the next page.
+      const didFailProvisionalLoad = (
+        _event: unknown,
+        code: number,
+        description: string,
+        _url: string,
+        isMainFrame: boolean,
+      ) => {
+        if (!isMainFrame) return;
+        documentPending = false;
+        if (started) fail(code, description);
+      };
+      const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
+        if (!started || !isMainFrame || documentPending) return;
+        fail(code, description);
       };
       const destroyed = () => {
         finish(new Error(TAB_CLOSED));
@@ -127,6 +150,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       contents.on("did-stop-loading", didStopLoading);
       contents.on("did-navigate-in-page", didNavigateInPage);
       contents.on("did-fail-load", didFailLoad);
+      contents.on("did-fail-provisional-load", didFailProvisionalLoad);
       contents.once("destroyed", destroyed);
       const startDeadline = (ms: number) => {
         timer = setTimeout(() => {
