@@ -130,6 +130,16 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     this.#disarm(thread);
   }
 
+  /**
+   * Holds a thread with no turn whose provider starts a turn of its own soon. Only the timeout closes
+   * it: the idle limit and a low-memory release do not, because they would end that turn before it
+   * starts. Its turn holds it, and the end of that turn marks it idle.
+   */
+  awaitOwnTurn(thread: Thread): void {
+    thread.idleSince = 0;
+    this.#arm(thread);
+  }
+
   /** Marks a thread with no turn as idle, and closes the longest idle threads over the limit. */
   readonly markIdle = Effect.fn("IdleThreadPool.markIdle")(function* (
     this: IdleThreadPool<Thread, Released>,

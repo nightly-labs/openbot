@@ -1735,9 +1735,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
       // The level can arrive after the turn that started the work ended, so it holds or frees the idle timer.
+      // When the work ends, the CLI starts a turn of its own to answer the result. Until that turn shows
+      // output, the idle limit must not close the thread (#6557).
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
-        else if (before > 0 && runtime.backgroundTasks === 0) yield* this.#threads.markIdle(runtime);
+        else if (before > 0 && runtime.backgroundTasks === 0) this.#threads.awaitOwnTurn(runtime);
       }
       return;
     }
