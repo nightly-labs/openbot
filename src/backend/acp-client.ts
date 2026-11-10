@@ -810,6 +810,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return result;
   }
 
+  /**
+   * A start failure with the agent's explanation in its message, because the provider row, its last
+   * error and the log read only the message. Antigravity 1.4.5 fails `session/new` with "Internal
+   * error" and the reason in `data.details` (#6454). An error with no explanation stays as it is:
+   * OpenCode's start retry knows its failure by the exact message.
+   */
+  #withFailureDetail(error: unknown): unknown {
+    if (!(error instanceof RequestError) || failureDetail(error) === null) return error;
+    return new RequestError(error.code, this.#redact(failureText(error).replace(/^RequestError:\s*/u, "")), error.data);
+  }
+
   get running(): boolean {
     return this.#transport.running;
   }
@@ -935,6 +946,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
     this.#threads.detach(thread);
+    this.#stopThreadSubagents(thread.id);
     thread.mcp.close();
     if (thread.transport) Effect.runFork(thread.transport.stop(Effect.void).pipe(Effect.ignore));
   }
@@ -943,6 +955,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     thread: AcpThread,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    this.#stopThreadSubagents(thread.id);
     thread.mcp.close();
     if (thread.transport) return yield* thread.transport.stop(Effect.void);
     yield* providerCall(() =>
@@ -1353,7 +1366,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#signedIn = false;
         return;
       }
-      return yield* providerFailure(error);
+      return yield* providerFailure(this.#withFailureDetail(error));
     }
   });
 
@@ -3175,6 +3188,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn.lastActivityAt = Date.now();
       this.#subagentThreads.set(turn.id, thread.id);
     }
+    // A background subagent that still works keeps the watch, and so its session, open. A closed
+    // session sends no end of it (#6448).
+    if (thread && thread.backgroundUntil > 0)
+      thread.backgroundUntil = Math.max(thread.backgroundUntil, Date.now() + ACP_BACKGROUND_WATCH_MS);
     this.#emitSubagents(
       foldOpenCodeChildUpdate(
         this.#subagents,
@@ -3202,6 +3219,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #stopSubagents(): void {
     for (const change of stopSubagents(this.#subagents, new Date().toISOString())) this.#emitSubagents(change);
     this.#openCodeLaunches.clear();
+  }
+
+  /**
+   * The session closed. OpenCode 2.2.6 then sends no end of a subagent that still runs, and its card
+   * showed "Working" until the app started again (#6448).
+   */
+  #stopThreadSubagents(threadId: string): void {
+    const turnIds = new Set<string>();
+    for (const [turnId, owner] of this.#subagentThreads) if (owner === threadId) turnIds.add(turnId);
+    if (turnIds.size === 0) return;
+    for (const change of stopSubagents(this.#subagents, new Date().toISOString(), turnIds)) this.#emitSubagents(change);
+    // A turn whose subagents had all ended sends no change, so its entry is removed here.
+    for (const turnId of turnIds) if (!this.#subagents.turns.has(turnId)) this.#subagentThreads.delete(turnId);
   }
 
   readonly #completeTurn = Effect.fn("AcpAgentClient.completeTurn")(function* (

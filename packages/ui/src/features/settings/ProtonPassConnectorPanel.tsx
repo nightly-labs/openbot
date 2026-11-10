@@ -27,7 +27,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createSignal, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { ProtonPassMark } from "./brand-marks";
+import { ProtonPassTile } from "./brand-marks";
 import {
   IntegrationPage,
   type IntegrationPageSlots,
@@ -176,7 +176,7 @@ export function ProtonPassConnectorPanel(props: ProtonPassConnectorPanelProps) {
   return (
     <IntegrationPage
       class="proton-pass-connector"
-      logo={<ProtonPassMark />}
+      logo={<ProtonPassTile />}
       name={t("connector.protonPass.title")}
       subtitle={
         props.hostName
@@ -456,7 +456,7 @@ function ConnectDialog(props: {
       dismissible={false}
       closeLabel={t("connector.protonPass.close")}
       onClose={close}
-      logo={<ProtonPassMark />}
+      logo={<ProtonPassTile />}
       link={link()}
       title={current().title}
       description={current().description}

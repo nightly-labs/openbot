@@ -55,7 +55,7 @@ import {
   type SubagentState,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { claudeBridgedToolName, visibleToolDefinitions } from "./agent/tool-catalog";
+import { claudeBridgedToolName, DIRECT_BROWSER_TOOL_DEFINITIONS, visibleToolDefinitions } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
@@ -64,6 +64,7 @@ import {
   ProviderTurnActiveError,
   RequestTimeoutError,
 } from "./agent-client";
+import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { claudeContextCategories } from "./claude-context-categories";
 import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
@@ -2480,6 +2481,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         version: "0.1.0",
         tools: claudeOpenBotTools((name, args) => call("openbot", name, args)),
       }),
+      // Without alwaysLoad, the CLI puts these tools behind its ToolSearch, and Haiku loaded them with
+      // a search before 23 of 30 browser tasks (`bun run bench:browser-tools`, 2026-11-10).
+      [OPENBOT_BROWSER_NAMESPACE]: createSdkMcpServer({
+        name: OPENBOT_BROWSER_NAMESPACE,
+        version: "0.1.0",
+        alwaysLoad: true,
+        tools: claudeBrowserTools((name, args) => call(OPENBOT_BROWSER_NAMESPACE, name, args)),
+      }),
     };
   }
 
@@ -2677,6 +2686,15 @@ export function claudeOpenBotTools(call: (name: string, args: unknown) => Promis
       const shape = advertisedZodShape(z.strictObject(definition.shape));
       return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
     });
+}
+
+/** The direct browser tools, as `mcp__openbot_browser__<tool>`: the form of a bridged browser call. */
+export function claudeBrowserTools(call: (name: string, args: unknown) => Promise<CallToolResult>) {
+  return DIRECT_BROWSER_TOOL_DEFINITIONS.map((definition) =>
+    tool(definition.name, definition.description, advertisedZodShape(definition.schema), (args) =>
+      call(definition.name, args),
+    ),
+  );
 }
 
 /**

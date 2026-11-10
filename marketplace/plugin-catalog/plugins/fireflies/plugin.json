@@ -1,0 +1,33 @@
+{
+  "slug": "fireflies",
+  "name": "Fireflies.ai",
+  "tagline": "Meeting transcripts and search",
+  "description": "Fireflies.ai lets agents search meeting transcripts and read summaries and action items in the signed-in Fireflies account. Each user signs in to their own Fireflies account through the browser.",
+  "category": "productivity",
+  "creatorName": "Fireflies.ai",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/9c/f8/a6/9cf8a6d8-e782-75a0-40b5-6a7e24e49f88/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-recent-meetings", "text": "List my meetings from this week with a one-line summary of each." },
+    { "id": "prompt-search-topic", "text": "Find what was said about the renewal date in my calls with Acme." },
+    { "id": "prompt-action-items", "text": "Collect the action items assigned to me in yesterday's meetings." }
+  ],
+  "apps": [
+    {
+      "id": "app-fireflies-mcp",
+      "name": "Fireflies.ai",
+      "description": "Transcript search, summaries, and action items, over Fireflies.ai's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/9c/f8/a6/9cf8a6d8-e782-75a0-40b5-6a7e24e49f88/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "fireflies",
+        "transport": "http",
+        "url": "https://api.fireflies.ai/mcp",
+        "auth": [{ "id": "fireflies-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://fireflies.ai",
+  "privacyPolicyUrl": "https://fireflies.ai/privacy-policy",
+  "termsUrl": "https://fireflies.ai/terms-of-service"
+}

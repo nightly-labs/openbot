@@ -1,0 +1,36 @@
+{
+  "slug": "krisp",
+  "name": "Krisp",
+  "tagline": "Meeting notes and transcripts",
+  "description": "Krisp lets agents search and read meeting transcripts, summaries, action items, and upcoming meetings in the signed-in Krisp account. Each user signs in to their own Krisp account through the browser.",
+  "category": "productivity",
+  "creatorName": "Krisp",
+  "iconUrl": "https://krisp.ai/wp-content/uploads/2023/12/cropped-favicon-1-192x192.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-action-items", "text": "List the action items from my meetings this week." },
+    { "id": "prompt-meeting-summary", "text": "Summarize yesterday's call with the design team." },
+    {
+      "id": "prompt-upcoming",
+      "text": "What meetings do I have tomorrow, and what did we discuss last time with each group?"
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-krisp-mcp",
+      "name": "Krisp",
+      "description": "Meeting transcripts, summaries, and action items, over Krisp's MCP server with browser sign-in.",
+      "iconUrl": "https://krisp.ai/wp-content/uploads/2023/12/cropped-favicon-1-192x192.png",
+      "server": {
+        "name": "krisp",
+        "transport": "http",
+        "url": "https://mcp.krisp.ai/mcp",
+        "auth": [{ "id": "krisp-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://krisp.ai",
+  "privacyPolicyUrl": "https://krisp.ai/privacy-policy/",
+  "termsUrl": "https://krisp.ai/terms-of-use/",
+  "skills": []
+}

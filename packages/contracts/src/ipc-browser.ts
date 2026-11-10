@@ -24,9 +24,9 @@ export type BrowserImageMode = "auto" | "always" | "never";
 
 export type BrowserTarget =
   | { kind: "ref"; ref: string; revision: number }
-  | { kind: "role"; role: string; name?: string | undefined; exact?: boolean | undefined }
-  | { kind: "text"; text: string; exact?: boolean | undefined }
-  | { kind: "css"; selector: string }
+  | { kind: "role"; role: string; name?: string | undefined; exact?: boolean | undefined; nth?: number | undefined }
+  | { kind: "text"; text: string; exact?: boolean | undefined; nth?: number | undefined }
+  | { kind: "css"; selector: string; nth?: number | undefined }
   | { kind: "point"; x: number; y: number };
 
 export interface BrowserViewport {

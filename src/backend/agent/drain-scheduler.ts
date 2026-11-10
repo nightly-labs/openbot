@@ -20,6 +20,7 @@ import { decodeTurnResponse } from "../protocol";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
+  type AnsweredRoutine,
   agentNamesById,
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
@@ -883,6 +884,7 @@ export class DrainScheduler {
               routineRun:
                 item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
+              answeredRoutine: this.answeredRoutine(item.delivery),
               tags,
               ...(executionText === undefined ? {} : { executionText }),
             });
@@ -1211,6 +1213,18 @@ export class DrainScheduler {
     const taskId = this.#mailbox.taskIdForDelivery(id);
     if (taskId !== null) return this.#tasks.isRoutineThread(taskId);
     return !this.#channels?.store.assignmentForDelivery(id) && !this.#messaging?.ownsDelivery(id);
+  }
+
+  /**
+   * The routine run that sent the request a teammate's answer replies to, when that run had its own
+   * session. The session closed with the run, so the turn that reads the answer did not see the
+   * routine task, and a task with several steps stopped after the first answer (#6457).
+   */
+  answeredRoutine(delivery: DeliveryContext["delivery"]): AnsweredRoutine | null {
+    if (delivery.sender.kind !== "agent" || !delivery.replyToMessageId) return null;
+    const run = this.#mailbox.routineDeliveryOfRequest(delivery.recipientAgentId, delivery.replyToMessageId);
+    if (run?.delivery.sender.kind !== "routine" || !this.#runsInOwnSession(run)) return null;
+    return { routineName: run.delivery.sender.routineName, task: run.delivery.text };
   }
 
   /**

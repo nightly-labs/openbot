@@ -183,16 +183,18 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
   },
 );
 
+const nthText = (nth: number | undefined) => (nth === undefined ? "" : ` nth=${nth}`);
+
 export function describeBrowserTarget(target: BrowserTarget): string {
   switch (target.kind) {
     case "ref":
       return `ref ${target.ref}@${target.revision}`;
     case "role":
-      return `role ${target.role}${target.name ? ` “${target.name}”` : ""}`;
+      return `role ${target.role}${target.name ? ` “${target.name}”` : ""}${nthText(target.nth)}`;
     case "text":
-      return `text “${target.text}”`;
+      return `text “${target.text}”${nthText(target.nth)}`;
     case "css":
-      return `css ${target.selector}`;
+      return `css ${target.selector}${nthText(target.nth)}`;
     case "point":
       return `point ${target.x},${target.y}`;
   }
