@@ -26,6 +26,7 @@ interface TransferPreferences {
   allowNewChat?: boolean;
   quickAcknowledgement?: boolean;
   fastMode?: boolean;
+  ultrafast?: boolean;
   backupModels?: AgentBackupModels;
   hidden?: boolean;
   notificationLevel?: ServerNotificationLevel;
@@ -66,6 +67,7 @@ export const readPreferences = Effect.fn("InstanceTransfer.readPreferences")(fun
     ...(agent.allowNewChat === undefined ? {} : { allowNewChat: agent.allowNewChat }),
     ...(agent.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: agent.quickAcknowledgement }),
     ...(agent.fastMode === undefined ? {} : { fastMode: agent.fastMode }),
+    ...(agent.ultrafast ? { ultrafast: true } : {}),
     ...(agent.backupModels ? { backupModels: agent.backupModels } : {}),
     ...(agent.hiddenAt ? { hidden: true } : {}),
     ...(level ? { notificationLevel: level } : {}),
@@ -103,6 +105,8 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
   if (value.computerUse === false) update.computerUse = false;
   if (typeof value.quickAcknowledgement === "boolean") update.quickAcknowledgement = value.quickAcknowledgement;
   if (typeof value.fastMode === "boolean") update.fastMode = value.fastMode;
+  // Ultrafast is a fast mode tier, so it comes only with fast mode on.
+  if (value.fastMode === true && value.ultrafast === true) update.ultrafast = true;
   if (value.allowAutomation === false) update.allowAutomation = false;
   if (value.allowAutomation === true) warnings.push(sourceText("error.import.transferLocalScripts", { name }));
   if (value.allowNewChat === false) update.allowNewChat = false;

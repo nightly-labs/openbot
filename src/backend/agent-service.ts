@@ -3393,6 +3393,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 ...(failingOver ? { cause: "provider-error" as const } : {}),
                 // The provider change turns fast mode off, so the return turns it on again.
                 ...(previous.fastMode ? { fastMode: true } : {}),
+                ...(previous.fastMode && previous.ultrafast ? { ultrafast: true } : {}),
               }))
         : undefined;
     const usageLimitReturn =
@@ -3523,6 +3524,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         input: {
           ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
           ...(agent.usageLimitReturn.fastMode ? { fastMode: true } : {}),
+          ...(agent.usageLimitReturn.fastMode && agent.usageLimitReturn.ultrafast ? { ultrafast: true } : {}),
         },
         move: "return",
       };

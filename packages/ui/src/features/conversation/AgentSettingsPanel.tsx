@@ -151,8 +151,10 @@ export interface AgentSettingsPanelProps {
   quickAcknowledgementEditable?: boolean;
   /** Fast mode, as the model picker of the chat header shows it. */
   fastMode?: boolean | undefined;
-  /** Without it, the model picker shows no Fast switch. The picker shows it only for a model with a fast tier. */
-  onFastModeChange?: ((fastMode: boolean) => void) | undefined;
+  /** With `fastMode`, the Ultrafast tier in place of Fast. */
+  ultrafast?: boolean | undefined;
+  /** Without it, the model picker shows no Speed control. The picker shows it only for a model with a fast tier. */
+  onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
   /** The browser profile of the agent's tabs. Left out when the host cannot change it. */
   browserProfiles?: AgentBrowserProfileOptions | undefined;
   /** The user's own notification level for the agent. Left out when the server cannot keep it. */
@@ -1411,6 +1413,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     if (effort !== draft.runtime.reasoningEffort) void selectReasoning(effort);
                   }}
                   fastMode={props.fastMode}
+                  ultrafast={props.ultrafast}
                   onFastModeChange={props.onFastModeChange}
                 />
               </SettingsLinkGroup>

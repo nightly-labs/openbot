@@ -107,6 +107,8 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   browserProfileId?: string;
   // Absent on every agent stored before the setting existed, which leaves the service tier to Codex.
   fastMode?: boolean;
+  // Only with `fastMode: true`. An older OpenBot drops it and runs the Fast tier.
+  ultrafast?: boolean;
   // Absent means the app default, as for every agent stored before the setting existed.
   busyMessageMode?: BusyMessageMode;
   // Absent means the default task limit, as for every agent stored before tasks existed.
@@ -798,6 +800,16 @@ export class AgentStore {
         // The new provider has its own price, and Claude fast mode needs the user's confirmation.
         next.fastMode = false;
       }
+      // Ultrafast is a fast mode tier, so it comes only with a fast mode change.
+      if (input.ultrafast !== undefined && (!isBoolean(input.ultrafast) || input.fastMode === undefined))
+        throw new Error("Invalid fast mode value.");
+      // Each fast mode change names the tier: a change from a client that does not know Ultrafast,
+      // such as a remote client, sets Fast.
+      if (input.fastMode !== undefined) {
+        if (input.fastMode && input.ultrafast) next.ultrafast = true;
+        else delete next.ultrafast;
+      }
+      if (!next.fastMode) delete next.ultrafast;
       // A provider change without an account returns the agent to the new provider's own sign-in.
       if (
         input.providerAccountId === null ||
@@ -892,6 +904,7 @@ export class AgentStore {
       if (next.allowAutomation === undefined) delete agent.allowAutomation;
       if (next.allowNewChat === undefined) delete agent.allowNewChat;
       if (next.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+      if (next.ultrafast === undefined) delete agent.ultrafast;
       if (next.avatarColor === undefined) delete agent.avatarColor;
       if (next.chatColor === undefined) delete agent.chatColor;
       try {
@@ -910,6 +923,7 @@ export class AgentStore {
         if (previous.allowAutomation === undefined) delete agent.allowAutomation;
         if (previous.allowNewChat === undefined) delete agent.allowNewChat;
         if (previous.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+        if (previous.ultrafast === undefined) delete agent.ultrafast;
         if (previous.avatarColor === undefined) delete agent.avatarColor;
         if (previous.chatColor === undefined) delete agent.chatColor;
         throw error;
@@ -2036,6 +2050,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.ownBrowserSession === undefined || isBoolean(record.ownBrowserSession)) &&
     (record.browserProfileId === undefined || isBrowserProfileId(record.browserProfileId)) &&
     (record.fastMode === undefined || isBoolean(record.fastMode)) &&
+    (record.ultrafast === undefined || isBoolean(record.ultrafast)) &&
     (record.busyMessageMode === undefined || isBusyMessageMode(record.busyMessageMode)) &&
     (record.taskLimit === undefined || isAgentTaskLimit(record.taskLimit)) &&
     (record.providerAccountId === undefined || isProviderAccountId(record.providerAccountId)) &&
@@ -2133,6 +2148,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       : reset("browserProfileId", undefined);
   const fastMode =
     value.fastMode === undefined || isBoolean(value.fastMode) ? value.fastMode : reset("fastMode", undefined);
+  const ultrafast =
+    value.ultrafast === undefined || isBoolean(value.ultrafast) ? value.ultrafast : reset("ultrafast", undefined);
   const busyMessageMode =
     value.busyMessageMode === undefined || isBusyMessageMode(value.busyMessageMode)
       ? value.busyMessageMode
@@ -2223,6 +2240,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(ownBrowserSession === undefined ? {} : { ownBrowserSession }),
     ...(browserProfileId === undefined ? {} : { browserProfileId }),
     ...(fastMode === undefined ? {} : { fastMode }),
+    ...(ultrafast && fastMode ? { ultrafast } : {}),
     ...(busyMessageMode === undefined ? {} : { busyMessageMode }),
     ...(taskLimit === undefined ? {} : { taskLimit }),
     ...(providerAccountId === undefined ? {} : { providerAccountId }),

@@ -1394,33 +1394,38 @@ export function createConversationViewScope(props: ConversationProps) {
     await props.onUpdateAgent(agentId, updates);
     return true;
   }
-  // The switch shows the new value while the save runs. The saved agent then holds it.
-  const [fastModeDraft, setFastModeDraft] = createSignal<{ agentId: string; fastMode: boolean }>();
+  // The Speed select shows the new value while the save runs. The saved agent then holds it.
+  const [fastModeDraft, setFastModeDraft] = createSignal<{ agentId: string; fastMode: boolean; ultrafast: boolean }>();
   const fastMode = () => {
     const draft = fastModeDraft();
     return draft && draft.agentId === props.agent?.id ? draft.fastMode : props.agent?.fastMode === true;
   };
+  const ultrafast = () => {
+    const draft = fastModeDraft();
+    return draft && draft.agentId === props.agent?.id ? draft.ultrafast : props.agent?.ultrafast === true;
+  };
   /**
-   * The Fast switch of the model pickers, in the chat header and in the agent settings: on this
+   * The Speed select of the model pickers, in the chat header and in the agent settings: on this
    * computer, or on a joined server with `agent-fast-mode-v1`. The picker shows it only for a model
-   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`).
+   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`). A joined
+   * server lists no Ultrafast tier, so its picker offers Standard and Fast.
    */
   const fastModeChange = () =>
     props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)
-      ? (next: boolean) => requestFastMode(next)
+      ? (next: boolean, nextUltrafast: boolean) => requestFastMode(next, nextUltrafast)
       : undefined;
   /**
    * The agent that waits for the user to confirm fast mode. Claude fast mode costs more per token, and
    * a Claude subscription pays for it from usage credits also when the plan has usage left.
    */
   const [fastModeConfirmation, setFastModeConfirmation] = createSignal<string>();
-  function requestFastMode(next: boolean): void {
+  function requestFastMode(next: boolean, nextUltrafast: boolean): void {
     const agentId = props.agent?.id;
     if (next && agentId && settingsProvider() === "claude") {
       setFastModeConfirmation(agentId);
       return;
     }
-    void changeFastMode(next);
+    void changeFastMode(next, nextUltrafast);
   }
   // The confirmation belongs to the agent on the screen. It ends when a different agent opens, so it
   // does not open again when the user comes back to that agent.
@@ -1437,22 +1442,22 @@ export function createConversationViewScope(props: ConversationProps) {
   function confirmFastMode(): void {
     if (!fastModeConfirmationOpen()) return;
     setFastModeConfirmation(undefined);
-    void changeFastMode(true);
+    void changeFastMode(true, false);
   }
   function cancelFastModeConfirmation(): void {
     setFastModeConfirmation(undefined);
   }
-  async function changeFastMode(next: boolean): Promise<void> {
+  async function changeFastMode(next: boolean, nextUltrafast: boolean): Promise<void> {
     const agentId = props.agent?.id;
     if (!agentId) return;
-    const draft = { agentId, fastMode: next };
+    const draft = { agentId, fastMode: next, ultrafast: next && nextUltrafast };
     setFastModeDraft(draft);
     setScopedComposerError(null);
     const { t, errorMessage } = currentText();
     let saved = false;
     let failure = t("composer.error.changeFastMode");
     try {
-      saved = await saveAgentPatch({ fastMode: next }, agentId);
+      saved = await saveAgentPatch({ fastMode: next, ...(draft.ultrafast ? { ultrafast: true } : {}) }, agentId);
     } catch (error) {
       failure = errorMessage(error, failure);
     }
@@ -2674,6 +2679,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     changeFastMode,
     fastMode,
+    ultrafast,
     fastModeChange,
     fastModeConfirmationOpen,
     confirmFastMode,
