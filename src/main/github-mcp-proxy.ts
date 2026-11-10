@@ -40,6 +40,16 @@ const REPOSITORY_CREATION_HINT =
   "permission request, in GitHub settings: Applications > Installed GitHub Apps (for an organization, in the " +
   "organization settings). Organization policy can also block repository creation. Tell the user this, and do " +
   "not try another credential. The user can also create the repository on github.com.";
+/** A refusal or a missing item in GitHub's text, which is also how GitHub hides a repository from the app. */
+const NOT_FOUND_OR_REFUSED = /\b40[34]\b|Not Found/u;
+/** A rate limit answer is not about access. */
+const RATE_LIMIT = /rate limit/iu;
+/** For the agent, which tells the user. The user token reaches only repositories where the app is installed. */
+const notInstalledHint = (repository: string) =>
+  `The OpenBot GitHub App is not installed on ${repository}. If ${repository} is private, GitHub answers "Not Found" ` +
+  'for it, and git answers "Write access to repository not granted", until the app is installed there. Tell the ' +
+  "user to add the repository in OpenBot: Marketplace > Apps > GitHub > Choose repositories. Do not try another " +
+  "credential.";
 
 export interface GitHubMcpProxyOptions {
   /** GitHub's remote MCP server. */
@@ -50,6 +60,8 @@ export interface GitHubMcpProxyOptions {
   userToken: () => Effect.Effect<string | null, GitHubOperationError>;
   /** The bot token of `owner/name`, or null when the user token applies. */
   botToken: (owner: string, name: string) => string | null;
+  /** Whether the app is installed on `owner/name`, or null when that is not known. */
+  installedOn: (owner: string, name: string) => Effect.Effect<boolean | null>;
 }
 
 interface Upstream {
@@ -234,12 +246,18 @@ export class GitHubMcpProxy {
       const owner = isDynamicRecord(args) && isString(args.owner) ? args.owner : null;
       const name = isDynamicRecord(args) && isString(args.repo) ? args.repo : null;
       const token = (owner && name && this.#options.botToken(owner, name)) || userToken;
-      return forward(token, async (client) => {
-        const result = await client.callTool(params, undefined, requestOptions(extra.signal));
-        if (params.name === "create_repository") addRepositoryCreationHint(result);
-        boundTextContent(result);
-        return result;
-      });
+      return runCauseEffect(
+        Effect.gen({ self: this }, function* () {
+          const result = yield* this.#call(token, (client) =>
+            client.callTool(params, undefined, requestOptions(extra.signal)),
+          );
+          if (params.name === "create_repository") addRepositoryCreationHint(result);
+          if (owner && name && isNotFoundOrRefused(result) && (yield* this.#options.installedOn(owner, name)) === false)
+            addNotInstalledHint(result, `${owner}/${name}`);
+          boundTextContent(result);
+          return result;
+        }),
+      );
     });
     if (capabilities.prompts) {
       mcp.setRequestHandler(ListPromptsRequestSchema, ({ params }, extra) =>
@@ -327,6 +345,17 @@ function addRepositoryCreationHint(result: Awaited<ReturnType<Client["callTool"]
     (item) => isDynamicRecord(item) && isString(item.text) && item.text.includes(MISSING_PERMISSION),
   );
   if (refused) result.content.push({ type: "text", text: REPOSITORY_CREATION_HINT });
+}
+
+/** An error that can mean that GitHub hides the repository from the app, as GitHub's text says nothing more. */
+function isNotFoundOrRefused(result: Awaited<ReturnType<Client["callTool"]>>): boolean {
+  if (result.isError !== true || !Array.isArray(result.content)) return false;
+  const texts = result.content.flatMap((item) => (isDynamicRecord(item) && isString(item.text) ? [item.text] : []));
+  return texts.some((text) => NOT_FOUND_OR_REFUSED.test(text)) && !texts.some((text) => RATE_LIMIT.test(text));
+}
+
+function addNotInstalledHint(result: Awaited<ReturnType<Client["callTool"]>>, repository: string): void {
+  if (Array.isArray(result.content)) result.content.push({ type: "text", text: notInstalledHint(repository) });
 }
 
 /**

@@ -132,6 +132,7 @@ async function measureGitHubProxy(): Promise<Record<string, number>> {
     secret: () => "bench-secret",
     userToken: () => Effect.succeed("bench-user-token"),
     botToken: () => null,
+    installedOn: () => Effect.succeed(null),
   });
   const client = new Client({ name: "tool-result-size-bench", version: "1.0.0" });
   try {

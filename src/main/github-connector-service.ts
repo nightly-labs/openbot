@@ -690,6 +690,26 @@ export class GitHubConnectorService {
     };
   });
 
+  /**
+   * Whether the app is installed on `owner/name`, for the hint of the MCP proxy. Null when that is not
+   * known: no sign-in, a failed read, or a list cut at `MAX_LISTED_REPOSITORIES`. Read only after an error.
+   */
+  readonly #installedOn = Effect.fn("GitHubConnector.installedOn")(
+    function* (
+      this: GitHubConnectorService,
+      owner: string,
+      name: string,
+    ): Effect.fn.Return<boolean | null, GitHubOperationError, GitHubPlatform> {
+      const token = yield* this.accessToken();
+      if (!token) return null;
+      const { repositories, total } = yield* this.#installationRepositories(token);
+      if (repositories.length < total) return null;
+      const fullName = `${owner}/${name}`.toLowerCase();
+      return repositories.some((repository) => repository.fullName.toLowerCase() === fullName);
+    },
+    (operation) => this.#owned(operation).pipe(Effect.catch(() => Effect.succeed(null))),
+  ).bind(this);
+
   readonly #getGitHubEffect = Effect.fn("GitHubConnector.getGitHub")(function* <T>(
     this: GitHubConnectorService,
     url: string,
@@ -963,6 +983,7 @@ export class GitHubConnectorService {
       secret: () => this.#mcpProxySecret,
       userToken: () => this.accessToken(),
       botToken: (owner, name) => this.#botTokens.forRepository(owner, name),
+      installedOn: (owner, name) => this.#installedOn(owner, name),
     });
     const attempt5 = yield* Effect.gen({ self: this }, function* () {
       return yield* proxy.start(record?.mcpProxy?.port ?? null);
