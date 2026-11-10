@@ -86,6 +86,9 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "より大きなサーバー、{count} 人を超えるメンバー、そのほかのご要望にも対応します。エンタープライズサポート付きです。",
   "sitePage.pricing.enterprise.contact": "営業に問い合わせる",
+  "sitePage.pricing.consent.statement": "{policy}、{terms}に同意します。",
+  "sitePage.pricing.consent.policy": "プライバシーポリシー",
+  "sitePage.pricing.consent.terms": "利用規約および撤回権",
   "sitePage.marketplace.agents.title": "エージェント — OpenBot マーケットプレイス",
   "sitePage.marketplace.agents.description":
     "OpenBot でほかの人が作ったエージェントです。スキルやルーティンと一緒に OpenBot に追加できます。",

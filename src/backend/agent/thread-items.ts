@@ -28,7 +28,7 @@ import {
   reasoningText,
   type ThreadItem,
 } from "../protocol";
-import { isImageTooSmallDiagnostic } from "./provider-diagnostics";
+import { isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
 import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
@@ -144,6 +144,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
   if (isImageTooSmallDiagnostic(message))
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
+  if (isImageTooLargeDiagnostic(message))
+    return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");

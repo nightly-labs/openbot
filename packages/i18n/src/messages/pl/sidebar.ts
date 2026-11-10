@@ -71,6 +71,8 @@ export const messages = {
   "sidebar.agentMenu.edit": "Edytuj agenta",
   "sidebar.agentMenu.duplicate": "Duplikuj agenta",
   "sidebar.agentMenu.duplicating": "Duplikowanie…",
+  "sidebar.agentMenu.markRead": "Oznacz jako przeczytane",
+  "sidebar.agentMenu.markUnread": "Oznacz jako nieprzeczytane",
   "sidebar.agentMenu.delete": "Usuń agenta",
   "sidebar.agentMenu.hide": "Ukryj agenta",
   "sidebar.agentMenu.restore": "Przywróć",
