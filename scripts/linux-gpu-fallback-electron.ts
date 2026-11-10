@@ -1,5 +1,5 @@
 // Electron side of `scripts/linux-gpu-fallback-e2e.ts`. It starts the GPU mode as `src/main/index.ts`
-// does and opens a window with a blurred backdrop.
+// does and opens a window with a blurred backdrop. It reports whether the page gets a WebGL context.
 // It writes the state to `--ready-file` when the page has loaded. A "quit" line or the end of stdin
 // quits the app, so the app also quits when the test stops.
 import { writeFileSync } from "node:fs";
@@ -39,6 +39,9 @@ void app.whenReady().then(async () => {
         "<div style='margin:40px;height:200px;backdrop-filter:blur(24px)'>GPU fallback</div></body>",
     )}`,
   );
+  const webgl: boolean = await window.webContents.executeJavaScript(
+    "Boolean(document.createElement('canvas').getContext('webgl'))",
+  );
   writeFileSync(
     argument("ready-file"),
     JSON.stringify({
@@ -46,6 +49,7 @@ void app.whenReady().then(async () => {
       mode,
       hardwareAccelerationEnabled: app.isHardwareAccelerationEnabled(),
       gpuCompositing: app.getGPUFeatureStatus().gpu_compositing,
+      webgl,
     }),
   );
   process.stdin.setEncoding("utf8");

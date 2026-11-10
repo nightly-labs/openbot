@@ -6,7 +6,8 @@
 // 4. A start that is killed before it is confirmed makes the next start use software rendering. A quit
 //    that starts confirms the start, also when the teardown is killed before it ends.
 // 5. `OPENBOT_DISABLE_GPU=1` uses software rendering and writes no start file.
-// 6. A server uses software rendering and writes no start file, also with `OPENBOT_DISABLE_GPU=0`.
+// 6. A server composites on the CPU, has WebGL (#6404), and writes no start file, also with
+//    `OPENBOT_DISABLE_GPU=0`.
 //
 // Run on a Linux desktop with a working GPU: bun scripts/linux-gpu-fallback-e2e.ts
 // It writes .openbot-build/linux-gpu-fallback-e2e/report.json and exits non-zero on a failure.
@@ -44,6 +45,7 @@ interface ReadyLine {
   mode: { hardwareAcceleration: boolean; reason: string };
   hardwareAccelerationEnabled: boolean;
   gpuCompositing: string;
+  webgl: boolean;
 }
 
 interface Step {
@@ -148,11 +150,13 @@ try {
   steps.push({ step: "OPENBOT_DISABLE_GPU=1", ready: launch.ready });
   await quit(launch);
 
-  // 6. A server has no GPU: software rendering, and the environment value does not change it.
+  // 6. A server has no GPU: it composites on the CPU, and the environment value does not change it.
+  //    It keeps WebGL on SwiftShader for the sites that its agents open.
   const server = join(root, "server");
   launch = await start(server, 1_000, { OPENBOT_DISABLE_GPU: "0" }, ["--server"]);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "server" });
-  assert.equal(launch.ready.hardwareAccelerationEnabled, false);
+  assert.equal(launch.ready.gpuCompositing.startsWith("enabled"), false, "a server composites on the CPU");
+  assert.equal(launch.ready.webgl, true, "a server page gets a WebGL context");
   assert.equal(existsSync(join(server, GPU_START_FILE)), false, "a server writes no start file");
   steps.push({ step: "server", ready: launch.ready });
   await quit(launch);

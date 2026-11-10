@@ -13,7 +13,9 @@
 // patch release keeps the Chromium major version, so it does not make a failing computer stop again.
 // `OPENBOT_DISABLE_GPU=1` always uses software rendering. `OPENBOT_DISABLE_GPU=0` always uses the GPU.
 // A server (`OPENBOT_SERVER=1` or a hosted server) runs under a virtual display with no GPU, so it
-// always uses software rendering. The renderer sandbox stays on in all cases.
+// always composites on the CPU. It keeps the GPU process for WebGL on SwiftShader (#6404): the
+// browser of its agents opens sites such as the Figma editor, which stop without WebGL.
+// The renderer sandbox stays on in all cases.
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -111,6 +113,13 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     unfinishedStart: process.platform === "linux" ? readGpuFailure(startPath) : undefined,
   });
   if (mode.reason === "not-linux") return mode;
+  if (mode.reason === "server") {
+    // `disableHardwareAcceleration()` also turns off WebGL, and Chromium has no automatic SwiftShader
+    // WebGL fallback. Compositing, raster, 2D canvas and video stay on the CPU, as with that call.
+    app.commandLine.appendSwitch("disable-gpu-compositing");
+    app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+    return mode;
+  }
   if (!mode.hardwareAcceleration) {
     app.disableHardwareAcceleration();
     // A second instance can read the start file of a first instance that is still new.
