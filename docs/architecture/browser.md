@@ -187,8 +187,9 @@ which the page script cannot see, and its host element is as wide as the form. W
 finds a Turnstile response field without a token, the main process finds the frame through CDP:
 `DOM.getFrameOwner` for each child frame, also for frames in other processes, then the frame's
 `src` and its box from `DOM.getBoxModel`. A field without a visible frame (invisible mode) is not a
-check. The first read of a document that needs a person
-then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
+check. A Turnstile widget often passes by itself in 1 to 2 seconds, and an early click can look like
+a bot, so the read that would offer its checkbox first waits up to 3 seconds for a token. The first
+read of a document that still needs a person then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
 ordinary `click` tool, so ownership, user control and the cursor stay the same. The next read of
 that document waits up to 6 seconds for the check to pass; a visible image puzzle or a block ends the
 wait at once, because only a person solves a puzzle. Later reads of the document ask for a person

@@ -7,6 +7,7 @@ import {
   CHALLENGE_WAIT_MS,
   type DetectedChallenge,
   describeChallenge,
+  TURNSTILE_SELF_PASS_MS,
 } from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
@@ -257,6 +258,10 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
     clickOffer.waited = true;
     yield* waitWhile((challenge) => challenge.kind !== "block" && !challenge.puzzle, CHALLENGE_CLICK_WAIT_MS);
   }
+  // A Turnstile widget often passes by itself. The read that would offer its checkbox waits for that
+  // first; the offer then makes later reads of the document skip this wait.
+  if (!clickOffer && current.result.challenge?.vendor === "turnstile" && current.result.challenge.checkbox)
+    yield* waitWhile((challenge) => challenge.vendor === "turnstile" && !challenge.puzzle, TURNSTILE_SELF_PASS_MS);
   const { result, cursor } = current;
   if (waitedVendor !== null && result.challenge?.kind === "non-interactive") {
     const waitedMs = Date.now() - waitStarted + (tab.documents === waitDocument ? priorWaitMs : 0);

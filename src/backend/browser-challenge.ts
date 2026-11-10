@@ -21,6 +21,13 @@ export const CHALLENGE_POLL_MS = 1_000;
 /** How long the read after a checkbox offer waits for the check to pass. */
 export const CHALLENGE_CLICK_WAIT_MS = 6_000;
 
+/**
+ * How long the first read of a document waits for a Turnstile widget to pass by itself before it
+ * offers the checkbox. Most widgets pass without a click in 1 to 2 seconds, and a click before that
+ * can look like a bot to the site.
+ */
+export const TURNSTILE_SELF_PASS_MS = 3_000;
+
 /** The check reads the DOM only. A slow page must not hold the snapshot. */
 const CHECK_TIMEOUT_MS = 1_000;
 

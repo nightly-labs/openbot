@@ -495,6 +495,13 @@ async function main(): Promise<void> {
       `The clicked checkbox in a closed shadow root did not pass the check: ${shadowPassed.page.challenge?.status}`,
     );
     recordCases("challenge-click-in-closed-shadow-root");
+    const selfPass = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/self-passing-turnstile` });
+    assert(
+      selfPass.page.challenge === undefined || selfPass.page.challenge.status === "cleared",
+      `A Turnstile that passes by itself offered its click: ${selfPass.page.challenge?.status}`,
+    );
+    measurements.selfPassingTurnstileMs = selfPass.ms;
+    recordCases("turnstile-passes-without-click");
     const stuckOffer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-checkbox-captcha` });
     assert.equal(stuckOffer.page.challenge?.status, "click-once");
     await call("click", { tabId: settleTab.id, target: offerSchema.parse(stuckOffer.raw).challenge.target });
@@ -690,6 +697,7 @@ const PAGES: Record<string, string> = {
   "/checkbox-captcha": checkboxCaptchaPage(true),
   "/stuck-checkbox-captcha": checkboxCaptchaPage(false),
   "/shadow-checkbox-captcha": checkboxCaptchaPage(true, true),
+  "/self-passing-turnstile": checkboxCaptchaPage(false, false, true),
   // A click anywhere in the widget tells the page; the fixture page decides whether the check passes.
   "/challenges.cloudflare.com/turnstile": `<!doctype html><meta charset="utf-8">
     <body style="margin:0"><label style="display:block;height:65px;padding-left:16px">
@@ -703,8 +711,9 @@ const PAGES: Record<string, string> = {
     <script>document.querySelector("dialog").showModal();</script>`,
 };
 
-// Turnstile puts its frame in a closed shadow root, so only CDP finds it.
-function checkboxCaptchaPage(passes: boolean, shadow = false): string {
+// Turnstile puts its frame in a closed shadow root, so only CDP finds it. A widget that passes by
+// itself gets its token without a click.
+function checkboxCaptchaPage(passes: boolean, shadow = false, selfPass = false): string {
   const frame = `<iframe src="/challenges.cloudflare.com/turnstile" style="width:300px;height:65px;border:0"></iframe>`;
   return `<!doctype html><meta charset="utf-8"><title>Security check</title>
     <p>Verify you are human to continue.</p>
@@ -712,6 +721,8 @@ function checkboxCaptchaPage(passes: boolean, shadow = false): string {
     <input type="hidden" name="cf-turnstile-response" value=""></div></form>
     <script>
       if (${shadow}) document.querySelector("#widget").attachShadow({ mode: "closed" }).innerHTML = ${JSON.stringify(frame)};
+      if (${selfPass})
+        setTimeout(() => (document.querySelector("[name=cf-turnstile-response]").value = "fixture-token"), 1500);
       addEventListener("message", (event) => {
         if (${passes} && event.data === "turnstile-click")
           document.querySelector("[name=cf-turnstile-response]").value = "fixture-token";
