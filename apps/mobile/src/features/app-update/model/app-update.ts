@@ -39,8 +39,9 @@ const NOTES_STALE_MS = 10 * 60_000;
 const key = "openbot.mobile.appUpdate.dismissed.v1";
 
 // `expo-updates` asks the update server only at a cold start, and a phone can keep the app in memory
-// for days. So the app asks again when it comes back to the foreground, at most this often.
-const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
+// for days. So the app asks again when it comes back to the foreground. The interval only stops a
+// burst of requests when the user changes apps fast: a fix or a rollback must not wait for a restart.
+const UPDATE_CHECK_INTERVAL_MS = 60_000;
 // The cold start of this process asked already.
 let lastUpdateCheck = Date.now();
 let updateCheckRuns = false;
@@ -89,6 +90,28 @@ export async function dismissAppUpdate(update: AppUpdate): Promise<void> {
   await SecureStore.setItemAsync(key, update.id);
 }
 
+let rollbackFetched = false;
+
+/**
+ * Marks a rollback that the cold start found as ready. At a cold start, `expo-updates` takes the
+ * instruction to go back to the bundle of the binary and uses it at the next start, but on Android
+ * it reports no pending update, so the header did not show. Only a fetch that the app starts reports
+ * the rollback as pending, on both platforms. It runs one time in each process.
+ */
+async function fetchRollback(): Promise<void> {
+  if (__DEV__ || !Updates.isEnabled || Updates.isEmbeddedLaunch || rollbackFetched) return;
+  rollbackFetched = true;
+  try {
+    await Updates.fetchUpdateAsync();
+  } catch (error) {
+    supportLog.add(
+      "warn",
+      "app",
+      `The rollback fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 /**
  * The ID of a downloaded bundle. A rollback has no bundle of its own: it sends the app back to the
  * bundle of its binary, and the restart installs that in the same way.
@@ -108,7 +131,8 @@ export function useAppUpdate(): AppUpdate | null {
   const { session } = useMobileSession();
   const apiUrl = session?.apiUrl ?? null;
   const latest = useLatestAppVersion(apiUrl ?? "");
-  const { isUpdatePending, downloadedUpdate } = Updates.useUpdates();
+  const { isUpdatePending, downloadedUpdate, availableUpdate } = Updates.useUpdates();
+  const rollbackWaits = availableUpdate?.type === Updates.UpdateInfoType.ROLLBACK && !isUpdatePending;
   const dismissed = useDismissedAppUpdate((state) => (state.ready ? state.dismissed : undefined));
 
   useEffect(() => {
@@ -120,6 +144,9 @@ export function useAppUpdate(): AppUpdate | null {
     });
     return () => subscription.remove();
   }, []);
+  useEffect(() => {
+    if (rollbackWaits) void fetchRollback();
+  }, [rollbackWaits]);
   useEffect(() => {
     if (!apiUrl) return;
     void refreshMobileFeatures(apiUrl);

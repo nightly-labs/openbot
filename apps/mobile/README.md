@@ -670,6 +670,11 @@ that its store build accepts.
 - A phone does not go back to an older update. So a rollback publishes the earlier bundle again as a
   new update. With no earlier update, or with `--to-embedded`, the server sends a signed instruction
   to use the bundle in the binary. A second rollback always returns to the bundle in the binary.
+- A phone takes a rollback as it takes an update: the header comes, and **Update** restarts the app.
+  Without the tap, the next cold start uses the earlier bundle. At a cold start, `expo-updates` on
+  Android reports no pending update for a rollback, so the app fetches it again to show the header.
+- `mobile:ota:rollout` and `mobile:ota:rollback` work from each branch and from a checkout that is
+  not up to date. They run the workflow on `main`.
 - If an update stops at launch, `expo-updates` starts the bundle in the binary and reports the update
   as failed. The server does not send that update to that phone again.
 - A change reaches all phones after 30 seconds at the latest, which is the cache time of the server.
@@ -677,7 +682,7 @@ that its store build accepts.
 ### How a phone gets an update
 
 The app asks the server at a cold start, and again when it comes back to the foreground, at most
-one time in 15 minutes (`src/features/app-update/model/app-update.ts`). It downloads a new bundle in
+one time in a minute (`src/features/app-update/model/app-update.ts`). It downloads a new bundle in
 the background. The home header then shows **A new OpenBot is ready**, and **Update** restarts the
 app with the new bundle. Without the tap, the next cold start uses it. The bundle is about 25 MB;
 the server sends it compressed, and the phone downloads only the assets that it does not have.
@@ -751,7 +756,7 @@ of the first version that uses this server, and after a change to `updates` in `
 
 1. Install the build from TestFlight and from the Play internal track.
 2. Publish a small visible change with `--rollout 100`. Only the phones with this new build get it.
-3. Open the app, leave it and come back after 15 minutes, or close and open it two times. Confirm
+3. Open the app, leave it and come back after one minute, or close and open it two times. Confirm
    the home header, the restart, the change, and the update ID in **Settings → About**.
 4. Open a chat with a diagram, a PDF and an HTML page, to check the DOM components of the update.
 5. Run `bun run mobile:ota:rollback -- --platform all` and confirm that the change goes away.

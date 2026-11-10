@@ -678,13 +678,19 @@ async function commandDispatch(action: string | undefined, options: Options) {
   if (platform !== "ios" && platform !== "android" && platform !== "all") {
     throw new UsageError("Give --platform ios, android or all.");
   }
-  const branch = await git("branch", "--show-current");
-  if (branch !== "main" && !branch.startsWith("mobile-hotfix/")) {
-    throw new UsageError("Start an update from main or from a mobile-hotfix/ branch.");
-  }
-  const remote = (await git("ls-remote", "origin", `refs/heads/${branch}`)).split("\t")[0];
-  if (remote !== (await git("rev-parse", "HEAD"))) {
-    throw new UsageError(`origin/${branch} is not at this commit. Push first: the workflow runs the remote branch.`);
+  // A publish sends the code of the branch, so the remote branch must be this commit. A rollout
+  // change and a rollback use no code of a branch: they find the update from the store build tags.
+  // They always run on `main`, also from another branch or from a checkout that is not up to date.
+  let branch = "main";
+  if (action === "publish") {
+    branch = await git("branch", "--show-current");
+    if (branch !== "main" && !branch.startsWith("mobile-hotfix/")) {
+      throw new UsageError("Publish an update from main or from a mobile-hotfix/ branch.");
+    }
+    const remote = (await git("ls-remote", "origin", `refs/heads/${branch}`)).split("\t")[0];
+    if (remote !== (await git("rev-parse", "HEAD"))) {
+      throw new UsageError(`origin/${branch} is not at this commit. Push first: the workflow runs the remote branch.`);
+    }
   }
   const fields = [`action=${action}`, `platform=${platform}`, `channel=${channelOf(options)}`];
   if (action === "publish") {
@@ -699,7 +705,9 @@ async function commandDispatch(action: string | undefined, options: Options) {
   await run("gh", ["workflow", "run", WORKFLOW, "--ref", branch, ...fields.flatMap((field) => ["-f", field])], {
     cwd: ROOT,
   });
-  out(`Started the Mobile OTA update workflow for ${branch}. Follow it with: gh run list --workflow ${WORKFLOW}`);
+  out(
+    `Started the Mobile OTA update workflow (${action}) on ${branch}. Follow it with: gh run list --workflow ${WORKFLOW}`,
+  );
   return 0;
 }
 
