@@ -317,6 +317,8 @@ export const messages = {
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.imageTooSmall":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageTooLarge":
+    "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
   "error.provider.museMcpStartupFault":

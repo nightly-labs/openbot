@@ -264,6 +264,8 @@ export const messages = {
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageTooLarge":
+    "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
   "error.provider.museMcpStartupFault":

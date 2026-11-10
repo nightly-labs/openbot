@@ -276,6 +276,8 @@ export const messages = {
     "{provider} לא קיבל את החשיבה הקודמת בצ'אט הזה, כי חשבון או מפתח API אחר קיבל אותה. OpenBot התחיל סשן חדש של {provider} עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.imageTooSmall":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageTooLarge":
+    "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.museMcpStartupFault":
