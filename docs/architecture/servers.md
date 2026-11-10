@@ -764,7 +764,7 @@ at each review. Server settings → General → Agents → Skill learning sets i
 (`hostAdmin.setSkillLearning`, local handler) and for a joined server.
 
 `browsing-memory-v1` reads and sets "Learn from my browsing" (`openbot-browsing-memory-v1.json`,
-`{ enabled }`, off by default) at `GET /v1/admin/host/browsing-memory` and
+`{ enabled }`, off by default) at `POST /v1/admin/host/browsing-memory` and
 `POST /v1/admin/host/browsing-memory/update` (owner or admin). While it is on, the host records the
 pages and the controls that a person uses in an agent tab that they hold, and the next memory review
 of that agent reads them (see [browser.md](browser.md)). Turning it off deletes the recorded steps.

@@ -34,6 +34,7 @@ const capturePage = `<!doctype html><meta charset="utf-8"><title>Capture</title>
 <label style="position:absolute;top:110px;left:10px">Email <input style="position:static" value="typed-fixture@example.com"></label>
 <p style="top:160px">Plain page text</p>
 <button style="top:210px">Marker</button>
+<label style="position:absolute;top:260px;left:10px">Remember me <input style="position:static" type="checkbox" value="checkbox-value-fixture"></label>
 <script>window.presses = 0; addEventListener("mousedown", () => { window.presses += 1; }, true);</script>`;
 
 // `/slow` never answers, so only a stop ends its load.
@@ -465,13 +466,30 @@ async function main(): Promise<void> {
       const marker = nextClick();
       await press(225);
       assert.equal((await marker).name, "Marker");
+      // A checkbox value is a field value: the step keeps the label.
+      const checkbox = nextClick();
+      await press(275, 150);
+      assert.deepEqual(await checkbox, {
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/capture",
+        role: "checkbox",
+        name: "Remember me",
+      });
       assert.deepEqual(
         captured.filter((item) => item.step.kind === "click").map((item) => item.step.name),
-        [...clicks.map((item) => item.step.name), "Proceed to checkout", "Email", "Marker"],
+        [...clicks.map((item) => item.step.name), "Proceed to checkout", "Email", "Marker", "Remember me"],
         "A password field or page text was recorded.",
       );
       const stored = JSON.stringify(captured);
-      for (const secret of ["QUERY-SECRET", "hunter2-fixture", "typed-fixture", "Plain page text", "#part"])
+      for (const secret of [
+        "QUERY-SECRET",
+        "hunter2-fixture",
+        "typed-fixture",
+        "checkbox-value-fixture",
+        "Plain page text",
+        "#part",
+      ])
         assert(!stored.includes(secret), `A step kept ${secret}.`);
       recordCases("capture-skips-password-and-text", "capture-keeps-field-label-not-value");
 

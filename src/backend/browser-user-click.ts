@@ -29,11 +29,13 @@ const clickScript = (x: number, y: number) => `(() => {
   const labelled = text((target.getAttribute("aria-labelledby") || "").split(/\\s+/).map((id) => document.getElementById(id)?.textContent || "").join(" "));
   const editable = target.isContentEditable || tag === "textarea" || (tag === "input" && !["checkbox", "radio", "button", "submit", "reset", "image", "range"].includes(type)) || tag === "select";
   const fieldLabel = () => text([...(target.labels || [])].map((label) => label.textContent).join(" ")) || text(target.getAttribute("placeholder"));
+  // Only a button input shows its value as its name. A checkbox, a radio or a slider value is a field value.
+  const valueNamed = tag === "input" && ["button", "submit", "reset"].includes(type);
   const name =
     text(target.getAttribute("aria-label")) ||
     labelled ||
-    (editable ? fieldLabel() : "") ||
-    (!editable && tag === "input" ? text(target.value) : "") ||
+    (editable || (tag === "input" && !valueNamed) ? fieldLabel() : "") ||
+    (valueNamed ? text(target.value) : "") ||
     (!editable && textRoles.includes(role) ? text(target.innerText) : "") ||
     text(target.getAttribute("title")) ||
     text(target.getAttribute("alt"));

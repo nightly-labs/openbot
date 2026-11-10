@@ -1250,7 +1250,7 @@ try {
     return { reviews: reviews().length };
   });
 
-  await check("a review adds a site memory, keeps a fact whose site is bad, and shows each site", async () => {
+  await check("a review adds a site memory, keeps a fact whose site is bad or null, and shows each site", async () => {
     const browsing = await createAgent("Browsing");
     const count = reviews().length;
     control({
@@ -1262,6 +1262,8 @@ try {
           site: "https://www.Example.com/login",
         },
         { type: "add", text: "The status page lists outages first.", inclusion: "searchable", site: "not a host" },
+        // A model can write null for a general memory.
+        { type: "add", text: "Reports are due on Fridays.", inclusion: "searchable", site: null },
       ],
     });
     await send(
@@ -1272,11 +1274,12 @@ try {
     await reviewed(count + 1);
     const memories = await waitFor("the memories of the review", () => {
       const list = service.listMemories(browsing.id);
-      return list.length === 3 ? list : null;
+      return list.length === 4 ? list : null;
     });
     const site = (text: string) => memories.find((memory) => memory.text === text)?.site;
     assert.equal(site("Example login: the Continue button is below the cookie banner."), "example.com");
     assert.equal(site("The status page lists outages first."), undefined, "A bad site is dropped, not the fact.");
+    assert.equal(site("Reports are due on Fridays."), undefined, "A null site makes a general memory.");
     assert.equal(site("Docs search is in the top bar."), "docs.example.org", "The agent's own save keeps its site.");
     assert.ok((reviews().at(-1) ?? "").includes('"site":"docs.example.org"'), "The review shows the site.");
     control({ operations: [] });

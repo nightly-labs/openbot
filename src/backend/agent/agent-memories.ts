@@ -824,7 +824,7 @@ function addChanges(
 }
 
 /** The site of a review change, when it is a host: a review keeps a fact whose site it wrote badly. */
-function reviewSite(site: string | undefined): { site?: string } {
+function reviewSite(site: string | null | undefined): { site?: string } {
   const normalized = site ? normalizeMemorySite(site) : null;
   return normalized ? { site: normalized } : {};
 }

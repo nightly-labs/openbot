@@ -23,8 +23,11 @@ const MEMORY_REVIEW_SEARCHABLE_CHARACTERS = 12_000;
 
 const MemoryText = Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(INPUT_LIMITS.agentMemoryText));
 const MemoryId = Schema.NonEmptyString.check(Schema.isMaxLength(INPUT_LIMITS.identifier));
-/** A host or a URL, as `openbot.remember` takes it. The apply step drops one that is not a host. */
-const MemorySite = Schema.optional(Schema.String.check(Schema.isMaxLength(2048)));
+/**
+ * A host or a URL, as `openbot.remember` takes it. The apply step drops one that is not a host. A model
+ * can write null for "no site", next to the null of "skill".
+ */
+const MemorySite = Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(2048))));
 
 const MemoryReviewOperationSchema = Schema.Union([
   Schema.Struct({
