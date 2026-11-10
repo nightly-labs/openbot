@@ -1,0 +1,43 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/computerUse";
+
+export const messages = {
+  // Cài đặt Computer Use, cửa sổ xin quyền và vùng làm nổi bật cửa sổ.
+  "computerUse.permission.screenRecording.title": "Ghi hình màn hình",
+  "computerUse.permission.screenRecording.description": "Cho phép OpenBot nhìn thấy cửa sổ ứng dụng.",
+  "computerUse.permission.screenRecording.pane": "Screen & System Audio Recording",
+  "computerUse.permission.accessibility.title": "Accessibility",
+  "computerUse.permission.accessibility.description": "Cho phép OpenBot bấm chuột và gõ phím.",
+  "computerUse.permission.accessibility.pane": "Accessibility",
+  "computerUse.error.check": "OpenBot không thể kiểm tra Computer Use.",
+  "computerUse.error.openSettings": "OpenBot không thể mở System Settings.",
+  "computerUse.error.startDriver": "OpenBot không thể khởi động Computer Use driver.",
+  "computerUse.checkAgain": "Kiểm tra lại",
+  "computerUse.checking": "Đang kiểm tra Computer Use",
+  "computerUse.unavailable.title": "Computer Use chưa khả dụng",
+  "computerUse.permissions.title": "Quyền hệ thống",
+  "computerUse.permissions.description": "Quyền do macOS quản lý.",
+  "computerUse.ready.title": "Computer Use đã sẵn sàng",
+  "computerUse.ready.description":
+    "OpenBot có thể nhìn thấy và tương tác với ứng dụng trên máy tính này. Hệ thống này không cần quyền bổ sung.",
+  "computerUse.openSettingsFailed.title": "Không mở được System Settings",
+  "computerUse.compact.title": "Bật Computer Use",
+  "computerUse.compact.description": "Cho phép OpenBot nhìn thấy và tương tác với ứng dụng trên máy tính này.",
+  "computerUse.granted": "Đã cấp quyền",
+  "computerUse.opening": "Đang mở…",
+  "computerUse.manage": "Quản lý",
+  "computerUse.grant": "Cấp quyền",
+  "computerUse.manageLabel": "Quản lý {permission}",
+  "computerUse.grantLabel": "Cấp quyền {permission}",
+  "computerUse.help.title": "Bật {permission}",
+  "computerUse.help.paneOpen": "System Settings đang mở ở {pane}.",
+  "computerUse.help.dragLabel": "Kéo {name} vào System Settings, hoặc bấm để hiển thị trong Finder",
+  "computerUse.help.dragToAdd": "Kéo để thêm",
+  "computerUse.help.findInList": "Tìm {name} trong danh sách.",
+  "computerUse.help.dragIntoList": "Kéo {name}.app vào danh sách.",
+  "computerUse.help.turnOn": "Bật công tắc.",
+  "computerUse.help.showInFinder": "Hiển thị trong Finder",
+  "computerUse.help.revealFailed": "Ứng dụng không thể hiển thị trong Finder.",
+  "computerUse.help.dragFailed": "Ứng dụng không thể kéo đi.",
+  "computerUse.highlight.working": "OpenBot đang làm việc trong {title}",
+} as const satisfies PartialTranslation<typeof source>;

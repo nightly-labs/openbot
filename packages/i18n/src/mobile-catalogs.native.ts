@@ -64,6 +64,10 @@ export function mobileCatalog(locale: TranslatedLocale): PartialTranslation<AppM
       const catalog: typeof import("./messages/tr/mobile") = require("./messages/tr/mobile");
       return catalog.trMobile;
     }
+    case "vi": {
+      const catalog: typeof import("./messages/vi/mobile") = require("./messages/vi/mobile");
+      return catalog.viMobile;
+    }
     case "zh": {
       const catalog: typeof import("./messages/zh/mobile") = require("./messages/zh/mobile");
       return catalog.zhMobile;

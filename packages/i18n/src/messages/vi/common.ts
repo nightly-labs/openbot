@@ -1,0 +1,30 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/common";
+
+export const messages = {
+  "common.cancel": "Hủy",
+  "common.save": "Lưu",
+  "common.close": "Đóng",
+  "common.delete": "Xóa",
+  "common.remove": "Gỡ bỏ",
+  "common.edit": "Sửa",
+  "common.rename": "Đổi tên",
+  "common.retry": "Thử lại",
+  "common.copy": "Sao chép",
+  "common.copied": "Đã sao chép",
+  "common.done": "Xong",
+  "common.back": "Quay lại",
+  "common.continue": "Tiếp tục",
+  "common.add": "Thêm",
+  "common.create": "Tạo",
+  "common.open": "Mở",
+  "common.search": "Tìm kiếm",
+  "common.noMatches": "Không có kết quả",
+  "common.loading": "Đang tải…",
+  "common.saving": "Đang lưu…",
+  "common.tryAgain": "Thử lại",
+  "common.connecting": "Đang kết nối…",
+  "common.download": "Tải xuống",
+  "common.removing": "Đang gỡ bỏ…",
+  "common.sending": "Đang gửi…",
+} as const satisfies PartialTranslation<typeof source>;
