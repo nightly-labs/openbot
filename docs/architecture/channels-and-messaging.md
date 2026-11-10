@@ -197,9 +197,9 @@ returns idle gives it to the mentioned members, as a person who is named in a gr
 An existing task that routing selects keeps its instruction, and the new message is its follow-up.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
 visible and the user can correct it. Deterministic selection adds no message, and a lead that selects
-only itself adds none: its reply shows who answers. A routing answer that does not decode pauses the
-task with `channelRoutingUnreadable` and offers Reassign. The log gets the answer length and its
-field names only, not its text.
+only itself adds none: its reply shows who answers. A routing answer that does not decode goes to the
+lead, as an unclear request does. The log gets the answer length and its field names only, not its
+text.
 
 A message that opens with agent mentions ("@A @B what do you think?") goes to each mentioned member
 that can take work, with no routing turn. A quote tag before or between the mentions does not end
