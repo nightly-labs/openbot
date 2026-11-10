@@ -18,6 +18,7 @@ import {
   recordingSummary,
   releaseSpeech,
   resumeSpeech,
+  type SpeechAgent,
   type SpeechSource,
   seekSpeech,
   setUpcomingReading,
@@ -58,8 +59,7 @@ interface DictatedMessage {
 /** What started a reading: a voice conversation, its progress updates, a dictated message, or the Read aloud control. */
 type SpeechTrigger = "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
 
-/** An agent on one server. Agent ids repeat across servers. */
-export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
+export type { SpeechAgent };
 
 function agentKey(agent: SpeechAgent): string {
   return `${agent.serverId}\n${agent.agentId}`;

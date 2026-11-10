@@ -152,6 +152,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let heldReplyEnded = false;
   /** The words of the turn that waits for its reply, to show again when the reply goes on. */
   let sentHeard = "";
+  /** The generation of the send whose reply the pane waits for. A hold that ends with no words keeps it. */
+  let waitingSend = 0;
   const startedAt = performance.now();
   /** The turns that were sent to the chat. */
   let sentTurns = 0;
@@ -325,12 +327,14 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   /** The turn had words, so the user spoke over the agent: its reply stops. */
   function interruptByVoice(): void {
-    desktopAnalytics.track("voice_conversation_action", {
-      action: "interrupt",
-      server_kind: serverKind,
-      result: "succeeded",
-      trigger: "voice",
-    });
+    // A reply that ended while the user spoke was not interrupted.
+    if (!heldReplyEnded)
+      desktopAnalytics.track("voice_conversation_action", {
+        action: "interrupt",
+        server_kind: serverKind,
+        result: "succeeded",
+        trigger: "voice",
+      });
     dropReply();
   }
 
@@ -598,11 +602,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       discardRecording(recordingId);
       return;
     }
+    waitingSend = own;
     noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
     // A send can fail after it is queued, so the wait for the reply ends there too.
     // A later failure, after a Retry, belongs to a turn that is over.
     const notSent = () => {
-      if (disposed || own !== generation || step !== "waiting") return;
+      if (disposed || own !== waitingSend || step !== "waiting") return;
       forgetDictatedMessage(target);
       void listen();
       setState((draft) => {

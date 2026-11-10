@@ -62,7 +62,7 @@ const SPOKEN_AUDIO_SECONDS = 3 * 60;
 const DECODED_RECORDING_LIMIT = 4;
 
 /** An agent on one server. Agent ids repeat across servers. */
-type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
+export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
 
 /** One text that is read aloud. Stopping it ends the part that plays and skips the rest. */
 interface Reading {
