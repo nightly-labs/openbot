@@ -1076,7 +1076,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("antigravity"),
         // A saved key has no plan quota.
-        readRateLimits: (_connection, _privatePrompt, model) =>
+        readRateLimits: (_connection, model) =>
           context.apiKey("antigravity") && !context.accountEnvironment
             ? Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null })
             : readAntigravityQuota({

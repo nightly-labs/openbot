@@ -49,8 +49,9 @@ function acpArgv(argv: AcpArgv, env: Readonly<Record<string, string | undefined>
  *
  * The server opens the page with the `open` or `xdg-open` command that it finds on `PATH`, and OpenBot
  * puts its own command first. On Windows, the server starts `rundll32` with the page as an argument,
- * and a batch file cannot take that address safely, so a sign-in at this computer lets the server
- * open the page itself. `onHost`: the user is at another device, and the page must not open here.
+ * by its absolute path, so a sign-in at this computer lets the server open the page itself.
+ * `onHost`: the user is at another device, and the page must not open here. On Windows that
+ * sign-in is refused (`startAcpAuthentication`).
  */
 export function googleSignInByOpenBot(onHost: boolean): boolean {
   return onHost || process.platform !== "win32";
@@ -94,21 +95,26 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   /**
    * Gemini gives its Google page to OpenBot's `open` command instead of a browser, and OpenBot opens
    * it, so a launch that fails shows an error. When the server opened it itself, a failure showed
-   * nothing (#3520). Without it, or on Windows, the server opens the page itself
-   * (`googleSignInByOpenBot`).
+   * nothing (#3520). Without it, the server opens the page itself (`googleSignInByOpenBot`). On
+   * Windows the call fails at once: the server opens the page here, and OpenBot cannot catch it.
    */
   openGoogleSignIn?: (url: string) => Promise<void>;
   /** A temporary folder of its own for the process (`provider-temp.ts`). */
   privateTemp?: ProviderTempOptions | undefined;
 }) {
+  // A Windows CLI opens the page on this computer, so a user at another device cannot sign in. The
+  // refusal comes before the process starts, so a Reconnect does not sign the account out first.
+  if (options.openGoogleSignIn && process.platform === "win32")
+    return yield* providerFailure(
+      new ProviderSignInError({ message: sourceText("error.provider.antigravityRemoteWindowsSignIn") }),
+    );
   const env = { ...process.env, ...options.env };
-  const opener =
-    options.openGoogleSignIn && process.platform !== "win32"
-      ? yield* Effect.acquireRelease(
-          Effect.tryPromise({ try: () => makeOpenerFolder(), catch: providerFailure }),
-          (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true })),
-        )
-      : null;
+  const opener = options.openGoogleSignIn
+    ? yield* Effect.acquireRelease(
+        Effect.tryPromise({ try: () => makeOpenerFolder(), catch: providerFailure }),
+        (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true })),
+      )
+    : null;
   // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
   const target = cliSpawnTarget(options.executable, acpArgv(options.argv, env));
   const child = yield* Effect.acquireRelease(

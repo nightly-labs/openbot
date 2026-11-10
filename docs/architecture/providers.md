@@ -783,8 +783,9 @@ page, registers it as a secret, and opens it in the desktop browser or in the ho
 failed browser launch gives an actionable error; the OAuth link and browser error details are not
 logged. On Windows the CLI runs `C:\Windows\System32\rundll32.exe url.dll,FileProtocolHandler` by its
 absolute path, so a folder on `PATH` cannot catch the link. There OpenBot makes no opener folder
-(`googleSignInByOpenBot`): the page opens from the CLI itself, and a remote host cannot relay it, as
-with 1.4.5 (#4521). The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
+(`googleSignInByOpenBot`): the page opens from the CLI itself. A remote host cannot relay it, as
+with 1.4.5 (#4521), so OpenBot refuses a sign-in from another device before the process starts, and
+a Reconnect does not sign the account out. The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
 So a Reconnect of a connected Google sign-in, with no saved key, first calls ACP `logout`, which
 `initialize` advertises in `agentCapabilities.auth.logout`. `logout` deletes `antigravity-oauth-token`
 and `cache/acp-auth-state.json` only: it does not revoke the token at Google, and a copy of the old

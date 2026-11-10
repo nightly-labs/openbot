@@ -477,11 +477,6 @@ export interface AcpProviderOptions {
    */
   savedKeyRefusedMessage?: () => string | null;
   /**
-   * The stderr line of a server that starts an interactive sign-in by itself when its token is not
-   * valid. The account check then reports sign-in required at once and does not wait for the user.
-   */
-  interactiveSignInPrompt?: RegExp;
-  /**
    * Reads optional identity fields that ACP does not define. A provider extension failing must not
    * turn a working authenticated process into a signed-out one, so account/read falls back to null
    * fields when this hook cannot answer.
@@ -490,13 +485,11 @@ export interface AcpProviderOptions {
     connection: ClientSideConnection,
   ): Effect.Effect<Partial<AcpProviderAccount>, ProviderClientOperationError>;
   /**
-   * Reads the account's plan usage. `privatePrompt` sends one prompt in a session that no thread
-   * owns and returns the answer text, for an agent that reports usage through a slash command.
-   * `model` is the model whose limit the caller checks, or null for the account's own reading.
+   * Reads the account's plan usage. `model` is the model whose limit the caller checks, or null for
+   * the account's own reading.
    */
   readRateLimits?(
     connection: ClientSideConnection,
-    privatePrompt: (text: string) => Effect.Effect<string, ProviderClientOperationError>,
     model: string | null,
   ): Effect.Effect<AccountRateLimitsReadResult, ProviderClientOperationError>;
   /**
@@ -586,7 +579,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Prompts that are being prepared, by session. A background replay waits until none is. */
   readonly #openingTurns = new Map<string, number>();
   /**
-   * The session of `#privatePrompt`, kept for the process: no thread or transcript sees it, and each
+   * The session of `readUsageText`, kept for the process: no thread or transcript sees it, and each
    * new Antigravity session leaves a conversation database of its own on disk, also after it closes.
    */
   #privateSession: { connection: ClientSideConnection; sessionId: string } | null = null;
@@ -608,8 +601,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #subagentThreads = new Map<string, string>();
   /** OpenCode subagent calls whose child session did not start yet. */
   readonly #openCodeLaunches: OpenCodeLaunches = new Map();
-  /** Settles when the server asks for an interactive sign-in while `initialize` checks the account. */
-  #signInPrompt: Deferred.Deferred<void> | null = null;
 
   constructor(
     cli: AgentCliInfo,
@@ -651,19 +642,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       privateTemp: this.options.privateTemp,
       label: () => this.#label,
       redact: (text) => this.#redact(text),
-      privateDiagnostic: this.options.interactiveSignInPrompt,
       diagnostic: (message, origin) => {
-        // The prompt carries OAuth state, so it is not a diagnostic. Only an explicit sign-in opens it.
-        if (this.options.interactiveSignInPrompt?.test(message)) {
-          if (this.#signInPrompt) Deferred.doneUnsafe(this.#signInPrompt, Exit.void);
-          else {
-            // The token stopped being valid after the account check, and the server now waits five
-            // minutes for a browser that does not open. The process ends, so its request fails now.
-            this.#signedIn = false;
-            this.emit("exit", new Error(this.options.signInMessage));
-          }
-          return;
-        }
         const failedSession = this.options.flavor.sdkHarness?.failedSession(message);
         const failedTurn = failedSession ? this.#threads.get(failedSession)?.activeTurn : undefined;
         if (failedTurn && failedTurn.sdkFailureAt === null) failedTurn.sdkFailureAt = failedTurn.text.length;
@@ -990,10 +969,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#redact(answer).trim() || null;
   });
 
-  #privatePrompt(text: string): Effect.Effect<string, ProviderClientOperationError> {
-    return this.#privatePromptLock.withPermit(this.#privatePromptOnce(text));
-  }
-
   /**
    * A prompt that times out is cancelled and drops the session, because the agent may still be
    * answering it. An error answer keeps it: a new session would leave one more conversation database
@@ -1112,11 +1087,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         {
           const readRateLimits = this.options.readRateLimits;
           const response = readRateLimits
-            ? yield* readRateLimits(
-                this.#requireConnection(),
-                (text) => this.#privatePrompt(text),
-                getString(params, "model"),
-              ).pipe(
+            ? yield* readRateLimits(this.#requireConnection(), getString(params, "model")).pipe(
                 Effect.timeoutOrElse({
                   duration: timeoutMs ?? this.#requestTimeoutMs,
                   orElse: () =>
@@ -1347,8 +1318,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#startTimeoutMs = timeoutMs;
     this.#initialization = yield* this.#initializeConnection(connection).pipe(startTimeout);
     const initialization = this.#initialization;
-    const signInPrompt = Deferred.makeUnsafe<void>();
-    this.#signInPrompt = signInPrompt;
     try {
       // A saved key's `authenticate` gets the same wait: a server that never answers it kept the row connecting.
       providerResult(
@@ -1356,15 +1325,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (this.options.authenticate?.(connection, initialization) ?? Effect.void).pipe(startTimeout),
         ),
       );
-      const discovery = yield* Effect.raceFirst(
-        Effect.result(this.#discoverModels(timeoutMs)),
-        Deferred.await(signInPrompt).pipe(Effect.as(null)),
-      );
-      if (!discovery) {
-        this.#signedIn = false;
-        return;
-      }
-      this.#models = providerResult(discovery);
+      this.#models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
       if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
         this.#signedIn = false;
         return;
@@ -1386,8 +1347,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       return yield* providerFailure(error);
-    } finally {
-      this.#signInPrompt = null;
     }
   });
 
@@ -1776,7 +1735,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               this.#signedIn = false;
               this.emit("exit", new Error(this.options.signInMessage));
             }
-            // The server asked for a browser sign-in while the session opened, and the stop ended it.
+            // The sign-in ended while the session opened.
             if (!this.#signedIn) return yield* providerFailure(new Error(this.options.signInMessage));
             return yield* transport ? yield* this.#explainSessionEnd(transport, error) : providerFailure(error);
           }
