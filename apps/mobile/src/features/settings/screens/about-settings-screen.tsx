@@ -13,7 +13,8 @@ import {
 } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-const PRODUCT_NAME = "OpenBot";
+// A temporary change for the test of an over-the-air update. This branch is never merged.
+const PRODUCT_NAME = "OpenBot (OTA test)";
 
 export function AboutSettingsScreen() {
   const { t } = useText();
