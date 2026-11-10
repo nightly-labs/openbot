@@ -8,6 +8,8 @@ export const messages = {
     "Geçmiş bağımsız değişkenleri yanlış: {detail} Bağımsız değişkenleri düzeltip yeniden dene. openbot.tool_describe şemayı verir.",
   "error.agent.toolRequestInvalid":
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Araç çalışmadı. tool_call içinde arguments metin değil, bir JSON nesnesi olmalı. Çağrıyı arguments bir nesne olacak şekilde yeniden gönderin.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",

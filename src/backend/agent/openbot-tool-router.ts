@@ -163,6 +163,7 @@ import {
   browserToolsPrimer,
   CODEX_DEFERRED_MCP_NOTE,
   DEFERRED_MCP_NOTE,
+  deferredCallArgumentsError,
   discoverTools,
   givesBrowserSchemas,
   namesInSearch,
@@ -509,7 +510,7 @@ export class OpenBotToolRouter {
             if (params.tool === "tool_call") {
               const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
-                client.respond(request.id, openBotToolFailure(invalid));
+                client.respond(request.id, openBotToolFailure(deferredCallArgumentsError(params) ?? invalid));
                 return;
               }
               params = resolved;
