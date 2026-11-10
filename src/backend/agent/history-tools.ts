@@ -186,7 +186,6 @@ export class HistoryTools {
       throw new Error(sourceText("error.agent.historyUnavailable"));
     const now = Date.now();
     const after = input.after === undefined ? null : windowBound(input.after, now);
-    if (input.after !== undefined && after === null) throw new Error(sourceText("error.agent.historyUnavailable"));
     const limit = input.limit ?? 8;
     const store = this.#options.store;
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
@@ -262,7 +261,6 @@ export class HistoryTools {
     if (input.query === undefined || input.taskId !== undefined || input.cursor !== undefined)
       throw new Error(sourceText("error.agent.historyUnavailable"));
     const after = input.after === undefined ? null : windowBound(input.after, Date.now());
-    if (input.after !== undefined && after === null) throw new Error(sourceText("error.agent.historyUnavailable"));
     const limit = input.limit ?? 5;
     const conversations = yield* toolStep(() => this.#conversations(agentId, after, SEARCH_ALL_THREADS));
     const ordered = [
@@ -345,7 +343,6 @@ export class HistoryTools {
     const searchQuery = search?.query;
     if (search && searchQuery === undefined) throw new Error(sourceText("error.agent.historyUnavailable"));
     const after = search?.after === undefined ? null : windowBound(search.after, Date.now());
-    if (search?.after !== undefined && after === null) throw new Error(sourceText("error.agent.historyUnavailable"));
     const store = this.#options.store;
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
     const query = search?.query;
