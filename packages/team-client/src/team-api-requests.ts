@@ -77,6 +77,11 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+  agentImportV2ChunkPath,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
+import {
   AGENT_MEMORIES_PAGE_ROUTE,
   AGENT_MEMORIES_PAGE_SIZE,
   AGENT_MEMORY_INCLUSION_ROUTE,
@@ -423,6 +428,42 @@ export const stageAgentImport = Effect.fn("TeamClient.stageAgentImport")(functio
       ...upload,
       maxBytes: AGENT_IMPORT_UPLOAD_BYTES,
     }),
+  );
+});
+
+function decodeUploadId(value: unknown): string {
+  if (!isDynamicRecord(value) || !isString(value.uploadId)) throw new Error("The host returned an invalid upload.");
+  return value.uploadId;
+}
+
+/** An export that is read one part at a time. */
+export interface AgentExportParts {
+  name: string;
+  size: number;
+  /** Up to `length` bytes from `offset`, as Base64. */
+  readPart: (offset: number, length: number) => Promise<string>;
+}
+
+/**
+ * Sends a Grok Bot export of any size to the host in parts, and answers its preview. Send it only to
+ * a host that serves `agent-import-v2`; `apply` and `discard` stay the v1 calls.
+ */
+export const stageAgentImportInParts = Effect.fn("TeamClient.stageAgentImportInParts")(function* (
+  request: TeamApiRequest,
+  file: AgentExportParts,
+): Effect.fn.Return<AgentImportPreview, TeamRequestError> {
+  const uploadId = yield* teamCall(() =>
+    request("POST", AGENT_IMPORT_V2_ROUTES.open, decodeUploadId, { size: file.size }),
+  );
+  for (let offset = 0; offset < file.size; ) {
+    const length = Math.min(AGENT_IMPORT_V2_CHUNK_BYTES, file.size - offset);
+    const base64 = yield* teamCall(() => file.readPart(offset, length));
+    const upload = { name: file.name, mimeType: "application/zip", base64, maxBytes: AGENT_IMPORT_V2_CHUNK_BYTES };
+    yield* teamCall(() => request("POST", agentImportV2ChunkPath(uploadId, offset), ignoreResponse, undefined, upload));
+    offset += length;
+  }
+  return yield* teamCall(() =>
+    request("POST", AGENT_IMPORT_V2_ROUTES.stage, decodeRemoteAgentImportPreview, { uploadId }),
   );
 });
 

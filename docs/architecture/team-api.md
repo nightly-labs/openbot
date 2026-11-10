@@ -367,6 +367,12 @@ conversation or compacts it; only owners and admins delete its history (else 403
 `channelsUnsupported`. Work that still runs or waits, an archived channel, or a compaction that no
 member session can do, gets 409 with the host's sentence.
 
+The optional `agent-import-v2` capability (protocol 9 only) sends a Grok Bot export of any size in
+parts: `/v1/agent-import/v2/open`, `/v1/agent-import/v2/chunk` (raw body, with `upload` and `offset`
+in the query) and `/v1/agent-import/v2/stage`. A host that advertises it also serves
+`agent-import-v1`, whose `apply` and `discard` routes take the staged token. See
+[Agent import from a joined server](servers.md#agent-import-from-a-joined-server).
+
 The optional `agent-welcome-v1` capability (protocol 9 only) changes no route shape. A client that
 sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The
 host stores that message with `welcome: true` in its mailbox JSON and the item type `agent_welcome`.

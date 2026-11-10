@@ -65,6 +65,7 @@ import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
@@ -2490,7 +2491,8 @@ export class TeamApiServer {
           if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
-          if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
+          if (capability === AGENT_IMPORT_CAPABILITY || capability === AGENT_IMPORT_V2_CAPABILITY)
+            return this.#options.agentImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === INSTANCE_TRANSFER_CHUNKS_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;

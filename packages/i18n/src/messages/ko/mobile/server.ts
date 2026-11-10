@@ -1339,7 +1339,7 @@ export const messages = {
   "mobile.server.import.reading": "내보낸 파일 읽는 중…",
   "mobile.server.import.sending": "내보낸 파일 보내는 중… {percent}%",
   "mobile.server.import.chooseNote":
-    "먼저 파일을 이 휴대폰에 저장하세요(예: 파일 앱). 100MB 미만이어야 해요. 변경하기 전에 에이전트를 먼저 확인할 수 있어요.",
+    "먼저 파일을 이 휴대폰에 저장하세요(예: 파일 앱). 변경하기 전에 에이전트를 먼저 확인할 수 있어요.",
   "mobile.server.import.readFailed": "내보낸 파일을 읽을 수 없었어요.",
   "mobile.server.import.reviewTitle": "{source} 내보내기",
   "mobile.server.import.exported": "{date}에 내보냄",

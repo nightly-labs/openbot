@@ -1412,7 +1412,7 @@ export const messages = {
   "mobile.server.import.reading": "Leyendo la exportación…",
   "mobile.server.import.sending": "Enviando la exportación… {percent} %",
   "mobile.server.import.chooseNote":
-    "Primero pon el archivo en este teléfono, por ejemplo en Archivos. Debe ocupar menos de 100 MB. Verás sus agentes antes de que cambie nada.",
+    "Primero pon el archivo en este teléfono, por ejemplo en Archivos. Verás sus agentes antes de que cambie nada.",
   "mobile.server.import.readFailed": "No se pudo leer la exportación.",
   "mobile.server.import.reviewTitle": "Exportación de {source}",
   "mobile.server.import.exported": "Exportado el {date}",

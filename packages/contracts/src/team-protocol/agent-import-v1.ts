@@ -38,7 +38,8 @@ const name = string(80);
 const messages = list(string(500), 200);
 const skipped = list(fields({ key, name, reason: string(500) }), 200);
 
-const preview = fields({
+/** The preview `stage` answers. `agent-import-v2` answers the same one. */
+export const AGENT_IMPORT_PREVIEW = fields({
   token: identifier,
   sourceApp: string(64),
   exportedAt: nullable(string(64)),
@@ -82,7 +83,7 @@ const result = fields({
 
 export const AGENT_IMPORT_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   // The request body is the raw `.zip`, so its decoder never reads it.
-  [AGENT_IMPORT_ROUTES.stage, adminRoute(empty, preview)],
+  [AGENT_IMPORT_ROUTES.stage, adminRoute(empty, AGENT_IMPORT_PREVIEW)],
   [
     AGENT_IMPORT_ROUTES.apply,
     adminRoute(

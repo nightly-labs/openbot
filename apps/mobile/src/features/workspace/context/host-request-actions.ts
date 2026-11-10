@@ -57,7 +57,8 @@ import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
-import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_IMPORT_CAPABILITY, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v2";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import {
   AGENT_INSTRUCTIONS_CAPABILITY,
@@ -150,6 +151,7 @@ import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/wor
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -284,6 +286,7 @@ import {
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
   stageAgentImport,
+  stageAgentImportInParts,
   stageInstanceTransfer,
   startAgentTask,
   startLiveVoice,
@@ -431,6 +434,7 @@ type HostRequestActions = Pick<
   | "saveVaultItem"
   | "deleteVaultItem"
   | "importVaultCsv"
+  | "checkAgentExport"
   | "stageAgentImport"
   | "applyAgentImport"
   | "discardAgentImport"
@@ -783,8 +787,26 @@ export function createHostRequestActions({
     deleteVaultItem: async (id, serverId) =>
       runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, has(serverId, VAULT_V2_CAPABILITY))),
     importVaultCsv: async (csv, serverId) => runTeamRequest(importHostVaultCsv(vaultImportAdmin(serverId), csv)),
-    stageAgentImport: async (upload, serverId, onProgress) =>
-      runTeamRequest(stageAgentImport(agentImportApi(serverId, onProgress), upload)),
+    checkAgentExport: (size, serverId) => {
+      if (!has(serverId, AGENT_IMPORT_V2_CAPABILITY) && size > AGENT_IMPORT_UPLOAD_BYTES)
+        throw new Error(sourceText("error.import.remoteZipTooLargeOldHost"));
+    },
+    stageAgentImport: async (file, serverId, onProgress) => {
+      if (has(serverId, AGENT_IMPORT_V2_CAPABILITY)) {
+        // The progress of each part's upload, as a fraction of the whole export.
+        let part = { offset: 0, length: 0 };
+        const request = agentImportApi(serverId, (fraction) =>
+          onProgress?.((part.offset + fraction * part.length) / file.size),
+        );
+        const readPart = (offset: number, length: number) => {
+          part = { offset, length };
+          return file.readPart(offset, length);
+        };
+        return runTeamRequest(stageAgentImportInParts(request, { name: file.name, size: file.size, readPart }));
+      }
+      const upload = { name: file.name, mimeType: "application/zip", base64: await file.readAll() };
+      return runTeamRequest(stageAgentImport(agentImportApi(serverId, onProgress), upload));
+    },
     applyAgentImport: async (input, serverId) =>
       runTeamRequest(applyAgentImport(agentImportApi(serverId), input, phoneTimezone())),
     discardAgentImport: async (token, serverId) => runTeamRequest(discardAgentImport(agentImportApi(serverId), token)),

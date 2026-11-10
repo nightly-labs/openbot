@@ -40,6 +40,10 @@ export const messages = {
   "error.import.empty": "הייצוא ריק.",
   "error.import.remoteZipTooLarge": "כדי לייבא לשרת שהצטרפת אליו, הייצוא חייב להיות קובץ .zip קטן מ-100 MB.",
   "error.import.hostBusy": "השרת קורא ייצואים אחרים. יש לנסות שוב בעוד כמה דקות.",
+  "error.import.uploadDiskSpace":
+    "הייצוא צריך {size} GB של מקום פנוי בדיסק של השרת, ויש {free} GB פנויים. יש לפנות מקום בשרת, ואז לבחור שוב את הייצוא.",
+  "error.import.remoteZipTooLargeOldHost":
+    "השרת הזה מקבל ייצוא של עד 100 MB. יש לעדכן את OpenBot בשרת כדי לייבא ייצוא גדול יותר.",
   "error.import.skillKept": '{name}: בשרת כבר יש את המיומנות "{skill}", ולכן הסוכן משתמש בה. יש לבקש ממנהל לעדכן אותה.',
   "error.import.skillRenamed":
     '{name}: השם של המיומנות "{skill}" דומה מדי לשם של מיומנות אחרת, ולכן היא נשמרת בשם "{renamed}".',

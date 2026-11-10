@@ -4,6 +4,7 @@ import {
   applyAgentImport,
   discardAgentImport,
   stageAgentImport,
+  stageAgentImportInParts,
   type TeamApiRequest,
 } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
@@ -13,7 +14,7 @@ import { openWebLink } from "./web-attachments";
 import { chooseFiles } from "./web-channels-runtime";
 
 /** The file's bytes as Base64, read by the browser rather than byte by byte. */
-function readBase64(file: File): Promise<string> {
+function readBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => {
@@ -28,11 +29,14 @@ function readBase64(file: File): Promise<string> {
 }
 
 /**
- * Server settings > Import in the browser client: the export goes to the connected host with
- * `agent-import-v1`. The export skill ships with the web client, and saving it downloads it.
+ * Server settings > Import in the browser client: the export goes to the connected host in parts
+ * with `agent-import-v2`, or with `agent-import-v1`. The export skill ships with the web client,
+ * and saving it downloads it.
  */
 export function createWebAgentImportCalls(options: {
   request: (serverId: string) => TeamApiRequest;
+  /** The host accepts an export of any size with `agent-import-v2`. */
+  sendsParts: () => boolean;
   listAgents: () => Promise<ClientAgentSummary[]>;
   saveFile: (file: { name: string; base64: string }) => void;
 }): AgentImportCalls {
@@ -43,7 +47,16 @@ export function createWebAgentImportCalls(options: {
       const [file] = await chooseFiles({ multiple: false, accept: ".zip,application/zip" });
       if (!file) return null;
       if (file.size === 0) throw new Error(currentText().t("error.import.chooseZip"));
-      if (file.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(currentText().t("error.import.remoteZipTooLarge"));
+      if (options.sendsParts())
+        return Effect.runPromise(
+          stageAgentImportInParts(request, {
+            name: file.name,
+            size: file.size,
+            readPart: (offset, length) => readBase64(file.slice(offset, offset + length)),
+          }).pipe(Effect.mapError((error) => error.cause)),
+        );
+      if (file.size > AGENT_IMPORT_UPLOAD_BYTES)
+        throw new Error(currentText().t("error.import.remoteZipTooLargeOldHost"));
       return Effect.runPromise(
         stageAgentImport(request, {
           name: file.name,
