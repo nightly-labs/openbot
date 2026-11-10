@@ -1747,7 +1747,7 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
           }),
         );
     const location = REDIRECT_STATUSES.has(response.status) ? response.headers.get("location") : null;
-    if (location === null) return response;
+    if (location === null) return unlimited ? response : yield* missingUnlessJson(response, url, request.method);
     // Redirect response bodies are not consumed by the SDK.
     yield* mcpCall(() => response.body?.cancel()).pipe(Effect.catch(() => Effect.void));
     if (hop >= MAX_OAUTH_REDIRECTS)
@@ -1800,6 +1800,22 @@ function limited(response: Response, origin: string): Effect.Effect<Response, Mc
     }),
   );
 }
+
+/**
+ * A 200 answer to a metadata request with a body that is not JSON, as a 404.
+ *
+ * A web host often answers every path with its own page, `/.well-known/…` too. RFC 8414 and RFC 9728
+ * allow only a JSON object as a successful answer, but the SDK reads any 200 as JSON, so the page
+ * stopped the discovery with a parser error before the next address was tried (#6204). The SDK
+ * skips a 404. `limited` has already read the body, so the copy is cheap.
+ */
+const missingUnlessJson = Effect.fnUntraced(function* (response: Response, url: URL, method: string | undefined) {
+  if (response.status !== 200 || (method ?? "GET").toUpperCase() !== "GET" || !url.pathname.includes("/.well-known/"))
+    return response;
+  const body = yield* mcpCall(() => response.clone().text());
+  if (Result.isSuccess(Result.try(() => JSON.parse(body)))) return response;
+  return new Response(null, { status: 404, statusText: "Not Found" });
+});
 
 /** The statuses whose response cannot have a body. */
 const NULL_BODY_STATUSES = new Set([204, 205, 304]);

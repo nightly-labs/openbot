@@ -226,6 +226,10 @@ function describeProbeFailure(
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
+  // The SDK reads each sign-in answer as JSON. A web page in place of one ended in the parser's own
+  // words, such as "Unexpected token '<'" (#6204).
+  if (signIn && causeChain(error).some((cause) => cause instanceof SyntaxError))
+    return sourceText("error.backend.mcpSignInAnswerUnreadable");
   if (signIn && httpStatus(error) === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
   if (challenge?.status === 401 && challenge.bearer && !hasCredentialHeader(config)) {

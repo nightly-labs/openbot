@@ -251,6 +251,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot はこのサーバーのサインイン情報を読み取れませんでした。サーバーアドレスを確認して再試行してください。",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "サインインサーバーから OpenBot が読み取れない応答が返されました。サービスから API キーまたはトークンが提供されている場合は、このサーバーの設定に追加してから、もう一度接続をテストしてください。",
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
