@@ -727,9 +727,9 @@ export class OpenBotToolRouter {
               return;
             }
             const tool = toolRequest.params.tool;
-            // The calling agent can correct a profile request, an attachment path or a refused channel call, so
-            // it gets the reason as a failed tool result. Codex replaces a JSON-RPC error with "dynamic tool
-            // request failed" (#1728, #6011).
+            // The calling agent can correct a profile request, an attachment path, a refused channel call or a
+            // refused teammate message, so it gets the reason as a failed tool result. Codex replaces a JSON-RPC
+            // error with "dynamic tool request failed" (#1728, #6011, #6373).
             const correctableFailure = (error: unknown) =>
               Effect.sync(() => {
                 const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
@@ -742,6 +742,7 @@ export class OpenBotToolRouter {
               tool.startsWith("channel_") ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
+              tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
               tool === "create_server_install_command";
