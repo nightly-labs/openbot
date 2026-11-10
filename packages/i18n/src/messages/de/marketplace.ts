@@ -392,6 +392,15 @@ export const messages = {
     "Wie viele Kontakte sind im VIP-Segment, und wie hat es sich diesen Monat verändert?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Entwirf eine Kampagne für die neue Kollektion, aber sende sie nicht.",
+  "marketplace.plugin.postiz.tagline": "Social-Media-Planung",
+  "marketplace.plugin.postiz.description":
+    "Mit Postiz können Agenten deine Social-Media-Kanäle auflisten und Beiträge auf über 30 Netzwerken wie X, LinkedIn, Instagram und TikTok entwerfen, planen und veröffentlichen. Agenten können auch Medien hochladen und KI-Bilder und -Videos erstellen. Melde dich im Browser bei deinem Postiz-Konto an oder füge den API-Schlüssel aus Settings › Developers in Postiz ein. Alle Postiz-Cloud-Tarife enthalten API-Zugriff. Agenten können einen Beitrag sofort veröffentlichen, also prüfe jeden Beitrag, bevor du ihn genehmigst.",
+  "marketplace.plugin.postiz.app":
+    "Kanäle, Entwürfe, geplante Beiträge und Medien über den MCP-Server von Postiz mit Anmeldung im Browser oder einem API-Schlüssel.",
+  "marketplace.plugin.postiz.prompt.channels": "Welche Social-Media-Kanäle sind mit Postiz verbunden?",
+  "marketplace.plugin.postiz.prompt.week": "Welche Beiträge sind für nächste Woche geplant?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Entwirf einen LinkedIn-Beitrag zu unserem neuen Release, aber plane ihn nicht ein.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub und über 1.000 weitere Apps",
   "marketplace.plugin.composio.description":
     "Composio verbindet deine Agenten über einen MCP-Server mit Gmail, Slack, GitHub und über 1.000 weiteren Apps. Melde dich mit deinem Composio-Konto an. Wenn ein Agent eine App braucht, bittet er dich, diese App zu verbinden.",
