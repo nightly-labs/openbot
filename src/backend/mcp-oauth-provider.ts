@@ -1715,6 +1715,7 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
   mcpServer: URL | null,
 ): Effect.fn.Return<Response, McpOperationError> {
   let url = yield* mcpSync(() => new URL(input instanceof URL ? input.toString() : input));
+  const requested = url;
   const mcpTraffic = mcpServer !== null && withoutHash(url) === withoutHash(mcpServer);
   let request: RequestInit = { ...init, ...(signal ? { signal } : {}), redirect: "manual" };
   for (let hop = 0; ; hop++) {
@@ -1747,7 +1748,7 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
           }),
         );
     const location = REDIRECT_STATUSES.has(response.status) ? response.headers.get("location") : null;
-    if (location === null) return response;
+    if (location === null) return mcpTraffic ? response : yield* readableAnswer(response, requested, request.method);
     // Redirect response bodies are not consumed by the SDK.
     yield* mcpCall(() => response.body?.cancel()).pipe(Effect.catch(() => Effect.void));
     if (hop >= MAX_OAUTH_REDIRECTS)
@@ -1798,6 +1799,39 @@ function limited(response: Response, origin: string): Effect.Effect<Response, Mc
         headers,
       });
     }),
+  );
+}
+
+/**
+ * An OAuth answer that a web page took the place of.
+ *
+ * A web host often answers every path with its own page, `/.well-known/…` too, also after a redirect
+ * to its home or login page. RFC 8414 and RFC 9728 allow only a JSON object as a successful metadata
+ * answer, but the SDK reads any 2xx as JSON, so the page stopped the discovery with a parser error
+ * before the next address was tried (#6204). Such an answer to a metadata request becomes the 404
+ * that the SDK skips. A page from another endpoint, such as the registration or the token endpoint,
+ * fails with words the user can act on. An empty answer, such as a revocation's, is not changed.
+ * `limited` has already read the body, so the copy is cheap.
+ */
+const readableAnswer = Effect.fnUntraced(function* (response: Response, requested: URL, method: string | undefined) {
+  if (!response.ok) return response;
+  const metadata = (method ?? "GET").toUpperCase() === "GET" && requested.pathname.includes("/.well-known/");
+  const page = (response.headers.get("content-type") ?? "").includes("text/html");
+  if (!metadata && !page) return response;
+  const body = yield* mcpCall(() => response.clone().text());
+  if (isJsonObject(body)) return response;
+  if (metadata) return new Response(null, { status: 404, statusText: "Not Found" });
+  if (body.trim() === "") return response;
+  return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInAnswerUnreadable")));
+});
+
+function isJsonObject(body: string): boolean {
+  const parsed = Result.try((): unknown => JSON.parse(body));
+  return (
+    Result.isSuccess(parsed) &&
+    typeof parsed.success === "object" &&
+    parsed.success !== null &&
+    !Array.isArray(parsed.success)
   );
 }
 

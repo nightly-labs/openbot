@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "ההיסטוריה אינה זמינה לבקשה הזו. יש לקרוא שוב את ההיסטוריה האחרונה, או להשתמש ב-channel_history לעבודה בערוץ.",
+  "error.agent.historyArgumentsInvalid":
+    "ארגומנטים שגויים להיסטוריה: {detail} תקן את הארגומנטים ונסה שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.toolRequestInvalid": "ארגומנטים לא תקינים לגילוי כלים. יש להשתמש בסכימה המוצהרת ובשם כלי מקורי מלא.",
   "error.agent.approvalWhileDeleting": "אי אפשר לתת אישור בזמן שהסוכן נמחק.",
   "error.agent.accessLocalOnly": "אפשר לשנות גישה של סוכן רק במחשב שמריץ את הסוכן.",

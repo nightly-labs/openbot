@@ -2592,6 +2592,21 @@ export async function createApplicationServices({
     account: centralAuth,
     ingress: signalIngress,
     hostId: () => teamStore.getIdentity()?.serverId ?? null,
+    // A route needs this computer registered for the account, also when it is not published (#6029).
+    // The sync runs only while signed in, after `host` below exists.
+    ensureHost: () => {
+      const hostId = teamStore.getIdentity()?.serverId;
+      if (hostId && centralAuth.hostSiteCredential(hostId)) return Effect.void;
+      return host
+        .register()
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("This host could not be registered for webhooks.", toLogValue(failure.cause)),
+            ),
+          ),
+        );
+    },
   });
   // Analytics starts later in this function. A request before then is not reported.
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;

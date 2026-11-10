@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "이 요청에서는 기록을 사용할 수 없어요. 최근 기록을 다시 읽거나, 채널 작업에는 channel_history를 사용하세요.",
+  "error.agent.historyArgumentsInvalid":
+    "기록 인수가 올바르지 않습니다: {detail} 인수를 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
   "error.agent.toolRequestInvalid":
     "도구 검색 인수가 올바르지 않아요. 선언된 스키마와 원래의 정규화된 도구 이름을 사용하세요.",
   "error.agent.approvalWhileDeleting": "에이전트를 삭제하는 중에는 승인할 수 없어요.",

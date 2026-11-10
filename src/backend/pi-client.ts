@@ -590,16 +590,18 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     return extension;
   });
 
-  #spawn(rpc: PiRpc, cwd: string, args: string[], environment: Record<string, string>): void {
+  /** The environment of the Pi process, before its extensions add theirs. */
+  #environment(): Record<string, string> {
     const extra = this.options.extraEnv?.() ?? {};
     for (const value of Object.values(extra)) this.#secrets.add(value);
+    const environment: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) if (value !== undefined) environment[key] = value;
+    return { ...environment, ...cliPathEnvironment(this.cli), ...extra };
+  }
+
+  #spawn(rpc: PiRpc, cwd: string, args: string[], environment: Record<string, string>): void {
     const target = cliSpawnTarget(this.cli.executable, ["--mode", "rpc", ...args]);
-    rpc.start(this.options.confine?.(target) ?? target, cwd, {
-      ...process.env,
-      ...cliPathEnvironment(this.cli),
-      ...extra,
-      ...environment,
-    });
+    rpc.start(this.options.confine?.(target) ?? target, cwd, { ...this.#environment(), ...environment });
   }
 
   readonly #open = Effect.fn("PiAgentClient.openThread")(function* (
@@ -652,7 +654,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         ).pipe(toProviderClientOperationError),
       );
       this.options.reportMcpDrops?.(this.provider, handoff.dropped);
-      extension = yield* createPiMcpExtension(handoff.servers, mcp, this.options.providerStateDirectory);
+      // In the Workspace only sandbox, the stdio servers start in OpenBot, with the environment that Pi
+      // would give them (#6191). A profile generation runs Pi with no MCP servers.
+      const relay =
+        this.options.confine && !this.options.profileGeneration ? { environment: this.#environment(), cwd } : undefined;
+      extension = yield* createPiMcpExtension(handoff.servers, mcp, this.options.providerStateDirectory, relay);
       for (const secret of extension.secrets) this.#secrets.add(secret);
       keyExtension = yield* this.#keyExtension();
       rpc.on("diagnostic", (text) => this.emit("diagnostic", text, { duringStop: thread?.closed ?? false }));

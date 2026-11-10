@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "السجل غير متاح لهذا الطلب. اقرأ السجل الحديث مرة أخرى، أو استخدم channel_history لعمل القنوات.",
+  "error.agent.historyArgumentsInvalid":
+    "وسائط السجل غير صحيحة: {detail} صحّح الوسائط وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
   "error.agent.toolRequestInvalid": "وسائط اكتشاف الأدوات غير صالحة. استخدم المخطط المُعلَن واسم الأداة المؤهَّل الأصلي.",
   "error.agent.approvalWhileDeleting": "لا يمكن منح الموافقة أثناء حذف الوكيل.",
   "error.agent.accessLocalOnly": "لا يمكن تغيير وصول الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",

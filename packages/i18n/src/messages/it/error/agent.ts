@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "La cronologia non è disponibile per questa richiesta. Rileggi la cronologia recente o usa channel_history per il lavoro nei canali.",
+  "error.agent.historyArgumentsInvalid":
+    "Argomenti della cronologia non corretti: {detail} Correggi gli argomenti e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.toolRequestInvalid":
     "Argomenti di ricerca del tool non validi. Usa lo schema dichiarato e un nome di tool qualificato originale.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",

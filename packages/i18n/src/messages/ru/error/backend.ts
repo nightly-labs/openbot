@@ -242,6 +242,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "Ответ на вход не пришёл вовремя.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot не удалось прочитать сведения о входе для этого сервера. Проверьте адрес сервера и повторите попытку.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Сервер входа прислал ответ, который OpenBot не может прочитать. Если сервис выдаёт API-ключ или токен, добавьте его в настройки этого сервера и снова проверьте подключение.",
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
