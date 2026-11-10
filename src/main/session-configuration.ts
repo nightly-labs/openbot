@@ -82,14 +82,18 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
       if (!attachment) return new Response("Not found", { status: 404 });
       return await runCauseEffect(
-        fileResponse(attachment.path, {
-          "Content-Type": attachment.mimeType,
-          "Cache-Control": "no-store",
-          ...attachmentCorsHeaders(request.headers.get("Origin")),
-          ...attachmentDocumentHeaders(attachment.mimeType),
-          "X-Content-Type-Options": "nosniff",
-          "Content-Disposition": "inline",
-        }),
+        fileResponse(
+          attachment.path,
+          {
+            "Content-Type": attachment.mimeType,
+            "Cache-Control": "no-store",
+            ...attachmentCorsHeaders(request.headers.get("Origin")),
+            ...attachmentDocumentHeaders(attachment.mimeType),
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": "inline",
+          },
+          request.headers.get("Range"),
+        ),
       );
     } catch {
       return new Response("Not found", { status: 404 });
